@@ -12,35 +12,53 @@ Parse the PRD at `.tasks/docs/prd.txt` and generate a complete project structure
 
 ---
 
-## Task JSON Output Format
+## STEP 1: Service Discovery (DO THIS FIRST)
 
-When generating tasks.json, you MUST populate ALL fields with detailed content:
+**Before generating any tasks**, analyze the PRD to identify all services and their tech stacks.
 
-```json
-{
-  "tasks": [
-    {
-      "id": "task-001",
-      "title": "Provision Infrastructure with Kubernetes Operators",
-      "description": "Deploy PostgreSQL (CloudNative-PG), Redis, Kafka (Strimzi) clusters",
-      "priority": "critical",
-      "status": "pending",
-      "dependencies": [],
-      "agentHint": "bolt",
-      "details": "MUST contain: specific components to deploy, configuration values, resource sizing, namespace requirements, connection string formats expected by other services",
-      "testStrategy": "MUST contain: specific verification commands, expected outputs, health check endpoints, how to validate connectivity from application pods"
-    }
-  ]
-}
+Create a **Service-to-Agent Mapping Table**:
+
+```markdown
+## Services Identified in PRD
+
+| Service Name | Agent | Tech Stack | Description |
+|--------------|-------|------------|-------------|
+| Notification Router | rex | Rust/Axum | High-performance notification API |
+| Integration Service | nova | Bun/Elysia/Effect | Channel delivery service |
+| Admin API | grizz | Go/gRPC | Tenant and user management |
+| Web Console | blaze | Next.js/React/shadcn | Admin dashboard |
+| Mobile App | tap | Expo/React Native | Mobile client |
+| Desktop Client | spark | Electron | Desktop notifications |
 ```
 
-### Field Requirements (MANDATORY)
+**Every task you generate MUST belong to one of these services**, and the agent assignment follows from the service's tech stack.
 
-| Field | Content Required | Bad Example | Good Example |
-|-------|-----------------|-------------|--------------|
-| `details` | Implementation specifics from PRD | `""` (empty) | "Deploy PostgreSQL using CloudNative-PG with 2 replicas, 20Gi storage. Configure connection pooler. Create alerthub-db-secret with POSTGRES_URL format: postgresql://user:pass@alerthub-db-rw:5432/alerthub" |
-| `testStrategy` | Specific test commands and criteria | `""` (empty) | "Verify: kubectl get cluster alerthub-db shows READY. psql -h alerthub-db-rw -c 'SELECT 1' succeeds. Redis PING returns PONG. Kafka topic creation succeeds." |
-| `agentHint` | Correct agent for task type | `"rex"` for infra | `"bolt"` for infrastructure |
+---
+
+## Agent Categories - CRITICAL DISTINCTION
+
+### Implementation Agents (write code - use for ALL implementation tasks)
+
+| Agent | Language/Stack | Use For |
+|-------|---------------|---------|
+| **bolt** | Kubernetes/Helm | Infrastructure provisioning (Task 1 ONLY) |
+| **rex** | Rust/Axum/Tokio | Rust backend services |
+| **grizz** | Go/gRPC/Chi | Go backend services |
+| **nova** | Bun/Elysia/Effect/Drizzle | TypeScript backend services |
+| **blaze** | Next.js/React/shadcn | Web frontends |
+| **tap** | Expo/React Native | Mobile apps |
+| **spark** | Electron | Desktop apps |
+
+### Support Agents (review only - run AFTER implementation)
+
+| Agent | Role | Use ONLY For |
+|-------|------|--------------|
+| **cleo** | Quality Review | Code review AFTER implementation PR is created |
+| **cipher** | Security Audit | Security audit AFTER implementation PR is created |
+| **tess** | Testing | Writing tests AFTER implementation PR is created |
+| **atlas** | Integration | Merging PRs AFTER all reviews pass |
+
+**CRITICAL RULE**: `cipher`, `cleo`, `tess`, and `atlas` are NEVER assigned to implementation tasks. If a task involves writing code (auth, API endpoints, UI components, etc.), it MUST use an implementation agent (bolt/rex/grizz/nova/blaze/tap/spark).
 
 ---
 
@@ -54,7 +72,7 @@ When generating tasks.json, you MUST populate ALL fields with detailed content:
 
 ```json
 {
-  "id": "task-001",
+  "id": "1",
   "title": "Provision Application Infrastructure",
   "description": "Deploy all infrastructure: PostgreSQL (CloudNative-PG), Redis, Kafka (Strimzi), MongoDB (Percona), SeaweedFS S3",
   "priority": "critical",
@@ -67,62 +85,113 @@ When generating tasks.json, you MUST populate ALL fields with detailed content:
 
 ---
 
-## Agent Routing (agentHint) - CRITICAL
+## Agent Assignment Rules (STRICT)
 
-**EVERY task MUST have a valid `agentHint` set.** Do NOT leave it empty or default everything to "rex".
+### Rule 1: Service Context Determines Agent
 
-| Agent | `agentHint` Value | Keywords to Match | Examples |
-|-------|-------------------|-------------------|----------|
-| **Bolt** | `"bolt"` | infrastructure, deploy, kubernetes, k8s, database, postgresql, redis, kafka, storage, provision, operator, cluster, helm | "Provision PostgreSQL", "Deploy Kafka cluster", "Setup Redis cache" |
-| **Rex** | `"rex"` | rust, axum, tokio, cargo, backend (when rust specified), sqlx | "Implement Rust API", "Build axum service", "Create tokio worker" |
-| **Grizz** | `"grizz"` | go, golang, grpc, chi, protobuf, go-based | "Go microservice", "gRPC API", "Chi router" |
-| **Nova** | `"nova"` | node, nodejs, bun, elysia, effect, drizzle, typescript backend, express, nestjs, hono | "Bun API", "Elysia service", "Node.js worker", "TypeScript API" |
-| **Blaze** | `"blaze"` | react, nextjs, next.js, frontend, web ui, dashboard, admin panel, web app, shadcn, tailwind, component | "React dashboard", "Next.js app", "Admin UI", "Web frontend" |
-| **Tap** | `"tap"` | expo, react native, mobile, ios, android, mobile app | "Mobile app", "Expo app", "React Native screen" |
-| **Spark** | `"spark"` | electron, desktop, desktop app, tauri | "Desktop app", "Electron client" |
-| **Tess** | `"tess"` | test suite, testing, e2e test, qa, coverage | "Write test suite", "E2E testing" |
-| **Cipher** | `"cipher"` | security audit, vulnerability, auth review | "Security audit", "Penetration test" |
-| **Atlas** | `"atlas"` | merge, integrate all, combine PRs | "Final integration" |
+When assigning an agent, ask: **"Which service does this task belong to?"**
 
-### Agent Assignment Rules
+- Tasks for "Notification Router" (Rust) → `rex`
+- Tasks for "Integration Service" (Nova) → `nova`
+- Tasks for "Admin API" (Go) → `grizz`
+- Tasks for "Web Console" (React) → `blaze`
+- Tasks for "Mobile App" (Expo) → `tap`
+- Tasks for "Desktop Client" (Electron) → `spark`
 
-1. **Task 1 = ALWAYS Bolt** - Infrastructure must be provisioned first
-2. **Backend API without language specified → Ask PRD or default to Nova** (TypeScript is most common)
-3. **"Dashboard", "Admin Panel", "Web App" → Blaze** (these are frontend even if they have "admin" in name)
-4. **"API" alone is NOT enough** - look for language hints (Rust → Rex, Go → Grizz, Node/Bun → Nova)
-5. **When PRD specifies stack** - e.g., "(Nova - Bun/Elysia)" in title → use that agent
+### Rule 2: Dependencies Imply Same Service
 
-### Common Mistakes to Avoid
+If Task N depends on Tasks assigned to a specific agent, Task N likely belongs to the same service:
 
-| Wrong | Right | Reason |
-|-------|-------|--------|
-| `"agentHint": "rex"` for "Admin Dashboard" | `"agentHint": "blaze"` | Dashboard = frontend |
-| `"agentHint": "rex"` for "Setup PostgreSQL" | `"agentHint": "bolt"` | Database setup = infrastructure |
-| `"agentHint": "rex"` for "Bun API Service" | `"agentHint": "nova"` | Bun = Node.js ecosystem |
-| `"agentHint": "rex"` for "gRPC Gateway" | `"agentHint": "grizz"` | gRPC typically = Go |
-| `"agentHint": null` | Always set a value | Never leave empty |
+```
+Task 14: "Integration Service - Project Scaffolding" → nova
+Task 15: "Integration Service - Effect Schema Definitions" → nova (depends on 14)
+Task 16: "Integration Service - MongoDB Integration" → nova (depends on 15)
+Task 17: "Integration Service - CRUD Endpoints" → nova (depends on 16)
+```
+
+### Rule 3: Support Agents Are NEVER Implementation
+
+**WRONG assignments to fix:**
+
+| Task Title | WRONG Agent | CORRECT Agent | Why |
+|------------|-------------|---------------|-----|
+| "JWT Authentication" | cipher | grizz/rex/nova | Implementation code, not audit |
+| "OAuth2 Token Management" | cipher | nova | Implementation code, not audit |
+| "RBAC Middleware" | cipher | grizz/rex/nova | Implementation code, not audit |
+| "Authentication Flow" | cipher | blaze | Frontend implementation |
+| "Rate Limiting Service" | tap | rex | Backend service, not mobile |
+| "Analytics Service" | blaze | grizz | Go/gRPC service, not frontend |
+
+### Rule 4: Keywords Are Hints, Service Context Is Truth
+
+Do NOT rely solely on keywords. Consider the service context:
+
+- "Slack Delivery Service" in **Integration Service (Nova)** → `nova` (not tap)
+- "Authentication" in **Admin API (Go)** → `grizz` (not cipher)
+- "WebSocket" in **Notification Router (Rust)** → `rex` (not nova)
+- "Dashboard" in **Web Console (React)** → `blaze`
 
 ---
 
-## Context Embedding Strategy
+## Code Signatures in Details Field
 
-For each task, embed relevant PRD sections in `details`:
+For each task, include **language-specific function/struct signatures** in the `details` field. This makes the agent assignment unambiguous.
 
-### Backend API Tasks (Rex/Grizz/Nova)
+### Rex (Rust) Task Example
 
 ```json
 {
-  "details": "From PRD Section: Notification Router Service\n\nEndpoints to implement:\n- POST /api/v1/notifications - Submit notification\n  - Request: { tenant_id, channel, priority, payload }\n  - Response: { id, status, created_at }\n  - Validation: tenant_id required, channel in [slack, discord, email, push]\n\n- GET /api/v1/notifications/:id - Get status\n  - Response: { id, status, events: [...] }\n\nData Model (from PRD):\n```rust\nstruct Notification {\n    id: Uuid,\n    tenant_id: Uuid,\n    channel: Channel,\n    priority: Priority,\n    payload: NotificationPayload,\n    status: NotificationStatus,\n}\n```\n\nDependencies: PostgreSQL (alerthub-db), Redis (alerthub-cache)\nConnection strings in ConfigMap: alerthub-infra-config",
-  "testStrategy": "1. POST /api/v1/notifications returns 201 with notification ID\n2. Invalid tenant_id returns 400\n3. GET /api/v1/notifications/:id returns notification with events\n4. cargo test --all passes\n5. cargo clippy -- -D warnings passes\n6. Integration test: create notification → verify in PostgreSQL → check Redis dedup key"
+  "agentHint": "rex",
+  "details": "From PRD: Notification Router Service\n\nCode Signatures:\n```rust\n#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct Notification {\n    pub id: Uuid,\n    pub tenant_id: Uuid,\n    pub channel: Channel,\n    pub priority: Priority,\n    pub payload: NotificationPayload,\n    pub status: NotificationStatus,\n}\n\npub async fn create_notification(\n    State(state): State<AppState>,\n    Json(req): Json<CreateNotificationRequest>,\n) -> Result<Json<NotificationResponse>, ApiError> {\n    todo!()\n}\n```\n\nEndpoints:\n- POST /api/v1/notifications\n- GET /api/v1/notifications/:id"
 }
 ```
 
-### Frontend Tasks (Blaze/Tap/Spark)
+### Nova (TypeScript/Effect) Task Example
 
 ```json
 {
-  "details": "From PRD Section: Web Dashboard\n\nPages to implement:\n1. /notifications - List view with filters\n   - Filter by: status, channel, date range\n   - Pagination: 20 per page\n   - Real-time updates via WebSocket\n\n2. /notifications/:id - Detail view\n   - Show: payload, delivery events timeline, retry button\n\nUI Components needed:\n- NotificationList (with virtual scrolling)\n- NotificationCard (status badge, channel icon)\n- FilterBar (dropdown + date picker)\n- DeliveryTimeline (event visualization)\n\nAPI Integration:\n- GET /api/v1/notifications?status=X&channel=Y&page=N\n- WS /api/v1/ws for real-time updates\n\nUse shadcn/ui components: Card, Badge, Select, DatePicker, ScrollArea",
-  "testStrategy": "1. npm run build succeeds without errors\n2. npm run lint passes\n3. /notifications renders list from API\n4. Filters update URL params and refresh data\n5. WebSocket connects and updates list in real-time\n6. playwright test: filter by status → verify correct items shown"
+  "agentHint": "nova",
+  "details": "From PRD: Integration Service\n\nCode Signatures:\n```typescript\nimport { Schema } from \"@effect/schema\"\nimport { Effect } from \"effect\"\n\nexport const Integration = Schema.Struct({\n  id: Schema.UUID,\n  name: Schema.String,\n  channel: Schema.Literal(\"slack\", \"discord\", \"email\", \"webhook\"),\n  config: Schema.Unknown,\n  enabled: Schema.Boolean,\n})\n\nexport interface SlackService {\n  sendMessage: (webhook: string, payload: SlackPayload) => Effect.Effect<void, SlackDeliveryError>\n}\n```"
+}
+```
+
+### Grizz (Go) Task Example
+
+```json
+{
+  "agentHint": "grizz",
+  "details": "From PRD: Admin API\n\nCode Signatures:\n```go\n// Proto definition\nservice TenantService {\n  rpc CreateTenant(CreateTenantRequest) returns (Tenant);\n  rpc GetTenant(GetTenantRequest) returns (Tenant);\n}\n\n// Go implementation\ntype TenantServiceServer struct {\n    pb.UnimplementedTenantServiceServer\n    db *pgxpool.Pool\n}\n\nfunc (s *TenantServiceServer) CreateTenant(ctx context.Context, req *pb.CreateTenantRequest) (*pb.Tenant, error) {\n    // TODO: implement\n}\n```"
+}
+```
+
+### Blaze (React) Task Example
+
+```json
+{
+  "agentHint": "blaze",
+  "details": "From PRD: Web Console\n\nCode Signatures:\n```tsx\ninterface NotificationListProps {\n  filters: NotificationFilters;\n  onFilterChange: (filters: NotificationFilters) => void;\n}\n\nexport function NotificationList({ filters, onFilterChange }: NotificationListProps): JSX.Element {\n  // TODO: implement with TanStack Query + virtual scrolling\n}\n\nexport function useNotifications(filters: NotificationFilters) {\n  return useQuery({\n    queryKey: ['notifications', filters],\n    queryFn: () => fetchNotifications(filters),\n  })\n}\n```\n\nUse shadcn/ui: Card, Badge, Select, DatePicker, ScrollArea"
+}
+```
+
+---
+
+## Task JSON Output Format
+
+```json
+{
+  "tasks": [
+    {
+      "id": "1",
+      "title": "Provision Infrastructure with Kubernetes Operators",
+      "description": "Deploy PostgreSQL (CloudNative-PG), Redis, Kafka (Strimzi) clusters",
+      "priority": "critical",
+      "status": "pending",
+      "dependencies": [],
+      "agentHint": "bolt",
+      "details": "MUST contain: specific components, configuration values, code signatures, connection strings",
+      "testStrategy": "MUST contain: specific verification commands, expected outputs, health checks"
+    }
+  ]
 }
 ```
 
@@ -137,43 +206,47 @@ For each task, embed relevant PRD sections in `details`:
 Generate the following files:
 
 ```
-.tasks/docs/
-├── prd.txt                    # Original PRD (already exists)
-├── tasks.json                 # All tasks with full details
-├── execution-levels.json      # Parallel execution order
-└── tasks/
-    ├── task-001/
-    │   ├── prompt.xml         # Structured agent prompt
-    │   ├── prompt.md          # Markdown prompt
-    │   └── acceptance.md      # Completion checklist
-    ├── task-002/
-    │   └── ...
+.tasks/
+├── tasks/
+│   └── tasks.json              # All tasks with full details
+└── docs/
+    ├── prd.txt                 # Original PRD (already exists)
+    ├── execution-levels.json   # Parallel execution order
+    └── task-N/
+        ├── prompt.xml          # Structured agent prompt with code signatures
+        ├── prompt.md           # Markdown prompt
+        └── acceptance.md       # Completion checklist
 ```
 
 ---
 
-## Quality Checklist
+## Quality Checklist (VERIFY EVERY ITEM)
 
-Before finalizing, verify EVERY item:
+Before finalizing:
 
+- [ ] **Service table created** - All services from PRD identified with tech stacks
 - [ ] **Task 1 is `agentHint: "bolt"`** - Infrastructure MUST be first
 - [ ] **Every task has `agentHint` set** - No null or empty values
-- [ ] **Agent hints match task type:**
-  - [ ] Frontend/Dashboard/UI tasks → `blaze`
-  - [ ] Infrastructure/Database/K8s tasks → `bolt`
+- [ ] **Implementation agents only for code tasks:**
   - [ ] Rust tasks → `rex`
   - [ ] Go/gRPC tasks → `grizz`
   - [ ] Node/Bun/TypeScript API tasks → `nova`
+  - [ ] Frontend/Dashboard/UI tasks → `blaze`
   - [ ] Mobile/Expo tasks → `tap`
   - [ ] Desktop/Electron tasks → `spark`
-- [ ] Every task has non-empty `details` with PRD context embedded
-- [ ] Every task has non-empty `testStrategy` with specific verification commands
-- [ ] Dependencies form valid DAG (no cycles)
-- [ ] Implementation tasks depend on task-001 (infrastructure)
-- [ ] Frontend tasks depend on their backend API tasks
-- [ ] Each task is atomic (completable in one PR)
+  - [ ] Infrastructure/K8s tasks → `bolt`
+- [ ] **Support agents ONLY for review/audit tasks:**
+  - [ ] `cipher` ONLY for "Security Audit", "Security Review", "Vulnerability Scan"
+  - [ ] `cleo` ONLY for "Code Review", "Quality Review"
+  - [ ] `tess` ONLY for "Write Tests", "E2E Testing", "Test Suite"
+  - [ ] `atlas` ONLY for "Merge PRs", "Integration"
+- [ ] **Code signatures in details** - Every implementation task has language-appropriate signatures
+- [ ] **No auth/jwt/oauth tasks assigned to cipher** - These are implementation!
+- [ ] **Dependencies form valid DAG** - No cycles
+- [ ] **Implementation tasks depend on task-1** - Infrastructure first
+- [ ] **Each task is atomic** - Completable in one PR
 
-**STOP and review if most tasks are assigned to Rex** - this usually indicates incorrect routing.
+**VALIDATION**: Count agent assignments. If `cipher` has more than 0-2 tasks (security audits only), you have made a mistake.
 
 ---
 
@@ -184,4 +257,4 @@ Before finalizing, verify EVERY item:
 - Model: {{model}}
 - Branch: intake/{{service}}
 
-**Read `.tasks/docs/prd.txt` now and generate comprehensive tasks.**
+**Read `.tasks/docs/prd.txt` now. First create the Service-to-Agent mapping table, then generate comprehensive tasks.**
