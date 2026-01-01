@@ -1002,12 +1002,14 @@ pub async fn create_task_issues_with_project(
 
     info!(
         task_count = tasks.len(),
-        parent_issue = %request.prd_identifier,
+        prd_issue = %request.prd_identifier,
         project_id = ?project_id,
-        "Creating task issues"
+        "Creating task issues in project"
     );
 
     // Create issues for each task.
+    // Tasks are linked to the project (not as sub-issues of the PRD).
+    // This allows proper use of Linear's project board view with workflow states.
     for task in tasks {
         let priority_label_name = match task.priority {
             1 => "priority:urgent",
@@ -1029,11 +1031,13 @@ pub async fn create_task_issues_with_project(
             label_ids.push(label.id);
         }
 
+        // Create as standalone issue linked to project (not as sub-issue of PRD).
+        // This enables proper board view in Linear with workflow state columns.
         let input = IssueCreateInput {
             team_id: request.team_id.clone(),
             title: format!("Task {}: {}", task.id, task.title),
             description: Some(description),
-            parent_id: Some(request.prd_issue_id.clone()),
+            parent_id: None, // Not a sub-issue - linked via project instead
             priority: Some(task.priority),
             label_ids: Some(label_ids),
             project_id: project_id.map(String::from),
