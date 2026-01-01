@@ -469,12 +469,11 @@ async fn create_project_from_intake(
         "Created Linear project"
     );
 
-    // Step 3: Create Linear issues for each task
+    // Step 3: Create Linear issues for each task (linked to project, not as sub-issues)
     let created_issues = create_issues_from_tasks(
         client,
         &metadata.team_id,
         &project.id,
-        &metadata.prd_issue_id,
         &tasks_json.tasks,
     )
     .await
@@ -668,12 +667,14 @@ where
     deserializer.deserialize_any(PriorityVisitor)
 }
 
-/// Create Linear issues from tasks.json content
+/// Create Linear issues from tasks.json content.
+///
+/// Issues are created as standalone issues linked to the project (not as sub-issues).
+/// This enables proper use of Linear's project board view with workflow state columns.
 pub async fn create_issues_from_tasks(
     client: &LinearClient,
     team_id: &str,
     project_id: &str,
-    parent_issue_id: &str,
     tasks: &[TaskFromJson],
 ) -> anyhow::Result<Vec<(String, String)>> {
     use std::fmt::Write;
@@ -709,11 +710,13 @@ pub async fn create_issues_from_tasks(
             );
         }
 
+        // Create as standalone issue linked to project (not as sub-issue).
+        // This enables proper board view in Linear with workflow state columns.
         let input = IssueCreateInput {
             team_id: team_id.to_string(),
             title: format!("[Task {}] {}", task.id, task.title),
             description: Some(description),
-            parent_id: Some(parent_issue_id.to_string()),
+            parent_id: None, // Not a sub-issue - linked via project instead
             priority: task.priority,
             label_ids: None,
             project_id: Some(project_id.to_string()),
