@@ -114,6 +114,19 @@ spec:
         value: '[]'
       - name: desktop-max-retries
         value: "10"
+      - name: infrastructure-agent
+        value: ""
+        description: "Agent for Infrastructure/DevOps work (e.g., 5DLabs-Bolt)"
+      - name: infrastructure-cli
+        value: ""  # Optional - if empty, falls back to implementation-cli
+      - name: infrastructure-model
+        value: ""  # Optional - if empty, falls back to implementation-model
+      - name: infrastructure-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: infrastructure-model-rotation
+        value: '[]'
+      - name: infrastructure-max-retries
+        value: "10"
       - name: quality-agent
         value: "5DLabs-Cleo"
       - name: quality-cli
@@ -1009,6 +1022,18 @@ spec:
                   value: '{{workflow.parameters.desktop-model-rotation}}'
                 - name: desktop-max-retries
                   value: "{{workflow.parameters.desktop-max-retries}}"
+                - name: infrastructure-agent
+                  value: "{{workflow.parameters.infrastructure-agent}}"
+                - name: infrastructure-cli
+                  value: "{{workflow.parameters.infrastructure-cli}}"
+                - name: infrastructure-model
+                  value: "{{workflow.parameters.infrastructure-model}}"
+                - name: infrastructure-tools
+                  value: '{{workflow.parameters.infrastructure-tools}}'
+                - name: infrastructure-model-rotation
+                  value: '{{workflow.parameters.infrastructure-model-rotation}}'
+                - name: infrastructure-max-retries
+                  value: "{{workflow.parameters.infrastructure-max-retries}}"
                 - name: quality-agent
                   value: "{{workflow.parameters.quality-agent}}"
                 - name: quality-cli
@@ -1741,6 +1766,18 @@ spec:
                   value: '{{workflow.parameters.desktop-model-rotation}}'
                 - name: desktop-max-retries
                   value: "{{workflow.parameters.desktop-max-retries}}"
+                - name: infrastructure-agent
+                  value: "{{workflow.parameters.infrastructure-agent}}"
+                - name: infrastructure-cli
+                  value: "{{workflow.parameters.infrastructure-cli}}"
+                - name: infrastructure-model
+                  value: "{{workflow.parameters.infrastructure-model}}"
+                - name: infrastructure-tools
+                  value: '{{workflow.parameters.infrastructure-tools}}'
+                - name: infrastructure-model-rotation
+                  value: '{{workflow.parameters.infrastructure-model-rotation}}'
+                - name: infrastructure-max-retries
+                  value: "{{workflow.parameters.infrastructure-max-retries}}"
                 - name: quality-agent
                   value: "{{workflow.parameters.quality-agent}}"
                 - name: quality-cli

@@ -68,6 +68,7 @@ spec:
           "go-max-retries": "{{workflow.parameters.go-max-retries}}",
           "node-max-retries": "{{workflow.parameters.node-max-retries}}",
           "desktop-max-retries": "{{workflow.parameters.desktop-max-retries}}",
+          "infrastructure-max-retries": "{{workflow.parameters.infrastructure-max-retries}}",
           "quality-max-retries": "{{workflow.parameters.quality-max-retries}}",
           "security-max-retries": "{{workflow.parameters.security-max-retries}}",
           "testing-max-retries": "{{workflow.parameters.testing-max-retries}}",
@@ -100,6 +101,9 @@ spec:
       - name: desktop-agent
         description: "Agent to use for Electron/Desktop work (e.g., 5DLabs-Spark)"
         value: ""  # Optional - if empty, falls back to frontend-agent
+      - name: infrastructure-agent
+        description: "Agent to use for infrastructure/DevOps work (e.g., 5DLabs-Bolt)"
+        value: ""  # Optional - if empty, falls back to implementation-agent
       - name: quality-agent
         description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
         value: ""  # Must be provided by MCP client
@@ -185,6 +189,12 @@ spec:
       - name: desktop-model
         description: "Model to use for Desktop agent"
         value: ""  # Optional - if empty, falls back to frontend-model
+      - name: infrastructure-cli
+        description: "CLI to use for Infrastructure/DevOps agent (e.g., claude)"
+        value: ""  # Optional - if empty, falls back to implementation-cli
+      - name: infrastructure-model
+        description: "Model to use for Infrastructure agent"
+        value: ""  # Optional - if empty, falls back to implementation-model
 
       # Agent tool configurations (JSON strings from client-side config)
       - name: implementation-tools
@@ -214,6 +224,9 @@ spec:
       - name: desktop-tools
         description: "JSON string of tools config for Desktop agent"
         value: "{}"  # Defaults to empty, populated by MCP client
+      - name: infrastructure-tools
+        description: "JSON string of tools config for Infrastructure agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
 
       # Model rotation configurations (JSON arrays of model names)
       - name: implementation-model-rotation
@@ -242,6 +255,9 @@ spec:
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
       - name: desktop-model-rotation
         description: "JSON array of model names for Desktop agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: infrastructure-model-rotation
+        description: "JSON array of model names for Infrastructure agent retry rotation"
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
 
       # PR context (populated by suspend/resume)
@@ -310,6 +326,9 @@ spec:
         value: "10"
       - name: desktop-max-retries
         description: "Maximum retry attempts for Desktop agent executions (0 = unlimited)"
+        value: "10"
+      - name: infrastructure-max-retries
+        description: "Maximum retry attempts for Infrastructure agent executions (0 = unlimited)"
         value: "10"
       - name: auto-merge
         description: "Whether Tess should automatically merge PRs after approval (true/false)"
@@ -2331,6 +2350,35 @@ spec:
                 echo "$DESKTOP_MODEL" > /tmp/model.txt
                 echo "{{workflow.parameters.desktop-model-rotation}}" > /tmp/model-rotation.txt
                 echo "{{workflow.parameters.desktop-max-retries}}" > /tmp/max-retries.txt
+              fi
+              ;;
+            "infrastructure"|"infra"|"devops"|"k8s"|"kubernetes"|"helm"|"operator"|"bolt")
+              echo "✅ Routing to INFRASTRUCTURE agent (Bolt)"
+              INFRA_AGENT="{{workflow.parameters.infrastructure-agent}}"
+
+              # Validate infrastructure-agent is not empty, fallback to implementation-agent
+              if [ -z "$INFRA_AGENT" ] || [ "$INFRA_AGENT" = "" ]; then
+                echo "⚠️ infrastructure-agent parameter is empty, falling back to implementation-agent"
+                echo "{{workflow.parameters.implementation-agent}}" > /tmp/github-app.txt
+                echo "{{workflow.parameters.implementation-cli}}" > /tmp/cli-type.txt
+                echo "{{workflow.parameters.implementation-model}}" > /tmp/model.txt
+                echo "{{workflow.parameters.implementation-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.implementation-max-retries}}" > /tmp/max-retries.txt
+              else
+                echo "$INFRA_AGENT" > /tmp/github-app.txt
+                INFRA_CLI="{{workflow.parameters.infrastructure-cli}}"
+                INFRA_MODEL="{{workflow.parameters.infrastructure-model}}"
+                # Fallback to implementation CLI/model if infrastructure-specific not set
+                if [ -z "$INFRA_CLI" ] || [ "$INFRA_CLI" = "" ]; then
+                  INFRA_CLI="{{workflow.parameters.implementation-cli}}"
+                fi
+                if [ -z "$INFRA_MODEL" ] || [ "$INFRA_MODEL" = "" ]; then
+                  INFRA_MODEL="{{workflow.parameters.implementation-model}}"
+                fi
+                echo "$INFRA_CLI" > /tmp/cli-type.txt
+                echo "$INFRA_MODEL" > /tmp/model.txt
+                echo "{{workflow.parameters.infrastructure-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.infrastructure-max-retries}}" > /tmp/max-retries.txt
               fi
               ;;
             *)
