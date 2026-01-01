@@ -42,6 +42,10 @@
       "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
       "frontendAgent": "5DLabs-Blaze",
+      "goAgent": "5DLabs-Grizz",
+      "nodeAgent": "5DLabs-Nova",
+      "mobileAgent": "5DLabs-Tap",
+      "desktopAgent": "5DLabs-Spark",
       "qualityAgent": "5DLabs-Cleo",
       "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",
@@ -230,6 +234,106 @@
           "github_get_secret_scanning_alert",
           "github_get_pull_request",
           "github_create_pull_request_review"
+        ],
+        "localServers": {}
+      }
+    },
+    "grizz": {
+      "githubApp": "5DLabs-Grizz",
+      "cli": "codex",
+      "model": "gpt-5-codex",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "firecrawl_scrape",
+          "firecrawl_crawl",
+          "firecrawl_map",
+          "firecrawl_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      }
+    },
+    "nova": {
+      "githubApp": "5DLabs-Nova",
+      "cli": "codex",
+      "model": "gpt-5-codex",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "firecrawl_scrape",
+          "firecrawl_crawl",
+          "firecrawl_map",
+          "firecrawl_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      }
+    },
+    "tap": {
+      "githubApp": "5DLabs-Tap",
+      "cli": "codex",
+      "model": "gpt-5-codex",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "firecrawl_scrape",
+          "firecrawl_crawl",
+          "firecrawl_map",
+          "firecrawl_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      }
+    },
+    "spark": {
+      "githubApp": "5DLabs-Spark",
+      "cli": "codex",
+      "model": "gpt-5-codex",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "firecrawl_scrape",
+          "firecrawl_crawl",
+          "firecrawl_map",
+          "firecrawl_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
+          "github_get_file_contents"
         ],
         "localServers": {}
       }
