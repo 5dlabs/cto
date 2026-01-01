@@ -257,7 +257,8 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Agent {
             || content.contains("next")
             || content.contains("shadcn")
             || content.contains("frontend")
-            || content.contains("validation")  // Form validation context
+            || content.contains("validation")
+        // Form validation context
         {
             return Agent::Blaze;
         }
@@ -484,7 +485,10 @@ fn infer_from_dependencies(task: &Task, all_tasks: &[Task]) -> Option<Agent> {
         .filter_map(|dep_id| {
             all_tasks
                 .iter()
-                .find(|t| t.id == *dep_id || format!("task-{:03}", t.id.parse::<u32>().unwrap_or(0)) == *dep_id)
+                .find(|t| {
+                    t.id == *dep_id
+                        || format!("task-{:03}", t.id.parse::<u32>().unwrap_or(0)) == *dep_id
+                })
                 .and_then(|t| t.agent_hint.as_ref())
                 .map(|hint| parse_agent(hint))
         })
@@ -844,7 +848,8 @@ mod tests {
     #[test]
     fn test_dependency_based_routing_spark() {
         // Task depending on Spark init should inherit Spark
-        let mut spark_init = Task::new("45", "Initialize Electron project", "Create Electron setup");
+        let mut spark_init =
+            Task::new("45", "Initialize Electron project", "Create Electron setup");
         spark_init.agent_hint = Some("spark".to_string());
 
         let mut tray_task = Task::new("46", "Implement system tray", "Notification badge");
@@ -916,7 +921,10 @@ mod tests {
     fn test_bolt_observability() {
         // Grafana dashboards should go to Bolt, not Blaze
         assert_eq!(
-            infer_agent_hint("Setup Grafana dashboards", "Create dashboards for monitoring"),
+            infer_agent_hint(
+                "Setup Grafana dashboards",
+                "Create dashboards for monitoring"
+            ),
             Agent::Bolt
         );
         assert_eq!(
@@ -1122,10 +1130,7 @@ mod tests {
             infer_agent_hint("Tray icon", "Status indicator"),
             Agent::Spark
         );
-        assert_eq!(
-            infer_agent_hint("Tray menu", "Quick actions"),
-            Agent::Spark
-        );
+        assert_eq!(infer_agent_hint("Tray menu", "Quick actions"), Agent::Spark);
     }
 
     #[test]
