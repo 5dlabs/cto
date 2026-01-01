@@ -1,5 +1,6 @@
 ---
 # Argo CD Application for Grafana Loki
+# Storage: SeaweedFS S3 (scalable object storage)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -18,7 +19,7 @@ spec:
     chart: loki
     helm:
       values: |
-        # Loki configuration - Single Binary deployment mode
+        # Loki configuration - Single Binary deployment mode with S3 storage
         deploymentMode: SingleBinary
 
         # Single binary configuration
@@ -26,8 +27,8 @@ spec:
           replicas: 1
           persistence:
             enabled: true
-            storageClass: "mayastor"  # High-performance NVMe storage
-            size: 100Gi
+            storageClass: "mayastor"
+            size: 20Gi  # Reduced - only for WAL/cache, chunks go to S3
           # Resource allocation
           resources:
             limits:
@@ -48,6 +49,18 @@ spec:
             runAsUser: 10001
             runAsGroup: 10001
             runAsNonRoot: true
+          # Environment variables for S3 credentials
+          extraEnv:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: loki-s3-secret
+                  key: S3_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: loki-s3-secret
+                  key: S3_SECRET_ACCESS_KEY
 
         # Loki configuration
         loki:
@@ -56,19 +69,37 @@ spec:
           # Common configuration
           commonConfig:
             replication_factor: 1
-          # Storage configuration - filesystem for single binary
+            path_prefix: /var/loki
+          # Storage configuration - S3 with SeaweedFS
           storage:
-            type: filesystem
-          # Schema configuration
+            type: s3
+            bucketNames:
+              chunks: loki-chunks
+              ruler: loki-ruler
+              admin: loki-admin
+            s3:
+              endpoint: http://seaweedfs-s3.seaweedfs:8333
+              region: us-east-1  # Required but ignored by SeaweedFS
+              s3ForcePathStyle: true
+              insecure: true  # HTTP, not HTTPS
+          # Schema configuration - use S3 for object store
           schemaConfig:
             configs:
               - from: "2024-01-01"
                 store: tsdb
-                object_store: filesystem
+                object_store: s3
                 schema: v13
                 index:
                   prefix: index_
                   period: 24h
+          # Compactor for index compaction
+          compactor:
+            working_directory: /var/loki/compactor
+            compaction_interval: 10m
+            retention_enabled: true
+            retention_delete_delay: 2h
+            retention_delete_worker_count: 150
+            delete_request_store: s3
           # Limits configuration (increased for high-volume log ingestion)
           limits_config:
             ingestion_rate_mb: 128
