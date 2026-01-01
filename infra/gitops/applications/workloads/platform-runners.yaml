@@ -36,8 +36,8 @@ spec:
         githubConfigUrl: "https://github.com/5dlabs"
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
-        minRunners: 6  # Increased from 2 to reduce job queue wait times
-        maxRunners: 10  # Increased for faster CI throughput with more parallel jobs
+        minRunners: 8  # Ensure 8 runners always available for CI throughput
+        maxRunners: 12  # Allow scaling up for burst workloads
         runnerGroup: "Default"
 
         # Docker-in-Docker configuration for container builds
