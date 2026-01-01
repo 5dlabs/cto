@@ -507,8 +507,9 @@ pub struct TaskFromJson {
     pub title: String,
     /// Task description
     pub description: String,
-    /// Priority (1=highest, 4=lowest)
-    #[serde(default)]
+    /// Priority (1=urgent, 2=high, 3=normal, 4=low).
+    /// Accepts both string ("medium", "high") and integer (1-4) formats.
+    #[serde(default, deserialize_with = "deserialize_priority_flexible_option")]
     pub priority: Option<i32>,
     /// Dependencies (task IDs)
     #[serde(default, deserialize_with = "deserialize_string_or_number_vec")]
@@ -597,6 +598,73 @@ where
             _ => Err(D::Error::custom("expected string or number")),
         })
         .collect()
+}
+
+/// Deserialize optional priority from either string ("medium") or integer (3).
+/// Maps string priorities to Linear's integer format:
+/// - "critical"/"urgent" → 1 (Urgent)
+/// - "high" → 2 (High)
+/// - "medium"/"normal" → 3 (Normal)
+/// - "low" → 4 (Low)
+fn deserialize_priority_flexible_option<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+    use std::fmt;
+
+    struct PriorityVisitor;
+
+    impl Visitor<'_> for PriorityVisitor {
+        type Value = Option<i32>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a priority string, integer, or null")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(match value.to_lowercase().as_str() {
+                "critical" | "urgent" => 1,
+                "high" => 2,
+                "low" => 4,
+                // "medium", "normal", "med", or any unknown string defaults to normal priority
+                _ => 3,
+            }))
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(value.clamp(0, 4) as i32))
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(value.min(4) as i32))
+        }
+    }
+
+    deserializer.deserialize_any(PriorityVisitor)
 }
 
 /// Create Linear issues from tasks.json content
@@ -924,4 +992,99 @@ async fn trigger_play_workflow(
     );
 
     Ok(PlayTriggerResult { workflow_name })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_task_priority_string_medium() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "medium"
+        }"#;
+
+        let task: TaskFromJson = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, Some(3)); // medium = normal = 3
+    }
+
+    #[test]
+    fn test_deserialize_task_priority_string_high() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "high"
+        }"#;
+
+        let task: TaskFromJson = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, Some(2)); // high = 2
+    }
+
+    #[test]
+    fn test_deserialize_task_priority_string_critical() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "critical"
+        }"#;
+
+        let task: TaskFromJson = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, Some(1)); // critical = urgent = 1
+    }
+
+    #[test]
+    fn test_deserialize_task_priority_string_low() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "low"
+        }"#;
+
+        let task: TaskFromJson = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, Some(4)); // low = 4
+    }
+
+    #[test]
+    fn test_deserialize_task_priority_integer() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": 2
+        }"#;
+
+        let task: TaskFromJson = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, Some(2)); // Integer passed through
+    }
+
+    #[test]
+    fn test_deserialize_task_priority_missing() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test"
+        }"#;
+
+        let task: TaskFromJson = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, None); // No default, returns None
+    }
+
+    #[test]
+    fn test_deserialize_task_priority_case_insensitive() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test",
+            "priority": "HIGH"
+        }"#;
+
+        let task: TaskFromJson = serde_json::from_str(json).unwrap();
+        assert_eq!(task.priority, Some(2)); // HIGH = high = 2
+    }
 }
