@@ -495,10 +495,14 @@ async fn create_project_from_intake(
 }
 
 /// Task from tasks.json
+///
+/// Note: `id` uses a custom deserializer to accept both string ("1") and numeric (1) IDs,
+/// since different intake implementations may produce either format.
 #[derive(Debug, Clone, Deserialize)]
 pub struct TaskFromJson {
-    /// Task ID
-    pub id: u32,
+    /// Task ID (accepts both string and numeric)
+    #[serde(deserialize_with = "deserialize_string_or_number")]
+    pub id: String,
     /// Task title
     pub title: String,
     /// Task description
@@ -507,8 +511,8 @@ pub struct TaskFromJson {
     #[serde(default)]
     pub priority: Option<i32>,
     /// Dependencies (task IDs)
-    #[serde(default)]
-    pub dependencies: Vec<u32>,
+    #[serde(default, deserialize_with = "deserialize_string_or_number_vec")]
+    pub dependencies: Vec<String>,
     /// Subtasks
     #[serde(default)]
     pub subtasks: Vec<SubtaskFromJson>,
@@ -517,13 +521,82 @@ pub struct TaskFromJson {
 /// Subtask from tasks.json
 #[derive(Debug, Clone, Deserialize)]
 pub struct SubtaskFromJson {
-    /// Subtask ID
-    pub id: u32,
+    /// Subtask ID (accepts both string and numeric)
+    #[serde(deserialize_with = "deserialize_string_or_number")]
+    pub id: String,
     /// Subtask title
     pub title: String,
     /// Subtask description
     #[serde(default)]
     pub description: Option<String>,
+}
+
+/// Deserialize a value that could be either a string or a number into a String.
+fn deserialize_string_or_number<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+    use std::fmt;
+
+    struct StringOrNumberVisitor;
+
+    impl Visitor<'_> for StringOrNumberVisitor {
+        type Value = String;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string or a number")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.to_string())
+        }
+
+        fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value)
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.to_string())
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.to_string())
+        }
+    }
+
+    deserializer.deserialize_any(StringOrNumberVisitor)
+}
+
+/// Deserialize a Vec where each element could be either a string or a number.
+fn deserialize_string_or_number_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    // Deserialize as a Vec of JSON values first, then convert each
+    let values: Vec<serde_json::Value> = Vec::deserialize(deserializer)?;
+    values
+        .into_iter()
+        .map(|v| match v {
+            serde_json::Value::String(s) => Ok(s),
+            serde_json::Value::Number(n) => Ok(n.to_string()),
+            _ => Err(D::Error::custom("expected string or number")),
+        })
+        .collect()
 }
 
 /// Create Linear issues from tasks.json content
@@ -533,7 +606,7 @@ pub async fn create_issues_from_tasks(
     project_id: &str,
     parent_issue_id: &str,
     tasks: &[TaskFromJson],
-) -> anyhow::Result<Vec<(u32, String)>> {
+) -> anyhow::Result<Vec<(String, String)>> {
     use std::fmt::Write;
 
     let mut created_issues = Vec::new();
@@ -581,16 +654,16 @@ pub async fn create_issues_from_tasks(
         match client.create_issue(input).await {
             Ok(issue) => {
                 info!(
-                    task_id = task.id,
+                    task_id = %task.id,
                     issue_id = %issue.id,
                     issue_identifier = %issue.identifier,
                     "Created issue for task"
                 );
-                created_issues.push((task.id, issue.id));
+                created_issues.push((task.id.clone(), issue.id));
             }
             Err(e) => {
                 warn!(
-                    task_id = task.id,
+                    task_id = %task.id,
                     error = %e,
                     "Failed to create issue for task"
                 );
