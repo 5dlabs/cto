@@ -13,6 +13,9 @@ spec:
       targetPort: {{ .Values.tools.service.port }}
       protocol: TCP
       name: http
+      {{- if and (eq .Values.tools.service.type "NodePort") .Values.tools.service.nodePort }}
+      nodePort: {{ .Values.tools.service.nodePort }}
+      {{- end }}
   selector:
     {{- include "cto.tools.selectorLabels" . | nindent 4 }}
 {{- end }}
