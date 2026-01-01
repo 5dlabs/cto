@@ -63,7 +63,7 @@ fn test_intake_task_string_priority() {
     }
 }
 
-/// Test that IntakeTask uses default priority when not specified.
+/// Test that `IntakeTask` uses default priority when not specified.
 #[test]
 fn test_intake_task_default_priority() {
     let json = r#"{
@@ -141,7 +141,7 @@ fn test_tasks_json_full_payload() {
 // Callback Payload Tests
 // =============================================================================
 
-/// Test IntakeCompleteCallback deserialization.
+/// Test `IntakeCompleteCallback` deserialization.
 #[test]
 fn test_intake_complete_callback_deserialization() {
     use pm::handlers::callbacks::IntakeCompleteCallback;
@@ -197,7 +197,7 @@ fn test_intake_complete_callback_failure() {
     );
 }
 
-/// Test PlayCompleteCallback deserialization.
+/// Test `PlayCompleteCallback` deserialization.
 #[test]
 fn test_play_complete_callback_deserialization() {
     use pm::handlers::callbacks::PlayCompleteCallback;
@@ -223,7 +223,7 @@ fn test_play_complete_callback_deserialization() {
 // Agent Status Tests
 // =============================================================================
 
-/// Test AgentStatus label name conversion.
+/// Test `AgentStatus` label name conversion.
 #[test]
 fn test_agent_status_label_names() {
     use pm::models::AgentStatus;
@@ -236,7 +236,7 @@ fn test_agent_status_label_names() {
     assert_eq!(AgentStatus::Error.to_label_name(), "agent:error");
 }
 
-/// Test AgentStatus from sidecar status conversion.
+/// Test `AgentStatus` from sidecar status conversion.
 #[test]
 fn test_agent_status_from_sidecar() {
     use pm::models::AgentStatus;
@@ -376,7 +376,7 @@ fn test_generate_completion_summary() {
 
     // Verify summary contains key information
     assert!(summary.contains("TSK-1"), "Should include PRD identifier");
-    assert!(summary.contains("2"), "Should include task count");
+    assert!(summary.contains('2'), "Should include task count");
     assert!(
         summary.contains("High Priority"),
         "Should mention high priority count"
