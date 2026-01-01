@@ -9,7 +9,7 @@ use pm::handlers::intake::IntakeTask;
 // IntakeTask Deserialization Tests
 // =============================================================================
 
-/// Test that IntakeTask deserializes correctly from AI-generated JSON.
+/// Test that `IntakeTask` deserializes correctly from AI-generated JSON.
 #[test]
 fn test_intake_task_deserialization_numeric_ids() {
     let json = r#"{
@@ -27,7 +27,7 @@ fn test_intake_task_deserialization_numeric_ids() {
     assert_eq!(task.priority, 2);
 }
 
-/// Test that IntakeTask deserializes string priorities.
+/// Test that `IntakeTask` deserializes string priorities.
 #[test]
 fn test_intake_task_string_priority() {
     let test_cases = vec![
@@ -423,14 +423,14 @@ fn test_format_task_description() {
 fn test_parse_cto_frontmatter() {
     use pm::handlers::intake::parse_cto_frontmatter;
 
-    let description = r#"---
+    let description = r"---
 cto:
   cli: cursor
   model: claude-opus-4-20250514
 ---
 ## PRD: My Feature
 
-This is the actual content."#;
+This is the actual content.";
 
     let config = parse_cto_frontmatter(description);
     assert!(config.is_some());
@@ -445,13 +445,13 @@ This is the actual content."#;
 fn test_strip_frontmatter() {
     use pm::handlers::intake::strip_frontmatter;
 
-    let description = r#"---
+    let description = r"---
 cto:
   cli: claude
 ---
 ## My PRD
 
-Content here"#;
+Content here";
 
     let stripped = strip_frontmatter(description);
     assert!(!stripped.contains("---"));
