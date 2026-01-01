@@ -320,9 +320,10 @@ fn is_intake_pr(payload: &PullRequestEvent) -> bool {
         .iter()
         .any(|l| l.name == "cto-intake" || l.name == "intake");
 
-    // Check for intake branch pattern (e.g., intake/TSK-1-*, cto-intake/*)
+    // Check for intake branch pattern (e.g., intake/TSK-1-*, intake-project-*, cto-intake/*)
     let branch = &payload.pull_request.head.ref_name;
     let is_intake_branch = branch.starts_with("intake/")
+        || branch.starts_with("intake-")
         || branch.starts_with("cto-intake/")
         || branch.contains("-intake-");
 
