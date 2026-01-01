@@ -338,9 +338,15 @@ impl CLITextGenerator {
                 args.push(prompt.to_string());
             }
             CLIType::Factory => {
-                // Factory: droid exec --output-format json -m <model> "prompt"
+                // Factory: droid exec --auto high --output-format json -m <model> "prompt"
                 // Must use 'exec' subcommand for non-interactive mode
                 args.push("exec".to_string());
+
+                // Enable full autonomy for CI/CD and development work
+                // Levels: low (safe edits), medium (dev work), high (CI/CD - full access)
+                args.push("--auto".to_string());
+                args.push("high".to_string());
+
                 args.push("--output-format".to_string());
                 args.push("json".to_string());
                 args.push("-m".to_string());
