@@ -234,12 +234,12 @@ impl Default for CtoConfig {
                         provider: "anthropic".to_string(),
                     },
                     fallback: ModelConfig {
-                        model: "claude-sonnet-4-20250514".to_string(),
+                        model: "claude-opus-4-5-20251101".to_string(),
                         provider: "anthropic".to_string(),
                     },
                 },
                 play: PlayDefaults {
-                    model: "claude-sonnet-4-20250514".to_string(),
+                    model: "claude-opus-4-5-20251101".to_string(),
                     cli: "claude".to_string(),
                     implementation_agent: "5DLabs-Rex".to_string(),
                     frontend_agent: "5DLabs-Blaze".to_string(),
@@ -466,7 +466,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "morgan" => AgentConfig {
             github_app: "5DLabs-Morgan".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -484,7 +484,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "rex" => AgentConfig {
             github_app: "5DLabs-Rex".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -507,7 +507,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "grizz" => AgentConfig {
             github_app: "5DLabs-Grizz".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -530,7 +530,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "nova" => AgentConfig {
             github_app: "5DLabs-Nova".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -553,7 +553,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "blaze" => AgentConfig {
             github_app: "5DLabs-Blaze".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -587,7 +587,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "tap" => AgentConfig {
             github_app: "5DLabs-Tap".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -610,7 +610,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "spark" => AgentConfig {
             github_app: "5DLabs-Spark".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -633,7 +633,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "cleo" => AgentConfig {
             github_app: "5DLabs-Cleo".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -656,7 +656,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "cipher" => AgentConfig {
             github_app: "5DLabs-Cipher".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -680,7 +680,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "tess" => AgentConfig {
             github_app: "5DLabs-Tess".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -705,7 +705,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "atlas" => AgentConfig {
             github_app: "5DLabs-Atlas".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -728,7 +728,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         "bolt" => AgentConfig {
             github_app: "5DLabs-Bolt".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: {
                     let mut tools = default_remote_tools();
@@ -763,7 +763,7 @@ fn get_agent_config(agent_hint: &str) -> AgentConfig {
         _ => AgentConfig {
             github_app: "5DLabs-Rex".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-20250514".to_string(),
+            model: "claude-opus-4-5-20251101".to_string(),
             tools: AgentTools {
                 remote: default_remote_tools(),
                 local_servers: HashMap::new(),
