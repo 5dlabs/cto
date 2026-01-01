@@ -591,6 +591,87 @@ tools:
           APP_STORE_ISSUER_ID: "${APP_STORE_ISSUER_ID}"
           APP_STORE_P8_PATH: "${APP_STORE_P8_PATH:-/secrets/appstore/AuthKey.p8}"
 
+      # --- Database ---
+      postgres:
+        name: "PostgreSQL"
+        description: "Comprehensive PostgreSQL database management - queries, mutations, schema management, and performance analysis"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@henkey/postgres-mcp-server", "--connection-string", "${POSTGRES_URL}"]
+        workingDirectory: "/tmp"
+        env:
+          POSTGRES_URL: "${POSTGRES_URL:-postgresql://localhost:5432/postgres}"
+
+      redis:
+        name: "Redis"
+        description: "Redis key-value store - set, get, delete, and list operations"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@gongrzhe/server-redis-mcp", "${REDIS_URL}"]
+        workingDirectory: "/tmp"
+        env:
+          REDIS_URL: "${REDIS_URL:-redis://localhost:6379}"
+
+      mongodb:
+        name: "MongoDB"
+        description: "MongoDB database operations - queries, aggregations, collections, and Atlas integration"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "mongodb-mcp-server"]
+        workingDirectory: "/tmp"
+        env:
+          MONGODB_URI: "${MONGODB_URI:-mongodb://localhost:27017}"
+
+      # --- GitOps & CI/CD ---
+      argocd:
+        name: "ArgoCD"
+        description: "ArgoCD GitOps management - applications, sync, resources, and deployment operations"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "argocd-mcp@latest", "stdio"]
+        workingDirectory: "/tmp"
+        env:
+          ARGOCD_BASE_URL: "${ARGOCD_BASE_URL:-https://argocd.platform.local}"
+          ARGOCD_API_TOKEN: "${ARGOCD_API_TOKEN}"
+
+      # --- Cloud Storage ---
+      s3:
+        name: "S3 Storage"
+        description: "S3-compatible storage - list buckets, list objects, get objects (supports AWS S3 and SeaweedFS)"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@geunoh/s3-mcp-server", "--region", "${AWS_REGION}", "--bucket", "${S3_BUCKET}"]
+        workingDirectory: "/tmp"
+        env:
+          AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+          AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
+          AWS_REGION: "${AWS_REGION:-us-east-1}"
+          S3_BUCKET_NAME: "${S3_BUCKET:-default}"
+
+      # --- API Protocols ---
+      graphql:
+        name: "GraphQL"
+        description: "GraphQL API interaction - schema introspection and query execution"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@iflow-mcp/mcp-graphql"]
+        workingDirectory: "/tmp"
+        env:
+          ENDPOINT: "${GRAPHQL_ENDPOINT:-http://localhost:4000/graphql}"
+          ALLOW_MUTATIONS: "${GRAPHQL_ALLOW_MUTATIONS:-false}"
+
+      # --- Message Queues ---
+      kafka:
+        name: "Kafka (Confluent)"
+        description: "Confluent Kafka and Confluent Cloud - produce, consume, and manage topics"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@mseep/mcp-confluent"]
+        workingDirectory: "/tmp"
+        env:
+          CONFLUENT_CLOUD_API_KEY: "${CONFLUENT_CLOUD_API_KEY}"
+          CONFLUENT_CLOUD_API_SECRET: "${CONFLUENT_CLOUD_API_SECRET}"
+
       # --- Local Servers (run in agent containers, not proxied) ---
       rust-tools:
         name: "Rust Development Tools"
