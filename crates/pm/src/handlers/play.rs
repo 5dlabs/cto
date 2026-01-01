@@ -162,14 +162,18 @@ pub async fn submit_play_workflow(
         format!("github-app={}", config.github_app),
         "-p".to_string(),
         format!("model={model}"),
+        // Implementation agents
         "-p".to_string(),
         format!("implementation-agent={}", config.implementation_agent),
+        "-p".to_string(),
+        format!("frontend-agent={}", config.frontend_agent),
+        // Support agents
         "-p".to_string(),
         format!("testing-agent={}", config.testing_agent),
         "-p".to_string(),
         format!("quality-agent={}", config.quality_agent),
         "-p".to_string(),
-        format!("frontend-agent={}", config.frontend_agent),
+        format!("security-agent={}", config.security_agent),
         "-p".to_string(),
         format!("parallel-execution={}", config.parallel_execution),
         "-p".to_string(),
@@ -187,6 +191,24 @@ pub async fn submit_play_workflow(
         "source=linear".to_string(),
         "--wait=false".to_string(),
     ];
+
+    // Add optional specialized agents if configured
+    if let Some(go_agent) = &config.go_agent {
+        args.push("-p".to_string());
+        args.push(format!("go-agent={go_agent}"));
+    }
+    if let Some(node_agent) = &config.node_agent {
+        args.push("-p".to_string());
+        args.push(format!("node-agent={node_agent}"));
+    }
+    if let Some(mobile_agent) = &config.mobile_agent {
+        args.push("-p".to_string());
+        args.push(format!("mobile-agent={mobile_agent}"));
+    }
+    if let Some(desktop_agent) = &config.desktop_agent {
+        args.push("-p".to_string());
+        args.push(format!("desktop-agent={desktop_agent}"));
+    }
 
     // Add docs project directory if configured
     if let Some(docs_dir) = &config.docs_project_directory {

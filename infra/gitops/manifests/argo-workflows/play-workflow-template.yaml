@@ -39,6 +39,15 @@ spec:
           "mobile-agent": "{{workflow.parameters.mobile-agent}}",
           "mobile-cli": "{{workflow.parameters.mobile-cli}}",
           "mobile-model": "{{workflow.parameters.mobile-model}}",
+          "go-agent": "{{workflow.parameters.go-agent}}",
+          "go-cli": "{{workflow.parameters.go-cli}}",
+          "go-model": "{{workflow.parameters.go-model}}",
+          "node-agent": "{{workflow.parameters.node-agent}}",
+          "node-cli": "{{workflow.parameters.node-cli}}",
+          "node-model": "{{workflow.parameters.node-model}}",
+          "desktop-agent": "{{workflow.parameters.desktop-agent}}",
+          "desktop-cli": "{{workflow.parameters.desktop-cli}}",
+          "desktop-model": "{{workflow.parameters.desktop-model}}",
           "quality-agent": "{{workflow.parameters.quality-agent}}",
           "quality-cli": "{{workflow.parameters.quality-cli}}",
           "quality-model": "{{workflow.parameters.quality-model}}",
@@ -56,6 +65,9 @@ spec:
           "implementation-max-retries": "{{workflow.parameters.implementation-max-retries}}",
           "frontend-max-retries": "{{workflow.parameters.frontend-max-retries}}",
           "mobile-max-retries": "{{workflow.parameters.mobile-max-retries}}",
+          "go-max-retries": "{{workflow.parameters.go-max-retries}}",
+          "node-max-retries": "{{workflow.parameters.node-max-retries}}",
+          "desktop-max-retries": "{{workflow.parameters.desktop-max-retries}}",
           "quality-max-retries": "{{workflow.parameters.quality-max-retries}}",
           "security-max-retries": "{{workflow.parameters.security-max-retries}}",
           "testing-max-retries": "{{workflow.parameters.testing-max-retries}}",
@@ -77,7 +89,16 @@ spec:
         description: "Agent to use for frontend work (e.g., 5DLabs-Blaze)"
         value: ""  # Must be provided by MCP client
       - name: mobile-agent
-        description: "Agent to use for mobile/React Native work (e.g., 5DLabs-Spark)"
+        description: "Agent to use for mobile/React Native work (e.g., 5DLabs-Tap)"
+        value: ""  # Optional - if empty, falls back to frontend-agent
+      - name: go-agent
+        description: "Agent to use for Go/gRPC work (e.g., 5DLabs-Grizz)"
+        value: ""  # Optional - if empty, falls back to implementation-agent
+      - name: node-agent
+        description: "Agent to use for Node.js/Bun work (e.g., 5DLabs-Nova)"
+        value: ""  # Optional - if empty, falls back to implementation-agent
+      - name: desktop-agent
+        description: "Agent to use for Electron/Desktop work (e.g., 5DLabs-Spark)"
         value: ""  # Optional - if empty, falls back to frontend-agent
       - name: quality-agent
         description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
@@ -146,6 +167,24 @@ spec:
       - name: mobile-model
         description: "Model to use for mobile agent"
         value: ""  # Optional - if empty, falls back to frontend-model
+      - name: go-cli
+        description: "CLI to use for Go agent (e.g., codex, claude)"
+        value: ""  # Optional - if empty, falls back to implementation-cli
+      - name: go-model
+        description: "Model to use for Go agent"
+        value: ""  # Optional - if empty, falls back to implementation-model
+      - name: node-cli
+        description: "CLI to use for Node.js agent (e.g., codex, claude)"
+        value: ""  # Optional - if empty, falls back to implementation-cli
+      - name: node-model
+        description: "Model to use for Node.js agent"
+        value: ""  # Optional - if empty, falls back to implementation-model
+      - name: desktop-cli
+        description: "CLI to use for Desktop agent (e.g., codex, claude)"
+        value: ""  # Optional - if empty, falls back to frontend-cli
+      - name: desktop-model
+        description: "Model to use for Desktop agent"
+        value: ""  # Optional - if empty, falls back to frontend-model
 
       # Agent tool configurations (JSON strings from client-side config)
       - name: implementation-tools
@@ -166,6 +205,15 @@ spec:
       - name: mobile-tools
         description: "JSON string of tools config for mobile agent"
         value: "{}"  # Defaults to empty, populated by MCP client
+      - name: go-tools
+        description: "JSON string of tools config for Go agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
+      - name: node-tools
+        description: "JSON string of tools config for Node.js agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
+      - name: desktop-tools
+        description: "JSON string of tools config for Desktop agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
 
       # Model rotation configurations (JSON arrays of model names)
       - name: implementation-model-rotation
@@ -185,6 +233,15 @@ spec:
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
       - name: mobile-model-rotation
         description: "JSON array of model names for mobile agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: go-model-rotation
+        description: "JSON array of model names for Go agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: node-model-rotation
+        description: "JSON array of model names for Node.js agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: desktop-model-rotation
+        description: "JSON array of model names for Desktop agent retry rotation"
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
 
       # PR context (populated by suspend/resume)
@@ -244,6 +301,15 @@ spec:
         value: "10"
       - name: mobile-max-retries
         description: "Maximum retry attempts for mobile agent executions (0 = unlimited)"
+        value: "10"
+      - name: go-max-retries
+        description: "Maximum retry attempts for Go agent executions (0 = unlimited)"
+        value: "10"
+      - name: node-max-retries
+        description: "Maximum retry attempts for Node.js agent executions (0 = unlimited)"
+        value: "10"
+      - name: desktop-max-retries
+        description: "Maximum retry attempts for Desktop agent executions (0 = unlimited)"
         value: "10"
       - name: auto-merge
         description: "Whether Tess should automatically merge PRs after approval (true/false)"
@@ -2015,12 +2081,24 @@ spec:
               TASK_CONTENT="$TASK_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
             fi
 
+            # Go/gRPC detection - check for Go/Grizz keywords
+            if echo "$TASK_CONTENT" | grep -qiE "(golang|go[- .]lang|\.go[^a-z]|grpc|protobuf|chi[- .]router|gorm|pgx|grizz)"; then
+              echo "🔍 Auto-detected GO task (Go/gRPC keywords matched)"
+              AGENT_TYPE="go"
+            # Node.js/Bun detection - check for Node/Nova keywords
+            elif echo "$TASK_CONTENT" | grep -qiE "(node\.?js|bun[- .]js|deno|elysia|effect[- .]ts|hono|drizzle|nova|nestjs|express\.js|fastify)"; then
+              echo "🔍 Auto-detected NODE task (Node.js/Bun keywords matched)"
+              AGENT_TYPE="node"
+            # Desktop/Electron detection - check for Electron/Tauri keywords
+            elif echo "$TASK_CONTENT" | grep -qiE "(electron|tauri|desktop[- .]app|spark[- .]agent|electron[- .]builder)"; then
+              echo "🔍 Auto-detected DESKTOP task (Electron/Desktop keywords matched)"
+              AGENT_TYPE="desktop"
             # Mobile/React Native detection - check first before generic frontend
-            if echo "$TASK_CONTENT" | grep -qiE "(react[- .]native|expo|mobile[- .]app|ios[- .]app|android[- .]app|nativewind|react[- .]navigation|expo[- .]router)"; then
+            elif echo "$TASK_CONTENT" | grep -qiE "(react[- .]native|expo|mobile[- .]app|ios[- .]app|android[- .]app|nativewind|react[- .]navigation|expo[- .]router|tap[- .]agent)"; then
               echo "🔍 Auto-detected MOBILE task (React Native/Expo keywords matched)"
               AGENT_TYPE="mobile"
             # Enhanced frontend detection - check for Material-UI to catch misrouted tasks
-            elif echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|material-ui|mui|@mui)"; then
+            elif echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|material-ui|mui|@mui|blaze[- .]agent)"; then
               echo "🔍 Auto-detected frontend task (keywords matched)"
               echo "⚠️ WARNING: If Material-UI/MUI keywords detected, this MUST route to Blaze (frontend agent)"
               AGENT_TYPE="frontend"
@@ -2053,11 +2131,26 @@ spec:
 
           # Default language if not specified
           if [ -z "$LANGUAGE" ]; then
-            if [ "$AGENT_TYPE" = "frontend" ] || [ "$AGENT_TYPE" = "ui" ]; then
-              LANGUAGE="typescript"
-            else
-              LANGUAGE="rust"
-            fi
+            case "$AGENT_TYPE" in
+              "go"|"golang"|"grizz")
+                LANGUAGE="go"
+                ;;
+              "node"|"nodejs"|"bun"|"nova")
+                LANGUAGE="typescript"
+                ;;
+              "desktop"|"electron"|"spark")
+                LANGUAGE="typescript"
+                ;;
+              "mobile"|"expo"|"tap"|"react-native")
+                LANGUAGE="typescript"
+                ;;
+              "frontend"|"ui"|"blaze"|"react"|"nextjs")
+                LANGUAGE="typescript"
+                ;;
+              *)
+                LANGUAGE="rust"
+                ;;
+            esac
           fi
 
           echo "   Detected agent type: '${AGENT_TYPE}'"
@@ -2066,8 +2159,8 @@ spec:
 
           # Determine which agent to use based on agent type
           case "$AGENT_TYPE" in
-            "mobile"|"react-native"|"expo"|"ios"|"android")
-              echo "✅ Routing to MOBILE agent (Spark)"
+            "mobile"|"react-native"|"expo"|"ios"|"android"|"tap")
+              echo "✅ Routing to MOBILE agent (Tap)"
               MOBILE_AGENT="{{workflow.parameters.mobile-agent}}"
 
               # Validate mobile-agent is not empty, fallback to frontend-agent
@@ -2106,7 +2199,7 @@ spec:
                 echo "{{workflow.parameters.mobile-max-retries}}" > /tmp/max-retries.txt
               fi
               ;;
-            "frontend"|"ui"|"react"|"nextjs")
+            "frontend"|"ui"|"react"|"nextjs"|"blaze")
               echo "✅ Routing to FRONTEND agent (Blaze)"
               FRONTEND_AGENT="{{workflow.parameters.frontend-agent}}"
 
@@ -2125,6 +2218,104 @@ spec:
                 echo "{{workflow.parameters.frontend-model}}" > /tmp/model.txt
                 echo "{{workflow.parameters.frontend-model-rotation}}" > /tmp/model-rotation.txt
                 echo "{{workflow.parameters.frontend-max-retries}}" > /tmp/max-retries.txt
+              fi
+              ;;
+            "go"|"golang"|"grpc"|"grizz"|"chi"|"protobuf")
+              echo "✅ Routing to GO agent (Grizz)"
+              GO_AGENT="{{workflow.parameters.go-agent}}"
+
+              # Validate go-agent is not empty, fallback to implementation-agent
+              if [ -z "$GO_AGENT" ] || [ "$GO_AGENT" = "" ]; then
+                echo "⚠️ go-agent parameter is empty, falling back to implementation-agent"
+                echo "{{workflow.parameters.implementation-agent}}" > /tmp/github-app.txt
+                echo "{{workflow.parameters.implementation-cli}}" > /tmp/cli-type.txt
+                echo "{{workflow.parameters.implementation-model}}" > /tmp/model.txt
+                echo "{{workflow.parameters.implementation-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.implementation-max-retries}}" > /tmp/max-retries.txt
+              else
+                echo "$GO_AGENT" > /tmp/github-app.txt
+                GO_CLI="{{workflow.parameters.go-cli}}"
+                GO_MODEL="{{workflow.parameters.go-model}}"
+                # Fallback to implementation CLI/model if go-specific not set
+                if [ -z "$GO_CLI" ] || [ "$GO_CLI" = "" ]; then
+                  GO_CLI="{{workflow.parameters.implementation-cli}}"
+                fi
+                if [ -z "$GO_MODEL" ] || [ "$GO_MODEL" = "" ]; then
+                  GO_MODEL="{{workflow.parameters.implementation-model}}"
+                fi
+                echo "$GO_CLI" > /tmp/cli-type.txt
+                echo "$GO_MODEL" > /tmp/model.txt
+                echo "{{workflow.parameters.go-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.go-max-retries}}" > /tmp/max-retries.txt
+              fi
+              ;;
+            "node"|"nodejs"|"bun"|"deno"|"nova"|"elysia"|"effect"|"hono")
+              echo "✅ Routing to NODE agent (Nova)"
+              NODE_AGENT="{{workflow.parameters.node-agent}}"
+
+              # Validate node-agent is not empty, fallback to implementation-agent
+              if [ -z "$NODE_AGENT" ] || [ "$NODE_AGENT" = "" ]; then
+                echo "⚠️ node-agent parameter is empty, falling back to implementation-agent"
+                echo "{{workflow.parameters.implementation-agent}}" > /tmp/github-app.txt
+                echo "{{workflow.parameters.implementation-cli}}" > /tmp/cli-type.txt
+                echo "{{workflow.parameters.implementation-model}}" > /tmp/model.txt
+                echo "{{workflow.parameters.implementation-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.implementation-max-retries}}" > /tmp/max-retries.txt
+              else
+                echo "$NODE_AGENT" > /tmp/github-app.txt
+                NODE_CLI="{{workflow.parameters.node-cli}}"
+                NODE_MODEL="{{workflow.parameters.node-model}}"
+                # Fallback to implementation CLI/model if node-specific not set
+                if [ -z "$NODE_CLI" ] || [ "$NODE_CLI" = "" ]; then
+                  NODE_CLI="{{workflow.parameters.implementation-cli}}"
+                fi
+                if [ -z "$NODE_MODEL" ] || [ "$NODE_MODEL" = "" ]; then
+                  NODE_MODEL="{{workflow.parameters.implementation-model}}"
+                fi
+                echo "$NODE_CLI" > /tmp/cli-type.txt
+                echo "$NODE_MODEL" > /tmp/model.txt
+                echo "{{workflow.parameters.node-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.node-max-retries}}" > /tmp/max-retries.txt
+              fi
+              ;;
+            "desktop"|"electron"|"tauri"|"spark")
+              echo "✅ Routing to DESKTOP agent (Spark)"
+              DESKTOP_AGENT="{{workflow.parameters.desktop-agent}}"
+
+              # Validate desktop-agent is not empty, fallback to frontend-agent
+              if [ -z "$DESKTOP_AGENT" ] || [ "$DESKTOP_AGENT" = "" ]; then
+                echo "⚠️ desktop-agent parameter is empty, falling back to frontend-agent"
+                DESKTOP_AGENT="{{workflow.parameters.frontend-agent}}"
+                if [ -z "$DESKTOP_AGENT" ] || [ "$DESKTOP_AGENT" = "" ]; then
+                  echo "❌ ERROR: Both desktop-agent and frontend-agent are empty!"
+                  echo "⚠️ Falling back to implementation-agent"
+                  echo "{{workflow.parameters.implementation-agent}}" > /tmp/github-app.txt
+                  echo "{{workflow.parameters.implementation-cli}}" > /tmp/cli-type.txt
+                  echo "{{workflow.parameters.implementation-model}}" > /tmp/model.txt
+                  echo "{{workflow.parameters.implementation-model-rotation}}" > /tmp/model-rotation.txt
+                  echo "{{workflow.parameters.implementation-max-retries}}" > /tmp/max-retries.txt
+                else
+                  echo "$DESKTOP_AGENT" > /tmp/github-app.txt
+                  echo "{{workflow.parameters.frontend-cli}}" > /tmp/cli-type.txt
+                  echo "{{workflow.parameters.frontend-model}}" > /tmp/model.txt
+                  echo "{{workflow.parameters.frontend-model-rotation}}" > /tmp/model-rotation.txt
+                  echo "{{workflow.parameters.frontend-max-retries}}" > /tmp/max-retries.txt
+                fi
+              else
+                echo "$DESKTOP_AGENT" > /tmp/github-app.txt
+                DESKTOP_CLI="{{workflow.parameters.desktop-cli}}"
+                DESKTOP_MODEL="{{workflow.parameters.desktop-model}}"
+                # Fallback to frontend CLI/model if desktop-specific not set
+                if [ -z "$DESKTOP_CLI" ] || [ "$DESKTOP_CLI" = "" ]; then
+                  DESKTOP_CLI="{{workflow.parameters.frontend-cli}}"
+                fi
+                if [ -z "$DESKTOP_MODEL" ] || [ "$DESKTOP_MODEL" = "" ]; then
+                  DESKTOP_MODEL="{{workflow.parameters.frontend-model}}"
+                fi
+                echo "$DESKTOP_CLI" > /tmp/cli-type.txt
+                echo "$DESKTOP_MODEL" > /tmp/model.txt
+                echo "{{workflow.parameters.desktop-model-rotation}}" > /tmp/model-rotation.txt
+                echo "{{workflow.parameters.desktop-max-retries}}" > /tmp/max-retries.txt
               fi
               ;;
             *)

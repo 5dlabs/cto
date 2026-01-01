@@ -143,14 +143,24 @@ pub struct PlayConfig {
     pub repository: Option<String>,
     /// Default docs project directory.
     pub docs_project_directory: Option<String>,
-    /// Implementation agent (rex, blaze, etc).
+    /// Implementation agent (rex for Rust).
     pub implementation_agent: String,
+    /// Frontend agent (blaze for React/TS).
+    pub frontend_agent: String,
+    /// Go agent (grizz for Go/gRPC).
+    pub go_agent: Option<String>,
+    /// Node agent (nova for Node.js/Bun).
+    pub node_agent: Option<String>,
+    /// Mobile agent (tap for Expo/React Native).
+    pub mobile_agent: Option<String>,
+    /// Desktop agent (spark for Electron).
+    pub desktop_agent: Option<String>,
     /// Testing agent.
     pub testing_agent: String,
     /// Quality agent.
     pub quality_agent: String,
-    /// Frontend agent.
-    pub frontend_agent: String,
+    /// Security agent.
+    pub security_agent: String,
     /// Primary model.
     pub model: String,
     /// Whether to use parallel execution.
@@ -166,10 +176,17 @@ impl Default for PlayConfig {
             repository: env::var("DEFAULT_REPOSITORY").ok(),
             docs_project_directory: env::var("DOCS_PROJECT_DIRECTORY").ok(),
             implementation_agent: env::var("IMPLEMENTATION_AGENT")
-                .unwrap_or_else(|_| "rex".to_string()),
-            testing_agent: env::var("TESTING_AGENT").unwrap_or_else(|_| "tess".to_string()),
-            quality_agent: env::var("QUALITY_AGENT").unwrap_or_else(|_| "cleo".to_string()),
-            frontend_agent: env::var("FRONTEND_AGENT").unwrap_or_else(|_| "blaze".to_string()),
+                .unwrap_or_else(|_| "5DLabs-Rex".to_string()),
+            frontend_agent: env::var("FRONTEND_AGENT")
+                .unwrap_or_else(|_| "5DLabs-Blaze".to_string()),
+            go_agent: env::var("GO_AGENT").ok(),
+            node_agent: env::var("NODE_AGENT").ok(),
+            mobile_agent: env::var("MOBILE_AGENT").ok(),
+            desktop_agent: env::var("DESKTOP_AGENT").ok(),
+            testing_agent: env::var("TESTING_AGENT").unwrap_or_else(|_| "5DLabs-Tess".to_string()),
+            quality_agent: env::var("QUALITY_AGENT").unwrap_or_else(|_| "5DLabs-Cleo".to_string()),
+            security_agent: env::var("SECURITY_AGENT")
+                .unwrap_or_else(|_| "5DLabs-Cipher".to_string()),
             model: env::var("PLAY_MODEL")
                 .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string()),
             parallel_execution: env::var("PARALLEL_EXECUTION")

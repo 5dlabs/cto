@@ -204,6 +204,14 @@ struct PlayDefaults {
     implementation_agent: String,
     #[serde(rename = "frontendAgent")]
     frontend_agent: Option<String>,
+    #[serde(rename = "goAgent")]
+    go_agent: Option<String>,
+    #[serde(rename = "nodeAgent")]
+    node_agent: Option<String>,
+    #[serde(rename = "mobileAgent")]
+    mobile_agent: Option<String>,
+    #[serde(rename = "desktopAgent")]
+    desktop_agent: Option<String>,
     #[serde(rename = "qualityAgent")]
     quality_agent: String,
     #[serde(rename = "securityAgent")]
@@ -224,6 +232,14 @@ struct PlayDefaults {
     max_retries: Option<u32>,
     #[serde(rename = "implementationMaxRetries")]
     implementation_max_retries: Option<u32>,
+    #[serde(rename = "goMaxRetries")]
+    go_max_retries: Option<u32>,
+    #[serde(rename = "nodeMaxRetries")]
+    node_max_retries: Option<u32>,
+    #[serde(rename = "mobileMaxRetries")]
+    mobile_max_retries: Option<u32>,
+    #[serde(rename = "desktopMaxRetries")]
+    desktop_max_retries: Option<u32>,
     #[serde(rename = "qualityMaxRetries")]
     quality_max_retries: Option<u32>,
     #[serde(rename = "securityMaxRetries")]
@@ -1230,6 +1246,10 @@ struct PlayTask {
     priority: Option<String>,
     #[serde(default)]
     dependencies: Option<Vec<u32>>,
+    /// Agent routing hint - used by workflow templates to determine which agent to use
+    #[serde(default, rename = "agentHint")]
+    #[allow(dead_code)]
+    agent_hint: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2043,6 +2063,258 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             )
         };
 
+    // Handle Go agent - use provided value or config default
+    let go_agent_input = arguments
+        .get("go_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.go_agent.clone())
+        .unwrap_or_default();
+
+    let go_agent_cfg = if !go_agent_input.is_empty() {
+        effective_config
+            .agents
+            .values()
+            .find(|a| a.github_app == go_agent_input)
+    } else {
+        None
+    };
+
+    let (go_agent, go_cli, go_model, go_tools, go_model_rotation) =
+        if let Some(agent_config) = go_agent_cfg {
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()))
+                .unwrap_or_else(|| "{}".to_string());
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        serde_json::to_string(&mr.models).ok()
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+                agent_model_rotation,
+            )
+        } else {
+            (
+                go_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+                "[]".to_string(),
+            )
+        };
+    let go_agent_max_retries = go_agent_cfg.and_then(|cfg| cfg.max_retries);
+
+    // Handle Node agent - use provided value or config default
+    let node_agent_input = arguments
+        .get("node_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.node_agent.clone())
+        .unwrap_or_default();
+
+    let node_agent_cfg = if !node_agent_input.is_empty() {
+        effective_config
+            .agents
+            .values()
+            .find(|a| a.github_app == node_agent_input)
+    } else {
+        None
+    };
+
+    let (node_agent, node_cli, node_model, node_tools, node_model_rotation) =
+        if let Some(agent_config) = node_agent_cfg {
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()))
+                .unwrap_or_else(|| "{}".to_string());
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        serde_json::to_string(&mr.models).ok()
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+                agent_model_rotation,
+            )
+        } else {
+            (
+                node_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+                "[]".to_string(),
+            )
+        };
+    let node_agent_max_retries = node_agent_cfg.and_then(|cfg| cfg.max_retries);
+
+    // Handle Mobile agent - use provided value or config default
+    let mobile_agent_input = arguments
+        .get("mobile_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.mobile_agent.clone())
+        .unwrap_or_default();
+
+    let mobile_agent_cfg = if !mobile_agent_input.is_empty() {
+        effective_config
+            .agents
+            .values()
+            .find(|a| a.github_app == mobile_agent_input)
+    } else {
+        None
+    };
+
+    let (mobile_agent, mobile_cli, mobile_model, mobile_tools, mobile_model_rotation) =
+        if let Some(agent_config) = mobile_agent_cfg {
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()))
+                .unwrap_or_else(|| "{}".to_string());
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        serde_json::to_string(&mr.models).ok()
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+                agent_model_rotation,
+            )
+        } else {
+            (
+                mobile_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+                "[]".to_string(),
+            )
+        };
+    let mobile_agent_max_retries = mobile_agent_cfg.and_then(|cfg| cfg.max_retries);
+
+    // Handle Desktop agent - use provided value or config default
+    let desktop_agent_input = arguments
+        .get("desktop_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.desktop_agent.clone())
+        .unwrap_or_default();
+
+    let desktop_agent_cfg = if !desktop_agent_input.is_empty() {
+        effective_config
+            .agents
+            .values()
+            .find(|a| a.github_app == desktop_agent_input)
+    } else {
+        None
+    };
+
+    let (desktop_agent, desktop_cli, desktop_model, desktop_tools, desktop_model_rotation) =
+        if let Some(agent_config) = desktop_agent_cfg {
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()))
+                .unwrap_or_else(|| "{}".to_string());
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        serde_json::to_string(&mr.models).ok()
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+                agent_model_rotation,
+            )
+        } else {
+            (
+                desktop_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+                "[]".to_string(),
+            )
+        };
+    let desktop_agent_max_retries = desktop_agent_cfg.and_then(|cfg| cfg.max_retries);
+
     // Handle quality agent - use provided value or config default
     let quality_agent_input = arguments
         .get("quality_agent")
@@ -2415,6 +2687,26 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("frontend-model={frontend_model}"),
         format!("frontend-tools={frontend_tools}"),
         format!("frontend-model-rotation={frontend_model_rotation}"),
+        format!("go-agent={go_agent}"),
+        format!("go-cli={go_cli}"),
+        format!("go-model={go_model}"),
+        format!("go-tools={go_tools}"),
+        format!("go-model-rotation={go_model_rotation}"),
+        format!("node-agent={node_agent}"),
+        format!("node-cli={node_cli}"),
+        format!("node-model={node_model}"),
+        format!("node-tools={node_tools}"),
+        format!("node-model-rotation={node_model_rotation}"),
+        format!("mobile-agent={mobile_agent}"),
+        format!("mobile-cli={mobile_cli}"),
+        format!("mobile-model={mobile_model}"),
+        format!("mobile-tools={mobile_tools}"),
+        format!("mobile-model-rotation={mobile_model_rotation}"),
+        format!("desktop-agent={desktop_agent}"),
+        format!("desktop-cli={desktop_cli}"),
+        format!("desktop-model={desktop_model}"),
+        format!("desktop-tools={desktop_tools}"),
+        format!("desktop-model-rotation={desktop_model_rotation}"),
         format!("quality-agent={quality_agent}"),
         format!("quality-cli={quality_cli}"),
         format!("quality-model={quality_model}"),
@@ -2436,6 +2728,24 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "implementation-max-retries={implementation_max_retries}"
     ));
     params.push(format!("frontend-max-retries={frontend_max_retries}"));
+    // Calculate max retries for new agents with fallback to default
+    let default_retries = effective_config.defaults.play.max_retries.unwrap_or(10);
+    let go_max_retries = go_agent_max_retries
+        .or(effective_config.defaults.play.go_max_retries)
+        .unwrap_or(default_retries);
+    let node_max_retries = node_agent_max_retries
+        .or(effective_config.defaults.play.node_max_retries)
+        .unwrap_or(default_retries);
+    let mobile_max_retries = mobile_agent_max_retries
+        .or(effective_config.defaults.play.mobile_max_retries)
+        .unwrap_or(default_retries);
+    let desktop_max_retries = desktop_agent_max_retries
+        .or(effective_config.defaults.play.desktop_max_retries)
+        .unwrap_or(default_retries);
+    params.push(format!("go-max-retries={go_max_retries}"));
+    params.push(format!("node-max-retries={node_max_retries}"));
+    params.push(format!("mobile-max-retries={mobile_max_retries}"));
+    params.push(format!("desktop-max-retries={desktop_max_retries}"));
     params.push(format!("quality-max-retries={quality_max_retries}"));
     params.push(format!("security-max-retries={security_max_retries}"));
     params.push(format!("testing-max-retries={testing_max_retries}"));

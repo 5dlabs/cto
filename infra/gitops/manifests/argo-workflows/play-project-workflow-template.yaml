@@ -62,6 +62,58 @@ spec:
         value: '[]'
       - name: frontend-max-retries
         value: "10"
+      - name: go-agent
+        value: ""
+        description: "Agent for Go/gRPC work (e.g., 5DLabs-Grizz)"
+      - name: go-cli
+        value: ""  # Optional - if empty, falls back to implementation-cli
+      - name: go-model
+        value: ""  # Optional - if empty, falls back to implementation-model
+      - name: go-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: go-model-rotation
+        value: '[]'
+      - name: go-max-retries
+        value: "10"
+      - name: node-agent
+        value: ""
+        description: "Agent for Node.js/Bun work (e.g., 5DLabs-Nova)"
+      - name: node-cli
+        value: ""  # Optional - if empty, falls back to implementation-cli
+      - name: node-model
+        value: ""  # Optional - if empty, falls back to implementation-model
+      - name: node-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: node-model-rotation
+        value: '[]'
+      - name: node-max-retries
+        value: "10"
+      - name: mobile-agent
+        value: ""
+        description: "Agent for mobile/React Native work (e.g., 5DLabs-Tap)"
+      - name: mobile-cli
+        value: ""  # Optional - if empty, falls back to frontend-cli
+      - name: mobile-model
+        value: ""  # Optional - if empty, falls back to frontend-model
+      - name: mobile-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: mobile-model-rotation
+        value: '[]'
+      - name: mobile-max-retries
+        value: "10"
+      - name: desktop-agent
+        value: ""
+        description: "Agent for Electron/Desktop work (e.g., 5DLabs-Spark)"
+      - name: desktop-cli
+        value: ""  # Optional - if empty, falls back to frontend-cli
+      - name: desktop-model
+        value: ""  # Optional - if empty, falls back to frontend-model
+      - name: desktop-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: desktop-model-rotation
+        value: '[]'
+      - name: desktop-max-retries
+        value: "10"
       - name: quality-agent
         value: "5DLabs-Cleo"
       - name: quality-cli
@@ -909,6 +961,54 @@ spec:
                   value: '{{workflow.parameters.frontend-model-rotation}}'
                 - name: frontend-max-retries
                   value: "{{workflow.parameters.frontend-max-retries}}"
+                - name: go-agent
+                  value: "{{workflow.parameters.go-agent}}"
+                - name: go-cli
+                  value: "{{workflow.parameters.go-cli}}"
+                - name: go-model
+                  value: "{{workflow.parameters.go-model}}"
+                - name: go-tools
+                  value: '{{workflow.parameters.go-tools}}'
+                - name: go-model-rotation
+                  value: '{{workflow.parameters.go-model-rotation}}'
+                - name: go-max-retries
+                  value: "{{workflow.parameters.go-max-retries}}"
+                - name: node-agent
+                  value: "{{workflow.parameters.node-agent}}"
+                - name: node-cli
+                  value: "{{workflow.parameters.node-cli}}"
+                - name: node-model
+                  value: "{{workflow.parameters.node-model}}"
+                - name: node-tools
+                  value: '{{workflow.parameters.node-tools}}'
+                - name: node-model-rotation
+                  value: '{{workflow.parameters.node-model-rotation}}'
+                - name: node-max-retries
+                  value: "{{workflow.parameters.node-max-retries}}"
+                - name: mobile-agent
+                  value: "{{workflow.parameters.mobile-agent}}"
+                - name: mobile-cli
+                  value: "{{workflow.parameters.mobile-cli}}"
+                - name: mobile-model
+                  value: "{{workflow.parameters.mobile-model}}"
+                - name: mobile-tools
+                  value: '{{workflow.parameters.mobile-tools}}'
+                - name: mobile-model-rotation
+                  value: '{{workflow.parameters.mobile-model-rotation}}'
+                - name: mobile-max-retries
+                  value: "{{workflow.parameters.mobile-max-retries}}"
+                - name: desktop-agent
+                  value: "{{workflow.parameters.desktop-agent}}"
+                - name: desktop-cli
+                  value: "{{workflow.parameters.desktop-cli}}"
+                - name: desktop-model
+                  value: "{{workflow.parameters.desktop-model}}"
+                - name: desktop-tools
+                  value: '{{workflow.parameters.desktop-tools}}'
+                - name: desktop-model-rotation
+                  value: '{{workflow.parameters.desktop-model-rotation}}'
+                - name: desktop-max-retries
+                  value: "{{workflow.parameters.desktop-max-retries}}"
                 - name: quality-agent
                   value: "{{workflow.parameters.quality-agent}}"
                 - name: quality-cli
@@ -1593,6 +1693,54 @@ spec:
                   value: '{{workflow.parameters.frontend-model-rotation}}'
                 - name: frontend-max-retries
                   value: "{{workflow.parameters.frontend-max-retries}}"
+                - name: go-agent
+                  value: "{{workflow.parameters.go-agent}}"
+                - name: go-cli
+                  value: "{{workflow.parameters.go-cli}}"
+                - name: go-model
+                  value: "{{workflow.parameters.go-model}}"
+                - name: go-tools
+                  value: '{{workflow.parameters.go-tools}}'
+                - name: go-model-rotation
+                  value: '{{workflow.parameters.go-model-rotation}}'
+                - name: go-max-retries
+                  value: "{{workflow.parameters.go-max-retries}}"
+                - name: node-agent
+                  value: "{{workflow.parameters.node-agent}}"
+                - name: node-cli
+                  value: "{{workflow.parameters.node-cli}}"
+                - name: node-model
+                  value: "{{workflow.parameters.node-model}}"
+                - name: node-tools
+                  value: '{{workflow.parameters.node-tools}}'
+                - name: node-model-rotation
+                  value: '{{workflow.parameters.node-model-rotation}}'
+                - name: node-max-retries
+                  value: "{{workflow.parameters.node-max-retries}}"
+                - name: mobile-agent
+                  value: "{{workflow.parameters.mobile-agent}}"
+                - name: mobile-cli
+                  value: "{{workflow.parameters.mobile-cli}}"
+                - name: mobile-model
+                  value: "{{workflow.parameters.mobile-model}}"
+                - name: mobile-tools
+                  value: '{{workflow.parameters.mobile-tools}}'
+                - name: mobile-model-rotation
+                  value: '{{workflow.parameters.mobile-model-rotation}}'
+                - name: mobile-max-retries
+                  value: "{{workflow.parameters.mobile-max-retries}}"
+                - name: desktop-agent
+                  value: "{{workflow.parameters.desktop-agent}}"
+                - name: desktop-cli
+                  value: "{{workflow.parameters.desktop-cli}}"
+                - name: desktop-model
+                  value: "{{workflow.parameters.desktop-model}}"
+                - name: desktop-tools
+                  value: '{{workflow.parameters.desktop-tools}}'
+                - name: desktop-model-rotation
+                  value: '{{workflow.parameters.desktop-model-rotation}}'
+                - name: desktop-max-retries
+                  value: "{{workflow.parameters.desktop-max-retries}}"
                 - name: quality-agent
                   value: "{{workflow.parameters.quality-agent}}"
                 - name: quality-cli
