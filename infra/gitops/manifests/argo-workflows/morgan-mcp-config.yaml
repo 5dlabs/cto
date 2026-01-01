@@ -1,0 +1,47 @@
+---
+# =========================================================================
+# Morgan MCP Configuration
+# =========================================================================
+# ConfigMap containing MCP server configuration for Morgan (intake agent).
+# This enables Morgan to use Firecrawl for URL scraping and Context7 for
+# library documentation lookup during PRD analysis.
+# =========================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: morgan-mcp-config
+  namespace: cto
+  labels:
+    app.kubernetes.io/name: morgan
+    app.kubernetes.io/component: mcp-config
+    app.kubernetes.io/managed-by: gitops
+data:
+  mcp.json: |
+    {
+      "mcpServers": {
+        "tools": {
+          "command": "tools",
+          "args": ["--url", "http://cto-tools.cto.svc.cluster.local:8080/mcp", "--working-dir", "/workspace"],
+          "env": {
+            "TOOLS_SERVER_URL": "http://cto-tools.cto.svc.cluster.local:8080/mcp"
+          },
+          "availableTools": [
+            "mcp_tools_firecrawl_firecrawl_scrape",
+            "mcp_tools_firecrawl_firecrawl_search",
+            "mcp_tools_firecrawl_firecrawl_map",
+            "mcp_tools_firecrawl_firecrawl_crawl",
+            "mcp_tools_firecrawl_firecrawl_extract",
+            "mcp_tools_context7_resolve-library-id",
+            "mcp_tools_context7_get-library-docs",
+            "mcp_tools_openmemory_openmemory_query",
+            "mcp_tools_openmemory_openmemory_store",
+            "mcp_tools_openmemory_openmemory_list",
+            "mcp_tools_github_create_pull_request",
+            "mcp_tools_github_create_branch",
+            "mcp_tools_github_push_files",
+            "mcp_tools_github_get_file_contents",
+            "mcp_tools_github_search_repositories"
+          ]
+        }
+      }
+    }
