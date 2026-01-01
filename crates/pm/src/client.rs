@@ -511,7 +511,7 @@ impl LinearClient {
         }
 
         const MUTATION: &str = r"
-            mutation CreateWorkflowState($teamId: String!, $name: String!, $type: String!, $color: String!) {
+            mutation CreateWorkflowState($teamId: ID!, $name: String!, $type: String!, $color: String!) {
                 workflowStateCreate(input: { teamId: $teamId, name: $name, type: $type, color: $color }) {
                     success
                     workflowState {
@@ -597,7 +597,7 @@ impl LinearClient {
         }
 
         const FIND_QUERY: &str = r"
-            query FindLabel($teamId: String!, $name: String!) {
+            query FindLabel($teamId: ID!, $name: String!) {
                 issueLabels(filter: { 
                     team: { id: { eq: $teamId } },
                     name: { eq: $name }
@@ -640,7 +640,7 @@ impl LinearClient {
         }
 
         const CREATE_MUTATION: &str = r"
-            mutation CreateLabel($teamId: String!, $name: String!) {
+            mutation CreateLabel($teamId: ID!, $name: String!) {
                 issueLabelCreate(input: { teamId: $teamId, name: $name }) {
                     success
                     issueLabel {
