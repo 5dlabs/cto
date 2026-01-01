@@ -624,8 +624,11 @@ mod dependency_routing_tests {
     #[test]
     fn test_frontend_task_inherits_blaze_from_dependency() {
         // Task 35 depends on Task 32 (Next.js init) → should be Blaze
-        let mut nextjs_init =
-            Task::new("32", "Initialize Next.js project", "Create Next.js 15 setup");
+        let mut nextjs_init = Task::new(
+            "32",
+            "Initialize Next.js project",
+            "Create Next.js 15 setup",
+        );
         nextjs_init.agent_hint = Some("blaze".to_string());
 
         let mut page_task = Task::new(
@@ -705,7 +708,10 @@ mod effect_context_tests {
     fn test_effect_with_frontend_context() {
         // Effect Schema in React form validation → Blaze
         assert_eq!(
-            infer_agent_hint("Form validation", "Effect Schema validation in React component"),
+            infer_agent_hint(
+                "Form validation",
+                "Effect Schema validation in React component"
+            ),
             Agent::Blaze
         );
     }
@@ -714,7 +720,10 @@ mod effect_context_tests {
     fn test_effect_with_backend_context() {
         // Effect retry for service delivery → Nova
         assert_eq!(
-            infer_agent_hint("Slack delivery service", "Effect retry with exponential backoff"),
+            infer_agent_hint(
+                "Slack delivery service",
+                "Effect retry with exponential backoff"
+            ),
             Agent::Nova
         );
     }

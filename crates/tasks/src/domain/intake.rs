@@ -273,16 +273,15 @@ impl IntakeDomain {
         // Dependencies are the PRIMARY signal - if a task depends on a Tap/Spark/Blaze
         // initialization task, it should inherit that agent.
         tracing::info!("Adding agent routing hints with dependency analysis...");
-        
+
         // First pass: assign hints to tasks without dependencies or with explicit agents
         // This ensures dependency targets have hints before we check dependencies
         for task in &mut tasks {
             if task.agent_hint.is_none() && task.dependencies.is_empty() {
-                task.agent_hint =
-                    Some(infer_agent_hint_with_deps_str(task, &[]).to_string());
+                task.agent_hint = Some(infer_agent_hint_with_deps_str(task, &[]).to_string());
             }
         }
-        
+
         // Second pass: assign hints considering dependencies
         // Clone tasks for reference since we need to mutate while iterating
         let tasks_snapshot: Vec<_> = tasks.iter().cloned().collect();
