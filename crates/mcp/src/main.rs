@@ -2946,7 +2946,9 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     params.push(format!("node-max-retries={node_max_retries}"));
     params.push(format!("mobile-max-retries={mobile_max_retries}"));
     params.push(format!("desktop-max-retries={desktop_max_retries}"));
-    params.push(format!("infrastructure-max-retries={infrastructure_max_retries}"));
+    params.push(format!(
+        "infrastructure-max-retries={infrastructure_max_retries}"
+    ));
     params.push(format!("quality-max-retries={quality_max_retries}"));
     params.push(format!("security-max-retries={security_max_retries}"));
     params.push(format!("testing-max-retries={testing_max_retries}"));
