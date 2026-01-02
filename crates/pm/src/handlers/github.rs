@@ -438,6 +438,7 @@ async fn create_project_from_intake(
     );
 
     // Step 2: Create the Linear project
+    // TODO: Use template_id from "Play Workflow" template when available
     let project_input = ProjectCreateInput {
         name: project_name.clone(),
         description: Some(format!(
@@ -457,6 +458,7 @@ async fn create_project_from_intake(
         lead_id: None,
         target_date: None,
         default_view: Some(crate::models::ProjectViewType::Board),
+        template_id: None, // Can be set to Play Workflow template ID
     };
 
     let project = client
@@ -514,6 +516,9 @@ pub struct TaskFromJson {
     /// Subtasks
     #[serde(default)]
     pub subtasks: Vec<SubtaskFromJson>,
+    /// Agent hint for delegate assignment (e.g., "rex", "blaze", "bolt")
+    #[serde(default, rename = "agentHint")]
+    pub agent_hint: Option<String>,
 }
 
 /// Subtask from tasks.json
@@ -709,6 +714,9 @@ pub async fn create_issues_from_tasks(
 
         // Create as standalone issue linked to project (not as sub-issue).
         // This enables proper board view in Linear with workflow state columns.
+        //
+        // Note: delegate_id would be set here if we have a mapping from agent name to Linear user ID.
+        // For now, agents can be assigned via Linear UI or through the MCP tools.
         let input = IssueCreateInput {
             team_id: team_id.to_string(),
             title: format!("[Task {}] {}", task.id, task.title),
@@ -718,6 +726,7 @@ pub async fn create_issues_from_tasks(
             label_ids: None,
             project_id: Some(project_id.to_string()),
             state_id: None,
+            delegate_id: None, // TODO: Look up agent ID from task.agent_hint when agent ID cache is available
         };
 
         match client.create_issue(input).await {

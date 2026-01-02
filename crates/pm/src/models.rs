@@ -293,6 +293,9 @@ pub struct IssueCreateInput {
     /// Workflow state ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state_id: Option<String>,
+    /// Delegate (agent) ID for agent assignment
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delegate_id: Option<String>,
 }
 
 /// Input for updating an issue
@@ -507,4 +510,7 @@ pub struct ProjectCreateInput {
     /// Default view type (list or board)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_view: Option<ProjectViewType>,
+    /// Template ID to create project from (use `list_project_templates` to get IDs)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_id: Option<String>,
 }

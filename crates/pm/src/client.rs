@@ -324,6 +324,37 @@ impl LinearClient {
             .ok_or_else(|| anyhow!("Issue not returned after update"))
     }
 
+    /// Update an issue's workflow state by state name
+    ///
+    /// This is a convenience wrapper that looks up the state by name
+    /// and then updates the issue.
+    #[instrument(skip(self), fields(issue_id = %issue_id, state_name = %state_name))]
+    pub async fn update_issue_state(&self, issue_id: &str, state_name: &str) -> Result<Issue> {
+        // First get the issue to find its team
+        let issue = self.get_issue(issue_id).await?;
+        let team = issue
+            .team
+            .as_ref()
+            .ok_or_else(|| anyhow!("Issue has no team assigned"))?;
+        let team_id = &team.id;
+
+        // Find the state by name
+        let state = self
+            .get_state_by_name(team_id, state_name)
+            .await?
+            .ok_or_else(|| anyhow!("Workflow state '{state_name}' not found in team"))?;
+
+        // Update the issue with the state ID
+        self.update_issue(
+            issue_id,
+            crate::models::IssueUpdateInput {
+                state_id: Some(state.id),
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
     /// Create an issue relation (blocking/blocked)
     #[instrument(skip(self, input))]
     pub async fn create_issue_relation(&self, input: IssueRelationCreateInput) -> Result<()> {
