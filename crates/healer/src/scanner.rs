@@ -2,14 +2,117 @@
 //!
 //! Scans Loki logs for errors and warnings across platform namespaces,
 //! analyzing patterns to determine if automated remediation should be triggered.
+//!
+//! The scanner uses log-level-aware patterns to avoid false positives from:
+//! - INFO-level messages containing the word "error" as a command name
+//! - JSON field names like "errorMessages" regardless of value
+//! - Empty error arrays that indicate success, not failure
 
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use tracing::{debug, info};
 
 use crate::loki::{LogEntry, LokiClient};
+
+/// Patterns that indicate an actual error log level (not just keyword matches)
+const ERROR_LEVEL_PATTERNS: &[&str] = &[
+    // Structured log level indicators (key-value style)
+    r#"level[=:]\s*["']?error"#,
+    r#"level[=:]\s*["']?fatal"#,
+    r#"level[=:]\s*["']?ERROR"#,
+    r#"level[=:]\s*["']?FATAL"#,
+    // JSON-style log levels (with quoted keys)
+    r#""level"\s*:\s*"error""#,
+    r#""level"\s*:\s*"fatal""#,
+    r#""level"\s*:\s*"ERROR""#,
+    r#""level"\s*:\s*"FATAL""#,
+    // Bracket-style log levels
+    r"\[ERROR\]",
+    r"\[ERR\]",
+    r"\[FATAL\]",
+    r"\[PANIC\]",
+    // Prefix-style log levels
+    r"^ERROR:",
+    r"^FATAL:",
+    r"^PANIC:",
+    r"^E\s",
+    // Rust-style errors
+    r"error\[E\d{4}\]",
+    r"thread '.*' panicked at",
+    // Go-style errors
+    r"level=error",
+    r"level=fatal",
+    // Python-style errors
+    r"ERROR\s+-\s+",
+    r"CRITICAL\s+-\s+",
+    // Stack traces - more specific patterns to avoid false positives
+    r"(?i)stack\s+trace",
+    r"(?i)traceback\s*\(",
+    r"(?i)Traceback\s+\(most recent",
+    r"(?i)exception\s*:",
+];
+
+/// Patterns that indicate false positives (INFO-level messages with "error" keyword)
+const FALSE_POSITIVE_PATTERNS: &[&str] = &[
+    // Command registration (the word "error" is a command name)
+    r"(?i)Register.*command.*extension.*for.*command.*error",
+    r"(?i)action.*command.*extension.*for.*command.*error",
+    // Empty error arrays in JSON (indicates NO errors)
+    r#""errorMessages"\s*:\s*\[\s*\]"#,
+    r#""errors"\s*:\s*\[\s*\]"#,
+    r"errorMessages.*\[\]",
+    // INFO-level messages that contain "error" as a keyword
+    r"(?i)\bINFO\b.*\berror\b",
+    r"(?i)\[INFO\].*\berror\b",
+    // Debug/trace messages about error handling
+    r"(?i)\bDEBUG\b.*error.*handler",
+    r"(?i)\bTRACE\b.*error.*handling",
+    // Error count reports showing zero errors
+    r"(?i)errors:\s*0\b",
+    r"(?i)error.*count.*:\s*0\b",
+    // Test/mock error messages
+    r"(?i)test.*error",
+    r"(?i)mock.*error",
+    r"(?i)fake.*error",
+];
+
+/// Get compiled regex patterns for error level detection (cached)
+fn get_error_level_regexes() -> &'static Vec<Regex> {
+    static ERROR_LEVEL_REGEX: OnceLock<Vec<Regex>> = OnceLock::new();
+    ERROR_LEVEL_REGEX.get_or_init(|| {
+        ERROR_LEVEL_PATTERNS
+            .iter()
+            .filter_map(|p| match Regex::new(p) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    eprintln!("Failed to compile error level regex '{}': {}", p, e);
+                    None
+                }
+            })
+            .collect()
+    })
+}
+
+/// Get compiled regex patterns for false positive detection (cached)
+fn get_false_positive_regexes() -> &'static Vec<Regex> {
+    static FALSE_POSITIVE_REGEX: OnceLock<Vec<Regex>> = OnceLock::new();
+    FALSE_POSITIVE_REGEX.get_or_init(|| {
+        FALSE_POSITIVE_PATTERNS
+            .iter()
+            .filter_map(|p| match Regex::new(p) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    eprintln!("Failed to compile false positive regex '{}': {}", p, e);
+                    None
+                }
+            })
+            .collect()
+    })
+}
 
 /// Default namespaces to scan for platform health
 pub const DEFAULT_NAMESPACES: &[&str] = &["cto", "automation", "argocd", "infra", "observability"];
@@ -99,6 +202,100 @@ pub struct RemediationCandidate {
     pub suggested_agent: String,
     /// Sample log context
     pub log_context: String,
+}
+
+/// Check if a log line contains an actual error-level indicator.
+///
+/// This function checks for structured log level markers rather than
+/// naive keyword matching, reducing false positives significantly.
+#[must_use]
+pub fn is_actual_error(line: &str) -> bool {
+    // Fast path: if the line doesn't contain any error-like keywords, skip regex
+    let line_lower = line.to_lowercase();
+    if !line_lower.contains("error")
+        && !line_lower.contains("fatal")
+        && !line_lower.contains("panic")
+        && !line_lower.contains("exception")
+        && !line_lower.contains("traceback")
+    {
+        return false;
+    }
+
+    // Check against actual error level patterns
+    get_error_level_regexes().iter().any(|re| re.is_match(line))
+}
+
+/// Check if a log line matches known false positive patterns.
+///
+/// These are INFO-level or other non-error messages that contain
+/// the word "error" as a command name, field name, or in other
+/// non-error contexts.
+#[must_use]
+pub fn is_false_positive(line: &str) -> bool {
+    get_false_positive_regexes()
+        .iter()
+        .any(|re| re.is_match(line))
+}
+
+/// Filter log entries to remove false positives and keep only actual errors.
+///
+/// This applies log-level-aware filtering to distinguish between:
+/// - Actual ERROR/FATAL level logs that need attention
+/// - INFO-level logs that happen to contain the word "error"
+pub fn filter_actual_errors(entries: Vec<LogEntry>) -> Vec<LogEntry> {
+    let original_count = entries.len();
+
+    let filtered: Vec<LogEntry> = entries
+        .into_iter()
+        .filter(|entry| {
+            // Check if it's a known false positive first (fast reject)
+            if is_false_positive(&entry.line) {
+                debug!(
+                    "Filtering out false positive: {}",
+                    truncate_line(&entry.line, 100)
+                );
+                return false;
+            }
+
+            // Check if it contains actual error level indicators
+            // If it doesn't match our error patterns but was caught by keyword search,
+            // it's likely a false positive
+            let has_error_keyword = entry.line.to_lowercase().contains("error")
+                || entry.line.to_lowercase().contains("fatal")
+                || entry.line.to_lowercase().contains("panic");
+
+            if has_error_keyword && !is_actual_error(&entry.line) {
+                debug!(
+                    "Filtering out keyword-only match: {}",
+                    truncate_line(&entry.line, 100)
+                );
+                return false;
+            }
+
+            true
+        })
+        .collect();
+
+    let filtered_count = filtered.len();
+    if original_count != filtered_count {
+        info!(
+            "Filtered {} false positives from {} entries ({} remaining)",
+            original_count - filtered_count,
+            original_count,
+            filtered_count
+        );
+    }
+
+    filtered
+}
+
+/// Truncate a line for logging purposes.
+fn truncate_line(line: &str, max_len: usize) -> String {
+    if line.len() <= max_len {
+        line.to_string()
+    } else {
+        format!("{}...", &line[..max_len])
+    }
 }
 
 /// Log scanner for periodic health checks
@@ -206,6 +403,18 @@ impl LogScanner {
                         error_entries.push(entry);
                     }
                 }
+            }
+
+            // Filter out false positives from error entries
+            // This removes INFO-level logs that contain "error" as a keyword but are not actual errors
+            let pre_filter_count = error_entries.len();
+            error_entries = filter_actual_errors(error_entries);
+            if pre_filter_count != error_entries.len() {
+                info!(
+                    "Namespace {}: filtered {} false positives from error entries",
+                    namespace,
+                    pre_filter_count - error_entries.len()
+                );
             }
 
             // Query for warning-level logs (including platform-specific patterns)
@@ -713,5 +922,147 @@ mod tests {
         // Lower threshold (3) to catch platform issues early
         assert_eq!(config.error_threshold, 3);
         assert!(config.namespaces.contains(&"cto".to_string()));
+    }
+
+    // Tests for false positive detection
+    #[test]
+    fn test_is_false_positive_command_registration() {
+        // These are INFO-level messages where "error" is a command name, not an error
+        assert!(is_false_positive(
+            "F [WORKER 2026-01-01 22:54:07Z INFO ActionCommandManager] Register action command extension for command error"
+        ));
+        assert!(is_false_positive(
+            "[INFO] Register action command extension for command error"
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_empty_error_arrays() {
+        // Empty error arrays indicate NO errors occurred
+        assert!(is_false_positive(r#"  "errorMessages": [],"#));
+        assert!(is_false_positive(r#"{"errors": [], "warnings": []}"#));
+        assert!(is_false_positive(r#"errorMessages: []"#));
+    }
+
+    #[test]
+    fn test_is_false_positive_info_level_with_error_keyword() {
+        // INFO-level logs that happen to contain the word "error"
+        assert!(is_false_positive(
+            "[INFO] Processing error handler registration"
+        ));
+        assert!(is_false_positive("INFO error recovery completed"));
+    }
+
+    #[test]
+    fn test_is_false_positive_zero_error_counts() {
+        // Reports showing zero errors
+        assert!(is_false_positive("errors: 0"));
+        assert!(is_false_positive("error count: 0"));
+    }
+
+    #[test]
+    fn test_is_actual_error_rust_errors() {
+        // Rust compiler errors should be detected
+        assert!(is_actual_error("error[E0382]: borrow of moved value"));
+        assert!(is_actual_error(
+            "thread 'main' panicked at 'assertion failed'"
+        ));
+    }
+
+    #[test]
+    fn test_is_actual_error_structured_log_levels() {
+        // Structured log level indicators
+        assert!(is_actual_error("level=error msg=\"something failed\""));
+        assert!(is_actual_error(r#"{"level": "error", "msg": "failed"}"#));
+        assert!(is_actual_error("[ERROR] Connection refused"));
+        assert!(is_actual_error("[FATAL] Database unavailable"));
+    }
+
+    #[test]
+    fn test_is_actual_error_stack_traces() {
+        // Stack traces and exceptions
+        assert!(is_actual_error("exception: NullPointerException"));
+        assert!(is_actual_error("Traceback (most recent call last):"));
+        assert!(is_actual_error(
+            "java.lang.RuntimeException: Error\n\tat stack trace"
+        ));
+    }
+
+    #[test]
+    fn test_is_not_actual_error_info_messages() {
+        // INFO-level messages should NOT be detected as actual errors
+        assert!(!is_actual_error("INFO: Processing error handler"));
+        assert!(!is_actual_error("[INFO] Error recovery complete"));
+        assert!(!is_actual_error(
+            "Register command extension for command error"
+        ));
+    }
+
+    #[test]
+    fn test_filter_actual_errors_removes_false_positives() {
+        use chrono::Utc;
+
+        let entries = vec![
+            // False positive: command registration
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-01 22:54:07Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+            // False positive: empty error array
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"  "errorMessages": [],"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual error: Rust compiler error
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "error[E0382]: borrow of moved value".to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual error: ERROR level log
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "[ERROR] Database connection failed".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out the 2 false positives
+        assert_eq!(filtered.len(), 2);
+
+        // Verify the actual errors are retained
+        assert!(filtered.iter().any(|e| e.line.contains("error[E0382]")));
+        assert!(filtered.iter().any(|e| e.line.contains("[ERROR]")));
+
+        // Verify false positives are removed
+        assert!(!filtered
+            .iter()
+            .any(|e| e.line.contains("command extension")));
+        assert!(!filtered.iter().any(|e| e.line.contains("errorMessages")));
+    }
+
+    #[test]
+    fn test_filter_actual_errors_preserves_all_when_no_false_positives() {
+        use chrono::Utc;
+
+        let entries = vec![
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "[ERROR] Connection refused".to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "level=error msg=\"timeout\"".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+        assert_eq!(filtered.len(), 2);
     }
 }
