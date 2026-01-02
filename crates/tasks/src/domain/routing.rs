@@ -562,7 +562,7 @@ fn check_explicit_agent(title: &str, description: &str) -> Option<Agent> {
 
     // Check for "AgentName:" prefix in title (common LLM output pattern)
     // This handles cases like "Rex: Dead Letter Queue" or "Grizz: JWT Auth"
-    if title_lower.starts_with("nova:") || title_lower.starts_with("nova :")  {
+    if title_lower.starts_with("nova:") || title_lower.starts_with("nova :") {
         return Some(Agent::Nova);
     }
     if title_lower.starts_with("grizz:") || title_lower.starts_with("grizz :") {
@@ -721,7 +721,10 @@ mod tests {
             Some(Agent::Grizz)
         );
         assert_eq!(
-            infer_agent_hint("Blaze: Authentication with Better Auth", "Implement auth flow"),
+            infer_agent_hint(
+                "Blaze: Authentication with Better Auth",
+                "Implement auth flow"
+            ),
             Some(Agent::Blaze)
         );
         assert_eq!(
@@ -729,7 +732,10 @@ mod tests {
             Some(Agent::Tap)
         );
         assert_eq!(
-            infer_agent_hint("Nova: Slack Delivery Service", "Implement Slack integration"),
+            infer_agent_hint(
+                "Nova: Slack Delivery Service",
+                "Implement Slack integration"
+            ),
             Some(Agent::Nova)
         );
         assert_eq!(
@@ -858,7 +864,10 @@ mod tests {
             Some(Agent::Nova)
         );
         assert_eq!(
-            infer_agent_hint("Deduplication Service", "Notification deduplication with TTL"),
+            infer_agent_hint(
+                "Deduplication Service",
+                "Notification deduplication with TTL"
+            ),
             Some(Agent::Nova)
         );
     }
