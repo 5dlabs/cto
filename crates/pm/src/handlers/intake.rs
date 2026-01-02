@@ -1026,7 +1026,32 @@ pub async fn create_task_issues_with_project(
         // Format task description with details.
         let description = format_task_description(task);
 
-        let mut label_ids = vec![cto_task_label.id.clone(), agent_pending_label.id.clone()];
+        let mut label_ids = vec![cto_task_label.id.clone()];
+
+        // Add agent label based on agent_hint (e.g., "agent:rex", "agent:blaze")
+        // This allows filtering/grouping by assigned agent in Linear
+        if !task.agent_hint.is_empty() {
+            let agent_label_name = format!("agent:{}", task.agent_hint.to_lowercase());
+            match client
+                .get_or_create_label(&request.team_id, &agent_label_name)
+                .await
+            {
+                Ok(label) => label_ids.push(label.id),
+                Err(e) => {
+                    warn!(
+                        task_id = %task.id,
+                        agent = %task.agent_hint,
+                        error = %e,
+                        "Failed to create agent label, using pending"
+                    );
+                    label_ids.push(agent_pending_label.id.clone());
+                }
+            }
+        } else {
+            // No agent hint - mark as pending for manual assignment
+            label_ids.push(agent_pending_label.id.clone());
+        }
+
         if let Some(label) = priority_label {
             label_ids.push(label.id);
         }
