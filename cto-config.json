@@ -46,6 +46,7 @@
       "nodeAgent": "5DLabs-Nova",
       "mobileAgent": "5DLabs-Tap",
       "desktopAgent": "5DLabs-Spark",
+      "infrastructureAgent": "5DLabs-Bolt",
       "qualityAgent": "5DLabs-Cleo",
       "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",

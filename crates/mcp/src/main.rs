@@ -212,6 +212,8 @@ struct PlayDefaults {
     mobile_agent: Option<String>,
     #[serde(rename = "desktopAgent")]
     desktop_agent: Option<String>,
+    #[serde(rename = "infrastructureAgent")]
+    infrastructure_agent: Option<String>,
     #[serde(rename = "qualityAgent")]
     quality_agent: String,
     #[serde(rename = "securityAgent")]
@@ -240,6 +242,8 @@ struct PlayDefaults {
     mobile_max_retries: Option<u32>,
     #[serde(rename = "desktopMaxRetries")]
     desktop_max_retries: Option<u32>,
+    #[serde(rename = "infrastructureMaxRetries")]
+    infrastructure_max_retries: Option<u32>,
     #[serde(rename = "qualityMaxRetries")]
     quality_max_retries: Option<u32>,
     #[serde(rename = "securityMaxRetries")]
@@ -2435,6 +2439,74 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         };
     let desktop_agent_max_retries = desktop_agent_cfg.and_then(|cfg| cfg.max_retries);
 
+    // Handle Infrastructure agent (Bolt) - use provided value or config default
+    let infrastructure_agent_input = arguments
+        .get("infrastructure_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.infrastructure_agent.clone())
+        .unwrap_or_default();
+
+    let infrastructure_agent_cfg = if infrastructure_agent_input.is_empty() {
+        None
+    } else {
+        effective_config
+            .agents
+            .values()
+            .find(|a| a.github_app == infrastructure_agent_input)
+    };
+
+    let (
+        infrastructure_agent,
+        infrastructure_cli,
+        infrastructure_model,
+        infrastructure_tools,
+        infrastructure_model_rotation,
+    ) = if let Some(agent_config) = infrastructure_agent_cfg {
+        let agent_cli = if agent_config.cli.is_empty() {
+            cli.clone()
+        } else {
+            agent_config.cli.clone()
+        };
+        let agent_model = if user_provided_model.is_some() || agent_config.model.is_empty() {
+            model.clone()
+        } else {
+            agent_config.model.clone()
+        };
+        let agent_tools = agent_config
+            .tools
+            .as_ref()
+            .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()))
+            .unwrap_or_else(|| "{}".to_string());
+        let agent_model_rotation = agent_config
+            .model_rotation
+            .as_ref()
+            .and_then(|mr| {
+                if mr.enabled && !mr.models.is_empty() {
+                    serde_json::to_string(&mr.models).ok()
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "[]".to_string());
+        (
+            agent_config.github_app.clone(),
+            agent_cli,
+            agent_model,
+            agent_tools,
+            agent_model_rotation,
+        )
+    } else {
+        (
+            infrastructure_agent_input.clone(),
+            cli.clone(),
+            model.clone(),
+            "{}".to_string(),
+            "[]".to_string(),
+        )
+    };
+    let infrastructure_agent_max_retries = infrastructure_agent_cfg.and_then(|cfg| cfg.max_retries);
+
     // Handle quality agent - use provided value or config default
     let quality_agent_input = arguments
         .get("quality_agent")
@@ -2827,6 +2899,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("desktop-model={desktop_model}"),
         format!("desktop-tools={desktop_tools}"),
         format!("desktop-model-rotation={desktop_model_rotation}"),
+        format!("infrastructure-agent={infrastructure_agent}"),
+        format!("infrastructure-cli={infrastructure_cli}"),
+        format!("infrastructure-model={infrastructure_model}"),
+        format!("infrastructure-tools={infrastructure_tools}"),
+        format!("infrastructure-model-rotation={infrastructure_model_rotation}"),
         format!("quality-agent={quality_agent}"),
         format!("quality-cli={quality_cli}"),
         format!("quality-model={quality_model}"),
@@ -2862,10 +2939,14 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let desktop_max_retries = desktop_agent_max_retries
         .or(effective_config.defaults.play.desktop_max_retries)
         .unwrap_or(default_retries);
+    let infrastructure_max_retries = infrastructure_agent_max_retries
+        .or(effective_config.defaults.play.infrastructure_max_retries)
+        .unwrap_or(default_retries);
     params.push(format!("go-max-retries={go_max_retries}"));
     params.push(format!("node-max-retries={node_max_retries}"));
     params.push(format!("mobile-max-retries={mobile_max_retries}"));
     params.push(format!("desktop-max-retries={desktop_max_retries}"));
+    params.push(format!("infrastructure-max-retries={infrastructure_max_retries}"));
     params.push(format!("quality-max-retries={quality_max_retries}"));
     params.push(format!("security-max-retries={security_max_retries}"));
     params.push(format!("testing-max-retries={testing_max_retries}"));
