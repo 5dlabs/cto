@@ -644,6 +644,17 @@ tools:
           ARGOCD_BASE_URL: "${ARGOCD_BASE_URL:-https://argocd.platform.local}"
           ARGOCD_API_TOKEN: "${ARGOCD_API_TOKEN}"
 
+      argo-workflows:
+        name: "Argo Workflows"
+        description: "Argo Workflows management - list, monitor, submit workflows, manage templates and cron workflows"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "argo-workflow-mcp-server"]
+        workingDirectory: "/tmp"
+        env:
+          ARGO_BASE_URL: "${ARGO_WORKFLOWS_URL:-http://argo-workflows-server.automation.svc:2746}"
+          ARGO_TOKEN: "${ARGO_WORKFLOWS_TOKEN}"
+
       # --- Cloud Storage ---
       s3:
         name: "S3 Storage"
