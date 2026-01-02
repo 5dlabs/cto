@@ -7,12 +7,13 @@ use axum::{extract::State, http::StatusCode, response::Json};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use super::intake::{
     create_intake_project, create_task_issues_with_project, generate_completion_summary,
     IntakeRequest, IntakeTask, TasksJson, TechStack,
 };
+use crate::activities::PlanStep;
 use crate::config::CtoConfig;
 use crate::models::AgentStatus;
 use crate::LinearClient;
@@ -40,6 +41,15 @@ pub struct IntakeCompleteCallback {
     /// Error message if failed.
     #[serde(default)]
     pub error: Option<String>,
+    /// GitHub repository (e.g., "5dlabs/my-project") - for attachments.
+    #[serde(default)]
+    pub repository: Option<String>,
+    /// Branch name (e.g., "main") - for attachments.
+    #[serde(default)]
+    pub branch: Option<String>,
+    /// Project directory within repository - for attachments.
+    #[serde(default)]
+    pub project_directory: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -111,6 +121,19 @@ pub async fn handle_intake_complete(
         })));
     };
 
+    // Fetch the PRD issue to check if it already belongs to a project
+    let existing_project = match client.get_issue(&payload.issue_id).await {
+        Ok(issue) => issue.project,
+        Err(e) => {
+            warn!(
+                issue_id = %payload.issue_id,
+                error = %e,
+                "Failed to fetch PRD issue for project check"
+            );
+            None
+        }
+    };
+
     // Create intake request from callback
     let request = IntakeRequest {
         session_id: payload.session_id.clone(),
@@ -129,36 +152,93 @@ pub async fn handle_intake_complete(
         source_branch: None,
         tech_stack: TechStack::default(), // Not needed for issue creation
         cto_config: CtoConfig::default(), // Not needed for issue creation
+        existing_project,
     };
 
-    // Create project first
-    if let Err(e) = client
-        .emit_thought(
-            &payload.session_id,
-            "Creating Linear project for this intake...",
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to emit thought activity");
-    }
+    // Check if PRD issue already has a project (hybrid approach)
+    let project = if let Some(ref existing_project) = request.existing_project {
+        // Use existing project - PRD is already part of it
+        info!(
+            session_id = %payload.session_id,
+            project_id = %existing_project.id,
+            project_name = %existing_project.name,
+            "Using existing project from PRD issue"
+        );
 
-    let project = match create_intake_project(client, &request, payload.tasks.len()).await {
-        Ok(p) => {
-            info!(
-                session_id = %payload.session_id,
-                project_id = %p.id,
-                project_name = %p.name,
-                "Created project for intake"
-            );
-            Some(p)
+        if let Err(e) = client
+            .emit_thought(
+                &payload.session_id,
+                format!(
+                    "Using existing project **{}** for this intake...",
+                    existing_project.name
+                ),
+            )
+            .await
+        {
+            warn!(error = %e, "Failed to emit thought activity");
         }
-        Err(e) => {
-            warn!(
-                session_id = %payload.session_id,
-                error = %e,
-                "Failed to create project, continuing without project"
-            );
-            None
+
+        Some(existing_project.clone())
+    } else {
+        // Create new project (original behavior)
+        if let Err(e) = client
+            .emit_thought(
+                &payload.session_id,
+                "Creating Linear project for this intake...",
+            )
+            .await
+        {
+            warn!(error = %e, "Failed to emit thought activity");
+        }
+
+        match create_intake_project(client, &request, payload.tasks.len()).await {
+            Ok(p) => {
+                info!(
+                    session_id = %payload.session_id,
+                    project_id = %p.id,
+                    project_name = %p.name,
+                    "Created project for intake"
+                );
+
+                // Add the PRD issue to the project so it appears in the board view
+                // This makes the PRD the "anchor" issue in the project
+                match client
+                    .update_issue(
+                        &request.prd_issue_id,
+                        crate::models::IssueUpdateInput {
+                            project_id: Some(p.id.clone()),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                {
+                    Ok(_) => {
+                        info!(
+                            prd_issue = %request.prd_issue_id,
+                            project_id = %p.id,
+                            "Added PRD issue to project"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(
+                            prd_issue = %request.prd_issue_id,
+                            project_id = %p.id,
+                            error = %e,
+                            "Failed to add PRD issue to project"
+                        );
+                    }
+                }
+
+                Some(p)
+            }
+            Err(e) => {
+                warn!(
+                    session_id = %payload.session_id,
+                    error = %e,
+                    "Failed to create project, continuing without project"
+                );
+                None
+            }
         }
     };
 
@@ -184,6 +264,62 @@ pub async fn handle_intake_complete(
                 project_id = ?project_id,
                 "Created task issues"
             );
+
+            // Create PRD and architecture doc attachments if repository info is available
+            if let (Some(repository), Some(branch), Some(project_dir)) = (
+                &payload.repository,
+                &payload.branch,
+                &payload.project_directory,
+            ) {
+                // Attach PRD document
+                let prd_url = format!(
+                    "https://github.com/{}/blob/{}/{}/.tasks/docs/prd.md",
+                    repository, branch, project_dir
+                );
+                let prd_attachment = crate::models::AttachmentCreateInput {
+                    issue_id: request.prd_issue_id.clone(),
+                    url: prd_url.clone(),
+                    title: "PRD Document".to_string(),
+                    subtitle: Some(format!("{} tasks generated", created_count)),
+                };
+                match client.create_attachment(prd_attachment).await {
+                    Ok(attachment) => {
+                        info!(
+                            attachment_id = %attachment.id,
+                            issue_id = %request.prd_issue_id,
+                            "Attached PRD document to issue"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "Failed to attach PRD document");
+                    }
+                }
+
+                // Attach architecture document
+                let arch_url = format!(
+                    "https://github.com/{}/blob/{}/{}/.tasks/docs/architecture.md",
+                    repository, branch, project_dir
+                );
+                let arch_attachment = crate::models::AttachmentCreateInput {
+                    issue_id: request.prd_issue_id.clone(),
+                    url: arch_url.clone(),
+                    title: "Architecture".to_string(),
+                    subtitle: Some("Design & structure".to_string()),
+                };
+                match client.create_attachment(arch_attachment).await {
+                    Ok(attachment) => {
+                        info!(
+                            attachment_id = %attachment.id,
+                            issue_id = %request.prd_issue_id,
+                            "Attached architecture document to issue"
+                        );
+                    }
+                    Err(e) => {
+                        // Architecture doc is optional, just debug log
+                        debug!(error = %e, "Failed to attach architecture document (may not exist)");
+                    }
+                }
+            }
 
             // Generate and emit completion summary
             let summary = generate_completion_summary(&request, &payload.tasks, &task_issue_map);
@@ -246,6 +382,15 @@ pub struct TasksJsonCallback {
     /// Workflow name.
     #[serde(default)]
     pub workflow_name: Option<String>,
+    /// GitHub repository (e.g., "5dlabs/my-project") - for attachments.
+    #[serde(default)]
+    pub repository: Option<String>,
+    /// Branch name (e.g., "main") - for attachments.
+    #[serde(default)]
+    pub branch: Option<String>,
+    /// Project directory within repository - for attachments.
+    #[serde(default)]
+    pub project_directory: Option<String>,
 }
 
 /// Handle callback with raw tasks.json content.
@@ -275,6 +420,9 @@ pub async fn handle_tasks_json_callback(
         workflow_name: payload.workflow_name,
         success: true,
         error: None,
+        repository: payload.repository,
+        branch: payload.branch,
+        project_directory: payload.project_directory,
     };
 
     handle_intake_complete(state, Json(full_callback)).await
@@ -305,6 +453,7 @@ pub struct PlayCompleteCallback {
 ///
 /// This is called by the Argo play workflow when it completes.
 /// It updates the Linear issue state, agent status label, and emits completion activity.
+#[allow(clippy::too_many_lines)]
 pub async fn handle_play_complete(
     State(state): State<Arc<CallbackState>>,
     Json(payload): Json<PlayCompleteCallback>,
@@ -354,6 +503,23 @@ pub async fn handle_play_complete(
     }
 
     if success {
+        // Update plan to show all completed
+        if let Err(e) = client
+            .update_plan(
+                &payload.linear_session_id,
+                vec![
+                    PlanStep::completed("Implementation"),
+                    PlanStep::completed("Quality review"),
+                    PlanStep::completed("Security audit"),
+                    PlanStep::completed("Testing"),
+                    PlanStep::completed("Create PR"),
+                ],
+            )
+            .await
+        {
+            warn!(error = %e, "Failed to update play completion plan");
+        }
+
         // Emit success response
         let summary = format!(
             "## Task Implementation Complete\n\n\
@@ -424,6 +590,233 @@ pub async fn handle_play_complete(
     })))
 }
 
+/// Handle PR created callback from agents.
+///
+/// This is called when an agent creates a PR for a task.
+/// It links the PR to the Linear issue as an attachment and updates the agent status.
+pub async fn handle_pr_created(
+    State(state): State<Arc<CallbackState>>,
+    Json(payload): Json<PrCreatedCallback>,
+) -> Result<Json<Value>, StatusCode> {
+    info!(
+        session_id = %payload.linear_session_id,
+        issue_id = %payload.linear_issue_id,
+        pr_url = %payload.pr_url,
+        "Received PR created callback"
+    );
+
+    // Get Linear client
+    let Some(client) = &state.linear_client else {
+        error!("Linear client not configured");
+        return Ok(Json(json!({
+            "status": "error",
+            "error": "Linear client not configured",
+            "session_id": payload.linear_session_id
+        })));
+    };
+
+    // Create attachment to link PR to issue
+    let pr_title = payload.pr_title.clone().unwrap_or_else(|| {
+        if let Some(num) = payload.pr_number {
+            format!("Pull Request #{num}")
+        } else {
+            "Pull Request".to_string()
+        }
+    });
+
+    let subtitle = payload.repository.as_ref().map(|r| format!("on {r}"));
+
+    let attachment_input = crate::models::AttachmentCreateInput {
+        issue_id: payload.linear_issue_id.clone(),
+        url: payload.pr_url.clone(),
+        title: pr_title.clone(),
+        subtitle,
+    };
+
+    match client.create_attachment(attachment_input).await {
+        Ok(attachment) => {
+            info!(
+                attachment_id = %attachment.id,
+                pr_url = %payload.pr_url,
+                issue_id = %payload.linear_issue_id,
+                "Linked PR to Linear issue"
+            );
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                pr_url = %payload.pr_url,
+                issue_id = %payload.linear_issue_id,
+                "Failed to create attachment for PR"
+            );
+        }
+    }
+
+    // Update agent status label to pr-created
+    if let Err(e) = client
+        .update_agent_status_label(
+            &payload.linear_issue_id,
+            &payload.linear_team_id,
+            AgentStatus::PrCreated,
+        )
+        .await
+    {
+        warn!(error = %e, "Failed to update agent status label to pr-created");
+    }
+
+    // Emit activity to Linear session
+    let message = format!(
+        "## 🔗 Pull Request Created\n\n\
+         **PR:** [{}]({})\n\n\
+         The implementation is ready for review.",
+        pr_title, payload.pr_url
+    );
+
+    if let Err(e) = client
+        .emit_response(&payload.linear_session_id, &message)
+        .await
+    {
+        warn!(error = %e, "Failed to emit PR created response");
+    }
+
+    Ok(Json(json!({
+        "status": "success",
+        "session_id": payload.linear_session_id,
+        "pr_url": payload.pr_url,
+        "linked": true
+    })))
+}
+
+/// Handle agent work started callback.
+///
+/// This is called when an agent begins work on a task.
+/// It sets the delegate, moves to started state, and updates labels.
+#[allow(clippy::too_many_lines)]
+pub async fn handle_agent_work_started(
+    State(state): State<Arc<CallbackState>>,
+    Json(payload): Json<AgentWorkStartedCallback>,
+) -> Result<Json<Value>, StatusCode> {
+    info!(
+        session_id = %payload.linear_session_id,
+        issue_id = %payload.linear_issue_id,
+        agent_name = ?payload.agent_name,
+        "Received agent work started callback"
+    );
+
+    // Get Linear client
+    let Some(client) = &state.linear_client else {
+        error!("Linear client not configured");
+        return Ok(Json(json!({
+            "status": "error",
+            "error": "Linear client not configured",
+            "session_id": payload.linear_session_id
+        })));
+    };
+
+    let mut updates_applied = Vec::new();
+
+    // Set delegate if agent_id is provided
+    if let Some(agent_id) = &payload.agent_id {
+        let update_input = crate::models::IssueUpdateInput {
+            delegate_id: Some(agent_id.clone()),
+            ..Default::default()
+        };
+
+        match client
+            .update_issue(&payload.linear_issue_id, update_input)
+            .await
+        {
+            Ok(_) => {
+                info!(
+                    issue_id = %payload.linear_issue_id,
+                    agent_id = %agent_id,
+                    "Set delegate on Linear issue"
+                );
+                updates_applied.push("delegate");
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    issue_id = %payload.linear_issue_id,
+                    "Failed to set delegate on Linear issue"
+                );
+            }
+        }
+    }
+
+    // Move to started state
+    match client.get_started_state(&payload.linear_team_id).await {
+        Ok(started_state) => {
+            let update_input = crate::models::IssueUpdateInput {
+                state_id: Some(started_state.id.clone()),
+                ..Default::default()
+            };
+
+            match client
+                .update_issue(&payload.linear_issue_id, update_input)
+                .await
+            {
+                Ok(_) => {
+                    info!(
+                        issue_id = %payload.linear_issue_id,
+                        state = %started_state.name,
+                        "Moved Linear issue to started state"
+                    );
+                    updates_applied.push("state");
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        issue_id = %payload.linear_issue_id,
+                        "Failed to move issue to started state"
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                team_id = %payload.linear_team_id,
+                "Failed to get started state for team"
+            );
+        }
+    }
+
+    // Update agent status label to working
+    if let Err(e) = client
+        .update_agent_status_label(
+            &payload.linear_issue_id,
+            &payload.linear_team_id,
+            AgentStatus::Working,
+        )
+        .await
+    {
+        warn!(error = %e, "Failed to update agent status label to working");
+    } else {
+        updates_applied.push("label");
+    }
+
+    // Emit activity to Linear session
+    let agent_name = payload.agent_name.as_deref().unwrap_or("Agent");
+    let message = format!(
+        "## 🚀 Work Started\n\n\
+         **{agent_name}** has started working on this task."
+    );
+
+    if let Err(e) = client
+        .emit_thought(&payload.linear_session_id, &message)
+        .await
+    {
+        warn!(error = %e, "Failed to emit work started thought");
+    }
+
+    Ok(Json(json!({
+        "status": "success",
+        "session_id": payload.linear_session_id,
+        "updates_applied": updates_applied
+    })))
+}
+
 /// Task status from sidecar.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SidecarTaskStatus {
@@ -459,6 +852,55 @@ pub struct StatusSyncPayload {
     pub status: SidecarTaskStatus,
     /// Workflow name
     pub workflow_name: String,
+}
+
+/// Callback payload for PR creation events.
+///
+/// Sent by agents when they create a pull request, allowing us to link it to the Linear issue.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PrCreatedCallback {
+    /// Linear session ID for activity updates.
+    pub linear_session_id: String,
+    /// Linear issue ID (task issue).
+    pub linear_issue_id: String,
+    /// Linear team ID.
+    pub linear_team_id: String,
+    /// Pull request URL.
+    pub pr_url: String,
+    /// Pull request title.
+    #[serde(default)]
+    pub pr_title: Option<String>,
+    /// Pull request number.
+    #[serde(default)]
+    pub pr_number: Option<u64>,
+    /// Repository name.
+    #[serde(default)]
+    pub repository: Option<String>,
+}
+
+/// Callback payload for agent work started events.
+///
+/// Sent when an agent begins work on a task. This triggers:
+/// - Setting the agent as delegate on the issue
+/// - Moving the issue to "started" state
+/// - Updating the agent status label to "working"
+#[derive(Debug, Clone, Deserialize)]
+pub struct AgentWorkStartedCallback {
+    /// Linear session ID for activity updates.
+    pub linear_session_id: String,
+    /// Linear issue ID (task issue).
+    pub linear_issue_id: String,
+    /// Linear team ID.
+    pub linear_team_id: String,
+    /// Agent ID (Linear user ID for the agent app).
+    #[serde(default)]
+    pub agent_id: Option<String>,
+    /// Agent name (e.g., "Rex", "Blaze").
+    #[serde(default)]
+    pub agent_name: Option<String>,
+    /// Workflow name.
+    #[serde(default)]
+    pub workflow_name: Option<String>,
 }
 
 /// Handle status sync from sidecar.
@@ -561,6 +1003,37 @@ pub async fn handle_status_sync(
         }
     };
 
+    // Link PR to issue if URL is provided
+    let mut pr_linked = false;
+    if let Some(pr_url) = &payload.status.pr_url {
+        // Create attachment to link PR to issue
+        let attachment_input = crate::models::AttachmentCreateInput {
+            issue_id: payload.linear_issue_id.clone(),
+            url: pr_url.clone(),
+            title: "Pull Request".to_string(),
+            subtitle: None,
+        };
+
+        match client.create_attachment(attachment_input).await {
+            Ok(attachment) => {
+                info!(
+                    attachment_id = %attachment.id,
+                    pr_url = %pr_url,
+                    issue_id = %payload.linear_issue_id,
+                    "Linked PR to Linear issue via status sync"
+                );
+                pr_linked = true;
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    pr_url = %pr_url,
+                    "Failed to create attachment for PR in status sync"
+                );
+            }
+        }
+    }
+
     // Emit appropriate activity type
     let emit_result = if payload.status.status == "failed" {
         client
@@ -571,7 +1044,7 @@ pub async fn handle_status_sync(
             format!(
                 "## Task Implementation Complete\n\n\
                  **Status:** ✅ Complete\n\
-                 **PR:** {pr_url}\n\n\
+                 **PR:** [{pr_url}]({pr_url})\n\n\
                  The implementation is ready for review."
             )
         } else {
@@ -594,7 +1067,8 @@ pub async fn handle_status_sync(
         "status": "success",
         "session_id": payload.linear_session_id,
         "task_status": payload.status.status,
-        "agent_label": agent_status.to_label_name()
+        "agent_label": agent_status.to_label_name(),
+        "pr_linked": pr_linked
     })))
 }
 
