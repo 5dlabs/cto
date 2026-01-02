@@ -26,7 +26,7 @@ info() { echo -e "${GREEN}[INFO]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*"; }
 
-# Generate OAuth URLs for all agents
+# Generate OAuth URLs for all agents (from OpenBao or K8s secrets)
 oauth_urls() {
   info "=== OAuth Installation URLs ==="
   echo ""
@@ -34,25 +34,25 @@ oauth_urls() {
   echo "After authorization, the token will be stored for that agent."
   echo ""
 
-  if [[ -f "$(dirname "$0")/../linear-agents.env.template" ]]; then
-    # shellcheck disable=SC1091
-    source "$(dirname "$0")/../linear-agents.env.template"
-  fi
-
   local base_url="https://linear.app/oauth/authorize"
   local redirect_uri="https://cto.5dlabs.ai/oauth/callback"
   local scope="read,write,app:assignable,app:mentionable"
 
   for agent in $AGENTS; do
-    upper=$(echo "$agent" | tr '[:lower:]' '[:upper:]')
-    eval "client_id=\${${upper}_CLIENT_ID:-}"
+    # Try to get client_id from K8s secret first, then OpenBao
+    client_id=""
+    if kubectl get secret "linear-app-$agent" -n cto &>/dev/null; then
+      client_id=$(kubectl get secret "linear-app-$agent" -n cto -o jsonpath='{.data.client_id}' | base64 -d 2>/dev/null || echo "")
+    elif command -v bao &>/dev/null; then
+      client_id=$(bao kv get -format=json "linear-app-$agent" 2>/dev/null | jq -r '.data.data.client_id' 2>/dev/null || echo "")
+    fi
 
-    if [[ -n "$client_id" ]]; then
+    if [[ -n "$client_id" && "$client_id" != "null" ]]; then
       echo "=== ${agent^} ==="
       echo "${base_url}?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&scope=${scope}&actor=app&state=${agent}"
       echo ""
     else
-      warn "No client_id for $agent - skipping"
+      warn "No client_id for $agent - credentials not configured"
     fi
   done
 }

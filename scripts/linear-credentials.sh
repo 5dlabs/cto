@@ -1,23 +1,30 @@
 #!/usr/bin/env bash
+# Linear agent credential management script
+# 
+# Credentials are stored in OpenBao at path: linear-app-{agent}
+# Each agent has: client_id, client_secret, webhook_secret
+#
+# To add new credentials, use: bao kv put linear-app-{agent} client_id=... client_secret=... webhook_secret=...
 set -euo pipefail
 
-ENV_FILE="${ENV_FILE:-$(dirname "$0")/../linear-agents.env.template}"
 AGENTS="morgan rex blaze grizz nova tap spark cleo cipher tess atlas bolt"
 
-store_all() {
-  echo "=== Storing all Linear agent credentials in OpenBao ==="
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
+store_interactive() {
+  echo "=== Store Linear agent credentials interactively ==="
+  echo ""
+  echo "For each agent, you'll be prompted for credentials."
+  echo "Get these from: https://linear.app/settings/api/applications"
+  echo ""
   
   for agent in $AGENTS; do
-    upper=$(echo "$agent" | tr '[:lower:]' '[:upper:]')
-    eval "client_id=\$${upper}_CLIENT_ID"
-    eval "client_secret=\$${upper}_CLIENT_SECRET"
-    eval "webhook_secret=\$${upper}_WEBHOOK_SECRET"
+    echo "--- ${agent^} ---"
+    read -rp "Client ID (32 hex chars): " client_id
+    read -rp "Client Secret (32 hex chars): " client_secret
+    read -rp "Webhook Secret (lin_wh_...): " webhook_secret
     
-    # Validate credentials exist
-    if [[ -z "$client_id" || -z "$client_secret" || -z "$webhook_secret" ]]; then
-      echo "ERROR: Missing credentials for $agent"
+    # Validate
+    if [[ ! "$client_id" =~ ^[a-f0-9]{32}$ ]]; then
+      echo "ERROR: Invalid client_id format"
       exit 1
     fi
     
@@ -26,6 +33,7 @@ store_all() {
       client_id="$client_id" \
       client_secret="$client_secret" \
       webhook_secret="$webhook_secret"
+    echo ""
   done
   
   echo "=== All 12 agents stored ==="
@@ -79,35 +87,39 @@ export_env() {
 
 oauth_urls() {
   echo "=== OAuth Installation URLs ==="
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
+  echo ""
+  echo "Fetching client IDs from OpenBao..."
+  echo ""
   
   local base_url="https://linear.app/oauth/authorize"
   local redirect_uri="https://cto.5dlabs.ai/oauth/callback"
   local scope="read,write,app:assignable,app:mentionable"
   
   for agent in $AGENTS; do
-    upper=$(echo "$agent" | tr '[:lower:]' '[:upper:]')
-    eval "client_id=\$${upper}_CLIENT_ID"
-    echo ""
-    echo "=== ${agent^} ==="
-    echo "${base_url}?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&scope=${scope}&actor=app"
+    client_id=$(bao kv get -format=json "linear-app-$agent" 2>/dev/null | jq -r '.data.data.client_id' 2>/dev/null || echo "")
+    
+    if [[ -n "$client_id" && "$client_id" != "null" ]]; then
+      echo "=== ${agent^} ==="
+      echo "${base_url}?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=code&scope=${scope}&actor=app"
+      echo ""
+    else
+      echo "=== ${agent^} === (not configured)"
+      echo ""
+    fi
   done
 }
 
 validate() {
-  echo "=== Validating env file format ==="
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
+  echo "=== Validating credentials in OpenBao ==="
   
   local errors=0
   for agent in $AGENTS; do
-    upper=$(echo "$agent" | tr '[:lower:]' '[:upper:]')
-    eval "client_id=\$${upper}_CLIENT_ID"
-    eval "client_secret=\$${upper}_CLIENT_SECRET"
-    eval "webhook_secret=\$${upper}_WEBHOOK_SECRET"
-    
     echo -n "$agent: "
+    
+    data=$(bao kv get -format=json "linear-app-$agent" 2>/dev/null | jq -r '.data.data' 2>/dev/null || echo "{}")
+    client_id=$(echo "$data" | jq -r '.client_id // ""')
+    client_secret=$(echo "$data" | jq -r '.client_secret // ""')
+    webhook_secret=$(echo "$data" | jq -r '.webhook_secret // ""')
     
     # Check client_id format (32 hex chars)
     if [[ ! "$client_id" =~ ^[a-f0-9]{32}$ ]]; then
@@ -141,18 +153,18 @@ validate() {
 }
 
 case "${1:-}" in
-  store)    store_all ;;
+  store)    store_interactive ;;
   verify)   verify_all ;;
   export)   export_env ;;
   urls)     oauth_urls ;;
   validate) validate ;;
   *)
     echo "Usage: $0 {store|verify|export|urls|validate}"
-    echo "  store    - Store all credentials from env file to OpenBao"
+    echo "  store    - Store credentials interactively to OpenBao"
     echo "  verify   - Check all credentials exist in OpenBao"
     echo "  export   - Export credentials from OpenBao to env file"
-    echo "  urls     - Generate OAuth installation URLs"
-    echo "  validate - Validate env file format without storing"
+    echo "  urls     - Generate OAuth installation URLs (from OpenBao)"
+    echo "  validate - Validate credential format in OpenBao"
     exit 1
     ;;
 esac
