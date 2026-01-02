@@ -14,7 +14,7 @@ mod email;
 mod generator;
 mod state;
 
-pub use analyzer::{ActionItem, DigestAnalysis, DigestAnalyzer};
+pub use analyzer::{ActionItem, DigestAnalysis, DigestAnalyzer, RichEntry};
 pub use config::DigestConfig;
 pub use email::EmailSender;
 pub use generator::DigestGenerator;
