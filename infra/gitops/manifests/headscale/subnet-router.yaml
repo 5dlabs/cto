@@ -61,7 +61,7 @@ spec:
         logs.platform.5dlabs.io/service: tailscale-subnet-router
     spec:
       serviceAccountName: tailscale-subnet-router
-      
+
       # Schedule on control plane for reliable connectivity
       nodeSelector:
         node-role.kubernetes.io/control-plane: ""
@@ -69,21 +69,21 @@ spec:
         - key: "node-role.kubernetes.io/control-plane"
           operator: "Exists"
           effect: "NoSchedule"
-      
+
       containers:
         - name: tailscale
           image: tailscale/tailscale:v1.76.6
           imagePullPolicy: IfNotPresent
-          
+
           env:
             # Connect to our Headscale server via internal HTTPS service
             - name: TS_LOGIN_SERVER
               value: "https://headscale.headscale.svc.cluster.local"
-            
+
             # Trust the self-signed certificate from cert-manager
             - name: SSL_CERT_FILE
               value: "/etc/headscale-tls/tls.crt"
-            
+
             # Auth key from secret (synced from OpenBao via ExternalSecret)
             - name: TS_AUTHKEY
               valueFrom:
@@ -91,42 +91,42 @@ spec:
                   name: tailscale-auth
                   key: TS_AUTHKEY
                   optional: false
-            
+
             # Subnet routes to advertise
             # - 10.96.0.0/12: Kubernetes service CIDR
             # - 10.244.0.0/16: Pod CIDR
             # - 192.168.1.0/24: Node network (for K8s API, SSH, NodePort services)
             - name: TS_ROUTES
               value: "10.96.0.0/12,10.244.0.0/16,192.168.1.0/24"
-            
+
             # Accept routes from other nodes
             - name: TS_ACCEPT_ROUTES
               value: "true"
-            
+
             # Run as subnet router
             - name: TS_USERSPACE
               value: "false"
-            
+
             # State directory
             - name: TS_STATE_DIR
               value: "/var/lib/tailscale"
-            
+
             # Hostname in Tailscale network
             - name: TS_HOSTNAME
               value: "k8s-subnet-router"
-            
+
             # Extra args for subnet routing
             # --login-server ensures we connect to Headscale, not public Tailscale
             - name: TS_EXTRA_ARGS
               value: "--login-server=https://headscale.headscale.svc.cluster.local --advertise-exit-node=false"
-          
+
           securityContext:
             capabilities:
               add:
                 - NET_ADMIN
                 - NET_RAW
             privileged: false
-          
+
           volumeMounts:
             - name: tailscale-state
               mountPath: /var/lib/tailscale
@@ -135,7 +135,7 @@ spec:
             - name: headscale-tls
               mountPath: /etc/headscale-tls
               readOnly: true
-          
+
           resources:
             requests:
               cpu: 50m
@@ -143,7 +143,7 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
-      
+
       volumes:
         - name: tailscale-state
           emptyDir: {}
