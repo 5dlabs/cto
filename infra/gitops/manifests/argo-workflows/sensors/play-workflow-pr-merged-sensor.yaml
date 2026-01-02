@@ -223,7 +223,7 @@ spec:
                           EXISTING_OWNER=$(kubectl get configmap $LOCK_NAME -n cto -o jsonpath='{.data.owner}' 2>/dev/null || echo "unknown")
                           LOCK_TIME=$(kubectl get configmap $LOCK_NAME -n cto -o jsonpath='{.data.timestamp}' 2>/dev/null || echo "")
                           CURRENT_TIME=$(date -u +%s)
-                          
+
                           if [ -n "$LOCK_TIME" ] && [[ "$LOCK_TIME" =~ ^[0-9]+$ ]]; then
                             LOCK_AGE=$((CURRENT_TIME - LOCK_TIME))
                             if [ $LOCK_AGE -gt 3600 ]; then
@@ -285,11 +285,11 @@ spec:
 
                           if [ -z "$INTAKE_METADATA" ]; then
                             echo "⚠️ No intake-metadata found in PR body, extracting from repo..."
-                            
+
                             # Clone repo and find project directory
                             REPO_DIR="/tmp/intake-repo-$$"
                             git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY}.git" "$REPO_DIR" 2>/dev/null
-                            
+
                             # Find the project directory (look for .tasks/docs/tasks.json)
                             PROJECT_DIR=$(find "$REPO_DIR" -name "tasks.json" -path "*/.tasks/docs/*" -exec dirname {} \; | head -1)
                             if [ -n "$PROJECT_DIR" ]; then
@@ -332,9 +332,9 @@ spec:
 
                           # Trigger play workflow using the play workflow template
                           echo "🚀 Triggering play workflow..."
-                          
+
                           PLAY_WORKFLOW_NAME="play-${PROJECT_DIR_NAME}-$(date +%s)"
-                          
+
                           kubectl create -f - <<EOF
                         apiVersion: argoproj.io/v1alpha1
                         kind: Workflow
@@ -388,12 +388,12 @@ spec:
                           echo "════════════════════════════════════════════════════════════════"
 
                           REPO_PATH="$REPOSITORY"
-                          
+
                           # Move task to .completed folder
                           echo "📝 Moving task-$TASK_ID to .completed..."
                           PROGRESS_REPO="/tmp/task-move-$$"
                           git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_PATH}.git" "$PROGRESS_REPO" 2>/dev/null || true
-                          
+
                           if [ -d "$PROGRESS_REPO" ]; then
                             cd "$PROGRESS_REPO"
                             TASK_DIRS=("docs/.tasks/docs/task-${TASK_ID}" ".tasks/docs/task-${TASK_ID}" "task-${TASK_ID}")
@@ -423,7 +423,7 @@ spec:
 
                           if [ -n "$ORCH_WORKFLOW" ]; then
                             echo "Found workflow: $ORCH_WORKFLOW"
-                            
+
                             # Find and resume suspend node
                             NODE_ID=$(kubectl get workflow $ORCH_WORKFLOW -n cto -o json | \
                               jq -r '.status.nodes | to_entries | .[] |
