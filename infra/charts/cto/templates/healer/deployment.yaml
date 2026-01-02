@@ -36,6 +36,8 @@ spec:
           env:
             - name: HEALER_CONFIG_PATH
               value: /config/healer-config.json
+            - name: CTO_CONFIG_PATH
+              value: /config/cto-config.json
             - name: HEALER_TEMPLATES_DIR
               value: "/app/templates/healer"
             - name: RUST_LOG
