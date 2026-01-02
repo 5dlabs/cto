@@ -593,7 +593,7 @@ const REQUIRED_CLIS: &[CliDependency] = &[
 
 /// Check all required dependencies and optionally install missing ones
 #[allow(clippy::disallowed_macros)]
-fn check_dependencies(auto_install: bool) -> Result<()> {
+fn check_dependencies(auto_install: bool) {
     let mut missing: Vec<&CliDependency> = Vec::new();
 
     eprintln!("🔍 Checking CLI dependencies...");
@@ -609,7 +609,7 @@ fn check_dependencies(auto_install: bool) -> Result<()> {
 
     if missing.is_empty() {
         eprintln!("✅ All dependencies satisfied");
-        return Ok(());
+        return;
     }
 
     // Check if we're on macOS with Homebrew
@@ -633,7 +633,10 @@ fn check_dependencies(auto_install: bool) -> Result<()> {
                     eprintln!("  ✅ {} installed successfully", dep.name);
                 }
                 _ => {
-                    eprintln!("  ⚠️  Failed to install {}. Please install manually:", dep.name);
+                    eprintln!(
+                        "  ⚠️  Failed to install {}. Please install manually:",
+                        dep.name
+                    );
                     eprintln!("     brew install {}", dep.brew_package);
                     eprintln!("     Or visit: {}", dep.install_url);
                 }
@@ -648,7 +651,7 @@ fn check_dependencies(auto_install: bool) -> Result<()> {
 
         if still_missing.is_empty() {
             eprintln!("✅ All dependencies now satisfied");
-            return Ok(());
+            return;
         }
 
         eprintln!("\n⚠️  Some dependencies still missing after install attempt:");
@@ -667,13 +670,10 @@ fn check_dependencies(auto_install: bool) -> Result<()> {
         for dep in &missing {
             eprintln!("    {}: {}", dep.name, dep.install_url);
         }
-        eprintln!(
-            "\n  💡 Tip: Set CTO_AUTO_INSTALL=1 to auto-install via Homebrew on startup"
-        );
+        eprintln!("\n  💡 Tip: Set CTO_AUTO_INSTALL=1 to auto-install via Homebrew on startup");
     }
 
     // Don't fail - just warn. Some features may still work without all CLIs
-    Ok(())
 }
 
 fn run_argo_cli(args: &[&str]) -> Result<String> {
@@ -3814,12 +3814,15 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
-                Ok("check_setup") => Some(handle_check_setup(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
+                Ok("check_setup") => {
+                    let result = handle_check_setup(&arguments);
+                    Some(Ok(json!({
+                        "content": [{
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                        }]
+                    })))
+                }
                 Ok(unknown) => Some(Err(anyhow!("Unknown tool: {unknown}"))),
                 Err(e) => Some(Err(e)),
             }
@@ -4371,9 +4374,9 @@ fn handle_update_mcp_server(arguments: &std::collections::HashMap<String, Value>
     }))
 }
 
-/// Handle the check_setup tool - verify and optionally install CLI dependencies
-#[allow(clippy::disallowed_macros)]
-fn handle_check_setup(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+/// Handle the `check_setup` tool - verify and optionally install CLI dependencies
+#[allow(clippy::disallowed_macros, clippy::too_many_lines)]
+fn handle_check_setup(arguments: &std::collections::HashMap<String, Value>) -> Value {
     let auto_install = arguments
         .get("auto_install")
         .and_then(serde_json::Value::as_bool)
@@ -4488,14 +4491,14 @@ fn handle_check_setup(arguments: &std::collections::HashMap<String, Value>) -> R
         })
     };
 
-    Ok(json!({
+    json!({
         "success": all_ok,
         "message": if all_ok { "All dependencies satisfied" } else { "Some dependencies missing or not configured" },
         "cli_tools": results,
         "cluster": cluster_status,
         "config": config_status,
         "tip": if all_ok { Value::Null } else { json!("Run with auto_install=true to install missing CLIs via Homebrew") }
-    }))
+    })
 }
 
 #[allow(clippy::disallowed_macros)]
@@ -4595,10 +4598,7 @@ fn main() -> Result<()> {
     let auto_install = std::env::var("CTO_AUTO_INSTALL")
         .map(|v| v == "1" || v.to_lowercase() == "true")
         .unwrap_or(false);
-    if let Err(e) = check_dependencies(auto_install) {
-        eprintln!("⚠️  Dependency check failed: {e}");
-        // Continue anyway - some features may still work
-    }
+    check_dependencies(auto_install);
 
     // Initialize configuration from JSON file
     let config = load_cto_config().context("Failed to load cto-config.json")?;
