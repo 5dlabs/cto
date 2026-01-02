@@ -17,8 +17,10 @@ metadata:
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: ai-ml
   annotations:
-    # Deploy after AI operators are ready
-    argocd.argoproj.io/sync-wave: "3"
+    # Deploy after AI operators AND their managed resources are ready
+    # Increased from wave 3 to wave 5 to give operators time to reconcile
+    # CRDs and create the backend services (ollama-model-*, llamastack-*)
+    argocd.argoproj.io/sync-wave: "5"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

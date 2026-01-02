@@ -25,6 +25,9 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
     # Rewrite to service root
     nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # Use service ClusterIP instead of pod endpoints for resilience
+    # when backend services are starting up or temporarily unavailable
+    nginx.ingress.kubernetes.io/service-upstream: "true"
 spec:
   ingressClassName: nginx
   rules:
