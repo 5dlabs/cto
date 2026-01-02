@@ -8,4 +8,4 @@ mod markdown;
 
 pub use dedup::DedupTracker;
 pub use index::{IndexEntry, ResearchIndex};
-pub use markdown::{MarkdownWriter, ResearchEntry};
+pub use markdown::{DigestContent, MarkdownReader, MarkdownWriter, ResearchEntry};

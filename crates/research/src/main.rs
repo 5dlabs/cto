@@ -617,7 +617,17 @@ async fn run_digest(
             .ok_or_else(|| anyhow::anyhow!("No provider configured for model: {model}"))?;
 
         let analyzer = DigestAnalyzer::new(provider, model.clone());
-        match analyzer.analyze(&entries).await {
+
+        // Load rich content from markdown files for better analysis
+        println!("   📖 Loading full document content...");
+        let rich_entries = DigestAnalyzer::load_rich_entries(&entries, &dir);
+        let rich_count = rich_entries
+            .iter()
+            .filter(|e| e.content.as_ref().is_some_and(|c| c.has_rich_content()))
+            .count();
+        println!("   → {rich_count}/{} entries have rich content", entries.len());
+
+        match analyzer.analyze_rich(&rich_entries).await {
             Ok(a) => {
                 println!("   ✓ Analysis complete");
                 println!("   Summary: {}", &a.summary[..a.summary.len().min(100)]);

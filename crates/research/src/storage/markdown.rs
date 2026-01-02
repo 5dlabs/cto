@@ -1,10 +1,10 @@
-//! Markdown file generation with YAML frontmatter.
+//! Markdown file generation and parsing with YAML frontmatter.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::analysis::RelevanceResult;
 use crate::enrichment::EnrichedLink;
@@ -291,6 +291,166 @@ fn implementation_label(score: f32) -> &'static str {
         "📌 Low Priority"
     } else {
         "📖 Not Actionable"
+    }
+}
+
+/// Content extracted from a markdown research file for digest purposes.
+#[derive(Debug, Clone, Default)]
+pub struct DigestContent {
+    /// Full tweet text (not truncated).
+    pub full_text: String,
+    /// Implementation ideas from the analysis.
+    pub implementation_ideas: Vec<String>,
+    /// AI analysis reasoning.
+    pub reasoning: String,
+    /// Topics identified.
+    pub topics: Vec<String>,
+    /// Content from enriched/scraped links.
+    pub enriched_content: Vec<String>,
+}
+
+/// Reads and parses markdown research files.
+pub struct MarkdownReader;
+
+impl MarkdownReader {
+    /// Load digest-relevant content from a markdown file.
+    ///
+    /// Extracts the full tweet text, implementation ideas, reasoning,
+    /// and enriched link content that can be used for more informative digests.
+    pub fn load_digest_content(path: &Path) -> Result<DigestContent> {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("Failed to read markdown file: {}", path.display()))?;
+
+        let mut digest = DigestContent::default();
+
+        // Parse frontmatter if present
+        if content.starts_with("---") {
+            if let Some(end_idx) = content[3..].find("---") {
+                let frontmatter = &content[3..end_idx + 3];
+                digest.parse_frontmatter(frontmatter);
+            }
+        }
+
+        // Extract sections from the markdown body
+        digest.parse_body(&content);
+
+        Ok(digest)
+    }
+}
+
+impl DigestContent {
+    /// Parse YAML frontmatter for implementation_ideas and topics.
+    fn parse_frontmatter(&mut self, frontmatter: &str) {
+        let mut in_ideas = false;
+        let mut in_topics = false;
+
+        for line in frontmatter.lines() {
+            let trimmed = line.trim();
+
+            // Detect section starts
+            if trimmed.starts_with("implementation_ideas:") {
+                in_ideas = true;
+                in_topics = false;
+                continue;
+            }
+            if trimmed.starts_with("topics:") {
+                in_topics = true;
+                in_ideas = false;
+                continue;
+            }
+            // End sections on new keys
+            if !trimmed.starts_with('-') && !trimmed.starts_with(' ') && trimmed.contains(':') {
+                in_ideas = false;
+                in_topics = false;
+            }
+
+            // Extract list items
+            if trimmed.starts_with("- ") || trimmed.starts_with("  - ") {
+                let value = trimmed
+                    .trim_start_matches('-')
+                    .trim()
+                    .trim_matches('"')
+                    .replace("\\n", "\n");
+
+                if in_ideas && !value.is_empty() {
+                    self.implementation_ideas.push(value);
+                } else if in_topics && !value.is_empty() {
+                    self.topics.push(value);
+                }
+            }
+        }
+    }
+
+    /// Parse the markdown body for tweet text, analysis, and enriched content.
+    fn parse_body(&mut self, content: &str) {
+        let mut current_section = "";
+        let mut in_quote = false;
+        let mut quote_lines: Vec<String> = Vec::new();
+
+        for line in content.lines() {
+            // Track section headers
+            if line.starts_with("## ") {
+                current_section = line.trim_start_matches('#').trim();
+                in_quote = false;
+                continue;
+            }
+            if line.starts_with("### ") {
+                // Sub-section - check for supporting content titles
+                if current_section == "Supporting Content" {
+                    // Start of a new enriched section
+                    continue;
+                }
+            }
+
+            match current_section {
+                "Original Tweet" => {
+                    // Capture blockquote content
+                    if line.starts_with("> ") {
+                        in_quote = true;
+                        quote_lines.push(line.trim_start_matches("> ").to_string());
+                    } else if in_quote && !line.is_empty() && !line.starts_with("**") {
+                        quote_lines.push(line.to_string());
+                    } else if in_quote {
+                        in_quote = false;
+                        self.full_text = quote_lines.join("\n");
+                        quote_lines.clear();
+                    }
+                }
+                "Analysis" => {
+                    // Capture analysis reasoning (skip metadata lines)
+                    if !line.starts_with("**") && !line.is_empty() && !line.starts_with('#') {
+                        if !self.reasoning.is_empty() {
+                            self.reasoning.push('\n');
+                        }
+                        self.reasoning.push_str(line);
+                    }
+                }
+                "Supporting Content" => {
+                    // Capture enriched content (excluding headers and URLs)
+                    if !line.starts_with('#')
+                        && !line.starts_with("**URL**")
+                        && !line.starts_with("---")
+                        && !line.is_empty()
+                    {
+                        self.enriched_content.push(line.to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Handle case where quote wasn't terminated
+        if !quote_lines.is_empty() {
+            self.full_text = quote_lines.join("\n");
+        }
+    }
+
+    /// Check if this content has meaningful data beyond the basics.
+    #[must_use]
+    pub fn has_rich_content(&self) -> bool {
+        !self.implementation_ideas.is_empty()
+            || !self.reasoning.is_empty()
+            || !self.enriched_content.is_empty()
     }
 }
 

@@ -5,11 +5,12 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::Arc;
 
 use tasks::ai::{parse_ai_response, AIMessage, AIProvider, GenerateOptions};
 
-use crate::storage::IndexEntry;
+use crate::storage::{DigestContent, IndexEntry, MarkdownReader};
 
 /// Analysis result for a batch of research entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,13 +48,125 @@ pub struct DigestAnalyzer {
     model: String,
 }
 
+/// Entry with optional rich content loaded from markdown file.
+pub struct RichEntry<'a> {
+    /// The index entry with basic metadata.
+    pub entry: &'a IndexEntry,
+    /// Optional full content from the markdown file.
+    pub content: Option<DigestContent>,
+}
+
 impl DigestAnalyzer {
     /// Create a new digest analyzer.
     pub fn new(provider: Arc<dyn AIProvider>, model: String) -> Self {
         Self { provider, model }
     }
 
-    /// Analyze a batch of research entries.
+    /// Load rich content for entries by reading their markdown files.
+    ///
+    /// Returns entries paired with their full content (if readable).
+    pub fn load_rich_entries<'a>(
+        entries: &[&'a IndexEntry],
+        base_dir: &Path,
+    ) -> Vec<RichEntry<'a>> {
+        entries
+            .iter()
+            .map(|entry| {
+                let content = if !entry.path.is_empty() {
+                    let full_path = base_dir.join(&entry.path);
+                    MarkdownReader::load_digest_content(&full_path).ok()
+                } else {
+                    None
+                };
+                RichEntry {
+                    entry,
+                    content,
+                }
+            })
+            .collect()
+    }
+
+    /// Analyze entries with full document content for richer insights.
+    ///
+    /// This method reads the full markdown files to include:
+    /// - Complete tweet text (not just 100 char preview)
+    /// - Implementation ideas from AI analysis
+    /// - Reasoning and context
+    /// - Enriched content from scraped links
+    pub async fn analyze_rich(
+        &self,
+        entries: &[RichEntry<'_>],
+    ) -> Result<DigestAnalysis> {
+        let entries_context: Vec<String> = entries
+            .iter()
+            .map(|rich| {
+                let e = rich.entry;
+                let categories: Vec<_> = e.categories.iter().map(ToString::to_string).collect();
+
+                // Use full content if available, otherwise fall back to preview
+                if let Some(content) = &rich.content {
+                    let text = if content.full_text.is_empty() {
+                        &e.preview
+                    } else {
+                        &content.full_text
+                    };
+
+                    let mut entry_str = format!(
+                        "### @{author} (score: {score:.2})\n**Categories**: {categories}\n\n**Tweet**: {text}",
+                        author = e.author,
+                        score = e.score,
+                        categories = categories.join(", "),
+                        text = text,
+                    );
+
+                    // Add implementation ideas if present
+                    if !content.implementation_ideas.is_empty() {
+                        entry_str.push_str("\n\n**Implementation Ideas**:\n");
+                        for idea in &content.implementation_ideas {
+                            entry_str.push_str(&format!("- {idea}\n"));
+                        }
+                    }
+
+                    // Add reasoning if present
+                    if !content.reasoning.is_empty() {
+                        entry_str.push_str(&format!("\n**Analysis**: {}\n", content.reasoning));
+                    }
+
+                    // Add enriched content summary (first 500 chars)
+                    if !content.enriched_content.is_empty() {
+                        let enriched_summary: String = content
+                            .enriched_content
+                            .iter()
+                            .take(5)
+                            .map(String::as_str)
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        let truncated = if enriched_summary.len() > 500 {
+                            format!("{}...", &enriched_summary[..500])
+                        } else {
+                            enriched_summary
+                        };
+                        entry_str.push_str(&format!("\n**From linked content**: {truncated}\n"));
+                    }
+
+                    entry_str
+                } else {
+                    // Fall back to basic format
+                    format!(
+                        "- @{author} (score: {score:.2}, categories: {categories}): {preview}",
+                        author = e.author,
+                        score = e.score,
+                        categories = categories.join(", "),
+                        preview = e.preview,
+                    )
+                }
+            })
+            .collect();
+
+        self.run_analysis(&entries_context.join("\n\n---\n\n")).await
+    }
+
+    /// Analyze a batch of research entries (basic mode - uses preview only).
     pub async fn analyze(&self, entries: &[&IndexEntry]) -> Result<DigestAnalysis> {
         // Build context from entries
         let entries_context: Vec<String> = entries
@@ -70,6 +183,11 @@ impl DigestAnalyzer {
             })
             .collect();
 
+        self.run_analysis(&entries_context.join("\n")).await
+    }
+
+    /// Run the AI analysis with the given entries context.
+    async fn run_analysis(&self, entries_context: &str) -> Result<DigestAnalysis> {
         let prompt = format!(
             r#"Analyze these research entries from Twitter/X bookmarks and provide actionable recommendations for the CTO platform.
 
@@ -116,7 +234,7 @@ Respond with JSON:
 }}
 
 Be specific and actionable. Focus on implementation potential, not just interesting reading."#,
-            entries = entries_context.join("\n"),
+            entries = entries_context,
         );
 
         let messages = vec![AIMessage::system(SYSTEM_PROMPT), AIMessage::user(prompt)];
