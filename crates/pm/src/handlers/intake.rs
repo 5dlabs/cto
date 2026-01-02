@@ -10,7 +10,7 @@ use kube::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::config::{CtoConfig, IntakeConfig};
 use crate::models::{
@@ -1070,6 +1070,10 @@ pub async fn create_task_issues_with_project(
 
         // Create as standalone issue linked to project (not as sub-issue of PRD).
         // This enables proper board view in Linear with workflow state columns.
+        //
+        // Note: Delegate assignment happens when the Play workflow starts each task.
+        // The PM service looks up the agent's Linear user ID and updates the issue.
+        // Agent is tracked via label (e.g., "agent:rex") until then.
         let input = IssueCreateInput {
             team_id: request.team_id.clone(),
             title: format!("Task {}: {}", task.id, task.title),
@@ -1079,6 +1083,7 @@ pub async fn create_task_issues_with_project(
             label_ids: Some(label_ids),
             project_id: project_id.map(String::from),
             state_id: Some(initial_state.id.clone()),
+            delegate_id: None, // Set by PM service when task starts
         };
 
         match client.create_issue(input).await {
@@ -1138,18 +1143,24 @@ pub async fn create_task_issues_with_project(
 
 /// Play workflow phase states configuration.
 ///
-/// These states map to the play workflow phases:
-/// - Phase 2: Implementation (Rex/Blaze)
-/// - Phase 3: Quality (Cleo/Tess/Cipher)
-/// - Phase 4: Integration (Stitch/Atlas)
-/// - Phase 5: Deployment (Bolt)
+/// These states map to the play workflow phases with 12 agents:
+/// - Infrastructure: Bolt (Task 1) - DB, cache, storage setup
+/// - Implementation: Rex/Grizz/Nova (backend), Blaze/Tap/Spark (frontend)
+/// - Quality: Cleo - Code review, linting
+/// - Security: Cipher - Security audit
+/// - Testing: Tess - Test coverage
+/// - Integration: Atlas - PR merge preparation
+/// - Deployment: Bolt (final) - Production release
 pub const PLAY_WORKFLOW_STATES: &[(&str, &str, &str)] = &[
     // (name, type, color)
-    ("Ready", "unstarted", "#6B7280"),
-    ("🔧 Implementation", "started", "#3B82F6"),
-    ("🔍 Quality", "started", "#8B5CF6"),
-    ("🔗 Integration", "started", "#F59E0B"),
-    ("🚀 Deployment", "started", "#10B981"),
+    ("Ready", "unstarted", "#6B7280"),        // Gray - PRD approved
+    ("Infrastructure", "started", "#10B981"), // Green - Bolt Task 1
+    ("Implementation", "started", "#3B82F6"), // Blue - Rex/Blaze/etc
+    ("Quality", "started", "#8B5CF6"),        // Purple - Cleo
+    ("Security", "started", "#6366F1"),       // Indigo - Cipher
+    ("Testing", "started", "#EC4899"),        // Pink - Tess
+    ("Integration", "started", "#F59E0B"),    // Amber - Atlas
+    ("Deployment", "started", "#059669"),     // Emerald - Bolt final
 ];
 
 /// Ensure play workflow states exist for a team.
@@ -1158,7 +1169,7 @@ pub const PLAY_WORKFLOW_STATES: &[(&str, &str, &str)] = &[
 /// This enables a board view with columns for each play phase:
 ///
 /// ```text
-/// Backlog → Ready → 🔧 Implementation → 🔍 Quality → 🔗 Integration → 🚀 Deployment → Done
+/// Backlog → Ready → Infrastructure → Implementation → Quality → Security → Testing → Integration → Deployment → Done
 /// ```
 pub async fn ensure_play_workflow_states(client: &LinearClient, team_id: &str) -> Result<()> {
     info!(team_id = %team_id, "Ensuring play workflow states exist");
@@ -1229,6 +1240,22 @@ pub async fn create_intake_project(
         request.title, request.prd_identifier, task_count
     );
 
+    // Try to find the "Play Workflow" template for consistent project structure
+    let template_id = match client.find_project_template_by_name("Play Workflow").await {
+        Ok(Some(template)) => {
+            info!(template_id = %template.id, "Using Play Workflow template");
+            Some(template.id)
+        }
+        Ok(None) => {
+            debug!("Play Workflow template not found, creating project without template");
+            None
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to look up project template, continuing without");
+            None
+        }
+    };
+
     let input = ProjectCreateInput {
         name: project_name,
         description: Some(description),
@@ -1236,6 +1263,7 @@ pub async fn create_intake_project(
         lead_id: None,
         target_date: None,
         default_view: Some(crate::models::ProjectViewType::Board),
+        template_id,
     };
 
     let project = client.create_project(input).await?;

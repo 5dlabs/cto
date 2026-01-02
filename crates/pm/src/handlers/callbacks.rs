@@ -273,14 +273,13 @@ pub async fn handle_intake_complete(
             ) {
                 // Attach PRD document
                 let prd_url = format!(
-                    "https://github.com/{}/blob/{}/{}/.tasks/docs/prd.md",
-                    repository, branch, project_dir
+                    "https://github.com/{repository}/blob/{branch}/{project_dir}/.tasks/docs/prd.md"
                 );
                 let prd_attachment = crate::models::AttachmentCreateInput {
                     issue_id: request.prd_issue_id.clone(),
                     url: prd_url.clone(),
                     title: "PRD Document".to_string(),
-                    subtitle: Some(format!("{} tasks generated", created_count)),
+                    subtitle: Some(format!("{created_count} tasks generated")),
                 };
                 match client.create_attachment(prd_attachment).await {
                     Ok(attachment) => {
@@ -297,8 +296,7 @@ pub async fn handle_intake_complete(
 
                 // Attach architecture document
                 let arch_url = format!(
-                    "https://github.com/{}/blob/{}/{}/.tasks/docs/architecture.md",
-                    repository, branch, project_dir
+                    "https://github.com/{repository}/blob/{branch}/{project_dir}/.tasks/docs/architecture.md"
                 );
                 let arch_attachment = crate::models::AttachmentCreateInput {
                     issue_id: request.prd_issue_id.clone(),
@@ -317,6 +315,38 @@ pub async fn handle_intake_complete(
                     Err(e) => {
                         // Architecture doc is optional, just debug log
                         debug!(error = %e, "Failed to attach architecture document (may not exist)");
+                    }
+                }
+
+                // Attach task prompts to each task issue
+                for task in &payload.tasks {
+                    if let Some(issue_id) = task_issue_map.get(&task.id) {
+                        let prompt_url = format!(
+                            "https://github.com/{}/blob/{}/{}/.tasks/tasks/task-{}/prompt.md",
+                            repository, branch, project_dir, task.id
+                        );
+                        let prompt_attachment = crate::models::AttachmentCreateInput {
+                            issue_id: issue_id.clone(),
+                            url: prompt_url.clone(),
+                            title: "Task Prompt".to_string(),
+                            subtitle: Some(format!("Agent: {}", task.agent_hint)),
+                        };
+                        match client.create_attachment(prompt_attachment).await {
+                            Ok(attachment) => {
+                                debug!(
+                                    attachment_id = %attachment.id,
+                                    task_id = %task.id,
+                                    "Attached task prompt to issue"
+                                );
+                            }
+                            Err(e) => {
+                                debug!(
+                                    task_id = %task.id,
+                                    error = %e,
+                                    "Failed to attach task prompt"
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -447,6 +477,9 @@ pub struct PlayCompleteCallback {
     /// Repository.
     #[serde(default)]
     pub repository: Option<String>,
+    /// Argo Workflow URL for linking to logs/status.
+    #[serde(default)]
+    pub workflow_url: Option<String>,
 }
 
 /// Handle play workflow completion callback.
@@ -518,6 +551,32 @@ pub async fn handle_play_complete(
             .await
         {
             warn!(error = %e, "Failed to update play completion plan");
+        }
+
+        // Attach Argo workflow link if provided
+        if let Some(workflow_url) = &payload.workflow_url {
+            let attachment_input = crate::models::AttachmentCreateInput {
+                issue_id: payload.linear_issue_id.clone(),
+                url: workflow_url.clone(),
+                title: "Argo Workflow".to_string(),
+                subtitle: Some(format!("Workflow: {}", payload.workflow_name)),
+            };
+            match client.create_attachment(attachment_input).await {
+                Ok(attachment) => {
+                    debug!(
+                        attachment_id = %attachment.id,
+                        workflow_url = %workflow_url,
+                        "Attached Argo workflow link to issue"
+                    );
+                }
+                Err(e) => {
+                    debug!(
+                        error = %e,
+                        workflow_url = %workflow_url,
+                        "Failed to attach Argo workflow link"
+                    );
+                }
+            }
         }
 
         // Emit success response

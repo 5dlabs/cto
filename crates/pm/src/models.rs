@@ -195,6 +195,19 @@ pub struct Project {
     pub url: Option<String>,
 }
 
+/// Linear project template
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTemplate {
+    /// Unique identifier
+    pub id: String,
+    /// Template name
+    pub name: String,
+    /// Template description
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
 /// Linear comment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -293,6 +306,9 @@ pub struct IssueCreateInput {
     /// Workflow state ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state_id: Option<String>,
+    /// Delegate (agent) ID for agent assignment
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delegate_id: Option<String>,
 }
 
 /// Input for updating an issue
@@ -507,4 +523,7 @@ pub struct ProjectCreateInput {
     /// Default view type (list or board)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_view: Option<ProjectViewType>,
+    /// Template ID to create project from (use `list_project_templates` to get IDs)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_id: Option<String>,
 }

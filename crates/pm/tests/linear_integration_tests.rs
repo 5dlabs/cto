@@ -160,6 +160,7 @@ async fn test_linear_client_create_issue() {
         label_ids: None,
         project_id: None,
         state_id: None,
+        delegate_id: None,
     };
 
     let issue = client.create_issue(input).await;
@@ -199,6 +200,7 @@ async fn test_linear_client_create_project() {
         lead_id: None,
         target_date: None,
         default_view: None, // Use Linear's default for test
+        template_id: None,
     };
 
     let project = client.create_project(input).await;
@@ -263,6 +265,7 @@ async fn test_intake_issue_creation_flow() {
         source_branch: None,
         tech_stack: TechStack::default(),
         cto_config: CtoConfig::default(),
+        existing_project: None,
     };
 
     // Create mock tasks
