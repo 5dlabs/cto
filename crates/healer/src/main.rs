@@ -2054,9 +2054,8 @@ fn resolve_agent_config(
                 println!(
                     "{}",
                     format!(
-                        "⚠️  WARNING: Agent '{}' found but has no tools configured. \
-                        Using default tools. Add 'tools' section to this agent in cto-config.json.",
-                        agent_name
+                        "⚠️  WARNING: Agent '{agent_name}' found but has no tools configured. \
+                        Using default tools. Add 'tools' section to this agent in cto-config.json."
                     )
                     .yellow()
                 );
@@ -2088,9 +2087,8 @@ fn resolve_agent_config(
         println!(
             "{}",
             format!(
-                "⚠️  WARNING: Agent '{}' not found in cto-config.json agents section. \
-                Using default tools. Add this agent to cto-config.json for proper tool configuration.",
-                agent_name
+                "⚠️  WARNING: Agent '{agent_name}' not found in cto-config.json agents section. \
+                Using default tools. Add this agent to cto-config.json for proper tool configuration."
             )
             .yellow()
         );
