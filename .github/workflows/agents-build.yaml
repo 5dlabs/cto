@@ -350,11 +350,15 @@ jobs:
             context: ./infra/images/gemini
             file: ./infra/images/gemini/Dockerfile
             version_type: dir_hash
-          - id: dexter
-            image: dexter
-            context: ./infra/images/dexter
-            file: ./infra/images/dexter/Dockerfile
-            version_type: dir_hash
+          # NOTE: dexter is temporarily disabled until ghcr.io/5dlabs/dexter package is created
+          # by an org admin. The GITHUB_TOKEN cannot create new org packages without prior setup.
+          # Error: "permission_denied: write_package" when pushing to non-existent package.
+          # To re-enable: uncomment below and ensure package exists in GHCR.
+          # - id: dexter
+          #   image: dexter
+          #   context: ./infra/images/dexter
+          #   file: ./infra/images/dexter/Dockerfile
+          #   version_type: dir_hash
     steps:
       - uses: actions/checkout@v4
 
