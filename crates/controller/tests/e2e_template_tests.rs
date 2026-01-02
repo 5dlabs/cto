@@ -42,7 +42,7 @@ fn agent_job_matrix() -> Vec<(&'static str, Vec<&'static str>)> {
         ("cleo", vec!["quality"]),
         ("tess", vec!["test"]),
         ("stitch", vec!["review"]),
-        ("morgan", vec!["pm", "docs", "intake"]),
+        ("morgan", vec!["intake", "healer"]),
         ("atlas", vec!["integration", "intake"]),
     ]
 }
