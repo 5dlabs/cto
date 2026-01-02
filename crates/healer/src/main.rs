@@ -4978,7 +4978,10 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         format!("infrastructure-cli={}", infrastructure_agent.cli),
         format!("infrastructure-model={}", infrastructure_agent.model),
         format!("infrastructure-tools={}", infrastructure_agent.tools),
-        format!("infrastructure-model-rotation={}", infrastructure_agent.model_rotation),
+        format!(
+            "infrastructure-model-rotation={}",
+            infrastructure_agent.model_rotation
+        ),
         // Quality agent
         format!("quality-agent={}", quality_agent.github_app),
         format!("quality-cli={}", quality_agent.cli),
