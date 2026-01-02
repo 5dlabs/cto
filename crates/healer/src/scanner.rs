@@ -89,7 +89,7 @@ fn get_error_level_regexes() -> &'static Vec<Regex> {
             .filter_map(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    eprintln!("Failed to compile error level regex '{}': {}", p, e);
+                    eprintln!("Failed to compile error level regex '{p}': {e}");
                     None
                 }
             })
@@ -106,7 +106,7 @@ fn get_false_positive_regexes() -> &'static Vec<Regex> {
             .filter_map(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    eprintln!("Failed to compile false positive regex '{}': {}", p, e);
+                    eprintln!("Failed to compile false positive regex '{p}': {e}");
                     None
                 }
             })
@@ -941,7 +941,7 @@ mod tests {
         // Empty error arrays indicate NO errors occurred
         assert!(is_false_positive(r#"  "errorMessages": [],"#));
         assert!(is_false_positive(r#"{"errors": [], "warnings": []}"#));
-        assert!(is_false_positive(r#"errorMessages: []"#));
+        assert!(is_false_positive(r"errorMessages: []"));
     }
 
     #[test]
