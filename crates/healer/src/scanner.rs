@@ -78,6 +78,21 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     r"(?i)test.*error",
     r"(?i)mock.*error",
     r"(?i)fake.*error",
+    // Go-style structured log levels indicating non-error (info, debug, trace, warn)
+    // These are explicitly NOT errors even if the message contains error-like keywords
+    r#"level[=:]\s*["']?info"#,
+    r#"level[=:]\s*["']?INFO"#,
+    r#"level[=:]\s*["']?debug"#,
+    r#"level[=:]\s*["']?DEBUG"#,
+    r#"level[=:]\s*["']?trace"#,
+    r#"level[=:]\s*["']?TRACE"#,
+    // JSON-style log levels indicating non-error
+    r#""level"\s*:\s*"info""#,
+    r#""level"\s*:\s*"INFO""#,
+    r#""level"\s*:\s*"debug""#,
+    r#""level"\s*:\s*"DEBUG""#,
+    // ArgoCD/Helm manifest cache hits (informational messages)
+    r"(?i)manifest\s+cache\s+hit",
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -1064,5 +1079,77 @@ mod tests {
 
         let filtered = filter_actual_errors(entries);
         assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_is_false_positive_structured_info_level() {
+        // Go-style structured logs with level=info should be filtered as false positives
+        // These are the exact patterns seen in ArgoCD logs
+        assert!(is_false_positive(
+            r#"time="2026-01-02T11:49:25Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://argoproj.github.io/argo-helm"#
+        ));
+        assert!(is_false_positive(r#"level=info msg="processing request""#));
+        assert!(is_false_positive(r#"level=INFO msg="started""#));
+
+        // JSON-style log levels
+        assert!(is_false_positive(
+            r#"{"level": "info", "msg": "cache hit"}"#
+        ));
+        assert!(is_false_positive(
+            r#"{"level": "debug", "msg": "trace data"}"#
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_manifest_cache_hit() {
+        // ArgoCD manifest cache hits are informational
+        assert!(is_false_positive("manifest cache hit: application data"));
+        assert!(is_false_positive("Manifest cache hit for repo"));
+    }
+
+    #[test]
+    fn test_filter_argocd_info_logs() {
+        use chrono::Utc;
+
+        // These are the exact error samples from the task
+        let entries = vec![
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-02T11:49:25Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://argoproj.github.io/argo-helm,Path:,TargetRevision:0.45.21,Helm:&ApplicationSourceHelm{ValueFiles:[]..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-02T11:49:26Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://argoproj.github.io/argo-helm,Path:,TargetRevision:0.45.21,Helm:&ApplicationSourceHelm{ValueFiles:[]..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-02T11:49:39Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://prometheus-community.github.io/helm-charts,Path:,TargetRevision:1.29.0,Helm:&ApplicationSourceHelm{..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-02T11:50:02Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://fluent.github.io/helm-charts,Path:,TargetRevision:0.47.7,Helm:&ApplicationSourceHelm{ValueFiles:[],..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // This should be retained as an actual error
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "[ERROR] ArgoCD sync failed".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out all 4 INFO-level manifest cache hits
+        assert_eq!(filtered.len(), 1);
+
+        // Only the actual error should remain
+        assert!(filtered.iter().any(|e| e.line.contains("[ERROR]")));
+        assert!(!filtered
+            .iter()
+            .any(|e| e.line.contains("manifest cache hit")));
     }
 }
