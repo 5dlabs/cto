@@ -2050,7 +2050,18 @@ fn resolve_agent_config(
             .tools
             .as_ref()
             .and_then(|t| serde_json::to_string(t).ok())
-            .unwrap_or_else(|| DEFAULT_REMOTE_TOOLS.to_string());
+            .unwrap_or_else(|| {
+                println!(
+                    "{}",
+                    format!(
+                        "⚠️  WARNING: Agent '{}' found but has no tools configured. \
+                        Using default tools. Add 'tools' section to this agent in cto-config.json.",
+                        agent_name
+                    )
+                    .yellow()
+                );
+                DEFAULT_REMOTE_TOOLS.to_string()
+            });
         let model_rotation = cfg
             .model_rotation
             .as_ref()
@@ -2072,7 +2083,17 @@ fn resolve_agent_config(
             max_retries: cfg.max_retries,
         }
     } else {
-        // Agent not found in config, use defaults
+        // Agent not found in config - log warning and use defaults
+        // This likely indicates a missing agent definition in cto-config.json
+        println!(
+            "{}",
+            format!(
+                "⚠️  WARNING: Agent '{}' not found in cto-config.json agents section. \
+                Using default tools. Add this agent to cto-config.json for proper tool configuration.",
+                agent_name
+            )
+            .yellow()
+        );
         ResolvedAgent {
             github_app: agent_name.to_string(),
             cli: default_cli.to_string(),

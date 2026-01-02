@@ -337,6 +337,62 @@
         ],
         "localServers": {}
       }
+    },
+    "bolt": {
+      "githubApp": "5DLabs-Bolt",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "firecrawl_scrape",
+          "firecrawl_crawl",
+          "firecrawl_map",
+          "firecrawl_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "kubernetes_listResources",
+          "kubernetes_getResource",
+          "kubernetes_createResource",
+          "kubernetes_updateResource",
+          "kubernetes_deleteResource",
+          "kubernetes_describeResource",
+          "kubernetes_getPodsLogs",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      }
+    },
+    "atlas": {
+      "githubApp": "5DLabs-Atlas",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_get_pull_request",
+          "github_get_pull_request_files",
+          "github_merge_pull_request",
+          "github_update_pull_request_branch",
+          "github_get_pull_request_status",
+          "github_create_pull_request_review",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      }
     }
   }
 }
