@@ -148,17 +148,10 @@ fi
 # JSON-escape the prompt
 USER_COMBINED=$(printf "%s" "$USER_PROMPT" | jq -Rs .)
 
-# Send prompt via sidecar HTTP endpoint (preferred) or direct FIFO
-if printf '{"text":%s}\n' "$USER_COMBINED" | \
-     curl -fsS -X POST http://127.0.0.1:8080/input \
-       -H 'Content-Type: application/json' \
-       --data-binary @- >/dev/null 2>&1; then
-    echo "✓ Prompt sent via sidecar /input"
-else
-    echo "⚠️ Sidecar /input failed, using direct FIFO write"
-    exec 9>"$FIFO_PATH"
-    printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-fi
+# Send prompt via direct FIFO write
+exec 9>"$FIFO_PATH"
+printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+echo "✓ Prompt sent via FIFO"
 
 # Wait for Claude to complete
 wait "$CLAUDE_PID"
