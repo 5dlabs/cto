@@ -195,6 +195,19 @@ pub struct Project {
     pub url: Option<String>,
 }
 
+/// Linear project template
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTemplate {
+    /// Unique identifier
+    pub id: String,
+    /// Template name
+    pub name: String,
+    /// Template description
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
 /// Linear comment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

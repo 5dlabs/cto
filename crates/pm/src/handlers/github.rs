@@ -438,7 +438,22 @@ async fn create_project_from_intake(
     );
 
     // Step 2: Create the Linear project
-    // TODO: Use template_id from "Play Workflow" template when available
+    // Try to find the "Play Workflow" template for consistent project structure
+    let template_id = match client.find_project_template_by_name("Play Workflow").await {
+        Ok(Some(template)) => {
+            info!(template_id = %template.id, "Using Play Workflow template");
+            Some(template.id)
+        }
+        Ok(None) => {
+            debug!("Play Workflow template not found, creating project without template");
+            None
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to look up project template, continuing without");
+            None
+        }
+    };
+
     let project_input = ProjectCreateInput {
         name: project_name.clone(),
         description: Some(format!(
@@ -458,7 +473,7 @@ async fn create_project_from_intake(
         lead_id: None,
         target_date: None,
         default_view: Some(crate::models::ProjectViewType::Board),
-        template_id: None, // Can be set to Play Workflow template ID
+        template_id,
     };
 
     let project = client
@@ -712,11 +727,17 @@ pub async fn create_issues_from_tasks(
             );
         }
 
+        // Include agent hint in description if available
+        if let Some(ref agent) = task.agent_hint {
+            use std::fmt::Write;
+            let _ = writeln!(description, "\n\n## Agent\n**Assigned to:** {agent}");
+        }
+
         // Create as standalone issue linked to project (not as sub-issue).
         // This enables proper board view in Linear with workflow state columns.
         //
-        // Note: delegate_id would be set here if we have a mapping from agent name to Linear user ID.
-        // For now, agents can be assigned via Linear UI or through the MCP tools.
+        // Note: Delegate assignment happens when the Play workflow starts each task.
+        // The PM service looks up the agent's Linear user ID and updates the issue.
         let input = IssueCreateInput {
             team_id: team_id.to_string(),
             title: format!("[Task {}] {}", task.id, task.title),
@@ -726,7 +747,7 @@ pub async fn create_issues_from_tasks(
             label_ids: None,
             project_id: Some(project_id.to_string()),
             state_id: None,
-            delegate_id: None, // TODO: Look up agent ID from task.agent_hint when agent ID cache is available
+            delegate_id: None, // Set by PM service when task starts
         };
 
         match client.create_issue(input).await {

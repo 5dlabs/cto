@@ -11,7 +11,7 @@ use crate::activities::{
 use crate::models::{
     AgentStatus, Attachment, AttachmentCreateInput, Comment, CommentCreateInput, Document, Issue,
     IssueCreateInput, IssueRelationCreateInput, IssueUpdateInput, Label, Project,
-    ProjectCreateInput, Team, WorkflowState,
+    ProjectCreateInput, ProjectTemplate, Team, User, WorkflowState,
 };
 
 /// Linear API endpoint
@@ -911,6 +911,94 @@ impl LinearClient {
 
         let response: Response = self.execute(QUERY, Variables { id: project_id }).await?;
         Ok(response.project)
+    }
+
+    /// List project templates
+    ///
+    /// Returns all available project templates. Use this to find the
+    /// "Play Workflow" template ID for creating projects from template.
+    #[instrument(skip(self))]
+    pub async fn list_project_templates(&self) -> Result<Vec<ProjectTemplate>> {
+        #[derive(Deserialize)]
+        struct Response {
+            #[serde(rename = "projectTemplates")]
+            project_templates: ProjectTemplatesConnection,
+        }
+
+        #[derive(Deserialize)]
+        struct ProjectTemplatesConnection {
+            nodes: Vec<ProjectTemplate>,
+        }
+
+        const QUERY: &str = r"
+            query ListProjectTemplates {
+                projectTemplates {
+                    nodes {
+                        id
+                        name
+                        description
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self.execute(QUERY, ()).await?;
+        Ok(response.project_templates.nodes)
+    }
+
+    /// Find a project template by name
+    ///
+    /// Returns the template with the given name, or None if not found.
+    #[instrument(skip(self), fields(name = %name))]
+    pub async fn find_project_template_by_name(&self, name: &str) -> Result<Option<ProjectTemplate>> {
+        let templates = self.list_project_templates().await?;
+        Ok(templates.into_iter().find(|t| t.name == name))
+    }
+
+    /// List assignable entities (users and OAuth apps) for a team
+    ///
+    /// Returns entities that can be set as delegates on issues.
+    /// OAuth apps appear here if they have `app:assignable` scope.
+    #[instrument(skip(self), fields(team_id = %team_id))]
+    pub async fn list_assignable_users(&self, team_id: &str) -> Result<Vec<User>> {
+        #[derive(Serialize)]
+        struct Variables<'a> {
+            #[serde(rename = "teamId")]
+            team_id: &'a str,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            team: TeamWithMembers,
+        }
+
+        #[derive(Deserialize)]
+        struct TeamWithMembers {
+            members: MembersConnection,
+        }
+
+        #[derive(Deserialize)]
+        struct MembersConnection {
+            nodes: Vec<User>,
+        }
+
+        const QUERY: &str = r"
+            query GetTeamMembers($teamId: String!) {
+                team(id: $teamId) {
+                    members {
+                        nodes {
+                            id
+                            name
+                            email
+                            isMe
+                        }
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self.execute(QUERY, Variables { team_id }).await?;
+        Ok(response.team.members.nodes)
     }
 
     // =========================================================================

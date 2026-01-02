@@ -10,7 +10,7 @@ use kube::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::config::{CtoConfig, IntakeConfig};
 use crate::models::{
@@ -1070,6 +1070,10 @@ pub async fn create_task_issues_with_project(
 
         // Create as standalone issue linked to project (not as sub-issue of PRD).
         // This enables proper board view in Linear with workflow state columns.
+        //
+        // Note: Delegate assignment happens when the Play workflow starts each task.
+        // The PM service looks up the agent's Linear user ID and updates the issue.
+        // Agent is tracked via label (e.g., "agent:rex") until then.
         let input = IssueCreateInput {
             team_id: request.team_id.clone(),
             title: format!("Task {}: {}", task.id, task.title),
@@ -1079,7 +1083,7 @@ pub async fn create_task_issues_with_project(
             label_ids: Some(label_ids),
             project_id: project_id.map(String::from),
             state_id: Some(initial_state.id.clone()),
-            delegate_id: None, // TODO: Look up agent ID from task.agent_hint
+            delegate_id: None, // Set by PM service when task starts
         };
 
         match client.create_issue(input).await {
@@ -1236,7 +1240,22 @@ pub async fn create_intake_project(
         request.title, request.prd_identifier, task_count
     );
 
-    // TODO: Use template_id from "Play Workflow" template when available
+    // Try to find the "Play Workflow" template for consistent project structure
+    let template_id = match client.find_project_template_by_name("Play Workflow").await {
+        Ok(Some(template)) => {
+            info!(template_id = %template.id, "Using Play Workflow template");
+            Some(template.id)
+        }
+        Ok(None) => {
+            debug!("Play Workflow template not found, creating project without template");
+            None
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to look up project template, continuing without");
+            None
+        }
+    };
+
     let input = ProjectCreateInput {
         name: project_name,
         description: Some(description),
@@ -1244,7 +1263,7 @@ pub async fn create_intake_project(
         lead_id: None,
         target_date: None,
         default_view: Some(crate::models::ProjectViewType::Board),
-        template_id: None, // Can be set to Play Workflow template ID
+        template_id,
     };
 
     let project = client.create_project(input).await?;
