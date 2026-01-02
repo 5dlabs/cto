@@ -552,6 +552,126 @@ fn find_command(name: &str) -> String {
     name.to_string()
 }
 
+/// Check if a command exists and is executable
+fn command_exists(name: &str) -> bool {
+    let cmd_path = find_command(name);
+    // Try to execute with --version or similar to verify it works
+    Command::new(&cmd_path)
+        .arg("version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok()
+}
+
+/// Required CLI dependencies for the MCP server
+struct CliDependency {
+    name: &'static str,
+    description: &'static str,
+    brew_package: &'static str,
+    install_url: &'static str,
+}
+
+const REQUIRED_CLIS: &[CliDependency] = &[
+    CliDependency {
+        name: "kubectl",
+        description: "Kubernetes CLI for cluster operations",
+        brew_package: "kubernetes-cli",
+        install_url: "https://kubernetes.io/docs/tasks/tools/",
+    },
+    CliDependency {
+        name: "argo",
+        description: "Argo Workflows CLI for workflow management",
+        brew_package: "argo",
+        install_url: "https://github.com/argoproj/argo-workflows/releases",
+    },
+];
+
+/// Check all required dependencies and optionally install missing ones
+#[allow(clippy::disallowed_macros)]
+fn check_dependencies(auto_install: bool) -> Result<()> {
+    let mut missing: Vec<&CliDependency> = Vec::new();
+
+    eprintln!("🔍 Checking CLI dependencies...");
+
+    for dep in REQUIRED_CLIS {
+        if command_exists(dep.name) {
+            eprintln!("  ✅ {} found", dep.name);
+        } else {
+            eprintln!("  ❌ {} not found - {}", dep.name, dep.description);
+            missing.push(dep);
+        }
+    }
+
+    if missing.is_empty() {
+        eprintln!("✅ All dependencies satisfied");
+        return Ok(());
+    }
+
+    // Check if we're on macOS with Homebrew
+    let has_homebrew = Command::new("brew")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok();
+
+    if auto_install && has_homebrew {
+        eprintln!("\n📦 Auto-installing missing dependencies via Homebrew...");
+        for dep in &missing {
+            eprintln!("  Installing {}...", dep.name);
+            let status = Command::new("brew")
+                .args(["install", dep.brew_package])
+                .status();
+
+            match status {
+                Ok(s) if s.success() => {
+                    eprintln!("  ✅ {} installed successfully", dep.name);
+                }
+                _ => {
+                    eprintln!("  ⚠️  Failed to install {}. Please install manually:", dep.name);
+                    eprintln!("     brew install {}", dep.brew_package);
+                    eprintln!("     Or visit: {}", dep.install_url);
+                }
+            }
+        }
+
+        // Re-check after installation
+        let still_missing: Vec<_> = missing
+            .iter()
+            .filter(|dep| !command_exists(dep.name))
+            .collect();
+
+        if still_missing.is_empty() {
+            eprintln!("✅ All dependencies now satisfied");
+            return Ok(());
+        }
+
+        eprintln!("\n⚠️  Some dependencies still missing after install attempt:");
+        for dep in still_missing {
+            eprintln!("  - {}: {}", dep.name, dep.install_url);
+        }
+    } else {
+        eprintln!("\n⚠️  Missing required CLI tools. Please install:");
+        if has_homebrew {
+            eprintln!("\n  Using Homebrew (recommended):");
+            for dep in &missing {
+                eprintln!("    brew install {}", dep.brew_package);
+            }
+        }
+        eprintln!("\n  Manual installation:");
+        for dep in &missing {
+            eprintln!("    {}: {}", dep.name, dep.install_url);
+        }
+        eprintln!(
+            "\n  💡 Tip: Set CTO_AUTO_INSTALL=1 to auto-install via Homebrew on startup"
+        );
+    }
+
+    // Don't fail - just warn. Some features may still work without all CLIs
+    Ok(())
+}
+
 fn run_argo_cli(args: &[&str]) -> Result<String> {
     let argo_cmd = find_command("argo");
     let output = Command::new(&argo_cmd)
@@ -3613,6 +3733,12 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
+                Ok("check_setup") => Some(handle_check_setup(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
                 Ok(unknown) => Some(Err(anyhow!("Unknown tool: {unknown}"))),
                 Err(e) => Some(Err(e)),
             }
@@ -4164,6 +4290,133 @@ fn handle_update_mcp_server(arguments: &std::collections::HashMap<String, Value>
     }))
 }
 
+/// Handle the check_setup tool - verify and optionally install CLI dependencies
+#[allow(clippy::disallowed_macros)]
+fn handle_check_setup(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let auto_install = arguments
+        .get("auto_install")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let verbose = arguments
+        .get("verbose")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+
+    let mut results = Vec::new();
+    let mut all_ok = true;
+
+    // Check required CLIs
+    for dep in REQUIRED_CLIS {
+        let exists = command_exists(dep.name);
+        let mut status = json!({
+            "name": dep.name,
+            "description": dep.description,
+            "installed": exists,
+        });
+
+        if verbose && exists {
+            // Get version info
+            let cmd_path = find_command(dep.name);
+            if let Ok(output) = Command::new(&cmd_path).arg("version").output() {
+                let version = String::from_utf8_lossy(&output.stdout)
+                    .lines()
+                    .next()
+                    .unwrap_or("unknown")
+                    .to_string();
+                status["version"] = json!(version);
+                status["path"] = json!(cmd_path);
+            }
+        }
+
+        if !exists {
+            all_ok = false;
+            status["install_homebrew"] = json!(format!("brew install {}", dep.brew_package));
+            status["install_url"] = json!(dep.install_url);
+
+            if auto_install {
+                // Try to install via Homebrew
+                let has_homebrew = Command::new("brew")
+                    .arg("--version")
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .is_ok();
+
+                if has_homebrew {
+                    eprintln!("📦 Installing {}...", dep.name);
+                    let install_result = Command::new("brew")
+                        .args(["install", dep.brew_package])
+                        .status();
+
+                    match install_result {
+                        Ok(s) if s.success() => {
+                            status["installed"] = json!(true);
+                            status["just_installed"] = json!(true);
+                            eprintln!("  ✅ {} installed", dep.name);
+                        }
+                        _ => {
+                            status["install_error"] = json!("Homebrew install failed");
+                            eprintln!("  ❌ Failed to install {}", dep.name);
+                        }
+                    }
+                } else {
+                    status["install_error"] = json!("Homebrew not available");
+                }
+            }
+        }
+
+        results.push(status);
+    }
+
+    // Check kubeconfig
+    let kubectl_path = find_command("kubectl");
+    let kubeconfig_ok = Command::new(&kubectl_path)
+        .args(["cluster-info"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    let cluster_status = if kubeconfig_ok {
+        json!({
+            "connected": true,
+            "message": "Kubernetes cluster is accessible"
+        })
+    } else {
+        all_ok = false;
+        json!({
+            "connected": false,
+            "message": "Cannot connect to Kubernetes cluster. Check KUBECONFIG or run: kubectl config use-context <context>"
+        })
+    };
+
+    // Check cto-config.json
+    let config_status = if CTO_CONFIG.get().is_some() {
+        let config = CTO_CONFIG.get().unwrap();
+        json!({
+            "loaded": true,
+            "agents_count": config.agents.len(),
+            "agents": config.agents.keys().collect::<Vec<_>>()
+        })
+    } else {
+        all_ok = false;
+        json!({
+            "loaded": false,
+            "message": "cto-config.json not found. Create one in your project root."
+        })
+    };
+
+    Ok(json!({
+        "success": all_ok,
+        "message": if all_ok { "All dependencies satisfied" } else { "Some dependencies missing or not configured" },
+        "cli_tools": results,
+        "cluster": cluster_status,
+        "config": config_status,
+        "tip": if all_ok { Value::Null } else { json!("Run with auto_install=true to install missing CLIs via Homebrew") }
+    }))
+}
+
 #[allow(clippy::disallowed_macros)]
 async fn rpc_loop() -> Result<()> {
     eprintln!("Starting RPC loop");
@@ -4256,6 +4509,15 @@ fn main() -> Result<()> {
         "🚀 Starting 5D Labs MCP Server... (built: {})",
         env!("BUILD_TIMESTAMP")
     );
+
+    // Check CLI dependencies (auto-install if CTO_AUTO_INSTALL=1)
+    let auto_install = std::env::var("CTO_AUTO_INSTALL")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false);
+    if let Err(e) = check_dependencies(auto_install) {
+        eprintln!("⚠️  Dependency check failed: {e}");
+        // Continue anyway - some features may still work
+    }
 
     // Initialize configuration from JSON file
     let config = load_cto_config().context("Failed to load cto-config.json")?;
