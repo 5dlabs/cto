@@ -190,6 +190,12 @@ impl LinearClient {
                         id
                         name
                     }
+                    project {
+                        id
+                        name
+                        description
+                        url
+                    }
                     createdAt
                     updatedAt
                 }

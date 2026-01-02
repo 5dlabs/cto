@@ -17,8 +17,8 @@ use crate::activities::{PlanStep, PlanStepStatus};
 use crate::config::Config;
 use crate::emitter::{AgentActivityEmitter, LinearAgentEmitter};
 use crate::handlers::callbacks::{
-    handle_intake_complete, handle_play_complete, handle_status_sync, handle_tasks_json_callback,
-    CallbackState,
+    handle_agent_work_started, handle_intake_complete, handle_play_complete, handle_pr_created,
+    handle_status_sync, handle_tasks_json_callback, CallbackState,
 };
 use crate::handlers::github::handle_github_webhook;
 use crate::handlers::intake::{extract_intake_request, submit_intake_workflow};
@@ -82,7 +82,17 @@ pub fn build_router(state: AppState) -> Router {
         // Status sync endpoint for sidecar
         .route(
             "/status/linear-sync",
-            post(handle_status_sync).with_state(callback_state),
+            post(handle_status_sync).with_state(callback_state.clone()),
+        )
+        // PR created callback from agents
+        .route(
+            "/callbacks/pr-created",
+            post(handle_pr_created).with_state(callback_state.clone()),
+        )
+        // Agent work started callback
+        .route(
+            "/callbacks/agent-work-started",
+            post(handle_agent_work_started).with_state(callback_state),
         )
         // Manual trigger endpoints for testing
         .route("/trigger/intake", post(trigger_intake))
@@ -616,8 +626,10 @@ async fn handle_session_created(
                         status: PlanStepStatus::InProgress,
                     },
                     PlanStep::pending("Submit play workflow"),
-                    PlanStep::pending("Implementation (Rex/Blaze)"),
-                    PlanStep::pending("Quality review (Cleo/Tess)"),
+                    PlanStep::pending("Implementation"),
+                    PlanStep::pending("Quality review"),
+                    PlanStep::pending("Security audit"),
+                    PlanStep::pending("Testing"),
                     PlanStep::pending("Create PR"),
                 ])
                 .await
@@ -653,8 +665,10 @@ async fn handle_session_created(
                         content: "Submit play workflow".to_string(),
                         status: PlanStepStatus::InProgress,
                     },
-                    PlanStep::pending("Implementation (Rex/Blaze)"),
-                    PlanStep::pending("Quality review (Cleo/Tess)"),
+                    PlanStep::pending("Implementation"),
+                    PlanStep::pending("Quality review"),
+                    PlanStep::pending("Security audit"),
+                    PlanStep::pending("Testing"),
                     PlanStep::pending("Create PR"),
                 ])
                 .await
@@ -688,10 +702,12 @@ async fn handle_session_created(
                             PlanStep::completed("Extract task details"),
                             PlanStep::completed("Submit play workflow"),
                             PlanStep {
-                                content: "Implementation (Rex/Blaze)".to_string(),
+                                content: "Implementation".to_string(),
                                 status: PlanStepStatus::InProgress,
                             },
-                            PlanStep::pending("Quality review (Cleo/Tess)"),
+                            PlanStep::pending("Quality review"),
+                            PlanStep::pending("Security audit"),
+                            PlanStep::pending("Testing"),
                             PlanStep::pending("Create PR"),
                         ])
                         .await

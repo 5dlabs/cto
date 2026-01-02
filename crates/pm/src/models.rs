@@ -78,6 +78,9 @@ pub struct Issue {
     /// Issue attachments (resource links)
     #[serde(default, deserialize_with = "deserialize_nodes")]
     pub attachments: Vec<Attachment>,
+    /// Project the issue belongs to
+    #[serde(default)]
+    pub project: Option<Project>,
     /// Created timestamp
     #[serde(default)]
     pub created_at: Option<DateTime<Utc>>,
@@ -311,6 +314,9 @@ pub struct IssueUpdateInput {
     /// New delegate ID (agent assignment)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delegate_id: Option<String>,
+    /// Project ID to add issue to
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
 }
 
 /// Input for creating an issue relation

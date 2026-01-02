@@ -82,6 +82,8 @@ pub struct IntakeRequest {
     pub tech_stack: TechStack,
     /// CTO configuration from labels/frontmatter.
     pub cto_config: CtoConfig,
+    /// Existing project (if PRD issue already belongs to one).
+    pub existing_project: Option<crate::models::Project>,
 }
 
 // =========================================================================
@@ -660,6 +662,15 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
         info!(project_name = %project_name, "No repository URL found - will create new repo");
     }
 
+    // Check if issue already belongs to a project
+    if let Some(ref project) = issue.project {
+        info!(
+            project_id = %project.id,
+            project_name = %project.name,
+            "PRD issue already belongs to a project - will use existing"
+        );
+    }
+
     Ok(IntakeRequest {
         session_id: session_id.to_string(),
         prd_issue_id: issue.id.clone(),
@@ -674,6 +685,7 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
         source_branch: None, // Default to main
         tech_stack,
         cto_config,
+        existing_project: issue.project.clone(),
     })
 }
 
@@ -1030,7 +1042,10 @@ pub async fn create_task_issues_with_project(
 
         // Add agent label based on agent_hint (e.g., "agent:rex", "agent:blaze")
         // This allows filtering/grouping by assigned agent in Linear
-        if !task.agent_hint.is_empty() {
+        if task.agent_hint.is_empty() {
+            // No agent hint - mark as pending for manual assignment
+            label_ids.push(agent_pending_label.id.clone());
+        } else {
             let agent_label_name = format!("agent:{}", task.agent_hint.to_lowercase());
             match client
                 .get_or_create_label(&request.team_id, &agent_label_name)
@@ -1047,9 +1062,6 @@ pub async fn create_task_issues_with_project(
                     label_ids.push(agent_pending_label.id.clone());
                 }
             }
-        } else {
-            // No agent hint - mark as pending for manual assignment
-            label_ids.push(agent_pending_label.id.clone());
         }
 
         if let Some(label) = priority_label {
