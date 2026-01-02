@@ -221,273 +221,199 @@ spec:
                   optional: true
 
     # =========================================================================
-    # Intake Container Step (with status-sync sidecar for CLI streaming)
+    # Intake Container Step (via CodeRun CR)
     # =========================================================================
-    # Runs the intake process with optional Claude CLI streaming.
-    # When intake-mode=cli, streams Claude output to Linear via sidecar.
+    # Creates a CodeRun CR for intake which the controller processes using
+    # the Handlebars templates (morgan/intake.sh.hbs). This aligns intake with
+    # the Play workflow architecture - single source of truth for all agent scripts.
     - name: intake-container
       inputs:
         parameters:
           - name: configmap-name
           - name: repository-url
-      volumes:
-        - name: intake-files
-          configMap:
-            name: "{{inputs.parameters.configmap-name}}"
-        - name: agent-templates
-          projected:
-            sources:
-              - configMap:
-                  name: controller-agent-templates-shared
-                  optional: true
-              - configMap:
-                  name: controller-agent-templates-claude
-                  optional: true
-              - configMap:
-                  name: controller-agent-templates-codex
-                  optional: true
-              - configMap:
-                  name: controller-agent-templates-cursor
-                  optional: true
-              - configMap:
-                  name: controller-agent-templates-factory
-                  optional: true
-              - configMap:
-                  name: controller-agent-templates-opencode
-                  optional: true
-              - configMap:
-                  name: controller-agent-templates-code-shared
-                  optional: true
-              - configMap:
-                  name: controller-agent-templates-docs
-                  optional: true
-              - configMap:
-                  name: controller-agent-templates-intake
-                  optional: true
-        - name: agents-config
-          configMap:
-            name: controller-agents
-        # Shared volume for CLI stream output (sidecar reads, main writes)
-        - name: workspace-shared
-          emptyDir: {}
-        # MCP config for Claude CLI (Firecrawl, Context7, etc.)
-        - name: mcp-config
-          configMap:
-            name: morgan-mcp-config
-            optional: true
-      containerSet:
-        containers:
-          # Main intake container
-          - name: main
-            image: "{{workflow.parameters.runtime-image}}"
-            imagePullPolicy: Always
-            command: ["/bin/bash"]
-            args: ["/agent-templates/intake_intake.sh"]
-            workingDir: /workspace
-            # Run as node user (UID 1000) to match image user and allow writes to ~/.claude.json
-            securityContext:
-              runAsUser: 1000
-              runAsGroup: 1000
+      outputs:
+        parameters:
+          - name: coderun-name
+            valueFrom:
+              parameter: "{{steps.create-intake-coderun.outputs.parameters.coderun-name}}"
+      steps:
+        - - name: create-intake-coderun
+            template: create-intake-coderun
+            arguments:
+              parameters:
+                - name: configmap-name
+                  value: "{{inputs.parameters.configmap-name}}"
+                - name: repository-url
+                  value: "{{inputs.parameters.repository-url}}"
+        - - name: wait-for-job
+            template: wait-for-intake-job
+            arguments:
+              parameters:
+                - name: coderun-name
+                  value: "{{steps.create-intake-coderun.outputs.parameters.coderun-name}}"
+        - - name: wait-for-completion
+            template: wait-for-intake-completion
+            arguments:
+              parameters:
+                - name: coderun-name
+                  value: "{{steps.create-intake-coderun.outputs.parameters.coderun-name}}"
+
+    # =========================================================================
+    # Create Intake CodeRun Resource
+    # =========================================================================
+    - name: create-intake-coderun
+      inputs:
+        parameters:
+          - name: configmap-name
+          - name: repository-url
+      outputs:
+        parameters:
+          - name: coderun-name
+            valueFrom:
+              path: /tmp/coderun-name.txt
+      script:
+        image: alpine/k8s:1.31.0
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+
+          # Build CodeRun manifest for intake
+          PROJECT_NAME="{{workflow.parameters.project-name}}"
+          REPOSITORY_URL="{{inputs.parameters.repository-url}}"
+          GITHUB_APP="{{workflow.parameters.github-app}}"
+          WORKFLOW_NAME="{{workflow.name}}"
+          CONFIGMAP_NAME="{{inputs.parameters.configmap-name}}"
+
+          # Model configuration
+          PRIMARY_MODEL="{{workflow.parameters.primary-model}}"
+          
+          # Task generation parameters
+          NUM_TASKS="{{workflow.parameters.num-tasks}}"
+          EXPAND_TASKS="{{workflow.parameters.expand-tasks}}"
+          ANALYZE_COMPLEXITY="{{workflow.parameters.analyze-complexity}}"
+          
+          # Intake mode
+          INTAKE_MODE="{{workflow.parameters.intake-mode}}"
+          INTAKE_CLI="{{workflow.parameters.cli}}"
+
+          # Linear integration
+          LINEAR_SESSION_ID="{{workflow.parameters.linear-session-id}}"
+          LINEAR_ISSUE_ID="{{workflow.parameters.linear-issue-id}}"
+          LINEAR_TEAM_ID="{{workflow.parameters.linear-team-id}}"
+
+          # Validate required parameters
+          if [ -z "$PROJECT_NAME" ]; then
+            echo "ERROR: project-name is required"
+            exit 1
+          fi
+          if [ -z "$REPOSITORY_URL" ]; then
+            echo "ERROR: repository-url is required (should come from github-prep step)"
+            exit 1
+          fi
+
+          # Generate unique name suffix
+          TIMESTAMP=$(date +%s)
+          NAME_SUFFIX=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | cut -c1-20)
+
+          cat > /tmp/coderun.yaml << MANIFEST_EOF
+          apiVersion: agents.platform/v1
+          kind: CodeRun
+          metadata:
+            generateName: "intake-${NAME_SUFFIX}-"
+            namespace: cto
+            labels:
+              workflow-type: intake
+              workflow-name: "${WORKFLOW_NAME}"
+              project-name: "${NAME_SUFFIX}"
+              github-app: "${GITHUB_APP}"
+          spec:
+            runType: intake
+            service: "${PROJECT_NAME}"
+            repositoryUrl: "${REPOSITORY_URL}"
+            githubApp: "${GITHUB_APP}"
+            model: "${PRIMARY_MODEL}"
+            enableDocker: false
             env:
-              # Linear Agent Activity emission (pm-activity)
-              - name: LINEAR_SESSION_ID
-                value: "{{workflow.parameters.linear-session-id}}"
-              - name: LINEAR_ISSUE_ID
-                value: "{{workflow.parameters.linear-issue-id}}"
-              - name: LINEAR_ISSUE_IDENTIFIER
-                value: "{{workflow.parameters.linear-issue-identifier}}"
-              - name: LINEAR_TEAM_ID
-                value: "{{workflow.parameters.linear-team-id}}"
-              - name: LINEAR_API_TOKEN
-                valueFrom:
-                  secretKeyRef:
-                    name: linear-secrets
-                    key: LINEAR_OAUTH_TOKEN
-              # AI Provider API Keys (all CLIs)
-              - name: ANTHROPIC_API_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: agent-platform-secrets
-                    key: ANTHROPIC_API_KEY
-              - name: OPENAI_API_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: agent-platform-secrets
-                    key: OPENAI_API_KEY
-              - name: GEMINI_API_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: agent-platform-secrets
-                    key: GEMINI_API_KEY
-                    optional: true
-              - name: GOOGLE_API_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: agent-platform-secrets
-                    key: GOOGLE_API_KEY
-                    optional: true
-              - name: CURSOR_API_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: agent-platform-secrets
-                    key: CURSOR_API_KEY
-                    optional: true
-              - name: XAI_API_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: agent-platform-secrets
-                    key: XAI_API_KEY
-                    optional: true
-              - name: PERPLEXITY_API_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: agent-platform-secrets
-                    key: PERPLEXITY_API_KEY
-                    optional: true
-              - name: CONTEXT7_API_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: agent-platform-secrets
-                    key: CONTEXT7_API_KEY
-                    optional: true
-              # Firecrawl API key for URL scraping/enrichment
-              - name: FIRECRAWL_API_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: tools-firecrawl-secrets
-                    key: FIRECRAWL_API_KEY
-                    optional: true
-              # Tools server URL for MCP tools (Firecrawl, Context7, etc.)
-              - name: TOOLS_SERVER_URL
-                value: "http://cto-tools.cto.svc.cluster.local:8080/mcp"
-              - name: GITHUB_APP_ID
-                valueFrom:
-                  secretKeyRef:
-                    name: github-app-5dlabs-morgan
-                    key: app-id
-                    optional: true
-              - name: GITHUB_APP_PRIVATE_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: github-app-5dlabs-morgan
-                    key: private-key
-                    optional: true
-              - name: GITHUB_APP_CLIENT_ID
-                valueFrom:
-                  secretKeyRef:
-                    name: github-app-5dlabs-morgan
-                    key: client-id
-                    optional: true
-              - name: GITHUB_APP_CLIENT_SECRET
-                valueFrom:
-                  secretKeyRef:
-                    name: github-app-5dlabs-morgan
-                    key: client-secret
-                    optional: true
-              - name: GITHUB_APP
-                value: "{{workflow.parameters.github-app}}"
-              - name: PRIMARY_MODEL
-                value: "{{workflow.parameters.primary-model}}"
-              - name: RESEARCH_MODEL
-                value: "{{workflow.parameters.research-model}}"
-              - name: FALLBACK_MODEL
-                value: "{{workflow.parameters.fallback-model}}"
-              - name: PRIMARY_PROVIDER
-                value: "{{workflow.parameters.primary-provider}}"
-              - name: RESEARCH_PROVIDER
-                value: "{{workflow.parameters.research-provider}}"
-              - name: FALLBACK_PROVIDER
-                value: "{{workflow.parameters.fallback-provider}}"
-              - name: NUM_TASKS
-                value: "{{workflow.parameters.num-tasks}}"
-              - name: EXPAND_TASKS
-                value: "{{workflow.parameters.expand-tasks}}"
-              - name: ANALYZE_COMPLEXITY
-                value: "{{workflow.parameters.analyze-complexity}}"
-              # Intake mode configuration
-              - name: INTAKE_MODE
-                value: "{{workflow.parameters.intake-mode}}"
-              - name: INTAKE_CLI
-                value: "{{workflow.parameters.cli}}"
-              # Pass repository URL from github-prep step
-              - name: REPOSITORY_URL
-                value: "{{inputs.parameters.repository-url}}"
-              # Claude stream file path (shared with sidecar)
-              - name: CLAUDE_STREAM_FILE
-                value: "/workspace-shared/claude-stream.jsonl"
-            volumeMounts:
-              - name: intake-files
-                mountPath: /intake-files
-                readOnly: true
-              - name: agent-templates
-                mountPath: /agent-templates
-                readOnly: true
-              - name: agents-config
-                mountPath: /config/agents
-                readOnly: true
-              - name: workspace-shared
-                mountPath: /workspace-shared
-              - name: mcp-config
-                mountPath: /mcp-config
-                readOnly: true
-          # Status-sync sidecar for real-time CLI output streaming to Linear
-          - name: status-sync
-            image: ghcr.io/5dlabs/linear-sidecar:latest
-            imagePullPolicy: Always
-            command: ["/app/status-sync"]
-            env:
-              # Linear session for activities
-              - name: LINEAR_SESSION_ID
-                value: "{{workflow.parameters.linear-session-id}}"
-              - name: LINEAR_ISSUE_ID
-                value: "{{workflow.parameters.linear-issue-id}}"
-              - name: LINEAR_TEAM_ID
-                value: "{{workflow.parameters.linear-team-id}}"
-              - name: LINEAR_OAUTH_TOKEN
-                valueFrom:
-                  secretKeyRef:
-                    name: linear-secrets
-                    key: LINEAR_OAUTH_TOKEN
-              # Workflow name for external URL
-              - name: WORKFLOW_NAME
-                value: "{{workflow.name}}"
-              - name: ARGO_WORKFLOW_URL
-                value: "https://argo.5dlabs.ai/workflows/cto/{{workflow.name}}"
-              # Task info for plan updates
-              - name: TASK_ID
-                value: "intake"
-              - name: TASK_DESCRIPTION
-                value: "PRD Analysis and Task Generation"
-              # File paths (shared with main container)
-              - name: CLAUDE_STREAM_FILE
-                value: "/workspace-shared/claude-stream.jsonl"
-              - name: STATUS_FILE
-                value: "/workspace-shared/status.json"
-              - name: LOG_FILE
-                value: "/workspace-shared/agent.log"
-              - name: INPUT_FIFO
-                value: "/workspace-shared/input.fifo"
-              # Service URLs
-              - name: LINEAR_SERVICE_URL
-                value: "http://cto-pm:8081"
-              - name: LINEAR_API_URL
-                value: "https://api.linear.app/graphql"
-              # Intervals (ms)
-              - name: STATUS_POLL_INTERVAL_MS
-                value: "2000"
-              - name: LOG_POST_INTERVAL_MS
-                value: "1000"
-              - name: STREAM_POLL_INTERVAL_MS
-                value: "500"
-              # HTTP server port
-              - name: HTTP_PORT
-                value: "8080"
-              # Whip cracking disabled for intake (use defaults)
-              - name: WHIP_CRACK_ENABLED
-                value: "false"
-            volumeMounts:
-              - name: workspace-shared
-                mountPath: /workspace-shared
+              PROJECT_NAME: "${PROJECT_NAME}"
+              REPOSITORY_URL: "${REPOSITORY_URL}"
+              NUM_TASKS: "${NUM_TASKS}"
+              EXPAND_TASKS: "${EXPAND_TASKS}"
+              ANALYZE_COMPLEXITY: "${ANALYZE_COMPLEXITY}"
+              INTAKE_MODE: "${INTAKE_MODE}"
+              INTAKE_CLI: "${INTAKE_CLI}"
+              INTAKE_CONFIGMAP: "${CONFIGMAP_NAME}"
+              WORKFLOW_NAME: "${WORKFLOW_NAME}"
+          MANIFEST_EOF
+
+          # Add linearIntegration section if LINEAR_SESSION_ID is provided
+          if [ -n "${LINEAR_SESSION_ID}" ]; then
+            cat >> /tmp/coderun.yaml << LINEAR_EOF
+            linearIntegration:
+              enabled: true
+              sessionId: "${LINEAR_SESSION_ID}"
+              issueId: "${LINEAR_ISSUE_ID}"
+              teamId: "${LINEAR_TEAM_ID}"
+          LINEAR_EOF
+          fi
+
+          echo "Creating CodeRun resource for intake..."
+          cat /tmp/coderun.yaml
+          echo "---"
+
+          RESULT=$(kubectl create -f /tmp/coderun.yaml -o json)
+          NAME=$(echo "$RESULT" | jq -r '.metadata.name')
+          echo "Created CodeRun: $NAME"
+          echo "$NAME" > /tmp/coderun-name.txt
+
+    # =========================================================================
+    # Wait for Job Creation (Controller Processing)
+    # =========================================================================
+    - name: wait-for-intake-job
+      inputs:
+        parameters:
+          - name: coderun-name
+      resource:
+        action: get
+        manifest: |
+          apiVersion: agents.platform/v1
+          kind: CodeRun
+          metadata:
+            name: "{{inputs.parameters.coderun-name}}"
+            namespace: cto
+        successCondition: status.jobName
+        failureCondition: status.phase == Failed
+      retryStrategy:
+        limit: 20
+        retryPolicy: "OnError"
+        backoff:
+          duration: "30s"
+          factor: 2
+          maxDuration: "10m"
+
+    # =========================================================================
+    # Wait for Intake Completion
+    # =========================================================================
+    - name: wait-for-intake-completion
+      inputs:
+        parameters:
+          - name: coderun-name
+      resource:
+        action: get
+        manifest: |
+          apiVersion: agents.platform/v1
+          kind: CodeRun
+          metadata:
+            name: "{{inputs.parameters.coderun-name}}"
+            namespace: cto
+        successCondition: status.phase == Succeeded
+        failureCondition: status.phase == Failed
+      retryStrategy:
+        limit: 200
+        retryPolicy: "OnError"
+        backoff:
+          duration: "60s"
+          factor: 2
 
     # =========================================================================
     # Cleanup Step

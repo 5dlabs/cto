@@ -727,7 +727,10 @@ kubectl port-forward svc/grafana -n observability 3000:80 &
 |-----------|---------|--------|
 | ARC Controller | GitHub Actions | `arc-systems` |
 | k8s-runner | Self-hosted runners | 2-6 runners, DinD |
-| BuildKit | Remote builds | Caching enabled |
+
+### Optional: BuildKit (Separate Chart)
+BuildKit remote build server is available as an **optional** standalone chart at `infra/charts/buildkit/`.
+CI builds use GitHub Actions with GHA caching - BuildKit is only needed for manual remote builds from dev machines.
 
 ### CTO Platform Services
 | Service | Image | Purpose |

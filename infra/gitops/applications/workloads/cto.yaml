@@ -155,18 +155,6 @@ spec:
         cloudflare:
           enabled: true
 
-        # BuildKit - Remote build infrastructure for Latitude cluster
-        buildkit:
-          enabled: true
-          # Schedule on Latitude worker node
-          nodeSelector:
-            kubernetes.io/hostname: hardware-219s058355
-          # Allow pushing to local in-cluster registry (HTTP)
-          config:
-            insecureRegistries:
-              - "10.8.0.2:30500"
-              - "10.8.0.1:30500"
-
   destination:
     server: https://kubernetes.default.svc
     namespace: cto
@@ -205,17 +193,5 @@ spec:
       jqPathExpressions:
         - .subjects
         - .tunnelRef
-    # StatefulSet field defaulting by API server (buildkit has 2 PVCs)
-    - group: apps
-      kind: StatefulSet
-      name: buildkit
-      jsonPointers:
-        - /spec/persistentVolumeClaimRetentionPolicy
-        - /spec/volumeClaimTemplates/0/status
-        - /spec/volumeClaimTemplates/0/apiVersion
-        - /spec/volumeClaimTemplates/0/kind
-        - /spec/volumeClaimTemplates/1/status
-        - /spec/volumeClaimTemplates/1/apiVersion
-        - /spec/volumeClaimTemplates/1/kind
 
   revisionHistoryLimit: 5

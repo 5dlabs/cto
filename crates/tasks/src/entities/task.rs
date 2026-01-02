@@ -164,7 +164,8 @@ pub struct Task {
     pub dependencies: Vec<String>,
 
     /// In-depth implementation instructions
-    #[serde(default)]
+    /// Note: Also accepts "acceptance_criteria" field from LLM-generated JSON for compatibility
+    #[serde(default, alias = "acceptance_criteria")]
     pub details: String,
 
     /// Verification approach
@@ -207,7 +208,13 @@ pub struct Task {
     pub complexity: Option<ComplexityInfo>,
 
     /// Agent routing hint (blaze, rex, grizz, tap, spark, nova, tess, cipher, bolt, atlas)
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "agentHint")]
+    /// Note: Also accepts "agent" field from LLM-generated JSON for compatibility
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "agentHint",
+        alias = "agent"
+    )]
     pub agent_hint: Option<String>,
 }
 
@@ -415,5 +422,55 @@ mod tests {
 
         let result = task.set_status(TaskStatus::Pending);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_serde_alias_agent_field() {
+        // LLMs often generate "agent" instead of "agentHint"
+        // The alias should allow both field names to work
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test description",
+            "agent": "bolt"
+        }"#;
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.agent_hint, Some("bolt".to_string()));
+    }
+
+    #[test]
+    fn test_serde_alias_agent_hint_field() {
+        // The canonical "agentHint" field should also work
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test description",
+            "agentHint": "rex"
+        }"#;
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.agent_hint, Some("rex".to_string()));
+    }
+
+    #[test]
+    fn test_serde_alias_acceptance_criteria() {
+        // LLMs often generate "acceptance_criteria" instead of "details"
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test description",
+            "acceptance_criteria": "Must pass all tests"
+        }"#;
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.details, "Must pass all tests");
+    }
+
+    #[test]
+    fn test_serde_serializes_canonical_field_names() {
+        // When serializing, we should use canonical names (agentHint, not agent)
+        let mut task = Task::new("1", "Test", "Test");
+        task.agent_hint = Some("bolt".to_string());
+        let json = serde_json::to_string(&task).unwrap();
+        assert!(json.contains("agentHint"));
+        assert!(!json.contains(r#""agent":"#));
     }
 }

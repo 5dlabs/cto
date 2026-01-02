@@ -20,6 +20,12 @@ echo "════════════════════════�
 echo "║               CLAUDE CODE CLI INVOCATION                     ║"
 echo "═══════════════════════════════════════════════════════════════"
 
+# =========================================================================
+# MCP Diagnostics - verify tools binary and server connectivity
+# =========================================================================
+MCP_CONFIG="${mcp_config_path:-}"
+{{> mcp-check }}
+
 # Claude Code CLI - use npx for consistent version management
 CLAUDE_CMD="npx -y @anthropic-ai/claude-code -p"
 echo "✓ Using Claude CLI via npx"
@@ -31,26 +37,20 @@ CLAUDE_CMD="$CLAUDE_CMD --input-format stream-json"
 # Verbose mode for debugging
 CLAUDE_CMD="$CLAUDE_CMD --verbose"
 
-# MCP configuration (check multiple locations)
-MCP_CONFIG=""
-for mcp_path in "${mcp_config_path:-}" "/task-files/mcp.json" "/workspace/.mcp.json" "$CLI_WORK_DIR/.mcp.json"; do
-    if [ -n "$mcp_path" ] && [ -f "$mcp_path" ]; then
-        MCP_CONFIG="$mcp_path"
-        break
-    fi
-done
+# Enable MCP debug logging for troubleshooting server connection issues
+CLAUDE_CMD="$CLAUDE_CMD --debug mcp"
 
-if [ -n "$MCP_CONFIG" ]; then
+# MCP configuration - use the config found by mcp-check partial
+if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
     # Validate the config is valid JSON before passing to Claude
-    if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG" 2>/dev/null; then
-        echo "✓ Adding MCP configuration: $MCP_CONFIG"
-        CLAUDE_CMD="$CLAUDE_CMD --mcp-config $MCP_CONFIG"
+    if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
+        echo "✓ Adding MCP configuration: $MCP_CONFIG_FILE"
+        CLAUDE_CMD="$CLAUDE_CMD --mcp-config $MCP_CONFIG_FILE"
     else
-        echo "⚠️ MCP config at $MCP_CONFIG is not valid JSON, skipping"
-        MCP_CONFIG=""
+        echo "⚠️ MCP config at $MCP_CONFIG_FILE is not valid JSON, skipping"
     fi
 else
-    echo "ℹ️ No MCP configuration found (checked /task-files/mcp.json, /workspace/.mcp.json)"
+    echo "ℹ️ No MCP configuration found"
 fi
 
 # System prompt handling

@@ -211,7 +211,7 @@ impl PlatformIssueType {
         match name {
             "CTOControllerDown" | "CTOHealerDown" | "CTOPMDown" => Self::ComponentDown,
             "CTOControllerCrashLoop" => Self::CrashLoop,
-            "CTOHighMemory" | "CTOBuildKitNotReady" => Self::HighResourceUsage,
+            "CTOHighMemory" => Self::HighResourceUsage,
             "CTOCodeRunStuck" => Self::CodeRunStuck,
             "CTOCodeRunFailed" => Self::CodeRunFailed,
             "ArgoWorkflowStepStuck" | "ArgoWorkflowPendingTooLong" => Self::WorkflowStepStuck,

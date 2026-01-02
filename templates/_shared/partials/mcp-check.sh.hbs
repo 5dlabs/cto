@@ -1,0 +1,125 @@
+# =========================================================================
+# MCP Tools Connectivity Check
+# Validates MCP client binary, server connectivity, and config
+# 
+# Required context:
+#   - MCP_CONFIG (optional): Path to MCP config file
+#   - TOOLS_SERVER_URL (optional): Tools server URL (defaults to cluster service)
+# =========================================================================
+
+echo ""
+echo "🔧 MCP Tools Diagnostics:"
+echo "───────────────────────────────────────────────────────────────"
+
+# Step 1: Check if tools-client binary exists
+echo ""
+echo "📦 MCP Client Binary:"
+if command -v tools >/dev/null 2>&1; then
+    TOOLS_PATH=$(command -v tools)
+    echo "  ✅ tools binary found: $TOOLS_PATH"
+    # Try to get version
+    TOOLS_VERSION_OUTPUT=$(tools --version 2>&1 || echo "unknown")
+    echo "  → Version: $TOOLS_VERSION_OUTPUT"
+elif command -v tools-client >/dev/null 2>&1; then
+    TOOLS_PATH=$(command -v tools-client)
+    echo "  ✅ tools-client binary found: $TOOLS_PATH"
+    TOOLS_VERSION_OUTPUT=$(tools-client --version 2>&1 || echo "unknown")
+    echo "  → Version: $TOOLS_VERSION_OUTPUT"
+else
+    echo "  ❌ tools/tools-client binary NOT FOUND in PATH"
+    echo "  → MCP server connection will fail!"
+    echo "  → PATH: $PATH"
+    echo "  → Checking common locations:"
+    for loc in /usr/local/bin/tools /usr/bin/tools /home/node/.local/bin/tools; do
+        if [ -f "$loc" ]; then
+            echo "     ✅ Found: $loc (not in PATH)"
+        else
+            echo "     ❌ Not found: $loc"
+        fi
+    done
+fi
+
+# Step 2: Test connectivity to tools server
+echo ""
+echo "🌐 Tools Server Connectivity:"
+TOOLS_SERVER_URL="${TOOLS_SERVER_URL:-http://cto-tools.cto.svc.cluster.local:8080}"
+echo "  → Server URL: $TOOLS_SERVER_URL"
+
+if command -v curl >/dev/null 2>&1; then
+    # Test health endpoint
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "${TOOLS_SERVER_URL}/health" 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "200" ]; then
+        echo "  ✅ Health check: OK (HTTP $HTTP_CODE)"
+    elif [ "$HTTP_CODE" = "000" ]; then
+        echo "  ❌ Server unreachable (connection failed/timeout)"
+    else
+        echo "  ⚠️ Health returned HTTP $HTTP_CODE"
+    fi
+    
+    # Test MCP endpoint
+    MCP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "${TOOLS_SERVER_URL}/mcp" 2>/dev/null || echo "000")
+    echo "  → MCP endpoint: HTTP $MCP_CODE"
+else
+    echo "  ⚠️ curl not available, skipping connectivity test"
+fi
+
+# Step 3: Validate MCP config file
+echo ""
+echo "📋 MCP Configuration:"
+
+# Find MCP config - check multiple locations
+MCP_CONFIG_FILE="${MCP_CONFIG:-}"
+if [ -z "$MCP_CONFIG_FILE" ]; then
+    for mcp_path in "/mcp-config/mcp.json" "/task-files/mcp.json" "/workspace/.mcp.json" "${CLI_WORK_DIR:-.}/.mcp.json"; do
+        if [ -f "$mcp_path" ]; then
+            MCP_CONFIG_FILE="$mcp_path"
+            break
+        fi
+    done
+fi
+
+if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
+    echo "  ✅ Config found: $MCP_CONFIG_FILE"
+    
+    # Validate JSON
+    if command -v jq >/dev/null 2>&1; then
+        if jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
+            echo "  ✅ Valid JSON"
+            
+            # Show server configuration
+            MCP_CMD=$(jq -r '.mcpServers.tools.command // "not configured"' "$MCP_CONFIG_FILE" 2>/dev/null)
+            MCP_CMD_ARGS=$(jq -r '.mcpServers.tools.args | if . then join(" ") else "none" end' "$MCP_CONFIG_FILE" 2>/dev/null || echo "none")
+            echo "  → Command: $MCP_CMD"
+            echo "  → Args: $MCP_CMD_ARGS"
+            
+            # Display available tools count
+            TOOLS_COUNT=$(jq -r '.mcpServers.tools.availableTools | if . then length else 0 end' "$MCP_CONFIG_FILE" 2>/dev/null || echo "0")
+            echo "  → Available tools: $TOOLS_COUNT"
+            
+            if [ "$TOOLS_COUNT" != "0" ] && [ "$TOOLS_COUNT" != "null" ]; then
+                echo "  → Tool prefixes:"
+                jq -r '.mcpServers.tools.availableTools[]?' "$MCP_CONFIG_FILE" 2>/dev/null | cut -d'_' -f1-3 | sort -u | head -10 | while read -r prefix; do
+                    [ -n "$prefix" ] && echo "     • $prefix"
+                done
+            fi
+        else
+            echo "  ❌ Invalid JSON - MCP config parsing will fail"
+        fi
+    else
+        echo "  ⚠️ jq not available, skipping config validation"
+    fi
+else
+    echo "  ⚠️ No MCP config found"
+    echo "  → Checked: /mcp-config/mcp.json, /task-files/mcp.json, /workspace/.mcp.json"
+fi
+
+# Step 4: Claude MCP list (if config available and claude is present)
+if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ] && command -v claude >/dev/null 2>&1; then
+    echo ""
+    echo "🔍 Claude MCP Server List:"
+    claude mcp list --mcp-config "$MCP_CONFIG_FILE" 2>&1 | head -20 || echo "  ⚠️ claude mcp list failed"
+fi
+
+echo ""
+echo "───────────────────────────────────────────────────────────────"
+
