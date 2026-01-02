@@ -1198,6 +1198,7 @@ pub async fn create_intake_project(
         team_ids: Some(vec![request.team_id.clone()]),
         lead_id: None,
         target_date: None,
+        default_view: Some(crate::models::ProjectViewType::Board),
     };
 
     let project = client.create_project(input).await?;

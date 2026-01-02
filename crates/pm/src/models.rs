@@ -469,6 +469,17 @@ impl AgentStatus {
     }
 }
 
+/// Project view type for Linear projects
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectViewType {
+    /// List view (default)
+    #[default]
+    List,
+    /// Board/Kanban view with workflow state columns
+    Board,
+}
+
 /// Input for creating a Linear project
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -487,4 +498,7 @@ pub struct ProjectCreateInput {
     /// Target completion date
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_date: Option<String>,
+    /// Default view type (list or board)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_view: Option<ProjectViewType>,
 }

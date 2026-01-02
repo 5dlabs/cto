@@ -198,6 +198,7 @@ async fn test_linear_client_create_project() {
         team_ids: Some(vec![team_id]),
         lead_id: None,
         target_date: None,
+        default_view: None, // Use Linear's default for test
     };
 
     let project = client.create_project(input).await;
