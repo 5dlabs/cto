@@ -7,6 +7,8 @@ metadata:
   labels:
     {{- include "cto.healer.labels" . | nindent 4 }}
 data:
+  cto-config.json: |
+{{ .Files.Get "cto-config.json" | indent 4 }}
   healer-config.json: |
     {
       "cli": {{ .Values.healer.config.cli | quote }},
