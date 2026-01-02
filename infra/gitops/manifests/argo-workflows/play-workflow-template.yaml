@@ -2409,7 +2409,7 @@ spec:
           CTO_CONFIG="${CLONE_DIR}/${DOCS_PROJECT_DIR}/cto-config.json"
           if [ -f "$CTO_CONFIG" ]; then
             echo "📋 Reading agent configuration from cto-config.json..."
-            
+
             # Map AGENT_TYPE to the agent key in cto-config.json
             AGENT_KEY=""
             case "$AGENT_TYPE" in
@@ -2435,33 +2435,33 @@ spec:
                 AGENT_KEY="rex"
                 ;;
             esac
-            
+
             echo "   Looking up agent key: ${AGENT_KEY}"
-            
+
             # Extract cli and model from the agents section
             AGENT_CONFIG=$(jq -r --arg key "$AGENT_KEY" '.agents[$key] // empty' "$CTO_CONFIG" 2>/dev/null)
-            
+
             if [ -n "$AGENT_CONFIG" ]; then
               CONFIG_CLI=$(echo "$AGENT_CONFIG" | jq -r '.cli // empty')
               CONFIG_MODEL=$(echo "$AGENT_CONFIG" | jq -r '.model // empty')
               CONFIG_GITHUB_APP=$(echo "$AGENT_CONFIG" | jq -r '.githubApp // empty')
-              
+
               echo "   Found config: cli=${CONFIG_CLI}, model=${CONFIG_MODEL}, githubApp=${CONFIG_GITHUB_APP}"
-              
+
               # Override cli-type if config has a value and current is empty
               CURRENT_CLI=$(cat /tmp/cli-type.txt 2>/dev/null || echo "")
               if [ -n "$CONFIG_CLI" ] && { [ -z "$CURRENT_CLI" ] || [ "$CURRENT_CLI" = "" ]; }; then
                 echo "   Overriding cli-type: '' -> ${CONFIG_CLI}"
                 echo "$CONFIG_CLI" > /tmp/cli-type.txt
               fi
-              
+
               # Override model if config has a value and current is empty
               CURRENT_MODEL=$(cat /tmp/model.txt 2>/dev/null || echo "")
               if [ -n "$CONFIG_MODEL" ] && { [ -z "$CURRENT_MODEL" ] || [ "$CURRENT_MODEL" = "" ]; }; then
                 echo "   Overriding model: '' -> ${CONFIG_MODEL}"
                 echo "$CONFIG_MODEL" > /tmp/model.txt
               fi
-              
+
               # Override github-app if config has a value
               if [ -n "$CONFIG_GITHUB_APP" ]; then
                 CURRENT_APP=$(cat /tmp/github-app.txt 2>/dev/null || echo "")
@@ -2474,22 +2474,22 @@ spec:
             else
               echo "   ⚠️ No agent config found for key: ${AGENT_KEY}"
             fi
-            
+
             # Also check defaults.play for fallback values
             PLAY_DEFAULTS=$(jq -r '.defaults.play // empty' "$CTO_CONFIG" 2>/dev/null)
             if [ -n "$PLAY_DEFAULTS" ]; then
               DEFAULT_CLI=$(echo "$PLAY_DEFAULTS" | jq -r '.cli // empty')
               DEFAULT_MODEL=$(echo "$PLAY_DEFAULTS" | jq -r '.model // empty')
-              
+
               # Apply defaults only if still empty
               CURRENT_CLI=$(cat /tmp/cli-type.txt 2>/dev/null || echo "")
               CURRENT_MODEL=$(cat /tmp/model.txt 2>/dev/null || echo "")
-              
+
               if [ -n "$DEFAULT_CLI" ] && { [ -z "$CURRENT_CLI" ] || [ "$CURRENT_CLI" = "" ]; }; then
                 echo "   Applying default cli from play config: ${DEFAULT_CLI}"
                 echo "$DEFAULT_CLI" > /tmp/cli-type.txt
               fi
-              
+
               if [ -n "$DEFAULT_MODEL" ] && { [ -z "$CURRENT_MODEL" ] || [ "$CURRENT_MODEL" = "" ]; }; then
                 echo "   Applying default model from play config: ${DEFAULT_MODEL}"
                 echo "$DEFAULT_MODEL" > /tmp/model.txt
