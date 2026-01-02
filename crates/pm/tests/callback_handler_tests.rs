@@ -297,16 +297,22 @@ fn test_agent_status_from_sidecar() {
 fn test_play_workflow_states() {
     use pm::handlers::intake::PLAY_WORKFLOW_STATES;
 
-    // Verify we have all expected states
+    // Verify we have all expected states for the 8-stage play workflow
     let state_names: Vec<_> = PLAY_WORKFLOW_STATES
         .iter()
         .map(|(name, _, _)| *name)
         .collect();
     assert!(state_names.contains(&"Ready"));
-    assert!(state_names.contains(&"🔧 Implementation"));
-    assert!(state_names.contains(&"🔍 Quality"));
-    assert!(state_names.contains(&"🔗 Integration"));
-    assert!(state_names.contains(&"🚀 Deployment"));
+    assert!(state_names.contains(&"Infrastructure"));
+    assert!(state_names.contains(&"Implementation"));
+    assert!(state_names.contains(&"Quality"));
+    assert!(state_names.contains(&"Security"));
+    assert!(state_names.contains(&"Testing"));
+    assert!(state_names.contains(&"Integration"));
+    assert!(state_names.contains(&"Deployment"));
+
+    // Should have exactly 8 states
+    assert_eq!(PLAY_WORKFLOW_STATES.len(), 8);
 
     // Verify state types are valid
     let valid_types = ["unstarted", "started", "completed", "canceled", "backlog"];
@@ -343,6 +349,7 @@ fn test_generate_completion_summary() {
         source_branch: None,
         tech_stack: TechStack::default(),
         cto_config: CtoConfig::default(),
+        existing_project: None,
     };
 
     let tasks = vec![

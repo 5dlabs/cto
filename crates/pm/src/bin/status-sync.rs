@@ -1845,6 +1845,8 @@ async fn progress_monitor_task(
 struct AppState {
     fifo_tx: mpsc::Sender<String>,
     shutdown: Arc<AtomicBool>,
+    config: Arc<Config>,
+    linear_client: Option<LinearApiClient>,
 }
 
 /// Input request body.
@@ -1896,11 +1898,39 @@ async fn handle_shutdown(State(state): State<AppState>) -> impl IntoResponse {
     (StatusCode::OK, "Shutting down")
 }
 
+/// Stop endpoint - handles Linear stop signal.
+///
+/// This endpoint is called when a user clicks "Stop" in Linear.
+/// It emits a response activity confirming the stop and triggers shutdown.
+async fn handle_stop(State(state): State<AppState>) -> impl IntoResponse {
+    info!("Stop signal received via HTTP");
+
+    // Emit response activity to Linear
+    if let Some(ref client) = state.linear_client {
+        if state.config.has_linear_session() {
+            let stop_msg = "Stopped as requested. No further changes were made.";
+            if let Err(e) = client
+                .emit_response(&state.config.linear_session_id, stop_msg)
+                .await
+            {
+                warn!(error = %e, "Failed to emit stop response to Linear");
+            } else {
+                info!("Emitted stop response to Linear");
+            }
+        }
+    }
+
+    // Trigger graceful shutdown
+    state.shutdown.store(true, Ordering::SeqCst);
+    (StatusCode::OK, "Agent stopped")
+}
+
 /// HTTP server task.
 async fn http_server_task(config: Arc<Config>, state: AppState) {
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/input", post(handle_input))
+        .route("/stop", post(handle_stop))
         .route("/shutdown", post(handle_shutdown))
         .with_state(state);
 
@@ -2031,6 +2061,8 @@ async fn main() -> Result<()> {
     let http_state = AppState {
         fifo_tx: fifo_tx.clone(),
         shutdown: shutdown.clone(),
+        config: config.clone(),
+        linear_client: linear_client.clone(),
     };
 
     // Create HTTP client for status sync

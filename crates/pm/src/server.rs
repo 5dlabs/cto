@@ -24,7 +24,7 @@ use crate::handlers::github::handle_github_webhook;
 use crate::handlers::intake::{extract_intake_request, submit_intake_workflow};
 use crate::handlers::play::{cancel_play_workflow, extract_play_request, submit_play_workflow};
 use crate::webhooks::{
-    validate_webhook_timestamp, verify_webhook_signature, WebhookAction, WebhookPayload,
+    identify_agent_or_legacy, validate_webhook_timestamp, WebhookAction, WebhookPayload,
     WebhookType,
 };
 use crate::LinearClient;
@@ -98,6 +98,15 @@ pub fn build_router(state: AppState) -> Router {
         .route("/trigger/intake", post(trigger_intake))
         // Input routing endpoint - send messages to running agents
         .route("/api/sessions/{session_id}/input", post(send_session_input))
+        // OAuth endpoints for Linear agent apps
+        .route(
+            "/oauth/callback",
+            axum::routing::get(crate::handlers::oauth::handle_oauth_callback),
+        )
+        .route(
+            "/oauth/start",
+            axum::routing::get(crate::handlers::oauth::handle_oauth_start),
+        )
         // Health check
         .route("/health", axum::routing::get(health_check))
         .route("/ready", axum::routing::get(readiness_check))
@@ -329,19 +338,36 @@ pub async fn linear_webhook_handler(
         "Received Linear webhook"
     );
 
-    // Verify signature if secret is configured
-    if let Some(secret) = &state.config.webhook_secret {
-        let Some(sig) = &signature else {
-            warn!("Missing Linear-Signature header");
-            return Err(StatusCode::UNAUTHORIZED);
-        };
+    // Identify agent and verify signature using multi-app configuration
+    let agent_id = if let Some(sig) = &signature {
+        // Try multi-app identification first, fall back to legacy single secret
+        let id = identify_agent_or_legacy(
+            &body,
+            sig,
+            &state.config.linear,
+            state.config.webhook_secret.as_deref(),
+        );
 
-        if !verify_webhook_signature(&body, sig, secret) {
-            warn!("Invalid webhook signature");
+        if let Some(ref agent_id) = id {
+            debug!(
+                agent = %agent_id.agent,
+                "Webhook signature verified for agent"
+            );
+        } else {
+            // No valid signature found
+            warn!("Invalid webhook signature - no matching agent or legacy secret");
             return Err(StatusCode::UNAUTHORIZED);
         }
-        debug!("Webhook signature verified");
-    }
+        id
+    } else if state.config.webhook_secret.is_some() || !state.config.linear.apps.is_empty() {
+        // Signature required but missing
+        warn!("Missing Linear-Signature header");
+        return Err(StatusCode::UNAUTHORIZED);
+    } else {
+        // No secrets configured, allow unsigned webhooks (dev mode)
+        debug!("No webhook secrets configured, accepting unsigned webhook");
+        None
+    };
 
     // Parse webhook payload
     let payload: WebhookPayload = serde_json::from_slice(&body).map_err(|e| {
@@ -358,23 +384,30 @@ pub async fn linear_webhook_handler(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    // Extract agent name for logging
+    let agent_name = agent_id.as_ref().map_or("unknown", |id| id.agent.as_str());
+
     // Route based on event type
     match (&payload.event_type, &payload.action) {
         (WebhookType::AgentSessionEvent, WebhookAction::Created) => {
+            info!(agent = %agent_name, "Routing to session created handler");
             handle_session_created(&state, &payload).await
         }
         (WebhookType::AgentSessionEvent, WebhookAction::Prompted) => {
+            info!(agent = %agent_name, "Routing to session prompted handler");
             handle_session_prompted(&state, &payload).await
         }
         _ => {
             debug!(
+                agent = %agent_name,
                 event_type = ?payload.event_type,
                 action = ?payload.action,
                 "Ignoring unhandled webhook event"
             );
             Ok(Json(json!({
                 "status": "ignored",
-                "reason": "unhandled_event_type"
+                "reason": "unhandled_event_type",
+                "agent": agent_name
             })))
         }
     }

@@ -6,6 +6,7 @@ use serde_json::Value;
 use sha2::Sha256;
 use subtle::ConstantTimeEq;
 
+use crate::config::LinearConfig;
 use crate::models::{AgentSession, Comment, Issue};
 
 type HmacSha256 = Hmac<Sha256>;
@@ -35,6 +36,80 @@ pub fn verify_webhook_signature(body: &[u8], signature: &str, secret: &str) -> b
 
     // Constant-time comparison to prevent timing attacks
     computed.as_slice().ct_eq(&signature_bytes).into()
+}
+
+/// Result of identifying an agent from a webhook signature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentIdentification {
+    /// Agent name (e.g., "rex", "morgan")
+    pub agent: String,
+    /// Whether the signature was verified
+    pub verified: bool,
+}
+
+/// Identify which agent app sent the webhook by validating the signature
+/// against all configured apps' webhook secrets.
+///
+/// # Arguments
+/// * `body` - Raw webhook body bytes
+/// * `signature` - Hex-encoded signature from `Linear-Signature` header
+/// * `config` - Linear multi-app configuration
+///
+/// # Returns
+/// The agent name if signature matches one of the configured apps, None otherwise.
+#[must_use]
+pub fn identify_agent_from_signature(
+    body: &[u8],
+    signature: &str,
+    config: &LinearConfig,
+) -> Option<AgentIdentification> {
+    for (agent_name, app_config) in &config.apps {
+        if verify_webhook_signature(body, signature, &app_config.webhook_secret) {
+            return Some(AgentIdentification {
+                agent: agent_name.clone(),
+                verified: true,
+            });
+        }
+    }
+    None
+}
+
+/// Try to identify the agent from signature, falling back to legacy single secret.
+///
+/// This function provides backward compatibility during migration from
+/// single-app to multi-app webhook handling.
+///
+/// # Arguments
+/// * `body` - Raw webhook body bytes
+/// * `signature` - Hex-encoded signature from `Linear-Signature` header
+/// * `config` - Linear multi-app configuration
+/// * `legacy_secret` - Optional legacy single-app webhook secret
+///
+/// # Returns
+/// `Some(AgentIdentification)` if signature matches, `None` if no match.
+#[must_use]
+pub fn identify_agent_or_legacy(
+    body: &[u8],
+    signature: &str,
+    config: &LinearConfig,
+    legacy_secret: Option<&str>,
+) -> Option<AgentIdentification> {
+    // First try multi-app identification
+    if let Some(id) = identify_agent_from_signature(body, signature, config) {
+        return Some(id);
+    }
+
+    // Fall back to legacy single secret
+    if let Some(secret) = legacy_secret {
+        if verify_webhook_signature(body, signature, secret) {
+            return Some(AgentIdentification {
+                agent: "legacy".to_string(),
+                verified: true,
+            });
+        }
+    }
+
+    None
 }
 
 /// Validate webhook timestamp is within acceptable range.
@@ -323,6 +398,91 @@ mod tests {
 
         // Not valid hex
         assert!(!verify_webhook_signature(body, "not-hex", secret));
+    }
+
+    #[test]
+    fn test_identify_agent_from_signature() {
+        use crate::config::{LinearAppConfig, LinearConfig};
+        use std::collections::HashMap;
+
+        let body = b"test payload";
+
+        // Create a config with two agents
+        let mut apps = HashMap::new();
+
+        // Create signature for rex
+        let rex_secret = "rex-secret";
+        let mut mac = HmacSha256::new_from_slice(rex_secret.as_bytes()).unwrap();
+        mac.update(body);
+        let rex_signature = hex::encode(mac.finalize().into_bytes());
+
+        apps.insert(
+            "rex".to_string(),
+            LinearAppConfig::new(
+                "rex-client-id".to_string(),
+                "rex-client-secret".to_string(),
+                rex_secret.to_string(),
+            ),
+        );
+        apps.insert(
+            "blaze".to_string(),
+            LinearAppConfig::new(
+                "blaze-client-id".to_string(),
+                "blaze-client-secret".to_string(),
+                "blaze-secret".to_string(),
+            ),
+        );
+
+        let config = LinearConfig {
+            apps,
+            webhook_url: "https://example.com/webhook".to_string(),
+            redirect_uri: "https://example.com/callback".to_string(),
+        };
+
+        // Test identifying rex
+        let result = identify_agent_from_signature(body, &rex_signature, &config);
+        assert!(result.is_some());
+        let id = result.unwrap();
+        assert_eq!(id.agent, "rex");
+        assert!(id.verified);
+
+        // Test with wrong signature
+        let wrong_sig = "0000000000000000000000000000000000000000000000000000000000000000";
+        let result = identify_agent_from_signature(body, wrong_sig, &config);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_identify_agent_or_legacy() {
+        use crate::config::LinearConfig;
+        use std::collections::HashMap;
+
+        let body = b"test payload";
+        let legacy_secret = "legacy-secret";
+
+        // Create signature using legacy secret
+        let mut mac = HmacSha256::new_from_slice(legacy_secret.as_bytes()).unwrap();
+        mac.update(body);
+        let legacy_signature = hex::encode(mac.finalize().into_bytes());
+
+        // Empty multi-app config
+        let config = LinearConfig {
+            apps: HashMap::new(),
+            webhook_url: "https://example.com/webhook".to_string(),
+            redirect_uri: "https://example.com/callback".to_string(),
+        };
+
+        // Should fall back to legacy
+        let result =
+            identify_agent_or_legacy(body, &legacy_signature, &config, Some(legacy_secret));
+        assert!(result.is_some());
+        let id = result.unwrap();
+        assert_eq!(id.agent, "legacy");
+        assert!(id.verified);
+
+        // Should fail with no legacy secret
+        let result = identify_agent_or_legacy(body, &legacy_signature, &config, None);
+        assert!(result.is_none());
     }
 
     #[test]

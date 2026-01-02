@@ -1,6 +1,7 @@
 //! Configuration for the PM service.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::env;
 
 /// PM webhook handler configuration.
@@ -8,13 +9,13 @@ use std::env;
 pub struct Config {
     /// HTTP server port.
     pub port: u16,
-    /// Webhook signing secret for signature verification.
+    /// Webhook signing secret for signature verification (legacy single-app).
     pub webhook_secret: Option<String>,
     /// Maximum age for webhook timestamps (default: 60 seconds).
     pub max_timestamp_age_ms: i64,
     /// Whether Linear integration is enabled.
     pub enabled: bool,
-    /// Linear OAuth token for API calls.
+    /// Linear OAuth token for API calls (legacy single-app).
     pub oauth_token: Option<String>,
     /// Kubernetes namespace.
     pub namespace: String,
@@ -22,6 +23,206 @@ pub struct Config {
     pub intake: IntakeConfig,
     /// Play configuration.
     pub play: PlayConfig,
+    /// Multi-agent Linear OAuth configuration.
+    pub linear: LinearConfig,
+}
+
+// =============================================================================
+// Multi-Agent Linear OAuth Configuration
+// =============================================================================
+
+/// All known agent names for the CTO platform.
+pub const AGENT_NAMES: &[&str] = &[
+    "morgan", "rex", "blaze", "grizz", "nova", "tap", "spark", "cleo", "cipher", "tess", "atlas",
+    "bolt",
+];
+
+/// Configuration for a single Linear OAuth application.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LinearAppConfig {
+    /// OAuth Client ID (32 hex characters).
+    pub client_id: String,
+    /// OAuth Client Secret (32 hex characters).
+    #[serde(skip_serializing)]
+    pub client_secret: String,
+    /// Webhook signing secret for this app.
+    #[serde(skip_serializing)]
+    pub webhook_secret: String,
+    /// OAuth access token (obtained after installation).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access_token: Option<String>,
+    /// Human-readable display name (e.g., "5DLabs-Rex").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+}
+
+impl LinearAppConfig {
+    /// Create a new app config with the given credentials.
+    #[must_use]
+    pub fn new(client_id: String, client_secret: String, webhook_secret: String) -> Self {
+        Self {
+            client_id,
+            client_secret,
+            webhook_secret,
+            access_token: None,
+            display_name: None,
+        }
+    }
+
+    /// Check if this app has been installed (has an access token).
+    #[must_use]
+    pub fn is_installed(&self) -> bool {
+        self.access_token.is_some()
+    }
+
+    /// Check if this app has all required credentials.
+    #[must_use]
+    pub fn is_configured(&self) -> bool {
+        !self.client_id.is_empty()
+            && !self.client_secret.is_empty()
+            && !self.webhook_secret.is_empty()
+    }
+}
+
+/// Configuration for all Linear OAuth applications.
+#[derive(Debug, Clone, Default)]
+pub struct LinearConfig {
+    /// Map of agent name to app configuration.
+    pub apps: HashMap<String, LinearAppConfig>,
+    /// Common webhook URL for all apps.
+    pub webhook_url: String,
+    /// Common OAuth redirect URI.
+    pub redirect_uri: String,
+}
+
+impl LinearConfig {
+    /// Load configuration from environment variables.
+    ///
+    /// Environment variable format:
+    /// - `LINEAR_APP_{AGENT}_CLIENT_ID`
+    /// - `LINEAR_APP_{AGENT}_CLIENT_SECRET`
+    /// - `LINEAR_APP_{AGENT}_WEBHOOK_SECRET`
+    /// - `LINEAR_APP_{AGENT}_ACCESS_TOKEN` (optional)
+    #[must_use]
+    pub fn from_env() -> Self {
+        let mut apps = HashMap::new();
+
+        for agent in AGENT_NAMES {
+            let upper = agent.to_uppercase();
+            let client_id = env::var(format!("LINEAR_APP_{upper}_CLIENT_ID")).unwrap_or_default();
+            let client_secret =
+                env::var(format!("LINEAR_APP_{upper}_CLIENT_SECRET")).unwrap_or_default();
+            let webhook_secret =
+                env::var(format!("LINEAR_APP_{upper}_WEBHOOK_SECRET")).unwrap_or_default();
+            let access_token = env::var(format!("LINEAR_APP_{upper}_ACCESS_TOKEN")).ok();
+
+            if !client_id.is_empty() {
+                let mut config = LinearAppConfig::new(client_id, client_secret, webhook_secret);
+                config.access_token = access_token;
+                config.display_name = Some(format!("5DLabs-{}", capitalize(agent)));
+                apps.insert((*agent).to_string(), config);
+            }
+        }
+
+        Self {
+            apps,
+            webhook_url: env::var("LINEAR_WEBHOOK_URL")
+                .unwrap_or_else(|_| "https://cto.5dlabs.ai/webhooks/linear".to_string()),
+            redirect_uri: env::var("LINEAR_REDIRECT_URI")
+                .unwrap_or_else(|_| "https://cto.5dlabs.ai/oauth/callback".to_string()),
+        }
+    }
+
+    /// Get app configuration by agent name.
+    #[must_use]
+    pub fn get_app(&self, agent: &str) -> Option<&LinearAppConfig> {
+        self.apps.get(&agent.to_lowercase())
+    }
+
+    /// Get mutable app configuration by agent name.
+    pub fn get_app_mut(&mut self, agent: &str) -> Option<&mut LinearAppConfig> {
+        self.apps.get_mut(&agent.to_lowercase())
+    }
+
+    /// Find which agent app has the given webhook secret.
+    ///
+    /// This is used to identify which agent sent a webhook by validating
+    /// the signature against each app's webhook secret.
+    #[must_use]
+    pub fn find_agent_by_webhook_secret(&self, secret: &str) -> Option<&str> {
+        for (agent, config) in &self.apps {
+            if config.webhook_secret == secret {
+                return Some(agent.as_str());
+            }
+        }
+        None
+    }
+
+    /// Get the access token for an agent, if installed.
+    #[must_use]
+    pub fn get_access_token(&self, agent: &str) -> Option<&str> {
+        self.get_app(agent)
+            .and_then(|app| app.access_token.as_deref())
+    }
+
+    /// Check if all apps are configured (have credentials).
+    #[must_use]
+    pub fn all_configured(&self) -> bool {
+        AGENT_NAMES.iter().all(|agent| {
+            self.get_app(agent)
+                .is_some_and(LinearAppConfig::is_configured)
+        })
+    }
+
+    /// Check if all apps are installed (have access tokens).
+    #[must_use]
+    pub fn all_installed(&self) -> bool {
+        AGENT_NAMES.iter().all(|agent| {
+            self.get_app(agent)
+                .is_some_and(LinearAppConfig::is_installed)
+        })
+    }
+
+    /// Get list of configured agent names.
+    #[must_use]
+    pub fn configured_agents(&self) -> Vec<&str> {
+        self.apps
+            .iter()
+            .filter(|(_, config)| config.is_configured())
+            .map(|(name, _)| name.as_str())
+            .collect()
+    }
+
+    /// Get list of installed agent names.
+    #[must_use]
+    pub fn installed_agents(&self) -> Vec<&str> {
+        self.apps
+            .iter()
+            .filter(|(_, config)| config.is_installed())
+            .map(|(name, _)| name.as_str())
+            .collect()
+    }
+
+    /// Generate OAuth authorization URL for an agent.
+    #[must_use]
+    pub fn oauth_url(&self, agent: &str) -> Option<String> {
+        self.get_app(agent).map(|app| {
+            format!(
+                "https://linear.app/oauth/authorize?client_id={}&redirect_uri={}&response_type=code&scope=read,write,app:assignable,app:mentionable&actor=app",
+                app.client_id,
+                urlencoding::encode(&self.redirect_uri)
+            )
+        })
+    }
+}
+
+/// Capitalize the first letter of a string.
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+    }
 }
 
 impl Default for Config {
@@ -45,6 +246,7 @@ impl Default for Config {
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "cto".to_string()),
             intake: IntakeConfig::default(),
             play: PlayConfig::default(),
+            linear: LinearConfig::from_env(),
         }
     }
 }
@@ -381,5 +583,140 @@ mod tests {
         let config: CtoConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.cli, Some("codex".to_string()));
         assert_eq!(config.model, Some("gpt-4.1".to_string()));
+    }
+
+    // =========================================================================
+    // LinearAppConfig Tests
+    // =========================================================================
+
+    #[test]
+    fn test_linear_app_config_new() {
+        let config = LinearAppConfig::new(
+            "abc123".to_string(),
+            "secret".to_string(),
+            "webhook".to_string(),
+        );
+        assert_eq!(config.client_id, "abc123");
+        assert_eq!(config.client_secret, "secret");
+        assert_eq!(config.webhook_secret, "webhook");
+        assert!(config.access_token.is_none());
+        assert!(!config.is_installed());
+        assert!(config.is_configured());
+    }
+
+    #[test]
+    fn test_linear_app_config_is_installed() {
+        let mut config = LinearAppConfig::new(
+            "abc123".to_string(),
+            "secret".to_string(),
+            "webhook".to_string(),
+        );
+        assert!(!config.is_installed());
+
+        config.access_token = Some("token".to_string());
+        assert!(config.is_installed());
+    }
+
+    #[test]
+    fn test_linear_app_config_is_configured() {
+        let empty = LinearAppConfig::default();
+        assert!(!empty.is_configured());
+
+        let partial = LinearAppConfig {
+            client_id: "abc".to_string(),
+            ..Default::default()
+        };
+        assert!(!partial.is_configured());
+
+        let complete = LinearAppConfig::new(
+            "abc".to_string(),
+            "secret".to_string(),
+            "webhook".to_string(),
+        );
+        assert!(complete.is_configured());
+    }
+
+    // =========================================================================
+    // LinearConfig Tests
+    // =========================================================================
+
+    #[test]
+    fn test_linear_config_get_app() {
+        let mut config = LinearConfig::default();
+        config.apps.insert(
+            "rex".to_string(),
+            LinearAppConfig::new(
+                "id".to_string(),
+                "secret".to_string(),
+                "webhook".to_string(),
+            ),
+        );
+
+        assert!(config.get_app("rex").is_some());
+        assert!(config.get_app("Rex").is_some()); // case-insensitive
+        assert!(config.get_app("REX").is_some());
+        assert!(config.get_app("unknown").is_none());
+    }
+
+    #[test]
+    fn test_linear_config_find_agent_by_webhook_secret() {
+        let mut config = LinearConfig::default();
+        config.apps.insert(
+            "rex".to_string(),
+            LinearAppConfig::new(
+                "id1".to_string(),
+                "s1".to_string(),
+                "webhook_rex".to_string(),
+            ),
+        );
+        config.apps.insert(
+            "blaze".to_string(),
+            LinearAppConfig::new(
+                "id2".to_string(),
+                "s2".to_string(),
+                "webhook_blaze".to_string(),
+            ),
+        );
+
+        assert_eq!(
+            config.find_agent_by_webhook_secret("webhook_rex"),
+            Some("rex")
+        );
+        assert_eq!(
+            config.find_agent_by_webhook_secret("webhook_blaze"),
+            Some("blaze")
+        );
+        assert_eq!(config.find_agent_by_webhook_secret("unknown"), None);
+    }
+
+    #[test]
+    fn test_linear_config_oauth_url() {
+        let mut config = LinearConfig {
+            redirect_uri: "https://example.com/callback".to_string(),
+            ..Default::default()
+        };
+        config.apps.insert(
+            "rex".to_string(),
+            LinearAppConfig::new(
+                "client123".to_string(),
+                "secret".to_string(),
+                "webhook".to_string(),
+            ),
+        );
+
+        let url = config.oauth_url("rex").unwrap();
+        assert!(url.contains("client_id=client123"));
+        assert!(url.contains("redirect_uri="));
+        assert!(url.contains("actor=app"));
+        assert!(url.contains("app:assignable"));
+        assert!(url.contains("app:mentionable"));
+    }
+
+    #[test]
+    fn test_capitalize() {
+        assert_eq!(super::capitalize("rex"), "Rex");
+        assert_eq!(super::capitalize("blaze"), "Blaze");
+        assert_eq!(super::capitalize(""), "");
+        assert_eq!(super::capitalize("a"), "A");
     }
 }

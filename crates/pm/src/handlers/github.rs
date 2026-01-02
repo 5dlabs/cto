@@ -438,6 +438,22 @@ async fn create_project_from_intake(
     );
 
     // Step 2: Create the Linear project
+    // Try to find the "Play Workflow" template for consistent project structure
+    let template_id = match client.find_project_template_by_name("Play Workflow").await {
+        Ok(Some(template)) => {
+            info!(template_id = %template.id, "Using Play Workflow template");
+            Some(template.id)
+        }
+        Ok(None) => {
+            debug!("Play Workflow template not found, creating project without template");
+            None
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to look up project template, continuing without");
+            None
+        }
+    };
+
     let project_input = ProjectCreateInput {
         name: project_name.clone(),
         description: Some(format!(
@@ -457,6 +473,7 @@ async fn create_project_from_intake(
         lead_id: None,
         target_date: None,
         default_view: Some(crate::models::ProjectViewType::Board),
+        template_id,
     };
 
     let project = client
@@ -514,6 +531,9 @@ pub struct TaskFromJson {
     /// Subtasks
     #[serde(default)]
     pub subtasks: Vec<SubtaskFromJson>,
+    /// Agent hint for delegate assignment (e.g., "rex", "blaze", "bolt")
+    #[serde(default, rename = "agentHint")]
+    pub agent_hint: Option<String>,
 }
 
 /// Subtask from tasks.json
@@ -707,8 +727,17 @@ pub async fn create_issues_from_tasks(
             );
         }
 
+        // Include agent hint in description if available
+        if let Some(ref agent) = task.agent_hint {
+            use std::fmt::Write;
+            let _ = writeln!(description, "\n\n## Agent\n**Assigned to:** {agent}");
+        }
+
         // Create as standalone issue linked to project (not as sub-issue).
         // This enables proper board view in Linear with workflow state columns.
+        //
+        // Note: Delegate assignment happens when the Play workflow starts each task.
+        // The PM service looks up the agent's Linear user ID and updates the issue.
         let input = IssueCreateInput {
             team_id: team_id.to_string(),
             title: format!("[Task {}] {}", task.id, task.title),
@@ -718,6 +747,7 @@ pub async fn create_issues_from_tasks(
             label_ids: None,
             project_id: Some(project_id.to_string()),
             state_id: None,
+            delegate_id: None, // Set by PM service when task starts
         };
 
         match client.create_issue(input).await {

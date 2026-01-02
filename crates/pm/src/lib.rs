@@ -20,6 +20,7 @@ pub mod emitter;
 pub mod handlers;
 pub mod models;
 pub mod server;
+pub mod state;
 pub mod webhooks;
 
 pub use activities::{ActivityContent, ActivitySignal, PlanStep, PlanStepStatus};
@@ -27,4 +28,7 @@ pub use client::LinearClient;
 pub use config::Config;
 pub use emitter::{AgentActivityEmitter, LinearAgentEmitter};
 pub use models::*;
-pub use webhooks::{verify_webhook_signature, WebhookPayload};
+pub use webhooks::{
+    identify_agent_from_signature, identify_agent_or_legacy, verify_webhook_signature,
+    AgentIdentification, WebhookPayload,
+};

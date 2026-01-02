@@ -287,12 +287,12 @@ spec:
 
           # Model configuration
           PRIMARY_MODEL="{{workflow.parameters.primary-model}}"
-          
+
           # Task generation parameters
           NUM_TASKS="{{workflow.parameters.num-tasks}}"
           EXPAND_TASKS="{{workflow.parameters.expand-tasks}}"
           ANALYZE_COMPLEXITY="{{workflow.parameters.analyze-complexity}}"
-          
+
           # Intake mode
           INTAKE_MODE="{{workflow.parameters.intake-mode}}"
           INTAKE_CLI="{{workflow.parameters.cli}}"

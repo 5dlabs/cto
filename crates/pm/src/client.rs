@@ -11,7 +11,7 @@ use crate::activities::{
 use crate::models::{
     AgentStatus, Attachment, AttachmentCreateInput, Comment, CommentCreateInput, Document, Issue,
     IssueCreateInput, IssueRelationCreateInput, IssueUpdateInput, Label, Project,
-    ProjectCreateInput, Team, WorkflowState,
+    ProjectCreateInput, ProjectTemplate, Team, User, WorkflowState,
 };
 
 /// Linear API endpoint
@@ -322,6 +322,37 @@ impl LinearClient {
             .issue_update
             .issue
             .ok_or_else(|| anyhow!("Issue not returned after update"))
+    }
+
+    /// Update an issue's workflow state by state name
+    ///
+    /// This is a convenience wrapper that looks up the state by name
+    /// and then updates the issue.
+    #[instrument(skip(self), fields(issue_id = %issue_id, state_name = %state_name))]
+    pub async fn update_issue_state(&self, issue_id: &str, state_name: &str) -> Result<Issue> {
+        // First get the issue to find its team
+        let issue = self.get_issue(issue_id).await?;
+        let team = issue
+            .team
+            .as_ref()
+            .ok_or_else(|| anyhow!("Issue has no team assigned"))?;
+        let team_id = &team.id;
+
+        // Find the state by name
+        let state = self
+            .get_state_by_name(team_id, state_name)
+            .await?
+            .ok_or_else(|| anyhow!("Workflow state '{state_name}' not found in team"))?;
+
+        // Update the issue with the state ID
+        self.update_issue(
+            issue_id,
+            crate::models::IssueUpdateInput {
+                state_id: Some(state.id),
+                ..Default::default()
+            },
+        )
+        .await
     }
 
     /// Create an issue relation (blocking/blocked)
@@ -880,6 +911,94 @@ impl LinearClient {
 
         let response: Response = self.execute(QUERY, Variables { id: project_id }).await?;
         Ok(response.project)
+    }
+
+    /// List project templates
+    ///
+    /// Returns all available project templates. Use this to find the
+    /// "Play Workflow" template ID for creating projects from template.
+    #[instrument(skip(self))]
+    pub async fn list_project_templates(&self) -> Result<Vec<ProjectTemplate>> {
+        #[derive(Deserialize)]
+        struct Response {
+            #[serde(rename = "projectTemplates")]
+            project_templates: ProjectTemplatesConnection,
+        }
+
+        #[derive(Deserialize)]
+        struct ProjectTemplatesConnection {
+            nodes: Vec<ProjectTemplate>,
+        }
+
+        const QUERY: &str = r"
+            query ListProjectTemplates {
+                projectTemplates {
+                    nodes {
+                        id
+                        name
+                        description
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self.execute(QUERY, ()).await?;
+        Ok(response.project_templates.nodes)
+    }
+
+    /// Find a project template by name
+    ///
+    /// Returns the template with the given name, or None if not found.
+    #[instrument(skip(self), fields(name = %name))]
+    pub async fn find_project_template_by_name(&self, name: &str) -> Result<Option<ProjectTemplate>> {
+        let templates = self.list_project_templates().await?;
+        Ok(templates.into_iter().find(|t| t.name == name))
+    }
+
+    /// List assignable entities (users and OAuth apps) for a team
+    ///
+    /// Returns entities that can be set as delegates on issues.
+    /// OAuth apps appear here if they have `app:assignable` scope.
+    #[instrument(skip(self), fields(team_id = %team_id))]
+    pub async fn list_assignable_users(&self, team_id: &str) -> Result<Vec<User>> {
+        #[derive(Serialize)]
+        struct Variables<'a> {
+            #[serde(rename = "teamId")]
+            team_id: &'a str,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            team: TeamWithMembers,
+        }
+
+        #[derive(Deserialize)]
+        struct TeamWithMembers {
+            members: MembersConnection,
+        }
+
+        #[derive(Deserialize)]
+        struct MembersConnection {
+            nodes: Vec<User>,
+        }
+
+        const QUERY: &str = r"
+            query GetTeamMembers($teamId: String!) {
+                team(id: $teamId) {
+                    members {
+                        nodes {
+                            id
+                            name
+                            email
+                            isMe
+                        }
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self.execute(QUERY, Variables { team_id }).await?;
+        Ok(response.team.members.nodes)
     }
 
     // =========================================================================
