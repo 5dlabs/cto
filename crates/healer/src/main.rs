@@ -787,6 +787,21 @@ struct PlayConfig {
     /// Frontend agent (e.g., "5DLabs-Blaze")
     #[serde(default)]
     frontend_agent: Option<String>,
+    /// Mobile agent (e.g., "5DLabs-Tap")
+    #[serde(default)]
+    mobile_agent: Option<String>,
+    /// Go agent (e.g., "5DLabs-Grizz")
+    #[serde(default)]
+    go_agent: Option<String>,
+    /// Node agent (e.g., "5DLabs-Nova")
+    #[serde(default)]
+    node_agent: Option<String>,
+    /// Desktop agent (e.g., "5DLabs-Spark")
+    #[serde(default)]
+    desktop_agent: Option<String>,
+    /// Infrastructure agent (e.g., "5DLabs-Bolt")
+    #[serde(default)]
+    infrastructure_agent: Option<String>,
     /// Quality agent (e.g., "5DLabs-Cleo")
     quality_agent: String,
     /// Security agent (e.g., "5DLabs-Cipher")
@@ -814,6 +829,21 @@ struct PlayConfig {
     /// Max retries for frontend
     #[serde(default)]
     frontend_max_retries: Option<u32>,
+    /// Max retries for mobile
+    #[serde(default)]
+    mobile_max_retries: Option<u32>,
+    /// Max retries for go
+    #[serde(default)]
+    go_max_retries: Option<u32>,
+    /// Max retries for node
+    #[serde(default)]
+    node_max_retries: Option<u32>,
+    /// Max retries for desktop
+    #[serde(default)]
+    desktop_max_retries: Option<u32>,
+    /// Max retries for infrastructure
+    #[serde(default)]
+    infrastructure_max_retries: Option<u32>,
     /// Max retries for quality
     #[serde(default)]
     quality_max_retries: Option<u32>,
@@ -1991,6 +2021,10 @@ struct ResolvedAgent {
     max_retries: Option<u32>,
 }
 
+/// Default remote tools configuration for agents without explicit tools config.
+/// These are the essential tools that all agents need access to.
+const DEFAULT_REMOTE_TOOLS: &str = r#"{"remote":["mcp_tools_context7_resolve-library-id","mcp_tools_context7_get-library-docs","mcp_tools_openmemory_openmemory_query","mcp_tools_openmemory_openmemory_store","mcp_tools_github_create_pull_request","mcp_tools_github_create_branch"],"localServers":{}}"#;
+
 /// Helper to resolve agent configuration from config
 fn resolve_agent_config(
     agent_name: &str,
@@ -2016,7 +2050,17 @@ fn resolve_agent_config(
             .tools
             .as_ref()
             .and_then(|t| serde_json::to_string(t).ok())
-            .unwrap_or_else(|| r#"{"remote":[],"localServers":{}}"#.to_string());
+            .unwrap_or_else(|| {
+                println!(
+                    "{}",
+                    format!(
+                        "⚠️  WARNING: Agent '{agent_name}' found but has no tools configured. \
+                        Using default tools. Add 'tools' section to this agent in cto-config.json."
+                    )
+                    .yellow()
+                );
+                DEFAULT_REMOTE_TOOLS.to_string()
+            });
         let model_rotation = cfg
             .model_rotation
             .as_ref()
@@ -2038,12 +2082,21 @@ fn resolve_agent_config(
             max_retries: cfg.max_retries,
         }
     } else {
-        // Agent not found in config, use defaults
+        // Agent not found in config - log warning and use defaults
+        // This likely indicates a missing agent definition in cto-config.json
+        println!(
+            "{}",
+            format!(
+                "⚠️  WARNING: Agent '{agent_name}' not found in cto-config.json agents section. \
+                Using default tools. Add this agent to cto-config.json for proper tool configuration."
+            )
+            .yellow()
+        );
         ResolvedAgent {
             github_app: agent_name.to_string(),
             cli: default_cli.to_string(),
             model: default_model.to_string(),
-            tools: r#"{"remote":[],"localServers":{}}"#.to_string(),
+            tools: DEFAULT_REMOTE_TOOLS.to_string(),
             model_rotation: "[]".to_string(),
             max_retries: None,
         }
@@ -4758,6 +4811,41 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         resolve_agent_config("5DLabs-Blaze", agents, default_cli, default_model)
     };
 
+    let mobile_agent = if let Some(ref agent_name) = play_config.mobile_agent {
+        resolve_agent_config(agent_name, agents, default_cli, default_model)
+    } else {
+        // Default mobile agent if not configured
+        resolve_agent_config("5DLabs-Tap", agents, default_cli, default_model)
+    };
+
+    let go_agent = if let Some(ref agent_name) = play_config.go_agent {
+        resolve_agent_config(agent_name, agents, default_cli, default_model)
+    } else {
+        // Default go agent if not configured
+        resolve_agent_config("5DLabs-Grizz", agents, default_cli, default_model)
+    };
+
+    let node_agent = if let Some(ref agent_name) = play_config.node_agent {
+        resolve_agent_config(agent_name, agents, default_cli, default_model)
+    } else {
+        // Default node agent if not configured
+        resolve_agent_config("5DLabs-Nova", agents, default_cli, default_model)
+    };
+
+    let desktop_agent = if let Some(ref agent_name) = play_config.desktop_agent {
+        resolve_agent_config(agent_name, agents, default_cli, default_model)
+    } else {
+        // Default desktop agent if not configured
+        resolve_agent_config("5DLabs-Spark", agents, default_cli, default_model)
+    };
+
+    let infrastructure_agent = if let Some(ref agent_name) = play_config.infrastructure_agent {
+        resolve_agent_config(agent_name, agents, default_cli, default_model)
+    } else {
+        // Default infrastructure agent if not configured
+        resolve_agent_config("5DLabs-Bolt", agents, default_cli, default_model)
+    };
+
     let quality_agent =
         resolve_agent_config(&play_config.quality_agent, agents, "claude", default_model);
 
@@ -4780,6 +4868,26 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
     let frontend_max_retries = frontend_agent
         .max_retries
         .or(play_config.frontend_max_retries)
+        .unwrap_or(default_retries);
+    let mobile_max_retries = mobile_agent
+        .max_retries
+        .or(play_config.mobile_max_retries)
+        .unwrap_or(default_retries);
+    let go_max_retries = go_agent
+        .max_retries
+        .or(play_config.go_max_retries)
+        .unwrap_or(default_retries);
+    let node_max_retries = node_agent
+        .max_retries
+        .or(play_config.node_max_retries)
+        .unwrap_or(default_retries);
+    let desktop_max_retries = desktop_agent
+        .max_retries
+        .or(play_config.desktop_max_retries)
+        .unwrap_or(default_retries);
+    let infrastructure_max_retries = infrastructure_agent
+        .max_retries
+        .or(play_config.infrastructure_max_retries)
         .unwrap_or(default_retries);
     let quality_max_retries = quality_agent
         .max_retries
@@ -4841,6 +4949,39 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         format!("frontend-model={}", frontend_agent.model),
         format!("frontend-tools={}", frontend_agent.tools),
         format!("frontend-model-rotation={}", frontend_agent.model_rotation),
+        // Mobile agent (Tap)
+        format!("mobile-agent={}", mobile_agent.github_app),
+        format!("mobile-cli={}", mobile_agent.cli),
+        format!("mobile-model={}", mobile_agent.model),
+        format!("mobile-tools={}", mobile_agent.tools),
+        format!("mobile-model-rotation={}", mobile_agent.model_rotation),
+        // Go agent (Grizz)
+        format!("go-agent={}", go_agent.github_app),
+        format!("go-cli={}", go_agent.cli),
+        format!("go-model={}", go_agent.model),
+        format!("go-tools={}", go_agent.tools),
+        format!("go-model-rotation={}", go_agent.model_rotation),
+        // Node agent (Nova)
+        format!("node-agent={}", node_agent.github_app),
+        format!("node-cli={}", node_agent.cli),
+        format!("node-model={}", node_agent.model),
+        format!("node-tools={}", node_agent.tools),
+        format!("node-model-rotation={}", node_agent.model_rotation),
+        // Desktop agent (Spark)
+        format!("desktop-agent={}", desktop_agent.github_app),
+        format!("desktop-cli={}", desktop_agent.cli),
+        format!("desktop-model={}", desktop_agent.model),
+        format!("desktop-tools={}", desktop_agent.tools),
+        format!("desktop-model-rotation={}", desktop_agent.model_rotation),
+        // Infrastructure agent (Bolt)
+        format!("infrastructure-agent={}", infrastructure_agent.github_app),
+        format!("infrastructure-cli={}", infrastructure_agent.cli),
+        format!("infrastructure-model={}", infrastructure_agent.model),
+        format!("infrastructure-tools={}", infrastructure_agent.tools),
+        format!(
+            "infrastructure-model-rotation={}",
+            infrastructure_agent.model_rotation
+        ),
         // Quality agent
         format!("quality-agent={}", quality_agent.github_app),
         format!("quality-cli={}", quality_agent.cli),
@@ -4862,6 +5003,11 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         // Max retries
         format!("implementation-max-retries={impl_max_retries}"),
         format!("frontend-max-retries={frontend_max_retries}"),
+        format!("mobile-max-retries={mobile_max_retries}"),
+        format!("go-max-retries={go_max_retries}"),
+        format!("node-max-retries={node_max_retries}"),
+        format!("desktop-max-retries={desktop_max_retries}"),
+        format!("infrastructure-max-retries={infrastructure_max_retries}"),
         format!("quality-max-retries={quality_max_retries}"),
         format!("security-max-retries={security_max_retries}"),
         format!("testing-max-retries={testing_max_retries}"),
