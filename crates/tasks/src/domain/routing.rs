@@ -304,6 +304,19 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Option<Agent> {
         || content.contains("drizzle")
         || content.contains("prisma")
         || content.contains("kafkajs")
+        // Async/queue processing patterns (typically Node.js/Bun)
+        || content.contains("background worker")
+        || content.contains("worker pool")
+        || content.contains("job queue")
+        || content.contains("priority queue")
+        || content.contains("message queue")
+        || content.contains("task queue")
+        // Rate limiting and processing patterns (NOT generic "middleware" - too broad)
+        || content.contains("rate limit")
+        || content.contains("rate-limit")
+        || content.contains("throttling")
+        || content.contains("deduplication")
+        || content.contains("sliding window")
     {
         return Some(Agent::Nova);
     }
@@ -346,6 +359,12 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Option<Agent> {
         || content.contains("console ui")
         || content.contains("recharts")
         || content.contains("chart.js")
+        // Theme/styling patterns
+        || content.contains("theme")
+        || content.contains("dark mode")
+        || content.contains("light mode")
+        || content.contains("color scheme")
+        || content.contains("local storage")
     {
         return Some(Agent::Blaze);
     }
@@ -721,6 +740,62 @@ mod tests {
         assert_eq!(
             infer_agent_hint("Express API", "Node.js server"),
             Some(Agent::Nova)
+        );
+    }
+
+    #[test]
+    fn test_queue_processing_detection() {
+        // Queue and worker patterns should go to Nova
+        assert_eq!(
+            infer_agent_hint(
+                "Implement Priority Queue Processing",
+                "Create background worker for processing notifications from priority queues"
+            ),
+            Some(Agent::Nova)
+        );
+        assert_eq!(
+            infer_agent_hint("Worker Pool", "Background worker for job processing"),
+            Some(Agent::Nova)
+        );
+        assert_eq!(
+            infer_agent_hint("Message Queue", "Process messages from queue"),
+            Some(Agent::Nova)
+        );
+    }
+
+    #[test]
+    fn test_rate_limiting_detection() {
+        // Rate limiting patterns should go to Nova
+        assert_eq!(
+            infer_agent_hint(
+                "Implement Rate Limiting",
+                "Create rate limiting using Redis sliding window algorithm"
+            ),
+            Some(Agent::Nova)
+        );
+        assert_eq!(
+            infer_agent_hint("Deduplication Service", "Notification deduplication with TTL"),
+            Some(Agent::Nova)
+        );
+    }
+
+    #[test]
+    fn test_theme_support_detection() {
+        // Theme/styling patterns should go to Blaze (frontend)
+        assert_eq!(
+            infer_agent_hint(
+                "Implement Dark/Light Theme Support",
+                "Add theme switching with dark and light modes"
+            ),
+            Some(Agent::Blaze)
+        );
+        assert_eq!(
+            infer_agent_hint("Color Scheme", "Implement color scheme selection"),
+            Some(Agent::Blaze)
+        );
+        assert_eq!(
+            infer_agent_hint("Settings", "Persist to local storage"),
+            Some(Agent::Blaze)
         );
     }
 
