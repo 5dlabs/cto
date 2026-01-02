@@ -23,8 +23,8 @@ metadata:
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: ai-ml
   annotations:
-    # Deploy after LlamaStack Operator is ready
-    argocd.argoproj.io/sync-wave: "2"
+    # Deploy after LlamaStack Operator is ready and has registered CRDs
+    argocd.argoproj.io/sync-wave: "3"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
