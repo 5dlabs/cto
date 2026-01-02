@@ -456,6 +456,7 @@ async fn create_project_from_intake(
         team_ids: Some(vec![metadata.team_id.clone()]),
         lead_id: None,
         target_date: None,
+        default_view: Some(crate::models::ProjectViewType::Board),
     };
 
     let project = client
