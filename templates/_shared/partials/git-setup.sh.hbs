@@ -53,7 +53,7 @@ if ! git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
   BASE_BRANCH="master"
 fi
 
-FEATURE_BRANCH="feature/task-{{task_id}}-{{job_type}}"
+FEATURE_BRANCH="feat/task-{{task_id}}-{{agent_name}}-{{job_type}}"
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   git checkout "$FEATURE_BRANCH"
   # If there's a tracking branch, reset to it to avoid diverged state
