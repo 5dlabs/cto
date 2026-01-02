@@ -4158,6 +4158,137 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     }
 }
 
+/// Build the prompt for Rex to manage MCP servers
+fn build_mcp_server_prompt(
+    task_type: &str,
+    server_key: &str,
+    github_url: Option<&str>,
+    readme_content: Option<&str>,
+) -> String {
+    let values_path = "infra/charts/cto/values.yaml";
+
+    let task_instruction = match task_type {
+        "add" => format!(
+            r#"## Task: Add MCP Server
+
+Add a new MCP server with key `{server_key}` to the tools server configuration.
+
+**GitHub Repository:** {}
+
+### Instructions:
+
+1. Read the current `{values_path}` file
+2. Add a new entry under `tools.config.servers` with key `{server_key}`
+3. Configure based on the README documentation below
+4. The entry should include:
+   - `name`: Human-readable display name
+   - `description`: What the server does
+   - `transport`: "stdio" for command-line servers, "http" for HTTP servers
+   - For stdio: `command`, `args`, `workingDirectory`
+   - For http: `url`
+   - `env`: Required environment variables (reference secrets with `${{SECRET_NAME}}`)
+5. Place the new server in the appropriate category section (look at existing entries for guidance)
+6. Create a PR with the changes
+
+### README Documentation:
+
+```
+{}
+```"#,
+            github_url.unwrap_or("Not provided"),
+            readme_content.unwrap_or("README not available - check the GitHub repository directly")
+        ),
+        "remove" => format!(
+            r#"## Task: Remove MCP Server
+
+Remove the MCP server with key `{server_key}` from the tools server configuration.
+
+### Instructions:
+
+1. Read the current `{values_path}` file
+2. Find and remove the entry with key `{server_key}` from `tools.config.servers`
+3. Create a PR with the changes
+
+**Note:** Make sure to only remove the specified server entry, leaving all other configurations intact."#
+        ),
+        "update" => format!(
+            r#"## Task: Update MCP Server
+
+Update the MCP server with key `{server_key}` in the tools server configuration.
+
+{}
+
+### Instructions:
+
+1. Read the current `{values_path}` file
+2. Find the entry with key `{server_key}` under `tools.config.servers`
+3. Update the configuration based on the README documentation below
+4. Create a PR with the changes
+
+### README Documentation:
+
+```
+{}
+```"#,
+            github_url.map_or(String::new(), |url| format!("**GitHub Repository:** {url}")),
+            readme_content.unwrap_or("README not available - check the existing configuration or GitHub repository")
+        ),
+        _ => format!(
+            "Unknown task type: {task_type}. Expected: add, remove, or update."
+        ),
+    };
+
+    format!(
+        r#"# MCP Server Management Task
+
+{task_instruction}
+
+## Values File Location
+
+The MCP server configuration is in: `{values_path}`
+
+## Expected Format
+
+MCP servers are configured under `tools.config.servers` in the values file:
+
+```yaml
+tools:
+  config:
+    servers:
+      server-key:
+        name: "Display Name"
+        description: "What this server does"
+        transport: "stdio"           # or "http"
+        command: "npx"               # for stdio transport
+        args: ["-y", "package-name"]
+        workingDirectory: "/tmp"
+        env:
+          API_KEY: "${{API_KEY}}"    # Reference secrets with ${{VAR}}
+```
+
+For HTTP transport servers:
+```yaml
+      server-key:
+        name: "Display Name"
+        description: "What this server does"
+        transport: "http"
+        url: "https://example.com/mcp"
+```
+
+## After Changes
+
+1. Run `cargo fmt` if any Rust files were modified
+2. Commit your changes to a new branch
+3. Create a PR targeting the `develop` branch
+4. The PR title should be: `feat(tools): {task_type} MCP server {server_key}`
+"#,
+        task_instruction = task_instruction,
+        values_path = values_path,
+        task_type = task_type,
+        server_key = server_key,
+    )
+}
+
 /// Create a `CodeRun` for MCP server management tasks
 fn create_mcp_server_coderun(
     task_type: &str,
@@ -4168,6 +4299,9 @@ fn create_mcp_server_coderun(
 ) -> Result<String> {
     let kubectl_cmd = find_command("kubectl");
 
+    // Build the prompt for Rex based on task type
+    let prompt = build_mcp_server_prompt(task_type, server_key, github_url, readme_content);
+
     // Build environment variables for the CodeRun
     let mut env_map = serde_json::Map::new();
     env_map.insert("MCP_SERVER_TASK".to_string(), json!(task_type));
@@ -4176,12 +4310,6 @@ fn create_mcp_server_coderun(
 
     if let Some(url) = github_url {
         env_map.insert("MCP_SERVER_GITHUB_URL".to_string(), json!(url));
-    }
-
-    if let Some(readme) = readme_content {
-        // Base64 encode the README content to avoid YAML escaping issues
-        let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, readme);
-        env_map.insert("MCP_SERVER_README_B64".to_string(), json!(encoded));
     }
 
     // Build the CodeRun manifest
@@ -4202,10 +4330,12 @@ fn create_mcp_server_coderun(
             "service": "cto",
             "repositoryUrl": "https://github.com/5dlabs/cto",
             "docsRepositoryUrl": "https://github.com/5dlabs/cto",
-            "model": "claude-sonnet-4-5-20250929",
+            "workingDirectory": ".",
+            "model": "claude-sonnet-4-20250514",
             "githubApp": "5DLabs-Rex",
             "continueSession": false,
             "overwriteMemory": true,
+            "promptModification": prompt,
             "env": env_map
         }
     });
