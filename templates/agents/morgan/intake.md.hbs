@@ -195,6 +195,25 @@ For each task, include **language-specific function/struct signatures** in the `
 }
 ```
 
+### CRITICAL: Required JSON Field Names
+
+You **MUST** use these **EXACT** field names (case-sensitive):
+
+| Field | Type | Example | Notes |
+|-------|------|---------|-------|
+| `id` | string | `"1"` | Sequential string IDs |
+| `title` | string | `"Rex: API Endpoints"` | Include agent prefix (AgentName:) |
+| `description` | string | `"Brief summary"` | One-line summary |
+| `agentHint` | string | `"rex"` | **LOWERCASE** agent name |
+| `dependencies` | array | `["1"]` | Array of task ID strings |
+| `details` | string | `"Full implementation..."` | Detailed instructions with code signatures |
+| `testStrategy` | string | `"kubectl get..."` | Verification commands |
+
+**FORBIDDEN field names** (DO NOT USE):
+- `agent` - Use `agentHint` instead
+- `acceptance_criteria` - Use `details` instead
+- Capitalized agent names like `"Bolt"` - Use lowercase `"bolt"`
+
 ---
 
 {{> frontend-toolkits }}

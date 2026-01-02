@@ -3716,8 +3716,8 @@ impl CodeTemplateGenerator {
         // Agent-specific job type defaults
         // Some agents only support specific job types
         let job = match (agent, job_type) {
-            // Morgan: docs for coder, otherwise use the requested type
-            ("morgan", "coder") => "docs",
+            // Morgan: intake by default (intake/documentation specialist)
+            ("morgan", "coder") => "intake",
 
             // Cleo: always quality (quality assurance specialist)
             ("cleo", _) => "quality",

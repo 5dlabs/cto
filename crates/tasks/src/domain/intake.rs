@@ -269,6 +269,24 @@ impl IntakeDomain {
             tracing::info!("Step 3/4: Skipping task expansion");
         }
 
+        // 5.5: Normalize agent hints to lowercase
+        // LLMs may generate "Bolt" instead of "bolt", or "Rex" instead of "rex"
+        // This ensures consistent lowercase agent names before routing validation
+        for task in &mut tasks {
+            if let Some(ref mut hint) = task.agent_hint {
+                let normalized = hint.to_lowercase();
+                if *hint != normalized {
+                    tracing::debug!(
+                        "Normalized agent hint for task {}: '{}' → '{}'",
+                        task.id,
+                        hint,
+                        normalized
+                    );
+                    *hint = normalized;
+                }
+            }
+        }
+
         // 6. Add agent routing hints WITH DEPENDENCY AWARENESS
         // Dependencies are the PRIMARY signal - if a task depends on a Tap/Spark/Blaze
         // initialization task, it should inherit that agent.

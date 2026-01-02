@@ -1,0 +1,94 @@
+---
+# BuildKit - Remote Build Infrastructure (DISABLED BY DEFAULT)
+# =============================================================================
+# Provides a high-performance BuildKit server for remote Docker builds.
+# Developers can connect via: docker buildx create --driver remote tcp://<node-ip>:30502
+#
+# This is an OPTIONAL component. It is NOT required for:
+#   - CI builds (use GitHub Actions with GHA caching)
+#   - Local development (Tilt uses local Docker BuildKit)
+#
+# Use cases for enabling:
+#   - Offloading heavy builds to cluster
+#   - Cross-compilation (ARM Mac → AMD64 Linux)
+#   - Shared persistent cargo/layer cache
+#
+# To enable: Change to `enabled: true` in helm.values below
+#
+# Setup after enabling:
+#   ./scripts/setup-cluster-builder.sh
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: buildkit
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: buildkit
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: build-infrastructure
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: develop
+    path: infra/charts/buildkit
+    helm:
+      valueFiles:
+        - values.yaml
+      # =======================================================================
+      # DISABLED BY DEFAULT
+      # Set enabled: true and configure nodeSelector for your cluster
+      # =======================================================================
+      values: |
+        # DISABLED - BuildKit is optional infrastructure
+        # To enable, uncomment the configuration below:
+        #
+        # namespace: buildkit
+        # storageClass: "local-path"  # or "mayastor" depending on cluster
+        #
+        # # Schedule on a specific worker node with enough resources
+        # nodeSelector:
+        #   kubernetes.io/hostname: your-worker-node
+        #
+        # # Allow pushing to local in-cluster registry (HTTP)
+        # config:
+        #   insecureRegistries:
+        #     - "10.8.0.2:30500"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: buildkit
+
+  syncPolicy:
+    # MANUAL sync - requires explicit action to deploy
+    # Change to automated when enabling BuildKit
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+
+  ignoreDifferences:
+    # StatefulSet field defaulting by API server (buildkit has 2 PVCs)
+    - group: apps
+      kind: StatefulSet
+      name: buildkit
+      jsonPointers:
+        - /spec/persistentVolumeClaimRetentionPolicy
+        - /spec/volumeClaimTemplates/0/status
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
+        - /spec/volumeClaimTemplates/1/status
+        - /spec/volumeClaimTemplates/1/apiVersion
+        - /spec/volumeClaimTemplates/1/kind
+
+  revisionHistoryLimit: 3

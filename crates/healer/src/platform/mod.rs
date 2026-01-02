@@ -2,9 +2,8 @@
 //!
 //! This module monitors and remediates issues in the CTO platform itself:
 //! - Controller pod failures
-//! - Healer pod failures  
+//! - Healer pod failures
 //! - PM pod failures
-//! - BuildKit issues
 //! - Stuck CodeRuns
 //! - Argo Workflow failures
 //!

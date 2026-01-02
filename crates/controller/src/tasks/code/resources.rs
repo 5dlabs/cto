@@ -588,6 +588,30 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
+        // Intake ConfigMap volume for intake workflows
+        // When run_type is "intake" and INTAKE_CONFIGMAP env is set, mount the intake files
+        // This ConfigMap contains the PRD, architecture, and config files from the PM server
+        if code_run.spec.run_type == "intake" {
+            if let Some(intake_cm_name) = code_run.spec.env.get("INTAKE_CONFIGMAP") {
+                if !intake_cm_name.is_empty() {
+                    info!(
+                        "📁 Mounting intake ConfigMap for intake workflow: {}",
+                        intake_cm_name
+                    );
+                    volumes.push(json!({
+                        "name": "intake-files",
+                        "configMap": {
+                            "name": intake_cm_name
+                        }
+                    }));
+                    volume_mounts.push(json!({
+                        "name": "intake-files",
+                        "mountPath": "/intake-files"
+                    }));
+                }
+            }
+        }
+
         let cli_type = Self::code_run_cli_type(code_run);
 
         if cli_type == CLIType::Claude {

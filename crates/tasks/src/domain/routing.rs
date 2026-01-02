@@ -550,10 +550,53 @@ fn infer_from_dependencies(task: &Task, all_tasks: &[Task]) -> Option<Agent> {
 }
 
 /// Check for explicit agent name in title/description.
-/// Returns the agent if found (e.g., "(Nova)", "- Rex", etc.)
+/// Returns the agent if found (e.g., "(Nova)", "- Rex", "Rex:", etc.)
+///
+/// Supports multiple patterns:
+/// - Parentheses: "(Nova - Bun)"
+/// - Dash prefix: "- nova"
+/// - Colon prefix in title: "Rex: Some Task" (common LLM output)
 fn check_explicit_agent(title: &str, description: &str) -> Option<Agent> {
     let content = format!("{} {}", title, description).to_lowercase();
+    let title_lower = title.to_lowercase();
 
+    // Check for "AgentName:" prefix in title (common LLM output pattern)
+    // This handles cases like "Rex: Dead Letter Queue" or "Grizz: JWT Auth"
+    if title_lower.starts_with("nova:") || title_lower.starts_with("nova :")  {
+        return Some(Agent::Nova);
+    }
+    if title_lower.starts_with("grizz:") || title_lower.starts_with("grizz :") {
+        return Some(Agent::Grizz);
+    }
+    if title_lower.starts_with("rex:") || title_lower.starts_with("rex :") {
+        return Some(Agent::Rex);
+    }
+    if title_lower.starts_with("blaze:") || title_lower.starts_with("blaze :") {
+        return Some(Agent::Blaze);
+    }
+    if title_lower.starts_with("tap:") || title_lower.starts_with("tap :") {
+        return Some(Agent::Tap);
+    }
+    if title_lower.starts_with("spark:") || title_lower.starts_with("spark :") {
+        return Some(Agent::Spark);
+    }
+    if title_lower.starts_with("bolt:") || title_lower.starts_with("bolt :") {
+        return Some(Agent::Bolt);
+    }
+    if title_lower.starts_with("cipher:") || title_lower.starts_with("cipher :") {
+        return Some(Agent::Cipher);
+    }
+    if title_lower.starts_with("tess:") || title_lower.starts_with("tess :") {
+        return Some(Agent::Tess);
+    }
+    if title_lower.starts_with("atlas:") || title_lower.starts_with("atlas :") {
+        return Some(Agent::Atlas);
+    }
+    if title_lower.starts_with("cleo:") || title_lower.starts_with("cleo :") {
+        return Some(Agent::Tess); // Cleo maps to Tess
+    }
+
+    // Check for parentheses and dash patterns in full content
     if content.contains("(nova") || content.contains("- nova") {
         return Some(Agent::Nova);
     }
@@ -655,6 +698,47 @@ mod tests {
         assert_eq!(
             infer_agent_hint("Dashboard (Blaze - React)", "Admin UI"),
             Some(Agent::Blaze)
+        );
+    }
+
+    #[test]
+    fn test_explicit_agent_colon_prefix() {
+        // Test "AgentName:" prefix pattern (common LLM output)
+        assert_eq!(
+            infer_agent_hint("Rex: Dead Letter Queue", "Implement dead letter queue"),
+            Some(Agent::Rex)
+        );
+        assert_eq!(
+            infer_agent_hint("Rex: Kafka Event Publishing", "Implement Kafka publishing"),
+            Some(Agent::Rex)
+        );
+        assert_eq!(
+            infer_agent_hint("Grizz: PostgreSQL Repository Layer", "Implement repository"),
+            Some(Agent::Grizz)
+        );
+        assert_eq!(
+            infer_agent_hint("Grizz: JWT Authentication Middleware", "Implement JWT auth"),
+            Some(Agent::Grizz)
+        );
+        assert_eq!(
+            infer_agent_hint("Blaze: Authentication with Better Auth", "Implement auth flow"),
+            Some(Agent::Blaze)
+        );
+        assert_eq!(
+            infer_agent_hint("Tap: Core Screens Implementation", "Implement screens"),
+            Some(Agent::Tap)
+        );
+        assert_eq!(
+            infer_agent_hint("Nova: Slack Delivery Service", "Implement Slack integration"),
+            Some(Agent::Nova)
+        );
+        assert_eq!(
+            infer_agent_hint("Bolt: Infrastructure Setup", "Deploy Kubernetes"),
+            Some(Agent::Bolt)
+        );
+        assert_eq!(
+            infer_agent_hint("Spark: Desktop Notifications", "System tray"),
+            Some(Agent::Spark)
         );
     }
 

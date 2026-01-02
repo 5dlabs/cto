@@ -1,0 +1,25 @@
+---
+apiVersion: v2
+name: buildkit
+description: |
+  BuildKit remote build infrastructure for Kubernetes clusters.
+  Provides a high-performance build server with persistent cache storage
+  that developers can connect to via `docker buildx create --driver remote`.
+
+type: application
+version: 0.1.0
+appVersion: "latest"
+
+keywords:
+  - buildkit
+  - docker
+  - builds
+  - ci-cd
+
+home: https://github.com/moby/buildkit
+sources:
+  - https://github.com/5dlabs/cto
+
+maintainers:
+  - name: 5DLabs
+    url: https://github.com/5dlabs

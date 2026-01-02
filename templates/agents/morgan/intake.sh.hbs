@@ -7,6 +7,11 @@
 {{> github-auth }}
 
 # =========================================================================
+# MCP Diagnostics - verify tools binary and server connectivity
+# =========================================================================
+{{> mcp-check }}
+
+# =========================================================================
 # Intake Configuration
 # =========================================================================
 
@@ -85,6 +90,19 @@ if [ "$INTAKE_MODE" = "cli" ]; then
     # =========================================================================
     echo "  ℹ️  CLI: $INTAKE_CLI"
     
+    # Build MCP arguments if config available (set by mcp-check partial)
+    MCP_ARGS=""
+    if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
+        if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
+            echo "  ✅ Using MCP configuration: $MCP_CONFIG_FILE"
+            MCP_ARGS="--mcp-config $MCP_CONFIG_FILE"
+        else
+            echo "  ⚠️ MCP config at $MCP_CONFIG_FILE is not valid JSON, skipping"
+        fi
+    else
+        echo "  ℹ️ No MCP configuration available"
+    fi
+    
     # Build the prompt for the CLI
     PRD_CONTENT=$(cat .tasks/docs/prd.txt)
     ARCH_CONTENT=""
@@ -121,14 +139,22 @@ $ARCH_CONTENT
 5. Ensure tasks have proper dependencies (no circular deps)
 6. Add complexity analysis if useful
 
-Use the available tools to create the files. Start by creating the tasks.json file.
+Use the available MCP tools (Firecrawl for URL scraping, Context7 for documentation) to research and enrich the tasks.
+Create the files using the filesystem tools. Start by creating the tasks.json file.
 "
 
-    # Run the specified CLI
+    # Run the specified CLI with MCP support
     case "$INTAKE_CLI" in
         claude)
-            echo "  → Running claude CLI..."
-            claude -p "$PROMPT" --dangerously-skip-permissions --output-format stream-json || exit 1
+            echo "  → Running claude CLI with MCP tools..."
+            # shellcheck disable=SC2086
+            claude -p "$PROMPT" \
+                --dangerously-skip-permissions \
+                --output-format stream-json \
+                --verbose \
+                --debug mcp \
+                $MCP_ARGS \
+                || exit 1
             ;;
         codex|code)
             echo "  → Running code CLI..."
