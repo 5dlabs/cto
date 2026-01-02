@@ -13,7 +13,8 @@ pub fn get_tool_schemas() -> Value {
             get_input_schema(),
             get_add_mcp_server_schema(),
             get_remove_mcp_server_schema(),
-            get_update_mcp_server_schema()
+            get_update_mcp_server_schema(),
+            get_check_setup_schema()
         ]
     })
 }
@@ -30,7 +31,8 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
             get_input_schema(),
             get_add_mcp_server_schema(),
             get_remove_mcp_server_schema(),
-            get_update_mcp_server_schema()
+            get_update_mcp_server_schema(),
+            get_check_setup_schema()
         ]
     })
 }
@@ -338,6 +340,27 @@ fn get_update_mcp_server_schema() -> Value {
                 }
             },
             "required": ["server_key"]
+        }
+    })
+}
+
+fn get_check_setup_schema() -> Value {
+    json!({
+        "name": "check_setup",
+        "description": "Check MCP server dependencies and configuration. Verifies required CLIs (kubectl, argo) are installed and optionally installs missing ones via Homebrew. Also validates kubeconfig and cluster connectivity.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "auto_install": {
+                    "type": "boolean",
+                    "description": "If true, automatically install missing CLI tools via Homebrew (macOS only). Default: false"
+                },
+                "verbose": {
+                    "type": "boolean",
+                    "description": "If true, show detailed version information for each tool. Default: false"
+                }
+            },
+            "required": []
         }
     })
 }
