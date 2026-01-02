@@ -324,9 +324,9 @@ impl MarkdownReader {
         let mut digest = DigestContent::default();
 
         // Parse frontmatter if present
-        if content.starts_with("---") {
-            if let Some(end_idx) = content[3..].find("---") {
-                let frontmatter = &content[3..end_idx + 3];
+        if let Some(after_start) = content.strip_prefix("---") {
+            if let Some(end_idx) = after_start.find("---") {
+                let frontmatter = &after_start[..end_idx];
                 digest.parse_frontmatter(frontmatter);
             }
         }
@@ -482,5 +482,76 @@ mod tests {
 
         let path = writer.entry_path(&entry);
         assert!(path.to_string_lossy().contains("123456.md"));
+    }
+
+    #[test]
+    fn test_digest_content_parse_frontmatter() {
+        let frontmatter = r#"
+id: "123"
+implementation_ideas:
+  - "Build a cache layer"
+  - "Add rate limiting"
+topics:
+  - "caching"
+  - "performance"
+categories:
+  - rust
+"#;
+
+        let mut content = DigestContent::default();
+        content.parse_frontmatter(frontmatter);
+
+        assert_eq!(content.implementation_ideas.len(), 2);
+        assert_eq!(content.implementation_ideas[0], "Build a cache layer");
+        assert_eq!(content.topics.len(), 2);
+        assert!(content.topics.contains(&"caching".to_string()));
+    }
+
+    #[test]
+    fn test_digest_content_parse_body() {
+        let body = r#"---
+id: "123"
+---
+
+# Research: Testing
+
+## Original Tweet
+
+> This is the full tweet text that should be captured.
+> It spans multiple lines.
+
+**Author**: @test
+
+## Analysis
+
+This is the analysis reasoning that explains why this tweet is relevant.
+
+## Supporting Content
+
+This is enriched content from a linked article.
+It has multiple paragraphs.
+
+---
+"#;
+
+        let mut content = DigestContent::default();
+        content.parse_body(body);
+
+        assert!(content.full_text.contains("full tweet text"));
+        assert!(content.reasoning.contains("analysis reasoning"));
+        assert!(!content.enriched_content.is_empty());
+    }
+
+    #[test]
+    fn test_digest_content_has_rich_content() {
+        let mut content = DigestContent::default();
+        assert!(!content.has_rich_content());
+
+        content.implementation_ideas.push("Test idea".to_string());
+        assert!(content.has_rich_content());
+
+        content.implementation_ideas.clear();
+        content.reasoning = "Test reasoning".to_string();
+        assert!(content.has_rich_content());
     }
 }

@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::fmt::Write;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -72,16 +73,13 @@ impl DigestAnalyzer {
         entries
             .iter()
             .map(|entry| {
-                let content = if !entry.path.is_empty() {
+                let content = if entry.path.is_empty() {
+                    None
+                } else {
                     let full_path = base_dir.join(&entry.path);
                     MarkdownReader::load_digest_content(&full_path).ok()
-                } else {
-                    None
                 };
-                RichEntry {
-                    entry,
-                    content,
-                }
+                RichEntry { entry, content }
             })
             .collect()
     }
@@ -93,10 +91,7 @@ impl DigestAnalyzer {
     /// - Implementation ideas from AI analysis
     /// - Reasoning and context
     /// - Enriched content from scraped links
-    pub async fn analyze_rich(
-        &self,
-        entries: &[RichEntry<'_>],
-    ) -> Result<DigestAnalysis> {
+    pub async fn analyze_rich(&self, entries: &[RichEntry<'_>]) -> Result<DigestAnalysis> {
         let entries_context: Vec<String> = entries
             .iter()
             .map(|rich| {
@@ -123,13 +118,13 @@ impl DigestAnalyzer {
                     if !content.implementation_ideas.is_empty() {
                         entry_str.push_str("\n\n**Implementation Ideas**:\n");
                         for idea in &content.implementation_ideas {
-                            entry_str.push_str(&format!("- {idea}\n"));
+                            let _ = writeln!(entry_str, "- {idea}");
                         }
                     }
 
                     // Add reasoning if present
                     if !content.reasoning.is_empty() {
-                        entry_str.push_str(&format!("\n**Analysis**: {}\n", content.reasoning));
+                        let _ = write!(entry_str, "\n**Analysis**: {}\n", content.reasoning);
                     }
 
                     // Add enriched content summary (first 500 chars)
@@ -146,7 +141,7 @@ impl DigestAnalyzer {
                         } else {
                             enriched_summary
                         };
-                        entry_str.push_str(&format!("\n**From linked content**: {truncated}\n"));
+                        let _ = write!(entry_str, "\n**From linked content**: {truncated}\n");
                     }
 
                     entry_str
@@ -163,7 +158,8 @@ impl DigestAnalyzer {
             })
             .collect();
 
-        self.run_analysis(&entries_context.join("\n\n---\n\n")).await
+        self.run_analysis(&entries_context.join("\n\n---\n\n"))
+            .await
     }
 
     /// Analyze a batch of research entries (basic mode - uses preview only).

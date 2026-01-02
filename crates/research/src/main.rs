@@ -625,7 +625,10 @@ async fn run_digest(
             .iter()
             .filter(|e| e.content.as_ref().is_some_and(|c| c.has_rich_content()))
             .count();
-        println!("   → {rich_count}/{} entries have rich content", entries.len());
+        println!(
+            "   → {rich_count}/{} entries have rich content",
+            entries.len()
+        );
 
         match analyzer.analyze_rich(&rich_entries).await {
             Ok(a) => {
