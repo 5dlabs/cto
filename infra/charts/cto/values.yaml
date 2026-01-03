@@ -1,0 +1,13 @@
+tools:
+  config:
+    servers:
+      # AI/ML Tools
+      nano-banana-mcp:
+        name: "Nano Banana MCP"
+        description: "AI image generation and editing using Google's Gemini 2.5 Flash Image API"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "nano-banana-mcp"]
+        workingDirectory: "/tmp"
+        env:
+          GEMINI_API_KEY: "${GEMINI_API_KEY}"
