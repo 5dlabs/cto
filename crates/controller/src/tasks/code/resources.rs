@@ -1928,7 +1928,7 @@ impl<'a> CodeResourceManager<'a> {
             )));
         }
 
-        // No CLI config specified - use default image (backward compatibility)
+        // No CLI config specified - require explicit configuration
         if self.config.agent.image.is_configured() {
             return Ok(format!(
                 "{}:{}",
@@ -1936,13 +1936,12 @@ impl<'a> CodeResourceManager<'a> {
             ));
         }
 
-        // Ultimate fallback: use factory image which supports all CLIs
-        // This prevents ImagePullBackOff errors when CodeRuns are created without cli_config
-        tracing::warn!(
-            code_run = ?code_run.metadata.name,
-            "No CLI configuration provided and agent.image is not set, falling back to factory:latest"
-        );
-        Ok("ghcr.io/5dlabs/factory:latest".to_string())
+        // No fallback - configuration must be explicit
+        Err(Error::ConfigError(format!(
+            "No CLI configuration provided for CodeRun '{}' and agent.image is not configured. \
+             Either specify cli_config in the CodeRun spec or configure agent.image in controller config.",
+            code_run.metadata.name.as_deref().unwrap_or("unknown")
+        )))
     }
 }
 

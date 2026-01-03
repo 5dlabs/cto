@@ -4336,6 +4336,10 @@ fn create_mcp_server_coderun(
             "continueSession": false,
             "overwriteMemory": true,
             "promptModification": prompt,
+            "cliConfig": {
+                "cliType": "claude",
+                "model": "claude-sonnet-4-20250514"
+            },
             "env": env_map
         }
     });

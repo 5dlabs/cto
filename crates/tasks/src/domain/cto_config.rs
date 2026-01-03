@@ -179,7 +179,7 @@ pub struct IntakeDefaults {
 }
 
 fn default_intake_image() -> String {
-    "ghcr.io/5dlabs/claude:latest".to_string()
+    "MISSING_INTAKE_IMAGE".to_string()
 }
 
 /// Model configuration
