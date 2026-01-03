@@ -10,6 +10,7 @@ const REMEDIATION_JOB_PREFIX: &str = "remediation-";
 const HEAL_REMEDIATION_JOB_PREFIX: &str = "heal-remediation-";
 const REVIEW_JOB_PREFIX: &str = "review-";
 const REMEDIATE_JOB_PREFIX: &str = "remediate-";
+const MCP_JOB_PREFIX: &str = "mcp-";
 
 pub struct ResourceNaming;
 
@@ -118,6 +119,31 @@ impl ResourceNaming {
             let available = MAX_K8S_NAME_LENGTH.saturating_sub(HEAL_REMEDIATION_JOB_PREFIX.len());
             let trimmed = Self::ensure_k8s_name_length(&base_name, available);
             return format!("{HEAL_REMEDIATION_JOB_PREFIX}{trimmed}");
+        }
+
+        // Check if this is an MCP server management CodeRun
+        // Detected via label: task-type starts with "mcp-server-"
+        let mcp_task_type = code_run
+            .metadata
+            .labels
+            .as_ref()
+            .and_then(|labels| labels.get("task-type"))
+            .filter(|v| v.starts_with("mcp-server-"));
+
+        // For MCP CodeRuns, use mcp- prefix with task type
+        // Format: mcp-{task}-{server_key}-{uid}-v{version}
+        if let Some(task_type) = mcp_task_type {
+            let mcp_task = task_type.strip_prefix("mcp-server-").unwrap_or("unknown");
+            let server_key = code_run
+                .metadata
+                .labels
+                .as_ref()
+                .and_then(|labels| labels.get("mcp-server-key"))
+                .map_or("unknown", String::as_str);
+            let base_name = format!("{mcp_task}-{server_key}-{uid_suffix}-v{context_version}");
+            let available = MAX_K8S_NAME_LENGTH.saturating_sub(MCP_JOB_PREFIX.len());
+            let trimmed = Self::ensure_k8s_name_length(&base_name, available);
+            return format!("{MCP_JOB_PREFIX}{trimmed}");
         }
 
         // Check if this is a watch CodeRun (monitor or remediation from watch service)
