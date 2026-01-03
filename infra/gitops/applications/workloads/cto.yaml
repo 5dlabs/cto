@@ -28,15 +28,16 @@ metadata:
     app.kubernetes.io/branch: develop
   annotations:
     # Image Updater for all CTO images
-    # Uses 'name:develop' strategy to track the develop tag specifically
+    # Uses digest strategy to track the 'develop' tag specifically
+    # NOTE: Version constraint (:develop) required for digest strategy
     argocd-image-updater.argoproj.io/image-list: |
-      controller=ghcr.io/5dlabs/controller,
-      pm=ghcr.io/5dlabs/pm-server,
-      tools=ghcr.io/5dlabs/tools,
-      openmemory=ghcr.io/5dlabs/openmemory,
-      healer=ghcr.io/5dlabs/healer,
-      tweakcn=ghcr.io/5dlabs/tweakcn,
-      research=ghcr.io/5dlabs/research
+      controller=ghcr.io/5dlabs/controller:develop,
+      pm=ghcr.io/5dlabs/pm-server:develop,
+      tools=ghcr.io/5dlabs/tools:develop,
+      openmemory=ghcr.io/5dlabs/openmemory:develop,
+      healer=ghcr.io/5dlabs/healer:develop,
+      tweakcn=ghcr.io/5dlabs/tweakcn:develop,
+      research=ghcr.io/5dlabs/research:develop
     # Use 'digest' strategy to track the 'develop' tag and auto-update on new pushes
     # This ensures we always get the latest digest when CI pushes a new develop image
     argocd-image-updater.argoproj.io/controller.update-strategy: "digest"
