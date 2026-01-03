@@ -82,9 +82,10 @@ spec:
               src:
                 dataKey: body.pull_request.merged_by.login
                 dependencyName: github-pr-merged
+            # Base64 encode PR body to safely handle special characters (quotes, etc.)
             - dest: spec.arguments.parameters.5.value
               src:
-                dataKey: body.pull_request.body
+                dataTemplate: '{{ .Input.body.pull_request.body | b64enc }}'
                 dependencyName: github-pr-merged
             - dest: spec.arguments.parameters.6.value
               src:
@@ -202,7 +203,8 @@ spec:
                         PR_TITLE="{{workflow.parameters.pr-title}}"
                         PR_NUMBER="{{workflow.parameters.pr-number}}"
                         PR_URL="{{workflow.parameters.pr-url}}"
-                        PR_BODY='{{workflow.parameters.pr-body}}'
+                        # PR body is base64 encoded to safely handle special characters
+                        PR_BODY=$(echo "{{workflow.parameters.pr-body}}" | base64 -d 2>/dev/null || echo "")
                         PR_LABELS='{{workflow.parameters.pr-labels}}'
                         REPOSITORY="{{workflow.parameters.repository}}"
                         CURRENT_WORKFLOW_NAME="{{workflow.name}}"
