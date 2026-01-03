@@ -24,7 +24,7 @@
 
   "play": {
     "cli": "claude",
-    "image": "ghcr.io/5dlabs/factory:latest",
+    "image": "ghcr.io/5dlabs/claude:latest",
     "model": "claude-sonnet-4-20250514",
     "parallelExecution": true,
     "autoMerge": false,
