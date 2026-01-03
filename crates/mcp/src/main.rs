@@ -4159,7 +4159,11 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
 }
 
 /// Build the prompt for Rex to manage MCP servers
-#[allow(clippy::too_many_lines, clippy::uninlined_format_args)]
+#[allow(
+    clippy::too_many_lines,
+    clippy::uninlined_format_args,
+    clippy::needless_raw_string_hashes
+)]
 fn build_mcp_server_prompt(
     task_type: &str,
     server_key: &str,
@@ -4232,11 +4236,11 @@ Update the MCP server with key `{server_key}` in the tools server configuration.
 {}
 ```"#,
             github_url.map_or(String::new(), |url| format!("**GitHub Repository:** {url}")),
-            readme_content.unwrap_or("README not available - check the existing configuration or GitHub repository")
+            readme_content.unwrap_or(
+                "README not available - check the existing configuration or GitHub repository"
+            )
         ),
-        _ => format!(
-            "Unknown task type: {task_type}. Expected: add, remove, or update."
-        ),
+        _ => format!("Unknown task type: {task_type}. Expected: add, remove, or update."),
     };
 
     format!(
