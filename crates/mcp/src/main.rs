@@ -4159,6 +4159,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
 }
 
 /// Build the prompt for Rex to manage MCP servers
+#[allow(clippy::too_many_lines, clippy::uninlined_format_args)]
 fn build_mcp_server_prompt(
     task_type: &str,
     server_key: &str,
@@ -4281,6 +4282,45 @@ For HTTP transport servers:
 2. Commit your changes to a new branch
 3. Create a PR targeting the `develop` branch
 4. The PR title should be: `feat(tools): {task_type} MCP server {server_key}`
+5. **Merge the PR** - Use GitHub MCP tools to merge the PR after CI passes
+6. **Trigger ArgoCD Sync** - Use ArgoCD MCP tools to sync the `cto-tools` application:
+   - Call `argocd_sync_application` with applicationName: `cto-tools`
+   - Wait for sync to complete (check with `argocd_get_application`)
+7. **Verify Deployment** - Confirm the tools server has restarted with the new config
+
+## Available MCP Tools
+
+You have access to these MCP tools for this task:
+
+### GitHub Tools
+- `github_create_pull_request` - Create the PR
+- `github_merge_pull_request` - Merge after CI passes
+- `github_get_pull_request` - Check PR status and CI checks
+
+### ArgoCD Tools  
+- `argocd_list_applications` - List all ArgoCD apps
+- `argocd_get_application` - Get app status (sync, health)
+- `argocd_sync_application` - Trigger sync for an app
+- `argocd_get_application_resource_tree` - Check deployed resources
+
+### Kubernetes Tools
+- `kubernetes_get_pods` - Check pod status
+- `kubernetes_get_pod_logs` - View logs if needed
+
+## Acceptance Criteria
+
+You MUST complete ALL of these steps before finishing:
+
+1. [ ] **values.yaml updated** - Server entry `{server_key}` exists under `tools.config.servers`
+2. [ ] **Valid YAML** - File parses without errors
+3. [ ] **PR created** - Pull request targeting `develop` branch
+4. [ ] **CI passes** - Wait for CI checks to complete successfully
+5. [ ] **PR merged** - Use `github_merge_pull_request` to merge
+6. [ ] **ArgoCD synced** - Call `argocd_sync_application` for `cto-tools`
+7. [ ] **Deployment verified** - Check `argocd_get_application` shows Healthy/Synced
+8. [ ] **Server available** - Verify tools-server pod restarted with new config
+
+**Keep iterating until ALL criteria are met.** Use the MCP tools to verify each step.
 "#,
         task_instruction = task_instruction,
         values_path = values_path,
@@ -4339,6 +4379,13 @@ fn create_mcp_server_coderun(
             "cliConfig": {
                 "cliType": "claude",
                 "model": "claude-sonnet-4-20250514"
+            },
+            "toolsConfig": {
+                "remoteTools": [
+                    "mcp_tools_github_*",
+                    "mcp_tools_argocd_*",
+                    "mcp_tools_kubernetes_*"
+                ]
             },
             "env": env_map
         }
