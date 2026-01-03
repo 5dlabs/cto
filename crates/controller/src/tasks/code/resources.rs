@@ -913,9 +913,11 @@ impl<'a> CodeResourceManager<'a> {
                 "image": "docker:dind",
                 "command": ["/bin/sh", "-c"],
                 "args": [
-                    format!("dockerd-entrypoint.sh & DOCKER_PID=$!; \
+                    // Watch for agent completion signal at /workspace/.agent_done
+                    // This matches the completion.sh.hbs template which writes to this path
+                    "dockerd-entrypoint.sh & DOCKER_PID=$!; \
                      while true; do \
-                       if [ -f /workspace/task-{}/.agent_done ]; then \
+                       if [ -f /workspace/.agent_done ]; then \
                          echo 'Agent done signal detected, stopping docker daemon...'; \
                          kill -TERM $DOCKER_PID 2>/dev/null || true; \
                          sleep 2; \
@@ -927,7 +929,7 @@ impl<'a> CodeResourceManager<'a> {
                          exit 1; \
                        fi; \
                        sleep 5; \
-                     done", code_run.spec.task_id.unwrap_or(0))
+                     done".to_string()
                 ],
                 "securityContext": {
                     "privileged": true,
@@ -1934,9 +1936,13 @@ impl<'a> CodeResourceManager<'a> {
             ));
         }
 
-        Err(Error::ConfigError(
-            "No CLI configuration provided and agent.image fallback is not set.".to_string(),
-        ))
+        // Ultimate fallback: use factory image which supports all CLIs
+        // This prevents ImagePullBackOff errors when CodeRuns are created without cli_config
+        tracing::warn!(
+            code_run = ?code_run.metadata.name,
+            "No CLI configuration provided and agent.image is not set, falling back to factory:latest"
+        );
+        Ok("ghcr.io/5dlabs/factory:latest".to_string())
     }
 }
 

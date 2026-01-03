@@ -242,25 +242,25 @@ agent:
     repository: ghcr.io/5dlabs/agent
     tag: latest
   serviceAccountName: ""
-  # All CLI types use the factory image which contains all CLIs
+  # Each CLI type has its own dedicated image
   cliImages:
     claude:
-      repository: ghcr.io/5dlabs/factory
+      repository: ghcr.io/5dlabs/claude
       tag: latest
     cursor:
-      repository: ghcr.io/5dlabs/factory
+      repository: ghcr.io/5dlabs/cursor
       tag: latest
     codex:
-      repository: ghcr.io/5dlabs/factory
+      repository: ghcr.io/5dlabs/codex
       tag: latest
     gemini:
-      repository: ghcr.io/5dlabs/factory
+      repository: ghcr.io/5dlabs/gemini
       tag: latest
     factory:
       repository: ghcr.io/5dlabs/factory
       tag: latest
     opencode:
-      repository: ghcr.io/5dlabs/factory
+      repository: ghcr.io/5dlabs/opencode
       tag: latest
   cliProviders: {}
   agentCliConfigs: {}

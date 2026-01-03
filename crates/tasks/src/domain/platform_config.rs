@@ -167,7 +167,7 @@ fn default_play_cli() -> String {
 }
 
 fn default_play_image() -> String {
-    "ghcr.io/5dlabs/factory:latest".to_string()
+    "ghcr.io/5dlabs/claude:latest".to_string()
 }
 
 fn default_play_model() -> String {
@@ -310,7 +310,7 @@ impl PlatformConfig {
         // Otherwise, derive from mode
         match self.intake.mode {
             IntakeMode::Api => "ghcr.io/5dlabs/runtime:latest",
-            IntakeMode::Cli => "ghcr.io/5dlabs/factory:latest",
+            IntakeMode::Cli => "ghcr.io/5dlabs/claude:latest",
         }
     }
 }
@@ -340,7 +340,7 @@ mod tests {
         let mut config = PlatformConfig::default();
         config.intake.mode = IntakeMode::Cli;
         config.intake.image = "ghcr.io/5dlabs/runtime:latest".to_string(); // Reset to trigger derivation
-        assert_eq!(config.intake_image(), "ghcr.io/5dlabs/factory:latest");
+        assert_eq!(config.intake_image(), "ghcr.io/5dlabs/claude:latest");
     }
 
     #[test]

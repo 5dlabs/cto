@@ -33,6 +33,14 @@ if [ -d "$REPO_NAME/.git" ]; then
   # Also clean up any ref locks
   find .git/refs -name "*.lock" -delete 2>/dev/null || true
   
+  # Clean any dirty state from previous runs before checkout
+  # This prevents "Your local changes would be overwritten by checkout" errors
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    echo "  🧹 Cleaning dirty workspace state from previous runs"
+    git reset --hard HEAD 2>/dev/null || true
+    git clean -fd 2>/dev/null || true
+  fi
+  
   # Force update refs to handle diverged branches
   # Use refspec +:refs/remotes/origin/* to force-update all remote refs
   git fetch --all --prune --force 2>/dev/null || {
