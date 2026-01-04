@@ -93,6 +93,15 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     r#""level"\s*:\s*"DEBUG""#,
     // ArgoCD/Helm manifest cache hits (informational messages)
     r"(?i)manifest\s+cache\s+hit",
+    // OTEL-wrapped logs: Body: Str(...) format with inner level=info
+    // The OTEL collector wraps logs, but if the inner content is info-level, it's not an error
+    r"(?i)Body:\s*Str\(.*level\s*=\s*info",
+    // Loki query state metadata (not actual log content)
+    // F State: Error indicates query state, not an application error
+    r"^F\s+State:\s*(Error|Success|Pending)",
+    // Kubernetes container log prefix (F/I/W/E) followed by info-level content
+    // The F prefix from k8s logging doesn't indicate error when content is info-level
+    r"^F\s+.*level\s*=\s*info",
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -1151,5 +1160,80 @@ mod tests {
         assert!(!filtered
             .iter()
             .any(|e| e.line.contains("manifest cache hit")));
+    }
+
+    #[test]
+    fn test_is_false_positive_otel_wrapped_info_logs() {
+        // OTEL-wrapped logs with Body: Str(...) format
+        // These wrap the actual log content, but if inner level is info, it's not an error
+        assert!(is_false_positive(
+            r#"F Body: Str(F time="2026-01-04T15:52:54Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://argoproj.github.io/argo-helm"#
+        ));
+        assert!(is_false_positive(
+            r#"Body: Str(time="2026-01-04T15:00:00Z" level=info msg="processing request")"#
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_loki_query_state() {
+        // Loki query state metadata - not actual log content
+        assert!(is_false_positive("F State: Error"));
+        assert!(is_false_positive("F State: Success"));
+        assert!(is_false_positive("F State: Pending"));
+    }
+
+    #[test]
+    fn test_is_false_positive_k8s_f_prefix_with_info_level() {
+        // Kubernetes container log with F prefix but info-level content
+        // The F prefix doesn't indicate error when the actual log is info-level
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T15:52:47Z" level=info msg="manifest cache hit""#
+        ));
+        assert!(is_false_positive(
+            r#"F level=info msg="processing completed successfully""#
+        ));
+    }
+
+    #[test]
+    fn test_filter_otel_and_loki_metadata() {
+        use chrono::Utc;
+
+        // These are error samples similar to the real issue
+        let entries = vec![
+            // OTEL-wrapped info log - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F Body: Str(F time="2026-01-04T15:52:54Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://argoproj.github.io/argo-helm"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Loki query state - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F State: Error".to_string(),
+                labels: HashMap::new(),
+            },
+            // K8s F prefix with info level - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T15:52:47Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://prometheus-community.github.io/helm-charts"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual error - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "[ERROR] Database connection failed".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out 3 false positives
+        assert_eq!(filtered.len(), 1);
+
+        // Only the actual error should remain
+        assert!(filtered.iter().any(|e| e.line.contains("[ERROR]")));
+        assert!(!filtered.iter().any(|e| e.line.contains("F State:")));
+        assert!(!filtered.iter().any(|e| e.line.contains("Body: Str")));
     }
 }
