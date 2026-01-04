@@ -85,16 +85,127 @@ runs:
       shell: bash
       run: |
         echo "🔧 Checking build dependencies..."
+        
+        # Helper function to run commands with timeout, trapping signals gracefully
+        # This prevents exit code 130 (SIGINT) from failing the step
+        run_with_timeout() {
+          local timeout_secs="$1"
+          shift
+          
+          # Use timeout command with SIGTERM instead of SIGKILL for graceful handling
+          # --signal=TERM sends SIGTERM first, then SIGKILL after 10s grace period
+          timeout --signal=TERM --kill-after=10s "$timeout_secs" "$@" 2>&1
+          local exit_code=$?
+          
+          # Exit codes: 0=success, 124=timeout, 130=SIGINT, 137=SIGKILL
+          if [ "$exit_code" -eq 0 ]; then
+            return 0
+          elif [ "$exit_code" -eq 124 ]; then
+            echo "  ⚠️ Command timed out after ${timeout_secs}s"
+            return 1
+          elif [ "$exit_code" -eq 130 ] || [ "$exit_code" -eq 137 ]; then
+            echo "  ⚠️ Command was interrupted (signal $exit_code)"
+            return 1
+          else
+            echo "  ⚠️ Command failed with exit code $exit_code"
+            return 1
+          fi
+        }
+        
         # Check if we have a C compiler
         if ! command -v cc &> /dev/null && ! command -v gcc &> /dev/null; then
           echo "📥 Installing build-essential..."
-          if command -v apt-get &> /dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq build-essential pkg-config libssl-dev
+          
+          # First check if sudo is available and working (non-interactive)
+          if ! sudo -n true 2>/dev/null; then
+            echo "⚠️ sudo not available or requires password, skipping package installation"
+            echo "ℹ️ Build may still succeed if the runner image has required dependencies"
+          elif command -v apt-get &> /dev/null; then
+            # Wait for any existing apt locks (max 60 seconds)
+            echo "⏳ Waiting for apt locks..."
+            lock_wait=0
+            while fuser /var/lib/apt/lists/lock /var/lib/dpkg/lock-frontend >/dev/null 2>&1 && [ $lock_wait -lt 60 ]; do
+              sleep 5
+              lock_wait=$((lock_wait + 5))
+            done
+            
+            # Retry apt-get commands with exponential backoff for transient failures
+            # Exit code 130 can occur when network operations are interrupted
+            # Using timeout to prevent commands from hanging indefinitely
+            APT_MAX_RETRIES=3
+            APT_TIMEOUT=120  # 2 minutes max per attempt
+            apt_update_success=false
+            apt_install_success=false
+            
+            for attempt in $(seq 1 $APT_MAX_RETRIES); do
+              echo "📦 apt-get update attempt $attempt/$APT_MAX_RETRIES (timeout: ${APT_TIMEOUT}s)..."
+              if run_with_timeout "$APT_TIMEOUT" sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq; then
+                echo "✅ apt-get update succeeded on attempt $attempt"
+                apt_update_success=true
+                break
+              fi
+              if [ "$attempt" -lt "$APT_MAX_RETRIES" ]; then
+                delay=$((attempt * 15))
+                echo "⚠️ apt-get update failed, retrying in ${delay}s..."
+                sleep "$delay"
+              fi
+            done
+            
+            if [ "$apt_update_success" = "true" ]; then
+              for attempt in $(seq 1 $APT_MAX_RETRIES); do
+                echo "📦 apt-get install attempt $attempt/$APT_MAX_RETRIES (timeout: ${APT_TIMEOUT}s)..."
+                if run_with_timeout "$APT_TIMEOUT" sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq build-essential pkg-config libssl-dev; then
+                  echo "✅ build dependencies installed on attempt $attempt"
+                  apt_install_success=true
+                  break
+                fi
+                if [ "$attempt" -lt "$APT_MAX_RETRIES" ]; then
+                  delay=$((attempt * 15))
+                  echo "⚠️ apt-get install failed, retrying in ${delay}s..."
+                  sleep "$delay"
+                fi
+              done
+            fi
+            
+            if [ "$apt_update_success" = "false" ] || [ "$apt_install_success" = "false" ]; then
+              echo "⚠️ apt-get commands did not fully succeed after $APT_MAX_RETRIES attempts"
+              echo "ℹ️ Continuing without explicit build dependencies - Rust setup may still work"
+            fi
           elif command -v apk &> /dev/null; then
-            sudo apk add --no-cache build-base pkgconfig openssl-dev
+            # Retry apk commands with timeout
+            APK_MAX_RETRIES=3
+            APK_TIMEOUT=120
+            apk_success=false
+            
+            for attempt in $(seq 1 $APK_MAX_RETRIES); do
+              echo "📦 apk add attempt $attempt/$APK_MAX_RETRIES (timeout: ${APK_TIMEOUT}s)..."
+              if run_with_timeout "$APK_TIMEOUT" sudo apk add --no-cache build-base pkgconfig openssl-dev; then
+                echo "✅ build dependencies installed on attempt $attempt"
+                apk_success=true
+                break
+              fi
+              if [ "$attempt" -lt "$APK_MAX_RETRIES" ]; then
+                delay=$((attempt * 15))
+                echo "⚠️ apk add failed, retrying in ${delay}s..."
+                sleep "$delay"
+              fi
+            done
+            
+            if [ "$apk_success" = "false" ]; then
+              echo "⚠️ apk commands failed after $APK_MAX_RETRIES attempts"
+              echo "ℹ️ Continuing without explicit build dependencies - Rust setup may still work"
+            fi
           else
             echo "⚠️ No package manager found, skipping build dependencies"
+          fi
+          
+          # Final check - report status but don't fail the step
+          if command -v cc &> /dev/null || command -v gcc &> /dev/null; then
+            echo "✅ C compiler now available"
+          else
+            echo "⚠️ C compiler still not available after package installation attempts"
+            echo "ℹ️ Some Rust crates requiring native compilation may fail"
+            echo "ℹ️ Consider updating the runner image to include build-essential"
           fi
         else
           echo "✅ C compiler already available"
