@@ -89,10 +89,55 @@ runs:
         if ! command -v cc &> /dev/null && ! command -v gcc &> /dev/null; then
           echo "📥 Installing build-essential..."
           if command -v apt-get &> /dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq build-essential pkg-config libssl-dev
+            # Retry apt-get commands with exponential backoff for transient failures
+            # Exit code 130 can occur when network operations are interrupted
+            APT_MAX_RETRIES=5
+            for attempt in $(seq 1 $APT_MAX_RETRIES); do
+              echo "📦 apt-get update attempt $attempt/$APT_MAX_RETRIES..."
+              if sudo apt-get update -qq 2>&1; then
+                echo "✅ apt-get update succeeded on attempt $attempt"
+                break
+              fi
+              if [ "$attempt" -eq "$APT_MAX_RETRIES" ]; then
+                echo "❌ apt-get update failed after $APT_MAX_RETRIES attempts"
+                exit 1
+              fi
+              delay=$((attempt * 10))
+              echo "⚠️ apt-get update failed, retrying in ${delay}s..."
+              sleep "$delay"
+            done
+            
+            for attempt in $(seq 1 $APT_MAX_RETRIES); do
+              echo "📦 apt-get install attempt $attempt/$APT_MAX_RETRIES..."
+              if sudo apt-get install -y -qq build-essential pkg-config libssl-dev 2>&1; then
+                echo "✅ build dependencies installed on attempt $attempt"
+                break
+              fi
+              if [ "$attempt" -eq "$APT_MAX_RETRIES" ]; then
+                echo "❌ apt-get install failed after $APT_MAX_RETRIES attempts"
+                exit 1
+              fi
+              delay=$((attempt * 10))
+              echo "⚠️ apt-get install failed, retrying in ${delay}s..."
+              sleep "$delay"
+            done
           elif command -v apk &> /dev/null; then
-            sudo apk add --no-cache build-base pkgconfig openssl-dev
+            # Retry apk commands with exponential backoff
+            APK_MAX_RETRIES=5
+            for attempt in $(seq 1 $APK_MAX_RETRIES); do
+              echo "📦 apk add attempt $attempt/$APK_MAX_RETRIES..."
+              if sudo apk add --no-cache build-base pkgconfig openssl-dev 2>&1; then
+                echo "✅ build dependencies installed on attempt $attempt"
+                break
+              fi
+              if [ "$attempt" -eq "$APK_MAX_RETRIES" ]; then
+                echo "❌ apk add failed after $APK_MAX_RETRIES attempts"
+                exit 1
+              fi
+              delay=$((attempt * 10))
+              echo "⚠️ apk add failed, retrying in ${delay}s..."
+              sleep "$delay"
+            done
           else
             echo "⚠️ No package manager found, skipping build dependencies"
           fi
