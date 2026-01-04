@@ -33,14 +33,22 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "list", "watch"]
-  # StatefulSets for NATS/STAN cluster management
+  # Services for legacy STAN cleanup
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "delete"]
+  # StatefulSets for NATS/STAN cluster management and legacy cleanup
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "delete"]
   # Deployments for Grafana management
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch"]
+  # PodDisruptionBudgets for legacy STAN cleanup
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

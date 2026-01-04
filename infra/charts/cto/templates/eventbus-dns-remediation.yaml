@@ -1,12 +1,12 @@
 # EventBus DNS Resolution Remediation
-# Task ID: 2641293645
+# Task ID: 2641293645, 2533441310
 # Generated: 2026-01-04
 # Issue: DNS lookup failures for eventbus-default-stan-*.eventbus-default-stan-svc.automation.svc
-# Root Cause: NATS Streaming EventBus cluster pods may be unhealthy or the headless service is misconfigured
-# This creates a remediation job to restart EventBus components and verify DNS resolution
+# Root Cause: Legacy STAN resources causing DNS failures after migration to JetStream
+# This job cleans up legacy STAN and monitors JetStream health
 
 ---
-# Job: EventBus Health Check and Remediation
+# Job: Legacy STAN Cleanup and JetStream Health Check
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -15,7 +15,7 @@ metadata:
   labels:
     app.kubernetes.io/name: eventbus-remediation
     app.kubernetes.io/component: dns-health
-    remediation.cto.io/task-id: "2641293645"
+    remediation.cto.io/task-id: "2641293645,2533441310"
     remediation.cto.io/type: dns-resolution
 spec:
   ttlSecondsAfterFinished: 3600
@@ -38,100 +38,110 @@ spec:
               echo "=== EventBus DNS Remediation Job ==="
               echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               echo "Namespace: automation"
-              
-              # Function to check DNS resolution
-              check_dns() {
-                local host="$1"
-                echo "Checking DNS resolution for: $host"
-                if nslookup "$host" 2>/dev/null; then
-                  echo "  DNS resolution: OK"
-                  return 0
-                else
-                  echo "  DNS resolution: FAILED"
-                  return 1
-                fi
-              }
-              
-              # Check EventBus StatefulSet status
               echo ""
-              echo "=== Checking EventBus StatefulSet ==="
-              kubectl get statefulset -n automation -l app=eventbus-default-stan -o wide || echo "No EventBus StatefulSet found"
+              echo "NOTE: STAN is deprecated. Migration to JetStream complete."
+              echo "This job cleans up legacy STAN resources causing DNS failures."
               
-              # Check EventBus pods
+              # ========================================
+              # STEP 1: Clean up Legacy STAN Resources
+              # ========================================
               echo ""
-              echo "=== Checking EventBus Pods ==="
-              kubectl get pods -n automation -l app=eventbus-default-stan -o wide || echo "No EventBus pods found"
+              echo "=== Step 1: Cleaning Legacy STAN Resources ==="
               
-              # Check headless service
-              echo ""
-              echo "=== Checking EventBus Headless Service ==="
-              kubectl get svc eventbus-default-stan-svc -n automation -o yaml || echo "Service not found"
-              
-              # Check endpoints
-              echo ""
-              echo "=== Checking EventBus Endpoints ==="
-              kubectl get endpoints eventbus-default-stan-svc -n automation -o yaml || echo "Endpoints not found"
-              
-              # Check DNS resolution for each expected pod
-              echo ""
-              echo "=== DNS Resolution Check ==="
-              dns_ok=true
-              for i in 0 1 2; do
-                host="eventbus-default-stan-${i}.eventbus-default-stan-svc.automation.svc.cluster.local"
-                if ! check_dns "$host"; then
-                  dns_ok=false
-                fi
-              done
-              
-              if [ "$dns_ok" = "false" ]; then
-                echo ""
-                echo "=== DNS Issues Detected - Attempting Remediation ==="
-                
-                # Get pod status details
-                echo "Pod status details:"
-                kubectl get pods -n automation -l app=eventbus-default-stan -o jsonpath='{range .items[*]}{.metadata.name}: {.status.phase} - {.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' || true
-                
-                # Check for pods not in Running state
-                unhealthy_pods=$(kubectl get pods -n automation -l app=eventbus-default-stan --field-selector=status.phase!=Running -o name 2>/dev/null || echo "")
-                
-                if [ -n "$unhealthy_pods" ]; then
-                  echo "Found unhealthy pods: $unhealthy_pods"
-                  echo "Deleting unhealthy pods to trigger restart..."
-                  echo "$unhealthy_pods" | xargs -r kubectl delete -n automation --wait=false
-                fi
-                
-                # If all pods appear running but DNS still fails, rollout restart
-                running_count=$(kubectl get pods -n automation -l app=eventbus-default-stan --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
-                
-                if [ "$running_count" -gt "0" ]; then
-                  echo "All pods appear running but DNS fails - checking pod readiness..."
-                  not_ready=$(kubectl get pods -n automation -l app=eventbus-default-stan -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | grep -c "False" || echo "0")
-                  
-                  if [ "$not_ready" -gt "0" ]; then
-                    echo "Found $not_ready pods not ready - performing rollout restart..."
-                    kubectl rollout restart statefulset -n automation -l app=eventbus-default-stan || true
-                    echo "Waiting for rollout to complete..."
-                    kubectl rollout status statefulset -n automation -l app=eventbus-default-stan --timeout=300s || echo "Rollout status check timed out"
-                  fi
-                fi
-                
-                # Final DNS check after remediation
-                echo ""
-                echo "=== Post-Remediation DNS Check ==="
-                sleep 30  # Wait for DNS propagation
-                for i in 0 1 2; do
-                  host="eventbus-default-stan-${i}.eventbus-default-stan-svc.automation.svc.cluster.local"
-                  check_dns "$host" || true
-                done
+              # Check for legacy STAN StatefulSet
+              if kubectl get statefulset eventbus-default-stan -n automation &>/dev/null; then
+                echo "Found legacy STAN StatefulSet - removing..."
+                kubectl delete statefulset eventbus-default-stan -n automation --grace-period=30 --wait=false || true
               else
-                echo ""
-                echo "=== DNS Resolution OK - No Remediation Needed ==="
+                echo "No legacy STAN StatefulSet found (already cleaned)"
               fi
               
-              # Check NATS cluster health
+              # Check for legacy STAN headless service (causes DNS errors)
+              if kubectl get service eventbus-default-stan-svc -n automation &>/dev/null; then
+                echo "Found legacy STAN headless service - removing..."
+                kubectl delete service eventbus-default-stan-svc -n automation || true
+              else
+                echo "No legacy STAN headless service found (already cleaned)"
+              fi
+              
+              # Check for legacy STAN client service
+              if kubectl get service eventbus-default-stan -n automation &>/dev/null; then
+                echo "Found legacy STAN client service - removing..."
+                kubectl delete service eventbus-default-stan -n automation || true
+              else
+                echo "No legacy STAN client service found (already cleaned)"
+              fi
+              
+              # Check for legacy STAN PDB
+              if kubectl get pdb eventbus-default-stan -n automation &>/dev/null; then
+                echo "Found legacy STAN PDB - removing..."
+                kubectl delete pdb eventbus-default-stan -n automation || true
+              else
+                echo "No legacy STAN PDB found (already cleaned)"
+              fi
+              
+              # Force delete any orphaned STAN pods
+              ORPHAN_PODS=$(kubectl get pods -n automation -l app=eventbus-default-stan -o name 2>/dev/null || echo "")
+              if [ -n "$ORPHAN_PODS" ]; then
+                echo "Found orphaned STAN pods - force deleting..."
+                echo "$ORPHAN_PODS" | xargs -r kubectl delete -n automation --force --grace-period=0 || true
+              else
+                echo "No orphaned STAN pods found"
+              fi
+              
+              # ========================================
+              # STEP 2: Verify JetStream EventBus Health
+              # ========================================
               echo ""
-              echo "=== NATS Cluster Health ==="
-              kubectl exec -n automation eventbus-default-stan-0 -- nats-streaming-server --version 2>/dev/null || echo "Could not check NATS version"
+              echo "=== Step 2: Verifying JetStream EventBus Health ==="
+              
+              # Check for JetStream EventBus pods
+              JETSTREAM_SELECTOR="app.kubernetes.io/name=eventbus-jetstream"
+              JETSTREAM_PODS=$(kubectl get pods -n automation -l "$JETSTREAM_SELECTOR" --no-headers 2>/dev/null | wc -l || echo "0")
+              
+              if [ "$JETSTREAM_PODS" -gt "0" ]; then
+                echo "Found $JETSTREAM_PODS JetStream EventBus pods"
+                kubectl get pods -n automation -l "$JETSTREAM_SELECTOR" -o wide
+                
+                # Check for unhealthy JetStream pods
+                UNHEALTHY=$(kubectl get pods -n automation -l "$JETSTREAM_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
+                if [ -n "$UNHEALTHY" ]; then
+                  echo "Found unhealthy JetStream pods: $UNHEALTHY"
+                  for pod in $UNHEALTHY; do
+                    echo "Deleting unhealthy pod: $pod"
+                    kubectl delete pod -n automation "$pod" --grace-period=30 || true
+                  done
+                else
+                  echo "All JetStream pods healthy"
+                fi
+              else
+                echo "No JetStream EventBus pods found"
+                # Fallback to generic NATS selector
+                NATS_SELECTOR="app.kubernetes.io/name=nats"
+                NATS_PODS=$(kubectl get pods -n automation -l "$NATS_SELECTOR" --no-headers 2>/dev/null | wc -l || echo "0")
+                if [ "$NATS_PODS" -gt "0" ]; then
+                  echo "Found $NATS_PODS NATS pods (fallback selector)"
+                  kubectl get pods -n automation -l "$NATS_SELECTOR" -o wide
+                fi
+              fi
+              
+              # ========================================
+              # STEP 3: Verify DNS Resolution is Clean
+              # ========================================
+              echo ""
+              echo "=== Step 3: Verifying DNS Resolution ==="
+              
+              # Legacy STAN DNS should now return NXDOMAIN (expected)
+              echo "Checking legacy STAN DNS entries (should fail with NXDOMAIN):"
+              for i in 0 1 2; do
+                host="eventbus-default-stan-${i}.eventbus-default-stan-svc.automation.svc.cluster.local"
+                echo -n "  $host: "
+                if nslookup "$host" >/dev/null 2>&1; then
+                  echo "WARNING - Still resolves (cleanup may need more time)"
+                else
+                  echo "OK - Not found (expected)"
+                fi
+              done
               
               echo ""
               echo "=== EventBus DNS Remediation Completed ==="
@@ -144,7 +154,7 @@ metadata:
   namespace: automation
   labels:
     app.kubernetes.io/name: eventbus-remediation
-    remediation.cto.io/task-id: "2641293645"
+    remediation.cto.io/task-id: "2641293645,2533441310"
 ---
 # Role for EventBus remediation
 apiVersion: rbac.authorization.k8s.io/v1
@@ -154,20 +164,23 @@ metadata:
   namespace: automation
   labels:
     app.kubernetes.io/name: eventbus-remediation
-    remediation.cto.io/task-id: "2641293645"
+    remediation.cto.io/task-id: "2641293645,2533441310"
 rules:
   - apiGroups: [""]
     resources: ["pods", "services", "endpoints"]
     verbs: ["get", "list", "watch", "delete"]
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
-    verbs: ["get", "list", "watch", "patch"]
+    verbs: ["get", "list", "watch", "patch", "delete"]
   - apiGroups: ["apps"]
     resources: ["statefulsets/status"]
     verbs: ["get"]
   - apiGroups: [""]
     resources: ["pods/exec"]
     verbs: ["create"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "delete"]
 ---
 # RoleBinding for remediation job
 apiVersion: rbac.authorization.k8s.io/v1
@@ -177,7 +190,7 @@ metadata:
   namespace: automation
   labels:
     app.kubernetes.io/name: eventbus-remediation
-    remediation.cto.io/task-id: "2641293645"
+    remediation.cto.io/task-id: "2641293645,2533441310"
 subjects:
   - kind: ServiceAccount
     name: eventbus-remediation-sa
@@ -187,7 +200,7 @@ roleRef:
   name: eventbus-remediation-role
   apiGroup: rbac.authorization.k8s.io
 ---
-# CronJob: Periodic EventBus health check
+# CronJob: Periodic EventBus health check (JetStream + Legacy STAN cleanup)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -196,7 +209,7 @@ metadata:
   labels:
     app.kubernetes.io/name: eventbus-remediation
     app.kubernetes.io/component: health-check
-    remediation.cto.io/task-id: "2641293645"
+    remediation.cto.io/task-id: "2641293645,2533441310"
 spec:
   schedule: "*/15 * * * *"  # Run every 15 minutes
   concurrencyPolicy: Forbid
@@ -224,28 +237,74 @@ spec:
                   echo "=== EventBus Health Check ==="
                   echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
                   
-                  # Quick DNS check
-                  dns_failures=0
-                  for i in 0 1 2; do
-                    host="eventbus-default-stan-${i}.eventbus-default-stan-svc.automation.svc.cluster.local"
-                    if ! nslookup "$host" >/dev/null 2>&1; then
-                      echo "DNS FAIL: $host"
-                      dns_failures=$((dns_failures + 1))
-                    fi
-                  done
+                  # Step 1: Clean any remaining legacy STAN resources
+                  echo ""
+                  echo "--- Checking for Legacy STAN Resources ---"
                   
-                  if [ "$dns_failures" -gt "0" ]; then
-                    echo "WARNING: $dns_failures DNS resolution failures detected"
-                    
-                    # Check pod status
-                    not_ready=$(kubectl get pods -n automation -l app=eventbus-default-stan -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | grep -c "False" || echo "0")
-                    
-                    if [ "$not_ready" -gt "0" ]; then
-                      echo "Found $not_ready unhealthy pods - triggering restart"
-                      kubectl delete pods -n automation -l app=eventbus-default-stan --field-selector=status.phase!=Running --wait=false 2>/dev/null || true
-                    fi
-                  else
-                    echo "All EventBus DNS resolutions successful"
+                  STAN_CLEANUP_NEEDED=false
+                  
+                  # Check for legacy StatefulSet
+                  if kubectl get statefulset eventbus-default-stan -n automation &>/dev/null; then
+                    echo "Found legacy STAN StatefulSet - cleaning..."
+                    kubectl delete statefulset eventbus-default-stan -n automation --grace-period=30 --wait=false || true
+                    STAN_CLEANUP_NEEDED=true
                   fi
                   
+                  # Check for legacy services
+                  if kubectl get service eventbus-default-stan-svc -n automation &>/dev/null; then
+                    echo "Found legacy STAN headless service - cleaning..."
+                    kubectl delete service eventbus-default-stan-svc -n automation || true
+                    STAN_CLEANUP_NEEDED=true
+                  fi
+                  
+                  if kubectl get service eventbus-default-stan -n automation &>/dev/null; then
+                    echo "Found legacy STAN client service - cleaning..."
+                    kubectl delete service eventbus-default-stan -n automation || true
+                    STAN_CLEANUP_NEEDED=true
+                  fi
+                  
+                  # Check for orphaned STAN pods
+                  ORPHAN_PODS=$(kubectl get pods -n automation -l app=eventbus-default-stan -o name 2>/dev/null || echo "")
+                  if [ -n "$ORPHAN_PODS" ]; then
+                    echo "Found orphaned STAN pods - force cleaning..."
+                    echo "$ORPHAN_PODS" | xargs -r kubectl delete -n automation --force --grace-period=0 || true
+                    STAN_CLEANUP_NEEDED=true
+                  fi
+                  
+                  if [ "$STAN_CLEANUP_NEEDED" = "true" ]; then
+                    echo "Legacy STAN cleanup performed"
+                  else
+                    echo "No legacy STAN resources found (clean)"
+                  fi
+                  
+                  # Step 2: Check JetStream EventBus health
+                  echo ""
+                  echo "--- Checking JetStream EventBus Health ---"
+                  
+                  JETSTREAM_SELECTOR="app.kubernetes.io/name=eventbus-jetstream"
+                  NATS_SELECTOR="app.kubernetes.io/name=nats"
+                  
+                  # Check JetStream pods first
+                  JS_UNHEALTHY=$(kubectl get pods -n automation -l "$JETSTREAM_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
+                  if [ -n "$JS_UNHEALTHY" ]; then
+                    echo "Found unhealthy JetStream pods: $JS_UNHEALTHY"
+                    for pod in $JS_UNHEALTHY; do
+                      echo "Restarting: $pod"
+                      kubectl delete pod -n automation "$pod" --grace-period=30 || true
+                    done
+                  else
+                    # Fallback to NATS selector
+                    NATS_UNHEALTHY=$(kubectl get pods -n automation -l "$NATS_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
+                    if [ -n "$NATS_UNHEALTHY" ]; then
+                      echo "Found unhealthy NATS pods: $NATS_UNHEALTHY"
+                      for pod in $NATS_UNHEALTHY; do
+                        echo "Restarting: $pod"
+                        kubectl delete pod -n automation "$pod" --grace-period=30 || true
+                      done
+                    else
+                      echo "All JetStream/NATS pods healthy"
+                    fi
+                  fi
+                  
+                  echo ""
                   echo "=== Health Check Completed ==="
