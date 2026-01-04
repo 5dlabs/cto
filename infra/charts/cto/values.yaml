@@ -432,7 +432,7 @@ tools:
 
       kubernetes:
         name: "Kubernetes"
-        description: "Kubernetes cluster management with kubectl and Helm - get, describe, apply, delete, scale, rollout, port-forward, and Helm chart operations"
+        description: "Kubernetes cluster management with kubectl and Helm operations"
         transport: "stdio"
         command: "npx"
         args: ["-y", "@iflow-mcp/mcp-server-kubernetes"]
