@@ -7,6 +7,8 @@
 //! - INFO-level messages containing the word "error" as a command name
 //! - JSON field names like "errorMessages" regardless of value
 //! - Empty error arrays that indicate success, not failure
+//! - Containerd/Docker "skip loading plugin" messages with error explanation fields
+//! - Warning-level logs (level=warn/warning) which are not errors
 
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
@@ -113,6 +115,15 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     r"^F?\s*I\d{4}\s",
     r"^F?\s*W\d{4}\s",
     r"^F?\s*D\d{4}\s",
+    // Containerd/Docker plugin skip messages (informational, not errors)
+    // These logs use level=info with an "error" field that explains WHY a plugin is skipped
+    // Example: level=info msg="skip loading plugin" error="no scratch file generator: skip plugin"
+    r#"(?i)skip\s+loading\s+plugin.*error="#,
+    // Warning-level logs should not be treated as errors
+    r#"level[=:]\s*["']?warn"#,
+    r#"level[=:]\s*["']?warning"#,
+    r#"level[=:]\s*["']?WARN"#,
+    r#"level[=:]\s*["']?WARNING"#,
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -1306,5 +1317,84 @@ mod tests {
         assert!(filtered.iter().any(|e| e.line.contains("E0104")));
         assert!(!filtered.iter().any(|e| e.line.contains("I0104")));
         assert!(!filtered.iter().any(|e| e.line.contains("manifest cache hit")));
+    }
+
+    #[test]
+    fn test_is_false_positive_containerd_skip_loading_plugin() {
+        // Containerd/Docker plugin skip messages are informational, not errors
+        // The "error" field explains WHY a plugin is skipped, not an actual error
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T21:55:52.758531113Z" level=info msg="skip loading plugin" error="no scratch file generator: skip plugin" id=io.containerd.snapshotter.v1.blockfile type=io.containerd.snapshotter.v1"#
+        ));
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T21:55:52.758566239Z" level=info msg="skip loading plugin" error="devmapper not configured: skip plugin" id=io.containerd.snapshotter.v1.devmapper type=io.containerd.snapshotter.v1"#
+        ));
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T21:55:52.758775901Z" level=info msg="skip loading plugin" error="EROFS unsupported, please `modprobe erofs`: skip plugin" id=io.containerd.snapshotter.v1.erofs"#
+        ));
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T21:55:52.759067037Z" level=info msg="skip loading plugin" error="lstat /var/lib/docker/containerd/daemon/io.containerd.snapshotter.v1.zfs: no such file or directory: skip plugin""#
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_warning_level_logs() {
+        // Warning-level logs should not be treated as errors
+        assert!(is_false_positive(r#"level=warn msg="deprecated API call""#));
+        assert!(is_false_positive(r#"level=warning msg="connection retry""#));
+        assert!(is_false_positive(r#"level=WARN msg="rate limit approaching""#));
+        assert!(is_false_positive(r#"level=WARNING msg="disk space low""#));
+    }
+
+    #[test]
+    fn test_filter_containerd_plugin_skip_logs() {
+        use chrono::Utc;
+
+        // Test case from the actual log scan that detected 1000 errors
+        // These are containerd/Docker plugin skip messages that should be filtered
+        let entries = vec![
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T21:55:52.758531113Z" level=info msg="skip loading plugin" error="no scratch file generator: skip plugin" id=io.containerd.snapshotter.v1.blockfile"#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T21:55:52.758566239Z" level=info msg="skip loading plugin" error="devmapper not configured: skip plugin""#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T21:55:52.758775901Z" level=info msg="skip loading plugin" error="EROFS unsupported, please `modprobe erofs`: skip plugin""#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T21:55:52.759067037Z" level=info msg="skip loading plugin" error="lstat /var/lib/docker/containerd/: no such file or directory: skip plugin""#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Command registration with INFO should also be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-04 21:55:50Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual ERROR-level log - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T21:55:53Z" level=error msg="failed to start container""#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out the 5 INFO-level/false positive logs
+        assert_eq!(filtered.len(), 1);
+
+        // Only the actual error should remain
+        assert!(filtered.iter().any(|e| e.line.contains("level=error")));
+        assert!(!filtered.iter().any(|e| e.line.contains("skip loading plugin")));
+        assert!(!filtered.iter().any(|e| e.line.contains("ActionCommandManager")));
     }
 }
