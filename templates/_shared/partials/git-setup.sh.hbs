@@ -2,6 +2,25 @@
 # Repository Setup
 # =========================================================================
 
+# Wait for DNS to be ready (fixes race condition on pod startup)
+echo "🌐 Waiting for DNS to be ready..."
+DNS_RETRIES=0
+DNS_MAX_RETRIES=30
+while [ $DNS_RETRIES -lt $DNS_MAX_RETRIES ]; do
+  # Use nslookup (available in most images) with timeout
+  if nslookup github.com >/dev/null 2>&1; then
+    echo "✅ DNS ready"
+    break
+  fi
+  DNS_RETRIES=$((DNS_RETRIES + 1))
+  if [ $DNS_RETRIES -eq $DNS_MAX_RETRIES ]; then
+    echo "❌ DNS not available after ${DNS_MAX_RETRIES} attempts"
+    exit 1
+  fi
+  echo "  ⏳ DNS not ready yet, retrying in 2s... (attempt $DNS_RETRIES/$DNS_MAX_RETRIES)"
+  sleep 2
+done
+
 REPO_URL="{{repository_url}}"
 WORK_DIR="{{working_directory}}"
 if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
