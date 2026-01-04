@@ -1,4 +1,41 @@
 # =============================================================================
+# ArgoCD Configuration
+# =============================================================================
+# Configure ArgoCD component logging to reduce noise from cache operations.
+# The repo-server generates high-volume INFO messages for manifest cache hits
+# during normal GitOps sync operations, which pollute logs and can be
+# incorrectly flagged as errors by log scanners.
+#
+# Reference: https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-cmd-params-cm/
+# =============================================================================
+argocd:
+  repoServer:
+    # Set log level to WARN to suppress info-level cache hit messages
+    # Valid levels: debug, info, warn, error
+    # This suppresses "manifest cache hit" messages from repo-server
+    logLevel: "warn"
+    
+    # Log format configuration (text or json)
+    logFormat: "json"
+    
+    # Resource defaults for repo-server pods
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+
+  # Controller log level (manages Application syncs)
+  controller:
+    logLevel: "warn"
+    
+  # Application-set controller log level
+  applicationSet:
+    logLevel: "warn"
+
+# =============================================================================
 # Argo Events Sensor Configuration
 # =============================================================================
 # Configure sensor logging to reduce noise from event processing warnings.
