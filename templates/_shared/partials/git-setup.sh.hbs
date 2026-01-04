@@ -10,6 +10,8 @@ while [ $DNS_RETRIES -lt $DNS_MAX_RETRIES ]; do
   # Use nslookup (available in most images) with timeout
   if nslookup github.com >/dev/null 2>&1; then
     echo "✅ DNS ready"
+    # Wait a bit for DNS to stabilize after initial resolution
+    sleep 3
     break
   fi
   DNS_RETRIES=$((DNS_RETRIES + 1))
@@ -70,7 +72,20 @@ if [ -d "$REPO_NAME/.git" ]; then
   }
 else
   echo "⬇️ Cloning repository"
-  git clone "$REPO_URL" "$REPO_NAME"
+  CLONE_RETRIES=0
+  CLONE_MAX_RETRIES=5
+  while [ $CLONE_RETRIES -lt $CLONE_MAX_RETRIES ]; do
+    if git clone "$REPO_URL" "$REPO_NAME" 2>&1; then
+      break
+    fi
+    CLONE_RETRIES=$((CLONE_RETRIES + 1))
+    if [ $CLONE_RETRIES -eq $CLONE_MAX_RETRIES ]; then
+      echo "❌ Git clone failed after ${CLONE_MAX_RETRIES} attempts"
+      exit 1
+    fi
+    echo "  ⏳ Clone failed, retrying in 5s... (attempt $CLONE_RETRIES/$CLONE_MAX_RETRIES)"
+    sleep 5
+  done
   cd "$REPO_NAME"
 fi
 
