@@ -77,7 +77,7 @@ impl AutoMergeHandler {
             match status {
                 MergeStatus::Ready => {
                     info!(pr = pr_number, "PR is ready to merge");
-                    return self.attempt_merge(pr_number).await;
+                    return self.attempt_merge(pr_number);
                 }
                 MergeStatus::Conflicting => {
                     warn!(pr = pr_number, "PR has merge conflicts");
@@ -108,7 +108,7 @@ impl AutoMergeHandler {
     }
 
     /// Attempt to merge the PR.
-    async fn attempt_merge(&self, pr_number: u32) -> Result<CompletionAction> {
+    fn attempt_merge(&self, pr_number: u32) -> Result<CompletionAction> {
         let method = parse_merge_method(&self.config.merge_method);
 
         info!(
