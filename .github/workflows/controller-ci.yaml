@@ -113,10 +113,11 @@ jobs:
           echo "✅ CRD validation passed"
 
   # Security scanning (non-blocking)
+  # Uses ubuntu-latest for stable network connectivity when downloading external actions
   security-scan:
     needs: changes
     if: github.event_name == 'push'
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -135,6 +136,9 @@ jobs:
         with:
           name: trivy-results
           path: trivy-results.sarif
+
+      - name: Setup Rust for cargo-audit
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Rust security audit
         run: |
