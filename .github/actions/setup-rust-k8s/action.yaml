@@ -122,19 +122,35 @@ runs:
         echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
         export PATH="$HOME/.cargo/bin:$PATH"
 
+        # Helper function to wait for DNS with retries
+        wait_for_dns() {
+          local host="$1"
+          local max_attempts="${2:-10}"
+          for i in $(seq 1 "$max_attempts"); do
+            if getent hosts "$host" > /dev/null 2>&1; then
+              return 0
+            fi
+            echo "⏳ Waiting for DNS ($host) - attempt $i/$max_attempts..."
+            sleep $((i * 5))
+          done
+          return 1
+        }
+
         # Install rustup if not present
         if ! command -v rustup &> /dev/null; then
           echo "📥 Installing rustup..."
           # Retry with exponential backoff for transient network/DNS issues
           for attempt in 1 2 3 4 5 6 7 8; do
             # Pre-check DNS before attempting download
-            if ! getent hosts sh.rustup.rs > /dev/null 2>&1; then
+            if ! wait_for_dns "sh.rustup.rs" 3; then
               echo "⚠️ DNS for sh.rustup.rs not ready, waiting..."
               sleep $((attempt * 15))
               continue
             fi
             
-            if curl --proto '=https' --tlsv1.2 -sSf --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 30 --max-time 300 https://sh.rustup.rs | sh -s -- -y --default-toolchain stable; then
+            # Install rustup WITHOUT toolchain first to avoid network dependency during initial setup
+            # This separates the rustup binary installation from toolchain download
+            if curl --proto '=https' --tlsv1.2 -sSf --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 30 --max-time 300 https://sh.rustup.rs | sh -s -- -y --default-toolchain none; then
               echo "✅ Rustup installed on attempt $attempt"
               break
             fi
@@ -152,6 +168,36 @@ runs:
           export PATH="$HOME/.cargo/bin:$PATH"
         fi
 
+        # Helper function to install toolchain with robust retries
+        install_toolchain() {
+          echo "🔧 Installing Rust stable toolchain..."
+          for attempt in 1 2 3 4 5 6 7 8; do
+            # Wait for DNS before each toolchain download attempt
+            if ! wait_for_dns "static.rust-lang.org" 5; then
+              echo "⚠️ DNS for static.rust-lang.org not ready, waiting..."
+              sleep $((attempt * 15))
+              continue
+            fi
+
+            # Clean before each attempt
+            rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
+            rm -rf /cache/rustup/update-hashes/* 2>/dev/null || true
+            rm -rf "$HOME/.rustup/downloads/"*.partial 2>/dev/null || true
+            rm -rf "$HOME/.rustup/tmp/"* 2>/dev/null || true
+
+            echo "📦 Toolchain install attempt $attempt/8..."
+            if rustup toolchain install stable --profile minimal && rustup default stable; then
+              echo "✅ Toolchain installed on attempt $attempt"
+              return 0
+            fi
+            local delay=$((attempt * 20))
+            echo "⚠️ Toolchain install attempt $attempt failed, retrying in ${delay}s..."
+            sleep "$delay"
+          done
+          echo "❌ Failed to install toolchain after 8 attempts"
+          return 1
+        }
+
         # Check if both rustc and cargo are available and working
         if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
           echo "✅ Rust toolchain ready: $(rustc --version)"
@@ -161,27 +207,31 @@ runs:
           rustup toolchain uninstall stable 2>/dev/null || true
           rm -rf /cache/rustup/toolchains/stable-* 2>/dev/null || true
 
-          for attempt in 1 2 3; do
-            # Clean before each attempt
-            rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
-            rm -rf /cache/rustup/update-hashes/* 2>/dev/null || true
-
-            if rustup toolchain install stable && rustup default stable; then
-              echo "✅ Toolchain installed on attempt $attempt"
-              break
-            fi
-            echo "⚠️ Rustup attempt $attempt failed, retrying..."
-            sleep $((attempt * 5))
-          done
+          if ! install_toolchain; then
+            exit 1
+          fi
         fi
 
         # Install additional components if specified
         COMPONENTS="${{ inputs.components }}"
         if [ -n "$COMPONENTS" ]; then
           echo "📦 Installing components: $COMPONENTS"
+          # Wait for DNS before component installation
+          wait_for_dns "static.rust-lang.org" 5
           IFS=',' read -ra COMP_ARRAY <<< "$COMPONENTS"
           for comp in "${COMP_ARRAY[@]}"; do
-            rustup component add "$(echo "$comp" | xargs)" 2>/dev/null || true
+            comp_name="$(echo "$comp" | xargs)"
+            for comp_attempt in 1 2 3 4 5; do
+              if rustup component add "$comp_name"; then
+                echo "  ✅ Component $comp_name installed"
+                break
+              fi
+              echo "  ⚠️ Component $comp_name install attempt $comp_attempt failed, retrying..."
+              sleep $((comp_attempt * 10))
+              if [ "$comp_attempt" -eq 5 ]; then
+                echo "  ⚠️ Failed to install component $comp_name after 5 attempts"
+              fi
+            done
           done
         fi
 
