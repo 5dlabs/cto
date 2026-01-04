@@ -19,7 +19,15 @@
 #![allow(
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
-    clippy::doc_markdown
+    clippy::doc_markdown,
+    clippy::must_use_candidate,
+    clippy::module_name_repetitions,
+    clippy::similar_names,
+    clippy::redundant_else,
+    clippy::unreadable_literal,
+    clippy::if_not_else,
+    clippy::items_after_statements,
+    clippy::wildcard_imports
 )]
 
 //! Orchestrator core library
