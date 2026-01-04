@@ -3981,6 +3981,7 @@ impl CodeTemplateGenerator {
             PARTIAL_INFRASTRUCTURE_OPERATORS,
             PARTIAL_INFRASTRUCTURE_SETUP,
             PARTIAL_INFRASTRUCTURE_VERIFY,
+            PARTIAL_MCP_CHECK,
             PARTIAL_NODE_ENV,
             PARTIAL_RETRY_LOOP,
             PARTIAL_RUST_ENV,
@@ -4015,6 +4016,7 @@ impl CodeTemplateGenerator {
             ("acceptance-probe", PARTIAL_ACCEPTANCE_PROBE),
             ("retry-loop", PARTIAL_RETRY_LOOP),
             ("completion", PARTIAL_COMPLETION),
+            ("mcp-check", PARTIAL_MCP_CHECK),
             // Frontend stack partials (for Blaze/Morgan)
             ("frontend-toolkits", PARTIAL_FRONTEND_TOOLKITS),
             ("tanstack-stack", PARTIAL_TANSTACK_STACK),
