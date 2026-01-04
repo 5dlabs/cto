@@ -143,7 +143,7 @@ jobs:
   helm-lint:
     needs: changes
     if: needs.changes.outputs.helm == 'true' || github.event_name == 'push'
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest  # Use ubuntu-latest for stability (no k8s resources needed)
     steps:
       - uses: actions/checkout@v4
 
@@ -168,7 +168,7 @@ jobs:
   docker-lint:
     needs: changes
     if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest  # Use ubuntu-latest for stability (no k8s resources needed)
     steps:
       - uses: actions/checkout@v4
 
@@ -182,10 +182,13 @@ jobs:
   security-audit:
     needs: changes
     if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest  # Use ubuntu-latest for stability (cargo-audit doesn't need k8s)
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Run security audit
         run: |
