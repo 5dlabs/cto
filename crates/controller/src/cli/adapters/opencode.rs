@@ -163,7 +163,7 @@ impl OpenCodeAdapter {
 
         // Get Tools MCP server URL from environment (same pattern as other adapters)
         let tools_url = std::env::var("TOOLS_SERVER_URL")
-            .unwrap_or_else(|_| "http://tools.cto.svc.cluster.local:3000/mcp".to_string());
+            .unwrap_or_else(|_| "http://cto-tools.cto.svc.cluster.local:3000/mcp".to_string());
         let tools_url = tools_url.trim_end_matches('/').to_string();
 
         json!({

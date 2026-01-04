@@ -83,7 +83,7 @@ fn get_intake_schema() -> Value {
                 },
                 "model": {
                     "type": "string",
-                    "description": "AI model to use (optional, defaults to claude-sonnet-4-20250514)"
+                    "description": "AI model to use (optional, defaults to claude-sonnet-4-5-20250514)"
                 },
                 "enrich_context": {
                     "type": "boolean",
