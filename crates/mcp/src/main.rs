@@ -4384,13 +4384,7 @@ fn create_mcp_server_coderun(
                 "cliType": "claude",
                 "model": "claude-sonnet-4-20250514"
             },
-            "toolsConfig": {
-                "remoteTools": [
-                    "mcp_tools_github_*",
-                    "mcp_tools_argocd_*",
-                    "mcp_tools_kubernetes_*"
-                ]
-            },
+            "remoteTools": "mcp_tools_github_*,mcp_tools_argocd_*,mcp_tools_kubernetes_*",
             "env": env_map
         }
     });
