@@ -1,6 +1,7 @@
 //! CTO MCP Server
 //!
 //! This module provides the Model Context Protocol (MCP) server for the CTO platform.
+//! Rebuilt: 2026-01-04
 
 #![allow(clippy::map_unwrap_or)]
 #![allow(clippy::format_push_string)]
