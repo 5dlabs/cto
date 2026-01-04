@@ -1,0 +1,61 @@
+{{- if .Values.healer.enabled }}
+# RBAC resources for the Healer CronJob
+# Grants permissions to list, get, and delete pods for remediation
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-healer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: remediation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-healer
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: remediation
+rules:
+  # Pod management for remediation
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  # Pod logs for error detection
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+  # Events for monitoring
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  # StatefulSets for NATS/STAN cluster management
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch"]
+  # Deployments for Grafana management
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-healer
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: remediation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-healer
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-healer
+    namespace: {{ .Release.Namespace }}
+{{- end }}

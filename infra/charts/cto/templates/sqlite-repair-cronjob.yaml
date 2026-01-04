@@ -1,0 +1,233 @@
+# SQLite Database Repair CronJob
+# Task ID: 2533441310, 2641293645
+# Generated: 2026-01-04
+# Issue: "database disk image is malformed" and "unable to open database file: input/output error"
+# Affected services: Grafana provisioning (dashboards), publish service (delayed messages)
+# This creates a recurring job to detect and repair SQLite corruption
+
+---
+# ConfigMap: SQLite repair script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sqlite-repair-script
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: sqlite-repair
+    remediation.cto.io/task-id: "2533441310,2641293645"
+data:
+  repair.sh: |
+    #!/bin/sh
+    set -e
+    
+    echo "=== SQLite Database Repair Script ==="
+    echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "Target path: $DB_PATH"
+    
+    # Function to repair a single database
+    repair_database() {
+      local db_path="$1"
+      local db_name=$(basename "$db_path")
+      
+      echo "Checking: $db_path"
+      
+      if [ ! -f "$db_path" ]; then
+        echo "  Database not found, skipping"
+        return 0
+      fi
+      
+      # Check integrity
+      integrity_result=$(sqlite3 "$db_path" "PRAGMA integrity_check;" 2>&1) || true
+      
+      if echo "$integrity_result" | grep -q "^ok$"; then
+        echo "  Integrity check: PASSED"
+        return 0
+      fi
+      
+      echo "  Integrity check: FAILED"
+      echo "  $integrity_result"
+      
+      # Create timestamped backup
+      backup_path="${db_path}.backup.$(date +%Y%m%d%H%M%S)"
+      echo "  Creating backup: $backup_path"
+      cp "$db_path" "$backup_path" 2>/dev/null || true
+      
+      # Attempt recovery
+      echo "  Attempting recovery..."
+      dump_path="/tmp/${db_name}.dump.$$"
+      
+      # Try to export data
+      if sqlite3 "$db_path" ".dump" > "$dump_path" 2>/dev/null && [ -s "$dump_path" ]; then
+        echo "  Data export successful"
+        
+        # Move corrupted file
+        mv "$db_path" "${db_path}.corrupted"
+        
+        # Create new database from dump
+        if sqlite3 "$db_path" < "$dump_path" 2>/dev/null; then
+          echo "  Recovery successful!"
+          rm -f "${db_path}.corrupted"
+        else
+          echo "  Recovery failed, restoring original"
+          mv "${db_path}.corrupted" "$db_path"
+        fi
+      else
+        echo "  Could not export data"
+        echo "  Database may need manual intervention or deletion"
+        
+        # As last resort, remove the corrupted database
+        # Uncomment if you want automatic deletion:
+        # echo "  Removing corrupted database..."
+        # rm -f "$db_path"
+      fi
+      
+      # Cleanup
+      rm -f "$dump_path"
+      rm -f "${db_path}-journal" "${db_path}-wal" "${db_path}-shm"
+      
+      echo "  Repair attempt completed"
+    }
+    
+    # Find and repair all SQLite databases in target path
+    if [ -n "$DB_PATH" ] && [ -d "$DB_PATH" ]; then
+      echo "Scanning directory: $DB_PATH"
+      find "$DB_PATH" -name "*.db" -o -name "*.sqlite" -o -name "*.sqlite3" 2>/dev/null | while read db; do
+        repair_database "$db"
+      done
+    elif [ -n "$DB_PATH" ] && [ -f "$DB_PATH" ]; then
+      repair_database "$DB_PATH"
+    else
+      echo "No valid DB_PATH specified"
+      exit 1
+    fi
+    
+    echo "=== Repair script completed ==="
+---
+# CronJob: Periodic SQLite integrity check and repair
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sqlite-integrity-check
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: sqlite-repair
+    app.kubernetes.io/component: integrity-check
+    remediation.cto.io/task-id: "2533441310,2641293645"
+spec:
+  schedule: "0 */4 * * *"  # Run every 4 hours (increased frequency due to recurring corruption)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 7200
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: sqlite-repair
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: sqlite-repair
+              image: alpine:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  apk add --no-cache sqlite
+                  /scripts/repair.sh
+              env:
+                - name: DB_PATH
+                  value: "/data"
+              volumeMounts:
+                - name: repair-script
+                  mountPath: /scripts
+                  readOnly: true
+                - name: grafana-data
+                  mountPath: /data/grafana
+                - name: alertmanager-data
+                  mountPath: /data/alertmanager
+          volumes:
+            - name: repair-script
+              configMap:
+                name: sqlite-repair-script
+                defaultMode: 0755
+            - name: grafana-data
+              persistentVolumeClaim:
+                claimName: grafana-pvc
+            - name: alertmanager-data
+              persistentVolumeClaim:
+                claimName: alertmanager-pvc
+---
+# One-time Job: Immediate SQLite repair
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sqlite-immediate-repair-{{ now | date "20060102150405" }}
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: sqlite-repair
+    app.kubernetes.io/component: immediate-repair
+    remediation.cto.io/task-id: "2533441310,2641293645"
+    remediation.cto.io/type: database-repair
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sqlite-repair
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: sqlite-repair
+          image: alpine:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "=== Immediate SQLite Repair Job ==="
+              echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              
+              # Install sqlite
+              apk add --no-cache sqlite
+              
+              # Repair Grafana database
+              echo "Repairing Grafana database..."
+              if [ -f "/data/grafana/grafana.db" ]; then
+                integrity=$(sqlite3 /data/grafana/grafana.db "PRAGMA integrity_check;" 2>&1) || true
+                if echo "$integrity" | grep -q "^ok$"; then
+                  echo "Grafana DB: OK"
+                else
+                  echo "Grafana DB: Corrupted - $integrity"
+                  
+                  # Backup and repair
+                  cp /data/grafana/grafana.db /data/grafana/grafana.db.corrupted.$(date +%s)
+                  sqlite3 /data/grafana/grafana.db ".dump" > /tmp/grafana.sql 2>/dev/null || true
+                  
+                  if [ -s /tmp/grafana.sql ]; then
+                    rm /data/grafana/grafana.db
+                    sqlite3 /data/grafana/grafana.db < /tmp/grafana.sql
+                    echo "Grafana DB: Repaired"
+                  else
+                    echo "Grafana DB: Could not repair, removing for fresh start"
+                    rm -f /data/grafana/grafana.db
+                  fi
+                fi
+                
+                # Clean up lock files
+                rm -f /data/grafana/grafana.db-journal
+                rm -f /data/grafana/grafana.db-wal
+                rm -f /data/grafana/grafana.db-shm
+              fi
+              
+              echo "=== Immediate repair completed ==="
+          volumeMounts:
+            - name: grafana-data
+              mountPath: /data/grafana
+      volumes:
+        - name: grafana-data
+          persistentVolumeClaim:
+            claimName: grafana-pvc
