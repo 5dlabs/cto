@@ -1162,10 +1162,10 @@ mod cto_config_tests {
         let mut task3 = Task::new("3", "Deploy to K8s", "Create Kubernetes manifests");
         task3.agent_hint = Some("bolt".to_string());
 
-        let tasks = vec![task1, task2, task3];
+        let task_list = vec![task1, task2, task3];
 
         let config = generate_cto_config(
-            &tasks,
+            &task_list,
             "5dlabs/test-project",
             "test-project",
             "5dlabs/test-project",
