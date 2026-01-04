@@ -45,3 +45,12 @@ tools:
         workingDirectory: "/tmp"
         env:
           GEMINI_API_KEY: "${GEMINI_API_KEY}"
+
+      # Educational Tools
+      courses:
+        name: "Anthropic Courses"
+        description: "Access to Anthropic's educational courses including API fundamentals, prompt engineering, and tool use"
+        transport: "stdio"
+        command: "git"
+        args: ["clone", "--depth=1", "https://github.com/anthropics/courses.git", "/tmp/courses"]
+        workingDirectory: "/tmp"
