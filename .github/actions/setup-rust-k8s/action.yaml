@@ -28,6 +28,59 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: DNS warm-up and network check
+      shell: bash
+      run: |
+        echo "🌐 Warming up DNS resolution for required hosts..."
+        # List of hosts we need to resolve during setup
+        HOSTS="sh.rustup.rs static.rust-lang.org github.com objects.githubusercontent.com"
+        MAX_WARMUP_ATTEMPTS=10
+        WARMUP_DELAY=15
+        
+        # Function to test DNS resolution for all hosts
+        test_dns() {
+          for host in $HOSTS; do
+            if ! getent hosts "$host" > /dev/null 2>&1; then
+              return 1
+            fi
+          done
+          return 0
+        }
+        
+        # Wait for DNS to become available with longer backoff
+        for attempt in $(seq 1 $MAX_WARMUP_ATTEMPTS); do
+          if test_dns; then
+            echo "✅ DNS resolution successful on attempt $attempt"
+            # Additional warmup - resolve all hosts to prime DNS cache
+            for host in $HOSTS; do
+              resolved=$(getent hosts "$host" 2>/dev/null | head -1 || echo "failed")
+              echo "  ✓ $host -> $resolved"
+            done
+            break
+          fi
+          echo "⚠️ DNS warm-up attempt $attempt/$MAX_WARMUP_ATTEMPTS failed, waiting ${WARMUP_DELAY}s..."
+          sleep $WARMUP_DELAY
+          if [ "$attempt" -eq "$MAX_WARMUP_ATTEMPTS" ]; then
+            echo "⚠️ DNS warm-up did not fully succeed, proceeding anyway (downloads will retry)"
+          fi
+        done
+        
+        # Test actual network connectivity with curl
+        echo "🔗 Testing network connectivity..."
+        for host in "https://static.rust-lang.org" "https://sh.rustup.rs"; do
+          for try in 1 2 3; do
+            if curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null "$host" 2>/dev/null; then
+              echo "  ✓ Connectivity to $host OK"
+              break
+            fi
+            if [ "$try" -eq 3 ]; then
+              echo "  ⚠️ Connectivity to $host unstable (will retry during download)"
+            else
+              sleep 5
+            fi
+          done
+        done
+
     - name: Install build dependencies
       shell: bash
       run: |
@@ -73,15 +126,22 @@ runs:
         if ! command -v rustup &> /dev/null; then
           echo "📥 Installing rustup..."
           # Retry with exponential backoff for transient network/DNS issues
-          for attempt in 1 2 3 4 5; do
-            if curl --proto '=https' --tlsv1.2 -sSf --retry 3 --retry-delay 5 https://sh.rustup.rs | sh -s -- -y --default-toolchain stable; then
+          for attempt in 1 2 3 4 5 6 7 8; do
+            # Pre-check DNS before attempting download
+            if ! getent hosts sh.rustup.rs > /dev/null 2>&1; then
+              echo "⚠️ DNS for sh.rustup.rs not ready, waiting..."
+              sleep $((attempt * 15))
+              continue
+            fi
+            
+            if curl --proto '=https' --tlsv1.2 -sSf --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 30 --max-time 300 https://sh.rustup.rs | sh -s -- -y --default-toolchain stable; then
               echo "✅ Rustup installed on attempt $attempt"
               break
             fi
-            echo "⚠️ Rustup download attempt $attempt failed, retrying in $((attempt * 10)) seconds..."
-            sleep $((attempt * 10))
-            if [ "$attempt" -eq 5 ]; then
-              echo "❌ Failed to install rustup after 5 attempts"
+            echo "⚠️ Rustup download attempt $attempt failed, retrying in $((attempt * 15)) seconds..."
+            sleep $((attempt * 15))
+            if [ "$attempt" -eq 8 ]; then
+              echo "❌ Failed to install rustup after 8 attempts"
               exit 1
             fi
           done
@@ -140,16 +200,24 @@ runs:
         if ! command -v sccache &> /dev/null; then
           echo "📥 Installing sccache (pre-built binary)..."
           SCCACHE_VERSION="v0.10.0"
+          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
           # Retry with exponential backoff for transient network/DNS issues
-          for attempt in 1 2 3 4 5; do
-            if curl -fsSL --retry 3 --retry-delay 5 "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar -xz; then
+          for attempt in 1 2 3 4 5 6 7 8; do
+            # Pre-check DNS before attempting download
+            if ! getent hosts github.com > /dev/null 2>&1; then
+              echo "⚠️ DNS for github.com not ready, waiting..."
+              sleep $((attempt * 15))
+              continue
+            fi
+            
+            if curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 30 --max-time 300 "$SCCACHE_URL" | tar -xz; then
               echo "✅ sccache downloaded on attempt $attempt"
               break
             fi
-            echo "⚠️ sccache download attempt $attempt failed, retrying in $((attempt * 10)) seconds..."
-            sleep $((attempt * 10))
-            if [ "$attempt" -eq 5 ]; then
-              echo "❌ Failed to download sccache after 5 attempts"
+            echo "⚠️ sccache download attempt $attempt failed, retrying in $((attempt * 15)) seconds..."
+            sleep $((attempt * 15))
+            if [ "$attempt" -eq 8 ]; then
+              echo "❌ Failed to download sccache after 8 attempts"
               exit 1
             fi
           done
