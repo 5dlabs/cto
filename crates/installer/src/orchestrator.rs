@@ -516,7 +516,7 @@ impl Installer {
         let timeout = Duration::from_secs(900); // 15 minutes
 
         // Wait for control plane
-        ui::print_info(&format!("Waiting for Talos on control plane ({})", cp_ip));
+        ui::print_info(&format!("Waiting for Talos on control plane ({cp_ip})"));
         metal::talos::wait_for_talos(&cp_ip, timeout)?;
         self.state.set_cp_talos_ready()?;
 
@@ -533,17 +533,16 @@ impl Installer {
             ui::print_info("Auto-detecting VLAN parent interface...");
             match metal::talos::detect_secondary_interface(&cp_ip) {
                 Ok(detected_interface) => {
-                    if detected_interface != self.state.config.vlan_parent_interface {
+                    if detected_interface == self.state.config.vlan_parent_interface {
                         ui::print_info(&format!(
-                            "Detected interface '{}' (overriding default '{}')",
-                            detected_interface, self.state.config.vlan_parent_interface
+                            "Detected interface '{detected_interface}' matches default"
                         ));
-                        self.state.config.vlan_parent_interface = detected_interface;
                     } else {
                         ui::print_info(&format!(
-                            "Detected interface '{}' matches default",
-                            detected_interface
+                            "Detected interface '{detected_interface}' (overriding default '{}')",
+                            self.state.config.vlan_parent_interface
                         ));
+                        self.state.config.vlan_parent_interface = detected_interface;
                     }
                 }
                 Err(e) => {
@@ -762,7 +761,7 @@ impl Installer {
                 // Workers are still in maintenance mode at this point
                 let worker_interface = match metal::talos::detect_secondary_interface(&worker.ip) {
                     Ok(iface) => {
-                        ui::print_info(&format!("  Detected interface '{}' for worker", iface));
+                        ui::print_info(&format!("  Detected interface '{iface}' for worker"));
                         iface
                     }
                     Err(e) => {
@@ -833,8 +832,7 @@ impl Installer {
 
         // Wait for all nodes to be ready
         ui::print_info(&format!(
-            "Waiting for {} node(s) to join the cluster...",
-            expected_nodes
+            "Waiting for {expected_nodes} node(s) to join the cluster..."
         ));
         metal::talos::wait_for_node_ready(kubeconfig_path, expected_nodes, timeout)?;
 

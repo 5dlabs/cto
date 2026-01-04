@@ -27,12 +27,11 @@ MCP_CONFIG="${mcp_config_path:-}"
 {{> mcp-check }}
 
 # Claude Code CLI - use npx for consistent version management
-CLAUDE_CMD="npx -y @anthropic-ai/claude-code -p"
+CLAUDE_CMD="npx -y @anthropic-ai/claude-code"
 echo "✓ Using Claude CLI via npx"
 
-# Output format: stream-json for programmatic parsing
+# Output format: stream-json for programmatic parsing by sidecar
 CLAUDE_CMD="$CLAUDE_CMD --output-format stream-json"
-CLAUDE_CMD="$CLAUDE_CMD --input-format stream-json"
 
 # Verbose mode for debugging
 CLAUDE_CMD="$CLAUDE_CMD --verbose"
@@ -88,15 +87,21 @@ echo "✓ Model specified: {{model}}"
 # Permission mode for automation
 CLAUDE_CMD="$CLAUDE_CMD --dangerously-skip-permissions"
 
-echo ""
-echo "🚀 Claude Command: $CLAUDE_CMD"
-echo ""
-
-# Execute Claude with FIFO for streaming input
-FIFO_PATH="/workspace/agent-input.jsonl"
-rm -f "$FIFO_PATH" 2>/dev/null || true
-mkfifo "$FIFO_PATH"
-chmod 666 "$FIFO_PATH" || true
+# Determine prompt source first (prefer XML format for better Claude results)
+if [ -n "${PROMPT_CONTENT:-}" ]; then
+    USER_PROMPT="$PROMPT_CONTENT"
+    echo "✓ Using prompt from PROMPT_CONTENT env var"
+elif [ -f "$CLAUDE_WORK_DIR/task/prompt.xml" ]; then
+    USER_PROMPT=$(cat "$CLAUDE_WORK_DIR/task/prompt.xml")
+    echo "✓ Using XML prompt from task/prompt.xml"
+elif [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
+    USER_PROMPT=$(cat "$CLAUDE_WORK_DIR/task/prompt.md")
+    echo "✓ Using prompt from task/prompt.md"
+else
+    echo "❌ ERROR: No prompt content available"
+    echo "   Checked: \$PROMPT_CONTENT, task/prompt.xml, task/prompt.md"
+    exit 1
+fi
 
 # Stream output file for sidecar to parse (structured activities)
 STREAM_OUTPUT="/workspace/claude-stream.jsonl"
@@ -113,46 +118,22 @@ chmod 666 "$AGENT_LOG" || true
 echo "✓ Claude stream output: $STREAM_OUTPUT"
 echo "✓ Agent log file: $AGENT_LOG"
 
-# Start Claude (reader) in background, tee output to both stream file and log file
-# Note: busybox tee doesn't support -u, use stdbuf or plain tee
+# Add -p flag for non-interactive mode with the prompt
+CLAUDE_CMD="$CLAUDE_CMD -p"
+
+echo ""
+echo "🚀 Claude Command: $CLAUDE_CMD \"<prompt>\""
+echo ""
+echo "✓ Prompt loaded ($(echo "$USER_PROMPT" | wc -c) bytes)"
+
+# Execute Claude with prompt piped via stdin
+# Use tee to capture output to both stream file and agent log
 if command -v stdbuf >/dev/null 2>&1; then
-    $CLAUDE_CMD < "$FIFO_PATH" | stdbuf -oL tee "$STREAM_OUTPUT" "$AGENT_LOG" &
+    echo "$USER_PROMPT" | $CLAUDE_CMD | stdbuf -oL tee "$STREAM_OUTPUT" "$AGENT_LOG"
 else
-    $CLAUDE_CMD < "$FIFO_PATH" | tee "$STREAM_OUTPUT" "$AGENT_LOG" &
+    echo "$USER_PROMPT" | $CLAUDE_CMD | tee "$STREAM_OUTPUT" "$AGENT_LOG"
 fi
-CLAUDE_PID=$!
-
-# Determine prompt source (prefer XML format for better Claude results)
-if [ -n "${PROMPT_CONTENT:-}" ]; then
-    USER_PROMPT="$PROMPT_CONTENT"
-    echo "✓ Using prompt from PROMPT_CONTENT env var"
-elif [ -f "$CLAUDE_WORK_DIR/task/prompt.xml" ]; then
-    USER_PROMPT=$(cat "$CLAUDE_WORK_DIR/task/prompt.xml")
-    echo "✓ Using XML prompt from task/prompt.xml"
-elif [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
-    USER_PROMPT=$(cat "$CLAUDE_WORK_DIR/task/prompt.md")
-    echo "✓ Using prompt from task/prompt.md"
-else
-    echo "❌ ERROR: No prompt content available"
-    echo "   Checked: \$PROMPT_CONTENT, task/prompt.xml, task/prompt.md"
-    kill "$CLAUDE_PID" 2>/dev/null || true
-    exit 1
-fi
-
-# JSON-escape the prompt
-USER_COMBINED=$(printf "%s" "$USER_PROMPT" | jq -Rs .)
-
-# Send prompt via direct FIFO write
-exec 9>"$FIFO_PATH"
-printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-echo "✓ Prompt sent via FIFO"
-
-# Wait for Claude to complete
-wait "$CLAUDE_PID"
 CLAUDE_EXIT_CODE=$?
-
-# Close FIFO writer if opened
-exec 9>&- 2>/dev/null || true
 
 # Request sidecar shutdown
 if [ "${SKIP_MCP_SHUTDOWN:-0}" != "1" ]; then

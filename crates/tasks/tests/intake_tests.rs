@@ -143,10 +143,7 @@ mod routing_tests {
             assert_ne!(
                 actual,
                 Some(Agent::Cipher),
-                "Auth implementation '{}' should NOT go to Cipher (got {:?}, expected {:?})",
-                title,
-                actual,
-                expected
+                "Auth implementation '{title}' should NOT go to Cipher (got {actual:?}, expected {expected:?})"
             );
         }
     }
@@ -186,8 +183,7 @@ mod routing_tests {
             assert_eq!(
                 infer_agent_hint(title, desc),
                 expected,
-                "Security audit '{}' should go to Cipher",
-                title
+                "Security audit '{title}' should go to Cipher"
             );
         }
     }
@@ -229,8 +225,7 @@ mod routing_tests {
             assert_eq!(
                 infer_agent_hint(title, desc),
                 expected,
-                "Go/gRPC task '{}' should go to Grizz",
-                title
+                "Go/gRPC task '{title}' should go to Grizz"
             );
         }
     }
@@ -309,13 +304,11 @@ mod routing_tests {
             assert_ne!(
                 actual,
                 Some(Agent::Tap),
-                "Backend task '{}' should NOT go to Tap (mobile)",
-                title
+                "Backend task '{title}' should NOT go to Tap (mobile)"
             );
             assert_eq!(
                 actual, expected,
-                "Backend task '{}' should go to {:?}",
-                title, expected
+                "Backend task '{title}' should go to {expected:?}"
             );
         }
     }
@@ -371,8 +364,7 @@ mod routing_tests {
             assert_eq!(
                 infer_agent_hint(title, desc),
                 expected,
-                "UI task '{}' should go to Blaze",
-                title
+                "UI task '{title}' should go to Blaze"
             );
         }
     }
@@ -411,8 +403,7 @@ mod routing_tests {
             assert_eq!(
                 infer_agent_hint(title, desc),
                 expected,
-                "Explicit agent in '{}' should be respected",
-                title
+                "Explicit agent in '{title}' should be respected"
             );
         }
     }

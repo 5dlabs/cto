@@ -11,6 +11,7 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use research::analysis::Category;
 use research::auth::{BrowserAuth, Session};
 use research::digest::{DigestAnalyzer, DigestConfig, DigestGenerator, DigestState, EmailSender};
+use research::storage::DigestContent;
 use research::pipeline::{Pipeline, PipelineConfig};
 use research::publish::{PublishConfig, Publisher};
 use research::storage::ResearchIndex;
@@ -623,7 +624,11 @@ async fn run_digest(
         let rich_entries = DigestAnalyzer::load_rich_entries(&entries, &dir);
         let rich_count = rich_entries
             .iter()
-            .filter(|e| e.content.as_ref().is_some_and(|c| c.has_rich_content()))
+            .filter(|e| {
+                e.content
+                    .as_ref()
+                    .is_some_and(DigestContent::has_rich_content)
+            })
             .count();
         println!(
             "   → {rich_count}/{} entries have rich content",
