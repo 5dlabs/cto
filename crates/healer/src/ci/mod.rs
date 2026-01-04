@@ -7,10 +7,12 @@
 //! - Tracks remediation attempts and implements retry logic
 //! - Escalates to humans after max attempts
 //! - Stores outcomes to `OpenMemory` for learning
+//! - Auto-merges PRs after successful remediation
 
 pub mod context;
 pub mod escalate;
 pub mod memory;
+pub mod merge;
 pub mod router;
 pub mod server;
 pub mod spawner;
@@ -21,6 +23,7 @@ pub mod types;
 pub use context::ContextGatherer;
 pub use escalate::Escalator;
 pub use memory::{MemoryClient, MemoryConfig};
+pub use merge::AutoMergeHandler;
 pub use router::CiRouter;
 pub use server::{build_router, run_server, ServerState};
 pub use spawner::CodeRunSpawner;

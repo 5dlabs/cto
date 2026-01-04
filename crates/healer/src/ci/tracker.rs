@@ -418,6 +418,18 @@ pub enum CompletionAction {
     Unknown,
     /// Failed to spawn retry
     SpawnFailed(String),
+    /// PR is ready to merge (all checks passed)
+    ReadyToMerge { pr_number: u32 },
+    /// PR has merge conflicts that need resolution
+    MergeConflict {
+        pr_number: u32,
+        branch: String,
+        conflicting_files: Vec<String>,
+    },
+    /// PR is awaiting CI checks to complete
+    AwaitingChecks { pr_number: u32 },
+    /// PR was successfully merged
+    Merged { pr_number: u32 },
 }
 
 #[cfg(test)]

@@ -826,10 +826,27 @@ pub struct RemediationConfig {
     /// Maximum concurrent healer `CodeRuns` allowed (0 = unlimited)
     #[serde(default = "default_max_concurrent")]
     pub max_concurrent_coderuns: usize,
+    /// Enable auto-merge after successful remediation
+    #[serde(default)]
+    pub auto_merge_enabled: bool,
+    /// Merge method to use (squash, merge, rebase)
+    #[serde(default = "default_merge_method")]
+    pub merge_method: String,
+    /// Maximum time to wait for checks before giving up (minutes)
+    #[serde(default = "default_check_timeout")]
+    pub check_timeout_mins: u32,
 }
 
 fn default_max_concurrent() -> usize {
     5
+}
+
+fn default_merge_method() -> String {
+    "squash".to_string()
+}
+
+fn default_check_timeout() -> u32 {
+    30
 }
 
 impl Default for RemediationConfig {
@@ -843,6 +860,9 @@ impl Default for RemediationConfig {
             memory_enabled: true,
             circuit_breaker: CircuitBreakerConfig::default(),
             max_concurrent_coderuns: default_max_concurrent(),
+            auto_merge_enabled: false, // Disabled by default for safety
+            merge_method: default_merge_method(),
+            check_timeout_mins: default_check_timeout(),
         }
     }
 }
