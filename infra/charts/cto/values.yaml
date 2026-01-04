@@ -413,6 +413,14 @@ tools:
         args: ["-y", "@upstash/context7-mcp"]
         workingDirectory: "/tmp"
 
+      courses:
+        name: "Anthropic Courses"
+        description: "Access to Anthropic's educational courses including API fundamentals, prompt engineering, and tool use"
+        transport: "stdio"
+        command: "git"
+        args: ["clone", "--depth=1", "https://github.com/anthropics/courses.git", "/tmp/courses"]
+        workingDirectory: "/tmp"
+
       # --- Infrastructure ---
       docker:
         name: "Docker"
@@ -424,7 +432,7 @@ tools:
 
       kubernetes:
         name: "Kubernetes"
-        description: "Kubernetes cluster management with kubectl and Helm - get, describe, apply, delete, scale, rollout, port-forward, and Helm chart operations"
+        description: "Kubernetes cluster management with kubectl and Helm operations"
         transport: "stdio"
         command: "npx"
         args: ["-y", "@iflow-mcp/mcp-server-kubernetes"]
