@@ -198,12 +198,51 @@ runs:
           return 1
         }
 
-        # Check if both rustc and cargo are available and working
-        if rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
+        # Check if BOTH rustup command exists AND toolchain is working
+        # This handles the case where rustup was installed but toolchain download failed
+        if command -v rustup &> /dev/null && rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
           echo "✅ Rust toolchain ready: $(rustc --version)"
         else
           echo "🔧 Installing/repairing Rust toolchain..."
-          # Full cleanup for fresh install
+          
+          # If rustup exists but no working toolchain, we have a partial install
+          # Clean up completely to avoid state corruption
+          if command -v rustup &> /dev/null && ! rustc --version 2>/dev/null; then
+            echo "⚠️ Detected partial rustup installation (no working toolchain), cleaning up..."
+            rm -rf "$HOME/.rustup" 2>/dev/null || true
+            rm -rf "$HOME/.cargo/bin/rustup" 2>/dev/null || true
+            rm -rf "$HOME/.cargo/bin/cargo" 2>/dev/null || true
+            rm -rf "$HOME/.cargo/bin/rustc" 2>/dev/null || true
+            hash -r 2>/dev/null || true  # Clear command hash table
+            
+            # Re-run rustup installation since we cleaned it
+            echo "📥 Re-installing rustup after cleanup..."
+            for attempt in 1 2 3 4 5 6 7 8; do
+              if ! wait_for_dns "sh.rustup.rs" 3; then
+                echo "⚠️ DNS for sh.rustup.rs not ready, waiting..."
+                sleep $((attempt * 15))
+                continue
+              fi
+              
+              if curl --proto '=https' --tlsv1.2 -sSf --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 30 --max-time 300 https://sh.rustup.rs | sh -s -- -y --default-toolchain none; then
+                echo "✅ Rustup re-installed on attempt $attempt"
+                # Source the env file to get PATH updates
+                if [ -f "$HOME/.cargo/env" ]; then
+                  source "$HOME/.cargo/env"
+                fi
+                export PATH="$HOME/.cargo/bin:$PATH"
+                break
+              fi
+              echo "⚠️ Rustup download attempt $attempt failed, retrying in $((attempt * 15)) seconds..."
+              sleep $((attempt * 15))
+              if [ "$attempt" -eq 8 ]; then
+                echo "❌ Failed to reinstall rustup after 8 attempts"
+                exit 1
+              fi
+            done
+          fi
+          
+          # Full cleanup for fresh toolchain install
           rustup toolchain uninstall stable 2>/dev/null || true
           rm -rf /cache/rustup/toolchains/stable-* 2>/dev/null || true
 
