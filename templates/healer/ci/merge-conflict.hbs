@@ -1,0 +1,68 @@
+{{!-- Template for resolving merge conflicts detected during auto-merge --}}
+# Merge Conflict Resolution
+
+PR #{{pr_number}} has merge conflicts with `{{base_branch}}` that prevent automatic merging.
+
+## Context
+
+- **Repository**: {{repository}}
+- **PR Branch**: {{target_branch}}
+- **Base Branch**: {{base_branch}}
+- **PR URL**: {{pr_url}}
+
+{{#if conflicting_files}}
+## Conflicting Files
+
+The following files have conflicts that need resolution:
+
+{{#each conflicting_files}}
+- `{{this}}`
+{{/each}}
+{{/if}}
+
+## Resolution Steps
+
+### 1. Fetch latest changes and attempt rebase
+
+```bash
+git fetch origin {{base_branch}}
+git checkout {{target_branch}}
+git rebase origin/{{base_branch}}
+```
+
+### 2. If conflicts occur, resolve each one
+
+For each conflicting file:
+1. Open the file and find conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
+2. Understand both changes and determine the correct resolution
+3. Remove all conflict markers
+4. Stage the resolved file: `git add <file>`
+5. Continue rebase: `git rebase --continue`
+
+### 3. Verify the fix
+
+```bash
+# Run tests to ensure nothing is broken
+cargo test
+
+# Check formatting
+cargo fmt --all --check
+
+# Run clippy
+cargo clippy --all-targets -- -D warnings
+```
+
+### 4. Push the resolved branch
+
+```bash
+git push origin {{target_branch}} --force-with-lease
+```
+
+## Important Notes
+
+- **Never leave conflict markers in committed code**
+- Preserve the intent of both the original PR changes and the base branch updates
+- If unsure about a resolution, prefer keeping both implementations and test thoroughly
+- After pushing, CI will re-run to verify the fix
+
+{{> _merge-conflict-resolution}}
