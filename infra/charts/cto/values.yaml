@@ -190,6 +190,40 @@ legacyCleanup:
       - kind: PodDisruptionBudget
         name: eventbus-default-stan
 
+# Healer CronJob Configuration
+# Continuous monitoring and auto-remediation for database corruption and unhealthy pods
+healer:
+  enabled: true
+  # CronJob schedule (default: every 5 minutes for rapid issue detection)
+  schedule: "*/5 * * * *"
+  # Namespaces to monitor for issues
+  namespaces:
+    # NATS Streaming eventbus namespace
+    automation: true
+    # Grafana and observability stack namespace
+    observability: true
+  # Error patterns to detect for automatic remediation
+  errorPatterns:
+    databaseCorruption:
+      - "database disk image is malformed"
+      - "database is locked"
+      - "unable to open database file"
+      - "input/output error"
+    grafanaProvisioner:
+      - "failed to search for dashboards"
+      - "unable to open database file"
+    natsStreaming:
+      - "Error trying to connect to route"
+      - "lookup for host"
+  # Resource limits for healer jobs
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
 # Tools MCP server configuration
 tools:
   config:
