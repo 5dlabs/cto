@@ -1,0 +1,104 @@
+# RBAC for Remediation Jobs
+# Task ID: 2533441310
+# Generated: 2026-01-04
+# Provides necessary permissions for remediation jobs to restart pods and manage resources
+
+---
+# ServiceAccount for Grafana admin operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana-admin
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana-remediation
+    remediation.cto.io/task-id: "2533441310"
+---
+# Role for Grafana pod management
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: grafana-admin-role
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana-remediation
+    remediation.cto.io/task-id: "2533441310"
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "statefulsets/scale"]
+    verbs: ["patch"]
+---
+# RoleBinding for Grafana admin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: grafana-admin-binding
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana-remediation
+    remediation.cto.io/task-id: "2533441310"
+subjects:
+  - kind: ServiceAccount
+    name: grafana-admin
+    namespace: observability
+roleRef:
+  kind: Role
+  name: grafana-admin-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# ServiceAccount for EventBus admin operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eventbus-admin
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: eventbus-remediation
+    remediation.cto.io/task-id: "2533441310"
+---
+# Role for EventBus management
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eventbus-admin-role
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: eventbus-remediation
+    remediation.cto.io/task-id: "2533441310"
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["eventbus"]
+    verbs: ["get", "list", "watch", "patch"]
+---
+# RoleBinding for EventBus admin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eventbus-admin-binding
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: eventbus-remediation
+    remediation.cto.io/task-id: "2533441310"
+subjects:
+  - kind: ServiceAccount
+    name: eventbus-admin
+    namespace: automation
+roleRef:
+  kind: Role
+  name: eventbus-admin-role
+  apiGroup: rbac.authorization.k8s.io

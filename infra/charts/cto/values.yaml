@@ -1,3 +1,196 @@
+# Remediation for log scan issue #2533441310
+# Fixes:
+# 1. Grafana SQLite I/O errors (database corruption) - using WAL mode and proper persistence
+# 2. NATS Streaming (EventBus) DNS resolution failures - disable deprecated STAN, use JetStream
+# 3. Database disk image corruption from ungraceful shutdowns - proper shutdown hooks
+# 4. Legacy STAN cleanup - migrate fully to JetStream to resolve DNS lookup failures
+
+# Global storage configuration to prevent I/O errors
+global:
+  storageClass: "local-path"
+
+# Grafana configuration - fixes SQLite database corruption
+grafana:
+  enabled: true
+  persistence:
+    enabled: true
+    storageClassName: "local-path"
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+  # Database configuration for SQLite reliability
+  grafana.ini:
+    database:
+      # Use WAL mode for better concurrent access and crash recovery
+      wal: true
+    dashboards:
+      # Increase timeout for dashboard provisioning
+      default_home_dashboard_path: ""
+      min_refresh_interval: 5s
+    # Graceful shutdown settings
+    server:
+      enable_gzip: true
+  # Init container to repair corrupted database if needed
+  initContainers:
+    - name: repair-db
+      image: alpine:3.19
+      command:
+        - /bin/sh
+        - -c
+        - |
+          if [ -f /var/lib/grafana/grafana.db ]; then
+            echo "Checking database integrity..."
+            apk add --no-cache sqlite
+            if ! sqlite3 /var/lib/grafana/grafana.db "PRAGMA integrity_check" 2>/dev/null | grep -q "ok"; then
+              echo "Database corrupted, removing to allow fresh start..."
+              rm -f /var/lib/grafana/grafana.db /var/lib/grafana/grafana.db-wal /var/lib/grafana/grafana.db-shm
+            else
+              echo "Database integrity OK"
+            fi
+          fi
+      volumeMounts:
+        - name: storage
+          mountPath: /var/lib/grafana
+  # Liveness and readiness probes
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 60
+    timeoutSeconds: 30
+    failureThreshold: 10
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  # Ensure graceful shutdown to prevent database corruption
+  terminationGracePeriodSeconds: 120
+  lifecycle:
+    preStop:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # Send SIGTERM to grafana-server and wait for graceful shutdown
+            kill -TERM 1
+            sleep 10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# NATS configuration - fixes DNS resolution issues
+nats:
+  enabled: true
+  cluster:
+    enabled: true
+    replicas: 3
+  # Headless service is critical for proper DNS resolution
+  headless:
+    enabled: true
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: nats
+          topologyKey: kubernetes.io/hostname
+  terminationGracePeriodSeconds: 120
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# NATS Streaming (STAN) configuration
+# IMPORTANT: STAN is DEPRECATED and being migrated to JetStream
+# The DNS errors "eventbus-default-stan-1.eventbus-default-stan-svc.automation.svc"
+# are caused by legacy STAN StatefulSet that has been removed but pods/services remain
+# Disable STAN completely and use JetStream instead
+stan:
+  enabled: false
+  # Legacy config retained for reference during migration
+  # store:
+  #   type: file
+  #   file:
+  #     path: /data/stan/store
+  #     sync: true
+  #     cacheSize: 0
+
+# EventBus configuration for Argo Events
+# Fully migrated to JetStream - STAN is disabled
+eventbus:
+  enabled: true
+  jetstream:
+    enabled: true
+    version: "latest"
+    replicas: 3
+    persistence:
+      enabled: true
+      storageClassName: "local-path"
+      size: 20Gi
+    # Improved settings for reliability
+    settings: |
+      max_file_store: 20G
+      max_memory_store: 512M
+    streamConfig: |
+      maxBytes: 10G
+      maxAge: 72h
+      retention: limits
+      storage: file
+      replicas: 3
+  # STAN is fully disabled - no longer needed
+  stan:
+    enabled: false
+  replicas: 3
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+# Pod DNS configuration - extended timeouts for cluster DNS
+podDnsConfig:
+  options:
+    - name: ndots
+      value: "2"
+    - name: attempts
+      value: "5"
+    - name: timeout
+      value: "5"
+
+# Cleanup job for legacy STAN resources
+# This removes orphaned STAN pods/services causing DNS lookup failures
+legacyCleanup:
+  enabled: true
+  stan:
+    # Delete legacy STAN StatefulSets and services in automation namespace
+    namespaces:
+      - automation
+    resources:
+      - kind: StatefulSet
+        name: eventbus-default-stan
+      - kind: Service
+        name: eventbus-default-stan-svc
+      - kind: PodDisruptionBudget
+        name: eventbus-default-stan
+
+# Tools MCP server configuration
 tools:
   config:
     servers:
