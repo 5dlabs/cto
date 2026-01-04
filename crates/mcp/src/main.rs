@@ -4170,8 +4170,50 @@ fn build_mcp_server_prompt(
     server_key: &str,
     github_url: Option<&str>,
     readme_content: Option<&str>,
+    skip_merge: bool,
 ) -> String {
     let values_path = "infra/charts/cto/values.yaml";
+
+    // Build acceptance criteria FIRST (context engineering: beginning has highest attention)
+    let acceptance_criteria = if skip_merge {
+        format!(
+            r#"## ⚠️ ACCEPTANCE CRITERIA (REQUIRED - Read First!)
+
+You MUST complete ALL of these steps before finishing:
+
+1. [ ] **values.yaml updated** - Server entry `{server_key}` exists under `tools.config.servers`
+2. [ ] **Valid YAML** - File parses without errors
+3. [ ] **PR created** - Pull request targeting `develop` branch
+4. [ ] **CI passes** - Wait for CI checks to complete successfully
+
+**Note:** `skip_merge=true` was set, so stop after CI passes. Do NOT merge the PR.
+
+---
+
+"#
+        )
+    } else {
+        format!(
+            r#"## ⚠️ ACCEPTANCE CRITERIA (REQUIRED - Read First!)
+
+You MUST complete ALL of these steps before finishing:
+
+1. [ ] **values.yaml updated** - Server entry `{server_key}` exists under `tools.config.servers`
+2. [ ] **Valid YAML** - File parses without errors
+3. [ ] **PR created** - Pull request targeting `develop` branch
+4. [ ] **CI passes** - Wait for CI checks to complete successfully
+5. [ ] **PR merged** - Use `github_merge_pull_request` to merge
+6. [ ] **ArgoCD synced** - Call `argocd_sync_application` for `cto-tools`
+7. [ ] **Deployment verified** - Check `argocd_get_application` shows Healthy/Synced
+8. [ ] **Server available** - Verify tools-server pod restarted with new config
+
+**Keep iterating until ALL criteria are met.** Use the MCP tools to verify each step.
+
+---
+
+"#
+        )
+    };
 
     let task_instruction = match task_type {
         "add" => format!(
@@ -4244,8 +4286,11 @@ Update the MCP server with key `{server_key}` in the tools server configuration.
         _ => format!("Unknown task type: {task_type}. Expected: add, remove, or update."),
     };
 
+    // Put acceptance criteria at the START for better attention (context engineering)
     format!(
         r#"# MCP Server Management Task
+
+{acceptance_criteria}
 
 {task_instruction}
 
@@ -4281,18 +4326,6 @@ For HTTP transport servers:
         url: "https://example.com/mcp"
 ```
 
-## After Changes
-
-1. Run `cargo fmt` if any Rust files were modified
-2. Commit your changes to a new branch
-3. Create a PR targeting the `develop` branch
-4. The PR title should be: `feat(tools): {task_type} MCP server {server_key}`
-5. **Merge the PR** - Use GitHub MCP tools to merge the PR after CI passes
-6. **Trigger ArgoCD Sync** - Use ArgoCD MCP tools to sync the `cto-tools` application:
-   - Call `argocd_sync_application` with applicationName: `cto-tools`
-   - Wait for sync to complete (check with `argocd_get_application`)
-7. **Verify Deployment** - Confirm the tools server has restarted with the new config
-
 ## Available MCP Tools
 
 You have access to these MCP tools for this task:
@@ -4311,26 +4344,10 @@ You have access to these MCP tools for this task:
 ### Kubernetes Tools
 - `kubernetes_get_pods` - Check pod status
 - `kubernetes_get_pod_logs` - View logs if needed
-
-## Acceptance Criteria
-
-You MUST complete ALL of these steps before finishing:
-
-1. [ ] **values.yaml updated** - Server entry `{server_key}` exists under `tools.config.servers`
-2. [ ] **Valid YAML** - File parses without errors
-3. [ ] **PR created** - Pull request targeting `develop` branch
-4. [ ] **CI passes** - Wait for CI checks to complete successfully
-5. [ ] **PR merged** - Use `github_merge_pull_request` to merge
-6. [ ] **ArgoCD synced** - Call `argocd_sync_application` for `cto-tools`
-7. [ ] **Deployment verified** - Check `argocd_get_application` shows Healthy/Synced
-8. [ ] **Server available** - Verify tools-server pod restarted with new config
-
-**Keep iterating until ALL criteria are met.** Use the MCP tools to verify each step.
 "#,
+        acceptance_criteria = acceptance_criteria,
         task_instruction = task_instruction,
         values_path = values_path,
-        task_type = task_type,
-        server_key = server_key,
     )
 }
 
@@ -4345,7 +4362,7 @@ fn create_mcp_server_coderun(
     let kubectl_cmd = find_command("kubectl");
 
     // Build the prompt for Rex based on task type
-    let prompt = build_mcp_server_prompt(task_type, server_key, github_url, readme_content);
+    let prompt = build_mcp_server_prompt(task_type, server_key, github_url, readme_content, skip_merge);
 
     // Build environment variables for the CodeRun
     let mut env_map = serde_json::Map::new();
