@@ -7,23 +7,10 @@
       "includeCodebase": false,
       "sourceBranch": "main"
     },
-    "code": {
-      "model": "claude-opus-4-5-20251101",
-      "githubApp": "5DLabs-Rex",
-      "continueSession": false,
-      "workingDirectory": ".",
-      "overwriteMemory": false,
-      "repository": "5dlabs/cto",
-      "docsRepository": "5dlabs/cto",
-      "docsProjectDirectory": "docs",
-      "service": "cto",
-      "cli": "claude"
-    },
     "intake": {
       "githubApp": "5DLabs-Morgan",
       "mode": "cli",
       "cli": "claude",
-      "image": "ghcr.io/5dlabs/claude:latest",
       "primary": {
         "model": "claude-opus-4-5-20251101",
         "provider": "anthropic"
@@ -36,6 +23,12 @@
         "model": "claude-opus-4-5-20251101",
         "provider": "anthropic"
       }
+    },
+    "linear": {
+      "teamId": "CTOPA",
+      "createProject": true,
+      "projectTemplate": "Play Workflow",
+      "pmServerUrl": "https://cto.5dlabs.ai"
     },
     "play": {
       "model": "claude-opus-4-5-20251101",

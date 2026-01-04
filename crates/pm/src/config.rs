@@ -15,7 +15,11 @@ pub struct Config {
     pub max_timestamp_age_ms: i64,
     /// Whether Linear integration is enabled.
     pub enabled: bool,
-    /// Linear OAuth token for API calls (legacy single-app).
+    /// Linear API token for API calls.
+    ///
+    /// Priority order:
+    /// 1. `LINEAR_API_KEY` - Workspace API key (preferred, simpler)
+    /// 2. `LINEAR_OAUTH_TOKEN` - Legacy OAuth token (backward compatibility)
     pub oauth_token: Option<String>,
     /// Kubernetes namespace.
     pub namespace: String,
@@ -28,10 +32,33 @@ pub struct Config {
 }
 
 // =============================================================================
-// Multi-Agent Linear OAuth Configuration
+// Linear API Key Helper
+// =============================================================================
+
+/// Get the Linear API token from environment variables.
+///
+/// Priority order:
+/// 1. `LINEAR_API_KEY` - Workspace API key (preferred, no OAuth flow needed)
+/// 2. `LINEAR_OAUTH_TOKEN` - Legacy OAuth token (backward compatibility)
+///
+/// # Returns
+/// The API token if available, `None` otherwise.
+#[must_use]
+pub fn linear_token() -> Option<String> {
+    env::var("LINEAR_API_KEY")
+        .or_else(|_| env::var("LINEAR_OAUTH_TOKEN"))
+        .ok()
+        .filter(|s| !s.is_empty())
+}
+
+// =============================================================================
+// Multi-Agent Linear OAuth Configuration (Deprecated)
 // =============================================================================
 
 /// All known agent names for the CTO platform.
+///
+/// Note: With the simplified API key approach, per-agent OAuth is deprecated.
+/// Kept for backward compatibility.
 pub const AGENT_NAMES: &[&str] = &[
     "morgan", "rex", "blaze", "grizz", "nova", "tap", "spark", "cleo", "cipher", "tess", "atlas",
     "bolt",
@@ -242,7 +269,10 @@ impl Default for Config {
             enabled: env::var("LINEAR_ENABLED")
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),
-            oauth_token: env::var("LINEAR_OAUTH_TOKEN").ok(),
+            // Priority: LINEAR_API_KEY (workspace key) > LINEAR_OAUTH_TOKEN (legacy)
+            oauth_token: env::var("LINEAR_API_KEY")
+                .or_else(|_| env::var("LINEAR_OAUTH_TOKEN"))
+                .ok(),
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "cto".to_string()),
             intake: IntakeConfig::default(),
             play: PlayConfig::default(),

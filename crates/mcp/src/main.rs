@@ -99,6 +99,9 @@ struct WorkflowDefaults {
     #[serde(default)]
     intake: IntakeDefaults,
     #[serde(default)]
+    #[allow(dead_code)]
+    linear: LinearDefaults,
+    #[serde(default)]
     play: PlayDefaults,
 }
 
@@ -257,6 +260,19 @@ struct PlayDefaults {
     auto_merge: Option<bool>,
     #[serde(rename = "parallelExecution")]
     parallel_execution: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Clone, Default)]
+#[allow(dead_code)]
+struct LinearDefaults {
+    #[serde(rename = "teamId")]
+    team_id: Option<String>,
+    #[serde(rename = "createProject")]
+    create_project: Option<bool>,
+    #[serde(rename = "projectTemplate")]
+    project_template: Option<String>,
+    #[serde(rename = "pmServerUrl")]
+    pm_server_url: Option<String>,
 }
 
 /// Load configuration from cto-config.json file
