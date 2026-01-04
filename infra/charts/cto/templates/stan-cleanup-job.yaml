@@ -1,0 +1,184 @@
+# Legacy STAN Cleanup Job
+# Task ID: 2533441310
+# Generated: 2026-01-04
+# Issue: DNS lookup failures for eventbus-default-stan-*.eventbus-default-stan-svc.automation.svc
+# Root Cause: Legacy NATS Streaming (STAN) resources remain after migration to JetStream
+# This job removes orphaned STAN StatefulSets, Services, and PDBs to eliminate DNS errors
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stan-legacy-cleanup
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: stan-cleanup
+    app.kubernetes.io/component: legacy-removal
+    remediation.cto.io/task-id: "2533441310"
+    remediation.cto.io/type: cleanup
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stan-cleanup
+    spec:
+      serviceAccountName: stan-cleanup-sa
+      restartPolicy: OnFailure
+      containers:
+        - name: cleanup
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "=== Legacy STAN Cleanup Job ==="
+              echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "Namespace: automation"
+              
+              echo ""
+              echo "=== Current State ==="
+              echo "StatefulSets with STAN:"
+              kubectl get statefulsets -n automation 2>/dev/null | grep -E "stan|eventbus" || echo "  None found"
+              
+              echo ""
+              echo "Services with STAN:"
+              kubectl get services -n automation 2>/dev/null | grep -E "stan" || echo "  None found"
+              
+              echo ""
+              echo "PDBs with STAN:"
+              kubectl get pdb -n automation 2>/dev/null | grep -E "stan" || echo "  None found"
+              
+              echo ""
+              echo "=== Removing Legacy STAN Resources ==="
+              
+              # Delete STAN StatefulSet (this will cascade delete pods)
+              if kubectl get statefulset eventbus-default-stan -n automation &>/dev/null; then
+                echo "Deleting StatefulSet: eventbus-default-stan"
+                kubectl delete statefulset eventbus-default-stan -n automation --grace-period=30 --wait=false || true
+              else
+                echo "StatefulSet eventbus-default-stan not found (already cleaned)"
+              fi
+              
+              # Delete STAN headless service
+              if kubectl get service eventbus-default-stan-svc -n automation &>/dev/null; then
+                echo "Deleting Service: eventbus-default-stan-svc"
+                kubectl delete service eventbus-default-stan-svc -n automation || true
+              else
+                echo "Service eventbus-default-stan-svc not found (already cleaned)"
+              fi
+              
+              # Delete any STAN client service
+              if kubectl get service eventbus-default-stan -n automation &>/dev/null; then
+                echo "Deleting Service: eventbus-default-stan"
+                kubectl delete service eventbus-default-stan -n automation || true
+              else
+                echo "Service eventbus-default-stan not found (already cleaned)"
+              fi
+              
+              # Delete STAN PodDisruptionBudget
+              if kubectl get pdb eventbus-default-stan -n automation &>/dev/null; then
+                echo "Deleting PDB: eventbus-default-stan"
+                kubectl delete pdb eventbus-default-stan -n automation || true
+              else
+                echo "PDB eventbus-default-stan not found (already cleaned)"
+              fi
+              
+              # Delete any remaining STAN pods (orphaned)
+              echo ""
+              echo "Checking for orphaned STAN pods..."
+              ORPHAN_PODS=$(kubectl get pods -n automation -l app=eventbus-default-stan -o name 2>/dev/null || echo "")
+              if [ -n "$ORPHAN_PODS" ]; then
+                echo "Deleting orphaned pods:"
+                echo "$ORPHAN_PODS" | xargs -r kubectl delete -n automation --force --grace-period=0
+              else
+                echo "No orphaned STAN pods found"
+              fi
+              
+              # Delete PVCs associated with STAN (careful - contains data)
+              echo ""
+              echo "Checking for STAN PVCs..."
+              STAN_PVCS=$(kubectl get pvc -n automation -l app=eventbus-default-stan -o name 2>/dev/null || echo "")
+              if [ -n "$STAN_PVCS" ]; then
+                echo "Found STAN PVCs (not deleting - may contain data):"
+                echo "$STAN_PVCS"
+                echo "To delete PVCs manually, run:"
+                echo "  kubectl delete pvc -n automation -l app=eventbus-default-stan"
+              else
+                echo "No STAN PVCs found"
+              fi
+              
+              echo ""
+              echo "=== Post-Cleanup State ==="
+              echo "StatefulSets:"
+              kubectl get statefulsets -n automation 2>/dev/null | grep -E "stan|eventbus" || echo "  None (clean)"
+              
+              echo ""
+              echo "Services:"
+              kubectl get services -n automation 2>/dev/null | grep -E "stan" || echo "  None (clean)"
+              
+              echo ""
+              echo "=== Verifying DNS Resolution ==="
+              # These should now fail cleanly (NXDOMAIN) rather than timeout
+              for i in 0 1 2; do
+                host="eventbus-default-stan-${i}.eventbus-default-stan-svc.automation.svc.cluster.local"
+                echo "Testing: $host"
+                if nslookup "$host" 2>&1 | head -5; then
+                  echo "  WARNING: Still resolves (resources may still exist)"
+                else
+                  echo "  OK: No longer resolves (expected)"
+                fi
+              done
+              
+              echo ""
+              echo "=== Legacy STAN Cleanup Completed ==="
+---
+# ServiceAccount for cleanup job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: stan-cleanup-sa
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: stan-cleanup
+    remediation.cto.io/task-id: "2533441310"
+---
+# Role for STAN cleanup
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: stan-cleanup-role
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: stan-cleanup
+    remediation.cto.io/task-id: "2533441310"
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "delete"]
+---
+# RoleBinding for cleanup job
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: stan-cleanup-binding
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: stan-cleanup
+    remediation.cto.io/task-id: "2533441310"
+subjects:
+  - kind: ServiceAccount
+    name: stan-cleanup-sa
+    namespace: automation
+roleRef:
+  kind: Role
+  name: stan-cleanup-role
+  apiGroup: rbac.authorization.k8s.io

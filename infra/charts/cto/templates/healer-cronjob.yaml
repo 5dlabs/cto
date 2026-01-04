@@ -100,36 +100,73 @@ spec:
                   }
 
                   # ========================================
-                  # Check 1: NATS Streaming Eventbus Health
+                  # Check 1: Legacy STAN Cleanup (Migration to JetStream)
                   # ========================================
                   echo ""
-                  echo "--- Checking NATS Streaming Eventbus ---"
+                  echo "--- Checking for Legacy STAN Resources ---"
 
                   # Check for STAN pods in automation namespace
                   STAN_NAMESPACE="automation"
                   STAN_SELECTOR="app=eventbus-default-stan"
 
-                  # Check if STAN pods exist and have issues
-                  if kubectl get pods -n "$STAN_NAMESPACE" -l "$STAN_SELECTOR" &>/dev/null; then
+                  # STAN is deprecated - clean up any remaining resources causing DNS failures
+                  STAN_RESOURCES=$(kubectl get pods,svc,statefulset -n "$STAN_NAMESPACE" -l "$STAN_SELECTOR" -o name 2>/dev/null || echo "")
+                  if [ -n "$STAN_RESOURCES" ]; then
+                    echo "ALERT: Legacy STAN resources found (should be migrated to JetStream)"
+                    echo "Found: $STAN_RESOURCES"
                     
-                    # Check for database corruption errors
-                    if check_db_corruption "$STAN_NAMESPACE" "$STAN_SELECTOR" "database disk image is malformed|database is locked|unable to open database"; then
-                      echo "REMEDIATION: Restarting STAN eventbus pods due to database corruption"
-                      restart_corrupted_pods "$STAN_NAMESPACE" "$STAN_SELECTOR" "Database corruption detected"
+                    # Delete orphaned STAN pods causing DNS lookup errors
+                    echo "REMEDIATION: Cleaning up legacy STAN resources"
+                    
+                    # Delete StatefulSet first (this will cascade delete pods)
+                    if kubectl get statefulset eventbus-default-stan -n "$STAN_NAMESPACE" &>/dev/null; then
+                      echo "Deleting legacy StatefulSet: eventbus-default-stan"
+                      kubectl delete statefulset eventbus-default-stan -n "$STAN_NAMESPACE" --grace-period=30 --wait=false || true
                     fi
-
-                    # Check for pods in CrashLoopBackOff or Error state
-                    UNHEALTHY_PODS=$(kubectl get pods -n "$STAN_NAMESPACE" -l "$STAN_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
-                    if [ -n "$UNHEALTHY_PODS" ]; then
-                      echo "ALERT: Unhealthy STAN pods found: $UNHEALTHY_PODS"
-                      # Delete unhealthy pods to trigger recreation
-                      for pod in $UNHEALTHY_PODS; do
+                    
+                    # Delete headless service causing DNS errors
+                    if kubectl get service eventbus-default-stan-svc -n "$STAN_NAMESPACE" &>/dev/null; then
+                      echo "Deleting legacy Service: eventbus-default-stan-svc"
+                      kubectl delete service eventbus-default-stan-svc -n "$STAN_NAMESPACE" || true
+                    fi
+                    
+                    # Force delete any orphaned pods
+                    kubectl delete pods -n "$STAN_NAMESPACE" -l "$STAN_SELECTOR" --force --grace-period=0 2>/dev/null || true
+                  else
+                    echo "No legacy STAN resources found (JetStream migration complete)"
+                  fi
+                  
+                  # ========================================
+                  # Check 1b: JetStream EventBus Health
+                  # ========================================
+                  echo ""
+                  echo "--- Checking JetStream EventBus Health ---"
+                  
+                  JETSTREAM_SELECTOR="app.kubernetes.io/name=eventbus-jetstream"
+                  if kubectl get pods -n "$STAN_NAMESPACE" -l "$JETSTREAM_SELECTOR" &>/dev/null; then
+                    # Check for JetStream pods not in Running state
+                    UNHEALTHY_JS=$(kubectl get pods -n "$STAN_NAMESPACE" -l "$JETSTREAM_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
+                    if [ -n "$UNHEALTHY_JS" ]; then
+                      echo "ALERT: Unhealthy JetStream pods found: $UNHEALTHY_JS"
+                      for pod in $UNHEALTHY_JS; do
+                        echo "Deleting unhealthy pod: $STAN_NAMESPACE/$pod"
+                        kubectl delete pod -n "$STAN_NAMESPACE" "$pod" --grace-period=30 || true
+                      done
+                    else
+                      echo "JetStream EventBus: All pods healthy"
+                    fi
+                  else
+                    echo "No JetStream eventbus pods found (checking NATS selector)"
+                    # Fallback to generic NATS selector
+                    NATS_SELECTOR="app.kubernetes.io/name=nats"
+                    UNHEALTHY_NATS=$(kubectl get pods -n "$STAN_NAMESPACE" -l "$NATS_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
+                    if [ -n "$UNHEALTHY_NATS" ]; then
+                      echo "ALERT: Unhealthy NATS pods found: $UNHEALTHY_NATS"
+                      for pod in $UNHEALTHY_NATS; do
                         echo "Deleting unhealthy pod: $STAN_NAMESPACE/$pod"
                         kubectl delete pod -n "$STAN_NAMESPACE" "$pod" --grace-period=30 || true
                       done
                     fi
-                  else
-                    echo "No STAN eventbus pods found in $STAN_NAMESPACE namespace"
                   fi
 
                   # ========================================
