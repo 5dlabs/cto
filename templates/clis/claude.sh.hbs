@@ -36,8 +36,8 @@ CLAUDE_CMD="$CLAUDE_CMD --output-format stream-json"
 # Verbose mode for debugging
 CLAUDE_CMD="$CLAUDE_CMD --verbose"
 
-# Enable MCP debug logging for troubleshooting server connection issues
-CLAUDE_CMD="$CLAUDE_CMD --debug mcp"
+# Note: --debug mcp breaks stdin handling in print mode, so we don't use it here
+# If MCP debugging is needed, check the tools-server logs instead
 
 # MCP configuration - use the config found by mcp-check partial
 if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
