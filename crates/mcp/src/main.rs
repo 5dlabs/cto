@@ -4206,6 +4206,7 @@ You MUST complete ALL of these steps before finishing:
 6. [ ] **ArgoCD synced** - Call `argocd_sync_application` for `cto-tools`
 7. [ ] **Deployment verified** - Check `argocd_get_application` shows Healthy/Synced
 8. [ ] **Server available** - Verify tools-server pod restarted with new config
+9. [ ] **Tool accessible** - Call `mcp_tools_list` to verify the new `{server_key}` server appears in available tools
 
 **Keep iterating until ALL criteria are met.** Use the MCP tools to verify each step.
 
