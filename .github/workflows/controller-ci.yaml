@@ -162,12 +162,15 @@ jobs:
           cd crates/controller && cargo audit || true
 
   # Docker Build & Push (main and develop branches)
+  # Runs on: push events when controller/templates files change, or manual workflow_dispatch
   build-and-push:
     needs: [changes, lint-rust, test-rust]
     if: |
-      github.event_name == 'push' && 
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
-      needs.changes.outputs.controller == 'true'
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && needs.changes.outputs.controller == 'true')
+      )
     runs-on: [k8s-runner]
     permissions:
       contents: read
