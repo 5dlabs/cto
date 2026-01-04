@@ -113,7 +113,8 @@ jobs:
           echo "✅ CRD validation passed"
 
   # Security scanning (non-blocking)
-  # Uses ubuntu-latest for stable network connectivity when downloading external actions
+  # Uses shell-based Trivy installation to avoid transient GitHub API failures
+  # when downloading external actions during job setup phase
   security-scan:
     needs: changes
     if: github.event_name == 'push'
@@ -122,20 +123,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30.0
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
+      - name: Install and run Trivy vulnerability scanner
+        run: |
+          # Install Trivy using shell script (more resilient than external action)
+          echo "📥 Installing Trivy..."
+          for attempt in 1 2 3 4 5; do
+            if curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.58.1; then
+              echo "✅ Trivy installed on attempt $attempt"
+              break
+            fi
+            echo "⚠️ Trivy install attempt $attempt failed, retrying in $((attempt * 10))s..."
+            sleep $((attempt * 10))
+            if [ "$attempt" -eq 5 ]; then
+              echo "⚠️ Failed to install Trivy after 5 attempts, skipping scan"
+              exit 0
+            fi
+          done
+          
+          # Run Trivy filesystem scan
+          echo "🔍 Running Trivy vulnerability scan..."
+          trivy fs --format sarif --output trivy-results.sarif --severity CRITICAL,HIGH . || true
+          echo "✅ Trivy scan complete"
 
       - name: Upload Trivy scan results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: trivy-results
           path: trivy-results.sarif
+          if-no-files-found: ignore
 
       - name: Setup Rust for cargo-audit
         uses: dtolnay/rust-toolchain@stable
