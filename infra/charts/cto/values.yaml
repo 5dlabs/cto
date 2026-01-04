@@ -1,3 +1,37 @@
+# =============================================================================
+# Argo Events Sensor Configuration
+# =============================================================================
+# Configure sensor logging to reduce noise from event processing warnings.
+# The sensor was generating 1000+ warn-level messages for normal GitHub event
+# processing, which were being flagged as errors by the log scanner.
+#
+# Reference: https://argoproj.github.io/argo-events/sensors/sensor-spec/
+# =============================================================================
+argoEvents:
+  sensor:
+    # Set log level to ERROR to suppress warn-level event processing messages
+    # Valid levels: debug, info, warn, error
+    logLevel: "error"
+    
+    # Optional: Configure specific logger components
+    # The argo-events.sensor logger at sensors/listener.go:198 generates
+    # high-volume warnings for event processing that are not actionable
+    loggers:
+      # Suppress verbose event listener logging
+      "argo-events.sensor": "error"
+    
+    # Resource defaults for sensor pods
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+
+# =============================================================================
+# Tools Configuration
+# =============================================================================
 tools:
   config:
     servers:
