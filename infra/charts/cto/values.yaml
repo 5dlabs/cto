@@ -11,3 +11,44 @@ tools:
         workingDirectory: "/tmp"
         env:
           GEMINI_API_KEY: "${GEMINI_API_KEY}"
+
+# Healer configuration for auto-remediation
+healer:
+  enabled: true
+  # CronJob schedule for health checks (every 5 minutes)
+  schedule: "*/5 * * * *"
+  # Image for healer job
+  image:
+    repository: bitnami/kubectl
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Resource limits
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # Namespaces to monitor for self-healing
+  monitoredNamespaces:
+    - argocd
+    - automation
+    - cto
+  # Remediation policies
+  policies:
+    # Grafana database corruption auto-healing
+    grafanaDbCorruption:
+      enabled: true
+      cooldownSeconds: 300
+      maxRetries: 3
+    # NATS/STAN eventbus DNS failure healing
+    natsStanDnsFailure:
+      enabled: true
+      cooldownSeconds: 180
+      maxRetries: 5
+    # General I/O error handling
+    dbIoError:
+      enabled: true
+      cooldownSeconds: 600
+      maxRetries: 2

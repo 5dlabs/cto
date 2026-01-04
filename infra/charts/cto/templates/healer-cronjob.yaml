@@ -1,0 +1,103 @@
+{{- if .Values.healer.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-healer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: healer
+spec:
+  schedule: {{ .Values.healer.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ .Chart.Name }}-healer
+            app.kubernetes.io/instance: {{ .Release.Name }}
+        spec:
+          serviceAccountName: {{ .Release.Name }}-healer
+          restartPolicy: OnFailure
+          containers:
+            - name: healer
+              image: {{ .Values.healer.image.repository }}:{{ .Values.healer.image.tag }}
+              imagePullPolicy: {{ .Values.healer.image.pullPolicy }}
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "=== CTO Healer Job Started at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+                  
+                  # Check Grafana pods in argocd namespace
+                  echo "Checking Grafana health..."
+                  GRAFANA_PODS=$(kubectl get pods -n argocd -l app.kubernetes.io/name=grafana -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+                  for POD in $GRAFANA_PODS; do
+                    STATUS=$(kubectl get pod -n argocd "$POD" -o jsonpath='{.status.phase}')
+                    RESTARTS=$(kubectl get pod -n argocd "$POD" -o jsonpath='{.status.containerStatuses[0].restartCount}')
+                    echo "  Pod: $POD, Status: $STATUS, Restarts: $RESTARTS"
+                    
+                    # Check for database errors in logs
+                    if kubectl logs -n argocd "$POD" --tail=100 2>/dev/null | grep -q "database disk image is malformed\|unable to open database file"; then
+                      echo "  WARNING: Database corruption detected in $POD"
+                      echo "  ACTION: Deleting pod for fresh restart..."
+                      kubectl delete pod -n argocd "$POD" --grace-period=30
+                      sleep 10
+                    fi
+                  done
+                  
+                  # Check NATS/STAN eventbus in automation namespace
+                  echo "Checking NATS STAN eventbus health..."
+                  STAN_PODS=$(kubectl get pods -n automation -l app=eventbus-default-stan -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+                  if [ -z "$STAN_PODS" ]; then
+                    echo "  WARNING: No STAN eventbus pods found"
+                    # Try to find the StatefulSet and scale it
+                    STS=$(kubectl get sts -n automation -l app=eventbus-default-stan -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                    if [ -n "$STS" ]; then
+                      echo "  ACTION: Scaling StatefulSet $STS..."
+                      kubectl scale sts -n automation "$STS" --replicas=0
+                      sleep 5
+                      kubectl scale sts -n automation "$STS" --replicas=3
+                    fi
+                  else
+                    for POD in $STAN_PODS; do
+                      STATUS=$(kubectl get pod -n automation "$POD" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                      echo "  Pod: $POD, Status: $STATUS"
+                      
+                      # Check if pod is stuck in non-Ready state
+                      READY=$(kubectl get pod -n automation "$POD" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+                      if [ "$READY" != "True" ] && [ "$STATUS" != "Pending" ]; then
+                        echo "  WARNING: Pod $POD is not ready"
+                        echo "  ACTION: Deleting pod for recreation..."
+                        kubectl delete pod -n automation "$POD" --grace-period=30
+                        sleep 5
+                      fi
+                    done
+                  fi
+                  
+                  # Check for pods with CrashLoopBackOff
+                  echo "Checking for CrashLoopBackOff pods..."
+                  CRASH_PODS=$(kubectl get pods --all-namespaces -o jsonpath='{range .items[?(@.status.containerStatuses[0].state.waiting.reason=="CrashLoopBackOff")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null || echo "")
+                  for POD_NS in $CRASH_PODS; do
+                    NS=$(echo "$POD_NS" | cut -d/ -f1)
+                    POD=$(echo "$POD_NS" | cut -d/ -f2)
+                    RESTARTS=$(kubectl get pod -n "$NS" "$POD" -o jsonpath='{.status.containerStatuses[0].restartCount}')
+                    echo "  CrashLoop: $NS/$POD (restarts: $RESTARTS)"
+                    
+                    # If too many restarts, try deleting the pod
+                    if [ "$RESTARTS" -gt 10 ]; then
+                      echo "  ACTION: High restart count, deleting pod..."
+                      kubectl delete pod -n "$NS" "$POD" --grace-period=0 --force 2>/dev/null || true
+                    fi
+                  done
+                  
+                  echo "=== CTO Healer Job Completed at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+              resources:
+                {{- toYaml .Values.healer.resources | nindent 16 }}
+{{- end }}
