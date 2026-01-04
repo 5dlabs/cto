@@ -40,6 +40,10 @@ const ERROR_LEVEL_PATTERNS: &[&str] = &[
     r"^FATAL:",
     r"^PANIC:",
     r"^E\s",
+    // Kubernetes klog-style ERROR logs (E0104 = ERROR on Jan 4th)
+    // Format: E{MMDD} {HH:MM:SS.microseconds} {thread} {file}:{line}] {message}
+    // The optional F prefix comes from Fluent Bit log collection
+    r"^F?\s*E\d{4}\s",
     // Rust-style errors
     r"error\[E\d{4}\]",
     r"thread '.*' panicked at",
@@ -93,6 +97,22 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     r#""level"\s*:\s*"DEBUG""#,
     // ArgoCD/Helm manifest cache hits (informational messages)
     r"(?i)manifest\s+cache\s+hit",
+    // OTEL-wrapped logs: Body: Str(...) format with inner level=info
+    // The OTEL collector wraps logs, but if the inner content is info-level, it's not an error
+    r"(?i)Body:\s*Str\(.*level\s*=\s*info",
+    // Loki query state metadata (not actual log content)
+    // F State: Error indicates query state, not an application error
+    r"^F\s+State:\s*(Error|Success|Pending)",
+    // Kubernetes container log prefix (F/I/W/E) followed by info-level content
+    // The F prefix from k8s logging doesn't indicate error when content is info-level
+    r"^F\s+.*level\s*=\s*info",
+    // Kubernetes klog-style INFO/WARNING/DEBUG log prefixes
+    // Format: I0104 (I=INFO, 0104=Jan 4th), W0104 (W=WARNING), D0104 (D=DEBUG)
+    // These are not errors even if the message contains "Error" as a quoted string or field name
+    // The optional F prefix comes from Fluent Bit log collection
+    r"^F?\s*I\d{4}\s",
+    r"^F?\s*W\d{4}\s",
+    r"^F?\s*D\d{4}\s",
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -1151,5 +1171,144 @@ mod tests {
         assert!(!filtered
             .iter()
             .any(|e| e.line.contains("manifest cache hit")));
+    }
+
+    #[test]
+    fn test_is_false_positive_klog_style_info_logs() {
+        // Kubernetes klog-style INFO logs (I0104 = INFO on Jan 4th)
+        // These should be filtered even if they contain "Error" as a quoted string or field name
+        assert!(is_false_positive(
+            r#"F I0104 20:51:59.031891       1 csi_handler.go:243] "Error processing" driver="io.openebs.csi-mayastor""#
+        ));
+        assert!(is_false_positive(
+            r#"I0104 20:51:59.031891       1 csi_handler.go:243] "Error processing" driver="io.openebs.csi-mayastor""#
+        ));
+        // WARNING level klog (W prefix) - also not an error
+        assert!(is_false_positive(
+            r"W0104 20:51:59.031891       1 handler.go:100] warning message with error in text"
+        ));
+        // DEBUG level klog (D prefix)
+        assert!(is_false_positive(
+            r"D0104 20:51:59.031891       1 debug.go:50] debug error handling"
+        ));
+        // Ensure actual klog ERROR (E prefix) is NOT filtered
+        assert!(!is_false_positive(
+            r"E0104 20:51:59.031891       1 handler.go:100] actual error occurred"
+        ));
+    }
+
+    #[test]
+    fn test_filter_klog_style_csi_handler_logs() {
+        use chrono::Utc;
+
+        // Test case from the actual log scan that detected 1000 errors
+        let entries = vec![
+            // klog INFO-level log with "Error processing" in message - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F I0104 20:51:59.031891       1 csi_handler.go:243] "Error processing" driver="io.openebs.csi-mayastor" VolumeAttachment="csi-7ed2dbd0dca97cd81ad59c8ca88e623dce149a8e6db8d88f3461366f00dcd122" err="fai..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // ArgoCD info-level manifest cache hit - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T20:51:58Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://fluent.github.io/helm-charts,Path:,TargetRevision:0.47.7,Helm:&ApplicationSourceHelm{ValueFiles:[]..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual ERROR-level log - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r"E0104 20:51:59.031891       1 csi_handler.go:250] CSI driver failed to attach volume".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out the 2 INFO-level logs
+        assert_eq!(filtered.len(), 1);
+
+        // Only the actual klog ERROR should remain
+        assert!(filtered.iter().any(|e| e.line.contains("E0104")));
+        assert!(!filtered.iter().any(|e| e.line.contains("I0104")));
+        assert!(!filtered
+            .iter()
+            .any(|e| e.line.contains("manifest cache hit")));
+    }
+
+    #[test]
+    fn test_is_false_positive_otel_wrapped_info_logs() {
+        // OTEL collector wraps logs with Body: Str(...) format
+        // If inner content is info-level, it's not an error
+        assert!(is_false_positive(
+            r#"Body: Str(time="2026-01-04T20:51:58Z" level=info msg="manifest cache hit")"#
+        ));
+        assert!(is_false_positive(
+            r#"Body: Str({"time":"2026-01-04T20:51:58Z","level":"info","msg":"processing"})"#
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_loki_query_state() {
+        // Loki query state metadata - F State: indicates query status, not app error
+        assert!(is_false_positive("F State: Error"));
+        assert!(is_false_positive("F State: Success"));
+        assert!(is_false_positive("F State: Pending"));
+    }
+
+    #[test]
+    fn test_is_false_positive_k8s_f_prefix_with_info_level() {
+        // Kubernetes container log prefix (F) followed by info-level content
+        // The F prefix doesn't indicate error when content is info-level
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T20:51:58Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://fluent.github.io/helm-charts"#
+        ));
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T20:51:59Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://prometheus-community.github.io/helm-charts"#
+        ));
+        // Ensure actual errors are not filtered
+        assert!(!is_false_positive(
+            r#"F time="2026-01-04T20:51:59Z" level=error msg="failed to sync application""#
+        ));
+    }
+
+    #[test]
+    fn test_filter_otel_loki_k8s_false_positives() {
+        use chrono::Utc;
+
+        let entries = vec![
+            // OTEL-wrapped info log
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"Body: Str(time="2026-01-04T20:51:58Z" level=info msg="cache hit")"#
+                    .to_string(),
+                labels: HashMap::new(),
+            },
+            // Loki query state metadata
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F State: Error".to_string(),
+                labels: HashMap::new(),
+            },
+            // K8s F prefix with info level
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T20:51:58Z" level=info msg="manifest cache hit""#
+                    .to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual error - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "[ERROR] Database connection failed".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out the 3 false positives
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered.iter().any(|e| e.line.contains("[ERROR]")));
     }
 }

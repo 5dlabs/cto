@@ -994,7 +994,10 @@ mod cto_config_tests {
 
         // Verify essential fields exist
         assert_eq!(config.version, "1.0");
-        assert!(!config.agents.is_empty(), "should have agent configurations");
+        assert!(
+            !config.agents.is_empty(),
+            "should have agent configurations"
+        );
 
         // Verify intake defaults
         assert_eq!(config.defaults.intake.github_app, "5DLabs-Morgan");
@@ -1010,6 +1013,7 @@ mod cto_config_tests {
     /// Test that cto-config.json can be parsed with MCP's expected structure
     /// MCP uses a slightly different struct but should be compatible
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_parse_cto_config_mcp_compatible() {
         // This mirrors the MCP's CtoConfig structure
         #[derive(Debug, serde::Deserialize)]
@@ -1114,8 +1118,8 @@ mod cto_config_tests {
             .unwrap()
             .join("cto-config.json");
 
-        let config_content = std::fs::read_to_string(&config_path)
-            .expect("cto-config.json should exist");
+        let config_content =
+            std::fs::read_to_string(&config_path).expect("cto-config.json should exist");
 
         let config: McpCtoConfig = serde_json::from_str(&config_content)
             .expect("cto-config.json should parse with MCP structure");
@@ -1123,8 +1127,14 @@ mod cto_config_tests {
         // Verify MCP-specific fields
         assert_eq!(config.version, "1.0");
         assert!(config.agents.contains_key("rex"), "should have rex agent");
-        assert!(config.agents.contains_key("blaze"), "should have blaze agent");
-        assert!(config.agents.contains_key("morgan"), "should have morgan agent");
+        assert!(
+            config.agents.contains_key("blaze"),
+            "should have blaze agent"
+        );
+        assert!(
+            config.agents.contains_key("morgan"),
+            "should have morgan agent"
+        );
 
         // Verify agent has required fields
         let rex = config.agents.get("rex").unwrap();
@@ -1133,12 +1143,17 @@ mod cto_config_tests {
         assert!(!rex.model.is_empty());
     }
 
-    /// Test that generate_cto_config produces valid config for all use cases
+    /// Test that `generate_cto_config` produces valid config for all use cases
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_generate_cto_config_roundtrip() {
         use tasks::domain::cto_config::CtoConfig;
 
-        let mut task1 = Task::new("1", "Build REST API", "Create user endpoints with Rust/Axum");
+        let mut task1 = Task::new(
+            "1",
+            "Build REST API",
+            "Create user endpoints with Rust/Axum",
+        );
         task1.agent_hint = Some("rex".to_string());
 
         let mut task2 = Task::new("2", "Build Dashboard", "Create React admin dashboard");
@@ -1180,7 +1195,7 @@ mod cto_config_tests {
         assert_eq!(parsed.agents.len(), config.agents.len());
     }
 
-    /// Test IntakeMode serialization/deserialization
+    /// Test `IntakeMode` serialization/deserialization
     #[test]
     fn test_intake_mode_serde() {
         // Test Cli mode (default)
@@ -1218,7 +1233,10 @@ mod cto_config_tests {
         if let Some(bolt) = config.agents.get("bolt") {
             if let Some(tools) = &bolt.tools {
                 assert!(
-                    tools.remote.iter().any(|t| t.contains("kubernetes") || t.contains("argocd")),
+                    tools
+                        .remote
+                        .iter()
+                        .any(|t| t.contains("kubernetes") || t.contains("argocd")),
                     "Bolt should have infrastructure tools"
                 );
             }
@@ -1238,7 +1256,10 @@ mod cto_config_tests {
         if let Some(cipher) = config.agents.get("cipher") {
             if let Some(tools) = &cipher.tools {
                 assert!(
-                    tools.remote.iter().any(|t| t.contains("scanning") || t.contains("security")),
+                    tools
+                        .remote
+                        .iter()
+                        .any(|t| t.contains("scanning") || t.contains("security")),
                     "Cipher should have security scanning tools"
                 );
             }
