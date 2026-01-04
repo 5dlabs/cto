@@ -1,14 +1,66 @@
 # Node Network Egress Issue: talos-evr-4zu
 
-## Status: ⚠️ Workaround Applied, Root Cause Unknown
+## Status: ✅ RESOLVED (2026-01-04)
 
 ## Summary
 
-The node `talos-evr-4zu` has broken network egress to external IPs (specifically 8.8.8.8:53 for DNS). This caused cluster-wide DNS failures because CoreDNS pods were scheduled on this node.
+The node `talos-evr-4zu` had broken network egress to external IPs (specifically 8.8.8.8:53 for DNS). This caused cluster-wide DNS failures because CoreDNS pods were scheduled on this node.
 
-**Temporary Fix:** Deleted the CoreDNS pod on `talos-evr-4zu`, which rescheduled to a healthy node.
+## Resolution
 
-**Permanent Fix Needed:** Investigate and fix the node's network egress.
+Two issues were identified and fixed:
+
+### Root Cause 1: Wrong Default Gateway
+
+The node had an incorrect default gateway configured (`192.168.1.254`) instead of the correct one (`192.168.1.1`). This was likely left over from a router change.
+
+**Fix applied:**
+```bash
+talosctl -n 192.168.1.77 patch machineconfig --patch @/tmp/gateway-fix.yaml
+# Patch content: Replace gateway 192.168.1.254 → 192.168.1.1
+talosctl -n 192.168.1.77 reboot
+```
+
+### Root Cause 2: Flannel/Cilium CNI Conflict
+
+Both Flannel and Cilium CNIs were running simultaneously. Talos was deploying Flannel by default, conflicting with the Cilium CNI.
+
+**Fix applied:**
+```bash
+# 1. Disable Flannel in Talos cluster config on control plane
+talosctl -n 192.168.1.77 patch machineconfig --patch '{"cluster":{"network":{"cni":{"name":"none"}}}}'
+
+# 2. Remove Flannel DaemonSet and resources
+kubectl delete daemonset kube-flannel -n kube-system
+kubectl delete configmap kube-flannel-cfg -n kube-system
+kubectl delete serviceaccount flannel -n kube-system
+kubectl delete clusterrolebinding flannel
+kubectl delete clusterrole flannel
+
+# 3. Clean up stale flannel.1 interface and routes
+kubectl exec -n kube-system <cilium-pod> -- ip link delete flannel.1
+kubectl exec -n kube-system <cilium-pod> -- ip route del 10.4.0.1 via 10.244.3.0 dev flannel.1
+kubectl exec -n kube-system <cilium-pod> -- ip route del 10.5.0.1 via 10.244.3.0 dev flannel.1
+
+# 4. Restart Cilium to regenerate BPF programs
+kubectl delete pod -n kube-system <cilium-pod-on-affected-node>
+```
+
+### Verification
+
+After fixes, egress works correctly:
+```
+PING 8.8.8.8 (8.8.8.8): 56 data bytes
+64 bytes from 8.8.8.8: seq=0 ttl=118 time=90.364 ms
+64 bytes from 8.8.8.8: seq=1 ttl=118 time=62.001 ms
+64 bytes from 8.8.8.8: seq=2 ttl=118 time=95.548 ms
+--- 8.8.8.8 ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+```
+
+---
+
+## Original Investigation (for reference)
 
 ## Evidence
 

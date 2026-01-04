@@ -878,3 +878,387 @@ mod desktop_window_tests {
         );
     }
 }
+
+/// Tests for cto-config.json parsing and generation
+/// Verifies the unified config works for MCP, Healer, and Argo workflows
+mod cto_config_tests {
+    use tasks::domain::cto_config::generate_cto_config;
+    use tasks::domain::IntakeMode;
+    use tasks::entities::Task;
+
+    // Root config structure - matches what MCP/Healer expect (lenient parsing)
+    // Note: CtoConfig in cto_config.rs is for GENERATION, this is for PARSING
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootCtoConfig {
+        version: String,
+        defaults: RootDefaults,
+        agents: std::collections::HashMap<String, RootAgentConfig>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootDefaults {
+        docs: RootDocsDefaults,
+        code: RootCodeDefaults,
+        intake: RootIntakeDefaults,
+        play: RootPlayDefaults,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootDocsDefaults {
+        model: String,
+        #[serde(rename = "githubApp")]
+        github_app: String,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootCodeDefaults {
+        model: String,
+        #[serde(rename = "githubApp")]
+        github_app: String,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootIntakeDefaults {
+        #[serde(rename = "githubApp")]
+        github_app: String,
+        #[serde(default)]
+        mode: Option<String>,
+        cli: String,
+        primary: RootModelConfig,
+        research: RootModelConfig,
+        fallback: RootModelConfig,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootModelConfig {
+        model: String,
+        provider: String,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootPlayDefaults {
+        model: String,
+        cli: String,
+        #[serde(rename = "implementationAgent")]
+        implementation_agent: String,
+        #[serde(rename = "qualityAgent")]
+        quality_agent: String,
+        #[serde(rename = "securityAgent")]
+        security_agent: String,
+        #[serde(rename = "testingAgent")]
+        testing_agent: String,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootAgentConfig {
+        #[serde(rename = "githubApp")]
+        github_app: String,
+        cli: String,
+        model: String,
+        #[serde(default)]
+        tools: Option<RootAgentTools>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootAgentTools {
+        #[serde(default)]
+        remote: Vec<String>,
+    }
+
+    /// Test that the actual cto-config.json in the repo root can be parsed
+    /// This is the primary integration test - if this fails, MCP/Healer will break
+    #[test]
+    fn test_parse_repo_cto_config() {
+        let config_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("cto-config.json");
+
+        let config_content = std::fs::read_to_string(&config_path)
+            .expect("cto-config.json should exist in repo root");
+
+        // Parse as RootCtoConfig (lenient structure matching MCP/Healer expectations)
+        let config: RootCtoConfig = serde_json::from_str(&config_content)
+            .expect("cto-config.json should parse as RootCtoConfig");
+
+        // Verify essential fields exist
+        assert_eq!(config.version, "1.0");
+        assert!(!config.agents.is_empty(), "should have agent configurations");
+
+        // Verify intake defaults
+        assert_eq!(config.defaults.intake.github_app, "5DLabs-Morgan");
+        assert!(!config.defaults.intake.cli.is_empty());
+        assert!(!config.defaults.intake.primary.model.is_empty());
+
+        // Verify play defaults
+        assert!(!config.defaults.play.model.is_empty());
+        assert!(!config.defaults.play.implementation_agent.is_empty());
+        assert!(!config.defaults.play.quality_agent.is_empty());
+    }
+
+    /// Test that cto-config.json can be parsed with MCP's expected structure
+    /// MCP uses a slightly different struct but should be compatible
+    #[test]
+    fn test_parse_cto_config_mcp_compatible() {
+        // This mirrors the MCP's CtoConfig structure
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpCtoConfig {
+            version: String,
+            defaults: McpWorkflowDefaults,
+            agents: std::collections::HashMap<String, McpAgentConfig>,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpWorkflowDefaults {
+            docs: McpDocsDefaults,
+            code: McpCodeDefaults,
+            #[serde(default)]
+            intake: McpIntakeDefaults,
+            #[serde(default)]
+            play: McpPlayDefaults,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpDocsDefaults {
+            model: String,
+            #[serde(rename = "githubApp")]
+            github_app: String,
+            #[serde(rename = "includeCodebase")]
+            include_codebase: bool,
+            #[serde(rename = "sourceBranch")]
+            source_branch: String,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpCodeDefaults {
+            model: String,
+            #[serde(rename = "githubApp")]
+            github_app: String,
+            #[serde(rename = "continueSession")]
+            continue_session: bool,
+            #[serde(rename = "workingDirectory")]
+            working_directory: String,
+        }
+
+        #[derive(Debug, serde::Deserialize, Default)]
+        #[allow(dead_code)]
+        struct McpIntakeDefaults {
+            #[serde(rename = "githubApp")]
+            github_app: String,
+            primary: Option<McpModelConfig>,
+            research: Option<McpModelConfig>,
+            fallback: Option<McpModelConfig>,
+        }
+
+        #[derive(Debug, serde::Deserialize, Default)]
+        #[allow(dead_code)]
+        struct McpModelConfig {
+            model: String,
+            provider: String,
+        }
+
+        #[derive(Debug, serde::Deserialize, Default)]
+        #[allow(dead_code)]
+        struct McpPlayDefaults {
+            model: String,
+            cli: String,
+            #[serde(rename = "implementationAgent")]
+            implementation_agent: String,
+            #[serde(rename = "frontendAgent")]
+            frontend_agent: Option<String>,
+            #[serde(rename = "qualityAgent")]
+            quality_agent: String,
+            #[serde(rename = "securityAgent")]
+            security_agent: String,
+            #[serde(rename = "testingAgent")]
+            testing_agent: String,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpAgentConfig {
+            #[serde(rename = "githubApp")]
+            github_app: String,
+            cli: String,
+            model: String,
+            #[serde(default)]
+            tools: Option<McpAgentTools>,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpAgentTools {
+            #[serde(default)]
+            remote: Vec<String>,
+        }
+
+        let config_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("cto-config.json");
+
+        let config_content = std::fs::read_to_string(&config_path)
+            .expect("cto-config.json should exist");
+
+        let config: McpCtoConfig = serde_json::from_str(&config_content)
+            .expect("cto-config.json should parse with MCP structure");
+
+        // Verify MCP-specific fields
+        assert_eq!(config.version, "1.0");
+        assert!(config.agents.contains_key("rex"), "should have rex agent");
+        assert!(config.agents.contains_key("blaze"), "should have blaze agent");
+        assert!(config.agents.contains_key("morgan"), "should have morgan agent");
+
+        // Verify agent has required fields
+        let rex = config.agents.get("rex").unwrap();
+        assert_eq!(rex.github_app, "5DLabs-Rex");
+        assert!(!rex.cli.is_empty());
+        assert!(!rex.model.is_empty());
+    }
+
+    /// Test that generate_cto_config produces valid config for all use cases
+    #[test]
+    fn test_generate_cto_config_roundtrip() {
+        use tasks::domain::cto_config::CtoConfig;
+
+        let mut task1 = Task::new("1", "Build REST API", "Create user endpoints with Rust/Axum");
+        task1.agent_hint = Some("rex".to_string());
+
+        let mut task2 = Task::new("2", "Build Dashboard", "Create React admin dashboard");
+        task2.agent_hint = Some("blaze".to_string());
+
+        let mut task3 = Task::new("3", "Deploy to K8s", "Create Kubernetes manifests");
+        task3.agent_hint = Some("bolt".to_string());
+
+        let tasks = vec![task1, task2, task3];
+
+        let config = generate_cto_config(
+            &tasks,
+            "5dlabs/test-project",
+            "test-project",
+            "5dlabs/test-project",
+            "docs/test-project",
+        );
+
+        // Verify generated config
+        assert_eq!(config.version, "1.0");
+
+        // Should have the agents from tasks plus support agents
+        assert!(config.agents.contains_key("rex"));
+        assert!(config.agents.contains_key("blaze"));
+        assert!(config.agents.contains_key("bolt"));
+        assert!(config.agents.contains_key("cleo")); // Always included
+        assert!(config.agents.contains_key("tess")); // Always included
+        assert!(config.agents.contains_key("cipher")); // Always included
+        assert!(config.agents.contains_key("atlas")); // Always included
+
+        // Verify play defaults are set
+        assert_eq!(config.defaults.play.repository, "5dlabs/test-project");
+        assert_eq!(config.defaults.play.service, "test-project");
+
+        // Roundtrip: serialize and deserialize
+        let json = serde_json::to_string_pretty(&config).expect("should serialize");
+        let parsed: CtoConfig = serde_json::from_str(&json).expect("should deserialize");
+        assert_eq!(parsed.version, config.version);
+        assert_eq!(parsed.agents.len(), config.agents.len());
+    }
+
+    /// Test IntakeMode serialization/deserialization
+    #[test]
+    fn test_intake_mode_serde() {
+        // Test Cli mode (default)
+        let cli_json = r#""cli""#;
+        let mode: IntakeMode = serde_json::from_str(cli_json).unwrap();
+        assert_eq!(mode, IntakeMode::Cli);
+
+        // Test Api mode
+        let api_json = r#""api""#;
+        let mode: IntakeMode = serde_json::from_str(api_json).unwrap();
+        assert_eq!(mode, IntakeMode::Api);
+
+        // Test default is Cli
+        assert_eq!(IntakeMode::default(), IntakeMode::Cli);
+
+        // Test roundtrip
+        let serialized = serde_json::to_string(&IntakeMode::Api).unwrap();
+        assert_eq!(serialized, r#""api""#);
+    }
+
+    /// Test that agents have proper tool configurations
+    #[test]
+    fn test_agent_tools_configuration() {
+        let config_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("cto-config.json");
+
+        let config_content = std::fs::read_to_string(&config_path).unwrap();
+        let config: RootCtoConfig = serde_json::from_str(&config_content).unwrap();
+
+        // Bolt should have infrastructure tools
+        if let Some(bolt) = config.agents.get("bolt") {
+            if let Some(tools) = &bolt.tools {
+                assert!(
+                    tools.remote.iter().any(|t| t.contains("kubernetes") || t.contains("argocd")),
+                    "Bolt should have infrastructure tools"
+                );
+            }
+        }
+
+        // Blaze should have UI tools
+        if let Some(blaze) = config.agents.get("blaze") {
+            if let Some(tools) = &blaze.tools {
+                assert!(
+                    tools.remote.iter().any(|t| t.contains("shadcn")),
+                    "Blaze should have shadcn tools"
+                );
+            }
+        }
+
+        // Cipher should have security tools
+        if let Some(cipher) = config.agents.get("cipher") {
+            if let Some(tools) = &cipher.tools {
+                assert!(
+                    tools.remote.iter().any(|t| t.contains("scanning") || t.contains("security")),
+                    "Cipher should have security scanning tools"
+                );
+            }
+        }
+    }
+
+    /// Test that config without platform-config.json still works
+    /// (verifies the merge was successful)
+    #[test]
+    fn test_no_platform_config_dependency() {
+        let platform_config_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("platform-config.json");
+
+        assert!(
+            !platform_config_path.exists(),
+            "platform-config.json should not exist (merged into cto-config.json)"
+        );
+    }
+}
