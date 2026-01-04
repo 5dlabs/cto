@@ -732,9 +732,21 @@ healer:
     cli: "claude"
     model: "claude-opus-4-5-20251101"
     maxAttempts: 3
-    timeWindowMins: 10
+    # Time window for deduplication (increased from 10 to 30 mins to prevent rapid re-spawning)
+    timeWindowMins: 30
     memoryUrl: "http://openmemory.cto.svc:3000"
     memoryEnabled: true
+    # Circuit breaker to prevent spawning when failures are high
+    circuitBreaker:
+      enabled: true
+      # Number of failed CodeRuns before circuit opens
+      failureThreshold: 5
+      # Time window to count failures (minutes)
+      windowMins: 30
+      # Base backoff time for failed branches (minutes), doubles with each retry
+      backoffBaseMins: 5
+    # Maximum concurrent healer CodeRuns allowed
+    maxConcurrentCodeRuns: 5
     # Server config for healer's inline Factory usage (alert analysis/triage)
     server:
       model: "claude-opus-4-5-20251101"
@@ -799,8 +811,8 @@ healer:
     enabled: true
     # Comma-separated list of repositories to monitor
     repositories: "5dlabs/cto"
-    # Poll interval in seconds (60 = 1 minute, 180 = 3 minutes)
-    pollInterval: 60
+    # Poll interval in seconds (300 = 5 minutes, reduced from 60 to prevent excessive CodeRun spawning)
+    pollInterval: 300
     # How far back to look on first poll (minutes)
     lookbackMins: 60
     # Create GitHub issues for detected failures
@@ -811,6 +823,8 @@ healer:
     branches: ""
     # Workflows to exclude from monitoring (comma-separated)
     excludedWorkflows: ""
+    # Maximum failures to process per poll (reduced from 10 to prevent spawning too many CodeRuns)
+    maxPerPoll: 3
 
   # Issue Reconciler - periodically checks and closes resolved issues
   reconciler:

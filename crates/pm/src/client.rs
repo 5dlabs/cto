@@ -950,7 +950,10 @@ impl LinearClient {
     ///
     /// Returns the template with the given name, or None if not found.
     #[instrument(skip(self), fields(name = %name))]
-    pub async fn find_project_template_by_name(&self, name: &str) -> Result<Option<ProjectTemplate>> {
+    pub async fn find_project_template_by_name(
+        &self,
+        name: &str,
+    ) -> Result<Option<ProjectTemplate>> {
         let templates = self.list_project_templates().await?;
         Ok(templates.into_iter().find(|t| t.name == name))
     }

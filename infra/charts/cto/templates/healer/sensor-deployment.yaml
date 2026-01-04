@@ -30,7 +30,7 @@ spec:
             - sensor
             - github-actions
             - --repositories={{ .Values.healer.sensor.repositories | default "5dlabs/cto" }}
-            - --poll-interval={{ .Values.healer.sensor.pollInterval | default 60 }}
+            - --poll-interval={{ .Values.healer.sensor.pollInterval | default 300 }}
             - --lookback-mins={{ .Values.healer.sensor.lookbackMins | default 60 }}
             {{- if .Values.healer.sensor.createIssues }}
             - --create-issues
@@ -42,6 +42,7 @@ spec:
             {{- if .Values.healer.sensor.excludedWorkflows }}
             - --excluded-workflows={{ .Values.healer.sensor.excludedWorkflows }}
             {{- end }}
+            - --max-per-poll={{ .Values.healer.sensor.maxPerPoll | default 3 }}
             - --namespace={{ include "cto.namespace" . }}
             - --verbose
           env:

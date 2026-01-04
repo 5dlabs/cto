@@ -415,6 +415,32 @@ impl GitHubActionsSensor {
 
     /// Process a detected failure.
     fn process_failure(&self, failure: &WorkflowFailure) -> Result<()> {
+        // Pre-check circuit breaker and global limit before doing expensive operations
+        // This avoids fetching logs and creating issues when we can't spawn anyway
+        let spawner = CodeRunSpawner::new(
+            self.remediation_config.clone(),
+            &self.config.namespace,
+            &failure.repository,
+        )?;
+
+        // Check circuit breaker first
+        if !spawner.check_circuit_breaker()? {
+            warn!(
+                "Skipping failure {} - circuit breaker is OPEN",
+                failure.run_id
+            );
+            return Ok(());
+        }
+
+        // Check global concurrent limit
+        if !spawner.check_global_limit()? {
+            warn!(
+                "Skipping failure {} - global CodeRun limit reached",
+                failure.run_id
+            );
+            return Ok(());
+        }
+
         // Fetch additional details (job info, actor)
         let (job_name, job_id, job_url, actor) = Self::fetch_failed_job_details(failure)?;
         let mut failure = failure.clone();
@@ -462,13 +488,7 @@ impl GitHubActionsSensor {
             }
         }
 
-        // Spawn CodeRun for remediation
-        let spawner = CodeRunSpawner::new(
-            self.remediation_config.clone(),
-            &self.config.namespace,
-            &failure.repository,
-        )?;
-
+        // Spawn CodeRun for remediation (spawner already created above)
         spawner.spawn(agent, &routing_ctx)?;
 
         Ok(())

@@ -517,7 +517,7 @@ enum SensorCommands {
         repositories: String,
 
         /// Poll interval in seconds
-        #[arg(long, default_value = "60")]
+        #[arg(long, default_value = "300")]
         poll_interval: u64,
 
         /// How far back to look for failures on first poll (minutes)
@@ -543,6 +543,10 @@ enum SensorCommands {
         /// Kubernetes namespace for `CodeRuns`
         #[arg(long, default_value = "cto")]
         namespace: String,
+
+        /// Maximum failures to process per poll (prevents spawning too many `CodeRuns`)
+        #[arg(long, default_value = "3")]
+        max_per_poll: usize,
 
         /// Run once and exit (instead of continuous loop)
         #[arg(long)]
@@ -2480,6 +2484,7 @@ async fn main() -> Result<()> {
                 branches,
                 excluded_workflows,
                 namespace,
+                max_per_poll,
                 once,
                 config,
             } => {
@@ -2492,6 +2497,7 @@ async fn main() -> Result<()> {
                     &branches,
                     &excluded_workflows,
                     &namespace,
+                    max_per_poll,
                     once,
                     config.as_deref(),
                 )
@@ -2532,6 +2538,7 @@ async fn main() -> Result<()> {
 // =============================================================================
 
 /// Run the GitHub Actions sensor to monitor for workflow failures.
+#[allow(clippy::too_many_arguments)]
 async fn run_github_actions_sensor(
     repositories: &str,
     poll_interval: u64,
@@ -2541,6 +2548,7 @@ async fn run_github_actions_sensor(
     branches: &str,
     excluded_workflows: &str,
     namespace: &str,
+    max_per_poll: usize,
     once: bool,
     config_path: Option<&str>,
 ) -> Result<()> {
@@ -2589,7 +2597,7 @@ async fn run_github_actions_sensor(
         issue_labels: labels,
         branches: branch_filter,
         excluded_workflows: excluded,
-        max_per_poll: 10,
+        max_per_poll,
         namespace: namespace.to_string(),
     };
 

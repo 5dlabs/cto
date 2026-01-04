@@ -820,6 +820,16 @@ pub struct RemediationConfig {
     pub memory_url: Option<String>,
     /// Whether to enable memory queries
     pub memory_enabled: bool,
+    /// Circuit breaker configuration
+    #[serde(default)]
+    pub circuit_breaker: CircuitBreakerConfig,
+    /// Maximum concurrent healer `CodeRuns` allowed (0 = unlimited)
+    #[serde(default = "default_max_concurrent")]
+    pub max_concurrent_coderuns: usize,
+}
+
+fn default_max_concurrent() -> usize {
+    5
 }
 
 impl Default for RemediationConfig {
@@ -828,9 +838,55 @@ impl Default for RemediationConfig {
             cli: "Factory".into(),
             model: "claude-opus-4-5-20251101".into(),
             max_attempts: 3,
-            time_window_mins: 10,
+            time_window_mins: 30,
             memory_url: Some("http://openmemory.cto-system.svc:3000".into()),
             memory_enabled: true,
+            circuit_breaker: CircuitBreakerConfig::default(),
+            max_concurrent_coderuns: default_max_concurrent(),
+        }
+    }
+}
+
+/// Circuit breaker configuration to prevent spawning when failures are high.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CircuitBreakerConfig {
+    /// Whether circuit breaker is enabled
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    /// Number of failed `CodeRuns` before circuit opens
+    #[serde(default = "default_failure_threshold")]
+    pub failure_threshold: u32,
+    /// Time window to count failures (minutes)
+    #[serde(default = "default_window_mins")]
+    pub window_mins: u32,
+    /// Base backoff time for failed branches (minutes), doubles with each retry
+    #[serde(default = "default_backoff_base_mins")]
+    pub backoff_base_mins: u32,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+fn default_failure_threshold() -> u32 {
+    5
+}
+
+fn default_window_mins() -> u32 {
+    30
+}
+
+fn default_backoff_base_mins() -> u32 {
+    5
+}
+
+impl Default for CircuitBreakerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_enabled(),
+            failure_threshold: default_failure_threshold(),
+            window_mins: default_window_mins(),
+            backoff_base_mins: default_backoff_base_mins(),
         }
     }
 }
@@ -919,5 +975,46 @@ mod tests {
             Agent::Rex,
         );
         assert!(state.same_agent_failed_twice());
+    }
+
+    #[test]
+    fn test_circuit_breaker_config_defaults() {
+        let config = CircuitBreakerConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.failure_threshold, 5);
+        assert_eq!(config.window_mins, 30);
+        assert_eq!(config.backoff_base_mins, 5);
+    }
+
+    #[test]
+    fn test_remediation_config_defaults() {
+        let config = RemediationConfig::default();
+        assert_eq!(config.cli, "Factory");
+        assert_eq!(config.model, "claude-opus-4-5-20251101");
+        assert_eq!(config.max_attempts, 3);
+        assert_eq!(config.time_window_mins, 30);
+        assert!(config.memory_enabled);
+        assert_eq!(config.max_concurrent_coderuns, 5);
+        assert!(config.circuit_breaker.enabled);
+    }
+
+    #[test]
+    fn test_remediation_config_serialization() {
+        let config = RemediationConfig::default();
+        let json = serde_json::to_string(&config).unwrap();
+        let parsed: RemediationConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.cli, config.cli);
+        assert_eq!(parsed.model, config.model);
+        assert_eq!(parsed.max_attempts, config.max_attempts);
+        assert_eq!(parsed.time_window_mins, config.time_window_mins);
+        assert_eq!(
+            parsed.max_concurrent_coderuns,
+            config.max_concurrent_coderuns
+        );
+        assert_eq!(
+            parsed.circuit_breaker.failure_threshold,
+            config.circuit_breaker.failure_threshold
+        );
     }
 }
