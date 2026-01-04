@@ -224,6 +224,29 @@ healer:
       cpu: 200m
       memory: 128Mi
 
+# =============================================================================
+# ArgoCD Repo-Server Log Level Fix
+# =============================================================================
+# Configure ArgoCD repo-server log level to suppress verbose INFO logs.
+# The repo-server generates 1000+ "manifest cache hit" INFO messages per scan,
+# which have a CRI "F" prefix that gets misinterpreted as "Fatal" errors by
+# log scanners.
+#
+# Root cause: The CRI log format prefix "F " (for "Full" line) is being
+# incorrectly parsed as a "Fatal" error indicator by log scanners, even though
+# the actual log content shows "level=info".
+#
+# This fix patches the ArgoCD repo-server ConfigMap to use WARN log level,
+# suppressing the verbose manifest cache hit INFO logs.
+argocd:
+  logFix:
+    enabled: true
+    # ArgoCD namespace
+    namespace: "argocd"
+    # Log level to set (valid: debug, info, warn, error)
+    # Set to "warn" to suppress verbose manifest cache INFO logs
+    logLevel: "warn"
+
 # Tools MCP server configuration
 tools:
   config:

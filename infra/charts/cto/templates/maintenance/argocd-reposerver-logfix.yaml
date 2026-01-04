@@ -1,0 +1,151 @@
+{{- if .Values.argocd }}
+{{- if .Values.argocd.logFix }}
+{{- if .Values.argocd.logFix.enabled }}
+---
+# =============================================================================
+# ArgoCD Repo-Server Log Level Fix
+# =============================================================================
+# This Job patches the ArgoCD repo-server log level to WARN to suppress
+# verbose INFO-level "manifest cache hit" messages that are being incorrectly
+# flagged as errors by the log scanner.
+#
+# Root cause: The ArgoCD repo-server generates high volumes of INFO logs for
+# manifest cache operations. These logs contain "level=info" but the CRI log
+# format prefix "F " (for "Full" line) was being misinterpreted as "Fatal"
+# by log parsers.
+#
+# Reference: https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-cmd-params-cm/
+# =============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "cto.fullname" . }}-argocd-logfix-{{ now | date "20060102150405" }}
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: maintenance
+  annotations:
+    # This job is a one-time fix, so we can delete it after completion
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: hook-succeeded
+    helm.sh/hook-weight: "10"
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "cto.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: maintenance
+    spec:
+      {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cto.fullname" . }}-maintenance
+      restartPolicy: OnFailure
+      containers:
+        - name: patch-argocd-cm
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "🔧 Checking ArgoCD repo-server log level configuration..."
+              
+              # Check if the ConfigMap exists
+              if ! kubectl get configmap argocd-cmd-params-cm -n {{ .Values.argocd.logFix.namespace | default "argocd" }} &>/dev/null; then
+                echo "⚠️ argocd-cmd-params-cm ConfigMap not found in {{ .Values.argocd.logFix.namespace | default "argocd" }} namespace"
+                echo "📝 Creating ConfigMap with repo-server log level set to warn..."
+                kubectl create configmap argocd-cmd-params-cm \
+                  -n {{ .Values.argocd.logFix.namespace | default "argocd" }} \
+                  --from-literal=reposerver.log.level={{ .Values.argocd.logFix.logLevel | default "warn" }} || true
+              else
+                echo "✅ argocd-cmd-params-cm ConfigMap found"
+                
+                # Check current log level
+                CURRENT_LEVEL=$(kubectl get configmap argocd-cmd-params-cm -n {{ .Values.argocd.logFix.namespace | default "argocd" }} -o jsonpath='{.data.reposerver\.log\.level}' 2>/dev/null || echo "not-set")
+                echo "📊 Current repo-server log level: $CURRENT_LEVEL"
+                
+                if [ "$CURRENT_LEVEL" != "{{ .Values.argocd.logFix.logLevel | default "warn" }}" ]; then
+                  echo "🔄 Patching repo-server log level to {{ .Values.argocd.logFix.logLevel | default "warn" }}..."
+                  kubectl patch configmap argocd-cmd-params-cm \
+                    -n {{ .Values.argocd.logFix.namespace | default "argocd" }} \
+                    --type merge \
+                    -p '{"data":{"reposerver.log.level":"{{ .Values.argocd.logFix.logLevel | default "warn" }}"}}'
+                  
+                  echo "♻️ Restarting ArgoCD repo-server to apply log level change..."
+                  kubectl rollout restart deployment argocd-repo-server -n {{ .Values.argocd.logFix.namespace | default "argocd" }} || true
+                  
+                  echo "✅ ArgoCD repo-server log level patched successfully"
+                else
+                  echo "✅ Log level already set to {{ .Values.argocd.logFix.logLevel | default "warn" }}, no action needed"
+                fi
+              fi
+              
+              echo "🎉 ArgoCD log fix job completed"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+# ServiceAccount for the maintenance job (if not already created)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "cto.fullname" . }}-maintenance
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: maintenance
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+    helm.sh/hook-weight: "0"
+---
+# ClusterRole to allow patching ArgoCD ConfigMaps
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cto.fullname" . }}-argocd-patch
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: maintenance
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+    helm.sh/hook-weight: "0"
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "create", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["patch"]
+---
+# ClusterRoleBinding for the maintenance service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cto.fullname" . }}-argocd-patch
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: maintenance
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+    helm.sh/hook-weight: "0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cto.fullname" . }}-argocd-patch
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cto.fullname" . }}-maintenance
+    namespace: {{ include "cto.namespace" . }}
+{{- end }}
+{{- end }}
+{{- end }}
