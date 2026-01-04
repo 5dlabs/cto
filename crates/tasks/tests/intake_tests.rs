@@ -1010,6 +1010,7 @@ mod cto_config_tests {
     /// Test that cto-config.json can be parsed with MCP's expected structure
     /// MCP uses a slightly different struct but should be compatible
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_parse_cto_config_mcp_compatible() {
         // This mirrors the MCP's CtoConfig structure
         #[derive(Debug, serde::Deserialize)]
@@ -1133,7 +1134,7 @@ mod cto_config_tests {
         assert!(!rex.model.is_empty());
     }
 
-    /// Test that generate_cto_config produces valid config for all use cases
+    /// Test that `generate_cto_config` produces valid config for all use cases
     #[test]
     fn test_generate_cto_config_roundtrip() {
         use tasks::domain::cto_config::CtoConfig;
@@ -1147,10 +1148,10 @@ mod cto_config_tests {
         let mut task3 = Task::new("3", "Deploy to K8s", "Create Kubernetes manifests");
         task3.agent_hint = Some("bolt".to_string());
 
-        let tasks = vec![task1, task2, task3];
+        let task_list = vec![task1, task2, task3];
 
         let config = generate_cto_config(
-            &tasks,
+            &task_list,
             "5dlabs/test-project",
             "test-project",
             "5dlabs/test-project",
@@ -1180,7 +1181,7 @@ mod cto_config_tests {
         assert_eq!(parsed.agents.len(), config.agents.len());
     }
 
-    /// Test IntakeMode serialization/deserialization
+    /// Test `IntakeMode` serialization/deserialization
     #[test]
     fn test_intake_mode_serde() {
         // Test Cli mode (default)
