@@ -19,6 +19,13 @@ k8sServicePort: 7445
 ipam:
   mode: kubernetes
 
+# MTU Configuration - CRITICAL for WireGuard encryption
+# WireGuard adds 80 bytes overhead (40 byte header + 40 byte authentication)
+# Physical MTU (1500) - WireGuard overhead (80) = 1420
+# Without this, pods send 1500 byte packets that get dropped at the WireGuard tunnel
+# Symptoms: intermittent "Resource temporarily unavailable" errors to external APIs
+mtu: 1420
+
 # WireGuard encryption for pod-to-pod traffic
 encryption:
   enabled: true
@@ -167,8 +174,3 @@ debug:
 
 # NOTE: Do NOT set `devices` explicitly - nodes have different interface names
 # (eno1 vs enp3s0f0). Let Cilium auto-detect devices with runtime detection.
-#
-# The neighbor-link-updater warnings about flannel.1 are non-fatal and caused
-# by Kilo's --compatibility=flannel creating a VXLAN interface. These warnings
-# do not affect cluster operation. Kilo is used for WireGuard VPN access to
-# the cluster (Pod CIDR, Service CIDR, Node Network).
