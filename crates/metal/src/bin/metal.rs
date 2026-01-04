@@ -1429,21 +1429,17 @@ async fn main() -> Result<()> {
 
                 if cp_site != worker_site {
                     anyhow::bail!(
-                        "❌ Site mismatch! Worker region '{}' does not match control plane site '{}'.\n\n\
+                        "❌ Site mismatch! Worker region '{region}' does not match control plane site '{cp_site}'.\n\n\
                          VLAN networking requires all cluster nodes to be in the SAME site.\n\
                          Cross-site clusters will have broken networking:\n\
                          - Worker won't have access to the private VLAN\n\
                          - DNS resolution will fail\n\
                          - Service routing will be unreliable\n\n\
-                         Please use --region {} to create the worker in the same site.",
-                        region, cp_site, cp_site
+                         Please use --region {cp_site} to create the worker in the same site."
                     );
                 }
 
-                println!(
-                    "   ✅ Site validation passed: both nodes will be in {}",
-                    cp_site
-                );
+                println!("   ✅ Site validation passed: both nodes will be in {cp_site}");
             } else {
                 println!("\n⚠️  Warning: --control-plane-id not provided, skipping same-site validation.");
                 println!(

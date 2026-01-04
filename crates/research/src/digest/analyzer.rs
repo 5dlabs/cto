@@ -196,7 +196,7 @@ The CTO platform is a multi-agent software development system built with:
 - AI agents (Rex, Blaze, Tess, etc.) for automated coding
 
 ## Research Entries to Analyze
-{entries}
+{entries_context}
 
 ## Task
 Analyze these entries and identify:
@@ -229,8 +229,7 @@ Respond with JSON:
   "overall_recommendation": "<1-2 sentence recommendation for this batch>"
 }}
 
-Be specific and actionable. Focus on implementation potential, not just interesting reading."#,
-            entries = entries_context,
+Be specific and actionable. Focus on implementation potential, not just interesting reading."#
         );
 
         let messages = vec![AIMessage::system(SYSTEM_PROMPT), AIMessage::user(prompt)];
