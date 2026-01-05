@@ -1487,4 +1487,104 @@ mod tests {
             .iter()
             .any(|e| e.line.contains("ActionCommandManager")));
     }
+
+    #[test]
+    fn test_is_false_positive_otel_wrapped_f_prefix() {
+        // OTEL collector wraps logs with Body: Str(...) format
+        // The inner content may have another F prefix from Fluent Bit
+        // Pattern: F Body: Str(F time="..." level=info ...)
+        assert!(is_false_positive(
+            r#"F Body: Str(F time="2026-01-05T06:54:42Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://prometheus-community.github.io/helm-charts"#
+        ));
+        // Also test without inner F prefix
+        assert!(is_false_positive(
+            r#"F Body: Str(time="2026-01-05T06:54:42Z" level=info msg="manifest cache hit")"#
+        ));
+        // Ensure actual errors are not filtered
+        assert!(!is_false_positive(
+            r#"F Body: Str(time="2026-01-05T06:54:42Z" level=error msg="connection failed")"#
+        ));
+    }
+
+    #[test]
+    fn test_filter_task_3237942171_samples_v2() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-05 07:00:06 UTC
+        // These are the exact patterns that triggered 1000 false positive errors
+        let entries = vec![
+            // ArgoCD manifest cache hit logs with F prefix
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T06:54:42Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://prometheus-community.github.io/helm-charts,Path:,TargetRevision:1.29.0,Helm:&ApplicationSourceHelm{..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // OTEL-wrapped log with nested F prefix
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F Body: Str(F time="2026-01-05T06:54:42Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://prometheus-community.github.io/helm-charts,Path:,TargetRevision:1.29.0,Helm:&Applicatio..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Fluent Bit helm chart manifest cache hit
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T06:54:43Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://fluent.github.io/helm-charts,Path:,TargetRevision:0.47.7,Helm:&ApplicationSourceHelm{ValueFiles:[],..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // WORKER INFO log with errorMessages empty array
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 06:54:46Z INFO ExecutionContext]   "errorMessages": [],"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // WORKER INFO log with command error registration
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 06:54:46Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual error should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T06:54:50Z" level=error msg="failed to sync application""#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 false positives should be filtered, only the actual error should remain
+        assert_eq!(
+            filtered.len(),
+            1,
+            "Expected 1 entry after filtering, got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+
+        // Only the actual level=error log should remain
+        assert!(filtered.iter().any(|e| e.line.contains("level=error")));
+
+        // Verify all false positives are filtered
+        assert!(
+            !filtered
+                .iter()
+                .any(|e| e.line.contains("manifest cache hit")),
+            "manifest cache hit should be filtered"
+        );
+        assert!(
+            !filtered.iter().any(|e| e.line.contains("Body: Str")),
+            "OTEL Body: Str wrapper should be filtered"
+        );
+        assert!(
+            !filtered.iter().any(|e| e.line.contains("errorMessages")),
+            "errorMessages: [] should be filtered"
+        );
+        assert!(
+            !filtered
+                .iter()
+                .any(|e| e.line.contains("ActionCommandManager")),
+            "ActionCommandManager command registration should be filtered"
+        );
+    }
 }
