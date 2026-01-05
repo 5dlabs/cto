@@ -126,6 +126,22 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     // These logs use level=info with an "error" field that explains WHY a plugin is skipped
     // Example: level=info msg="skip loading plugin" error="no scratch file generator: skip plugin"
     r#"(?i)skip\s+loading\s+plugin.*error="#,
+    // Generic containerd/Docker INFO logs with error= explanation field
+    // These are informational messages where error= explains a benign condition, not an actual error
+    // Examples:
+    //   level=info msg="Deleting nftables IPv4 rules" error="exec: \"nft\": executable file not found"
+    //   level=info msg="starting cri plugin" (doesn't have error field but is info-level)
+    // The key is that level=info combined with error= is informational, not an actual error
+    r#"(?i)level\s*=\s*info.*error\s*="#,
+    r#"(?i)error\s*=.*level\s*=\s*info"#,
+    // Containerd nftables cleanup messages (informational, not errors)
+    // These occur when nftables/nft binary isn't available - common in minimal container environments
+    // Example: level=info msg="Deleting nftables IPv4 rules" error="exec: \"nft\": executable file not found"
+    r#"(?i)nftables.*error="#,
+    r#"(?i)error=.*nft.*executable.*not\s+found"#,
+    // Containerd tracing endpoint not configured (informational skip)
+    // Example: level=info msg="skip loading plugin" error="skip plugin: tracing endpoint not configured"
+    r#"(?i)tracing\s+endpoint\s+not\s+configured"#,
     // Warning-level logs should not be treated as errors
     r#"level[=:]\s*["']?warn"#,
     r#"level[=:]\s*["']?warning"#,
@@ -1844,5 +1860,97 @@ mod tests {
             filtered.len(),
             filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn test_is_false_positive_containerd_info_with_error_field() {
+        // Containerd INFO logs with error= explanation field
+        // These are informational, not actual errors
+
+        // nftables cleanup messages
+        assert!(is_false_positive(
+            r#"F time="2026-01-05T18:51:13.265790279Z" level=info msg="Deleting nftables IPv4 rules" error="exec: \"nft\": executable file not found in $PATH""#
+        ));
+        assert!(is_false_positive(
+            r#"F time="2026-01-05T18:51:13.265821076Z" level=info msg="Deleting nftables IPv6 rules" error="exec: \"nft\": executable file not found in $PATH""#
+        ));
+
+        // Tracing endpoint not configured
+        assert!(is_false_positive(
+            r#"F time="2026-01-05T18:51:13.184272863Z" level=info msg="skip loading plugin" error="skip plugin: tracing endpoint not configured""#
+        ));
+
+        // Generic level=info with error= field pattern
+        assert!(is_false_positive(
+            r#"level=info msg="some operation" error="some explanation""#
+        ));
+
+        // CRI plugin startup (level=info without error field)
+        assert!(is_false_positive(
+            r#"F time="2026-01-05T18:51:13.183916823Z" level=info msg="starting cri plugin" config="{\"containerd\":{\"defaultRuntimeName\":\"runc\"...""#
+        ));
+    }
+
+    #[test]
+    fn test_filter_task_3237942171_scan_19_00_10_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-05 19:00:10 UTC
+        // These are containerd INFO logs that should NOT be treated as errors
+        let entries = vec![
+            // Sample 1: CRI plugin startup (level=info)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T18:51:13.183916823Z" level=info msg="starting cri plugin" config="{\"containerd\":{\"defaultRuntimeName\":\"runc\",\"runtimes\":{\"runc\":{\"runtimeType\":\"io.containerd.runc.v2\",...""#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: Skip loading plugin - tracing endpoint not configured
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T18:51:13.184272863Z" level=info msg="skip loading plugin" error="skip plugin: tracing endpoint not configured" id=io.containerd.tracing.processor.v1.otlp type=io.containerd.tracing...."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: Skip loading plugin - tracing endpoint not configured (internal)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T18:51:13.184285095Z" level=info msg="skip loading plugin" error="skip plugin: tracing endpoint not configured" id=io.containerd.internal.v1.tracing type=io.containerd.internal.v1"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: nftables IPv4 cleanup - nft not found
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T18:51:13.265790279Z" level=info msg="Deleting nftables IPv4 rules" error="exec: \"nft\": executable file not found in $PATH""#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: nftables IPv6 cleanup - nft not found
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T18:51:13.265821076Z" level=info msg="Deleting nftables IPv6 rules" error="exec: \"nft\": executable file not found in $PATH""#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual ERROR-level log - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T18:51:14Z" level=error msg="failed to start container""#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 containerd INFO logs should be filtered, only the actual error should remain
+        assert_eq!(
+            filtered.len(),
+            1,
+            "Expected 1 entry after filtering (containerd INFO logs filtered), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+
+        // Only the actual error should remain
+        assert!(filtered.iter().any(|e| e.line.contains("level=error")));
+        assert!(!filtered.iter().any(|e| e.line.contains("starting cri plugin")));
+        assert!(!filtered.iter().any(|e| e.line.contains("nftables")));
+        assert!(!filtered.iter().any(|e| e.line.contains("tracing endpoint")));
     }
 }
