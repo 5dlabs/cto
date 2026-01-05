@@ -100,10 +100,10 @@ pub async fn handle_agent_session_created(
         // Fetch full issue to check for PRD label
         match client.get_issue(&ctx.issue_id).await {
             Ok(issue) => {
-                let has_prd_label = issue
-                    .labels
-                    .iter()
-                    .any(|l| l.name.eq_ignore_ascii_case("prd"));
+                // Check for PRD label (legacy "prd" or new "task:intake")
+                let has_prd_label = issue.labels.iter().any(|l| {
+                    l.name.eq_ignore_ascii_case("prd") || l.name.eq_ignore_ascii_case("task:intake")
+                });
 
                 if has_prd_label {
                     info!(

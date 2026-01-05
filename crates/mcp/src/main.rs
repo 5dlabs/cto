@@ -3585,7 +3585,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         eprintln!("📦 Using repository: {detected}");
         detected
     };
-    let repository_url = format!("https://github.com/{repository_name}");
+    let _repository_url = format!("https://github.com/{repository_name}");
 
     // Auto-detect current branch (using workspace directory)
     eprintln!("🌿 Auto-detecting git branch...");
@@ -3623,11 +3623,10 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         eprintln!("   Please update your MCP client configuration to avoid this warning");
     }
 
-    let num_tasks = 15; // Default task count (reasonable for most projects)
-    let expand_tasks = true; // Always expand for detailed planning
-    let analyze_complexity = true; // Always analyze for better breakdown
+    // Note: num_tasks, expand_tasks, analyze_complexity are configured in the
+    // PM server/webhook handler when Morgan assignment triggers intake workflow
 
-    // Unified intake parameters (docs generation)
+    // Unified intake parameters (docs generation) - logged but not used directly
     let enrich_context = arguments
         .get("enrich_context")
         .and_then(Value::as_bool)
@@ -3686,9 +3685,6 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     project.url.as_deref().unwrap_or(&project.name)
                 );
                 eprintln!("   PRD Issue: {}", issue.url);
-                eprintln!();
-                eprintln!("👉 To start intake: Assign Morgan to the PRD issue in Linear");
-                eprintln!();
                 Some((project, issue))
             }
             Err(e) => {
@@ -3705,125 +3701,6 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         }
         None
     };
-
-    // Create a ConfigMap with the intake files to avoid YAML escaping issues
-    // Sanitize project name for Kubernetes resource naming (RFC 1123 subdomain)
-    let sanitized_name = project_name
-        .to_lowercase()
-        .replace(['/', ' ', '_'], "-")
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '.')
-        .collect::<String>();
-    // Trim to reasonable length and remove leading/trailing dashes
-    let sanitized_name = sanitized_name
-        .trim_matches('-')
-        .trim_matches('.')
-        .chars()
-        .take(50)
-        .collect::<String>();
-
-    let configmap_name = format!(
-        "intake-{}-{}",
-        sanitized_name,
-        chrono::Utc::now().timestamp()
-    );
-
-    eprintln!("📦 Creating ConfigMap: {configmap_name}");
-
-    // Create ConfigMap with the intake content (unified: PRD + docs generation)
-    let config_json = serde_json::json!({
-        "project_name": project_name,
-        "repository_url": format!("https://github.com/{}", repository_name),
-        "github_app": github_app,
-        "primary_model": primary_model,
-        "research_model": research_model,
-        "fallback_model": fallback_model,
-        "model": primary_model, // Legacy compatibility
-        "num_tasks": num_tasks,
-        "expand_tasks": expand_tasks,
-        "analyze_complexity": analyze_complexity,
-        // Unified intake: docs generation parameters
-        "docs_model": docs_model,
-        "enrich_context": enrich_context,
-        "include_codebase": include_codebase,
-        "cli": cli
-    });
-
-    // Create the ConfigMap using kubectl
-    let kubectl_cmd = find_command("kubectl");
-    let cm_output = std::process::Command::new(&kubectl_cmd)
-        .args([
-            "create",
-            "configmap",
-            &configmap_name,
-            "-n",
-            "cto",
-            &format!("--from-literal=prd.txt={prd_content}"),
-            &format!("--from-literal=architecture.md={architecture_content}"),
-            &format!("--from-literal=config.json={config_json}"),
-        ])
-        .output();
-
-    if let Err(e) = cm_output {
-        return Err(anyhow!("Failed to create ConfigMap: {e}"));
-    }
-
-    if let Ok(output) = cm_output {
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow!("Failed to create ConfigMap: {stderr}"));
-        }
-    }
-
-    // Submit Argo workflow with minimal parameters
-    let workflow_name = format!("intake-{}", chrono::Utc::now().timestamp());
-
-    let argo_cmd = find_command("argo");
-    let output = std::process::Command::new(&argo_cmd)
-        .args([
-            "submit",
-            "--from",
-            "workflowtemplate/project-intake",
-            "-n",
-            "cto",
-            "--name",
-            &workflow_name,
-            "-p",
-            &format!("configmap-name={configmap_name}"),
-            "-p",
-            &format!("project-name={project_name}"),
-            "-p",
-            &format!("repository-url={repository_url}"),
-            "-p",
-            &format!("source-branch={branch}"),
-            "-p",
-            &format!("github-app={github_app}"),
-            "-p",
-            &format!("primary-model={primary_model}"),
-            "-p",
-            &format!("research-model={research_model}"),
-            "-p",
-            &format!("fallback-model={fallback_model}"),
-            "-p",
-            &format!("num-tasks={num_tasks}"),
-            "-p",
-            &format!("expand-tasks={expand_tasks}"),
-            "-p",
-            &format!("analyze-complexity={analyze_complexity}"),
-            // Unified intake: docs generation parameters
-            "-p",
-            &format!("docs-model={docs_model}"),
-            "-p",
-            &format!("enrich-context={enrich_context}"),
-            "-p",
-            &format!("include-codebase={include_codebase}"),
-            "-p",
-            &format!("cli={cli}"),
-            "--wait=false",
-            "-o",
-            "json",
-        ])
-        .output();
 
     // Determine source labels for reporting
     let prd_source_label = if arguments
@@ -3857,60 +3734,50 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "none"
     };
 
-    match output {
-        Ok(result) if result.status.success() => {
-            let workflow_json: Value = serde_json::from_slice(&result.stdout)
-                .unwrap_or_else(|_| json!({"message": "Workflow submitted"}));
+    // Build response - Linear setup only, workflow triggered by Morgan assignment
+    if let Some((project, issue)) = &linear_result {
+        eprintln!("✅ Linear intake setup complete!");
+        eprintln!(
+            "   Project: {}",
+            project.url.as_deref().unwrap_or(&project.name)
+        );
+        eprintln!("   PRD Issue: {}", issue.url);
+        eprintln!();
+        eprintln!("👉 Next step: Review the PRD in Linear, then assign Morgan to start intake");
 
-            eprintln!("✅ Project intake workflow submitted: {workflow_name}");
-
-            // Build response with optional Linear info
-            let mut response = json!({
-                "status": "submitted",
-                "workflow_name": workflow_name,
-                "workflow": workflow_json,
-                "message": format!(
-                    "Project intake initiated for '{}'. PR will be created in {} on branch '{}'",
-                    project_name, repository_name, branch
-                ),
-                "details": {
-                    "project_name": project_name,
-                    "repository": repository_name,
-                    "branch": branch,
-                    "prd_source": prd_source_label,
-                    "architecture_source": architecture_source_label
+        Ok(json!({
+            "status": "ready",
+            "message": format!(
+                "Linear intake setup complete for '{}'. Assign Morgan to the PRD issue to start the intake workflow.",
+                project_name
+            ),
+            "linear": {
+                "project": {
+                    "id": project.id,
+                    "name": project.name,
+                    "url": project.url
+                },
+                "prd_issue": {
+                    "id": issue.id,
+                    "identifier": issue.identifier,
+                    "title": issue.title,
+                    "url": issue.url
                 }
-            });
-
-            // Add Linear info if setup was successful
-            if let Some((project, issue)) = &linear_result {
-                response["linear"] = json!({
-                    "project": {
-                        "id": project.id,
-                        "name": project.name,
-                        "url": project.url
-                    },
-                    "prd_issue": {
-                        "id": issue.id,
-                        "identifier": issue.identifier,
-                        "title": issue.title,
-                        "url": issue.url
-                    },
-                    "next_step": "Assign Morgan to the PRD issue to trigger intake workflow"
-                });
-            }
-
-            Ok(response)
-        }
-        Ok(result) => {
-            let error_msg = String::from_utf8_lossy(&result.stderr);
-            eprintln!("❌ Failed to submit intake workflow: {error_msg}");
-            Err(anyhow!("Failed to submit intake workflow: {error_msg}"))
-        }
-        Err(e) => {
-            eprintln!("❌ Failed to execute argo command: {e}");
-            Err(anyhow!("Failed to execute argo command: {e}"))
-        }
+            },
+            "details": {
+                "project_name": project_name,
+                "repository": repository_name,
+                "branch": branch,
+                "prd_source": prd_source_label,
+                "architecture_source": architecture_source_label
+            },
+            "next_step": "Review the PRD issue in Linear. When ready, assign Morgan to start the intake workflow."
+        }))
+    } else {
+        // Linear setup was skipped or failed - cannot proceed without Linear
+        Err(anyhow!(
+            "Linear setup is required for intake. Please configure linear.teamId in cto-config.json or check PM server connectivity."
+        ))
     }
 }
 fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Option<Result<Value>> {

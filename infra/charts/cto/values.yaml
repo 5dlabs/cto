@@ -1028,6 +1028,9 @@ cloudflare:
   bindings:
     pm:
       hostname: pm.5dlabs.ai
+    # CTO platform main URL - routes to PM service for OAuth callbacks
+    cto:
+      hostname: cto.5dlabs.ai
     webhooks:
       hostname: github-webhooks.5dlabs.ai
     # Platform services (external to CTO namespace)
