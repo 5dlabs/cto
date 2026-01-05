@@ -28,9 +28,9 @@
 
 {{#if error_message}}
 **Error**:
-```
+\`\`\`
 {{error_message}}
-```
+\`\`\`
 {{/if}}
 
 {{#if changes_made}}
@@ -45,15 +45,15 @@
 
 ## Current CI Logs
 
-```
+\`\`\`
 {{workflow_logs}}
-```
+\`\`\`
 
 {{#if changed_files}}
 ## Changed Files
 
 {{#each changed_files}}
-- `{{filename}}` ({{status}}: +{{additions}}/-{{deletions}})
+- \`{{filename}}\` ({{status}}: +{{additions}}/-{{deletions}})
 {{/each}}
 {{/if}}
 
@@ -124,16 +124,19 @@
 - If stuck, gather more diagnostic information first
 - Be more thorough in testing before declaring fixed
 
-### Steps
+### Workflow Steps
 
 1. Review previous attempt logs carefully
 2. Identify what was missed or incorrect
-3. Try a fundamentally different approach
-4. Test more thoroughly before committing
-5. Push and verify
+3. **Check for merge conflicts first** - if the PR has conflicts with the base branch, resolve them
+4. Try a fundamentally different approach
+5. Test more thoroughly before committing
+6. Push and verify
+7. **Wait for CI to pass** - monitor the GitHub Actions status
+8. **Merge the PR** once all checks pass and there are no conflicts
 
 {{#if pr_number}}
-Push your fixes to branch `{{branch}}` to update PR #{{pr_number}}.
+Push your fixes to branch \`{{branch}}\` to update PR #{{pr_number}}.
 {{/if}}
 
 {{#if attempt_number}}
@@ -142,3 +145,4 @@ Push your fixes to branch `{{branch}}` to update PR #{{pr_number}}.
 {{/if}}
 {{/if}}
 
+{{> _pr-completion}}
