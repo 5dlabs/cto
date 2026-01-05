@@ -36,17 +36,10 @@
     "intake": {
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
-      "primary": {
-        "model": "claude-opus-4-5-20251101",
-        "provider": "anthropic"
-      },
-      "research": {
-        "model": "claude-opus-4-5-20251101",
-        "provider": "anthropic"
-      },
-      "fallback": {
-        "model": "claude-opus-4-5-20251101",
-        "provider": "anthropic"
+      "models": {
+        "primary": "claude-opus-4-5-20251101",
+        "research": "claude-opus-4-5-20251101",
+        "fallback": "claude-opus-4-5-20251101"
       }
     },
     "_comment_play": "Default values for play() tool - playground test workflows",

@@ -941,8 +941,10 @@ mod cto_config_tests {
     #[derive(Debug, serde::Deserialize)]
     #[allow(dead_code)]
     struct RootPlayDefaults {
-        model: String,
-        cli: String,
+        #[serde(default)]
+        model: Option<String>,
+        #[serde(default)]
+        cli: Option<String>,
         #[serde(rename = "implementationAgent")]
         implementation_agent: String,
         #[serde(rename = "qualityAgent")]

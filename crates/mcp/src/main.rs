@@ -162,10 +162,10 @@ struct LinearIntakeConfig {
 
 /// Linear integration configuration.
 /// Uses PM server for API calls (no client-side API key needed).
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 struct LinearDefaults {
     /// Linear team ID (e.g., "CTOPA" for CTO Platform team)
-    #[serde(rename = "teamId")]
+    #[serde(rename = "teamId", default)]
     team_id: String,
     /// PM server URL for Linear API calls (uses port-forward by default)
     #[serde(rename = "pmServerUrl")]
@@ -177,16 +177,6 @@ struct LinearDefaults {
 
 fn default_true() -> bool {
     true
-}
-
-impl Default for LinearDefaults {
-    fn default() -> Self {
-        LinearDefaults {
-            team_id: String::new(),
-            pm_server_url: None,
-            intake: LinearIntakeConfig::default(),
-        }
-    }
 }
 
 /// Validate model name format (permissive - allows any reasonable model name)
@@ -3733,9 +3723,6 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "primary_model": primary_model,
         "research_model": research_model,
         "fallback_model": fallback_model,
-        "primary_provider": primary_provider,
-        "research_provider": research_provider,
-        "fallback_provider": fallback_provider,
         "model": primary_model, // Legacy compatibility
         "num_tasks": num_tasks,
         "expand_tasks": expand_tasks,
@@ -3802,12 +3789,6 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             &format!("research-model={research_model}"),
             "-p",
             &format!("fallback-model={fallback_model}"),
-            "-p",
-            &format!("primary-provider={primary_provider}"),
-            "-p",
-            &format!("research-provider={research_provider}"),
-            "-p",
-            &format!("fallback-provider={fallback_provider}"),
             "-p",
             &format!("num-tasks={num_tasks}"),
             "-p",
