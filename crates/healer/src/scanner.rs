@@ -1953,4 +1953,61 @@ mod tests {
         assert!(!filtered.iter().any(|e| e.line.contains("nftables")));
         assert!(!filtered.iter().any(|e| e.line.contains("tracing endpoint")));
     }
+
+    #[test]
+    fn test_filter_task_3237942171_scan_20_00_08_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-05 20:00:08 UTC
+        // These are the 5 sample errors that triggered 1000 error reports
+        // All should be filtered as false positives:
+        // - Samples 1-2: containerd INFO logs about nftables cleanup with error= explanation
+        // - Samples 3-5: WORKER INFO logs with empty errorMessages or command error registration
+        let entries = vec![
+            // Sample 1: nftables IPv4 cleanup - nft not found (level=info)
+            // This is an informational message explaining that nft binary isn't available
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T19:53:00.873861735Z" level=info msg="Deleting nftables IPv4 rules" error="exec: \"nft\": executable file not found in $PATH""#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: nftables IPv6 cleanup - nft not found (level=info)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T19:53:00.873909328Z" level=info msg="Deleting nftables IPv6 rules" error="exec: \"nft\": executable file not found in $PATH""#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: WORKER INFO log with empty errorMessages array
+            // Empty array indicates NO errors occurred - this is success, not failure
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 19:53:10Z INFO ExecutionContext]   "errorMessages": [],"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: WORKER INFO log with command error registration
+            // "error" is a command name being registered, not an actual error
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 19:53:10Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: Another WORKER INFO log with empty errorMessages array
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 19:53:10Z INFO ExecutionContext]   "errorMessages": [],"#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 samples should be filtered as false positives
+        assert_eq!(
+            filtered.len(),
+            0,
+            "Expected 0 entries after filtering (all false positives), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+    }
 }
