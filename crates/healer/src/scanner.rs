@@ -2087,4 +2087,64 @@ mod tests {
             r#"F Body: Str(F Body: Str(F time="2026-01-05T20:51:26Z" level=error msg="container failed to start"))"#
         ));
     }
+
+    #[test]
+    fn test_filter_task_3237942171_scan_23_00_06_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-05 23:00:06 UTC
+        // These are the 5 sample errors that triggered 1000 error reports
+        // All should be filtered as false positives:
+        // - Samples 1-2: Loki/Alloy client retry warnings (level=warn)
+        // - Samples 3-4: ArgoCD manifest cache hits (level=info)
+        // - Sample 5: WORKER INFO log with empty errorMessages array
+        let entries = vec![
+            // Sample 1: Loki/Alloy client retry warning (level=warn)
+            // This is a transient retry warning that the client will automatically recover from
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F ts=2026-01-05T22:50:36.118069498Z level=warn msg="error sending batch, will retry" component_path=/ component_id=loki.write.default component=client host=mayastor-loki:3100 status=-1 tenant=openebs ..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: Loki/Alloy client retry warning (level=warn)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F ts=2026-01-05T22:50:49.720380281Z level=warn msg="error sending batch, will retry" component_path=/ component_id=loki.write.default component=client host=mayastor-loki:3100 status=-1 tenant=openebs ..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: ArgoCD manifest cache hit (level=info) - fluent helm charts
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T22:50:52Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://fluent.github.io/helm-charts,Path:,TargetRevision:0.47.7,Helm:&ApplicationSourceHelm{ValueFiles:[]..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: ArgoCD manifest cache hit (level=info) - argo helm charts
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T22:50:52Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://argoproj.github.io/argo-helm,Path:,TargetRevision:0.45.21,Helm:&ApplicationSourceHelm{ValueFiles:[]..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: WORKER INFO log with empty errorMessages array
+            // Empty array indicates NO errors occurred - this is success, not failure
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 22:50:54Z INFO ExecutionContext]   "errorMessages": []"#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 samples should be filtered as false positives:
+        // - Samples 1-2: level=warn Loki retry messages (filtered by level=warn and retry patterns)
+        // - Samples 3-4: level=info manifest cache hits (filtered by level=info pattern)
+        // - Sample 5: WORKER INFO log with empty errorMessages (filtered by WORKER INFO and errorMessages patterns)
+        assert_eq!(
+            filtered.len(),
+            0,
+            "Expected 0 entries after filtering (all false positives), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+    }
 }
