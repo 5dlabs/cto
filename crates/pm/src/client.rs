@@ -1041,19 +1041,14 @@ impl LinearClient {
         status_type: &str,
     ) -> Result<Option<ProjectStatus>> {
         let statuses = self.list_project_statuses().await?;
-        Ok(statuses
-            .into_iter()
-            .find(|s| s.status_type == status_type))
+        Ok(statuses.into_iter().find(|s| s.status_type == status_type))
     }
 
     /// Find a project status by name
     ///
     /// Returns the status with the given name, or None if not found.
     #[instrument(skip(self), fields(name = %name))]
-    pub async fn find_project_status_by_name(
-        &self,
-        name: &str,
-    ) -> Result<Option<ProjectStatus>> {
+    pub async fn find_project_status_by_name(&self, name: &str) -> Result<Option<ProjectStatus>> {
         let statuses = self.list_project_statuses().await?;
         Ok(statuses.into_iter().find(|s| s.name == name))
     }
