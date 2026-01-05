@@ -6,7 +6,11 @@
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
+use base64::Engine;
+use k8s_openapi::api::core::v1::Secret;
+use kube::api::{Api, Patch, PatchParams};
 use serde::Deserialize;
+use serde_json::json;
 use tracing::{debug, error, info, warn};
 
 use crate::server::AppState;
@@ -123,27 +127,49 @@ pub async fn handle_oauth_callback(
                 "Successfully obtained access token"
             );
 
-            // TODO: Store token in OpenBao
-            // For now, just log success
-            debug!(
-                agent = %agent_name,
-                token_preview = &token[..8.min(token.len())],
-                "Token obtained (storage pending)"
-            );
+            // Store the token in the Kubernetes secret
+            let store_result = store_access_token(
+                &state.kube_client,
+                &state.config.namespace,
+                agent_name,
+                &token,
+            )
+            .await;
 
-            Html(format!(
-                r"<!DOCTYPE html>
+            match store_result {
+                Ok(()) => {
+                    info!(agent = %agent_name, "Access token stored in Kubernetes secret");
+                    Html(format!(
+                        r"<!DOCTYPE html>
 <html>
 <head><title>Authorization Successful</title></head>
 <body>
 <h1>✅ Authorization Successful</h1>
 <p>Agent <strong>{agent_name}</strong> has been authorized.</p>
-<p>The access token has been obtained and will be stored securely.</p>
+<p>The access token has been stored securely.</p>
 <p>You can close this window.</p>
 </body>
 </html>"
-            ))
-            .into_response()
+                    ))
+                    .into_response()
+                }
+                Err(e) => {
+                    error!(agent = %agent_name, error = %e, "Failed to store access token");
+                    Html(format!(
+                        r#"<!DOCTYPE html>
+<html>
+<head><title>Token Storage Failed</title></head>
+<body>
+<h1>⚠️ Authorization Partial Success</h1>
+<p>Agent <strong>{agent_name}</strong> was authorized, but the token could not be stored.</p>
+<p><strong>Error:</strong> {e}</p>
+<p>Please contact an administrator.</p>
+</body>
+</html>"#
+                    ))
+                    .into_response()
+                }
+            }
         }
         Err(e) => {
             error!(agent = %agent_name, error = %e, "Token exchange failed");
@@ -162,6 +188,52 @@ pub async fn handle_oauth_callback(
             .into_response()
         }
     }
+}
+
+/// Store the access token in the Kubernetes secret for the agent.
+///
+/// This patches the `linear-app-{agent}` secret to add/update the `access_token` field.
+async fn store_access_token(
+    kube_client: &kube::Client,
+    namespace: &str,
+    agent_name: &str,
+    token: &str,
+) -> Result<(), String> {
+    let secret_name = format!("linear-app-{}", agent_name.to_lowercase());
+    let secrets: Api<Secret> = Api::namespaced(kube_client.clone(), namespace);
+
+    // Base64 encode the token for Kubernetes secret
+    let encoded_token = base64::engine::general_purpose::STANDARD.encode(token);
+
+    // Create a strategic merge patch to update just the access_token field
+    let patch = json!({
+        "data": {
+            "access_token": encoded_token
+        }
+    });
+
+    debug!(
+        secret = %secret_name,
+        namespace = %namespace,
+        "Patching Kubernetes secret with access token"
+    );
+
+    secrets
+        .patch(
+            &secret_name,
+            &PatchParams::default(),
+            &Patch::Strategic(patch),
+        )
+        .await
+        .map_err(|e| format!("Failed to patch secret {secret_name}: {e}"))?;
+
+    info!(
+        secret = %secret_name,
+        agent = %agent_name,
+        "Successfully stored access token in Kubernetes secret"
+    );
+
+    Ok(())
 }
 
 /// Exchange an authorization code for an access token.
