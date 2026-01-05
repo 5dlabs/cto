@@ -1785,4 +1785,64 @@ mod tests {
             filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
         );
     }
+
+    #[test]
+    fn test_filter_task_3237942171_scan_16_00_09_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-05 16:00:09 UTC
+        // These are the 5 sample errors that triggered 1000 error reports
+        let entries = vec![
+            // Sample 1: ArgoCD manifest cache hit (level=info) - should be filtered
+            // Pattern: prometheus-community helm charts
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T15:52:24Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://prometheus-community.github.io/helm-charts,Path:,TargetRevision:1.29.0,Helm:&ApplicationSourceHelm{..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: ArgoCD manifest cache hit (level=info) - should be filtered
+            // Pattern: fluent helm charts
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T15:52:28Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://fluent.github.io/helm-charts,Path:,TargetRevision:0.47.7,Helm:&ApplicationSourceHelm{ValueFiles:[]..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: Loki/Alloy client retry warning (level=warn) - should be filtered
+            // This is a transient retry warning that the client will automatically recover from
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F ts=2026-01-05T15:52:32.712281039Z level=warn msg="error sending batch, will retry" component_path=/ component_id=loki.write.default component=client host=mayastor-loki:3100 status=-1 tenant=openebs ..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: WORKER INFO log with empty errorMessages array - should be filtered
+            // This indicates NO errors occurred (the array is empty)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 15:52:40Z INFO ExecutionContext]   "errorMessages": [],"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: WORKER INFO log with command error registration - should be filtered
+            // This is a command name "error", not an actual error
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 15:52:40Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 samples should be filtered as false positives:
+        // - Samples 1, 2: level=info manifest cache hits (filtered by level=info pattern)
+        // - Sample 3: level=warn retry message (filtered by level=warn and retry patterns)
+        // - Sample 4: WORKER INFO log with empty errorMessages (filtered by WORKER INFO and errorMessages patterns)
+        // - Sample 5: WORKER INFO log with command registration (filtered by WORKER INFO and command error patterns)
+        assert_eq!(
+            filtered.len(),
+            0,
+            "Expected 0 entries after filtering (all false positives), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+    }
 }
