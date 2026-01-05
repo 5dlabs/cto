@@ -1,17 +1,12 @@
 {
   "version": "1.0",
   "defaults": {
-    "docs": {
-      "model": "claude-opus-4-5-20251101",
-      "githubApp": "5DLabs-Morgan",
-      "includeCodebase": false,
-      "sourceBranch": "main"
-    },
     "intake": {
       "githubApp": "5DLabs-Morgan",
       "mode": "cli",
       "cli": "claude",
-      "image": "ghcr.io/5dlabs/claude:latest",
+      "includeCodebase": false,
+      "sourceBranch": "main",
       "primary": {
         "model": "claude-opus-4-5-20251101",
         "provider": "anthropic"

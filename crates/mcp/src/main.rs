@@ -93,26 +93,12 @@ struct CtoConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 struct WorkflowDefaults {
-    docs: DocsDefaults,
     #[serde(default)]
     intake: IntakeDefaults,
     #[serde(default)]
     linear: LinearDefaults,
     #[serde(default)]
     play: PlayDefaults,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct DocsDefaults {
-    model: String,
-    #[serde(rename = "githubApp")]
-    #[allow(dead_code)] // Used for backwards compatibility, will be removed in future version
-    github_app: String,
-    #[serde(rename = "includeCodebase")]
-    include_codebase: bool,
-    #[serde(rename = "sourceBranch")]
-    #[allow(dead_code)] // Used for backwards compatibility, will be removed in future version
-    source_branch: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -125,9 +111,21 @@ struct ModelConfig {
 struct IntakeDefaults {
     #[serde(rename = "githubApp")]
     github_app: String,
+    #[serde(default)]
+    mode: String,
+    #[serde(default)]
+    cli: String,
+    #[serde(rename = "includeCodebase", default)]
+    include_codebase: bool,
+    #[serde(rename = "sourceBranch", default = "default_source_branch")]
+    source_branch: String,
     primary: ModelConfig,
     research: ModelConfig,
     fallback: ModelConfig,
+}
+
+fn default_source_branch() -> String {
+    "main".to_string()
 }
 
 impl Default for IntakeDefaults {
@@ -136,6 +134,10 @@ impl Default for IntakeDefaults {
         // Morgan is the intake agent responsible for PRD processing
         IntakeDefaults {
             github_app: "5DLabs-Morgan".to_string(),
+            mode: "cli".to_string(),
+            cli: "claude".to_string(),
+            include_codebase: false,
+            source_branch: "main".to_string(),
             primary: ModelConfig {
                 model: String::new(),
                 provider: String::new(),
@@ -982,7 +984,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let source_branch = arguments
         .get("source_branch")
         .and_then(|v| v.as_str())
-        .map_or_else(|| config.defaults.docs.source_branch.clone(), String::from);
+        .map_or_else(|| config.defaults.intake.source_branch.clone(), String::from);
 
     // Check for uncommitted changes and push them before starting docs generation
     eprintln!("🔍 Checking for uncommitted changes...");
@@ -1086,7 +1088,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         config.agents[agent].github_app.clone()
     } else {
         // Use default from config
-        config.defaults.docs.github_app.clone()
+        config.defaults.intake.github_app.clone()
     };
 
     // Resolve selected agent key for precedence decisions
@@ -1103,25 +1105,25 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         })
     };
 
-    // Handle model precedence: explicit arg > agent model > docs default model (deprecated)
+    // Handle model precedence: explicit arg > agent model > intake.primary.model
     let model = if let Some(m) = arguments.get("model").and_then(|v| v.as_str()) {
         m.to_string()
     } else if let Some(agent_key) = &selected_agent_key {
         let agent_model = &config.agents[agent_key].model;
         if agent_model.is_empty() {
             eprintln!(
-                "⚠️ INFO: Agent '{agent_key}' has empty model; falling back to defaults.docs.model (deprecated)"
+                "⚠️ INFO: Agent '{agent_key}' has empty model; falling back to defaults.intake.primary.model"
             );
-            config.defaults.docs.model.clone()
+            config.defaults.intake.primary.model.clone()
         } else {
             agent_model.clone()
         }
     } else {
         eprintln!(
-            "⚠️ INFO: No agent resolved; using defaults.docs.model (deprecated): {}",
-            config.defaults.docs.model
+            "⚠️ INFO: No agent resolved; using defaults.intake.primary.model: {}",
+            config.defaults.intake.primary.model
         );
-        config.defaults.docs.model.clone()
+        config.defaults.intake.primary.model.clone()
     };
 
     // Validate model name (support both Claude API and CLAUDE code formats)
@@ -1133,7 +1135,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let include_codebase = arguments
         .get("include_codebase")
         .and_then(serde_json::Value::as_bool)
-        .unwrap_or(config.defaults.docs.include_codebase);
+        .unwrap_or(config.defaults.intake.include_codebase);
 
     // Calculate relative working directory for container (relative to git root)
     let container_working_directory = if let Ok(relative_path) = project_dir.strip_prefix(&git_root)
@@ -3648,11 +3650,11 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let include_codebase = arguments
         .get("include_codebase")
         .and_then(Value::as_bool)
-        .unwrap_or(config.defaults.docs.include_codebase);
+        .unwrap_or(config.defaults.intake.include_codebase);
     let docs_model = arguments
         .get("model")
         .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.docs.model);
+        .unwrap_or(&config.defaults.intake.primary.model);
 
     // CLI for documentation generation
     let cli = arguments

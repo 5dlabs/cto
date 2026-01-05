@@ -899,19 +899,10 @@ mod cto_config_tests {
     #[derive(Debug, serde::Deserialize)]
     #[allow(dead_code)]
     struct RootDefaults {
-        docs: RootDocsDefaults,
         #[serde(default)]
         code: Option<RootCodeDefaults>,
         intake: RootIntakeDefaults,
         play: RootPlayDefaults,
-    }
-
-    #[derive(Debug, serde::Deserialize)]
-    #[allow(dead_code)]
-    struct RootDocsDefaults {
-        model: String,
-        #[serde(rename = "githubApp")]
-        github_app: String,
     }
 
     #[derive(Debug, serde::Deserialize)]
@@ -930,6 +921,10 @@ mod cto_config_tests {
         #[serde(default)]
         mode: Option<String>,
         cli: String,
+        #[serde(rename = "includeCodebase", default)]
+        include_codebase: bool,
+        #[serde(rename = "sourceBranch", default)]
+        source_branch: Option<String>,
         primary: RootModelConfig,
         research: RootModelConfig,
         fallback: RootModelConfig,
@@ -1028,25 +1023,12 @@ mod cto_config_tests {
         #[derive(Debug, serde::Deserialize)]
         #[allow(dead_code)]
         struct McpWorkflowDefaults {
-            docs: McpDocsDefaults,
             #[serde(default)]
             code: Option<McpCodeDefaults>,
             #[serde(default)]
             intake: McpIntakeDefaults,
             #[serde(default)]
             play: McpPlayDefaults,
-        }
-
-        #[derive(Debug, serde::Deserialize)]
-        #[allow(dead_code)]
-        struct McpDocsDefaults {
-            model: String,
-            #[serde(rename = "githubApp")]
-            github_app: String,
-            #[serde(rename = "includeCodebase")]
-            include_codebase: bool,
-            #[serde(rename = "sourceBranch")]
-            source_branch: String,
         }
 
         #[derive(Debug, serde::Deserialize)]
@@ -1066,6 +1048,10 @@ mod cto_config_tests {
         struct McpIntakeDefaults {
             #[serde(rename = "githubApp")]
             github_app: String,
+            #[serde(rename = "includeCodebase", default)]
+            include_codebase: bool,
+            #[serde(rename = "sourceBranch", default)]
+            source_branch: Option<String>,
             primary: Option<McpModelConfig>,
             research: Option<McpModelConfig>,
             fallback: Option<McpModelConfig>,
