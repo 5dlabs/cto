@@ -16,7 +16,7 @@ const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
 /// Default model
-const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL: &str = "claude-sonnet-4-5-20250514";
 
 /// Supported Anthropic models
 const SUPPORTED_MODELS: &[&str] = &[
@@ -31,7 +31,7 @@ const SUPPORTED_MODELS: &[&str] = &[
     // Claude 4.1 models
     "claude-opus-4-1-20250805",
     // Claude 4 models
-    "claude-sonnet-4-20250514",
+    "claude-sonnet-4-5-20250514",
     // Claude 3.5 models (deprecated, but kept for backwards compatibility tests)
     // Note: claude-3-5-sonnet-20241022 was removed from Anthropic API
     "claude-3-5-haiku-20241022",
@@ -475,7 +475,7 @@ mod tests {
         // Claude 4.1 models
         assert!(provider.supports_model("claude-opus-4-1-20250805"));
         // Claude 4 models
-        assert!(provider.supports_model("claude-sonnet-4-20250514"));
+        assert!(provider.supports_model("claude-sonnet-4-5-20250514"));
         // Claude 3 models
         assert!(provider.supports_model("claude-3-opus-20240229"));
         // Non-Anthropic models

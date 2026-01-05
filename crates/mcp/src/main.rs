@@ -3263,7 +3263,7 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
     let model = arguments
         .get("model")
         .and_then(|v| v.as_str())
-        .unwrap_or("claude-sonnet-4-20250514");
+        .unwrap_or("claude-sonnet-4-5-20250514");
 
     // Build tasks intake command
     // Check for local development binary first, then fall back to PATH
@@ -4394,14 +4394,14 @@ fn create_mcp_server_coderun(
             "repositoryUrl": "https://github.com/5dlabs/cto",
             "docsRepositoryUrl": "https://github.com/5dlabs/cto",
             "workingDirectory": ".",
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-sonnet-4-5-20250514",
             "githubApp": "5DLabs-Rex",
             "continueSession": false,
             "overwriteMemory": true,
             "promptModification": prompt,
             "cliConfig": {
                 "cliType": "claude",
-                "model": "claude-sonnet-4-20250514"
+                "model": "claude-sonnet-4-5-20250514"
             },
             "remoteTools": "mcp_tools_github_*,mcp_tools_argocd_*,mcp_tools_kubernetes_*",
             "env": env_map

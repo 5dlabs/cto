@@ -43,10 +43,7 @@ impl AutoMergeHandler {
     /// # Errors
     ///
     /// Returns an error if the GitHub API calls fail.
-    pub async fn handle_success(
-        &self,
-        tracked: &TrackedRemediation,
-    ) -> Result<CompletionAction> {
+    pub async fn handle_success(&self, tracked: &TrackedRemediation) -> Result<CompletionAction> {
         let Some(pr_number) = tracked.pr_number else {
             debug!("No PR number associated with remediation, skipping auto-merge");
             return Ok(CompletionAction::Success);
@@ -60,9 +57,7 @@ impl AutoMergeHandler {
         info!(pr = pr_number, "Checking PR status for auto-merge");
 
         // Poll for PR status
-        let timeout = Duration::from_secs(
-            u64::from(self.config.check_timeout_mins) * 60,
-        );
+        let timeout = Duration::from_secs(u64::from(self.config.check_timeout_mins) * 60);
         let start = std::time::Instant::now();
 
         loop {
@@ -82,7 +77,7 @@ impl AutoMergeHandler {
             match status {
                 MergeStatus::Ready => {
                     info!(pr = pr_number, "PR is ready to merge");
-                    return self.attempt_merge(pr_number).await;
+                    return self.attempt_merge(pr_number);
                 }
                 MergeStatus::Conflicting => {
                     warn!(pr = pr_number, "PR has merge conflicts");
@@ -113,7 +108,7 @@ impl AutoMergeHandler {
     }
 
     /// Attempt to merge the PR.
-    async fn attempt_merge(&self, pr_number: u32) -> Result<CompletionAction> {
+    fn attempt_merge(&self, pr_number: u32) -> Result<CompletionAction> {
         let method = parse_merge_method(&self.config.merge_method);
 
         info!(
