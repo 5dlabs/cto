@@ -355,7 +355,7 @@ runs:
                 continue
               fi
               # Capture exit code to handle SIGINT (130) properly
-              local comp_exit=0
+              comp_exit=0
               rustup component add "$comp_name" || comp_exit=$?
               if [ "$comp_exit" -eq 0 ]; then
                 echo "  ✅ Component $comp_name installed"
