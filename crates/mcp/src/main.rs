@@ -3747,7 +3747,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             }
             Err(e) => {
                 eprintln!("⚠️  Linear setup failed (continuing without): {e}");
-                eprintln!("   Make sure LINEAR_API_KEY environment variable is set");
+                eprintln!("   Make sure the PM server is running: kubectl port-forward svc/cto-pm 8081:8081 -n cto");
                 None
             }
         }
