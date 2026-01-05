@@ -395,6 +395,32 @@ async fn handle_intake_setup(
         team.id
     };
 
+    // Ensure play workflow states exist for the team's board view
+    if let Err(e) =
+        crate::handlers::intake::ensure_play_workflow_states(client, &team_id).await
+    {
+        warn!(
+            error = %e,
+            "Failed to ensure play workflow states (continuing with project creation)"
+        );
+    }
+
+    // Try to find "Planned" project status for initial project state
+    let status_id = match client.find_project_status_by_type("planned").await {
+        Ok(Some(status)) => {
+            info!(status_id = %status.id, status_name = %status.name, "Using 'Planned' project status");
+            Some(status.id)
+        }
+        Ok(None) => {
+            debug!("No 'planned' type project status found, project will use default status");
+            None
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to look up project status, continuing without");
+            None
+        }
+    };
+
     // Create project
     let project_description = format!(
         "## Project Overview\n\n\
@@ -415,7 +441,7 @@ async fn handle_intake_setup(
             lead_id: None,
             target_date: None,
             template_id: None,
-            status_id: None,
+            status_id,
         })
         .await
         .map_err(|e| {
