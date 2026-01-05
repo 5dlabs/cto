@@ -132,9 +132,14 @@ if [ -f "$CLI_WORK_DIR/task/tools-guide.md" ]; then
 fi
 
 # Agent guidelines (gracefully handle missing ConfigMap)
+# Only copy AGENTS.md if it doesn't already exist in the repo to avoid git conflicts
 if [ -f /task-files/AGENTS.md ]; then
-    cp /task-files/AGENTS.md "$CLI_WORK_DIR/" 2>/dev/null || true
-    echo "  ✓ AGENTS.md"
+    if [ ! -f "$CLI_WORK_DIR/AGENTS.md" ]; then
+        cp /task-files/AGENTS.md "$CLI_WORK_DIR/" 2>/dev/null || true
+        echo "  ✓ AGENTS.md (from ConfigMap)"
+    else
+        echo "  ✓ AGENTS.md (using repo version)"
+    fi
 fi
 
 echo ""
