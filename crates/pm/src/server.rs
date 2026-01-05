@@ -411,7 +411,7 @@ async fn handle_intake_setup(
         .create_project(crate::models::ProjectCreateInput {
             name: request.project_name.clone(),
             description: Some(project_description),
-            team_ids: Some(vec![team_id.to_string()]),
+            team_ids: Some(vec![team_id.clone()]),
             lead_id: None,
             target_date: None,
             template_id: None,
@@ -465,7 +465,7 @@ async fn handle_intake_setup(
 
     let issue = client
         .create_issue(crate::models::IssueCreateInput {
-            team_id: team_id.to_string(),
+            team_id: team_id.clone(),
             title: issue_title.clone(),
             description: Some(issue_description),
             parent_id: None,
