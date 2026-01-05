@@ -779,7 +779,7 @@ fn create_linear_intake_setup(
         .pm_server_url
         .clone()
         .or_else(|| std::env::var("CTO_PM_SERVER_URL").ok())
-        .unwrap_or_else(|| "http://localhost:8081".to_string());
+        .unwrap_or_else(|| "https://pm.5dlabs.ai".to_string());
 
     eprintln!("📋 Setting up Linear project and PRD issue via PM server...");
     eprintln!("   PM Server: {pm_server_url}");
@@ -801,7 +801,7 @@ fn create_linear_intake_setup(
         .header("Content-Type", "application/json")
         .json(&request_body)
         .send()
-        .context("Failed to send request to PM server. Make sure the PM server is running (kubectl port-forward svc/cto-pm 8081:8081 -n cto)")?;
+        .context("Failed to send request to PM server at pm.5dlabs.ai")?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -3747,7 +3747,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             }
             Err(e) => {
                 eprintln!("⚠️  Linear setup failed (continuing without): {e}");
-                eprintln!("   Make sure the PM server is running: kubectl port-forward svc/cto-pm 8081:8081 -n cto");
+                eprintln!("   Check PM server status at https://pm.5dlabs.ai/health");
                 None
             }
         }
