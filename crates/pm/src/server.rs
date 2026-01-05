@@ -396,9 +396,7 @@ async fn handle_intake_setup(
     };
 
     // Ensure play workflow states exist for the team's board view
-    if let Err(e) =
-        crate::handlers::intake::ensure_play_workflow_states(client, &team_id).await
-    {
+    if let Err(e) = crate::handlers::intake::ensure_play_workflow_states(client, &team_id).await {
         warn!(
             error = %e,
             "Failed to ensure play workflow states (continuing with project creation)"
