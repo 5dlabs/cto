@@ -29,6 +29,34 @@ use crate::webhooks::{
 };
 use crate::LinearClient;
 
+/// Get an agent-specific Linear client using the agent's OAuth access token.
+///
+/// For agent activities, Linear requires the OAuth token obtained when the agent
+/// app was installed, not a personal API key. This function creates a new client
+/// with the agent's access token if available.
+///
+/// Returns `None` if:
+/// - The agent is not configured
+/// - The agent doesn't have an access token (OAuth not completed)
+/// - Failed to create the client
+fn get_agent_client(config: &Config, agent_name: &str) -> Option<LinearClient> {
+    let token = config.linear.get_access_token(agent_name)?;
+    match LinearClient::new(token) {
+        Ok(client) => {
+            debug!(agent = %agent_name, "Created agent-specific Linear client");
+            Some(client)
+        }
+        Err(e) => {
+            warn!(
+                agent = %agent_name,
+                error = %e,
+                "Failed to create agent-specific Linear client"
+            );
+            None
+        }
+    }
+}
+
 /// Shared application state.
 #[derive(Clone)]
 pub struct AppState {
@@ -661,11 +689,11 @@ pub async fn linear_webhook_handler(
     match (&payload.event_type, &payload.action) {
         (WebhookType::AgentSessionEvent, WebhookAction::Created) => {
             info!(agent = %agent_name, "Routing to session created handler");
-            handle_session_created(&state, &payload).await
+            handle_session_created(&state, &payload, agent_name).await
         }
         (WebhookType::AgentSessionEvent, WebhookAction::Prompted) => {
             info!(agent = %agent_name, "Routing to session prompted handler");
-            handle_session_prompted(&state, &payload).await
+            handle_session_prompted(&state, &payload, agent_name).await
         }
         _ => {
             debug!(
@@ -690,6 +718,7 @@ pub async fn linear_webhook_handler(
 async fn handle_session_created(
     state: &AppState,
     payload: &WebhookPayload,
+    agent_name: &str,
 ) -> Result<Json<Value>, StatusCode> {
     let session_id = payload.get_session_id().ok_or_else(|| {
         warn!("Missing session ID in webhook payload");
@@ -765,11 +794,20 @@ async fn handle_session_created(
             "Detected PRD issue - triggering intake workflow"
         );
 
-        // Create emitter for activity emission
-        let emitter = state
-            .linear_client
+        // Create emitter for activity emission using agent's OAuth token
+        // (not the workspace API key, which Linear rejects for agent activities)
+        let agent_client = get_agent_client(&state.config, agent_name);
+        let emitter = agent_client
             .as_ref()
             .map(|client| LinearAgentEmitter::new(client.clone(), session_id));
+
+        if emitter.is_none() {
+            warn!(
+                agent = %agent_name,
+                "Agent OAuth token not available - activities will not be emitted. \
+                 Complete OAuth authorization at /oauth/start?agent={agent_name}"
+            );
+        }
 
         // Emit initial thought and plan
         if let Some(ref emitter) = emitter {
@@ -916,11 +954,18 @@ async fn handle_session_created(
             "Detected task issue - triggering play workflow"
         );
 
-        // Create emitter for activity emission
-        let emitter = state
-            .linear_client
+        // Create emitter for activity emission using agent's OAuth token
+        let agent_client = get_agent_client(&state.config, agent_name);
+        let emitter = agent_client
             .as_ref()
             .map(|client| LinearAgentEmitter::new(client.clone(), session_id));
+
+        if emitter.is_none() {
+            warn!(
+                agent = %agent_name,
+                "Agent OAuth token not available - activities will not be emitted"
+            );
+        }
 
         // Emit initial thought and plan
         if let Some(ref emitter) = emitter {
@@ -1064,8 +1109,8 @@ async fn handle_session_created(
             "Issue does not have recognized labels for intake or play workflow"
         );
 
-        // Provide helpful guidance
-        if let Some(client) = &state.linear_client {
+        // Provide helpful guidance using agent's client
+        if let Some(client) = &get_agent_client(&state.config, agent_name) {
             let _ = client
                 .emit_response(
                     session_id,
@@ -1093,6 +1138,7 @@ async fn handle_session_created(
 async fn handle_session_prompted(
     state: &AppState,
     payload: &WebhookPayload,
+    agent_name: &str,
 ) -> Result<Json<Value>, StatusCode> {
     use crate::handlers::agent_comms::{broadcast_to_session, AgentMessage};
 
@@ -1103,6 +1149,9 @@ async fn handle_session_prompted(
 
     let issue_identifier = payload.get_issue().map(|i| i.identifier.clone());
 
+    // Get agent-specific client for activities
+    let agent_client = get_agent_client(&state.config, agent_name);
+
     // Check for stop signal
     if payload.has_stop_signal() {
         info!(
@@ -1110,7 +1159,7 @@ async fn handle_session_prompted(
             "Received stop signal - cancelling workflow"
         );
 
-        if let Some(client) = &state.linear_client {
+        if let Some(client) = &agent_client {
             let _ = client
                 .emit_thought(session_id, "Received stop signal. Cancelling workflow...")
                 .await;
@@ -1134,7 +1183,7 @@ async fn handle_session_prompted(
         match cancel_play_workflow(&state.config.namespace, session_id).await {
             Ok(()) => {
                 info!(session_id = %session_id, "Workflows cancelled");
-                if let Some(client) = &state.linear_client {
+                if let Some(client) = &agent_client {
                     let _ = client
                         .emit_response(session_id, "✅ Workflow cancelled successfully.")
                         .await;
@@ -1148,7 +1197,7 @@ async fn handle_session_prompted(
             }
             Err(e) => {
                 error!(error = %e, "Failed to cancel workflows");
-                if let Some(client) = &state.linear_client {
+                if let Some(client) = &agent_client {
                     let _ = client
                         .emit_error(session_id, format!("Failed to cancel workflow: {e}"))
                         .await;
@@ -1176,7 +1225,7 @@ async fn handle_session_prompted(
     // If we have a prompt, forward it to running agents
     if let Some(body) = &prompt_body {
         // Emit ephemeral "processing" thought
-        if let Some(client) = &state.linear_client {
+        if let Some(client) = &agent_client {
             let _ = client
                 .emit_ephemeral_thought(session_id, "💭 Processing your message...")
                 .await;
@@ -1199,7 +1248,7 @@ async fn handle_session_prompted(
                     "Forwarded message to running agents"
                 );
 
-                if let Some(client) = &state.linear_client {
+                if let Some(client) = &agent_client {
                     let _ = client
                         .emit_thought(
                             session_id,
@@ -1225,7 +1274,7 @@ async fn handle_session_prompted(
                     "Could not forward message to agents"
                 );
 
-                if let Some(client) = &state.linear_client {
+                if let Some(client) = &agent_client {
                     let _ = client
                         .emit_thought(
                             session_id,
