@@ -742,12 +742,22 @@ async fn handle_session_created(
     // Check issue labels to determine workflow type
     let labels: Vec<&str> = issue.labels.iter().map(|l| l.name.as_str()).collect();
 
-    let is_prd = labels
-        .iter()
-        .any(|l| *l == "prd" || *l == "intake" || *l == "product-requirement");
-    let is_task = labels
-        .iter()
-        .any(|l| *l == "task" || *l == "cto-task" || l.starts_with("task-"));
+    // Check for intake/PRD labels (legacy: prd, intake, product-requirement; new: task:intake)
+    let is_prd = labels.iter().any(|l| {
+        *l == "prd"
+            || *l == "intake"
+            || *l == "product-requirement"
+            || *l == "task:intake"
+            || l.eq_ignore_ascii_case("task:intake")
+    });
+    // Check for task/play labels (legacy: task, cto-task, task-*; new: task:play)
+    let is_task = labels.iter().any(|l| {
+        *l == "task"
+            || *l == "cto-task"
+            || *l == "task:play"
+            || l.eq_ignore_ascii_case("task:play")
+            || l.starts_with("task-")
+    });
 
     if is_prd {
         info!(
@@ -1061,8 +1071,8 @@ async fn handle_session_created(
                     session_id,
                     "I couldn't determine the workflow type for this issue.\n\n\
                     **To trigger a workflow, add one of these labels:**\n\
-                    - `prd`, `intake`, or `product-requirement` → PRD processing (intake)\n\
-                    - `task` or `cto-task` → Task implementation (play)",
+                    - `task:intake` (or legacy: `prd`, `intake`) → PRD processing\n\
+                    - `task:play` (or legacy: `task`, `cto-task`) → Task implementation",
                 )
                 .await;
         }
