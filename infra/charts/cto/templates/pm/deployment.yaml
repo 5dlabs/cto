@@ -78,6 +78,23 @@ spec:
             - name: WEBHOOK_CALLBACK_URL
               value: {{ .Values.pm.github.webhookCallbackUrl | quote }}
             {{- end }}
+            # Linear OAuth App credentials for each agent
+            {{- $agents := list "morgan" "rex" "blaze" "grizz" "nova" "tap" "spark" "cleo" "cipher" "tess" "atlas" "bolt" }}
+            {{- range $agents }}
+            {{- $upper := . | upper }}
+            - name: LINEAR_APP_{{ $upper }}_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: linear-app-{{ . }}
+                  key: client_id
+                  optional: true
+            - name: LINEAR_APP_{{ $upper }}_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: linear-app-{{ . }}
+                  key: client_secret
+                  optional: true
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ .Values.pm.secrets.secretName }}
