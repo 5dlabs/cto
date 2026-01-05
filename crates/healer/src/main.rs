@@ -4802,7 +4802,7 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
     let default_model = play_config
         .model
         .as_deref()
-        .unwrap_or("claude-sonnet-4-20250514");
+        .unwrap_or("claude-sonnet-4-5-20250514");
 
     // Resolve all 5 agent stages from config
     let impl_agent = resolve_agent_config(

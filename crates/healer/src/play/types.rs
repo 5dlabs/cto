@@ -526,7 +526,7 @@ impl Default for EvaluationConfig {
             enabled: true,
             use_llm: true,
             llm_endpoint: "http://tools-server:8080/v1/chat/completions".to_string(),
-            llm_model: "claude-sonnet-4-20250514".to_string(),
+            llm_model: "claude-sonnet-4-5-20250514".to_string(),
             pass_threshold: 0.7,
             feedback_enabled: true,
             feedback_threshold: 3,
@@ -551,7 +551,7 @@ impl EvaluationConfig {
             llm_endpoint: std::env::var("EVALUATION_LLM_ENDPOINT")
                 .unwrap_or_else(|_| "http://tools-server:8080/v1/chat/completions".to_string()),
             llm_model: std::env::var("EVALUATION_LLM_MODEL")
-                .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string()),
+                .unwrap_or_else(|_| "claude-sonnet-4-5-20250514".to_string()),
             pass_threshold: std::env::var("EVALUATION_PASS_THRESHOLD")
                 .ok()
                 .and_then(|v| v.parse().ok())

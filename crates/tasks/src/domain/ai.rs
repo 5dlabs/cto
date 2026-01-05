@@ -66,7 +66,7 @@ impl AIDomain {
     /// Get the default model for a provider.
     fn get_default_model(provider: &dyn AIProvider) -> &str {
         if provider.name() == "anthropic" {
-            "claude-sonnet-4-20250514"
+            "claude-sonnet-4-5-20250514"
         } else {
             "gpt-4o"
         }

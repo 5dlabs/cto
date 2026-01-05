@@ -19,7 +19,7 @@ use super::provider::{
 };
 
 /// Default model for CLI-based generation
-const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL: &str = "claude-sonnet-4-5-20250514";
 
 /// Default model for extended thinking (Opus 4.5 - latest with thinking)
 pub const DEFAULT_THINKING_MODEL: &str = "claude-opus-4-5-20251101";
@@ -629,7 +629,7 @@ impl CLITextGenerator {
                 // Opus 4.1
                 "claude-opus-4-1-20250805",
                 // Sonnet 4.0
-                "claude-sonnet-4-20250514",
+                "claude-sonnet-4-5-20250514",
                 // Haiku
                 "claude-3-5-haiku-20241022",
                 "haiku",
@@ -721,7 +721,7 @@ impl CLITextGenerator {
                 // Claude models
                 "claude-opus-4-5-20251101",
                 "claude-sonnet-4-5-20250929",
-                "claude-sonnet-4-20250514",
+                "claude-sonnet-4-5-20250514",
                 // GPT models
                 "gpt-5.1",
                 "gpt-4-turbo",
@@ -850,7 +850,7 @@ mod tests {
     #[test]
     fn test_supported_models() {
         let provider = CLITextGenerator::new(CLIType::Claude).unwrap();
-        assert!(provider.supports_model("claude-sonnet-4-20250514"));
+        assert!(provider.supports_model("claude-sonnet-4-5-20250514"));
         assert!(!provider.supports_model("gpt-4"));
     }
 
