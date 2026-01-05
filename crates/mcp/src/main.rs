@@ -198,8 +198,9 @@ struct LinearDefaults {
     /// Whether to create a Linear project during intake
     #[serde(rename = "createProject", default = "default_true")]
     create_project: bool,
-    /// Optional project template name to use
+    /// Optional project template name to use (future use)
     #[serde(rename = "projectTemplate")]
+    #[allow(dead_code)]
     project_template: Option<String>,
 }
 
@@ -817,6 +818,7 @@ struct LinearLabelNodes {
 #[derive(Debug, Deserialize, Clone)]
 struct LinearLabel {
     id: String,
+    #[allow(dead_code)]
     name: String,
 }
 
@@ -856,14 +858,19 @@ impl LinearClient {
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().unwrap_or_default();
-            return Err(anyhow!("Linear API error: {} - {}", status, text));
+            return Err(anyhow!("Linear API error: {status} - {text}"));
         }
 
         response.json().context("Failed to parse Linear response")
     }
 
     /// Create a Linear project.
-    fn create_project(&self, name: &str, description: &str, team_ids: &[&str]) -> Result<LinearProject> {
+    fn create_project(
+        &self,
+        name: &str,
+        description: &str,
+        team_ids: &[&str],
+    ) -> Result<LinearProject> {
         let query = r#"
             mutation ProjectCreate($input: ProjectCreateInput!) {
                 projectCreate(input: $input) {
@@ -885,11 +892,16 @@ impl LinearClient {
             }
         });
 
-        let response: LinearProjectResponse = serde_json::from_value(self.graphql(query, variables)?)?;
+        let response: LinearProjectResponse =
+            serde_json::from_value(self.graphql(query, variables)?)?;
 
         if let Some(errors) = response.errors {
-            let msg = errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join(", ");
-            return Err(anyhow!("Linear API errors: {}", msg));
+            let msg = errors
+                .iter()
+                .map(|e| e.message.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(anyhow!("Linear API errors: {msg}"));
         }
 
         response
@@ -922,7 +934,8 @@ impl LinearClient {
             }
         });
 
-        let find_response: LinearLabelResponse = serde_json::from_value(self.graphql(find_query, find_variables)?)?;
+        let find_response: LinearLabelResponse =
+            serde_json::from_value(self.graphql(find_query, find_variables)?)?;
 
         if let Some(data) = find_response.data {
             if let Some(labels) = data.labels {
@@ -952,11 +965,16 @@ impl LinearClient {
             }
         });
 
-        let create_response: LinearLabelResponse = serde_json::from_value(self.graphql(create_query, create_variables)?)?;
+        let create_response: LinearLabelResponse =
+            serde_json::from_value(self.graphql(create_query, create_variables)?)?;
 
         if let Some(errors) = create_response.errors {
-            let msg = errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join(", ");
-            return Err(anyhow!("Failed to create label: {}", msg));
+            let msg = errors
+                .iter()
+                .map(|e| e.message.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(anyhow!("Failed to create label: {msg}"));
         }
 
         create_response
@@ -964,7 +982,7 @@ impl LinearClient {
             .and_then(|d| d.label_create)
             .filter(|lc| lc.success)
             .and_then(|lc| lc.label)
-            .ok_or_else(|| anyhow!("Failed to create label '{}'", name))
+            .ok_or_else(|| anyhow!("Failed to create label '{name}'"))
     }
 
     /// Create a Linear issue.
@@ -1006,11 +1024,16 @@ impl LinearClient {
 
         let variables = json!({ "input": input });
 
-        let response: LinearIssueResponse = serde_json::from_value(self.graphql(query, variables)?)?;
+        let response: LinearIssueResponse =
+            serde_json::from_value(self.graphql(query, variables)?)?;
 
         if let Some(errors) = response.errors {
-            let msg = errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join(", ");
-            return Err(anyhow!("Linear API errors: {}", msg));
+            let msg = errors
+                .iter()
+                .map(|e| e.message.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(anyhow!("Linear API errors: {msg}"));
         }
 
         response
@@ -1058,7 +1081,10 @@ fn create_linear_intake_setup(
         &project_description,
         &[&linear_config.team_id],
     )?;
-    eprintln!("  ✅ Project created: {}", project.url.as_deref().unwrap_or(&project.id));
+    eprintln!(
+        "  ✅ Project created: {}",
+        project.url.as_deref().unwrap_or(&project.id)
+    );
 
     // Get or create PRD label
     eprintln!("  Creating PRD label...");
@@ -3961,6 +3987,56 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("📁 Include Codebase: {include_codebase}");
     eprintln!("🖥️  CLI for Docs: {cli}");
 
+    // =========================================================================
+    // Linear Project/Issue Setup (optional)
+    // =========================================================================
+    // If Linear is configured and not skipped, create project and PRD issue
+    let skip_linear = arguments
+        .get("skip_linear")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    let linear_result = if !skip_linear
+        && config.defaults.linear.create_project
+        && !config.defaults.linear.team_id.is_empty()
+    {
+        match create_linear_intake_setup(
+            project_name,
+            &prd_content,
+            if architecture_content.is_empty() {
+                None
+            } else {
+                Some(&architecture_content)
+            },
+            config,
+        ) {
+            Ok((project, issue)) => {
+                eprintln!("✅ Linear setup complete!");
+                eprintln!(
+                    "   Project: {}",
+                    project.url.as_deref().unwrap_or(&project.name)
+                );
+                eprintln!("   PRD Issue: {}", issue.url);
+                eprintln!("");
+                eprintln!("👉 To start intake: Assign Morgan to the PRD issue in Linear");
+                eprintln!("");
+                Some((project, issue))
+            }
+            Err(e) => {
+                eprintln!("⚠️  Linear setup failed (continuing without): {e}");
+                eprintln!("   Make sure LINEAR_API_KEY environment variable is set");
+                None
+            }
+        }
+    } else {
+        if skip_linear {
+            eprintln!("⏭️  Skipping Linear setup (skip_linear=true)");
+        } else if config.defaults.linear.team_id.is_empty() {
+            eprintln!("⏭️  Skipping Linear setup (team_id not configured)");
+        }
+        None
+    };
+
     // Create a ConfigMap with the intake files to avoid YAML escaping issues
     let configmap_name = format!(
         "intake-{}-{}",
@@ -4113,7 +4189,8 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
             eprintln!("✅ Project intake workflow submitted: {workflow_name}");
 
-            Ok(json!({
+            // Build response with optional Linear info
+            let mut response = json!({
                 "status": "submitted",
                 "workflow_name": workflow_name,
                 "workflow": workflow_json,
@@ -4128,7 +4205,27 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     "prd_source": prd_source_label,
                     "architecture_source": architecture_source_label
                 }
-            }))
+            });
+
+            // Add Linear info if setup was successful
+            if let Some((project, issue)) = &linear_result {
+                response["linear"] = json!({
+                    "project": {
+                        "id": project.id,
+                        "name": project.name,
+                        "url": project.url
+                    },
+                    "prd_issue": {
+                        "id": issue.id,
+                        "identifier": issue.identifier,
+                        "title": issue.title,
+                        "url": issue.url
+                    },
+                    "next_step": "Assign Morgan to the PRD issue to trigger intake workflow"
+                });
+            }
+
+            Ok(response)
         }
         Ok(result) => {
             let error_msg = String::from_utf8_lossy(&result.stderr);
@@ -4760,7 +4857,13 @@ fn create_mcp_server_coderun(
     let kubectl_cmd = find_command("kubectl");
 
     // Build the prompt for Rex based on task type
-    let prompt = build_mcp_server_prompt(task_type, server_key, github_url, readme_content, skip_merge);
+    let prompt = build_mcp_server_prompt(
+        task_type,
+        server_key,
+        github_url,
+        readme_content,
+        skip_merge,
+    );
 
     // Build environment variables for the CodeRun
     let mut env_map = serde_json::Map::new();
