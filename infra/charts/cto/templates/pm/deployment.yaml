@@ -94,6 +94,12 @@ spec:
                   name: linear-app-{{ . }}
                   key: client_secret
                   optional: true
+            - name: LINEAR_APP_{{ $upper }}_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: linear-app-{{ . }}
+                  key: webhook_secret
+                  optional: true
             {{- end }}
           envFrom:
             - secretRef:
