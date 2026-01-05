@@ -1068,14 +1068,13 @@ fn create_linear_intake_setup(
     // Create project
     let project_description = format!(
         "## Project Overview\n\n\
-         Generated from PRD: **{}**\n\n\
+         Generated from PRD: **{project_name}**\n\n\
          Switch to **Board view** to track progress through play workflow phases.\n\n\
          ---\n\n\
-         *Created by CTO Agent intake*",
-        project_name
+         *Created by CTO Agent intake*"
     );
 
-    eprintln!("  Creating Linear project: {}", project_name);
+    eprintln!("  Creating Linear project: {project_name}");
     let project = client.create_project(
         project_name,
         &project_description,
@@ -1091,7 +1090,7 @@ fn create_linear_intake_setup(
     let prd_label = client.get_or_create_label(&linear_config.team_id, "PRD")?;
 
     // Build issue description
-    let mut issue_description = format!("## PRD Content\n\n{}", prd_content);
+    let mut issue_description = format!("## PRD Content\n\n{prd_content}");
     if let Some(arch) = architecture_content {
         if !arch.is_empty() {
             issue_description.push_str("\n\n---\n\n## Architecture\n\n");
