@@ -1100,8 +1100,8 @@ fn create_linear_intake_setup(
     issue_description.push_str("\n\n---\n\n*Assign to @Morgan to start intake workflow*");
 
     // Create PRD issue
-    let issue_title = format!("[PRD] {}", project_name);
-    eprintln!("  Creating PRD issue: {}", issue_title);
+    let issue_title = format!("[PRD] {project_name}");
+    eprintln!("  Creating PRD issue: {issue_title}");
     let issue = client.create_issue(
         &linear_config.team_id,
         &issue_title,
@@ -4016,9 +4016,9 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     project.url.as_deref().unwrap_or(&project.name)
                 );
                 eprintln!("   PRD Issue: {}", issue.url);
-                eprintln!("");
+                eprintln!();
                 eprintln!("👉 To start intake: Assign Morgan to the PRD issue in Linear");
-                eprintln!("");
+                eprintln!();
                 Some((project, issue))
             }
             Err(e) => {
