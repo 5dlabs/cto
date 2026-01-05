@@ -1,9 +1,11 @@
 {{- if .Values.healer.enabled }}
 # Healer CronJob - Automatic remediation for database corruption and unhealthy pods
 # This CronJob runs periodically to detect and recover from:
-# 1. NATS Streaming (STAN) eventbus pods with database corruption
-# 2. Grafana dashboard provisioner database corruption
-# 3. General pod health issues in automation and observability namespaces
+# 1. NATS Streaming (STAN) eventbus pods with database corruption (when enabled)
+# 2. JetStream eventbus health issues
+# 3. Grafana dashboard provisioner database corruption
+# 4. General pod health issues in automation and observability namespaces
+# Note: Log output is minimized to reduce noise when no issues are detected
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -34,28 +36,36 @@ spec:
           containers:
             - name: healer
               image: bitnami/kubectl:latest
+              env:
+                # Configuration flags passed from values.yaml
+                - name: STAN_ENABLED
+                  value: {{ .Values.stan.enabled | default false | quote }}
+                - name: JETSTREAM_ENABLED
+                  value: {{ .Values.eventbus.jetstream.enabled | default true | quote }}
               command:
                 - /bin/bash
                 - -c
                 - |
                   set -euo pipefail
 
+                  # Track if any issues were found for summary
+                  ISSUES_FOUND=0
+
                   echo "=== CTO Healer Starting ==="
                   echo "Time: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
                   # Function to check pod logs for database corruption errors
+                  # Returns 0 if corruption found, 1 otherwise (silent if no issues)
                   check_db_corruption() {
                     local namespace=$1
                     local pod_selector=$2
                     local error_pattern=$3
 
-                    echo "Checking for database corruption in $namespace with selector: $pod_selector"
-                    
                     for pod in $(kubectl get pods -n "$namespace" -l "$pod_selector" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo ""); do
                       if [ -n "$pod" ]; then
                         # Check last 100 lines of logs for corruption errors
                         if kubectl logs -n "$namespace" "$pod" --tail=100 2>/dev/null | grep -qE "$error_pattern"; then
-                          echo "ALERT: Database corruption detected in pod $namespace/$pod"
+                          echo "[ALERT] Database corruption detected in pod $namespace/$pod"
                           return 0
                         fi
                       fi
@@ -69,29 +79,28 @@ spec:
                     local pod_selector=$2
                     local reason=$3
 
-                    echo "Initiating pod restart in $namespace with selector: $pod_selector"
-                    echo "Reason: $reason"
+                    echo "[REMEDIATION] Restarting pods in $namespace (selector: $pod_selector)"
+                    echo "[REMEDIATION] Reason: $reason"
 
                     for pod in $(kubectl get pods -n "$namespace" -l "$pod_selector" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo ""); do
                       if [ -n "$pod" ]; then
-                        echo "Deleting pod: $namespace/$pod"
+                        echo "[REMEDIATION] Deleting pod: $namespace/$pod"
                         kubectl delete pod -n "$namespace" "$pod" --grace-period=30 || true
                       fi
                     done
                   }
 
                   # Function to check for DNS resolution failures indicating cluster issues
+                  # Returns 0 if DNS failure found, 1 otherwise (silent if no issues)
                   check_dns_failures() {
                     local namespace=$1
                     local pod_selector=$2
                     local target_host=$3
 
-                    echo "Checking for DNS resolution failures to $target_host in $namespace"
-                    
                     for pod in $(kubectl get pods -n "$namespace" -l "$pod_selector" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo ""); do
                       if [ -n "$pod" ]; then
                         if kubectl logs -n "$namespace" "$pod" --tail=100 2>/dev/null | grep -qE "lookup.*$target_host"; then
-                          echo "ALERT: DNS resolution failure for $target_host in pod $namespace/$pod"
+                          echo "[ALERT] DNS resolution failure for $target_host in pod $namespace/$pod"
                           return 0
                         fi
                       fi
@@ -101,88 +110,113 @@ spec:
 
                   # ========================================
                   # Check 1: NATS Streaming Eventbus Health
+                  # Only run if STAN is enabled (skip for JetStream-only deployments)
                   # ========================================
-                  echo ""
-                  echo "--- Checking NATS Streaming Eventbus ---"
+                  if [ "$STAN_ENABLED" = "true" ]; then
+                    STAN_NAMESPACE="automation"
+                    STAN_SELECTOR="app=eventbus-default-stan"
 
-                  # Check for STAN pods in automation namespace
-                  STAN_NAMESPACE="automation"
-                  STAN_SELECTOR="app=eventbus-default-stan"
-
-                  # Check if STAN pods exist and have issues
-                  if kubectl get pods -n "$STAN_NAMESPACE" -l "$STAN_SELECTOR" &>/dev/null; then
+                    # Check if STAN pods exist
+                    STAN_POD_COUNT=$(kubectl get pods -n "$STAN_NAMESPACE" -l "$STAN_SELECTOR" --no-headers 2>/dev/null | wc -l || echo "0")
                     
-                    # Check for database corruption errors
-                    if check_db_corruption "$STAN_NAMESPACE" "$STAN_SELECTOR" "database disk image is malformed|database is locked|unable to open database"; then
-                      echo "REMEDIATION: Restarting STAN eventbus pods due to database corruption"
-                      restart_corrupted_pods "$STAN_NAMESPACE" "$STAN_SELECTOR" "Database corruption detected"
-                    fi
+                    if [ "$STAN_POD_COUNT" -gt "0" ]; then
+                      # Check for database corruption errors
+                      if check_db_corruption "$STAN_NAMESPACE" "$STAN_SELECTOR" "database disk image is malformed|database is locked|unable to open database"; then
+                        ISSUES_FOUND=$((ISSUES_FOUND + 1))
+                        restart_corrupted_pods "$STAN_NAMESPACE" "$STAN_SELECTOR" "Database corruption detected"
+                      fi
 
-                    # Check for pods in CrashLoopBackOff or Error state
-                    UNHEALTHY_PODS=$(kubectl get pods -n "$STAN_NAMESPACE" -l "$STAN_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
-                    if [ -n "$UNHEALTHY_PODS" ]; then
-                      echo "ALERT: Unhealthy STAN pods found: $UNHEALTHY_PODS"
-                      # Delete unhealthy pods to trigger recreation
-                      for pod in $UNHEALTHY_PODS; do
-                        echo "Deleting unhealthy pod: $STAN_NAMESPACE/$pod"
-                        kubectl delete pod -n "$STAN_NAMESPACE" "$pod" --grace-period=30 || true
-                      done
+                      # Check for pods in CrashLoopBackOff or Error state
+                      UNHEALTHY_PODS=$(kubectl get pods -n "$STAN_NAMESPACE" -l "$STAN_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
+                      if [ -n "$UNHEALTHY_PODS" ]; then
+                        ISSUES_FOUND=$((ISSUES_FOUND + 1))
+                        echo "[ALERT] Unhealthy STAN pods: $UNHEALTHY_PODS"
+                        # Delete unhealthy pods to trigger recreation
+                        for pod in $UNHEALTHY_PODS; do
+                          echo "[REMEDIATION] Deleting unhealthy pod: $STAN_NAMESPACE/$pod"
+                          kubectl delete pod -n "$STAN_NAMESPACE" "$pod" --grace-period=30 || true
+                        done
+                      fi
                     fi
-                  else
-                    echo "No STAN eventbus pods found in $STAN_NAMESPACE namespace"
+                  fi
+
+                  # ========================================
+                  # Check 1b: JetStream Eventbus Health
+                  # Run if JetStream is enabled
+                  # ========================================
+                  if [ "$JETSTREAM_ENABLED" = "true" ]; then
+                    JETSTREAM_NAMESPACE="automation"
+                    JETSTREAM_SELECTOR="controller=eventbus-controller"
+
+                    # Check if JetStream pods exist
+                    JETSTREAM_POD_COUNT=$(kubectl get pods -n "$JETSTREAM_NAMESPACE" -l "$JETSTREAM_SELECTOR" --no-headers 2>/dev/null | wc -l || echo "0")
+                    
+                    if [ "$JETSTREAM_POD_COUNT" -gt "0" ]; then
+                      # Check for pods not in Running state
+                      UNHEALTHY_JS=$(kubectl get pods -n "$JETSTREAM_NAMESPACE" -l "$JETSTREAM_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
+                      if [ -n "$UNHEALTHY_JS" ]; then
+                        ISSUES_FOUND=$((ISSUES_FOUND + 1))
+                        echo "[ALERT] Unhealthy JetStream pods: $UNHEALTHY_JS"
+                        for pod in $UNHEALTHY_JS; do
+                          echo "[REMEDIATION] Deleting unhealthy pod: $JETSTREAM_NAMESPACE/$pod"
+                          kubectl delete pod -n "$JETSTREAM_NAMESPACE" "$pod" --grace-period=30 || true
+                        done
+                      fi
+                    fi
                   fi
 
                   # ========================================
                   # Check 2: Grafana Dashboard Provisioner
                   # ========================================
-                  echo ""
-                  echo "--- Checking Grafana Health ---"
-
                   GRAFANA_NAMESPACE="observability"
                   GRAFANA_SELECTOR="app.kubernetes.io/name=grafana"
 
-                  if kubectl get pods -n "$GRAFANA_NAMESPACE" -l "$GRAFANA_SELECTOR" &>/dev/null; then
-                    
+                  # Check if Grafana pods exist
+                  GRAFANA_POD_COUNT=$(kubectl get pods -n "$GRAFANA_NAMESPACE" -l "$GRAFANA_SELECTOR" --no-headers 2>/dev/null | wc -l || echo "0")
+                  
+                  if [ "$GRAFANA_POD_COUNT" -gt "0" ]; then
                     # Check for SQLite database corruption in Grafana
                     if check_db_corruption "$GRAFANA_NAMESPACE" "$GRAFANA_SELECTOR" "unable to open database file|input/output error|database disk image is malformed|failed to search for dashboards"; then
-                      echo "REMEDIATION: Restarting Grafana pods due to database corruption"
+                      ISSUES_FOUND=$((ISSUES_FOUND + 1))
                       restart_corrupted_pods "$GRAFANA_NAMESPACE" "$GRAFANA_SELECTOR" "Dashboard provisioner database corruption"
                     fi
 
                     # Check for Grafana pods not in Running state
                     UNHEALTHY_GRAFANA=$(kubectl get pods -n "$GRAFANA_NAMESPACE" -l "$GRAFANA_SELECTOR" -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
                     if [ -n "$UNHEALTHY_GRAFANA" ]; then
-                      echo "ALERT: Unhealthy Grafana pods found: $UNHEALTHY_GRAFANA"
+                      ISSUES_FOUND=$((ISSUES_FOUND + 1))
+                      echo "[ALERT] Unhealthy Grafana pods: $UNHEALTHY_GRAFANA"
                       for pod in $UNHEALTHY_GRAFANA; do
-                        echo "Deleting unhealthy pod: $GRAFANA_NAMESPACE/$pod"
+                        echo "[REMEDIATION] Deleting unhealthy pod: $GRAFANA_NAMESPACE/$pod"
                         kubectl delete pod -n "$GRAFANA_NAMESPACE" "$pod" --grace-period=30 || true
                       done
                     fi
-                  else
-                    echo "No Grafana pods found in $GRAFANA_NAMESPACE namespace"
                   fi
 
                   # ========================================
                   # Check 3: General Pod Health
                   # ========================================
-                  echo ""
-                  echo "--- Checking General Pod Health ---"
-
                   # Check for pods in Error state across both namespaces
                   for ns in automation observability; do
                     ERROR_PODS=$(kubectl get pods -n "$ns" --field-selector=status.phase=Failed -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
                     if [ -n "$ERROR_PODS" ]; then
-                      echo "ALERT: Failed pods in $ns: $ERROR_PODS"
+                      ISSUES_FOUND=$((ISSUES_FOUND + 1))
+                      echo "[ALERT] Failed pods in $ns: $ERROR_PODS"
                       for pod in $ERROR_PODS; do
-                        echo "Deleting failed pod: $ns/$pod"
+                        echo "[REMEDIATION] Deleting failed pod: $ns/$pod"
                         kubectl delete pod -n "$ns" "$pod" --grace-period=0 --force || true
                       done
                     fi
                   done
 
-                  echo ""
+                  # Summary (only print detailed completion if issues were found or remediated)
                   echo "=== CTO Healer Completed ==="
                   echo "Time: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+                  if [ "$ISSUES_FOUND" -gt "0" ]; then
+                    echo "Issues found and remediated: $ISSUES_FOUND"
+                  else
+                    echo "Status: Healthy (no issues detected)"
+                  fi
               resources:
                 requests:
                   cpu: {{ .Values.healer.resources.requests.cpu }}

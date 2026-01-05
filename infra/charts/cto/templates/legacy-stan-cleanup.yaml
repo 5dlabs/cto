@@ -1,0 +1,237 @@
+# Legacy STAN Cleanup Job
+# Task ID: 2641293645
+# Generated: 2026-01-05
+# Issue: 500 warnings in automation namespace from orphaned STAN resources
+# Root Cause: STAN has been disabled and migrated to JetStream, but legacy resources
+#   and components referencing them still generate warnings
+# This job removes all legacy STAN resources to eliminate warning noise
+
+{{- if .Values.legacyCleanup.enabled }}
+---
+# One-time cleanup job to remove all legacy STAN resources
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-legacy-stan-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: legacy-cleanup
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: stan-cleanup
+    remediation.cto.io/task-id: "2641293645"
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: legacy-cleanup
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-legacy-cleanup
+      restartPolicy: OnFailure
+      containers:
+        - name: cleanup
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              
+              echo "=== Legacy STAN Cleanup Job ==="
+              echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "Task ID: 2641293645"
+              echo ""
+              
+              # Define namespaces to clean up
+              NAMESPACES="{{ .Values.legacyCleanup.stan.namespaces | join " " }}"
+              
+              cleanup_namespace() {
+                local ns="$1"
+                echo "=== Cleaning up namespace: $ns ==="
+                
+                # Delete STAN StatefulSets
+                echo "Looking for STAN StatefulSets..."
+                if kubectl get statefulset eventbus-default-stan -n "$ns" &>/dev/null; then
+                  echo "  Deleting StatefulSet: eventbus-default-stan"
+                  kubectl delete statefulset eventbus-default-stan -n "$ns" --wait=false 2>/dev/null || true
+                else
+                  echo "  StatefulSet eventbus-default-stan not found (already cleaned)"
+                fi
+                
+                # Delete STAN Services
+                echo "Looking for STAN Services..."
+                if kubectl get service eventbus-default-stan-svc -n "$ns" &>/dev/null; then
+                  echo "  Deleting Service: eventbus-default-stan-svc"
+                  kubectl delete service eventbus-default-stan-svc -n "$ns" --wait=false 2>/dev/null || true
+                else
+                  echo "  Service eventbus-default-stan-svc not found (already cleaned)"
+                fi
+                
+                # Delete STAN PodDisruptionBudgets
+                echo "Looking for STAN PodDisruptionBudgets..."
+                if kubectl get pdb eventbus-default-stan -n "$ns" &>/dev/null; then
+                  echo "  Deleting PDB: eventbus-default-stan"
+                  kubectl delete pdb eventbus-default-stan -n "$ns" --wait=false 2>/dev/null || true
+                else
+                  echo "  PDB eventbus-default-stan not found (already cleaned)"
+                fi
+                
+                # Delete any orphaned STAN pods
+                echo "Looking for orphaned STAN pods..."
+                STAN_PODS=$(kubectl get pods -n "$ns" -l app=eventbus-default-stan -o name 2>/dev/null || echo "")
+                if [ -n "$STAN_PODS" ]; then
+                  echo "  Deleting orphaned STAN pods:"
+                  echo "$STAN_PODS" | while read pod; do
+                    echo "    $pod"
+                    kubectl delete "$pod" -n "$ns" --grace-period=10 --wait=false 2>/dev/null || true
+                  done
+                else
+                  echo "  No orphaned STAN pods found"
+                fi
+                
+                # Delete STAN ConfigMaps
+                echo "Looking for STAN ConfigMaps..."
+                STAN_CMS=$(kubectl get configmap -n "$ns" -l app=eventbus-default-stan -o name 2>/dev/null || echo "")
+                if [ -n "$STAN_CMS" ]; then
+                  echo "  Deleting STAN ConfigMaps:"
+                  echo "$STAN_CMS" | while read cm; do
+                    echo "    $cm"
+                    kubectl delete "$cm" -n "$ns" --wait=false 2>/dev/null || true
+                  done
+                else
+                  echo "  No STAN ConfigMaps found"
+                fi
+                
+                # Delete STAN Secrets
+                echo "Looking for STAN Secrets..."
+                STAN_SECRETS=$(kubectl get secret -n "$ns" -l app=eventbus-default-stan -o name 2>/dev/null || echo "")
+                if [ -n "$STAN_SECRETS" ]; then
+                  echo "  Deleting STAN Secrets:"
+                  echo "$STAN_SECRETS" | while read secret; do
+                    echo "    $secret"
+                    kubectl delete "$secret" -n "$ns" --wait=false 2>/dev/null || true
+                  done
+                else
+                  echo "  No STAN Secrets found"
+                fi
+                
+                # Delete STAN PVCs (be careful - data loss!)
+                echo "Looking for STAN PVCs..."
+                STAN_PVCS=$(kubectl get pvc -n "$ns" -l app=eventbus-default-stan -o name 2>/dev/null || echo "")
+                if [ -n "$STAN_PVCS" ]; then
+                  echo "  Deleting STAN PVCs (data will be lost):"
+                  echo "$STAN_PVCS" | while read pvc; do
+                    echo "    $pvc"
+                    kubectl delete "$pvc" -n "$ns" --wait=false 2>/dev/null || true
+                  done
+                else
+                  echo "  No STAN PVCs found"
+                fi
+                
+                echo "  Cleanup completed for namespace: $ns"
+                echo ""
+              }
+              
+              # Process each namespace
+              for ns in $NAMESPACES; do
+                cleanup_namespace "$ns"
+              done
+              
+              # Also clean up any Argo Events EventBus STAN resources
+              echo "=== Cleaning up Argo Events EventBus STAN resources ==="
+              for ns in $NAMESPACES; do
+                # Check for EventBus resources using STAN
+                EVENTBUS=$(kubectl get eventbus -n "$ns" -o jsonpath='{.items[?(@.spec.nats.native)].metadata.name}' 2>/dev/null || echo "")
+                if [ -n "$EVENTBUS" ]; then
+                  echo "Found native NATS EventBus in $ns: $EVENTBUS"
+                  echo "Note: EventBus resources should be migrated to JetStream"
+                fi
+              done
+              
+              echo ""
+              echo "=== Legacy STAN Cleanup Completed ==="
+              echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo ""
+              echo "Summary:"
+              echo "- STAN StatefulSets, Services, PDBs removed"
+              echo "- Orphaned STAN pods deleted"
+              echo "- STAN ConfigMaps and Secrets cleaned"
+              echo "- STAN PVCs deleted"
+              echo ""
+              echo "The automation namespace should now be free of legacy STAN resources."
+              echo "JetStream EventBus is the recommended replacement."
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+# ServiceAccount for cleanup job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-legacy-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: legacy-cleanup
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+# ClusterRole for cleanup job (needs access to multiple namespaces)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-legacy-cleanup
+  labels:
+    app.kubernetes.io/name: legacy-cleanup
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["eventbus"]
+    verbs: ["get", "list", "watch"]
+---
+# ClusterRoleBinding for cleanup job
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-legacy-cleanup
+  labels:
+    app.kubernetes.io/name: legacy-cleanup
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "2"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-legacy-cleanup
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Name }}-legacy-cleanup
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

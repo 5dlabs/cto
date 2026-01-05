@@ -1,6 +1,8 @@
-# EventBus DNS Resolution Remediation
+{{- if .Values.stan.enabled }}
+# EventBus DNS Resolution Remediation (STAN - Legacy)
 # Task ID: 2641293645
 # Generated: 2026-01-04
+# Note: This job only runs when STAN is enabled. For JetStream deployments, use the healer CronJob.
 # Issue: DNS lookup failures for eventbus-default-stan-*.eventbus-default-stan-svc.automation.svc
 # Root Cause: NATS Streaming EventBus cluster pods may be unhealthy or the headless service is misconfigured
 # This creates a remediation job to restart EventBus components and verify DNS resolution
@@ -35,68 +37,50 @@ spec:
             - -c
             - |
               set -e
-              echo "=== EventBus DNS Remediation Job ==="
+              echo "=== EventBus DNS Remediation Job (STAN) ==="
               echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-              echo "Namespace: automation"
               
-              # Function to check DNS resolution
+              # Track issues
+              ISSUES_FOUND=0
+              
+              # Function to check DNS resolution (silent on success)
               check_dns() {
                 local host="$1"
-                echo "Checking DNS resolution for: $host"
-                if nslookup "$host" 2>/dev/null; then
-                  echo "  DNS resolution: OK"
+                if nslookup "$host" >/dev/null 2>&1; then
                   return 0
                 else
-                  echo "  DNS resolution: FAILED"
+                  echo "[ALERT] DNS resolution failed: $host"
                   return 1
                 fi
               }
               
-              # Check EventBus StatefulSet status
-              echo ""
-              echo "=== Checking EventBus StatefulSet ==="
-              kubectl get statefulset -n automation -l app=eventbus-default-stan -o wide || echo "No EventBus StatefulSet found"
+              # Check if STAN pods exist
+              STAN_POD_COUNT=$(kubectl get pods -n automation -l app=eventbus-default-stan --no-headers 2>/dev/null | wc -l || echo "0")
               
-              # Check EventBus pods
-              echo ""
-              echo "=== Checking EventBus Pods ==="
-              kubectl get pods -n automation -l app=eventbus-default-stan -o wide || echo "No EventBus pods found"
-              
-              # Check headless service
-              echo ""
-              echo "=== Checking EventBus Headless Service ==="
-              kubectl get svc eventbus-default-stan-svc -n automation -o yaml || echo "Service not found"
-              
-              # Check endpoints
-              echo ""
-              echo "=== Checking EventBus Endpoints ==="
-              kubectl get endpoints eventbus-default-stan-svc -n automation -o yaml || echo "Endpoints not found"
+              if [ "$STAN_POD_COUNT" -eq "0" ]; then
+                echo "No STAN EventBus pods found - skipping DNS remediation"
+                echo "=== EventBus DNS Remediation Completed ==="
+                exit 0
+              fi
               
               # Check DNS resolution for each expected pod
-              echo ""
-              echo "=== DNS Resolution Check ==="
               dns_ok=true
               for i in 0 1 2; do
                 host="eventbus-default-stan-${i}.eventbus-default-stan-svc.automation.svc.cluster.local"
                 if ! check_dns "$host"; then
                   dns_ok=false
+                  ISSUES_FOUND=$((ISSUES_FOUND + 1))
                 fi
               done
               
               if [ "$dns_ok" = "false" ]; then
-                echo ""
-                echo "=== DNS Issues Detected - Attempting Remediation ==="
-                
-                # Get pod status details
-                echo "Pod status details:"
-                kubectl get pods -n automation -l app=eventbus-default-stan -o jsonpath='{range .items[*]}{.metadata.name}: {.status.phase} - {.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' || true
+                echo "[REMEDIATION] DNS issues detected - attempting remediation"
                 
                 # Check for pods not in Running state
                 unhealthy_pods=$(kubectl get pods -n automation -l app=eventbus-default-stan --field-selector=status.phase!=Running -o name 2>/dev/null || echo "")
                 
                 if [ -n "$unhealthy_pods" ]; then
-                  echo "Found unhealthy pods: $unhealthy_pods"
-                  echo "Deleting unhealthy pods to trigger restart..."
+                  echo "[REMEDIATION] Deleting unhealthy pods: $unhealthy_pods"
                   echo "$unhealthy_pods" | xargs -r kubectl delete -n automation --wait=false
                 fi
                 
@@ -104,37 +88,29 @@ spec:
                 running_count=$(kubectl get pods -n automation -l app=eventbus-default-stan --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
                 
                 if [ "$running_count" -gt "0" ]; then
-                  echo "All pods appear running but DNS fails - checking pod readiness..."
                   not_ready=$(kubectl get pods -n automation -l app=eventbus-default-stan -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | grep -c "False" || echo "0")
                   
                   if [ "$not_ready" -gt "0" ]; then
-                    echo "Found $not_ready pods not ready - performing rollout restart..."
+                    echo "[REMEDIATION] Performing rollout restart ($not_ready pods not ready)"
                     kubectl rollout restart statefulset -n automation -l app=eventbus-default-stan || true
-                    echo "Waiting for rollout to complete..."
-                    kubectl rollout status statefulset -n automation -l app=eventbus-default-stan --timeout=300s || echo "Rollout status check timed out"
+                    kubectl rollout status statefulset -n automation -l app=eventbus-default-stan --timeout=300s 2>/dev/null || true
                   fi
                 fi
                 
                 # Final DNS check after remediation
-                echo ""
-                echo "=== Post-Remediation DNS Check ==="
-                sleep 30  # Wait for DNS propagation
+                sleep 30
                 for i in 0 1 2; do
                   host="eventbus-default-stan-${i}.eventbus-default-stan-svc.automation.svc.cluster.local"
                   check_dns "$host" || true
                 done
-              else
-                echo ""
-                echo "=== DNS Resolution OK - No Remediation Needed ==="
               fi
               
-              # Check NATS cluster health
-              echo ""
-              echo "=== NATS Cluster Health ==="
-              kubectl exec -n automation eventbus-default-stan-0 -- nats-streaming-server --version 2>/dev/null || echo "Could not check NATS version"
-              
-              echo ""
               echo "=== EventBus DNS Remediation Completed ==="
+              if [ "$ISSUES_FOUND" -gt "0" ]; then
+                echo "Issues remediated: $ISSUES_FOUND"
+              else
+                echo "Status: Healthy"
+              fi
 ---
 # ServiceAccount for remediation job
 apiVersion: v1
@@ -187,7 +163,7 @@ roleRef:
   name: eventbus-remediation-role
   apiGroup: rbac.authorization.k8s.io
 ---
-# CronJob: Periodic EventBus health check
+# CronJob: Periodic EventBus health check (STAN only)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -221,31 +197,154 @@ spec:
                 - -c
                 - |
                   set -e
-                  echo "=== EventBus Health Check ==="
+                  echo "=== EventBus Health Check (STAN) ==="
                   echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  
+                  # Check if STAN pods exist first
+                  STAN_POD_COUNT=$(kubectl get pods -n automation -l app=eventbus-default-stan --no-headers 2>/dev/null | wc -l || echo "0")
+                  
+                  if [ "$STAN_POD_COUNT" -eq "0" ]; then
+                    echo "Status: No STAN pods (JetStream-only deployment)"
+                    echo "=== Health Check Completed ==="
+                    exit 0
+                  fi
                   
                   # Quick DNS check
                   dns_failures=0
                   for i in 0 1 2; do
                     host="eventbus-default-stan-${i}.eventbus-default-stan-svc.automation.svc.cluster.local"
                     if ! nslookup "$host" >/dev/null 2>&1; then
-                      echo "DNS FAIL: $host"
+                      echo "[ALERT] DNS failure: $host"
                       dns_failures=$((dns_failures + 1))
                     fi
                   done
                   
                   if [ "$dns_failures" -gt "0" ]; then
-                    echo "WARNING: $dns_failures DNS resolution failures detected"
-                    
                     # Check pod status
                     not_ready=$(kubectl get pods -n automation -l app=eventbus-default-stan -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | grep -c "False" || echo "0")
                     
                     if [ "$not_ready" -gt "0" ]; then
-                      echo "Found $not_ready unhealthy pods - triggering restart"
+                      echo "[REMEDIATION] Restarting $not_ready unhealthy pods"
                       kubectl delete pods -n automation -l app=eventbus-default-stan --field-selector=status.phase!=Running --wait=false 2>/dev/null || true
                     fi
-                  else
-                    echo "All EventBus DNS resolutions successful"
                   fi
                   
                   echo "=== Health Check Completed ==="
+                  if [ "$dns_failures" -eq "0" ]; then
+                    echo "Status: Healthy"
+                  fi
+{{- else }}
+# STAN is disabled - JetStream mode
+# This provides minimal health monitoring for JetStream EventBus
+# and ensures RBAC resources exist for the healer CronJob
+# Task ID: 2641293645 - Updated to eliminate warnings when STAN is disabled
+---
+# ServiceAccount for JetStream EventBus monitoring
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eventbus-remediation-sa
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: eventbus-remediation
+    app.kubernetes.io/component: jetstream
+    remediation.cto.io/task-id: "2641293645"
+---
+# Role for JetStream EventBus monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eventbus-remediation-role
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: eventbus-remediation
+    app.kubernetes.io/component: jetstream
+    remediation.cto.io/task-id: "2641293645"
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["eventbus"]
+    verbs: ["get", "list", "watch"]
+---
+# RoleBinding for JetStream monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eventbus-remediation-binding
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: eventbus-remediation
+    app.kubernetes.io/component: jetstream
+    remediation.cto.io/task-id: "2641293645"
+subjects:
+  - kind: ServiceAccount
+    name: eventbus-remediation-sa
+    namespace: automation
+roleRef:
+  kind: Role
+  name: eventbus-remediation-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# CronJob: JetStream EventBus health check (quiet mode - minimal logging)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: eventbus-health-check
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: eventbus-remediation
+    app.kubernetes.io/component: jetstream-health-check
+    remediation.cto.io/task-id: "2641293645"
+spec:
+  schedule: "*/30 * * * *"  # Run every 30 minutes (less frequent for JetStream)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 1800
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: eventbus-remediation
+            app.kubernetes.io/component: jetstream
+        spec:
+          serviceAccountName: eventbus-remediation-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: health-check
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  # JetStream EventBus health check
+                  # Minimal output to reduce log noise and warnings
+                  
+                  ISSUES=0
+                  
+                  # Check JetStream pods (if any exist)
+                  JS_UNHEALTHY=$(kubectl get pods -n automation -l controller=eventbus-controller -o jsonpath='{range .items[?(@.status.phase!="Running")]}{.metadata.name}{" "}{end}' 2>/dev/null || echo "")
+                  
+                  if [ -n "$JS_UNHEALTHY" ]; then
+                    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [ALERT] Unhealthy JetStream pods: $JS_UNHEALTHY"
+                    for pod in $JS_UNHEALTHY; do
+                      kubectl delete pod -n automation "$pod" --grace-period=30 --wait=false 2>/dev/null || true
+                    done
+                    ISSUES=$((ISSUES + 1))
+                  fi
+                  
+                  # Only log if issues were found (reduces warning noise)
+                  if [ "$ISSUES" -gt "0" ]; then
+                    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] JetStream health check: $ISSUES remediation(s)"
+                  fi
+                  
+                  exit 0
+{{- end }}

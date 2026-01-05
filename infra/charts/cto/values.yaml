@@ -190,6 +190,20 @@ legacyCleanup:
       - kind: PodDisruptionBudget
         name: eventbus-default-stan
 
+# Healer CronJob configuration
+# Automatic remediation for database corruption and unhealthy pods
+healer:
+  enabled: true
+  # Run every 5 minutes to quickly detect and recover from issues
+  schedule: "*/5 * * * *"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
 # Tools MCP server configuration
 tools:
   config:
