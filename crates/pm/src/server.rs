@@ -415,6 +415,7 @@ async fn handle_intake_setup(
             lead_id: None,
             target_date: None,
             template_id: None,
+            status_id: None,
         })
         .await
         .map_err(|e| {

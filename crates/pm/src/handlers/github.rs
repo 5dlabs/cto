@@ -454,6 +454,22 @@ async fn create_project_from_intake(
         }
     };
 
+    // Try to find "Planned" project status for initial project state
+    let status_id = match client.find_project_status_by_type("planned").await {
+        Ok(Some(status)) => {
+            info!(status_id = %status.id, status_name = %status.name, "Using 'Planned' project status");
+            Some(status.id)
+        }
+        Ok(None) => {
+            debug!("No 'planned' type project status found, project will use default status");
+            None
+        }
+        Err(e) => {
+            warn!(error = %e, "Failed to look up project status, continuing without");
+            None
+        }
+    };
+
     let project_input = ProjectCreateInput {
         name: project_name.clone(),
         description: Some(format!(
@@ -473,6 +489,7 @@ async fn create_project_from_intake(
         lead_id: None,
         target_date: None,
         template_id,
+        status_id,
     };
 
     let project = client

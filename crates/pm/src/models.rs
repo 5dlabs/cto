@@ -208,6 +208,27 @@ pub struct ProjectTemplate {
     pub description: Option<String>,
 }
 
+/// Linear project status
+///
+/// Project statuses represent the lifecycle stage of a project.
+/// Categories: backlog, planned, started, completed, canceled
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectStatus {
+    /// Unique identifier
+    pub id: String,
+    /// Status name (e.g., "Planned", "In Progress")
+    pub name: String,
+    /// Status description
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Status color (hex)
+    pub color: String,
+    /// Status type/category: backlog, planned, started, completed, canceled
+    #[serde(rename = "type")]
+    pub status_type: String,
+}
+
 /// Linear comment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -521,4 +542,7 @@ pub struct ProjectCreateInput {
     /// Template ID to create project from (use `list_project_templates` to get IDs)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template_id: Option<String>,
+    /// Project status ID (use `list_project_statuses` to get IDs)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_id: Option<String>,
 }

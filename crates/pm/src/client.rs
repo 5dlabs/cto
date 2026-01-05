@@ -11,7 +11,7 @@ use crate::activities::{
 use crate::models::{
     AgentStatus, Attachment, AttachmentCreateInput, Comment, CommentCreateInput, Document, Issue,
     IssueCreateInput, IssueRelationCreateInput, IssueUpdateInput, Label, Project,
-    ProjectCreateInput, ProjectTemplate, Team, User, WorkflowState,
+    ProjectCreateInput, ProjectStatus, ProjectTemplate, Team, User, WorkflowState,
 };
 
 /// Linear API endpoint
@@ -995,6 +995,67 @@ impl LinearClient {
     ) -> Result<Option<ProjectTemplate>> {
         let templates = self.list_project_templates().await?;
         Ok(templates.into_iter().find(|t| t.name == name))
+    }
+
+    /// List project statuses
+    ///
+    /// Returns all available project statuses in the workspace.
+    /// These represent project lifecycle stages (Backlog, Planned, In Progress, etc.)
+    #[instrument(skip(self))]
+    pub async fn list_project_statuses(&self) -> Result<Vec<ProjectStatus>> {
+        #[derive(Deserialize)]
+        struct Response {
+            #[serde(rename = "projectStatuses")]
+            project_statuses: ProjectStatusesConnection,
+        }
+
+        #[derive(Deserialize)]
+        struct ProjectStatusesConnection {
+            nodes: Vec<ProjectStatus>,
+        }
+
+        const QUERY: &str = r"
+            query ListProjectStatuses {
+                projectStatuses {
+                    nodes {
+                        id
+                        name
+                        description
+                        color
+                        type
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self.execute(QUERY, ()).await?;
+        Ok(response.project_statuses.nodes)
+    }
+
+    /// Find a project status by type
+    ///
+    /// Returns the first status with the given type (backlog, planned, started, completed, canceled).
+    #[instrument(skip(self), fields(status_type = %status_type))]
+    pub async fn find_project_status_by_type(
+        &self,
+        status_type: &str,
+    ) -> Result<Option<ProjectStatus>> {
+        let statuses = self.list_project_statuses().await?;
+        Ok(statuses
+            .into_iter()
+            .find(|s| s.status_type == status_type))
+    }
+
+    /// Find a project status by name
+    ///
+    /// Returns the status with the given name, or None if not found.
+    #[instrument(skip(self), fields(name = %name))]
+    pub async fn find_project_status_by_name(
+        &self,
+        name: &str,
+    ) -> Result<Option<ProjectStatus>> {
+        let statuses = self.list_project_statuses().await?;
+        Ok(statuses.into_iter().find(|s| s.name == name))
     }
 
     /// List assignable entities (users and OAuth apps) for a team
