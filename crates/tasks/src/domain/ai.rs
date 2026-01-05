@@ -11,12 +11,14 @@ use std::sync::Arc;
 use crate::ai::{
     parse_ai_response,
     prompts::{
-        AddTaskContext, AnalyzeComplexityContext, ExpandTaskContext, ParsePrdContext, TaskSummary,
-        UpdateSubtaskContext, UpdateTaskContext, UpdateTasksContext,
+        AddTaskContext, AnalyzeComplexityContext, ExpandTaskContext, ParsePrdContext,
+        ScopeDownContext, ScopeUpContext, TaskSummary, UpdateSubtaskContext, UpdateTaskContext,
+        UpdateTasksContext,
     },
     schemas::{
         AddTaskResponse, AnalyzeComplexityResponse, ComplexityReport, ExpandTaskResponse,
-        GeneratedSubtask, GeneratedTask, ParsePrdResponse, UpdateTaskResponse, UpdateTasksResponse,
+        GeneratedSubtask, GeneratedTask, ParsePrdResponse, ScopeDownResponse, ScopeUpResponse,
+        UpdateTaskResponse, UpdateTasksResponse,
     },
     AIMessage, AIProvider, GenerateOptions, PromptManager, ProviderRegistry, TokenUsage,
 };
@@ -540,6 +542,224 @@ impl AIDomain {
             .collect();
 
         Ok((tasks, response.usage))
+    }
+
+    /// Reduce task complexity by splitting complex tasks into simpler ones.
+    ///
+    /// # Arguments
+    /// * `tasks` - Tasks to scope down
+    /// * `strength` - Scoping strength: "light", "regular", or "heavy"
+    /// * `prompt` - Custom prompt for specific adjustments
+    /// * `threshold` - Complexity threshold (tasks >= this are prioritized)
+    /// * `research` - Use research mode
+    /// * `model` - AI model to use
+    pub async fn scope_down(
+        &self,
+        tasks: &[Task],
+        strength: &str,
+        prompt: Option<&str>,
+        threshold: i32,
+        research: bool,
+        model: Option<&str>,
+    ) -> TasksResult<(Vec<Task>, TokenUsage)> {
+        let provider = self.get_provider(model)?;
+        let model_id = model.unwrap_or_else(|| Self::get_default_model(provider.as_ref()));
+
+        // Validate strength
+        let valid_strengths = ["light", "regular", "heavy"];
+        if !valid_strengths.contains(&strength) {
+            return Err(TasksError::Ai(format!(
+                "Invalid strength '{}'. Must be one of: {}",
+                strength,
+                valid_strengths.join(", ")
+            )));
+        }
+
+        let context = ScopeDownContext {
+            tasks: serde_json::to_value(tasks)?,
+            strength: strength.to_string(),
+            prompt: prompt.map(String::from),
+            threshold,
+            use_research: research,
+            gathered_context: String::new(),
+            project_root: String::new(),
+        };
+
+        let template = self
+            .prompts
+            .get("scope-down")
+            .ok_or_else(|| TasksError::Ai("scope-down template not found".to_string()))?;
+
+        let (system, user) = template.render(&context)?;
+
+        let messages = vec![AIMessage::system(system), AIMessage::user(user)];
+
+        let options = GenerateOptions {
+            temperature: Some(0.7),
+            max_tokens: Some(16000),
+            json_mode: true,
+            ..Default::default()
+        };
+
+        let response = provider
+            .generate_text(model_id, &messages, &options)
+            .await?;
+        let parsed: ScopeDownResponse = parse_ai_response(&response)?;
+
+        let result_tasks: Vec<Task> = parsed
+            .tasks
+            .into_iter()
+            .map(Self::generated_task_to_task)
+            .collect();
+
+        Ok((result_tasks, response.usage))
+    }
+
+    /// Increase task complexity by consolidating or expanding tasks.
+    ///
+    /// # Arguments
+    /// * `tasks` - Tasks to scope up
+    /// * `strength` - Scoping strength: "light", "regular", or "heavy"
+    /// * `prompt` - Custom prompt for specific adjustments
+    /// * `threshold` - Complexity threshold (tasks <= this are candidates for merging)
+    /// * `research` - Use research mode
+    /// * `model` - AI model to use
+    pub async fn scope_up(
+        &self,
+        tasks: &[Task],
+        strength: &str,
+        prompt: Option<&str>,
+        threshold: i32,
+        research: bool,
+        model: Option<&str>,
+    ) -> TasksResult<(Vec<Task>, TokenUsage)> {
+        let provider = self.get_provider(model)?;
+        let model_id = model.unwrap_or_else(|| Self::get_default_model(provider.as_ref()));
+
+        // Validate strength
+        let valid_strengths = ["light", "regular", "heavy"];
+        if !valid_strengths.contains(&strength) {
+            return Err(TasksError::Ai(format!(
+                "Invalid strength '{}'. Must be one of: {}",
+                strength,
+                valid_strengths.join(", ")
+            )));
+        }
+
+        let context = ScopeUpContext {
+            tasks: serde_json::to_value(tasks)?,
+            strength: strength.to_string(),
+            prompt: prompt.map(String::from),
+            threshold,
+            use_research: research,
+            gathered_context: String::new(),
+            project_root: String::new(),
+        };
+
+        let template = self
+            .prompts
+            .get("scope-up")
+            .ok_or_else(|| TasksError::Ai("scope-up template not found".to_string()))?;
+
+        let (system, user) = template.render(&context)?;
+
+        let messages = vec![AIMessage::system(system), AIMessage::user(user)];
+
+        let options = GenerateOptions {
+            temperature: Some(0.7),
+            max_tokens: Some(16000),
+            json_mode: true,
+            ..Default::default()
+        };
+
+        let response = provider
+            .generate_text(model_id, &messages, &options)
+            .await?;
+        let parsed: ScopeUpResponse = parse_ai_response(&response)?;
+
+        let result_tasks: Vec<Task> = parsed
+            .tasks
+            .into_iter()
+            .map(Self::generated_task_to_task)
+            .collect();
+
+        Ok((result_tasks, response.usage))
+    }
+
+    /// Expand all pending tasks into subtasks based on complexity or defaults.
+    ///
+    /// # Arguments
+    /// * `num_subtasks` - Optional target number of subtasks per task
+    /// * `force` - Force regeneration of subtasks for tasks that already have them
+    /// * `research` - Enable research-backed subtask generation
+    /// * `additional_context` - Additional context to guide subtask generation
+    /// * `complexity_report` - Optional complexity report for guided expansion
+    /// * `model` - AI model to use
+    pub async fn expand_all(
+        &self,
+        num_subtasks: Option<i32>,
+        force: bool,
+        research: bool,
+        additional_context: Option<&str>,
+        complexity_report: Option<&ComplexityReport>,
+        model: Option<&str>,
+    ) -> TasksResult<(Vec<Task>, TokenUsage)> {
+        let mut all_tasks = self.storage.load_tasks(None).await?;
+        let mut total_usage = TokenUsage::default();
+        let mut expanded_count = 0;
+
+        // Find tasks that need expansion
+        for task in &mut all_tasks {
+            // Skip non-pending tasks
+            if task.status != TaskStatus::Pending {
+                continue;
+            }
+
+            // Skip tasks that already have subtasks unless force is set
+            if !task.subtasks.is_empty() && !force {
+                continue;
+            }
+
+            // Get subtask count from complexity report or use default
+            let subtask_count = num_subtasks.or_else(|| {
+                complexity_report
+                    .and_then(|r| r.get_task_analysis(task.id.parse().ok()?))
+                    .map(|a| a.recommended_subtasks)
+            });
+
+            // Skip if complexity report says 0 subtasks needed
+            if subtask_count == Some(0) {
+                continue;
+            }
+
+            // Expand the task
+            let (subtasks, usage) = self
+                .expand_task(
+                    task,
+                    subtask_count,
+                    research,
+                    additional_context,
+                    complexity_report,
+                    model,
+                )
+                .await?;
+
+            // Clear existing subtasks if force is set
+            if force {
+                task.subtasks.clear();
+            }
+
+            // Add new subtasks
+            task.subtasks.extend(subtasks);
+            total_usage.input_tokens += usage.input_tokens;
+            total_usage.output_tokens += usage.output_tokens;
+            total_usage.total_tokens += usage.total_tokens;
+            expanded_count += 1;
+        }
+
+        tracing::info!(expanded_count, "Expanded tasks into subtasks");
+
+        Ok((all_tasks, total_usage))
     }
 
     /// Convert a generated task to a Task entity.

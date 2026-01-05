@@ -66,15 +66,17 @@ Fix the frontend build/lint/test errors in this PR. Common issues include:
 - Make minimal, targeted changes - don't refactor unrelated code
 - Ensure all changes pass CI checks
 
-### Steps
+### Workflow Steps
 
 1. Clone the repository and checkout the branch
-2. Install dependencies: `pnpm install`
-3. Analyze the error messages carefully
-4. Make the necessary code changes
-5. Run `pnpm lint`, `pnpm typecheck`, and `pnpm test`
-6. Commit and push the fixes
-7. Verify CI passes
+2. **Check for merge conflicts first** - if the PR has conflicts with the base branch, resolve them before fixing CI
+3. Install dependencies: `pnpm install`
+4. Analyze the error messages carefully
+5. Make the necessary code changes
+6. Run `pnpm lint`, `pnpm typecheck`, and `pnpm test`
+7. Commit and push the fixes
+8. **Wait for CI to pass** - monitor the GitHub Actions status
+9. **Merge the PR** once all checks pass and there are no conflicts
 
 {{#if pr_number}}
 Push your fixes to branch `{{branch}}` to update PR #{{pr_number}}.
@@ -82,3 +84,4 @@ Push your fixes to branch `{{branch}}` to update PR #{{pr_number}}.
 Create a new branch and open a PR with your fixes.
 {{/if}}
 
+{{> _pr-completion}}

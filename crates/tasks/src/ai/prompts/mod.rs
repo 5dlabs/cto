@@ -16,6 +16,8 @@ mod add_task;
 mod analyze_complexity;
 mod expand_task;
 mod parse_prd;
+mod scope_down;
+mod scope_up;
 mod update_subtask;
 mod update_task;
 mod update_tasks;
@@ -25,6 +27,8 @@ pub use add_task::AddTaskContext;
 pub use analyze_complexity::AnalyzeComplexityContext;
 pub use expand_task::{ExpandTaskContext, TaskSummary};
 pub use parse_prd::ParsePrdContext;
+pub use scope_down::ScopeDownContext;
+pub use scope_up::ScopeUpContext;
 pub use update_subtask::UpdateSubtaskContext;
 pub use update_task::UpdateTaskContext;
 pub use update_tasks::UpdateTasksContext;
@@ -173,6 +177,8 @@ impl PromptManager {
         manager.register(update_task::template());
         manager.register(update_subtask::template());
         manager.register(update_tasks::template());
+        manager.register(scope_down::template());
+        manager.register(scope_up::template());
 
         manager
     }

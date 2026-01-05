@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linear-CTO Integration Workflow</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a24;
+            --text-primary: #e4e4e7;
+            --text-secondary: #a1a1aa;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-green: #22c55e;
+            --accent-orange: #f97316;
+            --accent-pink: #ec4899;
+            --border-color: #27272a;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--accent-blue);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 24px;
+            background: var(--accent-blue);
+            border-radius: 2px;
+        }
+        
+        .mermaid {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        
+        .credential-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .credential-card {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 1.25rem;
+            border-left: 4px solid var(--accent-purple);
+        }
+        
+        .credential-card.github {
+            border-left-color: var(--accent-green);
+        }
+        
+        .credential-card h3 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+        
+        .credential-card p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .credential-card code {
+            background: var(--bg-primary);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-orange);
+        }
+        
+        .phase-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .phase-tab {
+            padding: 0.5rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .phase-tab:hover, .phase-tab.active {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+        
+        .status-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .status-table th, .status-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .status-table th {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .status-badge.implemented {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+        }
+        
+        .status-badge.partial {
+            background: rgba(249, 115, 22, 0.15);
+            color: var(--accent-orange);
+        }
+        
+        .status-badge.not-implemented {
+            background: rgba(161, 161, 170, 0.15);
+            color: var(--text-secondary);
+        }
+        
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .agent-card {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .agent-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .agent-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .agent-role {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        
+        .agent-app {
+            color: var(--accent-purple);
+            font-size: 0.8rem;
+            font-family: monospace;
+            margin-top: 0.5rem;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Linear-CTO Integration Workflow</h1>
+            <p class="subtitle">AI-driven development with real-time visibility in Linear</p>
+        </header>
+        
+        <!-- Credentials Section -->
+        <div class="section">
+            <h2>Credential Architecture</h2>
+            <div class="credential-grid">
+                <div class="credential-card">
+                    <h3>Linear API (Simplified)</h3>
+                    <p>Single workspace API key for all Linear operations</p>
+                    <p style="margin-top: 0.5rem;"><code>LINEAR_API_KEY</code></p>
+                    <p style="margin-top: 0.25rem; font-size: 0.8rem;">Stored in OpenBao at <code>cto/linear</code></p>
+                </div>
+                <div class="credential-card github">
+                    <h3>GitHub Apps (Per-Agent)</h3>
+                    <p>Each agent has its own GitHub App for git operations</p>
+                    <p style="margin-top: 0.5rem;"><code>GITHUB_APP_ID</code> + <code>GITHUB_APP_PRIVATE_KEY</code></p>
+                    <p style="margin-top: 0.25rem; font-size: 0.8rem;">Stored in OpenBao at <code>github-app-{agent}</code></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Workflow Diagram -->
+        <div class="section">
+            <h2>Complete Workflow</h2>
+            <div class="mermaid">
+flowchart TB
+    subgraph Phase1[Phase 1: Intake via MCP]
+        U1[User on Workstation]
+        MCP[intake MCP Tool]
+        AW0[Argo Workflow]
+        MOR0[Morgan: Parse PRD]
+        TG[Generate tasks.json + docs]
+        LP[Create Linear Project]
+        LIS[Create Linear Issues]
+        
+        U1 -->|"PRD + Architecture"| MCP
+        MCP --> AW0
+        AW0 --> MOR0
+        MOR0 --> TG
+        TG --> LP
+        LP --> LIS
+    end
+    
+    subgraph Phase2[Phase 2: Play Workflow - Per Task]
+        TA[Task with agentHint]
+        
+        subgraph Impl[Implementation Phase]
+            BOLT["Bolt - Infra (Task 1 + Additional)"]
+            REX[Rex/Grizz/Nova - Backend]
+            BLAZE[Blaze/Tap/Spark - Frontend]
+        end
+        
+        subgraph Support[Support Phases - Every Task]
+            CLEO[Cleo: Quality]
+            CIPHER[Cipher: Security]
+            TESS[Tess: Testing]
+            ATLAS[Atlas: Merge]
+        end
+        
+        TA -->|"agentHint=bolt"| BOLT
+        TA -->|"agentHint=rex/grizz/nova"| REX
+        TA -->|"agentHint=blaze/tap/spark"| BLAZE
+        
+        BOLT --> CLEO
+        REX --> CLEO
+        BLAZE --> CLEO
+        
+        CLEO -->|"task-language context"| CIPHER
+        CIPHER -->|"task-language context"| TESS
+        TESS --> ATLAS
+        ATLAS --> DONE[PR Merged]
+    end
+    
+    LIS --> TA
+    
+    style Phase1 fill:#1e1e2e,stroke:#3b82f6
+    style Phase2 fill:#1e1e2e,stroke:#22c55e
+    style Impl fill:#1a1a24,stroke:#f97316
+    style Support fill:#1a1a24,stroke:#8b5cf6
+            </div>
+        </div>
+        
+        <!-- Agent Routing Flow -->
+        <div class="section">
+            <h2>Agent Routing Flow</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Morgan determines the <code>agentHint</code> for each task during intake. 
+                The play workflow routes to the correct implementation agent, then all support agents run sequentially.
+            </p>
+            <div class="mermaid">
+flowchart LR
+    subgraph Intake[Intake - Morgan]
+        PRD[Parse PRD]
+        TASKS[Generate Tasks]
+        HINT[Assign agentHint]
+        
+        PRD --> TASKS
+        TASKS --> HINT
+    end
+    
+    subgraph Routing[Agent Hint Sources]
+        EXP[Explicit: Rex colon Task Title]
+        DEP[Dependencies: inherit from parent]
+        KEY[Keywords: rust/react/go]
+    end
+    
+    subgraph Play[Play Workflow]
+        T1["Task 1: Forced to Bolt"]
+        TN["Task N: Based on agentHint (can include more Bolt tasks)"]
+        SUP[Support Agents: All Tasks]
+    end
+    
+    HINT --> EXP
+    HINT --> DEP
+    HINT --> KEY
+    
+    EXP --> T1
+    DEP --> TN
+    KEY --> TN
+    
+    T1 --> SUP
+    TN --> SUP
+            </div>
+        </div>
+        
+        <!-- Agent Session Lifecycle -->
+        <div class="section">
+            <h2>Agent Session Lifecycle</h2>
+            <div class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant L as Linear
+    participant PM as PM Server
+    participant A as Argo Workflow
+    participant AG as Agent Pod
+    participant SC as Linear Sidecar
+    participant GH as GitHub
+    
+    U->>L: Assign issue to Agent
+    L->>PM: AgentSessionEvent (created)
+    PM->>A: Submit workflow
+    A->>AG: Create CodeRun
+    A->>SC: Start sidecar
+    
+    Note over AG,SC: Agent execution begins
+    
+    AG->>SC: Log output
+    SC->>L: emit_thought (progress)
+    AG->>SC: Tool call
+    SC->>L: emit_action (tool invocation)
+    AG->>SC: Tool result
+    SC->>L: emit_action (with result)
+    
+    Note over U,L: User can interact
+    
+    U->>L: Send message
+    L->>PM: AgentSessionEvent (prompted)
+    PM->>SC: Forward input
+    SC->>AG: Write to FIFO
+    
+    Note over AG,GH: Work completes
+    
+    AG->>GH: Create PR (GitHub App)
+    AG->>SC: Status: complete
+    SC->>L: emit_response (summary)
+    SC->>L: update_plan (all completed)
+            </div>
+        </div>
+        
+        <!-- Task-Based Agent Routing Section -->
+        <div class="section">
+            <h2>Task-Based Agent Routing</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                During <strong>intake</strong>, Morgan assigns an <code>agentHint</code> to each task based on explicit mentions, 
+                dependency inheritance, or keyword inference. Task 1 is always forced to <strong>Bolt</strong>, but Bolt can 
+                also handle additional infrastructure tasks throughout the project.
+            </p>
+            
+            <h3 style="color: var(--accent-blue); margin: 1.5rem 0 1rem; font-size: 1.1rem;">Implementation Agents (Task-Routed)</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                One implementation agent runs per task, determined by the task's <code>agentHint</code>.
+            </p>
+            <div class="agent-grid">
+                <div class="agent-card" style="border-left: 4px solid #f59e0b;">
+                    <div class="agent-name">Bolt</div>
+                    <div class="agent-role">Infrastructure (Task 1 + Additional Infra)</div>
+                    <div class="agent-app">5DLabs-Bolt</div>
+                </div>
+                <div class="agent-card" style="border-left: 4px solid #3b82f6;">
+                    <div class="agent-name">Rex</div>
+                    <div class="agent-role">Rust Backend</div>
+                    <div class="agent-app">5DLabs-Rex</div>
+                </div>
+                <div class="agent-card" style="border-left: 4px solid #22c55e;">
+                    <div class="agent-name">Grizz</div>
+                    <div class="agent-role">Go Backend</div>
+                    <div class="agent-app">5DLabs-Grizz</div>
+                </div>
+                <div class="agent-card" style="border-left: 4px solid #f97316;">
+                    <div class="agent-name">Nova</div>
+                    <div class="agent-role">Node.js Backend</div>
+                    <div class="agent-app">5DLabs-Nova</div>
+                </div>
+                <div class="agent-card" style="border-left: 4px solid #ec4899;">
+                    <div class="agent-name">Blaze</div>
+                    <div class="agent-role">React Frontend</div>
+                    <div class="agent-app">5DLabs-Blaze</div>
+                </div>
+                <div class="agent-card" style="border-left: 4px solid #a855f7;">
+                    <div class="agent-name">Tap</div>
+                    <div class="agent-role">Mobile (Expo)</div>
+                    <div class="agent-app">5DLabs-Tap</div>
+                </div>
+                <div class="agent-card" style="border-left: 4px solid #06b6d4;">
+                    <div class="agent-name">Spark</div>
+                    <div class="agent-role">Desktop (Electron)</div>
+                    <div class="agent-app">5DLabs-Spark</div>
+                </div>
+            </div>
+            
+            <h3 style="color: var(--accent-purple); margin: 1.5rem 0 1rem; font-size: 1.1rem;">Support Agents (Run for Every Task)</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                After implementation, these agents run <strong>sequentially for every task</strong>. 
+                They receive <code>task-language</code> and <code>task-framework</code> context for language-specific checks.
+            </p>
+            <div class="agent-grid">
+                <div class="agent-card" style="border-left: 4px solid #8b5cf6;">
+                    <div class="agent-name">Cleo</div>
+                    <div class="agent-role">Quality Review</div>
+                    <div class="agent-app">5DLabs-Cleo</div>
+                    <div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.5rem;">clippy/eslint/golangci-lint</div>
+                </div>
+                <div class="agent-card" style="border-left: 4px solid #ef4444;">
+                    <div class="agent-name">Cipher</div>
+                    <div class="agent-role">Security Scan</div>
+                    <div class="agent-app">5DLabs-Cipher</div>
+                    <div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.5rem;">memory safety/XSS/injection</div>
+                </div>
+                <div class="agent-card" style="border-left: 4px solid #14b8a6;">
+                    <div class="agent-name">Tess</div>
+                    <div class="agent-role">Testing</div>
+                    <div class="agent-app">5DLabs-Tess</div>
+                    <div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.5rem;">cargo test/jest/go test</div>
+                </div>
+                <div class="agent-card" style="border-left: 4px solid #84cc16;">
+                    <div class="agent-name">Atlas</div>
+                    <div class="agent-role">Integration Gate</div>
+                    <div class="agent-app">5DLabs-Atlas</div>
+                    <div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.5rem;">CI verify/merge PR</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Implementation Status -->
+        <div class="section">
+            <h2>Linear Agent API Implementation Status</h2>
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Status</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>emit_thought()</code></td>
+                        <td><span class="status-badge implemented">✓ Implemented</span></td>
+                        <td>Thoughts, progress updates</td>
+                    </tr>
+                    <tr>
+                        <td><code>emit_ephemeral_thought()</code></td>
+                        <td><span class="status-badge implemented">✓ Implemented</span></td>
+                        <td>Transient status messages</td>
+                    </tr>
+                    <tr>
+                        <td><code>emit_action()</code></td>
+                        <td><span class="status-badge implemented">✓ Implemented</span></td>
+                        <td>Tool invocations</td>
+                    </tr>
+                    <tr>
+                        <td><code>emit_action_complete()</code></td>
+                        <td><span class="status-badge implemented">✓ Implemented</span></td>
+                        <td>Tool results</td>
+                    </tr>
+                    <tr>
+                        <td><code>emit_error()</code></td>
+                        <td><span class="status-badge implemented">✓ Implemented</span></td>
+                        <td>Error reporting</td>
+                    </tr>
+                    <tr>
+                        <td><code>emit_response()</code></td>
+                        <td><span class="status-badge implemented">✓ Implemented</span></td>
+                        <td>Final completion</td>
+                    </tr>
+                    <tr>
+                        <td><code>update_plan()</code></td>
+                        <td><span class="status-badge implemented">✓ Implemented</span></td>
+                        <td>Checklist updates</td>
+                    </tr>
+                    <tr>
+                        <td><code>set_external_url()</code></td>
+                        <td><span class="status-badge implemented">✓ Implemented</span></td>
+                        <td>Link to Argo workflow</td>
+                    </tr>
+                    <tr>
+                        <td>User input polling</td>
+                        <td><span class="status-badge implemented">✓ Implemented</span></td>
+                        <td>Forward to agent FIFO</td>
+                    </tr>
+                    <tr>
+                        <td><code>stop</code> signal handling</td>
+                        <td><span class="status-badge partial">⚠ Partial</span></td>
+                        <td>Need graceful shutdown</td>
+                    </tr>
+                    <tr>
+                        <td><code>select</code> signal</td>
+                        <td><span class="status-badge not-implemented">Not Implemented</span></td>
+                        <td>Could use for confirmations</td>
+                    </tr>
+                    <tr>
+                        <td><code>elicitation</code> activity</td>
+                        <td><span class="status-badge not-implemented">Not Implemented</span></td>
+                        <td>For user clarifications</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Activity Types -->
+        <div class="section">
+            <h2>Linear Agent Activity Types</h2>
+            <div class="mermaid">
+flowchart LR
+    subgraph AgentEmits[Agent Emits]
+        T[thought]
+        A[action]
+        E[elicitation]
+        R[response]
+        ER[error]
+    end
+    
+    subgraph UserEmits[User Emits]
+        P[prompt]
+    end
+    
+    subgraph Signals[Signals]
+        ST[stop]
+        AU[auth]
+        SE[select]
+    end
+    
+    T -->|"Progress, reasoning"| Dialog[Agent Dialog]
+    A -->|"Tool calls + results"| Dialog
+    E -->|"Request input"| Dialog
+    R -->|"Completion"| Dialog
+    ER -->|"Failures"| Dialog
+    P -->|"User message"| Agent[Agent]
+    
+    ST -->|"Human to Agent"| Agent
+    AU -->|"Agent to Human"| Dialog
+    SE -->|"Agent to Human"| Dialog
+    
+    style T fill:#22c55e
+    style A fill:#3b82f6
+    style E fill:#f97316
+    style R fill:#8b5cf6
+    style ER fill:#ef4444
+    style P fill:#ec4899
+            </div>
+        </div>
+        
+        <footer>
+            <p>
+                Documentation: <a href="./linear-integration-workflow.md">Markdown Reference</a> |
+                Linear Docs: <a href="https://linear.app/developers/agents" target="_blank">Agent API</a>
+            </p>
+            <p style="margin-top: 0.5rem;">CTO Platform - 5D Labs</p>
+        </footer>
+    </div>
+    
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#3b82f6',
+                primaryTextColor: '#e4e4e7',
+                primaryBorderColor: '#27272a',
+                lineColor: '#52525b',
+                secondaryColor: '#1e1e2e',
+                tertiaryColor: '#0a0a0f',
+                background: '#12121a',
+                mainBkg: '#1e1e2e',
+                nodeBorder: '#3b82f6',
+                clusterBkg: '#1e1e2e',
+                clusterBorder: '#27272a',
+                titleColor: '#e4e4e7',
+                actorBkg: '#1e1e2e',
+                actorBorder: '#3b82f6',
+                actorTextColor: '#e4e4e7',
+                actorLineColor: '#52525b',
+                signalColor: '#e4e4e7',
+                signalTextColor: '#e4e4e7',
+                labelBoxBkgColor: '#1e1e2e',
+                labelBoxBorderColor: '#27272a',
+                labelTextColor: '#e4e4e7',
+                loopTextColor: '#a1a1aa',
+                noteBkgColor: '#27272a',
+                noteTextColor: '#e4e4e7',
+                noteBorderColor: '#3b82f6',
+                activationBkgColor: '#3b82f6',
+                activationBorderColor: '#2563eb',
+                sequenceNumberColor: '#e4e4e7'
+            },
+            flowchart: {
+                curve: 'basis',
+                padding: 20
+            },
+            sequence: {
+                diagramMarginX: 50,
+                diagramMarginY: 10,
+                actorMargin: 50,
+                width: 150,
+                height: 65,
+                boxMargin: 10,
+                boxTextMargin: 5,
+                noteMargin: 10,
+                messageMargin: 35
+            }
+        });
+    </script>
+</body>
+</html>

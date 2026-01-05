@@ -138,12 +138,7 @@ agent-templates/
 # Documentation archive (private/archived docs)
 .docs-archive/
 
-# Documentation - kept locally only (except specific files)
-/docs/*
-!/docs/play-workflow-guide.html
-!/docs/MCP-SERVERS-BINARIES.md
-!/docs/HEADSCALE-CLIENT-SETUP.md
-!/docs/research/
+# Documentation - all files in docs/ are tracked except specific private directories below
 
 # Local scripts (development utilities, not for version control)
 /.scripts/

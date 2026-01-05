@@ -143,6 +143,49 @@ pub struct UpdateTasksResponse {
     pub tasks: Vec<GeneratedTask>,
 }
 
+/// Response from scope-down command.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScopeDownResponse {
+    /// Modified/split tasks
+    pub tasks: Vec<GeneratedTask>,
+    /// Optional metadata about the scoping operation
+    #[serde(default)]
+    pub metadata: Option<ScopeMetadata>,
+}
+
+/// Response from scope-up command.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScopeUpResponse {
+    /// Consolidated tasks
+    pub tasks: Vec<GeneratedTask>,
+    /// Optional metadata about the scoping operation
+    #[serde(default)]
+    pub metadata: Option<ScopeMetadata>,
+}
+
+/// Metadata for scope operations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScopeMetadata {
+    /// Original task IDs that were modified
+    #[serde(default, rename = "originalTaskIds")]
+    pub original_task_ids: Vec<i32>,
+    /// Task IDs that were merged (for scope-up)
+    #[serde(default, rename = "mergedTaskIds")]
+    pub merged_task_ids: Vec<i32>,
+    /// Description of split details (for scope-down)
+    #[serde(default, rename = "splitDetails")]
+    pub split_details: Option<String>,
+    /// Features or scope that was deferred (for scope-down)
+    #[serde(default, rename = "deferredScope")]
+    pub deferred_scope: Option<String>,
+    /// Scope that was added (for scope-up)
+    #[serde(default, rename = "addedScope")]
+    pub added_scope: Option<String>,
+    /// Reason for consolidation (for scope-up)
+    #[serde(default, rename = "consolidationReason")]
+    pub consolidation_reason: Option<String>,
+}
+
 /// Complexity report file structure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplexityReport {

@@ -64,14 +64,16 @@ Fix the Rust compilation/lint errors in this PR. Common issues include:
 - Make minimal, targeted changes - don't refactor unrelated code
 - Ensure all changes compile and pass CI checks
 
-### Steps
+### Workflow Steps
 
 1. Clone the repository and checkout the branch
-2. Analyze the error messages carefully
-3. Make the necessary code changes
-4. Run `cargo check`, `cargo clippy`, and `cargo test`
-5. Commit and push the fixes
-6. Verify CI passes
+2. **Check for merge conflicts first** - if the PR has conflicts with the base branch, resolve them before fixing CI
+3. Analyze the error messages carefully
+4. Make the necessary code changes
+5. Run `cargo check`, `cargo clippy`, and `cargo test`
+6. Commit and push the fixes
+7. **Wait for CI to pass** - monitor the GitHub Actions status
+8. **Merge the PR** once all checks pass and there are no conflicts
 
 {{#if pr_number}}
 Push your fixes to branch `{{branch}}` to update PR #{{pr_number}}.
@@ -79,3 +81,54 @@ Push your fixes to branch `{{branch}}` to update PR #{{pr_number}}.
 Create a new branch and open a PR with your fixes.
 {{/if}}
 
+## ⚠️ CRITICAL: You Must Complete the Full Cycle
+
+**Your job is NOT done until the PR is merged.** Follow this loop:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. Fix code issues                                         │
+│  2. Push changes                                            │
+│  3. Check PR status: gh pr view --json mergeable,state      │
+│  4. If CONFLICTING → resolve merge conflicts, go to step 2  │
+│  5. If checks failing → fix issues, go to step 2            │
+│  6. If ready → merge: gh pr merge --squash --delete-branch  │
+│  7. Verify merged state                                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Merge Conflict Resolution
+
+If the PR has merge conflicts (`mergeable: CONFLICTING`):
+
+```bash
+# Fetch latest and rebase
+git fetch origin develop
+git rebase origin/develop
+
+# If conflicts occur, resolve each file:
+# 1. Edit the file to remove conflict markers (<<<<<<, ======, >>>>>>)
+# 2. Keep the correct code from both sides
+# 3. git add <file>
+# 4. git rebase --continue
+
+# Push the resolved branch
+git push origin {{branch}} --force-with-lease
+```
+
+### Merging the PR
+
+Once all checks pass and there are no conflicts:
+
+```bash
+# Verify PR is ready
+gh pr view {{pr_number}} --json mergeable,mergeStateStatus
+
+# Merge using squash (standard for this repo)
+gh pr merge {{pr_number}} --squash --delete-branch
+
+# Verify the merge succeeded
+gh pr view {{pr_number}} --json state
+```
+
+**DO NOT EXIT until the PR state is "MERGED".**
