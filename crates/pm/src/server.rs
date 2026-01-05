@@ -403,6 +403,14 @@ async fn handle_intake_setup(
         );
     }
 
+    // Ensure required labels exist for CLI/model config, status tracking, etc.
+    if let Err(e) = client.ensure_required_labels(&team_id).await {
+        warn!(
+            error = %e,
+            "Failed to ensure required labels (continuing with project creation)"
+        );
+    }
+
     // Try to find "Planned" project status for initial project state
     let status_id = match client.find_project_status_by_type("planned").await {
         Ok(Some(status)) => {
@@ -459,12 +467,12 @@ async fn handle_intake_setup(
         "Created Linear project"
     );
 
-    // Get or create PRD label
-    let prd_label = client
-        .get_or_create_label(&team_id, "PRD")
+    // Get or create task:intake label for PRD issues
+    let intake_label = client
+        .get_or_create_label(&team_id, "task:intake")
         .await
         .map_err(|e| {
-            warn!(error = %e, "Failed to create PRD label, continuing without");
+            warn!(error = %e, "Failed to create task:intake label, continuing without");
             e
         })
         .ok();
@@ -484,7 +492,7 @@ async fn handle_intake_setup(
     info!(title = %issue_title, "Creating PRD issue");
 
     let mut label_ids = Vec::new();
-    if let Some(label) = &prd_label {
+    if let Some(label) = &intake_label {
         label_ids.push(label.id.clone());
     }
 

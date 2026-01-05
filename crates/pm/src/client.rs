@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Context, Result};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument, warn};
 
 use crate::activities::{
     AgentActivityCreateInput, AgentActivityCreateResponse, AGENT_ACTIVITY_CREATE_MUTATION,
@@ -750,6 +750,97 @@ impl LinearClient {
             .issue_label_create
             .issue_label
             .ok_or_else(|| anyhow!("Failed to create label"))
+    }
+
+    /// Ensure all required CTO platform labels exist for a team.
+    ///
+    /// This creates labels for:
+    /// - CLI/Model config: `claude:opus`, `claude:sonnet`, `cursor:opus`, etc.
+    /// - Status tracking: `PRD`, `cto-task`
+    /// - Agent status: `agent:pending`, `agent:working`, etc.
+    ///
+    /// Labels that already exist are skipped.
+    #[instrument(skip(self), fields(team_id = %team_id))]
+    pub async fn ensure_required_labels(&self, team_id: &str) -> Result<()> {
+        // CLI:Model config labels (preferred format)
+        const CONFIG_LABELS: &[&str] = &[
+            // Claude CLI combinations
+            "claude:opus",
+            "claude:sonnet",
+            "claude:haiku",
+            // Cursor CLI combinations
+            "cursor:opus",
+            "cursor:sonnet",
+            // Codex CLI combinations
+            "codex:gpt5",
+            // OpenCode CLI combinations
+            "opencode:grok4",
+            // Gemini CLI combinations
+            "gemini:pro3",
+        ];
+
+        // Task type labels
+        const TASK_LABELS: &[&str] = &[
+            "task:intake", // PRD/intake issues
+            "task:play",   // Play workflow task issues
+        ];
+
+        // Agent status labels
+        const STATUS_LABELS: &[&str] = &[
+            "agent:pending",
+            "agent:working",
+            "agent:blocked",
+            "agent:pr-created",
+            "agent:complete",
+            "agent:error",
+        ];
+
+        // Priority labels
+        const PRIORITY_LABELS: &[&str] = &["High Priority", "Medium Priority", "Low Priority"];
+
+        let all_labels: Vec<&str> = CONFIG_LABELS
+            .iter()
+            .chain(TASK_LABELS.iter())
+            .chain(STATUS_LABELS.iter())
+            .chain(PRIORITY_LABELS.iter())
+            .copied()
+            .collect();
+
+        info!(
+            team_id = %team_id,
+            label_count = all_labels.len(),
+            "Ensuring required labels exist"
+        );
+
+        let mut success_count = 0;
+        let mut error_count = 0;
+
+        for label_name in all_labels {
+            match self.get_or_create_label(team_id, label_name).await {
+                Ok(label) => {
+                    debug!(label_name = %label_name, label_id = %label.id, "Label ensured");
+                    success_count += 1;
+                }
+                Err(e) => {
+                    // Log but don't fail - some labels may have naming conflicts
+                    warn!(
+                        label_name = %label_name,
+                        error = %e,
+                        "Failed to ensure label (may already exist with different casing)"
+                    );
+                    error_count += 1;
+                }
+            }
+        }
+
+        info!(
+            team_id = %team_id,
+            success = success_count,
+            errors = error_count,
+            "Label initialization complete"
+        );
+
+        Ok(())
     }
 
     /// Set labels on an issue (replaces existing labels)

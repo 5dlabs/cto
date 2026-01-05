@@ -1002,8 +1002,8 @@ pub async fn create_task_issues_with_project(
         .ok_or_else(|| anyhow!("No unstarted state found for team"))?;
 
     // Get or create labels.
-    let cto_task_label = client
-        .get_or_create_label(&request.team_id, "cto-task")
+    let play_task_label = client
+        .get_or_create_label(&request.team_id, "task:play")
         .await?;
 
     // Get or create agent:pending label for new tasks
@@ -1037,7 +1037,7 @@ pub async fn create_task_issues_with_project(
         // Format task description with details.
         let description = format_task_description(task);
 
-        let mut label_ids = vec![cto_task_label.id.clone()];
+        let mut label_ids = vec![play_task_label.id.clone()];
 
         // Add agent label based on agent_hint (e.g., "agent:rex", "agent:blaze")
         // This allows filtering/grouping by assigned agent in Linear

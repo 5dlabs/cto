@@ -3707,9 +3707,24 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     };
 
     // Create a ConfigMap with the intake files to avoid YAML escaping issues
+    // Sanitize project name for Kubernetes resource naming (RFC 1123 subdomain)
+    let sanitized_name = project_name
+        .to_lowercase()
+        .replace(['/', ' ', '_'], "-")
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '.')
+        .collect::<String>();
+    // Trim to reasonable length and remove leading/trailing dashes
+    let sanitized_name = sanitized_name
+        .trim_matches('-')
+        .trim_matches('.')
+        .chars()
+        .take(50)
+        .collect::<String>();
+
     let configmap_name = format!(
         "intake-{}-{}",
-        project_name.to_lowercase().replace(' ', "-"),
+        sanitized_name,
         chrono::Utc::now().timestamp()
     );
 
