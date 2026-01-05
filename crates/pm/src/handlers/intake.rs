@@ -1039,29 +1039,8 @@ pub async fn create_task_issues_with_project(
 
         let mut label_ids = vec![play_task_label.id.clone()];
 
-        // Add agent label based on agent_hint (e.g., "agent:rex", "agent:blaze")
-        // This allows filtering/grouping by assigned agent in Linear
-        if task.agent_hint.is_empty() {
-            // No agent hint - mark as pending for manual assignment
-            label_ids.push(agent_pending_label.id.clone());
-        } else {
-            let agent_label_name = format!("agent:{}", task.agent_hint.to_lowercase());
-            match client
-                .get_or_create_label(&request.team_id, &agent_label_name)
-                .await
-            {
-                Ok(label) => label_ids.push(label.id),
-                Err(e) => {
-                    warn!(
-                        task_id = %task.id,
-                        agent = %task.agent_hint,
-                        error = %e,
-                        "Failed to create agent label, using pending"
-                    );
-                    label_ids.push(agent_pending_label.id.clone());
-                }
-            }
-        }
+        // All new tasks start as pending - delegate assignment happens when Play workflow starts
+        label_ids.push(agent_pending_label.id.clone());
 
         if let Some(label) = priority_label {
             label_ids.push(label.id);
@@ -1072,7 +1051,7 @@ pub async fn create_task_issues_with_project(
         //
         // Note: Delegate assignment happens when the Play workflow starts each task.
         // The PM service looks up the agent's Linear user ID and updates the issue.
-        // Agent is tracked via label (e.g., "agent:rex") until then.
+        // The agent_hint is stored in the task description for reference.
         let input = IssueCreateInput {
             team_id: request.team_id.clone(),
             title: format!("Task {}: {}", task.id, task.title),
