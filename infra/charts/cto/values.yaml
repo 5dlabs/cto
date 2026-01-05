@@ -91,6 +91,16 @@ healer:
       - 'INFO.*ExecutionContext.*errorMessages'
       # Generic pattern: INFO level logs should not be errors
       - '^\s*F\s*\[WORKER.*INFO'
+      # ArgoCD manifest cache INFO logs (level=info means not an error)
+      - 'level=info\s+msg="manifest cache'
+      # ArgoCD general INFO level logs
+      - 'level=info\s+msg='
+      # Kubernetes-style INFO logs (I followed by date like I0105 = INFO Jan 5)
+      - '^\s*F?\s*I\d{4}\s+\d{2}:\d{2}:\d{2}'
+      # CSI driver INFO logs that mention "Error processing" but are informational
+      - 'I\d{4}.*csi_handler\.go.*Error processing'
+      # Generic klog INFO format with Error in message content
+      - '^\s*F?\s*I\d{4}\s+.*"Error'
     
     # Only match actual error log levels
     # Valid error levels: error, fatal, panic, critical
