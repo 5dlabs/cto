@@ -94,8 +94,6 @@ struct CtoConfig {
 #[derive(Debug, Deserialize, Clone)]
 struct WorkflowDefaults {
     docs: DocsDefaults,
-    #[allow(dead_code)]
-    code: CodeDefaults,
     #[serde(default)]
     intake: IntakeDefaults,
     #[serde(default)]
@@ -115,40 +113,6 @@ struct DocsDefaults {
     #[serde(rename = "sourceBranch")]
     #[allow(dead_code)] // Used for backwards compatibility, will be removed in future version
     source_branch: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct CodeDefaults {
-    #[allow(dead_code)]
-    model: String,
-    #[serde(rename = "githubApp")]
-    #[allow(dead_code)]
-    github_app: String,
-    #[serde(rename = "continueSession")]
-    #[allow(dead_code)]
-    continue_session: bool,
-    #[serde(rename = "workingDirectory")]
-    #[allow(dead_code)]
-    working_directory: String,
-    #[serde(rename = "overwriteMemory")]
-    #[allow(dead_code)]
-    overwrite_memory: bool,
-    #[allow(dead_code)]
-    repository: Option<String>,
-    #[serde(rename = "docsRepository")]
-    #[allow(dead_code)]
-    docs_repository: Option<String>,
-    #[serde(rename = "docsProjectDirectory")]
-    #[allow(dead_code)]
-    docs_project_directory: Option<String>,
-    #[allow(dead_code)]
-    service: Option<String>,
-    #[serde(rename = "maxRetries")]
-    #[allow(dead_code)]
-    max_retries: Option<u32>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    cli: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -2943,35 +2907,30 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             .or(implementation_agent_max_retries)
             .or(effective_config.defaults.play.implementation_max_retries)
             .or(effective_config.defaults.play.max_retries)
-            .or(effective_config.defaults.code.max_retries)
             .unwrap_or(10);
 
     let frontend_max_retries = parse_max_retries_argument(arguments, "frontend_max_retries")
         .or(frontend_agent_max_retries)
         .or(effective_config.defaults.play.frontend_max_retries)
         .or(effective_config.defaults.play.max_retries)
-        .or(effective_config.defaults.code.max_retries)
         .unwrap_or(10);
 
     let quality_max_retries = parse_max_retries_argument(arguments, "quality_max_retries")
         .or(quality_agent_max_retries)
         .or(effective_config.defaults.play.quality_max_retries)
         .or(effective_config.defaults.play.max_retries)
-        .or(effective_config.defaults.code.max_retries)
         .unwrap_or(10);
 
     let security_max_retries = parse_max_retries_argument(arguments, "security_max_retries")
         .or(security_agent_max_retries)
         .or(effective_config.defaults.play.security_max_retries)
         .or(effective_config.defaults.play.max_retries)
-        .or(effective_config.defaults.code.max_retries)
         .unwrap_or(10);
 
     let testing_max_retries = parse_max_retries_argument(arguments, "testing_max_retries")
         .or(testing_agent_max_retries)
         .or(effective_config.defaults.play.testing_max_retries)
         .or(effective_config.defaults.play.max_retries)
-        .or(effective_config.defaults.code.max_retries)
         .unwrap_or(10);
 
     let opencode_max_retries_override =

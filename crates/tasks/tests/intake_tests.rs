@@ -900,7 +900,8 @@ mod cto_config_tests {
     #[allow(dead_code)]
     struct RootDefaults {
         docs: RootDocsDefaults,
-        code: RootCodeDefaults,
+        #[serde(default)]
+        code: Option<RootCodeDefaults>,
         intake: RootIntakeDefaults,
         play: RootPlayDefaults,
     }
@@ -1028,7 +1029,8 @@ mod cto_config_tests {
         #[allow(dead_code)]
         struct McpWorkflowDefaults {
             docs: McpDocsDefaults,
-            code: McpCodeDefaults,
+            #[serde(default)]
+            code: Option<McpCodeDefaults>,
             #[serde(default)]
             intake: McpIntakeDefaults,
             #[serde(default)]
