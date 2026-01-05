@@ -1,0 +1,111 @@
+{{- if .Values.healer.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-remediation-policies
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: healer
+data:
+  remediation-policies.yaml: |
+    # Auto-remediation policies for common infrastructure issues
+    # Detected from log scan analysis on 2026-01-04
+    
+    policies:
+      # Policy for Grafana SQLite database corruption
+      - name: grafana-db-corruption
+        description: "Remediate Grafana SQLite database corruption (unable to open database file)"
+        trigger:
+          errorPattern: "unable to open database file|database disk image is malformed"
+          service: grafana
+          namespace: "*"
+        actions:
+          - type: restart-pod
+            description: "Restart Grafana pod to recreate database connections"
+            selector:
+              app.kubernetes.io/name: grafana
+          - type: delete-pvc-data
+            description: "If restart fails, delete corrupted SQLite database"
+            path: "/var/lib/grafana/grafana.db"
+            condition: "restart-failed"
+        cooldown: 300s
+        maxRetries: 3
+      
+      # Policy for NATS/STAN eventbus DNS lookup failures
+      - name: nats-stan-dns-failure
+        description: "Remediate NATS STAN eventbus pod DNS lookup failures"
+        trigger:
+          errorPattern: "lookup for host.*eventbus-default-stan.*lookup.*no such host"
+          namespace: "automation"
+        actions:
+          - type: restart-statefulset
+            description: "Restart STAN StatefulSet to recover failed pods"
+            selector:
+              app: eventbus-default-stan
+          - type: check-pvc
+            description: "Verify PVC is bound and healthy"
+            selector:
+              app: eventbus-default-stan
+          - type: scale-down-up
+            description: "Scale StatefulSet down to 0 then back up if pods stuck"
+            resource: statefulset/eventbus-default-stan
+            condition: "restart-failed"
+        cooldown: 180s
+        maxRetries: 5
+      
+      # Policy for general database file I/O errors
+      - name: db-io-error
+        description: "Remediate database I/O errors caused by storage issues"
+        trigger:
+          errorPattern: "input/output error|disk I/O error"
+          namespace: "*"
+        actions:
+          - type: check-node-health
+            description: "Verify node disk health and capacity"
+          - type: restart-pod
+            description: "Restart affected pod"
+          - type: cordon-node
+            description: "Cordon node if disk errors persist"
+            condition: "error-count > 10"
+        cooldown: 600s
+        maxRetries: 2
+
+  health-checks.yaml: |
+    # Health check configurations for monitored services
+    
+    healthChecks:
+      - name: grafana
+        namespace: argocd
+        selector:
+          app.kubernetes.io/name: grafana
+        checks:
+          - type: http
+            path: /api/health
+            port: 3000
+            interval: 30s
+            timeout: 10s
+          - type: database
+            description: "SQLite database integrity"
+            command: "sqlite3 /var/lib/grafana/grafana.db 'PRAGMA integrity_check;'"
+            interval: 300s
+            timeout: 30s
+      
+      - name: nats-stan-eventbus
+        namespace: automation
+        selector:
+          app: eventbus-default-stan
+        checks:
+          - type: tcp
+            port: 4222
+            interval: 15s
+            timeout: 5s
+          - type: dns
+            hostname: "eventbus-default-stan-svc.automation.svc.cluster.local"
+            interval: 30s
+            timeout: 10s
+          - type: statefulset-ready
+            description: "All STAN replicas ready"
+            interval: 60s
+{{- end }}

@@ -54,3 +54,87 @@ tools:
         command: "git"
         args: ["clone", "--depth=1", "https://github.com/anthropics/courses.git", "/tmp/courses"]
         workingDirectory: "/tmp"
+
+# =============================================================================
+# Healer Configuration
+# =============================================================================
+# Configure the healer for auto-remediation of production issues.
+# =============================================================================
+healer:
+  enabled: true
+  # CronJob schedule for health checks (every 5 minutes)
+  schedule: "*/5 * * * *"
+  
+  # =============================================================================
+  # Log Scanner Configuration
+  # =============================================================================
+  # Configure the log scanner to exclude false positive error patterns.
+  # These patterns match INFO-level log lines that contain the word "error" in
+  # non-error contexts (e.g., success messages, command registrations, etc.)
+  #
+  # The log scanner should only flag actual errors, not INFO logs that happen
+  # to mention "error" as part of normal operation.
+  # =============================================================================
+  scanner:
+    # Exclude patterns: Log lines matching these regex patterns will NOT be
+    # counted as errors, even if they contain the word "error"
+    excludePatterns:
+      # ArgoCD Image Updater success messages (errors=0 means success)
+      - 'level=info.*errors=0'
+      # Empty error arrays in JSON logs (indicates no errors)
+      - '"errorMessages":\s*\[\]'
+      # Factory worker command registration (registering error handlers is normal)
+      - 'INFO.*ActionCommandManager.*Register action command extension'
+      # Factory worker manifest processing INFO logs
+      - 'INFO.*ActionManifestManager'
+      # Factory execution context INFO logs showing empty errors
+      - 'INFO.*ExecutionContext.*errorMessages'
+      # Generic pattern: INFO level logs should not be errors
+      - '^\s*F\s*\[WORKER.*INFO'
+    
+    # Only match actual error log levels
+    # Valid error levels: error, fatal, panic, critical
+    errorLevels:
+      - "error"
+      - "fatal"
+      - "panic"
+      - "critical"
+      - "ERROR"
+      - "FATAL"
+      - "PANIC"
+      - "CRITICAL"
+  # Image for healer job
+  image:
+    repository: bitnami/kubectl
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Resource limits
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # Namespaces to monitor for self-healing
+  monitoredNamespaces:
+    - argocd
+    - automation
+    - cto
+  # Remediation policies
+  policies:
+    # Grafana database corruption auto-healing
+    grafanaDbCorruption:
+      enabled: true
+      cooldownSeconds: 300
+      maxRetries: 3
+    # NATS/STAN eventbus DNS failure healing
+    natsStanDnsFailure:
+      enabled: true
+      cooldownSeconds: 180
+      maxRetries: 5
+    # General I/O error handling
+    dbIoError:
+      enabled: true
+      cooldownSeconds: 600
+      maxRetries: 2
