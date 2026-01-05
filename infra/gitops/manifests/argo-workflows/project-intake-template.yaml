@@ -58,12 +58,6 @@ spec:
         description: "Research AI model"
       - name: fallback-model
         description: "Fallback AI model"
-      - name: primary-provider
-        description: "Primary AI provider"
-      - name: research-provider
-        description: "Research AI provider"
-      - name: fallback-provider
-        description: "Fallback AI provider"
       # Task generation parameters
       - name: num-tasks
         description: "Target number of tasks to generate"
@@ -86,9 +80,6 @@ spec:
       - name: cli
         description: "CLI tool to use (when mode=cli)"
         value: "claude"
-      - name: intake-mode
-        description: "Intake mode: api (direct API calls) or cli (use AI CLI)"
-        value: "api"
       # Linear callback parameters
       - name: linear-session-id
         description: "Linear session ID for callbacks"
@@ -293,8 +284,7 @@ spec:
           EXPAND_TASKS="{{workflow.parameters.expand-tasks}}"
           ANALYZE_COMPLEXITY="{{workflow.parameters.analyze-complexity}}"
 
-          # Intake mode
-          INTAKE_MODE="{{workflow.parameters.intake-mode}}"
+          # CLI configuration
           INTAKE_CLI="{{workflow.parameters.cli}}"
 
           # Linear integration
@@ -340,7 +330,6 @@ spec:
               NUM_TASKS: "${NUM_TASKS}"
               EXPAND_TASKS: "${EXPAND_TASKS}"
               ANALYZE_COMPLEXITY: "${ANALYZE_COMPLEXITY}"
-              INTAKE_MODE: "${INTAKE_MODE}"
               INTAKE_CLI: "${INTAKE_CLI}"
               INTAKE_CONFIGMAP: "${CONFIGMAP_NAME}"
               WORKFLOW_NAME: "${WORKFLOW_NAME}"

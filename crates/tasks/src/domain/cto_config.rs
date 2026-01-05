@@ -59,11 +59,13 @@ pub struct AgentConfig {
 /// Play workflow defaults
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayDefaults {
-    /// Default AI model
-    pub model: String,
+    /// Default AI model (deprecated - use agent-specific model config)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 
-    /// Default CLI
-    pub cli: String,
+    /// Default CLI (deprecated - use agent-specific cli config)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cli: Option<String>,
 
     /// Implementation agent GitHub App
     #[serde(rename = "implementationAgent")]
@@ -147,24 +149,24 @@ pub struct IntakeDefaults {
     /// Options: claude, codex, gemini, opencode, factory, dexter
     pub cli: String,
 
-    /// Primary model configuration
-    pub primary: ModelConfig,
-
-    /// Research model configuration
-    pub research: ModelConfig,
-
-    /// Fallback model configuration
-    pub fallback: ModelConfig,
+    /// Model configuration (simplified - just model names, CLI-only)
+    pub models: IntakeModels,
 }
 
-/// Model configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelConfig {
-    /// Model ID
-    pub model: String,
+/// Simplified model configuration for intake (CLI-only, no provider needed)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct IntakeModels {
+    /// Primary model for task generation
+    #[serde(default)]
+    pub primary: String,
 
-    /// Provider name
-    pub provider: String,
+    /// Research model for context enrichment
+    #[serde(default)]
+    pub research: String,
+
+    /// Fallback model if primary fails
+    #[serde(default)]
+    pub fallback: String,
 }
 
 /// All default configurations
@@ -198,22 +200,15 @@ impl Default for CtoConfig {
                 intake: IntakeDefaults {
                     github_app: "5DLabs-Morgan".to_string(),
                     cli: "claude".to_string(),
-                    primary: ModelConfig {
-                        model: "claude-opus-4-5-20251101".to_string(),
-                        provider: "anthropic".to_string(),
-                    },
-                    research: ModelConfig {
-                        model: "claude-opus-4-5-20251101".to_string(),
-                        provider: "anthropic".to_string(),
-                    },
-                    fallback: ModelConfig {
-                        model: "claude-opus-4-5-20251101".to_string(),
-                        provider: "anthropic".to_string(),
+                    models: IntakeModels {
+                        primary: "claude-opus-4-5-20251101".to_string(),
+                        research: "claude-opus-4-5-20251101".to_string(),
+                        fallback: "claude-opus-4-5-20251101".to_string(),
                     },
                 },
                 play: PlayDefaults {
-                    model: "claude-opus-4-5-20251101".to_string(),
-                    cli: "claude".to_string(),
+                    model: None,
+                    cli: None,
                     implementation_agent: "5DLabs-Rex".to_string(),
                     frontend_agent: "5DLabs-Blaze".to_string(),
                     quality_agent: "5DLabs-Cleo".to_string(),

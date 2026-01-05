@@ -101,10 +101,18 @@ struct WorkflowDefaults {
     play: PlayDefaults,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-struct ModelConfig {
-    model: String,
-    provider: String,
+/// Simplified model configuration for intake (CLI-only, no provider needed)
+#[derive(Debug, Deserialize, Clone, Default)]
+struct IntakeModels {
+    /// Primary model for task generation
+    #[serde(default)]
+    primary: String,
+    /// Research model for context enrichment
+    #[serde(default)]
+    research: String,
+    /// Fallback model if primary fails
+    #[serde(default)]
+    fallback: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -119,9 +127,9 @@ struct IntakeDefaults {
     include_codebase: bool,
     #[serde(rename = "sourceBranch", default = "default_source_branch")]
     source_branch: String,
-    primary: ModelConfig,
-    research: ModelConfig,
-    fallback: ModelConfig,
+    /// Model configuration (simplified - just model names, no providers)
+    #[serde(default)]
+    models: IntakeModels,
 }
 
 fn default_source_branch() -> String {
@@ -130,46 +138,41 @@ fn default_source_branch() -> String {
 
 impl Default for IntakeDefaults {
     fn default() -> Self {
-        // Provide sensible defaults for intake operations
-        // Morgan is the intake agent responsible for PRD processing
         IntakeDefaults {
             github_app: "5DLabs-Morgan".to_string(),
             cli: "claude".to_string(),
             include_codebase: false,
             source_branch: "main".to_string(),
-            primary: ModelConfig {
-                model: String::new(),
-                provider: String::new(),
-            },
-            research: ModelConfig {
-                model: String::new(),
-                provider: String::new(),
-            },
-            fallback: ModelConfig {
-                model: String::new(),
-                provider: String::new(),
-            },
+            models: IntakeModels::default(),
         }
     }
 }
 
-/// Linear integration configuration for intake.
+/// Intake-specific Linear settings (nested under defaults.linear.intake).
+#[derive(Debug, Deserialize, Clone, Default)]
+struct LinearIntakeConfig {
+    /// Whether to create a Linear project during intake
+    #[serde(rename = "createProject", default = "default_true")]
+    create_project: bool,
+    /// Optional project template name to use
+    #[serde(rename = "projectTemplate")]
+    #[allow(dead_code)]
+    project_template: Option<String>,
+}
+
+/// Linear integration configuration.
 /// Uses PM server for API calls (no client-side API key needed).
 #[derive(Debug, Deserialize, Clone)]
 struct LinearDefaults {
     /// Linear team ID (e.g., "CTOPA" for CTO Platform team)
     #[serde(rename = "teamId")]
     team_id: String,
-    /// Whether to create a Linear project during intake
-    #[serde(rename = "createProject", default = "default_true")]
-    create_project: bool,
-    /// Optional project template name to use (future use)
-    #[serde(rename = "projectTemplate")]
-    #[allow(dead_code)]
-    project_template: Option<String>,
     /// PM server URL for Linear API calls (uses port-forward by default)
     #[serde(rename = "pmServerUrl")]
     pm_server_url: Option<String>,
+    /// Intake-specific Linear settings
+    #[serde(default)]
+    intake: LinearIntakeConfig,
 }
 
 fn default_true() -> bool {
@@ -180,9 +183,8 @@ impl Default for LinearDefaults {
     fn default() -> Self {
         LinearDefaults {
             team_id: String::new(),
-            create_project: true,
-            project_template: None,
             pm_server_url: None,
+            intake: LinearIntakeConfig::default(),
         }
     }
 }
@@ -200,8 +202,12 @@ fn validate_model_name(model: &str) -> Result<()> {
 
 #[derive(Debug, Deserialize, Clone, Default)]
 struct PlayDefaults {
-    model: String,
-    cli: String,
+    /// Default AI model (deprecated - use agent-specific model config)
+    #[serde(default)]
+    model: Option<String>,
+    /// Default CLI (deprecated - use agent-specific cli config)
+    #[serde(default)]
+    cli: Option<String>,
     #[serde(rename = "implementationAgent")]
     implementation_agent: String,
     #[serde(rename = "frontendAgent")]
@@ -446,14 +452,15 @@ fn parse_bool_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<
 /// Auto-correct deprecated Anthropic model IDs to valid alternatives
 /// This prevents silent failures when clients pass outdated model names
 #[allow(clippy::disallowed_macros)]
-fn autocorrect_anthropic_model(model: &str, provider: &str) -> (String, bool) {
-    // Only apply autocorrection for anthropic provider
-    if provider != "anthropic" {
+/// Auto-correct deprecated Claude model names to current versions.
+/// Applied to any model starting with "claude-" prefix.
+fn autocorrect_model(model: &str) -> (String, bool) {
+    // Only apply autocorrection for Claude models
+    if !model.starts_with("claude-") {
         return (model.to_string(), false);
     }
 
     // Map of deprecated model IDs to their replacements
-    // claude-3-5-sonnet-20241022 was removed from Anthropic API in late 2025
     let deprecated_models: &[(&str, &str)] = &[
         ("claude-3-5-sonnet-20241022", "claude-sonnet-4-5-20250929"),
         ("claude-3-5-sonnet", "claude-sonnet-4-5-20250929"),
@@ -462,11 +469,9 @@ fn autocorrect_anthropic_model(model: &str, provider: &str) -> (String, bool) {
 
     for &(deprecated, replacement) in deprecated_models {
         if model == deprecated {
-            eprintln!(
-                "⚠️  DEPRECATED MODEL: '{deprecated}' is no longer available in Anthropic API"
-            );
+            eprintln!("⚠️  DEPRECATED MODEL: '{deprecated}' is no longer available");
             eprintln!("   ↳ Auto-correcting to: '{replacement}'");
-            eprintln!("   💡 Update your client configuration to use '{replacement}' directly");
+            eprintln!("   💡 Update your configuration to use '{replacement}' directly");
             return ((*replacement).to_string(), true);
         }
     }
@@ -1107,25 +1112,25 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         })
     };
 
-    // Handle model precedence: explicit arg > agent model > intake.primary.model
+    // Handle model precedence: explicit arg > agent model > intake.models.primary
     let model = if let Some(m) = arguments.get("model").and_then(|v| v.as_str()) {
         m.to_string()
     } else if let Some(agent_key) = &selected_agent_key {
         let agent_model = &config.agents[agent_key].model;
         if agent_model.is_empty() {
             eprintln!(
-                "⚠️ INFO: Agent '{agent_key}' has empty model; falling back to defaults.intake.primary.model"
+                "⚠️ INFO: Agent '{agent_key}' has empty model; falling back to defaults.intake.models.primary"
             );
-            config.defaults.intake.primary.model.clone()
+            config.defaults.intake.models.primary.clone()
         } else {
             agent_model.clone()
         }
     } else {
         eprintln!(
-            "⚠️ INFO: No agent resolved; using defaults.intake.primary.model: {}",
-            config.defaults.intake.primary.model
+            "⚠️ INFO: No agent resolved; using defaults.intake.models.primary: {}",
+            config.defaults.intake.models.primary
         );
-        config.defaults.intake.primary.model.clone()
+        config.defaults.intake.models.primary.clone()
     };
 
     // Validate model name (support both Claude API and CLAUDE code formats)
@@ -2077,21 +2082,26 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or(config.defaults.play.docs_project_directory.as_deref())
         .ok_or(anyhow!("Missing required parameter: docs_project_directory. Please provide it or set defaults.play.docsProjectDirectory in config"))?;
 
-    // Handle CLI - use provided value or config default (needed for agent resolution)
+    // Handle CLI - use provided value or fall back to "claude"
+    // Note: Agent-specific CLI config takes priority in agent resolution below
     let cli = arguments
         .get("cli")
         .and_then(|v| v.as_str())
-        .map_or_else(|| config.defaults.play.cli.clone(), String::from);
+        .map(String::from)
+        .or_else(|| config.defaults.play.cli.clone())
+        .unwrap_or_else(|| "claude".to_string());
 
-    // Handle model - use provided value or config default (needed for agent resolution)
-    // Track if user explicitly provided a model to override agent-specific configs
+    // Handle model - use provided value only
+    // Note: Agent-specific model config takes priority; we only use this if user explicitly provides it
     let user_provided_model = arguments
         .get("model")
         .and_then(|v| v.as_str())
         .map(String::from);
+    // Fallback model for agents without model config (should be rare)
     let model = user_provided_model
         .clone()
-        .unwrap_or_else(|| config.defaults.play.model.clone());
+        .or_else(|| config.defaults.play.model.clone())
+        .unwrap_or_default();
 
     // Try to load repository-specific configuration for agent tools
     eprintln!("🔍 Checking for repository-specific configuration...");
@@ -3602,37 +3612,20 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let primary_model_raw = arguments
         .get("primary_model")
         .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intake.primary.model);
+        .unwrap_or(&config.defaults.intake.models.primary);
     let research_model_raw = arguments
         .get("research_model")
         .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intake.research.model);
+        .unwrap_or(&config.defaults.intake.models.research);
     let fallback_model_raw = arguments
         .get("fallback_model")
         .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intake.fallback.model);
+        .unwrap_or(&config.defaults.intake.models.fallback);
 
-    // Extract provider configuration
-    let primary_provider = arguments
-        .get("primary_provider")
-        .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intake.primary.provider);
-    let research_provider = arguments
-        .get("research_provider")
-        .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intake.research.provider);
-    let fallback_provider = arguments
-        .get("fallback_provider")
-        .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intake.fallback.provider);
-
-    // Auto-correct deprecated Anthropic model IDs to prevent silent failures
-    let (primary_model, primary_corrected) =
-        autocorrect_anthropic_model(primary_model_raw, primary_provider);
-    let (research_model, research_corrected) =
-        autocorrect_anthropic_model(research_model_raw, research_provider);
-    let (fallback_model, fallback_corrected) =
-        autocorrect_anthropic_model(fallback_model_raw, fallback_provider);
+    // Auto-correct deprecated model IDs to prevent silent failures
+    let (primary_model, primary_corrected) = autocorrect_model(primary_model_raw);
+    let (research_model, research_corrected) = autocorrect_model(research_model_raw);
+    let (fallback_model, fallback_corrected) = autocorrect_model(fallback_model_raw);
 
     // Log summary of corrections if any were made
     if primary_corrected || research_corrected || fallback_corrected {
@@ -3656,7 +3649,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let docs_model = arguments
         .get("model")
         .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intake.primary.model);
+        .unwrap_or(&config.defaults.intake.models.primary);
 
     // CLI for documentation generation
     let cli = arguments
@@ -3665,9 +3658,9 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or("claude");
 
     eprintln!("🤖 Using GitHub App: {github_app}");
-    eprintln!("🧠 Using Primary Model: {primary_model} ({primary_provider})");
-    eprintln!("🔬 Using Research Model: {research_model} ({research_provider})");
-    eprintln!("🛡️  Using Fallback Model: {fallback_model} ({fallback_provider})");
+    eprintln!("🧠 Using Primary Model: {primary_model}");
+    eprintln!("🔬 Using Research Model: {research_model}");
+    eprintln!("🛡️  Using Fallback Model: {fallback_model}");
     eprintln!("📚 Docs Model: {docs_model}");
     eprintln!("🔗 Context Enrichment (Firecrawl): {enrich_context}");
     eprintln!("📁 Include Codebase: {include_codebase}");
@@ -3683,7 +3676,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or(false);
 
     let linear_result = if !skip_linear
-        && config.defaults.linear.create_project
+        && config.defaults.linear.intake.create_project
         && !config.defaults.linear.team_id.is_empty()
     {
         match create_linear_intake_setup(

@@ -1,9 +1,9 @@
 //! Test module for Task 2: Flexible CLI Model Configuration
 //!
 //! Tests the new permissive `validate_model_name` function and
-//! the `autocorrect_anthropic_model` function for deprecated model handling.
+//! the `autocorrect_model` function for deprecated model handling.
 
-use crate::autocorrect_anthropic_model;
+use crate::autocorrect_model;
 use crate::validate_model_name;
 
 #[cfg(test)]
@@ -118,14 +118,12 @@ mod tests {
     #[test]
     fn test_autocorrect_deprecated_models() {
         // Deprecated claude-3-5-sonnet-20241022 should be corrected
-        let (corrected, was_corrected) =
-            autocorrect_anthropic_model("claude-3-5-sonnet-20241022", "anthropic");
+        let (corrected, was_corrected) = autocorrect_model("claude-3-5-sonnet-20241022");
         assert!(was_corrected);
         assert_eq!(corrected, "claude-sonnet-4-5-20250929");
 
         // claude-3-5-sonnet (short form) should also be corrected
-        let (corrected, was_corrected) =
-            autocorrect_anthropic_model("claude-3-5-sonnet", "anthropic");
+        let (corrected, was_corrected) = autocorrect_model("claude-3-5-sonnet");
         assert!(was_corrected);
         assert_eq!(corrected, "claude-sonnet-4-5-20250929");
     }
@@ -134,29 +132,25 @@ mod tests {
     #[test]
     fn test_autocorrect_preserves_valid_models() {
         // Valid models should pass through unchanged
-        let (model, was_corrected) =
-            autocorrect_anthropic_model("claude-sonnet-4-5-20250929", "anthropic");
+        let (model, was_corrected) = autocorrect_model("claude-sonnet-4-5-20250929");
         assert!(!was_corrected);
         assert_eq!(model, "claude-sonnet-4-5-20250929");
 
-        let (model, was_corrected) =
-            autocorrect_anthropic_model("claude-opus-4-5-20251101", "anthropic");
+        let (model, was_corrected) = autocorrect_model("claude-opus-4-5-20251101");
         assert!(!was_corrected);
         assert_eq!(model, "claude-opus-4-5-20251101");
     }
 
-    /// Test that autocorrection only applies to anthropic provider
+    /// Test that autocorrection only applies to Claude models
     #[test]
-    fn test_autocorrect_skips_non_anthropic() {
-        // Same deprecated model name but different provider should not be corrected
-        let (model, was_corrected) =
-            autocorrect_anthropic_model("claude-3-5-sonnet-20241022", "openai");
+    fn test_autocorrect_skips_non_claude() {
+        // Non-Claude models should not be corrected
+        let (model, was_corrected) = autocorrect_model("gpt-4");
         assert!(!was_corrected);
-        assert_eq!(model, "claude-3-5-sonnet-20241022");
+        assert_eq!(model, "gpt-4");
 
-        let (model, was_corrected) =
-            autocorrect_anthropic_model("claude-3-5-sonnet-20241022", "claude-code");
+        let (model, was_corrected) = autocorrect_model("gemini-2.0-flash-exp");
         assert!(!was_corrected);
-        assert_eq!(model, "claude-3-5-sonnet-20241022");
+        assert_eq!(model, "gemini-2.0-flash-exp");
     }
 }

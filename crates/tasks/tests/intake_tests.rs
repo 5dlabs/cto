@@ -924,16 +924,18 @@ mod cto_config_tests {
         include_codebase: bool,
         #[serde(rename = "sourceBranch", default)]
         source_branch: Option<String>,
-        primary: RootModelConfig,
-        research: RootModelConfig,
-        fallback: RootModelConfig,
+        models: RootIntakeModels,
     }
 
-    #[derive(Debug, serde::Deserialize)]
+    #[derive(Debug, serde::Deserialize, Default)]
     #[allow(dead_code)]
-    struct RootModelConfig {
-        model: String,
-        provider: String,
+    struct RootIntakeModels {
+        #[serde(default)]
+        primary: String,
+        #[serde(default)]
+        research: String,
+        #[serde(default)]
+        fallback: String,
     }
 
     #[derive(Debug, serde::Deserialize)]
@@ -997,10 +999,9 @@ mod cto_config_tests {
         // Verify intake defaults
         assert_eq!(config.defaults.intake.github_app, "5DLabs-Morgan");
         assert!(!config.defaults.intake.cli.is_empty());
-        assert!(!config.defaults.intake.primary.model.is_empty());
+        assert!(!config.defaults.intake.models.primary.is_empty());
 
-        // Verify play defaults
-        assert!(!config.defaults.play.model.is_empty());
+        // Verify play defaults (model/cli are deprecated and optional)
         assert!(!config.defaults.play.implementation_agent.is_empty());
         assert!(!config.defaults.play.quality_agent.is_empty());
     }
@@ -1051,23 +1052,28 @@ mod cto_config_tests {
             include_codebase: bool,
             #[serde(rename = "sourceBranch", default)]
             source_branch: Option<String>,
-            primary: Option<McpModelConfig>,
-            research: Option<McpModelConfig>,
-            fallback: Option<McpModelConfig>,
+            #[serde(default)]
+            models: McpIntakeModels,
         }
 
         #[derive(Debug, serde::Deserialize, Default)]
         #[allow(dead_code)]
-        struct McpModelConfig {
-            model: String,
-            provider: String,
+        struct McpIntakeModels {
+            #[serde(default)]
+            primary: String,
+            #[serde(default)]
+            research: String,
+            #[serde(default)]
+            fallback: String,
         }
 
         #[derive(Debug, serde::Deserialize, Default)]
         #[allow(dead_code)]
         struct McpPlayDefaults {
-            model: String,
-            cli: String,
+            #[serde(default)]
+            model: Option<String>,
+            #[serde(default)]
+            cli: Option<String>,
             #[serde(rename = "implementationAgent")]
             implementation_agent: String,
             #[serde(rename = "frontendAgent")]
