@@ -71,9 +71,14 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     r#""errorMessages"\s*:\s*\[\s*\]"#,
     r#""errors"\s*:\s*\[\s*\]"#,
     r"errorMessages.*\[\]",
-    // INFO-level messages that contain "error" as a keyword
+    // INFO-level messages that contain "error" as a keyword (bidirectional)
+    // Handles both "INFO ... error" and "error ... INFO" patterns
     r"(?i)\bINFO\b.*\berror\b",
+    r"(?i)\berror\b.*\bINFO\b",
     r"(?i)\[INFO\].*\berror\b",
+    r"(?i)\berror\b.*\[INFO\]",
+    // Bracket-style INFO with various formats (e.g., [WORKER ... INFO ...])
+    r"(?i)\[WORKER[^\]]*\bINFO\b",
     // Debug/trace messages about error handling
     r"(?i)\bDEBUG\b.*error.*handler",
     r"(?i)\bTRACE\b.*error.*handling",
@@ -1396,5 +1401,90 @@ mod tests {
         assert!(filtered.iter().any(|e| e.line.contains("level=error")));
         assert!(!filtered.iter().any(|e| e.line.contains("skip loading plugin")));
         assert!(!filtered.iter().any(|e| e.line.contains("ActionCommandManager")));
+    }
+
+    #[test]
+    fn test_is_false_positive_bidirectional_info_error() {
+        // Test bidirectional patterns: INFO ... error AND error ... INFO
+        // INFO before error (already covered, but verify)
+        assert!(is_false_positive("INFO: error recovery complete"));
+        assert!(is_false_positive("[INFO] Processing error handler"));
+
+        // Error before INFO (new patterns)
+        assert!(is_false_positive("error handling [INFO] complete"));
+        assert!(is_false_positive("F error_handler [2026-01-05 INFO] initialized"));
+        assert!(is_false_positive("handling error [INFO] success"));
+
+        // WORKER bracket style logs
+        assert!(is_false_positive(
+            "F [WORKER 2026-01-05 05:51:12Z INFO ExecutionContext] error handling"
+        ));
+        assert!(is_false_positive(
+            "[WORKER timestamp INFO SomeClass] any message"
+        ));
+    }
+
+    #[test]
+    fn test_filter_task_3237942171_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171
+        // Note: Using simplified versions of the log lines to avoid raw string literal issues
+        let entries = vec![
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F time=\"2026-01-05T05:51:02Z\" level=info msg=\"manifest cache hit: ApplicationSource...\"".to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F time=\"2026-01-05T05:51:05Z\" level=info msg=\"manifest cache hit: ApplicationSource...\"".to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 05:51:12Z INFO ExecutionContext]   \"errorMessages\": [],".to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 05:51:12Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 05:51:13Z INFO ExecutionContext]   \"errorMessages\": [],".to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual error should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "[ERROR] Actual error that should not be filtered".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 false positives should be filtered, only the actual error should remain
+        assert_eq!(
+            filtered.len(),
+            1,
+            "Expected 1 entry, got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+
+        // Only the actual [ERROR] should remain
+        assert!(filtered.iter().any(|e| e.line.contains("[ERROR]")));
+
+        // Verify all false positives are filtered
+        assert!(!filtered
+            .iter()
+            .any(|e| e.line.contains("manifest cache hit")));
+        assert!(!filtered.iter().any(|e| e.line.contains("errorMessages")));
+        assert!(!filtered
+            .iter()
+            .any(|e| e.line.contains("ActionCommandManager")));
     }
 }
