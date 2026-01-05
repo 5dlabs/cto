@@ -2010,4 +2010,81 @@ mod tests {
             filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
         );
     }
+
+    #[test]
+    fn test_filter_task_3237942171_scan_21_00_09_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-05 21:00:09 UTC
+        // These are the 5 sample errors that triggered 1000 error reports
+        // All should be filtered as false positives:
+        // - Samples 1-4: Double-nested OTEL-wrapped containerd INFO logs
+        // - Sample 5: WORKER INFO log with empty errorMessages array
+        let entries = vec![
+            // Sample 1: Double-nested OTEL wrapper with containerd tracing skip (level=info)
+            // Pattern: F Body: Str(F Body: Str(F time="..." level=info msg="skip loading plugin" error="...tracing endpoint not configured"...
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F Body: Str(F Body: Str(F time="2026-01-05T20:51:26.323526454Z" level=info msg="skip loading plugin" error="skip plugin: tracing endpoint not configured" id=io.containerd.tracing.processor.v1.otlp typ..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: Double-nested OTEL wrapper with containerd tracing skip (level=info)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F Body: Str(F Body: Str(F time="2026-01-05T20:51:26.323549309Z" level=info msg="skip loading plugin" error="skip plugin: tracing endpoint not configured" id=io.containerd.internal.v1.tracing type=io.c..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: Double-nested OTEL wrapper with nftables IPv4 cleanup (level=info)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F Body: Str(F Body: Str(F time="2026-01-05T20:51:26.430810713Z" level=info msg="Deleting nftables IPv4 rules" error="exec: \"nft\": executable file not found in $PATH"))"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: Double-nested OTEL wrapper with nftables IPv6 cleanup (level=info)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F Body: Str(F Body: Str(F time="2026-01-05T20:51:26.430851150Z" level=info msg="Deleting nftables IPv6 rules" error="exec: \"nft\": executable file not found in $PATH"))"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: WORKER INFO log with empty errorMessages array
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 20:51:51Z INFO ExecutionContext]   "errorMessages": [],"#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 samples should be filtered as false positives
+        assert_eq!(
+            filtered.len(),
+            0,
+            "Expected 0 entries after filtering (all false positives), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_double_nested_otel_wrapper() {
+        // Test double-nested OTEL wrapper patterns
+        // These occur when logs pass through multiple collection stages
+        // Pattern: F Body: Str(F Body: Str(F time="..." level=info ...
+
+        // Double-nested with containerd tracing skip
+        assert!(is_false_positive(
+            r#"F Body: Str(F Body: Str(F time="2026-01-05T20:51:26Z" level=info msg="skip loading plugin" error="skip plugin: tracing endpoint not configured"))"#
+        ));
+
+        // Double-nested with nftables cleanup
+        assert!(is_false_positive(
+            r#"F Body: Str(F Body: Str(F time="2026-01-05T20:51:26Z" level=info msg="Deleting nftables IPv4 rules" error="exec: \"nft\": executable file not found"))"#
+        ));
+
+        // Ensure actual errors are not filtered even in double-nested wrapper
+        assert!(!is_false_positive(
+            r#"F Body: Str(F Body: Str(F time="2026-01-05T20:51:26Z" level=error msg="container failed to start"))"#
+        ));
+    }
 }
