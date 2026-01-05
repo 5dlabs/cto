@@ -59,11 +59,13 @@ pub struct AgentConfig {
 /// Play workflow defaults
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayDefaults {
-    /// Default AI model
-    pub model: String,
+    /// Default AI model (deprecated - use agent-specific model config)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 
-    /// Default CLI
-    pub cli: String,
+    /// Default CLI (deprecated - use agent-specific cli config)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cli: Option<String>,
 
     /// Implementation agent GitHub App
     #[serde(rename = "implementationAgent")]
@@ -212,8 +214,8 @@ impl Default for CtoConfig {
                     },
                 },
                 play: PlayDefaults {
-                    model: "claude-opus-4-5-20251101".to_string(),
-                    cli: "claude".to_string(),
+                    model: None,
+                    cli: None,
                     implementation_agent: "5DLabs-Rex".to_string(),
                     frontend_agent: "5DLabs-Blaze".to_string(),
                     quality_agent: "5DLabs-Cleo".to_string(),

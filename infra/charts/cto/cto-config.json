@@ -20,8 +20,6 @@
       }
     },
     "play": {
-      "model": "claude-opus-4-5-20251101",
-      "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
       "frontendAgent": "5DLabs-Blaze",
       "goAgent": "5DLabs-Grizz",

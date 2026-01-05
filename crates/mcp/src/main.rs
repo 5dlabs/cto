@@ -153,23 +153,31 @@ impl Default for IntakeDefaults {
     }
 }
 
-/// Linear integration configuration for intake.
+/// Intake-specific Linear settings (nested under defaults.linear.intake).
+#[derive(Debug, Deserialize, Clone, Default)]
+struct LinearIntakeConfig {
+    /// Whether to create a Linear project during intake
+    #[serde(rename = "createProject", default = "default_true")]
+    create_project: bool,
+    /// Optional project template name to use
+    #[serde(rename = "projectTemplate")]
+    #[allow(dead_code)]
+    project_template: Option<String>,
+}
+
+/// Linear integration configuration.
 /// Uses PM server for API calls (no client-side API key needed).
 #[derive(Debug, Deserialize, Clone)]
 struct LinearDefaults {
     /// Linear team ID (e.g., "CTOPA" for CTO Platform team)
     #[serde(rename = "teamId")]
     team_id: String,
-    /// Whether to create a Linear project during intake
-    #[serde(rename = "createProject", default = "default_true")]
-    create_project: bool,
-    /// Optional project template name to use (future use)
-    #[serde(rename = "projectTemplate")]
-    #[allow(dead_code)]
-    project_template: Option<String>,
     /// PM server URL for Linear API calls (uses port-forward by default)
     #[serde(rename = "pmServerUrl")]
     pm_server_url: Option<String>,
+    /// Intake-specific Linear settings
+    #[serde(default)]
+    intake: LinearIntakeConfig,
 }
 
 fn default_true() -> bool {
@@ -180,9 +188,8 @@ impl Default for LinearDefaults {
     fn default() -> Self {
         LinearDefaults {
             team_id: String::new(),
-            create_project: true,
-            project_template: None,
             pm_server_url: None,
+            intake: LinearIntakeConfig::default(),
         }
     }
 }
@@ -200,8 +207,12 @@ fn validate_model_name(model: &str) -> Result<()> {
 
 #[derive(Debug, Deserialize, Clone, Default)]
 struct PlayDefaults {
-    model: String,
-    cli: String,
+    /// Default AI model (deprecated - use agent-specific model config)
+    #[serde(default)]
+    model: Option<String>,
+    /// Default CLI (deprecated - use agent-specific cli config)
+    #[serde(default)]
+    cli: Option<String>,
     #[serde(rename = "implementationAgent")]
     implementation_agent: String,
     #[serde(rename = "frontendAgent")]
@@ -2077,21 +2088,26 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or(config.defaults.play.docs_project_directory.as_deref())
         .ok_or(anyhow!("Missing required parameter: docs_project_directory. Please provide it or set defaults.play.docsProjectDirectory in config"))?;
 
-    // Handle CLI - use provided value or config default (needed for agent resolution)
+    // Handle CLI - use provided value or fall back to "claude"
+    // Note: Agent-specific CLI config takes priority in agent resolution below
     let cli = arguments
         .get("cli")
         .and_then(|v| v.as_str())
-        .map_or_else(|| config.defaults.play.cli.clone(), String::from);
+        .map(String::from)
+        .or_else(|| config.defaults.play.cli.clone())
+        .unwrap_or_else(|| "claude".to_string());
 
-    // Handle model - use provided value or config default (needed for agent resolution)
-    // Track if user explicitly provided a model to override agent-specific configs
+    // Handle model - use provided value only
+    // Note: Agent-specific model config takes priority; we only use this if user explicitly provides it
     let user_provided_model = arguments
         .get("model")
         .and_then(|v| v.as_str())
         .map(String::from);
+    // Fallback model for agents without model config (should be rare)
     let model = user_provided_model
         .clone()
-        .unwrap_or_else(|| config.defaults.play.model.clone());
+        .or_else(|| config.defaults.play.model.clone())
+        .unwrap_or_default();
 
     // Try to load repository-specific configuration for agent tools
     eprintln!("🔍 Checking for repository-specific configuration...");
@@ -3683,7 +3699,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or(false);
 
     let linear_result = if !skip_linear
-        && config.defaults.linear.create_project
+        && config.defaults.linear.intake.create_project
         && !config.defaults.linear.team_id.is_empty()
     {
         match create_linear_intake_setup(

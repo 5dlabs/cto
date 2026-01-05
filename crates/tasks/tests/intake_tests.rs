@@ -999,8 +999,7 @@ mod cto_config_tests {
         assert!(!config.defaults.intake.cli.is_empty());
         assert!(!config.defaults.intake.primary.model.is_empty());
 
-        // Verify play defaults
-        assert!(!config.defaults.play.model.is_empty());
+        // Verify play defaults (model/cli are deprecated and optional)
         assert!(!config.defaults.play.implementation_agent.is_empty());
         assert!(!config.defaults.play.quality_agent.is_empty());
     }
@@ -1066,8 +1065,10 @@ mod cto_config_tests {
         #[derive(Debug, serde::Deserialize, Default)]
         #[allow(dead_code)]
         struct McpPlayDefaults {
-            model: String,
-            cli: String,
+            #[serde(default)]
+            model: Option<String>,
+            #[serde(default)]
+            cli: Option<String>,
             #[serde(rename = "implementationAgent")]
             implementation_agent: String,
             #[serde(rename = "frontendAgent")]

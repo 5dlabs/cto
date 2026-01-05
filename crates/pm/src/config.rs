@@ -364,8 +364,8 @@ pub struct PlayConfig {
     pub quality_agent: String,
     /// Security agent.
     pub security_agent: String,
-    /// Primary model.
-    pub model: String,
+    /// Primary model (deprecated - use agent-specific model config).
+    pub model: Option<String>,
     /// Whether to use parallel execution.
     pub parallel_execution: bool,
     /// Whether to auto-merge PRs.
@@ -390,8 +390,7 @@ impl Default for PlayConfig {
             quality_agent: env::var("QUALITY_AGENT").unwrap_or_else(|_| "5DLabs-Cleo".to_string()),
             security_agent: env::var("SECURITY_AGENT")
                 .unwrap_or_else(|_| "5DLabs-Cipher".to_string()),
-            model: env::var("PLAY_MODEL")
-                .unwrap_or_else(|_| "claude-sonnet-4-5-20250514".to_string()),
+            model: env::var("PLAY_MODEL").ok(),
             parallel_execution: env::var("PARALLEL_EXECUTION")
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),

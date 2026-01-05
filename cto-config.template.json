@@ -51,8 +51,6 @@
     },
     "_comment_play": "Default values for play() tool - playground test workflows",
     "play": {
-      "model": "claude-opus-4-5-20251101",
-      "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
       "frontendAgent": "5DLabs-Blaze",
       "qualityAgent": "5DLabs-Cleo",
