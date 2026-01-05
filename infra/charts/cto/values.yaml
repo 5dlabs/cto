@@ -312,20 +312,9 @@ pm:
 
   # Intake workflow configuration
   intake:
-    # Intake mode: "api" (direct API calls) or "cli" (use AI CLI)
-    # - api: Uses `tasks intake` binary (faster, default)
-    # - cli: Uses AI CLI (claude, codex, etc.) for intake
-    mode: cli
-    # CLI to use when mode=cli - image is resolved from agent.cliImages[cli]
+    # CLI to use for intake - image is resolved from agent.cliImages[cli]
     # Options: claude, cursor, codex, gemini, opencode, factory, dexter
     cli: claude
-    # Direct image override (bypasses devRegistry for intake)
-    # Use claude image which has the Anthropic Claude CLI installed
-    image: "ghcr.io/5dlabs/claude:latest"
-    # Runtime image: Used in api mode (smaller, has tasks CLI)
-    runtimeImage:
-      repository: ghcr.io/5dlabs/runtime
-      tag: latest
     # Model configuration for intake workflows
     # Using Opus 4.5 with extended thinking for complex task generation
     models:

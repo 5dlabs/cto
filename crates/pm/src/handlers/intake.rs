@@ -901,7 +901,6 @@ pub async fn submit_intake_workflow(
                     {"name": "enrich-context", "value": config.enrich_context.to_string()},
                     {"name": "include-codebase", "value": config.include_codebase.to_string()},
                     {"name": "cli", "value": cli},
-                    {"name": "intake-mode", "value": config.mode},
                     {"name": "linear-session-id", "value": request.session_id},
                     {"name": "linear-issue-id", "value": request.prd_issue_id},
                     {"name": "linear-issue-identifier", "value": request.prd_identifier},

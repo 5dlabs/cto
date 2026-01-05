@@ -72,56 +72,47 @@ cp "$PRD_FILE" ".tasks/docs/prd.txt"
 [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ] && cp "$ARCH_FILE" ".tasks/docs/architecture.md"
 
 # =========================================================================
-# Run Intake (supports API mode or CLI mode)
+# Run Intake (CLI mode with MCP tools)
 # =========================================================================
 
 echo ""
 echo "🚀 Running intake workflow..."
 
-# Check intake mode from environment (default: api)
-INTAKE_MODE="${INTAKE_MODE:-api}"
 INTAKE_CLI="${INTAKE_CLI:-claude}"
+echo "  ℹ️  CLI: $INTAKE_CLI"
 
-echo "  ℹ️  Mode: $INTAKE_MODE"
-
-if [ "$INTAKE_MODE" = "cli" ]; then
-    # =========================================================================
-    # CLI Mode: Use AI CLI (claude, codex, etc.) to run intake
-    # =========================================================================
-    echo "  ℹ️  CLI: $INTAKE_CLI"
-    
-    # Build MCP arguments if config available (set by mcp-check partial)
-    MCP_ARGS=""
-    if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
-        if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
-            echo "  ✅ Using MCP configuration: $MCP_CONFIG_FILE"
-            MCP_ARGS="--mcp-config $MCP_CONFIG_FILE"
-        else
-            echo "  ⚠️ MCP config at $MCP_CONFIG_FILE is not valid JSON, skipping"
-        fi
+# Build MCP arguments if config available (set by mcp-check partial)
+MCP_ARGS=""
+if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
+    if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
+        echo "  ✅ Using MCP configuration: $MCP_CONFIG_FILE"
+        MCP_ARGS="--mcp-config $MCP_CONFIG_FILE"
     else
-        echo "  ℹ️ No MCP configuration available"
+        echo "  ⚠️ MCP config at $MCP_CONFIG_FILE is not valid JSON, skipping"
     fi
-    
-    # Build the prompt for the CLI
-    PRD_CONTENT=$(cat .tasks/docs/prd.txt)
-    ARCH_CONTENT=""
-    [ -f ".tasks/docs/architecture.md" ] && ARCH_CONTENT=$(cat .tasks/docs/architecture.md)
-    
-    PROMPT="You are Morgan, a project management AI agent. Your task is to analyze a PRD (Product Requirements Document) and generate a structured task breakdown.
+else
+    echo "  ℹ️ No MCP configuration available"
+fi
+
+# Build the prompt for the CLI
+PRD_CONTENT=$(cat .tasks/docs/prd.txt)
+ARCH_CONTENT=""
+[ -f ".tasks/docs/architecture.md" ] && ARCH_CONTENT=$(cat .tasks/docs/architecture.md)
+
+PROMPT="You are Morgan, a project management AI agent. Your task is to analyze a PRD (Product Requirements Document) and generate a structured task breakdown.
 
 ## PRD Content
 $PRD_CONTENT
 "
-    
-    if [ -n "$ARCH_CONTENT" ]; then
-        PROMPT="$PROMPT
+
+if [ -n "$ARCH_CONTENT" ]; then
+    PROMPT="$PROMPT
 ## Architecture Document
 $ARCH_CONTENT
 "
-    fi
-    
-    PROMPT="$PROMPT
+fi
+
+PROMPT="$PROMPT
 ## Instructions
 1. Analyze the PRD and architecture (if provided)
 2. Generate approximately $NUM_TASKS implementation tasks
@@ -139,64 +130,40 @@ $ARCH_CONTENT
 5. Ensure tasks have proper dependencies (no circular deps)
 6. Add complexity analysis if useful
 
-Use the available MCP tools (Firecrawl for URL scraping, Context7 for documentation) to research and enrich the tasks.
+Use the available MCP tools (Firecrawl for URL scraping, Context7 for documentation, Repomix for codebase analysis) to research and enrich the tasks.
 Create the files using the filesystem tools. Start by creating the tasks.json file.
 "
 
-    # Run the specified CLI with MCP support
-    case "$INTAKE_CLI" in
-        claude)
-            echo "  → Running claude CLI with MCP tools..."
-            # shellcheck disable=SC2086
-            claude -p "$PROMPT" \
-                --dangerously-skip-permissions \
-                --output-format stream-json \
-                --verbose \
-                --debug mcp \
-                $MCP_ARGS \
-                || exit 1
-            ;;
-        codex|code)
-            echo "  → Running code CLI..."
-            code --no-approval "$PROMPT" --sandbox workspace-write || exit 1
-            ;;
-        gemini)
-            echo "  → Running gemini CLI..."
-            gemini -p "$PROMPT" --output-format stream-json || exit 1
-            ;;
-        opencode)
-            echo "  → Running opencode CLI..."
-            opencode -p "$PROMPT" --output-format stream-json || exit 1
-            ;;
-        *)
-            echo "❌ Unknown CLI: $INTAKE_CLI"
-            exit 1
-            ;;
-    esac
-else
-    # =========================================================================
-    # API Mode: Use tasks CLI directly (faster, default)
-    # =========================================================================
-    
-    # Build intake command with options
-    INTAKE_CMD="tasks intake --prd .tasks/docs/prd.txt --num-tasks $NUM_TASKS"
-
-    # Add architecture if present
-    [ -f ".tasks/docs/architecture.md" ] && INTAKE_CMD="$INTAKE_CMD --architecture .tasks/docs/architecture.md"
-
-    # Add model if specified
-    [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ] && INTAKE_CMD="$INTAKE_CMD --model $PRIMARY_MODEL"
-
-    # Add research flag for better results
-    INTAKE_CMD="$INTAKE_CMD --research"
-
-    # Optionally skip expansion/analysis
-    [ "$EXPAND_TASKS" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-expand"
-    [ "$ANALYZE_COMPLEXITY" = "false" ] && INTAKE_CMD="$INTAKE_CMD --no-analyze"
-
-    echo "  → $INTAKE_CMD"
-    eval "$INTAKE_CMD" || exit 1
-fi
+# Run the specified CLI with MCP support
+case "$INTAKE_CLI" in
+    claude)
+        echo "  → Running claude CLI with MCP tools..."
+        # shellcheck disable=SC2086
+        claude -p "$PROMPT" \
+            --dangerously-skip-permissions \
+            --output-format stream-json \
+            --verbose \
+            --debug mcp \
+            $MCP_ARGS \
+            || exit 1
+        ;;
+    codex|code)
+        echo "  → Running code CLI..."
+        code --no-approval "$PROMPT" --sandbox workspace-write || exit 1
+        ;;
+    gemini)
+        echo "  → Running gemini CLI..."
+        gemini -p "$PROMPT" --output-format stream-json || exit 1
+        ;;
+    opencode)
+        echo "  → Running opencode CLI..."
+        opencode -p "$PROMPT" --output-format stream-json || exit 1
+        ;;
+    *)
+        echo "❌ Unknown CLI: $INTAKE_CLI"
+        exit 1
+        ;;
+esac
 
 # Verify tasks were generated
 TASKS_FILE=".tasks/tasks/tasks.json"
@@ -206,11 +173,8 @@ TASK_COUNT=$(jq '.tasks | length' "$TASKS_FILE")
 echo "✅ Generated $TASK_COUNT tasks with documentation"
 
 # Generate per-task documentation (prompt.xml, prompt.md, acceptance.md)
-# API mode already does this via `tasks intake`, but CLI mode doesn't
-if [ "${INTAKE_MODE:-api}" = "cli" ]; then
-    echo "📝 Generating per-task documentation..."
-    tasks generate-docs --output .tasks/docs 2>&1 || echo "⚠️ Doc generation skipped (tasks generate-docs failed)"
-fi
+echo "📝 Generating per-task documentation..."
+tasks generate-docs --output .tasks/docs 2>&1 || echo "⚠️ Doc generation skipped (tasks generate-docs failed)"
 
 # =========================================================================
 # Create Pull Request

@@ -111,9 +111,9 @@ struct ModelConfig {
 struct IntakeDefaults {
     #[serde(rename = "githubApp")]
     github_app: String,
+    /// CLI for intake (deserialized but used only in PM service)
     #[serde(default)]
-    mode: String,
-    #[serde(default)]
+    #[allow(dead_code)]
     cli: String,
     #[serde(rename = "includeCodebase", default)]
     include_codebase: bool,
@@ -134,7 +134,6 @@ impl Default for IntakeDefaults {
         // Morgan is the intake agent responsible for PRD processing
         IntakeDefaults {
             github_app: "5DLabs-Morgan".to_string(),
-            mode: "cli".to_string(),
             cli: "claude".to_string(),
             include_codebase: false,
             source_branch: "main".to_string(),

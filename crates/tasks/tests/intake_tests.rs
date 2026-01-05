@@ -883,7 +883,6 @@ mod desktop_window_tests {
 /// Verifies the unified config works for MCP, Healer, and Argo workflows
 mod cto_config_tests {
     use tasks::domain::cto_config::generate_cto_config;
-    use tasks::domain::IntakeMode;
     use tasks::entities::Task;
 
     // Root config structure - matches what MCP/Healer expect (lenient parsing)
@@ -1181,27 +1180,6 @@ mod cto_config_tests {
         let parsed: CtoConfig = serde_json::from_str(&json).expect("should deserialize");
         assert_eq!(parsed.version, config.version);
         assert_eq!(parsed.agents.len(), config.agents.len());
-    }
-
-    /// Test `IntakeMode` serialization/deserialization
-    #[test]
-    fn test_intake_mode_serde() {
-        // Test Cli mode (default)
-        let cli_json = r#""cli""#;
-        let mode: IntakeMode = serde_json::from_str(cli_json).unwrap();
-        assert_eq!(mode, IntakeMode::Cli);
-
-        // Test Api mode
-        let api_json = r#""api""#;
-        let mode: IntakeMode = serde_json::from_str(api_json).unwrap();
-        assert_eq!(mode, IntakeMode::Api);
-
-        // Test default is Cli
-        assert_eq!(IntakeMode::default(), IntakeMode::Cli);
-
-        // Test roundtrip
-        let serialized = serde_json::to_string(&IntakeMode::Api).unwrap();
-        assert_eq!(serialized, r#""api""#);
     }
 
     /// Test that agents have proper tool configurations

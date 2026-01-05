@@ -3,7 +3,6 @@
   "defaults": {
     "intake": {
       "githubApp": "5DLabs-Morgan",
-      "mode": "cli",
       "cli": "claude",
       "includeCodebase": false,
       "sourceBranch": "main",

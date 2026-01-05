@@ -15,7 +15,7 @@ mod tasks;
 
 pub use ai::AIDomain;
 pub use config::ConfigDomain;
-pub use cto_config::{generate_cto_config, save_cto_config, CtoConfig, IntakeMode};
+pub use cto_config::{generate_cto_config, save_cto_config, CtoConfig};
 pub use deps::DependencyDomain;
 pub use intake::{IntakeConfig, IntakeDomain, IntakeResult};
 pub use routing::{

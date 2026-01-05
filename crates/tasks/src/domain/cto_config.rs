@@ -136,17 +136,6 @@ pub struct PlayDefaults {
     pub parallel_execution: bool,
 }
 
-/// Intake execution mode
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum IntakeMode {
-    /// Direct API calls via `tasks intake` binary (faster, no MCP tools)
-    Api,
-    /// Use AI CLI (claude, codex, etc.) for intake with full MCP tool access
-    #[default]
-    Cli,
-}
-
 /// Intake workflow defaults
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntakeDefaults {
@@ -154,19 +143,9 @@ pub struct IntakeDefaults {
     #[serde(rename = "githubApp")]
     pub github_app: String,
 
-    /// Execution mode: "api" (direct calls) or "cli" (use AI CLI)
-    #[serde(default)]
-    pub mode: IntakeMode,
-
-    /// CLI to use (only used when mode = "cli")
-    /// Options: claude, codex, gemini, opencode
+    /// CLI to use for intake (image is derived from cli field)
+    /// Options: claude, codex, gemini, opencode, factory, dexter
     pub cli: String,
-
-    /// Container image for intake workflow
-    /// - API mode: use "runtime" (smaller, has tasks CLI)
-    /// - CLI mode: use "factory" (has all AI CLIs)
-    #[serde(default = "default_intake_image")]
-    pub image: String,
 
     /// Primary model configuration
     pub primary: ModelConfig,
@@ -176,10 +155,6 @@ pub struct IntakeDefaults {
 
     /// Fallback model configuration
     pub fallback: ModelConfig,
-}
-
-fn default_intake_image() -> String {
-    "MISSING_INTAKE_IMAGE".to_string()
 }
 
 /// Model configuration
@@ -222,9 +197,7 @@ impl Default for CtoConfig {
             defaults: Defaults {
                 intake: IntakeDefaults {
                     github_app: "5DLabs-Morgan".to_string(),
-                    mode: IntakeMode::Cli, // Default to CLI mode (uses tools-server for MCP)
                     cli: "claude".to_string(),
-                    image: default_intake_image(),
                     primary: ModelConfig {
                         model: "claude-opus-4-5-20251101".to_string(),
                         provider: "anthropic".to_string(),

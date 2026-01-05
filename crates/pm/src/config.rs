@@ -260,9 +260,7 @@ impl Default for Config {
 #[derive(Debug, Clone)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct IntakeConfig {
-    /// Intake mode: "api" (direct API calls) or "cli" (use AI CLI).
-    pub mode: String,
-    /// Container image for intake workflows.
+    /// Container image for intake workflows (derived from CLI selection).
     pub runtime_image: String,
     /// GitHub App for authentication.
     pub github_app: String,
@@ -303,11 +301,9 @@ pub struct IntakeConfig {
 impl Default for IntakeConfig {
     fn default() -> Self {
         Self {
-            // Intake mode: "api" (direct API calls via tasks CLI) or "cli" (use AI CLI)
-            mode: env::var("INTAKE_MODE").unwrap_or_else(|_| "api".to_string()),
-            // Container image for intake workflows
+            // Container image for intake workflows (derived from CLI selection)
             runtime_image: env::var("RUNTIME_IMAGE")
-                .unwrap_or_else(|_| "ghcr.io/5dlabs/runtime:latest".to_string()),
+                .unwrap_or_else(|_| "ghcr.io/5dlabs/claude:latest".to_string()),
             github_app: env::var("GITHUB_APP_NAME").unwrap_or_else(|_| "cto-dev".to_string()),
             // Opus 4.5 with extended thinking for complex intake tasks
             primary_model: env::var("PRIMARY_MODEL")

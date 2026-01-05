@@ -12,6 +12,19 @@ Parse the PRD at `.tasks/docs/prd.txt` and generate a complete project structure
 
 ---
 
+## Structured Analysis (Chain of Thought)
+
+Before generating tasks, think step-by-step:
+
+1. **Analyze PRD Structure** - Identify features, tech requirements, implicit dependencies
+2. **Map Dependencies** - What depends on what? Shared infrastructure needs?
+3. **Define Task Boundaries** - Atomic, single responsibility, independently testable
+4. **Generate Implementation Details** - Pseudo-code, file structures, library versions
+5. **Define Test Strategies** - Acceptance criteria, unit/integration/E2E guidance
+6. **Self-Verify** - All requirements covered? No circular deps? Valid ordering?
+
+---
+
 ## STEP 1: Service Discovery (DO THIS FIRST)
 
 **Before generating any tasks**, analyze the PRD to identify all services and their tech stacks.
