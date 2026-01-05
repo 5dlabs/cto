@@ -42,6 +42,10 @@ spec:
             - name: LINEAR_MAX_TIMESTAMP_AGE_MS
               value: {{ .Values.pm.maxTimestampAgeMs | quote }}
             {{- end }}
+            {{- if .Values.pm.linear.teamId }}
+            - name: LINEAR_TEAM_ID
+              value: {{ .Values.pm.linear.teamId | quote }}
+            {{- end }}
             {{- end }}
             # Intake workflow configuration
             - name: INTAKE_MODE

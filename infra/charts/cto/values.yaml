@@ -302,6 +302,8 @@ pm:
   # Linear integration
   linear:
     enabled: true
+    # Linear team ID for intake setup (e.g., "CTOPA" for CTO Platform team)
+    teamId: "CTOPA"
 
   # GitHub configuration
   github:

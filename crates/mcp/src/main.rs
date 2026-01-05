@@ -729,393 +729,113 @@ fn run_argo_cli(args: &[&str]) -> Result<String> {
 }
 
 // =============================================================================
-// Linear API Client (for intake project/issue creation)
+// Linear Intake Setup (via PM Server)
 // =============================================================================
 
-/// Simple Linear GraphQL client for intake operations.
-/// Uses LINEAR_API_KEY environment variable for authentication.
-struct LinearClient {
-    api_key: String,
-    client: reqwest::blocking::Client,
-}
-
-/// Linear project response
+/// Response from PM server intake setup endpoint.
 #[derive(Debug, Deserialize)]
-struct LinearProjectResponse {
-    data: Option<LinearProjectData>,
-    errors: Option<Vec<LinearError>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct LinearProjectData {
-    #[serde(rename = "projectCreate")]
-    project_create: Option<LinearProjectCreate>,
-}
-
-#[derive(Debug, Deserialize)]
-struct LinearProjectCreate {
-    success: bool,
-    project: Option<LinearProject>,
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupResponse {
+    status: String,
+    project: IntakeSetupProject,
+    prd_issue: IntakeSetupIssue,
+    #[allow(dead_code)]
+    next_step: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct LinearProject {
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupProject {
+    #[allow(dead_code)]
     id: String,
     name: String,
     url: Option<String>,
 }
 
-/// Linear issue response
-#[derive(Debug, Deserialize)]
-struct LinearIssueResponse {
-    data: Option<LinearIssueData>,
-    errors: Option<Vec<LinearError>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct LinearIssueData {
-    #[serde(rename = "issueCreate")]
-    issue_create: Option<LinearIssueCreate>,
-}
-
-#[derive(Debug, Deserialize)]
-struct LinearIssueCreate {
-    success: bool,
-    issue: Option<LinearIssue>,
-}
-
 #[derive(Debug, Deserialize, Clone)]
-struct LinearIssue {
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupIssue {
+    #[allow(dead_code)]
     id: String,
+    #[allow(dead_code)]
     identifier: String,
+    #[allow(dead_code)]
     title: String,
     url: String,
 }
 
-/// Linear label response
-#[derive(Debug, Deserialize)]
-struct LinearLabelResponse {
-    data: Option<LinearLabelData>,
-    errors: Option<Vec<LinearError>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct LinearLabelData {
-    #[serde(rename = "issueLabelCreate")]
-    label_create: Option<LinearLabelCreate>,
-    #[serde(rename = "issueLabels")]
-    labels: Option<LinearLabelNodes>,
-}
-
-#[derive(Debug, Deserialize)]
-struct LinearLabelCreate {
-    success: bool,
-    #[serde(rename = "issueLabel")]
-    label: Option<LinearLabel>,
-}
-
-#[derive(Debug, Deserialize)]
-struct LinearLabelNodes {
-    nodes: Vec<LinearLabel>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct LinearLabel {
-    id: String,
-    #[allow(dead_code)]
-    name: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct LinearError {
-    message: String,
-}
-
-impl LinearClient {
-    /// Create a new Linear client from environment variable.
-    fn from_env() -> Result<Self> {
-        let api_key = std::env::var("LINEAR_API_KEY")
-            .context("LINEAR_API_KEY environment variable not set")?;
-
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .context("Failed to create HTTP client")?;
-
-        Ok(Self { api_key, client })
-    }
-
-    /// Execute a GraphQL query against Linear API.
-    fn graphql(&self, query: &str, variables: Value) -> Result<Value> {
-        let response = self
-            .client
-            .post("https://api.linear.app/graphql")
-            .header("Authorization", &self.api_key)
-            .header("Content-Type", "application/json")
-            .json(&json!({
-                "query": query,
-                "variables": variables
-            }))
-            .send()
-            .context("Failed to send request to Linear API")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let text = response.text().unwrap_or_default();
-            return Err(anyhow!("Linear API error: {status} - {text}"));
-        }
-
-        response.json().context("Failed to parse Linear response")
-    }
-
-    /// Create a Linear project.
-    fn create_project(
-        &self,
-        name: &str,
-        description: &str,
-        team_ids: &[&str],
-    ) -> Result<LinearProject> {
-        let query = r#"
-            mutation ProjectCreate($input: ProjectCreateInput!) {
-                projectCreate(input: $input) {
-                    success
-                    project {
-                        id
-                        name
-                        url
-                    }
-                }
-            }
-        "#;
-
-        let variables = json!({
-            "input": {
-                "name": name,
-                "description": description,
-                "teamIds": team_ids
-            }
-        });
-
-        let response: LinearProjectResponse =
-            serde_json::from_value(self.graphql(query, variables)?)?;
-
-        if let Some(errors) = response.errors {
-            let msg = errors
-                .iter()
-                .map(|e| e.message.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(anyhow!("Linear API errors: {msg}"));
-        }
-
-        response
-            .data
-            .and_then(|d| d.project_create)
-            .filter(|pc| pc.success)
-            .and_then(|pc| pc.project)
-            .ok_or_else(|| anyhow!("Failed to create Linear project"))
-    }
-
-    /// Get or create a label by name.
-    fn get_or_create_label(&self, team_id: &str, name: &str) -> Result<LinearLabel> {
-        // First try to find existing label
-        let find_query = r#"
-            query FindLabel($teamId: String!, $filter: IssueLabelFilter) {
-                issueLabels(filter: $filter) {
-                    nodes {
-                        id
-                        name
-                    }
-                }
-            }
-        "#;
-
-        let find_variables = json!({
-            "teamId": team_id,
-            "filter": {
-                "name": { "eq": name },
-                "team": { "id": { "eq": team_id } }
-            }
-        });
-
-        let find_response: LinearLabelResponse =
-            serde_json::from_value(self.graphql(find_query, find_variables)?)?;
-
-        if let Some(data) = find_response.data {
-            if let Some(labels) = data.labels {
-                if let Some(label) = labels.nodes.into_iter().next() {
-                    return Ok(label);
-                }
-            }
-        }
-
-        // Create new label
-        let create_query = r#"
-            mutation CreateLabel($input: IssueLabelCreateInput!) {
-                issueLabelCreate(input: $input) {
-                    success
-                    issueLabel {
-                        id
-                        name
-                    }
-                }
-            }
-        "#;
-
-        let create_variables = json!({
-            "input": {
-                "name": name,
-                "teamId": team_id
-            }
-        });
-
-        let create_response: LinearLabelResponse =
-            serde_json::from_value(self.graphql(create_query, create_variables)?)?;
-
-        if let Some(errors) = create_response.errors {
-            let msg = errors
-                .iter()
-                .map(|e| e.message.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(anyhow!("Failed to create label: {msg}"));
-        }
-
-        create_response
-            .data
-            .and_then(|d| d.label_create)
-            .filter(|lc| lc.success)
-            .and_then(|lc| lc.label)
-            .ok_or_else(|| anyhow!("Failed to create label '{name}'"))
-    }
-
-    /// Create a Linear issue.
-    fn create_issue(
-        &self,
-        team_id: &str,
-        title: &str,
-        description: &str,
-        project_id: Option<&str>,
-        label_ids: &[String],
-    ) -> Result<LinearIssue> {
-        let query = r#"
-            mutation IssueCreate($input: IssueCreateInput!) {
-                issueCreate(input: $input) {
-                    success
-                    issue {
-                        id
-                        identifier
-                        title
-                        url
-                    }
-                }
-            }
-        "#;
-
-        let mut input = json!({
-            "teamId": team_id,
-            "title": title,
-            "description": description
-        });
-
-        if let Some(pid) = project_id {
-            input["projectId"] = json!(pid);
-        }
-
-        if !label_ids.is_empty() {
-            input["labelIds"] = json!(label_ids);
-        }
-
-        let variables = json!({ "input": input });
-
-        let response: LinearIssueResponse =
-            serde_json::from_value(self.graphql(query, variables)?)?;
-
-        if let Some(errors) = response.errors {
-            let msg = errors
-                .iter()
-                .map(|e| e.message.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(anyhow!("Linear API errors: {msg}"));
-        }
-
-        response
-            .data
-            .and_then(|d| d.issue_create)
-            .filter(|ic| ic.success)
-            .and_then(|ic| ic.issue)
-            .ok_or_else(|| anyhow!("Failed to create Linear issue"))
-    }
-}
-
-/// Create Linear project and PRD issue for intake.
-/// Returns (project, issue) if successful.
+/// Create Linear project and PRD issue for intake via PM server.
+/// This avoids needing the Linear API key on the client side.
 fn create_linear_intake_setup(
     project_name: &str,
     prd_content: &str,
     architecture_content: Option<&str>,
     config: &CtoConfig,
-) -> Result<(LinearProject, LinearIssue)> {
+) -> Result<(IntakeSetupProject, IntakeSetupIssue)> {
     let linear_config = &config.defaults.linear;
 
-    if linear_config.team_id.is_empty() {
+    // Get PM server URL from config, env var, or default
+    let pm_server_url = linear_config
+        .pm_server_url
+        .clone()
+        .or_else(|| std::env::var("CTO_PM_SERVER_URL").ok())
+        .unwrap_or_else(|| "http://localhost:8081".to_string());
+
+    eprintln!("📋 Setting up Linear project and PRD issue via PM server...");
+    eprintln!("   PM Server: {pm_server_url}");
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .context("Failed to create HTTP client")?;
+
+    let request_body = json!({
+        "projectName": project_name,
+        "prdContent": prd_content,
+        "architectureContent": architecture_content,
+        "teamId": if linear_config.team_id.is_empty() { Value::Null } else { json!(&linear_config.team_id) }
+    });
+
+    let response = client
+        .post(format!("{pm_server_url}/api/intake/setup"))
+        .header("Content-Type", "application/json")
+        .json(&request_body)
+        .send()
+        .context("Failed to send request to PM server. Make sure the PM server is running (kubectl port-forward svc/cto-pm 8081:8081 -n cto)")?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_body: Value = response
+            .json()
+            .unwrap_or_else(|_| json!({"error": "Unknown error"}));
+        let error_msg = error_body
+            .get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("Unknown error");
         return Err(anyhow!(
-            "Linear team ID not configured. Set 'defaults.linear.teamId' in cto-config.json"
+            "PM server error ({status}): {error_msg}\n\nMake sure the PM server is running and accessible."
         ));
     }
 
-    eprintln!("📋 Setting up Linear project and PRD issue...");
+    let setup_response: IntakeSetupResponse = response
+        .json()
+        .context("Failed to parse PM server response")?;
 
-    let client = LinearClient::from_env()?;
+    if setup_response.status != "success" {
+        return Err(anyhow!("Intake setup failed: {}", setup_response.status));
+    }
 
-    // Create project
-    let project_description = format!(
-        "## Project Overview\n\n\
-         Generated from PRD: **{project_name}**\n\n\
-         Switch to **Board view** to track progress through play workflow phases.\n\n\
-         ---\n\n\
-         *Created by CTO Agent intake*"
-    );
-
-    eprintln!("  Creating Linear project: {project_name}");
-    let project = client.create_project(
-        project_name,
-        &project_description,
-        &[&linear_config.team_id],
-    )?;
     eprintln!(
         "  ✅ Project created: {}",
-        project.url.as_deref().unwrap_or(&project.id)
+        setup_response
+            .project
+            .url
+            .as_deref()
+            .unwrap_or(&setup_response.project.name)
     );
+    eprintln!("  ✅ PRD issue created: {}", setup_response.prd_issue.url);
 
-    // Get or create PRD label
-    eprintln!("  Creating PRD label...");
-    let prd_label = client.get_or_create_label(&linear_config.team_id, "PRD")?;
-
-    // Build issue description
-    let mut issue_description = format!("## PRD Content\n\n{prd_content}");
-    if let Some(arch) = architecture_content {
-        if !arch.is_empty() {
-            issue_description.push_str("\n\n---\n\n## Architecture\n\n");
-            issue_description.push_str(arch);
-        }
-    }
-    issue_description.push_str("\n\n---\n\n*Assign to @Morgan to start intake workflow*");
-
-    // Create PRD issue
-    let issue_title = format!("[PRD] {project_name}");
-    eprintln!("  Creating PRD issue: {issue_title}");
-    let issue = client.create_issue(
-        &linear_config.team_id,
-        &issue_title,
-        &issue_description,
-        Some(&project.id),
-        &[prd_label.id],
-    )?;
-    eprintln!("  ✅ PRD issue created: {}", issue.url);
-
-    Ok((project, issue))
+    Ok((setup_response.project, setup_response.prd_issue))
 }
 
 /// Get the remote URL for the current git repository

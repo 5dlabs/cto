@@ -40,7 +40,8 @@
     "linear": {
       "teamId": "CTOPA",
       "createProject": true,
-      "projectTemplate": "Play Workflow"
+      "projectTemplate": "Play Workflow",
+      "pmServerUrl": "http://localhost:8081"
     },
     "play": {
       "model": "claude-opus-4-5-20251101",

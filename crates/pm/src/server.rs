@@ -356,11 +356,13 @@ async fn handle_intake_setup(
         ));
     };
 
-    // Get team ID from request or config
+    // Get team ID from request or config (empty strings treated as "not provided")
     let team_id = request
         .team_id
         .as_deref()
+        .filter(|s| !s.is_empty())
         .or(state.config.linear_team_id.as_deref())
+        .filter(|s| !s.is_empty())
         .ok_or_else(|| {
             error!("No Linear team ID configured");
             (
