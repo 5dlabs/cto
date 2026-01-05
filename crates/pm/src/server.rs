@@ -96,6 +96,8 @@ pub fn build_router(state: AppState) -> Router {
         )
         // Manual trigger endpoints for testing
         .route("/trigger/intake", post(trigger_intake))
+        // Intake setup endpoint - create Linear project + PRD issue
+        .route("/api/intake/setup", post(handle_intake_setup))
         // Input routing endpoint - send messages to running agents
         .route("/api/sessions/{session_id}/input", post(send_session_input))
         // OAuth endpoints for Linear agent apps
@@ -122,6 +124,49 @@ struct TriggerIntakeRequest {
     /// Optional session ID for activity updates (generates one if not provided)
     #[serde(default)]
     session_id: Option<String>,
+}
+
+/// Request body for intake setup (Linear project + PRD issue creation).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupRequest {
+    /// Project name (used for Linear project name and derived identifiers)
+    project_name: String,
+    /// PRD content (markdown)
+    prd_content: String,
+    /// Optional architecture content (markdown)
+    #[serde(default)]
+    architecture_content: Option<String>,
+    /// Optional team ID override (uses config default if not provided)
+    #[serde(default)]
+    team_id: Option<String>,
+}
+
+/// Response from intake setup.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupResponse {
+    status: String,
+    project: IntakeSetupProject,
+    prd_issue: IntakeSetupIssue,
+    next_step: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupProject {
+    id: String,
+    name: String,
+    url: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupIssue {
+    id: String,
+    identifier: String,
+    title: String,
+    url: String,
 }
 
 /// Request body for sending input to a session.
@@ -281,6 +326,176 @@ async fn trigger_intake(
             })))
         }
     }
+}
+
+/// Create Linear project and PRD issue for intake.
+///
+/// `POST /api/intake/setup`
+///
+/// This is called by the MCP tool to set up Linear before the user triggers intake.
+#[allow(clippy::too_many_lines)]
+async fn handle_intake_setup(
+    State(state): State<AppState>,
+    Json(request): Json<IntakeSetupRequest>,
+) -> Result<Json<IntakeSetupResponse>, (StatusCode, Json<Value>)> {
+    info!(
+        project_name = %request.project_name,
+        prd_len = request.prd_content.len(),
+        has_arch = request.architecture_content.is_some(),
+        "Intake setup requested"
+    );
+
+    let Some(client) = &state.linear_client else {
+        error!("Linear client not configured");
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({
+                "status": "error",
+                "error": "Linear client not configured on server"
+            })),
+        ));
+    };
+
+    // Get team ID from request or config
+    let team_id = request
+        .team_id
+        .as_deref()
+        .or(state.config.linear_team_id.as_deref())
+        .ok_or_else(|| {
+            error!("No Linear team ID configured");
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "status": "error",
+                    "error": "No Linear team ID configured. Set LINEAR_TEAM_ID or provide team_id in request."
+                })),
+            )
+        })?;
+
+    // Create project
+    let project_description = format!(
+        "## Project Overview\n\n\
+         Generated from PRD: **{}**\n\n\
+         Switch to **Board view** to track progress through play workflow phases.\n\n\
+         ---\n\n\
+         *Created by CTO Agent intake*",
+        request.project_name
+    );
+
+    info!(team_id = %team_id, "Creating Linear project: {}", request.project_name);
+
+    let project = client
+        .create_project(crate::models::ProjectCreateInput {
+            name: request.project_name.clone(),
+            description: Some(project_description),
+            team_ids: Some(vec![team_id.to_string()]),
+            lead_id: None,
+            target_date: None,
+            default_view: Some(crate::models::ProjectViewType::Board),
+            template_id: None,
+        })
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to create Linear project");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({
+                    "status": "error",
+                    "error": format!("Failed to create Linear project: {e}")
+                })),
+            )
+        })?;
+
+    info!(
+        project_id = %project.id,
+        project_name = %project.name,
+        "Created Linear project"
+    );
+
+    // Get or create PRD label
+    let prd_label = client
+        .get_or_create_label(team_id, "PRD")
+        .await
+        .map_err(|e| {
+            warn!(error = %e, "Failed to create PRD label, continuing without");
+            e
+        })
+        .ok();
+
+    // Build issue description
+    let mut issue_description = format!("## PRD Content\n\n{}", request.prd_content);
+    if let Some(arch) = &request.architecture_content {
+        if !arch.is_empty() {
+            issue_description.push_str("\n\n---\n\n## Architecture\n\n");
+            issue_description.push_str(arch);
+        }
+    }
+    issue_description.push_str("\n\n---\n\n*Assign to @Morgan to start intake workflow*");
+
+    // Create PRD issue
+    let issue_title = format!("[PRD] {}", request.project_name);
+    info!(title = %issue_title, "Creating PRD issue");
+
+    let mut label_ids = Vec::new();
+    if let Some(label) = &prd_label {
+        label_ids.push(label.id.clone());
+    }
+
+    let issue = client
+        .create_issue(crate::models::IssueCreateInput {
+            team_id: team_id.to_string(),
+            title: issue_title.clone(),
+            description: Some(issue_description),
+            parent_id: None,
+            priority: Some(2), // High priority
+            label_ids: if label_ids.is_empty() {
+                None
+            } else {
+                Some(label_ids)
+            },
+            project_id: Some(project.id.clone()),
+            state_id: None,
+            delegate_id: None,
+        })
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to create PRD issue");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({
+                    "status": "error",
+                    "error": format!("Failed to create PRD issue: {e}")
+                })),
+            )
+        })?;
+
+    let issue_url = issue
+        .url
+        .clone()
+        .unwrap_or_else(|| format!("https://linear.app/team/issue/{}", issue.identifier));
+
+    info!(
+        issue_id = %issue.id,
+        identifier = %issue.identifier,
+        url = %issue_url,
+        "Created PRD issue"
+    );
+
+    Ok(Json(IntakeSetupResponse {
+        status: "success".to_string(),
+        project: IntakeSetupProject {
+            id: project.id,
+            name: project.name,
+            url: project.url,
+        },
+        prd_issue: IntakeSetupIssue {
+            id: issue.id,
+            identifier: issue.identifier,
+            title: issue.title,
+            url: issue_url,
+        },
+        next_step: "Assign Morgan to the PRD issue in Linear to start intake workflow".to_string(),
+    }))
 }
 
 /// Health check endpoint.

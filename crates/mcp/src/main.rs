@@ -189,7 +189,7 @@ impl Default for IntakeDefaults {
 }
 
 /// Linear integration configuration for intake.
-/// API key comes from LINEAR_API_KEY environment variable.
+/// Uses PM server for API calls (no client-side API key needed).
 #[derive(Debug, Deserialize, Clone)]
 struct LinearDefaults {
     /// Linear team ID (e.g., "CTOPA" for CTO Platform team)
@@ -202,6 +202,9 @@ struct LinearDefaults {
     #[serde(rename = "projectTemplate")]
     #[allow(dead_code)]
     project_template: Option<String>,
+    /// PM server URL for Linear API calls (uses port-forward by default)
+    #[serde(rename = "pmServerUrl")]
+    pm_server_url: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -214,6 +217,7 @@ impl Default for LinearDefaults {
             team_id: String::new(),
             create_project: true,
             project_template: None,
+            pm_server_url: None,
         }
     }
 }
