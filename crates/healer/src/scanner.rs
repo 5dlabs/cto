@@ -1731,4 +1731,58 @@ mod tests {
             "Retry warning should be filtered"
         );
     }
+
+    #[test]
+    fn test_filter_task_3237942171_scan_13_00_07_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-05 13:00:07 UTC
+        // These are the 5 sample errors that triggered 1000 error reports
+        let entries = vec![
+            // Sample 1: ArgoCD manifest cache hit (level=info) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T12:47:12Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://prometheus-community.github.io/helm-charts,Path:,TargetRevision:1.29.0,Helm:&ApplicationSourceHelm{..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: ArgoCD manifest cache hit (level=info) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T12:47:13Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://argoproj.github.io/argo-helm,Path:,TargetRevision:0.45.21,Helm:&ApplicationSourceHelm{ValueFiles:[]..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: ArgoCD manifest cache hit (level=info) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T12:47:16Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://argoproj.github.io/argo-helm,Path:,TargetRevision:0.45.21,Helm:&ApplicationSourceHelm{ValueFiles:[]..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: klog INFO-level log (I0105) with "Error processing" in message - should be filtered
+            // This is an INFO log (I prefix = INFO in klog) despite containing "Error processing"
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F I0105 12:47:16.919581       1 csi_handler.go:243] "Error processing" driver="io.openebs.csi-mayastor" VolumeAttachment="csi-7ed2dbd0dca97cd81ad59c8ca88e623dce149a8e6db8d88f3461366f00dcd122" err="fai..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: ArgoCD manifest cache hit (level=info) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T12:47:45Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://fluent.github.io/helm-charts,Path:,TargetRevision:0.47.7,Helm:&ApplicationSourceHelm{ValueFiles:[]..."#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 samples should be filtered as false positives
+        // - Samples 1, 2, 3, 5: level=info manifest cache hits
+        // - Sample 4: klog INFO log (I0105) with "Error processing" in message
+        assert_eq!(
+            filtered.len(),
+            0,
+            "Expected 0 entries after filtering (all false positives), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+    }
 }
