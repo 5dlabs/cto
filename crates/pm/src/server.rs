@@ -356,8 +356,8 @@ async fn handle_intake_setup(
         ));
     };
 
-    // Get team ID from request or config (empty strings treated as "not provided")
-    let team_id = request
+    // Get team ID/key from request or config (empty strings treated as "not provided")
+    let team_id_or_key = request
         .team_id
         .as_deref()
         .filter(|s| !s.is_empty())
@@ -373,6 +373,27 @@ async fn handle_intake_setup(
                 })),
             )
         })?;
+
+    // Resolve team key to UUID if needed (team keys are short like "CTOPA", UUIDs contain hyphens)
+    let team_id = if team_id_or_key.contains('-') {
+        // Already a UUID
+        team_id_or_key.to_string()
+    } else {
+        // Look up team by key
+        info!(team_key = %team_id_or_key, "Looking up team by key");
+        let team = client.get_team_by_key(team_id_or_key).await.map_err(|e| {
+            error!(error = %e, team_key = %team_id_or_key, "Failed to look up team");
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "status": "error",
+                    "error": format!("Team '{}' not found: {}", team_id_or_key, e)
+                })),
+            )
+        })?;
+        info!(team_id = %team.id, team_name = %team.name, "Resolved team");
+        team.id
+    };
 
     // Create project
     let project_description = format!(
@@ -415,7 +436,7 @@ async fn handle_intake_setup(
 
     // Get or create PRD label
     let prd_label = client
-        .get_or_create_label(team_id, "PRD")
+        .get_or_create_label(&team_id, "PRD")
         .await
         .map_err(|e| {
             warn!(error = %e, "Failed to create PRD label, continuing without");

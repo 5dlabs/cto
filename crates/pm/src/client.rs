@@ -422,6 +422,45 @@ impl LinearClient {
         Ok(response.team)
     }
 
+    /// Get a team by key (e.g., "CTOPA")
+    #[instrument(skip(self), fields(team_key = %team_key))]
+    pub async fn get_team_by_key(&self, team_key: &str) -> Result<Team> {
+        #[derive(Serialize)]
+        struct Variables<'a> {
+            key: &'a str,
+        }
+
+        #[derive(Deserialize)]
+        struct TeamsResponse {
+            teams: TeamsNodes,
+        }
+
+        #[derive(Deserialize)]
+        struct TeamsNodes {
+            nodes: Vec<Team>,
+        }
+
+        const QUERY: &str = r"
+            query GetTeamByKey($key: String!) {
+                teams(filter: { key: { eq: $key } }) {
+                    nodes {
+                        id
+                        name
+                        key
+                    }
+                }
+            }
+        ";
+
+        let response: TeamsResponse = self.execute(QUERY, Variables { key: team_key }).await?;
+        response
+            .teams
+            .nodes
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("Team with key '{team_key}' not found"))
+    }
+
     /// Get workflow states for a team
     #[instrument(skip(self), fields(team_id = %team_id))]
     pub async fn get_team_workflow_states(&self, team_id: &str) -> Result<Vec<WorkflowState>> {
