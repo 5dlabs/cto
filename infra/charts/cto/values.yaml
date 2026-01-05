@@ -101,6 +101,11 @@ healer:
       - 'I\d{4}.*csi_handler\.go.*Error processing'
       # Generic klog INFO format with Error in message content
       - '^\s*F?\s*I\d{4}\s+.*"Error'
+      # Factory worker JSON config field names containing "error" (not actual errors)
+      - '"actions_display_helpful_actions_download_errors"'
+      - '"actions_skip_retry_complete_job_upon_known_errors"'
+      # Generic JSON field names with _errors suffix (config field names, not errors)
+      - '"[a-z_]+_errors"\s*:\s*\{'
     
     # Only match actual error log levels
     # Valid error levels: error, fatal, panic, critical
