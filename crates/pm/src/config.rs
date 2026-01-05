@@ -244,7 +244,9 @@ impl Default for Config {
             enabled: env::var("LINEAR_ENABLED")
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),
-            oauth_token: env::var("LINEAR_OAUTH_TOKEN").ok(),
+            oauth_token: env::var("LINEAR_OAUTH_TOKEN")
+                .or_else(|_| env::var("LINEAR_API_KEY"))
+                .ok(),
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "cto".to_string()),
             linear_team_id: env::var("LINEAR_TEAM_ID").ok().filter(|s| !s.is_empty()),
             intake: IntakeConfig::default(),

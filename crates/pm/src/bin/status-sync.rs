@@ -91,6 +91,7 @@ impl Config {
             linear_issue_id: std::env::var("LINEAR_ISSUE_ID").unwrap_or_default(),
             linear_team_id: std::env::var("LINEAR_TEAM_ID").unwrap_or_default(),
             linear_oauth_token: std::env::var("LINEAR_OAUTH_TOKEN")
+                .or_else(|_| std::env::var("LINEAR_API_KEY"))
                 .ok()
                 .filter(|s| !s.is_empty()),
             workflow_name: std::env::var("WORKFLOW_NAME").unwrap_or_else(|_| "unknown".to_string()),

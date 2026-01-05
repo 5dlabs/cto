@@ -1070,13 +1070,24 @@ impl<'a> CodeResourceManager<'a> {
                     json!({ "name": "MAX_NUDGE_LEVEL", "value": "3" }),
                 ];
 
-                // Add LINEAR_OAUTH_TOKEN from secret if available
+                // Add LINEAR_OAUTH_TOKEN from secret if available (fallback to LINEAR_API_KEY)
                 sidecar_env.push(json!({
                     "name": "LINEAR_OAUTH_TOKEN",
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": "linear-secrets",
                             "key": "LINEAR_OAUTH_TOKEN",
+                            "optional": true
+                        }
+                    }
+                }));
+                // Also add LINEAR_API_KEY as fallback (status-sync uses either)
+                sidecar_env.push(json!({
+                    "name": "LINEAR_API_KEY",
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": "linear-secrets",
+                            "key": "LINEAR_API_KEY",
                             "optional": true
                         }
                     }
