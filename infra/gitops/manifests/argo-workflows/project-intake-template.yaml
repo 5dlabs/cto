@@ -302,9 +302,13 @@ spec:
             exit 1
           fi
 
-          # Generate unique name suffix
+          # Generate unique name suffix (must be valid Kubernetes label: start/end with alphanumeric)
           TIMESTAMP=$(date +%s)
-          NAME_SUFFIX=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | cut -c1-20)
+          NAME_SUFFIX=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-20)
+          # Ensure suffix starts with alphanumeric (add 'p' prefix if needed)
+          if [ -z "$NAME_SUFFIX" ] || ! echo "$NAME_SUFFIX" | grep -q '^[a-z0-9]'; then
+            NAME_SUFFIX="p${NAME_SUFFIX}"
+          fi
 
           cat > /tmp/coderun.yaml << MANIFEST_EOF
           apiVersion: agents.platform/v1
@@ -321,6 +325,8 @@ spec:
             runType: intake
             service: "${PROJECT_NAME}"
             repositoryUrl: "${REPOSITORY_URL}"
+            docsRepositoryUrl: "${REPOSITORY_URL}"
+            workingDirectory: "."
             githubApp: "${GITHUB_APP}"
             model: "${PRIMARY_MODEL}"
             enableDocker: false

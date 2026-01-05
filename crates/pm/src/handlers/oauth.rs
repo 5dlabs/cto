@@ -59,6 +59,7 @@ struct TokenErrorResponse {
 ///
 /// This endpoint is called by Linear after user authorizes the app.
 /// We exchange the code for an access token and store it.
+#[allow(clippy::too_many_lines)]
 pub async fn handle_oauth_callback(
     State(state): State<AppState>,
     Query(params): Query<OAuthCallback>,
@@ -156,7 +157,7 @@ pub async fn handle_oauth_callback(
                 Err(e) => {
                     error!(agent = %agent_name, error = %e, "Failed to store access token");
                     Html(format!(
-                        r#"<!DOCTYPE html>
+                        r"<!DOCTYPE html>
 <html>
 <head><title>Token Storage Failed</title></head>
 <body>
@@ -165,7 +166,7 @@ pub async fn handle_oauth_callback(
 <p><strong>Error:</strong> {e}</p>
 <p>Please contact an administrator.</p>
 </body>
-</html>"#
+</html>"
                     ))
                     .into_response()
                 }
