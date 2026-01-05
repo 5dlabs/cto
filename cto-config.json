@@ -86,7 +86,11 @@
           "openmemory_openmemory_store",
           "openmemory_openmemory_list",
           "openmemory_openmemory_get",
-          "openmemory_openmemory_reinforce"
+          "openmemory_openmemory_reinforce",
+          "repomix_pack_codebase",
+          "repomix_pack_remote_repository",
+          "repomix_grep_repomix_output",
+          "repomix_read_repomix_output"
         ],
         "localServers": {}
       }

@@ -275,5 +275,59 @@ Before finalizing:
 - Service: {{service}}
 - Model: {{model}}
 - Branch: intake/{{service}}
+{{#if include_codebase}}
+- **Existing Codebase**: Yes (use Repomix tools to analyze)
+- Repository: {{repository}}
+{{/if}}
 
-**Read `.tasks/docs/prd.txt` now. First create the Service-to-Agent mapping table, then generate comprehensive tasks.**
+{{#if include_codebase}}
+---
+
+## Existing Codebase Analysis (REQUIRED)
+
+This is an **existing project**, not greenfield. Before generating tasks, you MUST understand what code already exists.
+
+### Step 0: Pack and Analyze the Existing Codebase
+
+Use the Repomix MCP tools to analyze the existing codebase:
+
+1. **Pack the repository** (do this first):
+   ```
+   pack_remote_repository({ remote: "{{repository}}" })
+   ```
+   This returns an `outputId` you'll use for subsequent queries.
+
+2. **Discover project structure**:
+   ```
+   grep_repomix_output({ outputId: "<id>", pattern: "^## File:" })
+   ```
+
+3. **Find existing implementations** relevant to the PRD:
+   ```
+   grep_repomix_output({ outputId: "<id>", pattern: "function|class|struct|interface", contextLines: 3 })
+   ```
+
+4. **Read specific sections** when you need detail:
+   ```
+   read_repomix_output({ outputId: "<id>", startLine: 100, endLine: 200 })
+   ```
+
+### What to Look For
+
+- **Existing services**: What's already implemented? Don't recreate existing functionality.
+- **Code patterns**: Match the existing style, naming conventions, and architecture.
+- **Dependencies**: What libraries/frameworks are already in use?
+- **Database schemas**: What tables/collections already exist?
+- **API endpoints**: What routes are already defined?
+
+### Task Generation for Existing Projects
+
+When generating tasks for an existing codebase:
+
+- **Reference existing code**: Include relevant file paths and function names in task details
+- **Extend, don't replace**: Tasks should build on existing patterns
+- **Identify gaps**: Focus on what's missing, not what exists
+- **Preserve compatibility**: Ensure new code works with existing implementations
+
+{{/if}}
+**Read `.tasks/docs/prd.txt` now.{{#if include_codebase}} Then pack and analyze the existing codebase using Repomix tools.{{/if}} First create the Service-to-Agent mapping table, then generate comprehensive tasks.**

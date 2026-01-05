@@ -517,6 +517,15 @@ tools:
         args: ["-y", "firecrawl-mcp"]
         workingDirectory: "/tmp"
 
+      # --- Codebase Analysis ---
+      repomix:
+        name: "Repomix"
+        description: "Pack codebases into AI-friendly formats - compress, search, and analyze repositories for existing project context"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "repomix", "--mcp"]
+        workingDirectory: "/tmp"
+
       # --- Project Management ---
       linear:
         name: "Linear"

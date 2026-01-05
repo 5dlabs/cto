@@ -448,35 +448,33 @@ Perform thorough code review of the authentication refactor.
         AgentDef {
             name: "morgan",
             github_app: "5DLabs-Morgan",
-            specialty: "Documentation",
-            primary_job: "docs",
+            specialty: "Intake/PM",
+            primary_job: "intake",
             supported_clis: vec![CLIType::Claude],
-            keywords: vec!["document", "PRD", "spec"],
+            keywords: vec!["PRD", "intake", "task", "project"],
             scenario: TaskScenario {
-                title: "Create API documentation from OpenAPI spec",
-                repository: "5dlabs/docs",
-                working_directory: "api",
-                task_prompt: r#"## Task: API Documentation
+                title: "Parse PRD and generate implementation tasks",
+                repository: "5dlabs/new-project",
+                working_directory: ".",
+                task_prompt: r#"## Task: PRD Intake
 
-Create developer documentation in `api/`.
+Parse the PRD at `.tasks/docs/prd.txt` and generate tasks.
 
 ### Requirements
-- Parse OpenAPI 3.0 spec
-- Generate endpoint documentation
-- Add request/response examples
-- Document error codes and handling
-- Create quickstart guide
-- Add authentication section
+- Analyze PRD for services and tech stacks
+- Generate ~15 implementation tasks
+- Assign appropriate agents (rex, blaze, nova, etc.)
+- Create task dependencies (DAG)
+- Generate per-task documentation
 
 ### Output Files
-- `getting-started.md`
-- `authentication.md`
-- `endpoints/` directory with per-resource docs
-- `errors.md`
-- `examples/` with code samples
+- `.tasks/tasks/tasks.json`
+- `.tasks/docs/task-N/prompt.xml`
+- `.tasks/docs/task-N/prompt.md`
+- `.tasks/docs/task-N/acceptance.md`
 
 ### Acceptance Criteria
-- [ ] All endpoints documented
+- [ ] All services identified
 - [ ] Working code examples
 - [ ] Error codes table
 - [ ] Authentication guide

@@ -34,7 +34,7 @@ fn agent_job_matrix() -> Vec<(&'static str, Vec<&'static str>)> {
         ("rex", vec!["coder", "healer"]),
         ("blaze", vec!["coder", "healer"]),
         ("grizz", vec!["coder", "healer"]),
-        ("nova", vec!["coder", "healer", "docs"]),
+        ("nova", vec!["coder", "healer"]),
         ("tap", vec!["coder", "healer"]),
         ("spark", vec!["coder", "healer"]),
         ("bolt", vec!["infra", "deploy", "healer"]),
@@ -267,7 +267,6 @@ fn test_system_prompts_contain_role_context() {
         ("test", vec!["test", "qa", "coverage", "spec"]),
         ("review", vec!["review", "pr", "pull request", "feedback"]),
         ("pm", vec!["product", "spec", "requirement", "user"]),
-        ("docs", vec!["document", "doc", "readme", "guide"]),
         (
             "integration",
             vec!["merge", "conflict", "integrate", "rebase"],
