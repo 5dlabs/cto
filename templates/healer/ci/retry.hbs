@@ -28,9 +28,9 @@
 
 {{#if error_message}}
 **Error**:
-\`\`\`
+```
 {{error_message}}
-\`\`\`
+```
 {{/if}}
 
 {{#if changes_made}}
@@ -45,15 +45,15 @@
 
 ## Current CI Logs
 
-\`\`\`
+```
 {{workflow_logs}}
-\`\`\`
+```
 
 {{#if changed_files}}
 ## Changed Files
 
 {{#each changed_files}}
-- \`{{filename}}\` ({{status}}: +{{additions}}/-{{deletions}})
+- `{{filename}}` ({{status}}: +{{additions}}/-{{deletions}})
 {{/each}}
 {{/if}}
 
@@ -136,7 +136,7 @@
 8. **Merge the PR** once all checks pass and there are no conflicts
 
 {{#if pr_number}}
-Push your fixes to branch \`{{branch}}\` to update PR #{{pr_number}}.
+Push your fixes to branch `{{branch}}` to update PR #{{pr_number}}.
 {{/if}}
 
 {{#if attempt_number}}

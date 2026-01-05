@@ -114,13 +114,16 @@ impl CodeRunSpawner {
     ///
     /// Templates are registered with a "ci/" prefix to match the lookup pattern
     /// in `render_prompt` (e.g., "rust-fix.hbs" becomes "ci/rust-fix").
+    /// Also loads partials from the sibling "partials" directory.
     ///
     /// # Errors
     ///
     /// Returns an error if the directory cannot be read or templates are invalid.
     pub fn load_templates(&mut self, dir: &str) -> Result<()> {
         use std::fs;
+        use std::path::Path;
 
+        // Load main templates from the CI directory
         let entries = fs::read_dir(dir).context("Failed to read templates directory")?;
         for entry in entries.flatten() {
             let path = entry.path();
@@ -136,6 +139,38 @@ impl CodeRunSpawner {
                 self.templates
                     .register_template_string(&name, &content)
                     .context(format!("Failed to register template: {name}"))?;
+            }
+        }
+
+        // Load partials from the sibling "partials" directory
+        let partials_dir = Path::new(dir).parent().map(|p| p.join("partials"));
+        if let Some(partials_path) = partials_dir {
+            if partials_path.exists() {
+                self.load_partials(&partials_path)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Load partial templates from a directory.
+    fn load_partials(&mut self, dir: &std::path::Path) -> Result<()> {
+        use std::fs;
+
+        let entries = fs::read_dir(dir).context("Failed to read partials directory")?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "hbs") {
+                let stem = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown");
+                let content = fs::read_to_string(&path)
+                    .context(format!("Failed to read partial: {}", path.display()))?;
+                self.templates
+                    .register_partial(stem, &content)
+                    .context(format!("Failed to register partial: {stem}"))?;
+                debug!("Loaded partial: {stem}");
             }
         }
         Ok(())
