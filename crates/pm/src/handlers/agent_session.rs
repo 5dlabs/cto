@@ -7,9 +7,10 @@
 use axum::http::StatusCode;
 use axum::Json;
 use serde_json::{json, Value};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::emitter::AgentActivityEmitter;
+use crate::handlers::intake::{extract_intake_request, submit_intake_workflow};
 use crate::server::AppState;
 use crate::webhooks::AgentIdentification;
 use crate::WebhookPayload;
@@ -58,10 +59,11 @@ impl AgentSessionContext {
 ///
 /// This is called when an agent is @mentioned or delegated to an issue.
 /// We should:
-/// 1. Start the appropriate Argo workflow
-/// 2. Store the session-to-workflow mapping
-/// 3. Move the issue to "started" state
-/// 4. Emit an initial thought activity within 10 seconds
+/// 1. Check if Morgan + PRD tag → trigger intake workflow
+/// 2. Otherwise, start the appropriate Argo workflow
+/// 3. Store the session-to-workflow mapping
+/// 4. Move the issue to "started" state
+/// 5. Emit an initial thought activity within 10 seconds
 #[allow(clippy::too_many_lines)]
 pub async fn handle_agent_session_created(
     state: &AppState,
@@ -92,6 +94,123 @@ pub async fn handle_agent_session_created(
     // Create emitter for this session
     // TODO: Use per-agent OAuth tokens instead of shared client
     let emitter = crate::emitter::LinearAgentEmitter::new(client.clone(), ctx.session_id.clone());
+
+    // Check if this is Morgan assigned to a PRD issue → trigger intake
+    if ctx.agent_name().eq_ignore_ascii_case("morgan") {
+        // Fetch full issue to check for PRD label
+        match client.get_issue(&ctx.issue_id).await {
+            Ok(issue) => {
+                let has_prd_label = issue
+                    .labels
+                    .iter()
+                    .any(|l| l.name.eq_ignore_ascii_case("prd"));
+
+                if has_prd_label {
+                    info!(
+                        issue = %ctx.issue_identifier,
+                        session_id = %ctx.session_id,
+                        "Morgan assigned to PRD issue - triggering intake workflow"
+                    );
+
+                    // Emit initial thought for intake
+                    if let Err(e) = emitter
+                        .emit_thought(
+                            "📋 Processing PRD for intake - analyzing tasks and generating documentation...",
+                            false,
+                        )
+                        .await
+                    {
+                        warn!(error = %e, "Failed to emit initial thought for intake");
+                    }
+
+                    // Extract intake request from issue
+                    match extract_intake_request(&ctx.session_id, &issue) {
+                        Ok(intake_request) => {
+                            // Submit intake workflow
+                            match submit_intake_workflow(
+                                &state.kube_client,
+                                &state.config.namespace,
+                                &intake_request,
+                                &state.config.intake,
+                            )
+                            .await
+                            {
+                                Ok(result) => {
+                                    info!(
+                                        workflow = %result.workflow_name,
+                                        configmap = %result.configmap_name,
+                                        "Intake workflow submitted"
+                                    );
+
+                                    if let Err(e) = emitter
+                                        .emit_thought(
+                                            &format!(
+                                                "✅ Intake workflow started: `{}`",
+                                                result.workflow_name
+                                            ),
+                                            false,
+                                        )
+                                        .await
+                                    {
+                                        warn!(error = %e, "Failed to emit workflow start thought");
+                                    }
+
+                                    // Move issue to "started" state
+                                    if let Err(e) =
+                                        move_issue_to_started(client, &ctx.issue_id).await
+                                    {
+                                        warn!(error = %e, "Failed to move issue to started state");
+                                    }
+
+                                    return Ok(Json(json!({
+                                        "status": "intake_triggered",
+                                        "session_id": ctx.session_id,
+                                        "agent": "morgan",
+                                        "issue": ctx.issue_identifier,
+                                        "workflow": result.workflow_name
+                                    })));
+                                }
+                                Err(e) => {
+                                    error!(error = %e, "Failed to submit intake workflow");
+                                    if let Err(emit_err) = emitter
+                                        .emit_thought(
+                                            &format!("❌ Failed to start intake workflow: {e}"),
+                                            false,
+                                        )
+                                        .await
+                                    {
+                                        warn!(error = %emit_err, "Failed to emit error thought");
+                                    }
+                                    return Ok(Json(json!({
+                                        "status": "error",
+                                        "reason": "intake_workflow_failed",
+                                        "error": e.to_string()
+                                    })));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!(error = %e, "Failed to extract intake request");
+                            if let Err(emit_err) = emitter
+                                .emit_thought(&format!("❌ Failed to prepare intake: {e}"), false)
+                                .await
+                            {
+                                warn!(error = %emit_err, "Failed to emit error thought");
+                            }
+                            return Ok(Json(json!({
+                                "status": "error",
+                                "reason": "intake_extraction_failed",
+                                "error": e.to_string()
+                            })));
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to fetch issue for PRD label check");
+            }
+        }
+    }
 
     // Emit initial thought within 10 seconds (Linear requirement)
     if let Err(e) = emitter

@@ -700,6 +700,42 @@ impl SessionActivity {
             .and_then(|m| m.get("body"))
             .and_then(|b| b.as_str())
     }
+
+    /// Check if this activity contains a stop signal.
+    /// Linear Agent API sends signals via metadata: { "signal": "stop" }
+    #[must_use]
+    pub fn is_stop_signal(&self) -> bool {
+        self.content
+            .get("signal")
+            .and_then(|s| s.as_str())
+            .is_some_and(|s| s == "stop")
+    }
+
+    /// Check if this activity contains an auth signal.
+    /// Linear Agent API sends auth signals via metadata: { "signal": "auth" }
+    #[must_use]
+    pub fn is_auth_signal(&self) -> bool {
+        self.content
+            .get("signal")
+            .and_then(|s| s.as_str())
+            .is_some_and(|s| s == "auth")
+    }
+
+    /// Check if this activity contains a select signal.
+    /// Linear Agent API sends select signals via metadata: { "signal": "select" }
+    #[must_use]
+    pub fn is_select_signal(&self) -> bool {
+        self.content
+            .get("signal")
+            .and_then(|s| s.as_str())
+            .is_some_and(|s| s == "select")
+    }
+
+    /// Get the signal type if present.
+    #[must_use]
+    pub fn signal_type(&self) -> Option<&str> {
+        self.content.get("signal").and_then(|s| s.as_str())
+    }
 }
 
 // =============================================================================
@@ -1544,10 +1580,12 @@ async fn process_stream_event(
 // =============================================================================
 
 /// Input polling task - polls Linear for user messages and writes to FIFO.
+/// Also monitors for stop signals from Linear UI.
 async fn input_poll_task(
     config: Arc<Config>,
     linear_client: Option<LinearApiClient>,
     fifo_tx: mpsc::Sender<String>,
+    shutdown: Arc<AtomicBool>,
 ) {
     let Some(client) = linear_client else {
         info!("Linear API not configured, input polling disabled");
@@ -1576,6 +1614,12 @@ async fn input_poll_task(
     }
 
     loop {
+        // Check shutdown flag
+        if shutdown.load(Ordering::Relaxed) {
+            info!("Input polling task shutting down");
+            return;
+        }
+
         sleep(Duration::from_millis(config.input_poll_interval_ms)).await;
 
         match client
@@ -1590,6 +1634,40 @@ async fn input_poll_task(
 
                     seen_activity_ids.insert(activity.id.clone());
 
+                    // Check for stop signal from Linear
+                    if activity.is_stop_signal() {
+                        warn!(activity_id = %activity.id, "🛑 STOP SIGNAL received from Linear");
+
+                        // Emit response to Linear acknowledging stop
+                        let stop_msg = "🛑 Stopped as requested. No further changes were made.";
+                        if let Err(e) = client
+                            .emit_response(&config.linear_session_id, stop_msg)
+                            .await
+                        {
+                            warn!(error = %e, "Failed to emit stop response to Linear");
+                        }
+
+                        // Trigger graceful shutdown
+                        shutdown.store(true, Ordering::SeqCst);
+                        info!("Shutdown triggered by Linear stop signal");
+                        return;
+                    }
+
+                    // Check for auth signal (future: handle OAuth flow)
+                    if activity.is_auth_signal() {
+                        info!(activity_id = %activity.id, "Auth signal received (not yet implemented)");
+                        // Future: Trigger OAuth flow
+                        continue;
+                    }
+
+                    // Check for select signal (future: handle selection)
+                    if activity.is_select_signal() {
+                        info!(activity_id = %activity.id, "Select signal received (not yet implemented)");
+                        // Future: Handle selection choice
+                        continue;
+                    }
+
+                    // Handle user messages
                     if activity.is_user_message() {
                         if let Some(body) = activity.user_message_body() {
                             info!(activity_id = %activity.id, "Received user message from Linear");
@@ -2099,9 +2177,16 @@ async fn main() -> Result<()> {
 
     let config_clone = config.clone();
     let linear_client_clone = linear_client.clone();
+    let shutdown_clone = shutdown.clone();
     let input_handle = tokio::spawn(async move {
         if config_clone.has_linear_api() {
-            input_poll_task(config_clone, linear_client_clone, fifo_tx_for_input).await;
+            input_poll_task(
+                config_clone,
+                linear_client_clone,
+                fifo_tx_for_input,
+                shutdown_clone,
+            )
+            .await;
         }
     });
 
