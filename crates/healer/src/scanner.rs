@@ -9,6 +9,8 @@
 //! - Empty error arrays that indicate success, not failure
 //! - Containerd/Docker "skip loading plugin" messages with error explanation fields
 //! - Warning-level logs (level=warn/warning) which are not errors
+//! - ArgoCD notification trigger configuration errors (benign when triggers aren't defined)
+//! - Grafana Alloy/Loki client retry messages (transient, self-recovering)
 
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
@@ -129,6 +131,17 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     r#"level[=:]\s*["']?warning"#,
     r#"level[=:]\s*["']?WARN"#,
     r#"level[=:]\s*["']?WARNING"#,
+    // ArgoCD notification trigger configuration errors (benign)
+    // These occur when notification subscriptions reference triggers that aren't defined
+    // Example: "trigger 'on-sync-succeeded' is not configured using the configuration"
+    // The sync still works, only the notification fails - not a critical error
+    r"(?i)trigger\s+'[^']+'\s+is\s+not\s+configured",
+    r"(?i)Failed\s+to\s+execute\s+condition\s+of\s+trigger.*is\s+not\s+configured",
+    // Grafana Alloy / Loki client retry messages (transient, self-recovering)
+    // These are retry warnings that the client will automatically recover from
+    // Example: "error sending batch, will retry"
+    r"(?i)error\s+sending\s+batch.*will\s+retry",
+    r"(?i)will\s+retry.*error\s+sending\s+batch",
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -1585,6 +1598,137 @@ mod tests {
                 .iter()
                 .any(|e| e.line.contains("ActionCommandManager")),
             "ActionCommandManager command registration should be filtered"
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_argocd_notification_trigger() {
+        // ArgoCD notification trigger configuration errors are benign
+        // These occur when subscriptions reference triggers that aren't defined
+        // The sync still works, only the notification fails
+
+        // JSON format error from ArgoCD notifications controller
+        assert!(is_false_positive(
+            r#"F {"level":"error","msg":"Failed to execute condition of trigger on-sync-succeeded: trigger 'on-sync-succeeded' is not configured using the configuration in namespace argocd","resource":"argocd/opensearch"}"#
+        ));
+
+        // Simpler trigger not configured pattern
+        assert!(is_false_positive(
+            "trigger 'on-sync-succeeded' is not configured"
+        ));
+        assert!(is_false_positive(
+            "trigger 'on-sync-failed' is not configured using the configuration"
+        ));
+        assert!(is_false_positive(
+            "Failed to execute condition of trigger my-custom-trigger: trigger 'my-custom-trigger' is not configured"
+        ));
+
+        // Actual errors should NOT be filtered
+        assert!(!is_false_positive(
+            r#"{"level":"error","msg":"ArgoCD sync failed due to resource conflict"}"#
+        ));
+        assert!(!is_false_positive(
+            r#"{"level":"error","msg":"Failed to sync application: connection refused"}"#
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_loki_retry_messages() {
+        // Grafana Alloy / Loki client retry messages are transient and self-recovering
+        // These should be filtered as they're expected during network hiccups
+
+        // Warn-level retry message from Alloy/Loki client
+        assert!(is_false_positive(
+            r#"F ts=2026-01-05T07:47:11.585166007Z level=warn msg="error sending batch, will retry" component_path=/ component_id=loki.write.default component=client host=mayastor-loki:3100"#
+        ));
+
+        // Without F prefix
+        assert!(is_false_positive(
+            r#"ts=2026-01-05T07:47:11Z level=warn msg="error sending batch, will retry" host=loki:3100"#
+        ));
+
+        // Different word order (bidirectional)
+        assert!(is_false_positive(
+            "will retry after error sending batch"
+        ));
+
+        // Final errors (not retrying) should NOT be filtered - these are actual errors
+        // Note: The level=warn pattern will still filter the warn-level one,
+        // but level=error messages about final failures should be kept
+        assert!(!is_false_positive(
+            r#"level=error msg="final error sending batch""#
+        ));
+    }
+
+    #[test]
+    fn test_filter_task_3237942171_new_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from the new task 3237942171 scan at 2026-01-05 08:00:07 UTC
+        // These samples include ArgoCD notification trigger errors and Loki retry messages
+        let entries = vec![
+            // Sample 1: ArgoCD manifest cache hit (INFO) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T07:46:44Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://prometheus-community.github.io/helm-charts,Path:,TargetRevision:1.29.0,Helm:&ApplicationSourceHelm{..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: ArgoCD manifest cache hit (INFO) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T07:46:55Z" level=info msg="manifest cache hit: &ApplicationSource{RepoURL:https://github.com/actions/actions-runner-controller,Path:charts/gha-runner-scale-set,TargetRevision:gha-ru..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: ArgoCD notification trigger not configured (benign) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F {"level":"error","msg":"Failed to execute condition of trigger on-sync-succeeded: trigger 'on-sync-succeeded' is not configured using the configuration in namespace argocd","resource":"argocd/opense..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: Loki client retry warning - should be filtered (level=warn)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F ts=2026-01-05T07:47:11.585166007Z level=warn msg="error sending batch, will retry" component_path=/ component_id=loki.write.default component=client host=mayastor-loki:3100 status=-1 tenant=openebs ..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: Loki client final error (ACTUAL ERROR) - should NOT be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F ts=2026-01-05T07:47:11.585246457Z level=error msg="final error sending batch" component_path=/ component_id=loki.write.default component=client host=mayastor-loki:3100 status=-1 tenant=openebs error..."#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Samples 1, 2, 3, 4 should be filtered (4 false positives)
+        // Only sample 5 (final error) should remain as an actual error
+        assert_eq!(
+            filtered.len(),
+            1,
+            "Expected 1 entry after filtering, got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+
+        // Verify the actual error is retained
+        assert!(
+            filtered.iter().any(|e| e.line.contains("final error sending batch")),
+            "Final error should be retained"
+        );
+
+        // Verify false positives are filtered
+        assert!(
+            !filtered.iter().any(|e| e.line.contains("manifest cache hit")),
+            "manifest cache hit should be filtered"
+        );
+        assert!(
+            !filtered.iter().any(|e| e.line.contains("trigger 'on-sync-succeeded' is not configured")),
+            "ArgoCD notification trigger error should be filtered"
+        );
+        assert!(
+            !filtered.iter().any(|e| e.line.contains("will retry")),
+            "Retry warning should be filtered"
         );
     }
 }
