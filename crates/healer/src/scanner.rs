@@ -7,6 +7,9 @@
 //! - INFO-level messages containing the word "error" as a command name
 //! - JSON field names like "errorMessages" regardless of value
 //! - Empty error arrays that indicate success, not failure
+//! - Containerd/Docker "skip loading plugin" messages with error explanation fields
+//! - Warning-level logs (level=warn/warning) which are not errors
+//! - Partial JSON arrays in INFO logs (e.g., "errorMessages": [ without close)
 
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
@@ -113,6 +116,22 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     r"^F?\s*I\d{4}\s",
     r"^F?\s*W\d{4}\s",
     r"^F?\s*D\d{4}\s",
+    // Containerd/Docker plugin skip messages (informational, not errors)
+    // These logs use level=info with an "error" field that explains WHY a plugin is skipped
+    // Example: level=info msg="skip loading plugin" error="no scratch file generator: skip plugin"
+    r#"(?i)skip\s+loading\s+plugin.*error="#,
+    // Warning-level logs should not be treated as errors
+    // These are explicitly warnings, not errors, even if they mention "Error" in the message
+    r#"level[=:]\s*["']?warn"#,
+    r#"level[=:]\s*["']?warning"#,
+    r#"level[=:]\s*["']?WARN"#,
+    r#"level[=:]\s*["']?WARNING"#,
+    // Partial JSON array opening in INFO logs (errorMessages array start without close)
+    // This catches multi-line JSON where "errorMessages": [ is on one line
+    // Example: F [WORKER ... INFO ExecutionContext]   "errorMessages": [
+    r#"(?i)\bINFO\b.*"errorMessages"\s*:\s*\["#,
+    // ExecutionContext INFO logs with errorMessages field (partial JSON output)
+    r"(?i)ExecutionContext\].*errorMessages",
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -1310,5 +1329,133 @@ mod tests {
         // Should have filtered out the 3 false positives
         assert_eq!(filtered.len(), 1);
         assert!(filtered.iter().any(|e| e.line.contains("[ERROR]")));
+    }
+
+    #[test]
+    fn test_is_false_positive_containerd_skip_loading_plugin() {
+        // Containerd/Docker plugin skip messages are informational, not errors
+        // The "error" field explains WHY a plugin is skipped, not an actual error
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T21:55:52.758531113Z" level=info msg="skip loading plugin" error="no scratch file generator: skip plugin" id=io.containerd.snapshotter.v1.blockfile type=io.containerd.snapshotter.v1"#
+        ));
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T21:55:52.758566239Z" level=info msg="skip loading plugin" error="devmapper not configured: skip plugin" id=io.containerd.snapshotter.v1.devmapper type=io.containerd.snapshotter.v1"#
+        ));
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T21:55:52.758775901Z" level=info msg="skip loading plugin" error="EROFS unsupported, please `modprobe erofs`: skip plugin" id=io.containerd.snapshotter.v1.erofs"#
+        ));
+        assert!(is_false_positive(
+            r#"F time="2026-01-04T21:55:52.759067037Z" level=info msg="skip loading plugin" error="lstat /var/lib/docker/containerd/daemon/io.containerd.snapshotter.v1.zfs: no such file or directory: skip plugin""#
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_warning_level_logs() {
+        // Warning-level logs should not be treated as errors
+        assert!(is_false_positive(r#"level=warn msg="deprecated API call""#));
+        assert!(is_false_positive(r#"level=warning msg="connection retry""#));
+        assert!(is_false_positive(r#"level=WARN msg="rate limit approaching""#));
+        assert!(is_false_positive(r#"level=WARNING msg="disk space low""#));
+        // ArgoCD warning with "Error" in message text (this is the sample from the task)
+        assert!(is_false_positive(
+            r#"F time="2026-01-05T02:52:30Z" level=warning msg="Error updating application: Application.argoproj.io \"external-secrets-config\" is invalid: [status.operationState.phase: Required value, status.operat..."#
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_partial_json_errormessages() {
+        // Partial JSON array opening in INFO logs
+        // This is from the sample errors in the task: F [WORKER ... INFO ExecutionContext]   "errorMessages": [
+        assert!(is_false_positive(
+            r#"F [WORKER 2026-01-05 02:52:32Z INFO ExecutionContext]   "errorMessages": ["#
+        ));
+        // ExecutionContext INFO logs with errorMessages field
+        assert!(is_false_positive(
+            r#"F [WORKER 2026-01-05 02:52:32Z INFO ExecutionContext]   "errorMessages": [],"#
+        ));
+    }
+
+    #[test]
+    fn test_filter_task_sample_errors() {
+        use chrono::Utc;
+
+        // These are the exact error samples from the task
+        let entries = vec![
+            // Warning-level log with "Error" in message - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T02:52:30Z" level=warning msg="Error updating application: Application.argoproj.io \"external-secrets-config\" is invalid: [status.operationState.phase: Required value, status.operat..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Partial JSON errorMessages in INFO log - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 02:52:32Z INFO ExecutionContext]   "errorMessages": ["#.to_string(),
+                labels: HashMap::new(),
+            },
+            // ActionCommandManager command registration - should be filtered (existing pattern)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 02:52:32Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+            // Empty errorMessages array in INFO log - should be filtered (existing pattern)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 02:52:32Z INFO ExecutionContext]   "errorMessages": [],"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual ERROR-level log - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-05T02:52:35Z" level=error msg="failed to sync application""#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out all 4 false positives, keeping only the actual error
+        assert_eq!(filtered.len(), 1);
+
+        // Only the actual error should remain
+        assert!(filtered.iter().any(|e| e.line.contains("level=error")));
+        assert!(!filtered.iter().any(|e| e.line.contains("level=warning")));
+        assert!(!filtered.iter().any(|e| e.line.contains("ActionCommandManager")));
+        assert!(!filtered.iter().any(|e| e.line.contains("errorMessages")));
+    }
+
+    #[test]
+    fn test_filter_containerd_plugin_skip_logs() {
+        use chrono::Utc;
+
+        // Test case for containerd/Docker plugin skip messages
+        let entries = vec![
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T21:55:52.758531113Z" level=info msg="skip loading plugin" error="no scratch file generator: skip plugin" id=io.containerd.snapshotter.v1.blockfile"#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T21:55:52.758566239Z" level=info msg="skip loading plugin" error="devmapper not configured: skip plugin""#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual ERROR-level log - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-04T21:55:53Z" level=error msg="failed to start container""#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out the 2 INFO-level plugin skip logs
+        assert_eq!(filtered.len(), 1);
+
+        // Only the actual error should remain
+        assert!(filtered.iter().any(|e| e.line.contains("level=error")));
+        assert!(!filtered.iter().any(|e| e.line.contains("skip loading plugin")));
     }
 }

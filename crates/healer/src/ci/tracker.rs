@@ -15,12 +15,14 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use super::memory::{MemoryClient, MemoryConfig};
+use super::merge::AutoMergeHandler;
 use super::router::CiRouter;
 use super::spawner::CodeRunSpawner;
 use super::types::{
     Agent, AttemptOutcome, CiFailure, CiFailureType, RemediationConfig, RemediationContext,
     RemediationState, RemediationStatus,
 };
+use crate::github::GitHubClient;
 
 /// Remediation tracker state.
 pub struct RemediationTracker {
@@ -237,6 +239,34 @@ impl RemediationTracker {
                 let _ = memory
                     .store_routing_decision(Some(&tracked.failure_type), agent, None, true)
                     .await;
+            }
+
+            // Clone data needed for auto-merge BEFORE releasing lock
+            let tracked_clone = tracked.clone();
+            let config_clone = self.config.clone();
+
+            // Release lock BEFORE async operation to prevent deadlock
+            drop(active);
+
+            // Attempt auto-merge if enabled and PR exists
+            if config_clone.auto_merge_enabled && tracked_clone.pr_number.is_some() {
+                // Parse owner/repo from repository string
+                let parts: Vec<&str> = tracked_clone.repository.split('/').collect();
+                if parts.len() == 2 {
+                    let github = GitHubClient::new(parts[0], parts[1]);
+                    let merge_handler = AutoMergeHandler::new(github, config_clone);
+
+                    info!(
+                        pr = tracked_clone.pr_number,
+                        "Attempting auto-merge for successful remediation"
+                    );
+
+                    return merge_handler.handle_success(&tracked_clone).await;
+                }
+                warn!(
+                    "Could not parse repository '{}' for auto-merge",
+                    tracked_clone.repository
+                );
             }
 
             Ok(CompletionAction::Success)

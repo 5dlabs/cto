@@ -302,6 +302,8 @@ pm:
   # Linear integration
   linear:
     enabled: true
+    # Linear team ID for intake setup (e.g., "CTOPA" for CTO Platform team)
+    teamId: "CTOPA"
 
   # GitHub configuration
   github:
@@ -744,6 +746,12 @@ healer:
     timeWindowMins: 30
     memoryUrl: "http://openmemory.cto.svc:3000"
     memoryEnabled: true
+    # Auto-merge: merge PRs automatically after CI checks pass
+    autoMergeEnabled: true
+    # Merge method: squash, merge, or rebase
+    mergeMethod: "squash"
+    # Maximum time to wait for CI checks before giving up (minutes)
+    checkTimeoutMins: 30
     # Circuit breaker to prevent spawning when failures are high
     circuitBreaker:
       enabled: true

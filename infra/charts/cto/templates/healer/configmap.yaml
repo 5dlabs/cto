@@ -17,6 +17,9 @@ data:
       "time_window_mins": {{ .Values.healer.config.timeWindowMins }},
       "memory_url": {{ .Values.healer.config.memoryUrl | quote }},
       "memory_enabled": {{ .Values.healer.config.memoryEnabled }},
+      "auto_merge_enabled": {{ .Values.healer.config.autoMergeEnabled }},
+      "merge_method": {{ .Values.healer.config.mergeMethod | quote }},
+      "check_timeout_mins": {{ .Values.healer.config.checkTimeoutMins }},
       "server": {
         "model": {{ .Values.healer.config.server.model | quote }},
         "autoLevel": {{ .Values.healer.config.server.autoLevel | quote }},

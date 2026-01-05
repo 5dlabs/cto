@@ -99,6 +99,8 @@ struct WorkflowDefaults {
     #[serde(default)]
     intake: IntakeDefaults,
     #[serde(default)]
+    linear: LinearDefaults,
+    #[serde(default)]
     play: PlayDefaults,
 }
 
@@ -182,6 +184,40 @@ impl Default for IntakeDefaults {
                 model: String::new(),
                 provider: String::new(),
             },
+        }
+    }
+}
+
+/// Linear integration configuration for intake.
+/// Uses PM server for API calls (no client-side API key needed).
+#[derive(Debug, Deserialize, Clone)]
+struct LinearDefaults {
+    /// Linear team ID (e.g., "CTOPA" for CTO Platform team)
+    #[serde(rename = "teamId")]
+    team_id: String,
+    /// Whether to create a Linear project during intake
+    #[serde(rename = "createProject", default = "default_true")]
+    create_project: bool,
+    /// Optional project template name to use (future use)
+    #[serde(rename = "projectTemplate")]
+    #[allow(dead_code)]
+    project_template: Option<String>,
+    /// PM server URL for Linear API calls (uses port-forward by default)
+    #[serde(rename = "pmServerUrl")]
+    pm_server_url: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for LinearDefaults {
+    fn default() -> Self {
+        LinearDefaults {
+            team_id: String::new(),
+            create_project: true,
+            project_template: None,
+            pm_server_url: None,
         }
     }
 }
@@ -690,6 +726,116 @@ fn run_argo_cli(args: &[&str]) -> Result<String> {
         let stderr = String::from_utf8(output.stderr)?;
         Err(anyhow!("Argo command failed: {stderr}"))
     }
+}
+
+// =============================================================================
+// Linear Intake Setup (via PM Server)
+// =============================================================================
+
+/// Response from PM server intake setup endpoint.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupResponse {
+    status: String,
+    project: IntakeSetupProject,
+    prd_issue: IntakeSetupIssue,
+    #[allow(dead_code)]
+    next_step: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupProject {
+    #[allow(dead_code)]
+    id: String,
+    name: String,
+    url: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupIssue {
+    #[allow(dead_code)]
+    id: String,
+    #[allow(dead_code)]
+    identifier: String,
+    #[allow(dead_code)]
+    title: String,
+    url: String,
+}
+
+/// Create Linear project and PRD issue for intake via PM server.
+/// This avoids needing the Linear API key on the client side.
+fn create_linear_intake_setup(
+    project_name: &str,
+    prd_content: &str,
+    architecture_content: Option<&str>,
+    config: &CtoConfig,
+) -> Result<(IntakeSetupProject, IntakeSetupIssue)> {
+    let linear_config = &config.defaults.linear;
+
+    // Get PM server URL from config, env var, or default
+    let pm_server_url = linear_config
+        .pm_server_url
+        .clone()
+        .or_else(|| std::env::var("CTO_PM_SERVER_URL").ok())
+        .unwrap_or_else(|| "http://localhost:8081".to_string());
+
+    eprintln!("📋 Setting up Linear project and PRD issue via PM server...");
+    eprintln!("   PM Server: {pm_server_url}");
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .context("Failed to create HTTP client")?;
+
+    let request_body = json!({
+        "projectName": project_name,
+        "prdContent": prd_content,
+        "architectureContent": architecture_content,
+        "teamId": if linear_config.team_id.is_empty() { Value::Null } else { json!(&linear_config.team_id) }
+    });
+
+    let response = client
+        .post(format!("{pm_server_url}/api/intake/setup"))
+        .header("Content-Type", "application/json")
+        .json(&request_body)
+        .send()
+        .context("Failed to send request to PM server. Make sure the PM server is running (kubectl port-forward svc/cto-pm 8081:8081 -n cto)")?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_body: Value = response
+            .json()
+            .unwrap_or_else(|_| json!({"error": "Unknown error"}));
+        let error_msg = error_body
+            .get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("Unknown error");
+        return Err(anyhow!(
+            "PM server error ({status}): {error_msg}\n\nMake sure the PM server is running and accessible."
+        ));
+    }
+
+    let setup_response: IntakeSetupResponse = response
+        .json()
+        .context("Failed to parse PM server response")?;
+
+    if setup_response.status != "success" {
+        return Err(anyhow!("Intake setup failed: {}", setup_response.status));
+    }
+
+    eprintln!(
+        "  ✅ Project created: {}",
+        setup_response
+            .project
+            .url
+            .as_deref()
+            .unwrap_or(&setup_response.project.name)
+    );
+    eprintln!("  ✅ PRD issue created: {}", setup_response.prd_issue.url);
+
+    Ok((setup_response.project, setup_response.prd_issue))
 }
 
 /// Get the remote URL for the current git repository
@@ -3564,6 +3710,56 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("📁 Include Codebase: {include_codebase}");
     eprintln!("🖥️  CLI for Docs: {cli}");
 
+    // =========================================================================
+    // Linear Project/Issue Setup (optional)
+    // =========================================================================
+    // If Linear is configured and not skipped, create project and PRD issue
+    let skip_linear = arguments
+        .get("skip_linear")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    let linear_result = if !skip_linear
+        && config.defaults.linear.create_project
+        && !config.defaults.linear.team_id.is_empty()
+    {
+        match create_linear_intake_setup(
+            project_name,
+            &prd_content,
+            if architecture_content.is_empty() {
+                None
+            } else {
+                Some(&architecture_content)
+            },
+            config,
+        ) {
+            Ok((project, issue)) => {
+                eprintln!("✅ Linear setup complete!");
+                eprintln!(
+                    "   Project: {}",
+                    project.url.as_deref().unwrap_or(&project.name)
+                );
+                eprintln!("   PRD Issue: {}", issue.url);
+                eprintln!();
+                eprintln!("👉 To start intake: Assign Morgan to the PRD issue in Linear");
+                eprintln!();
+                Some((project, issue))
+            }
+            Err(e) => {
+                eprintln!("⚠️  Linear setup failed (continuing without): {e}");
+                eprintln!("   Make sure LINEAR_API_KEY environment variable is set");
+                None
+            }
+        }
+    } else {
+        if skip_linear {
+            eprintln!("⏭️  Skipping Linear setup (skip_linear=true)");
+        } else if config.defaults.linear.team_id.is_empty() {
+            eprintln!("⏭️  Skipping Linear setup (team_id not configured)");
+        }
+        None
+    };
+
     // Create a ConfigMap with the intake files to avoid YAML escaping issues
     let configmap_name = format!(
         "intake-{}-{}",
@@ -3716,7 +3912,8 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
             eprintln!("✅ Project intake workflow submitted: {workflow_name}");
 
-            Ok(json!({
+            // Build response with optional Linear info
+            let mut response = json!({
                 "status": "submitted",
                 "workflow_name": workflow_name,
                 "workflow": workflow_json,
@@ -3731,7 +3928,27 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     "prd_source": prd_source_label,
                     "architecture_source": architecture_source_label
                 }
-            }))
+            });
+
+            // Add Linear info if setup was successful
+            if let Some((project, issue)) = &linear_result {
+                response["linear"] = json!({
+                    "project": {
+                        "id": project.id,
+                        "name": project.name,
+                        "url": project.url
+                    },
+                    "prd_issue": {
+                        "id": issue.id,
+                        "identifier": issue.identifier,
+                        "title": issue.title,
+                        "url": issue.url
+                    },
+                    "next_step": "Assign Morgan to the PRD issue to trigger intake workflow"
+                });
+            }
+
+            Ok(response)
         }
         Ok(result) => {
             let error_msg = String::from_utf8_lossy(&result.stderr);
@@ -4363,7 +4580,13 @@ fn create_mcp_server_coderun(
     let kubectl_cmd = find_command("kubectl");
 
     // Build the prompt for Rex based on task type
-    let prompt = build_mcp_server_prompt(task_type, server_key, github_url, readme_content, skip_merge);
+    let prompt = build_mcp_server_prompt(
+        task_type,
+        server_key,
+        github_url,
+        readme_content,
+        skip_merge,
+    );
 
     // Build environment variables for the CodeRun
     let mut env_map = serde_json::Map::new();

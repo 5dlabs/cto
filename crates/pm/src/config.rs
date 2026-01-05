@@ -19,6 +19,8 @@ pub struct Config {
     pub oauth_token: Option<String>,
     /// Kubernetes namespace.
     pub namespace: String,
+    /// Linear team ID for intake setup (e.g., "CTOPA").
+    pub linear_team_id: Option<String>,
     /// Intake configuration.
     pub intake: IntakeConfig,
     /// Play configuration.
@@ -244,6 +246,7 @@ impl Default for Config {
                 .unwrap_or(false),
             oauth_token: env::var("LINEAR_OAUTH_TOKEN").ok(),
             namespace: env::var("NAMESPACE").unwrap_or_else(|_| "cto".to_string()),
+            linear_team_id: env::var("LINEAR_TEAM_ID").ok().filter(|s| !s.is_empty()),
             intake: IntakeConfig::default(),
             play: PlayConfig::default(),
             linear: LinearConfig::from_env(),

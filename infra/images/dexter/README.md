@@ -151,4 +151,3 @@ Dexter makes multiple API calls during research. Consider:
 ### Build fails with "No pyproject.toml found"
 
 This error occurs if you're using an outdated Dockerfile that tries to use Python/uv. Dexter was rewritten to TypeScript/Bun in December 2025. Ensure you're using the updated Dockerfile that installs Bun instead of Python.
-
