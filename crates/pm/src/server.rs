@@ -393,7 +393,6 @@ async fn handle_intake_setup(
             team_ids: Some(vec![team_id.to_string()]),
             lead_id: None,
             target_date: None,
-            default_view: Some(crate::models::ProjectViewType::Board),
             template_id: None,
         })
         .await

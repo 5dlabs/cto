@@ -1121,10 +1121,12 @@ pub async fn create_task_issues_with_project(
                 continue;
             };
 
+            // Linear only supports "blocks", not "blockedBy", so invert the relationship:
+            // Instead of "issue is blocked by dep", we create "dep blocks issue"
             let input = IssueRelationCreateInput {
-                issue_id: issue_id.clone(),
-                related_issue_id: dep_issue_id.clone(),
-                relation_type: IssueRelationType::BlockedBy,
+                issue_id: dep_issue_id.clone(),
+                related_issue_id: issue_id.clone(),
+                relation_type: IssueRelationType::Blocks,
             };
 
             if let Err(e) = client.create_issue_relation(input).await {
@@ -1262,7 +1264,6 @@ pub async fn create_intake_project(
         team_ids: Some(vec![request.team_id.clone()]),
         lead_id: None,
         target_date: None,
-        default_view: Some(crate::models::ProjectViewType::Board),
         template_id,
     };
 

@@ -266,14 +266,12 @@ pub struct AgentSession {
     pub external_url: Option<String>,
 }
 
-/// Issue relation type
+/// Issue relation type (Linear API supported values)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum IssueRelationType {
     /// This issue blocks the related issue
     Blocks,
-    /// This issue is blocked by the related issue
-    BlockedBy,
     /// This issue is related to the related issue
     Related,
     /// This issue duplicates the related issue
@@ -520,9 +518,6 @@ pub struct ProjectCreateInput {
     /// Target completion date
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_date: Option<String>,
-    /// Default view type (list or board)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_view: Option<ProjectViewType>,
     /// Template ID to create project from (use `list_project_templates` to get IDs)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template_id: Option<String>,
