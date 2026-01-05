@@ -983,7 +983,10 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let source_branch = arguments
         .get("source_branch")
         .and_then(|v| v.as_str())
-        .map_or_else(|| config.defaults.intake.source_branch.clone(), String::from);
+        .map_or_else(
+            || config.defaults.intake.source_branch.clone(),
+            String::from,
+        );
 
     // Check for uncommitted changes and push them before starting docs generation
     eprintln!("🔍 Checking for uncommitted changes...");
