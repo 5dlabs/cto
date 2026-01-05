@@ -855,6 +855,7 @@ spec:
     FAILURE_TYPE: "{failure_type}"
     WORKFLOW_RUN_ID: "{workflow_run_id}"
     TARGET_BRANCH: "{branch}"
+    PR_BASE_BRANCH: "develop"
   cliConfig:
     cliType: {cli_type}
     model: {model}

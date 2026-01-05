@@ -90,7 +90,7 @@ else
 fi
 
 # Branch setup
-BASE_BRANCH="${PR_BASE_BRANCH:-main}"
+BASE_BRANCH="${PR_BASE_BRANCH:-develop}"
 if ! git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
   BASE_BRANCH="master"
 fi

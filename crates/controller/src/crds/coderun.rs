@@ -31,7 +31,7 @@ fn default_context_version() -> u32 {
 
 /// Default function for `docs_branch` field
 fn default_docs_branch() -> String {
-    "main".to_string()
+    "develop".to_string()
 }
 
 /// Default function for `continue_session` field
@@ -230,7 +230,7 @@ impl Default for CodeRunSpec {
             github_user: None,
             github_app: None,
             context_version: 1,
-            docs_branch: "main".to_string(),
+            docs_branch: "develop".to_string(),
             continue_session: false,
             overwrite_memory: false,
             env: std::collections::HashMap::new(),

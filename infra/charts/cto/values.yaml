@@ -785,7 +785,7 @@ healer:
       repositoryUrl: "https://github.com/5dlabs/cto"
       docsRepositoryUrl: "https://github.com/5dlabs/cto"
       docsProjectDirectory: "docs"
-      docsBranch: "main"
+      docsBranch: "develop"
       workingDirectory: "."
       service: "heal"
       runType: "implementation"
@@ -958,7 +958,7 @@ research:
   # PR creation
   createPR: true
   repo: "5dlabs/cto"
-  baseBranch: "main"
+  baseBranch: "develop"
   researchDir: "docs/research"
 
   persistence:

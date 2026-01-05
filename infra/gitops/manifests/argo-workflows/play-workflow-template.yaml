@@ -133,6 +133,9 @@ spec:
       - name: working-directory
         description: "Working directory for code implementation (where agents write code)"
         value: "."  # Default to repository root
+      - name: pr-base-branch
+        description: "Base branch for pull requests (e.g., develop, main)"
+        value: "develop"  # Default to develop per git workflow
 
       # CLI configuration per agent (multi-CLI aware)
       - name: implementation-cli
@@ -1299,6 +1302,7 @@ spec:
           LINEAR_SESSION_ID="{{workflow.parameters.linear-session-id}}"
           LINEAR_ISSUE_ID="{{workflow.parameters.linear-issue-id}}"
           LINEAR_TEAM_ID="{{workflow.parameters.linear-team-id}}"
+          PR_BASE_BRANCH="{{workflow.parameters.pr-base-branch}}"
 
           # Validate required parameters
           if [ -z "$GITHUB_APP" ]; then
@@ -1338,7 +1342,7 @@ spec:
             model: "${MODEL}"
             continueSession: true
             overwriteMemory: false
-            docsBranch: "main"
+            docsBranch: "{{workflow.parameters.pr-base-branch}}"
             contextVersion: 1
             cliConfig:
               cliType: "${CLI_TYPE}"
@@ -1363,6 +1367,7 @@ spec:
             env:
               PR_URL: "${PR_URL}"
               PR_NUMBER: "${PR_NUMBER}"
+              PR_BASE_BRANCH: "${PR_BASE_BRANCH}"
               QA_READY: "${QA_READY}"
               WORKFLOW_STAGE: "${STAGE}"
               WORKFLOW_NAME: "${WORKFLOW_NAME}"

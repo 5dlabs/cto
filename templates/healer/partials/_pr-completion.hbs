@@ -34,9 +34,9 @@ gh pr view {{pr_number}} --json mergeable,mergeStateStatus,statusCheckRollup
 If the PR has merge conflicts (`mergeable: CONFLICTING` or `mergeStateStatus: DIRTY`):
 
 ```bash
-# Fetch latest and rebase onto develop (the base branch)
-git fetch origin develop
-git rebase origin/develop
+# Fetch latest and rebase onto the base branch
+git fetch origin $BASE_BRANCH
+git rebase origin/$BASE_BRANCH
 
 # If conflicts occur, resolve each file:
 # 1. Edit the file to remove conflict markers (<<<<<<, ======, >>>>>>)
