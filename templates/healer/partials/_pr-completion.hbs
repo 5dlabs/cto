@@ -35,8 +35,8 @@ If the PR has merge conflicts (`mergeable: CONFLICTING` or `mergeStateStatus: DI
 
 ```bash
 # Fetch latest and rebase onto the base branch
-git fetch origin $BASE_BRANCH
-git rebase origin/$BASE_BRANCH
+git fetch origin ${PR_BASE_BRANCH:-develop}
+git rebase origin/${PR_BASE_BRANCH:-develop}
 
 # If conflicts occur, resolve each file:
 # 1. Edit the file to remove conflict markers (<<<<<<, ======, >>>>>>)
