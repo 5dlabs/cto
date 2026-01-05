@@ -160,11 +160,13 @@ runs:
 
     - name: Setup Rust toolchain
       shell: bash
-      env:
-        # Use curl for rustup downloads - more robust retry handling
-        RUSTUP_USE_CURL: '1'
       run: |
         echo "🚀 Setting up optimized Rust build environment..."
+        
+        # Trap SIGINT to prevent abrupt exit during downloads
+        # Exit code 130 (128 + SIGINT signal 2) can occur when network operations
+        # are interrupted on k8s-runner pods. We handle this in the retry loops.
+        trap 'echo "⚠️ Received SIGINT, will retry if in download loop..."' INT
         # Ensure cargo bin directory exists
         mkdir -p "$HOME/.cargo/bin"
         echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
@@ -237,6 +239,8 @@ runs:
         fi
 
         # Helper function to install toolchain with robust retries
+        # Handles exit code 130 (SIGINT) which can occur when network operations
+        # are interrupted on k8s-runner pods
         install_toolchain() {
           echo "🔧 Installing Rust stable toolchain..."
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
@@ -248,20 +252,34 @@ runs:
               continue
             fi
 
-            # Clean before each attempt
+            # Clean before each attempt to handle partial downloads
             rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
             rm -rf /cache/rustup/update-hashes/* 2>/dev/null || true
             rm -rf "$HOME/.rustup/downloads/"*.partial 2>/dev/null || true
             rm -rf "$HOME/.rustup/tmp/"* 2>/dev/null || true
 
             echo "📦 Toolchain install attempt $attempt/10..."
-            # Use RUSTUP_USE_CURL=1 for better network handling
-            if RUSTUP_USE_CURL=1 rustup toolchain install stable --profile minimal && rustup default stable; then
-              echo "✅ Toolchain installed on attempt $attempt"
-              return 0
+            # Capture exit code to handle SIGINT (130) specifically
+            # Note: Removed RUSTUP_USE_CURL=1 as it's deprecated and can cause issues
+            local exit_code=0
+            rustup toolchain install stable --profile minimal || exit_code=$?
+            
+            if [ "$exit_code" -eq 0 ]; then
+              # Toolchain installed, now set default
+              if rustup default stable; then
+                echo "✅ Toolchain installed on attempt $attempt"
+                return 0
+              fi
+              exit_code=$?
             fi
+            
+            # Handle specific exit codes
+            if [ "$exit_code" -eq 130 ]; then
+              echo "⚠️ Download interrupted by signal (exit 130), this is retriable..."
+            fi
+            
             local delay=$((attempt * 15))
-            echo "⚠️ Toolchain install attempt $attempt failed, retrying in ${delay}s..."
+            echo "⚠️ Toolchain install attempt $attempt failed (exit code: $exit_code), retrying in ${delay}s..."
             sleep "$delay"
           done
           echo "❌ Failed to install toolchain after 10 attempts"
@@ -336,11 +354,17 @@ runs:
                 sleep $((comp_attempt * 10))
                 continue
               fi
-              if RUSTUP_USE_CURL=1 rustup component add "$comp_name"; then
+              # Capture exit code to handle SIGINT (130) properly
+              local comp_exit=0
+              rustup component add "$comp_name" || comp_exit=$?
+              if [ "$comp_exit" -eq 0 ]; then
                 echo "  ✅ Component $comp_name installed"
                 break
               fi
-              echo "  ⚠️ Component $comp_name install attempt $comp_attempt failed, retrying..."
+              if [ "$comp_exit" -eq 130 ]; then
+                echo "  ⚠️ Component install interrupted by signal (exit 130), retriable..."
+              fi
+              echo "  ⚠️ Component $comp_name install attempt $comp_attempt failed (exit: $comp_exit), retrying..."
               sleep $((comp_attempt * 10))
               if [ "$comp_attempt" -eq 7 ]; then
                 echo "  ⚠️ Failed to install component $comp_name after 7 attempts"
