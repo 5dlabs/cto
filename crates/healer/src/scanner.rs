@@ -72,6 +72,13 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     // INFO-level messages that contain "error" as a keyword
     r"(?i)\bINFO\b.*\berror\b",
     r"(?i)\[INFO\].*\berror\b",
+    // WORKER/ExecutionContext INFO-level logs with error-related JSON keys
+    // Format: F [WORKER ... INFO Worker] "key_with_errors": {
+    // These are configuration dumps, not actual errors
+    r"(?i)\[WORKER\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}Z\s+INFO\s+\w+\]",
+    // JSON keys containing "errors" as a suffix (configuration field names, not actual errors)
+    // Examples: "actions_display_helpful_actions_download_errors": {
+    r#""[^"]+_errors"\s*:\s*\{"#,
     // Debug/trace messages about error handling
     r"(?i)\bDEBUG\b.*error.*handler",
     r"(?i)\bTRACE\b.*error.*handling",
@@ -1310,5 +1317,78 @@ mod tests {
         // Should have filtered out the 3 false positives
         assert_eq!(filtered.len(), 1);
         assert!(filtered.iter().any(|e| e.line.contains("[ERROR]")));
+    }
+
+    #[test]
+    fn test_is_false_positive_worker_info_logs() {
+        // WORKER INFO-level logs with timestamps - these are configuration dumps, not errors
+        assert!(is_false_positive(
+            r#"F [WORKER 2026-01-05 16:56:00Z INFO Worker]     "actions_display_helpful_actions_download_errors": {"#
+        ));
+        assert!(is_false_positive(
+            r#"F [WORKER 2026-01-05 16:56:00Z INFO Worker]     "actions_skip_retry_complete_job_upon_known_errors": {"#
+        ));
+        assert!(is_false_positive(
+            r#"F [WORKER 2026-01-05 16:56:01Z INFO ExecutionContext]   "errorMessages": [],"#
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_json_config_keys_with_errors() {
+        // JSON keys containing "_errors" suffix are configuration field names, not actual errors
+        assert!(is_false_positive(
+            r#"    "actions_display_helpful_actions_download_errors": {"#
+        ));
+        assert!(is_false_positive(
+            r#"    "actions_skip_retry_complete_job_upon_known_errors": {"#
+        ));
+        assert!(is_false_positive(r#""validation_errors": {"#));
+        assert!(is_false_positive(r#""known_errors": {"#));
+    }
+
+    #[test]
+    fn test_filter_worker_info_logs_false_positives() {
+        use chrono::Utc;
+
+        // Test cases from the actual task - 1000 false positive errors
+        let entries = vec![
+            // WORKER INFO logs with JSON keys containing "errors"
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 16:56:00Z INFO Worker]     "actions_display_helpful_actions_download_errors": {"#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 16:56:00Z INFO Worker]     "actions_skip_retry_complete_job_upon_known_errors": {"#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 16:56:01Z INFO ExecutionContext]   "errorMessages": [],"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual error - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "[ERROR] Worker failed to process task".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out the 3 WORKER INFO false positives
+        assert_eq!(filtered.len(), 1);
+
+        // Only the actual error should remain
+        assert!(filtered.iter().any(|e| e.line.contains("[ERROR]")));
+        assert!(!filtered
+            .iter()
+            .any(|e| e.line.contains("actions_display_helpful")));
+        assert!(!filtered
+            .iter()
+            .any(|e| e.line.contains("actions_skip_retry")));
+        assert!(!filtered.iter().any(|e| e.line.contains("errorMessages")));
     }
 }
