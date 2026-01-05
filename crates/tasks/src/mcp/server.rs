@@ -1707,10 +1707,7 @@ impl McpServer {
     async fn tool_complexity_report(&self, args: &Value) -> Result<String, String> {
         let tag = args.get("tag").and_then(|v| v.as_str());
 
-        let report = self
-            .load_complexity_report(tag)
-            .await
-            .map_err(|e| e.to_string())?;
+        let report = self.load_complexity_report(tag).await?;
 
         Ok(serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string()))
     }
