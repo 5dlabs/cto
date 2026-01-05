@@ -385,6 +385,7 @@ struct IntakeProjectResult {
 }
 
 /// Create a Linear project from a merged intake PR
+#[allow(clippy::too_many_lines)]
 async fn create_project_from_intake(
     state: &Arc<CallbackState>,
     client: &LinearClient,

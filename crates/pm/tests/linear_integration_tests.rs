@@ -200,6 +200,7 @@ async fn test_linear_client_create_project() {
         lead_id: None,
         target_date: None,
         template_id: None,
+        status_id: None,
     };
 
     let project = client.create_project(input).await;
