@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use tracing::{debug, error, info, warn};
 
 use crate::emitter::AgentActivityEmitter;
-use crate::handlers::intake::{extract_intake_request, submit_intake_workflow};
+use crate::handlers::intake::{extract_intake_request, submit_intake_coderun};
 use crate::server::AppState;
 use crate::webhooks::AgentIdentification;
 use crate::WebhookPayload;
@@ -126,8 +126,8 @@ pub async fn handle_agent_session_created(
                     // Extract intake request from issue
                     match extract_intake_request(&ctx.session_id, &issue) {
                         Ok(intake_request) => {
-                            // Submit intake workflow
-                            match submit_intake_workflow(
+                            // Submit intake CodeRun (new architecture - direct CodeRun creation)
+                            match submit_intake_coderun(
                                 &state.kube_client,
                                 &state.config.namespace,
                                 &intake_request,
@@ -137,15 +137,15 @@ pub async fn handle_agent_session_created(
                             {
                                 Ok(result) => {
                                     info!(
-                                        workflow = %result.workflow_name,
+                                        coderun = %result.workflow_name,
                                         configmap = %result.configmap_name,
-                                        "Intake workflow submitted"
+                                        "Intake CodeRun submitted"
                                     );
 
                                     if let Err(e) = emitter
                                         .emit_thought(
                                             &format!(
-                                                "✅ Intake workflow started: `{}`",
+                                                "✅ Intake started: `{}`",
                                                 result.workflow_name
                                             ),
                                             false,

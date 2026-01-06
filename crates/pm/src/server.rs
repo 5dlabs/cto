@@ -22,7 +22,7 @@ use crate::handlers::callbacks::{
     handle_status_sync, handle_tasks_json_callback, CallbackState,
 };
 use crate::handlers::github::handle_github_webhook;
-use crate::handlers::intake::{extract_intake_request, submit_intake_workflow};
+use crate::handlers::intake::{extract_intake_request, submit_intake_coderun};
 use crate::handlers::play::{cancel_play_workflow, extract_play_request, submit_play_workflow};
 use crate::webhooks::{
     identify_agent_or_legacy, validate_webhook_timestamp, WebhookAction, WebhookPayload,
@@ -332,9 +332,9 @@ async fn trigger_intake(
         }
     };
 
-    // Submit the workflow
+    // Submit the CodeRun (new architecture - direct CodeRun creation)
     let namespace = &state.config.namespace;
-    match submit_intake_workflow(
+    match submit_intake_coderun(
         &state.kube_client,
         namespace,
         &intake_request,
@@ -344,9 +344,9 @@ async fn trigger_intake(
     {
         Ok(result) => {
             info!(
-                workflow_name = %result.workflow_name,
+                coderun_name = %result.workflow_name,
                 configmap_name = %result.configmap_name,
-                "Intake workflow submitted via manual trigger"
+                "Intake CodeRun submitted via manual trigger"
             );
             Ok(Json(json!({
                 "status": "accepted",
@@ -1017,8 +1017,8 @@ async fn handle_session_created(
             }
         }
 
-        // Submit intake workflow
-        match submit_intake_workflow(
+        // Submit intake CodeRun (new architecture - direct CodeRun creation)
+        match submit_intake_coderun(
             &state.kube_client,
             &state.config.namespace,
             &intake_request,
@@ -1028,9 +1028,9 @@ async fn handle_session_created(
         {
             Ok(result) => {
                 info!(
-                    workflow_name = %result.workflow_name,
+                    coderun_name = %result.workflow_name,
                     configmap_name = %result.configmap_name,
-                    "Intake workflow submitted"
+                    "Intake CodeRun submitted"
                 );
 
                 // Emit action activity and update plan
