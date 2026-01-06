@@ -100,6 +100,12 @@ spec:
                   name: linear-app-{{ . }}
                   key: webhook_secret
                   optional: true
+            - name: LINEAR_APP_{{ $upper }}_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: linear-app-{{ . }}
+                  key: access_token
+                  optional: true
             {{- end }}
           envFrom:
             - secretRef:
