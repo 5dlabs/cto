@@ -164,6 +164,12 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     // Example: "error sending batch, will retry"
     r"(?i)error\s+sending\s+batch.*will\s+retry",
     r"(?i)will\s+retry.*error\s+sending\s+batch",
+    // Prometheus/Thanos/Cortex runutil retry messages (transient, self-recovering)
+    // These are retry errors from Prometheus-style components that will automatically recover
+    // Example: level=error caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: ..."
+    // The component will keep retrying until the issue is resolved (e.g., web.enable-lifecycle is set)
+    r"(?i)runutil\.go.*function\s+failed.*Retrying\s+in\s+next\s+tick",
+    r"(?i)Retrying\s+in\s+next\s+tick.*function\s+failed",
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -2273,6 +2279,99 @@ mod tests {
         // All 5 samples should be filtered as false positives:
         // - Samples 1, 3, 5: WORKER INFO command registration (filtered by command registration and WORKER INFO patterns)
         // - Samples 2, 4: WORKER INFO empty errorMessages (filtered by errorMessages and WORKER INFO patterns)
+        assert_eq!(
+            filtered.len(),
+            0,
+            "Expected 0 entries after filtering (all false positives), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_prometheus_runutil_retry() {
+        // Prometheus/Thanos/Cortex runutil.go retry messages are transient and self-recovering
+        // These should be filtered as they're expected during configuration issues that will be retried
+
+        // Exact pattern from task 3237942171 at scan time 2026-01-06 04:00:04 UTC
+        assert!(is_false_positive(
+            r#"F level=error ts=2026-01-06T03:52:56.281397597Z caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: received non-200 response: 403 Forbidden; have you set `--web.en..."#
+        ));
+
+        // OTEL-wrapped version (Body: Str(...) wrapper)
+        assert!(is_false_positive(
+            r#"F Body: Str(F level=error ts=2026-01-06T03:52:56.281397597Z caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: received non-200 response: 403 Forbidden; have you s..."#
+        ));
+
+        // Without F prefix
+        assert!(is_false_positive(
+            r#"level=error ts=2026-01-06T03:52:56Z caller=runutil.go:117 msg="function failed. Retrying in next tick" err="some error""#
+        ));
+
+        // Different caller line number
+        assert!(is_false_positive(
+            r#"level=error caller=runutil.go:200 msg="function failed. Retrying in next tick""#
+        ));
+
+        // Actual errors from runutil.go that are NOT retrying should NOT be filtered
+        assert!(!is_false_positive(
+            r#"level=error caller=runutil.go:117 msg="function failed permanently""#
+        ));
+    }
+
+    #[test]
+    fn test_filter_task_3237942171_scan_04_00_04_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-06 04:00:04 UTC
+        // These are the 5 sample errors that triggered 1000 error reports
+        // All should be filtered as false positives:
+        // - Sample 1: ArgoCD notification trigger not configured (benign)
+        // - Sample 2: Loki client retry warning (level=warn)
+        // - Samples 3-4: Prometheus runutil.go retry messages
+        // - Sample 5: ArgoCD notification trigger not configured (duplicate pattern)
+        let entries = vec![
+            // Sample 1: ArgoCD notification trigger not configured (benign)
+            // This is a configuration error that doesn't affect sync, only notifications
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F {"level":"error","msg":"Failed to execute condition of trigger on-sync-succeeded: trigger 'on-sync-succeeded' is not configured using the configuration in namespace argocd","resource":"argocd/strimz..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: Loki/Alloy client retry warning (level=warn)
+            // This is a transient retry warning that the client will automatically recover from
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F ts=2026-01-06T03:52:55.417371924Z level=warn msg="error sending batch, will retry" component_path=/ component_id=loki.write.default component=client host=mayastor-loki:3100 status=-1 tenant=openebs ..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: Prometheus/Thanos runutil.go retry message
+            // This is a self-recovering retry mechanism for configuration reload
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F level=error ts=2026-01-06T03:52:56.281397597Z caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: received non-200 response: 403 Forbidden; have you set `--web.en..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: OTEL-wrapped Prometheus runutil.go retry message (Body: Str wrapper)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F Body: Str(F level=error ts=2026-01-06T03:52:56.281397597Z caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: received non-200 response: 403 Forbidden; have you s..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: ArgoCD notification trigger not configured (different resource)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F {"level":"error","msg":"Failed to execute condition of trigger on-sync-succeeded: trigger 'on-sync-succeeded' is not configured using the configuration in namespace argocd","resource":"argocd/opense..."#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 samples should be filtered as false positives:
+        // - Samples 1, 5: ArgoCD notification trigger not configured (filtered by trigger pattern)
+        // - Sample 2: level=warn Loki retry message (filtered by level=warn and retry patterns)
+        // - Samples 3, 4: Prometheus runutil.go retry messages (filtered by runutil retry pattern)
         assert_eq!(
             filtered.len(),
             0,
