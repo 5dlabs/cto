@@ -120,6 +120,10 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     r"^F?\s*I\d{4}\s",
     r"^F?\s*W\d{4}\s",
     r"^F?\s*D\d{4}\s",
+    // Prometheus/Thanos/Cortex runutil retry messages (transient, self-recovering)
+    // These are retry errors from Prometheus-style components that will automatically recover
+    // Example: level=error caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: ..."
+    r"(?i)runutil\.go.*function\s+failed.*Retrying\s+in\s+next\s+tick",
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -1344,6 +1348,30 @@ mod tests {
         ));
         assert!(is_false_positive(r#""validation_errors": {"#));
         assert!(is_false_positive(r#""known_errors": {"#));
+    }
+
+    #[test]
+    fn test_is_false_positive_prometheus_runutil_retry() {
+        // Prometheus/Thanos/Cortex runutil.go retry messages are transient and self-recovering
+        assert!(is_false_positive(
+            r#"F level=error ts=2026-01-06T03:52:56.281397597Z caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: received non-200 response: 403 Forbidden; have you set `--web.en..."#
+        ));
+        // OTEL-wrapped version
+        assert!(is_false_positive(
+            r#"F Body: Str(F level=error ts=2026-01-06T03:52:56.281397597Z caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: received non-200 response: 403 Forbidden; have you s..."#
+        ));
+        // Plain version without F prefix
+        assert!(is_false_positive(
+            r#"level=error ts=2026-01-06T03:52:56Z caller=runutil.go:117 msg="function failed. Retrying in next tick" err="some error""#
+        ));
+        // Different line number in runutil.go
+        assert!(is_false_positive(
+            r#"level=error caller=runutil.go:200 msg="function failed. Retrying in next tick""#
+        ));
+        // Actual errors from runutil.go that are NOT retrying should NOT be filtered
+        assert!(!is_false_positive(
+            r#"level=error caller=runutil.go:117 msg="function failed permanently""#
+        ));
     }
 
     #[test]
