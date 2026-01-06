@@ -4100,6 +4100,7 @@ impl CodeTemplateGenerator {
 
     /// Register shared agent system prompt partials
     /// These partials are used by agent-specific templates via {{> agents/partial-name}}
+    #[allow(clippy::too_many_lines)]
     fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
             PARTIAL_FRONTEND_TOOLKITS, PARTIAL_INFRASTRUCTURE_OPERATORS,
