@@ -62,36 +62,13 @@ jobs:
               - 'crates/mcp/**'
               - 'infra/images/tools/**'
 
-  # Build PM Server (pre-built binary strategy for fast builds)
+  # Build PM Server (Docker multi-stage build)
   build-pm:
     needs: changes
     if: needs.changes.outputs.pm == 'true' || github.event.inputs.force_all == 'true'
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        run: |
-          # Always source cargo environment if it exists
-          source "$HOME/.cargo/env" 2>/dev/null || true
-          # Always add cargo bin to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Check if cargo is available, if not install Rust
-          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
-            echo "Rust not found, installing..."
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            source "$HOME/.cargo/env"
-          fi
-          # Verify Rust is available
-          cargo --version
-          # Check for optional build accelerators
-          which sccache && sccache --version || echo "sccache not available"
-          which mold && mold --version || echo "mold not available"
-
-      - name: Build pm-server binary
-        run: |
-          cargo build --profile ci -p pm --bin pm-server
-          cp target/ci/pm-server pm-server
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -114,6 +91,7 @@ jobs:
         with:
           context: .
           file: ./infra/images/pm-server/Dockerfile
+          target: local
           platforms: linux/amd64
           push: true
           provenance: false
@@ -124,36 +102,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Build Controller (pre-built binary strategy for fast builds)
+  # Build Controller (Docker multi-stage build)
   build-controller:
     needs: changes
     if: needs.changes.outputs.controller == 'true' || github.event.inputs.force_all == 'true'
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        run: |
-          # Always source cargo environment if it exists
-          source "$HOME/.cargo/env" 2>/dev/null || true
-          # Always add cargo bin to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Check if cargo is available, if not install Rust
-          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
-            echo "Rust not found, installing..."
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            source "$HOME/.cargo/env"
-          fi
-          # Verify Rust is available
-          cargo --version
-          # Check for optional build accelerators
-          which sccache && sccache --version || echo "sccache not available"
-          which mold && mold --version || echo "mold not available"
-
-      - name: Build controller binary
-        run: |
-          cargo build --profile ci --bin agent-controller
-          cp target/ci/agent-controller agent-controller
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -176,6 +131,7 @@ jobs:
         with:
           context: .
           file: ./infra/images/controller/Dockerfile
+          target: local
           platforms: linux/amd64
           push: true
           provenance: false
@@ -186,36 +142,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Build Linear Sidecar (pre-built binary strategy for fast builds)
+  # Build Linear Sidecar (Docker multi-stage build)
   build-sidecar:
     needs: changes
     if: needs.changes.outputs.sidecar == 'true' || github.event.inputs.force_all == 'true'
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        run: |
-          # Always source cargo environment if it exists
-          source "$HOME/.cargo/env" 2>/dev/null || true
-          # Always add cargo bin to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Check if cargo is available, if not install Rust
-          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
-            echo "Rust not found, installing..."
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            source "$HOME/.cargo/env"
-          fi
-          # Verify Rust is available
-          cargo --version
-          # Check for optional build accelerators
-          which sccache && sccache --version || echo "sccache not available"
-          which mold && mold --version || echo "mold not available"
-
-      - name: Build status-sync binary
-        run: |
-          cargo build --profile ci -p pm --bin status-sync
-          cp target/ci/status-sync status-sync
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -227,57 +160,35 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Calculate version
+      - name: Get version info
         id: version
         run: |
-          VERSION=$(git rev-parse --short HEAD)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push linear-sidecar
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./infra/images/linear-sidecar/Dockerfile
+          target: local
           platforms: linux/amd64
           push: true
           provenance: false
           sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:${{ steps.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Build Healer (pre-built binary strategy for fast builds)
+  # Build Healer (Docker multi-stage build)
   build-healer:
     needs: changes
     if: needs.changes.outputs.healer == 'true' || github.event.inputs.force_all == 'true'
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        run: |
-          # Always source cargo environment if it exists
-          source "$HOME/.cargo/env" 2>/dev/null || true
-          # Always add cargo bin to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Check if cargo is available, if not install Rust
-          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
-            echo "Rust not found, installing..."
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            source "$HOME/.cargo/env"
-          fi
-          # Verify Rust is available
-          cargo --version
-          # Check for optional build accelerators
-          which sccache && sccache --version || echo "sccache not available"
-          which mold && mold --version || echo "mold not available"
-
-      - name: Build healer binary
-        run: |
-          cargo build --profile ci --package healer
-          cp target/ci/healer healer
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -300,6 +211,7 @@ jobs:
         with:
           context: .
           file: ./infra/images/healer/Dockerfile
+          target: local
           platforms: linux/amd64
           push: true
           provenance: false
@@ -310,40 +222,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Build Tools Server (pre-built binary strategy for fast builds)
+  # Build Tools Server (Docker multi-stage build)
   build-tools:
     needs: changes
     if: needs.changes.outputs.tools == 'true' || github.event.inputs.force_all == 'true'
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        run: |
-          # Always source cargo environment if it exists
-          source "$HOME/.cargo/env" 2>/dev/null || true
-          # Always add cargo bin to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Check if cargo is available, if not install Rust
-          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
-            echo "Rust not found, installing..."
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            source "$HOME/.cargo/env"
-          fi
-          # Verify Rust is available
-          cargo --version
-          # Check for optional build accelerators
-          which sccache && sccache --version || echo "sccache not available"
-          which mold && mold --version || echo "mold not available"
-
-      - name: Build tools binaries
-        run: |
-          cargo build --profile ci --package tools --bin tools-server
-          cargo build --profile ci --package cto-mcp --bin cto-mcp
-          cp target/ci/tools-server tools-server
-          cp target/ci/cto-mcp cto-mcp
-          # Copy entrypoint script to build context root
-          cp infra/images/tools/entrypoint.sh entrypoint.sh
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -366,6 +251,7 @@ jobs:
         with:
           context: .
           file: ./infra/images/tools/Dockerfile
+          target: local
           platforms: linux/amd64
           push: true
           provenance: false
