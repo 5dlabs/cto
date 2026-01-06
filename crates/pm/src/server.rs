@@ -320,8 +320,9 @@ async fn trigger_intake(
         .session_id
         .unwrap_or_else(|| format!("manual-intake-{}", chrono::Utc::now().timestamp()));
 
-    // Extract intake request
-    let intake_request = match extract_intake_request(&session_id, &issue) {
+    // Extract intake request (reads PRD/arch from ConfigMap if available)
+    let intake_request = match extract_intake_request(&state.kube_client, &session_id, &issue).await
+    {
         Ok(req) => req,
         Err(e) => {
             error!(error = %e, "Failed to extract intake request");
@@ -509,6 +510,28 @@ async fn handle_intake_setup(
         project_name = %project.name,
         "Created Linear project"
     );
+
+    // Store PRD and architecture in project ConfigMap (source of truth for workflow)
+    // This makes the workflow Linear-independent - we don't need to re-fetch from Linear
+    if let Err(e) = crate::handlers::document::store_intake_content(
+        &state.kube_client,
+        &project.id,
+        &request.prd_content,
+        request.architecture_content.as_deref(),
+    )
+    .await
+    {
+        warn!(
+            error = %e,
+            project_id = %project.id,
+            "Failed to store PRD/architecture in ConfigMap (continuing with Linear documents)"
+        );
+    } else {
+        info!(
+            project_id = %project.id,
+            "Stored PRD and architecture in project ConfigMap"
+        );
+    }
 
     // Create architecture document if provided (as a separate Linear Document)
     let mut architecture_doc: Option<IntakeSetupDocument> = None;
@@ -980,23 +1003,24 @@ async fn handle_session_created(
             }
         }
 
-        // Extract intake request from issue
-        let intake_request = match extract_intake_request(session_id, &issue) {
-            Ok(req) => req,
-            Err(e) => {
-                error!(error = %e, "Failed to extract intake request");
-                if let Some(ref emitter) = emitter {
-                    let _ = emitter
-                        .emit_error(&format!("Failed to extract PRD: {e}"))
-                        .await;
+        // Extract intake request from issue (reads PRD/arch from ConfigMap if available)
+        let intake_request =
+            match extract_intake_request(&state.kube_client, session_id, &issue).await {
+                Ok(req) => req,
+                Err(e) => {
+                    error!(error = %e, "Failed to extract intake request");
+                    if let Some(ref emitter) = emitter {
+                        let _ = emitter
+                            .emit_error(&format!("Failed to extract PRD: {e}"))
+                            .await;
+                    }
+                    return Ok(Json(json!({
+                        "status": "error",
+                        "error": format!("Failed to extract intake request: {e}"),
+                        "session_id": session_id
+                    })));
                 }
-                return Ok(Json(json!({
-                    "status": "error",
-                    "error": format!("Failed to extract intake request: {e}"),
-                    "session_id": session_id
-                })));
-            }
-        };
+            };
 
         // Update plan - extraction complete
         if let Some(ref emitter) = emitter {
@@ -1446,11 +1470,12 @@ async fn handle_session_prompted(
 ///
 /// Syncs `cto-config.json` documents to Kubernetes `ConfigMaps` for project-specific
 /// Play workflow configuration.
+#[allow(clippy::too_many_lines)]
 async fn handle_document_event(
-    _state: &AppState,
+    state: &AppState,
     payload: &WebhookPayload,
 ) -> Result<Json<Value>, StatusCode> {
-    use crate::handlers::document::sync_document_to_configmap;
+    use crate::handlers::document::{sync_architecture_to_configmap, sync_document_to_configmap};
 
     let document = payload.get_document_data().ok_or_else(|| {
         warn!("Missing document data in webhook payload");
@@ -1465,56 +1490,99 @@ async fn handle_document_event(
         "Received Document webhook"
     );
 
-    // Only process cto-config.json documents
-    if document.title != "cto-config.json" {
+    // Must have a project association
+    let Some(project_id) = document.project_id.as_deref() else {
         debug!(
-            document_title = %document.title,
-            "Ignoring non-config document"
+            document_id = %document.id,
+            "Document has no project association, ignoring"
         );
         return Ok(Json(json!({
             "status": "ignored",
-            "reason": "not_cto_config",
+            "reason": "no_project",
             "document_title": document.title
         })));
-    }
+    };
 
-    // Must have a project association
-    let project_id = document.project_id.as_deref().ok_or_else(|| {
-        warn!(
-            document_id = %document.id,
-            "cto-config.json document has no project association"
-        );
-        StatusCode::BAD_REQUEST
-    })?;
-
-    // Sync to ConfigMap
-    match sync_document_to_configmap(&document, project_id).await {
-        Ok(configmap_name) => {
-            info!(
-                document_id = %document.id,
-                project_id = %project_id,
-                configmap_name = %configmap_name,
-                "Synced CTO config document to ConfigMap"
-            );
-            Ok(Json(json!({
-                "status": "synced",
-                "document_id": document.id,
-                "project_id": project_id,
-                "configmap_name": configmap_name
-            })))
+    // Handle different document types
+    match document.title.as_str() {
+        "cto-config.json" => {
+            // Sync CTO config to ConfigMap (existing behavior)
+            match sync_document_to_configmap(&document, project_id).await {
+                Ok(configmap_name) => {
+                    info!(
+                        document_id = %document.id,
+                        project_id = %project_id,
+                        configmap_name = %configmap_name,
+                        "Synced CTO config document to ConfigMap"
+                    );
+                    Ok(Json(json!({
+                        "status": "synced",
+                        "document_type": "cto-config",
+                        "document_id": document.id,
+                        "project_id": project_id,
+                        "configmap_name": configmap_name
+                    })))
+                }
+                Err(e) => {
+                    error!(
+                        document_id = %document.id,
+                        project_id = %project_id,
+                        error = %e,
+                        "Failed to sync CTO config document to ConfigMap"
+                    );
+                    Ok(Json(json!({
+                        "status": "error",
+                        "error": format!("Failed to sync document: {e}"),
+                        "document_id": document.id,
+                        "project_id": project_id
+                    })))
+                }
+            }
         }
-        Err(e) => {
-            error!(
-                document_id = %document.id,
-                project_id = %project_id,
-                error = %e,
-                "Failed to sync CTO config document to ConfigMap"
+        "Architecture" => {
+            // Sync Architecture document to ConfigMap
+            let content = document.content.as_deref().unwrap_or("");
+            match sync_architecture_to_configmap(&state.kube_client, project_id, content).await {
+                Ok(configmap_name) => {
+                    info!(
+                        document_id = %document.id,
+                        project_id = %project_id,
+                        configmap_name = %configmap_name,
+                        "Synced Architecture document to ConfigMap"
+                    );
+                    Ok(Json(json!({
+                        "status": "synced",
+                        "document_type": "architecture",
+                        "document_id": document.id,
+                        "project_id": project_id,
+                        "configmap_name": configmap_name
+                    })))
+                }
+                Err(e) => {
+                    error!(
+                        document_id = %document.id,
+                        project_id = %project_id,
+                        error = %e,
+                        "Failed to sync Architecture document to ConfigMap"
+                    );
+                    Ok(Json(json!({
+                        "status": "error",
+                        "error": format!("Failed to sync architecture: {e}"),
+                        "document_id": document.id,
+                        "project_id": project_id
+                    })))
+                }
+            }
+        }
+        _ => {
+            debug!(
+                document_title = %document.title,
+                "Ignoring unrecognized document type"
             );
             Ok(Json(json!({
-                "status": "error",
-                "error": format!("Failed to sync document: {e}"),
-                "document_id": document.id,
-                "project_id": project_id
+                "status": "ignored",
+                "reason": "unrecognized_document_type",
+                "document_title": document.title
             })))
         }
     }

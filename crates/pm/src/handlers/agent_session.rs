@@ -123,8 +123,9 @@ pub async fn handle_agent_session_created(
                         warn!(error = %e, "Failed to emit initial thought for intake");
                     }
 
-                    // Extract intake request from issue
-                    match extract_intake_request(&ctx.session_id, &issue) {
+                    // Extract intake request from issue (reads PRD/arch from ConfigMap)
+                    match extract_intake_request(&state.kube_client, &ctx.session_id, &issue).await
+                    {
                         Ok(intake_request) => {
                             // Submit intake CodeRun (new architecture - direct CodeRun creation)
                             match submit_intake_coderun(

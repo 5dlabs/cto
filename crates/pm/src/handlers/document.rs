@@ -203,6 +203,258 @@ pub fn configmap_name_for_project(project_id: &str) -> String {
     format!("{CONFIG_PREFIX}-{}", sanitize_project_id(project_id))
 }
 
+/// Store PRD and architecture content in the project `ConfigMap`.
+///
+/// This is called during initial intake setup to make the workflow
+/// Linear-independent. The `ConfigMap` becomes the source of truth for
+/// PRD and architecture content.
+///
+/// # Arguments
+/// * `kube_client` - Kubernetes client
+/// * `project_id` - The Linear project ID
+/// * `prd_content` - The PRD markdown content
+/// * `architecture_content` - Optional architecture markdown content
+///
+/// # Returns
+/// The name of the updated `ConfigMap`
+pub async fn store_intake_content(
+    kube_client: &KubeClient,
+    project_id: &str,
+    prd_content: &str,
+    architecture_content: Option<&str>,
+) -> Result<String> {
+    let configmap_name = configmap_name_for_project(project_id);
+
+    info!(
+        configmap_name = %configmap_name,
+        project_id = %project_id,
+        prd_len = prd_content.len(),
+        has_arch = architecture_content.is_some(),
+        "Storing PRD and architecture in project ConfigMap"
+    );
+
+    let api: Api<ConfigMap> = Api::namespaced(kube_client.clone(), CONFIG_NAMESPACE);
+
+    // Try to get existing ConfigMap to preserve cto-config.json if present
+    let existing_data = match api.get(&configmap_name).await {
+        Ok(cm) => cm.data.unwrap_or_default(),
+        Err(_) => BTreeMap::new(),
+    };
+
+    // Build new data, preserving existing keys
+    let mut data = existing_data;
+    data.insert("prd.txt".to_string(), prd_content.to_string());
+
+    if let Some(arch) = architecture_content {
+        data.insert("architecture.md".to_string(), arch.to_string());
+    }
+
+    // Update source metadata
+    let source_json = data
+        .get("source.json")
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    let updated_source = serde_json::json!({
+        "linearProjectId": project_id,
+        "syncedAt": chrono::Utc::now().to_rfc3339(),
+        "hasPrd": true,
+        "hasArchitecture": architecture_content.is_some(),
+        // Preserve existing fields
+        "linearDocumentId": source_json.get("linearDocumentId"),
+        "documentUrl": source_json.get("documentUrl"),
+    });
+    data.insert("source.json".to_string(), updated_source.to_string());
+
+    let configmap = ConfigMap {
+        metadata: ObjectMeta {
+            name: Some(configmap_name.clone()),
+            namespace: Some(CONFIG_NAMESPACE.to_string()),
+            labels: Some(BTreeMap::from([
+                (
+                    "app.kubernetes.io/name".to_string(),
+                    "cto-config".to_string(),
+                ),
+                (
+                    "app.kubernetes.io/component".to_string(),
+                    "project-config".to_string(),
+                ),
+                ("linear.app/project-id".to_string(), project_id.to_string()),
+                ("cto.5dlabs.io/has-prd".to_string(), "true".to_string()),
+                (
+                    "cto.5dlabs.io/has-architecture".to_string(),
+                    architecture_content.is_some().to_string(),
+                ),
+            ])),
+            annotations: Some(BTreeMap::from([(
+                "cto.5dlabs.ai/synced-at".to_string(),
+                chrono::Utc::now().to_rfc3339(),
+            )])),
+            ..Default::default()
+        },
+        data: Some(data),
+        ..Default::default()
+    };
+
+    // Use server-side apply for idempotent create/update
+    let patch_params = PatchParams::apply("pm-server").force();
+    api.patch(&configmap_name, &patch_params, &Patch::Apply(configmap))
+        .await
+        .context("Failed to create/update project ConfigMap with PRD/architecture")?;
+
+    info!(
+        configmap_name = %configmap_name,
+        namespace = %CONFIG_NAMESPACE,
+        "Successfully stored PRD and architecture in project ConfigMap"
+    );
+
+    Ok(configmap_name)
+}
+
+/// Sync architecture document content to the project `ConfigMap`.
+///
+/// Called when an Architecture document is updated in Linear via webhook.
+///
+/// # Arguments
+/// * `kube_client` - Kubernetes client
+/// * `project_id` - The Linear project ID
+/// * `content` - The architecture document content
+///
+/// # Returns
+/// The name of the updated `ConfigMap`
+pub async fn sync_architecture_to_configmap(
+    kube_client: &KubeClient,
+    project_id: &str,
+    content: &str,
+) -> Result<String> {
+    let configmap_name = configmap_name_for_project(project_id);
+
+    info!(
+        configmap_name = %configmap_name,
+        project_id = %project_id,
+        content_len = content.len(),
+        "Syncing architecture document to project ConfigMap"
+    );
+
+    let api: Api<ConfigMap> = Api::namespaced(kube_client.clone(), CONFIG_NAMESPACE);
+
+    // Try to get existing ConfigMap to preserve other keys
+    let existing_data = match api.get(&configmap_name).await {
+        Ok(cm) => cm.data.unwrap_or_default(),
+        Err(_) => BTreeMap::new(),
+    };
+
+    // Build new data, preserving existing keys
+    let mut data = existing_data;
+    data.insert("architecture.md".to_string(), content.to_string());
+
+    // Update source metadata
+    let source_json = data
+        .get("source.json")
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    let updated_source = serde_json::json!({
+        "linearProjectId": project_id,
+        "syncedAt": chrono::Utc::now().to_rfc3339(),
+        "hasArchitecture": true,
+        // Preserve existing fields
+        "hasPrd": source_json.get("hasPrd"),
+        "linearDocumentId": source_json.get("linearDocumentId"),
+        "documentUrl": source_json.get("documentUrl"),
+    });
+    data.insert("source.json".to_string(), updated_source.to_string());
+
+    let configmap = ConfigMap {
+        metadata: ObjectMeta {
+            name: Some(configmap_name.clone()),
+            namespace: Some(CONFIG_NAMESPACE.to_string()),
+            labels: Some(BTreeMap::from([
+                (
+                    "app.kubernetes.io/name".to_string(),
+                    "cto-config".to_string(),
+                ),
+                (
+                    "app.kubernetes.io/component".to_string(),
+                    "project-config".to_string(),
+                ),
+                ("linear.app/project-id".to_string(), project_id.to_string()),
+                (
+                    "cto.5dlabs.io/has-architecture".to_string(),
+                    "true".to_string(),
+                ),
+            ])),
+            annotations: Some(BTreeMap::from([(
+                "cto.5dlabs.ai/synced-at".to_string(),
+                chrono::Utc::now().to_rfc3339(),
+            )])),
+            ..Default::default()
+        },
+        data: Some(data),
+        ..Default::default()
+    };
+
+    // Use server-side apply for idempotent create/update
+    let patch_params = PatchParams::apply("pm-server").force();
+    api.patch(&configmap_name, &patch_params, &Patch::Apply(configmap))
+        .await
+        .context("Failed to sync architecture to project ConfigMap")?;
+
+    info!(
+        configmap_name = %configmap_name,
+        namespace = %CONFIG_NAMESPACE,
+        "Successfully synced architecture to project ConfigMap"
+    );
+
+    Ok(configmap_name)
+}
+
+/// Read PRD and architecture content from the project `ConfigMap`.
+///
+/// # Arguments
+/// * `kube_client` - Kubernetes client
+/// * `project_id` - The Linear project ID
+///
+/// # Returns
+/// Tuple of (`prd_content`, `architecture_content`) if found
+pub async fn read_intake_content(
+    kube_client: &KubeClient,
+    project_id: &str,
+) -> Result<(String, Option<String>)> {
+    let configmap_name = configmap_name_for_project(project_id);
+
+    debug!(
+        configmap_name = %configmap_name,
+        project_id = %project_id,
+        "Reading PRD and architecture from project ConfigMap"
+    );
+
+    let api: Api<ConfigMap> = Api::namespaced(kube_client.clone(), CONFIG_NAMESPACE);
+
+    let cm = api
+        .get(&configmap_name)
+        .await
+        .context("Project ConfigMap not found")?;
+
+    let data = cm.data.ok_or_else(|| anyhow!("ConfigMap has no data"))?;
+
+    let prd_content = data
+        .get("prd.txt")
+        .cloned()
+        .ok_or_else(|| anyhow!("ConfigMap missing prd.txt"))?;
+
+    let architecture_content = data.get("architecture.md").cloned().filter(|s| !s.is_empty());
+
+    info!(
+        configmap_name = %configmap_name,
+        prd_len = prd_content.len(),
+        has_arch = architecture_content.is_some(),
+        "Read intake content from project ConfigMap"
+    );
+
+    Ok((prd_content, architecture_content))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

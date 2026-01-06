@@ -641,9 +641,17 @@ pub fn extract_github_visibility(labels: &[Label]) -> String {
 
 /// Extract intake request from a Linear issue.
 ///
-/// This function extracts the PRD content, CTO config from labels/frontmatter,
-/// and any linked documents from the issue.
-pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeRequest> {
+/// This function reads PRD and architecture content from the project `ConfigMap`
+/// (source of truth), falling back to parsing the issue description if the
+/// `ConfigMap` doesn't exist or doesn't have the content.
+///
+/// This makes the workflow Linear-independent - we don't need to re-fetch
+/// content from Linear documents.
+pub async fn extract_intake_request(
+    kube_client: &KubeClient,
+    session_id: &str,
+    issue: &Issue,
+) -> Result<IntakeRequest> {
     let team_id = issue
         .team
         .as_ref()
@@ -665,15 +673,36 @@ pub fn extract_intake_request(session_id: &str, issue: &Issue) -> Result<IntakeR
     // Extract GitHub visibility from labels (default: private)
     let github_visibility = extract_github_visibility(&issue.labels);
 
-    // Strip frontmatter from PRD content (if present)
-    let prd_content = strip_frontmatter(&raw_description);
-
     // Derive project name from title (sanitized for repo name)
     let project_name = sanitize_for_repo_name(&issue.title);
 
-    // For now, we don't have a way to link documents directly.
-    // TODO: Parse document links from description (e.g., Linear document URLs).
-    let architecture_content = None;
+    // Try to read PRD and architecture from project ConfigMap (source of truth)
+    let (prd_content, architecture_content) = if let Some(ref project) = issue.project {
+        match crate::handlers::document::read_intake_content(kube_client, &project.id).await {
+            Ok((prd, arch)) => {
+                info!(
+                    project_id = %project.id,
+                    prd_len = prd.len(),
+                    has_arch = arch.is_some(),
+                    "Read PRD and architecture from project ConfigMap"
+                );
+                (prd, arch)
+            }
+            Err(e) => {
+                warn!(
+                    project_id = %project.id,
+                    error = %e,
+                    "Failed to read from ConfigMap, falling back to issue description"
+                );
+                // Fallback: strip frontmatter from description
+                (strip_frontmatter(&raw_description), None)
+            }
+        }
+    } else {
+        // No project attached, fall back to description
+        debug!("Issue has no project, extracting PRD from description");
+        (strip_frontmatter(&raw_description), None)
+    };
 
     // Extract repository URL from description (if present)
     // If not found, the workflow will create a new repo based on the project name
@@ -792,6 +821,8 @@ pub struct ProjectConfig {
     pub service: Option<String>,
     /// Source branch
     pub source_branch: Option<String>,
+    /// Morgan's tools configuration from cto-config.json agents.morgan.tools
+    pub morgan_tools: Option<cto_config::AgentTools>,
 }
 
 /// Read project-specific configuration from the Kubernetes `ConfigMap`.
@@ -824,10 +855,20 @@ pub async fn read_project_config(
 
     match cto_config::CtoConfig::from_json(json_content) {
         Ok(config) => {
+            // Extract Morgan's tools configuration if present
+            let morgan_tools = config.agents.get("morgan").map(|agent| {
+                debug!(
+                    remote_tools = ?agent.tools.remote,
+                    "Extracted Morgan's tools from project config"
+                );
+                agent.tools.clone()
+            });
+
             info!(
                 configmap_name = %configmap_name,
                 cli = ?config.defaults.intake.cli,
                 model = ?config.defaults.intake.models.primary,
+                has_morgan_tools = morgan_tools.is_some(),
                 "Loaded project config from ConfigMap"
             );
 
@@ -846,6 +887,7 @@ pub async fn read_project_config(
                     Some(config.defaults.play.service)
                 },
                 source_branch: Some(config.defaults.intake.source_branch),
+                morgan_tools,
             })
         }
         Err(e) => {
@@ -950,14 +992,26 @@ pub async fn submit_intake_coderun(
         .and_then(|c| c.service.clone())
         .unwrap_or_else(|| sanitize_for_repo_name(project_name_for_repo));
 
+    // Extract Morgan's tools if configured
+    let morgan_tools = project_config
+        .as_ref()
+        .and_then(|c| c.morgan_tools.as_ref());
+
     info!(
         cli = %cli,
         model = %primary_model,
         github_app = %github_app,
         repository_url = %repository_url,
         service = %service_name,
+        has_morgan_tools = morgan_tools.is_some(),
         "Using intake configuration"
     );
+
+    // Project ID for linking to project ConfigMap
+    let project_id = request
+        .existing_project
+        .as_ref()
+        .map_or("", |p| p.id.as_str());
 
     // Create ConfigMap with PRD content
     let config_json = serde_json::json!({
@@ -977,6 +1031,12 @@ pub async fn submit_intake_coderun(
         "linear_session_id": request.session_id,
         "linear_issue_id": request.prd_issue_id,
         "linear_team_id": request.team_id,
+        "linear_project_id": project_id,
+        // Morgan's tools from project cto-config.json
+        "morgan_tools": morgan_tools.map(|t| serde_json::json!({
+            "remote": t.remote,
+            "localServers": t.local_servers,
+        })),
     });
 
     let mut data = BTreeMap::new();
