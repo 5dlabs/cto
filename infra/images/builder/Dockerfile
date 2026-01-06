@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Rust builder image for fast CI builds
 # Based on official GitHub Actions Runner Controller (ARC) image
-FROM ghcr.io/actions/actions-runner:2.328.0
+FROM ghcr.io/actions/actions-runner:2.330.0
 
 # Switch to root for installations
 USER root
