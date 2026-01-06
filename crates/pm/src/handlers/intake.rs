@@ -4,12 +4,12 @@
 //!
 //! ## New Architecture (v2)
 //!
-//! The intake workflow now uses direct CodeRun creation instead of Argo workflows:
+//! The intake workflow now uses direct `CodeRun` creation instead of Argo workflows:
 //!
 //! 1. PM server receives Linear webhook (Morgan assigned to PRD issue)
-//! 2. PM server reads project-specific `cto-config.json` from ConfigMap
-//! 3. PM server creates CodeRun CR directly (no Argo workflow)
-//! 4. Controller processes CodeRun, Morgan handles GitHub setup + intake
+//! 2. PM server reads project-specific `cto-config.json` from `ConfigMap`
+//! 3. PM server creates `CodeRun` CR directly (no Argo workflow)
+//! 4. Controller processes `CodeRun`, Morgan handles GitHub setup + intake
 //! 5. Linear sidecar logs all progress to the issue
 //!
 //! This replaces the previous multi-step Argo workflow approach.
@@ -774,10 +774,10 @@ fn sanitize_for_repo_name(name: &str) -> String {
 // Project Configuration from ConfigMap
 // =========================================================================
 
-/// Project-specific configuration loaded from the Kubernetes ConfigMap.
+/// Project-specific configuration loaded from the Kubernetes `ConfigMap`.
 ///
 /// This represents the settings from the `cto-config.json` document synced to the
-/// `cto-config-project-{project_id}` ConfigMap.
+/// `cto-config-project-{project_id}` `ConfigMap`.
 #[derive(Debug, Clone, Default)]
 pub struct ProjectConfig {
     /// CLI to use for the agent (claude, codex, cursor, etc.)
