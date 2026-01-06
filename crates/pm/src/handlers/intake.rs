@@ -931,11 +931,18 @@ pub async fn submit_intake_coderun(
         .or_else(|| request.source_branch.clone())
         .unwrap_or_else(|| "main".to_string());
 
-    // Repository URL from project config, request, or empty (will create new)
-    let repository_url = project_config
-        .as_ref()
-        .and_then(|c| c.repository.clone())
-        .or_else(|| request.repository_url.clone())
+    // Repository URL from request first (explicit URL), then project config
+    // Note: We filter out placeholder values like "unnamed-project" since intake
+    // should create a new repository if no real URL is provided
+    let repository_url = request
+        .repository_url
+        .clone()
+        .or_else(|| {
+            project_config
+                .as_ref()
+                .and_then(|c| c.repository.clone())
+        })
+        .filter(|url| !url.contains("unnamed-project") && !url.is_empty())
         .unwrap_or_default();
 
     let service_name = project_config
