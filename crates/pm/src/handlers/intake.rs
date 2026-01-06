@@ -1,6 +1,18 @@
 //! Intake workflow handler for Linear integration.
 //!
 //! Handles the intake workflow triggered by delegating a PRD issue to the CTO agent.
+//!
+//! ## New Architecture (v2)
+//!
+//! The intake workflow now uses direct CodeRun creation instead of Argo workflows:
+//!
+//! 1. PM server receives Linear webhook (Morgan assigned to PRD issue)
+//! 2. PM server reads project-specific `cto-config.json` from ConfigMap
+//! 3. PM server creates CodeRun CR directly (no Argo workflow)
+//! 4. Controller processes CodeRun, Morgan handles GitHub setup + intake
+//! 5. Linear sidecar logs all progress to the issue
+//!
+//! This replaces the previous multi-step Argo workflow approach.
 
 use anyhow::{anyhow, Context, Result};
 use k8s_openapi::api::core::v1::ConfigMap;
@@ -13,6 +25,7 @@ use std::collections::{BTreeMap, HashMap};
 use tracing::{debug, error, info, warn};
 
 use crate::config::{CtoConfig, IntakeConfig};
+use crate::handlers::document::configmap_name_for_project;
 use crate::models::{
     Issue, IssueCreateInput, IssueRelationCreateInput, IssueRelationType, Label, Project,
     ProjectCreateInput,
@@ -757,7 +770,370 @@ fn sanitize_for_repo_name(name: &str) -> String {
         .to_string()
 }
 
+// =========================================================================
+// Project Configuration from ConfigMap
+// =========================================================================
+
+/// Project-specific configuration loaded from the Kubernetes ConfigMap.
+///
+/// This represents the settings from the `cto-config.json` document synced to the
+/// `cto-config-project-{project_id}` ConfigMap.
+#[derive(Debug, Clone, Default)]
+pub struct ProjectConfig {
+    /// CLI to use for the agent (claude, codex, cursor, etc.)
+    pub cli: Option<String>,
+    /// AI model to use
+    pub model: Option<String>,
+    /// GitHub App for Morgan
+    pub github_app: Option<String>,
+    /// Repository URL
+    pub repository: Option<String>,
+    /// Service name for workspace isolation
+    pub service: Option<String>,
+    /// Source branch
+    pub source_branch: Option<String>,
+}
+
+/// Read project-specific configuration from the Kubernetes ConfigMap.
+///
+/// Looks up the `cto-config-project-{project_id}` ConfigMap in the `cto` namespace
+/// and extracts the relevant settings for the intake workflow.
+///
+/// Returns `None` if the ConfigMap doesn't exist or can't be parsed.
+pub async fn read_project_config(
+    kube_client: &KubeClient,
+    project_id: &str,
+) -> Option<ProjectConfig> {
+    let configmap_name = configmap_name_for_project(project_id);
+    let api: Api<ConfigMap> = Api::namespaced(kube_client.clone(), "cto");
+
+    let cm = match api.get(&configmap_name).await {
+        Ok(cm) => cm,
+        Err(e) => {
+            debug!(
+                configmap_name = %configmap_name,
+                error = %e,
+                "Project ConfigMap not found (will use defaults)"
+            );
+            return None;
+        }
+    };
+
+    let data = cm.data?;
+    let json_content = data.get("cto-config.json")?;
+
+    match cto_config::CtoConfig::from_json(json_content) {
+        Ok(config) => {
+            info!(
+                configmap_name = %configmap_name,
+                cli = ?config.defaults.intake.cli,
+                model = ?config.defaults.intake.models.primary,
+                "Loaded project config from ConfigMap"
+            );
+
+            Some(ProjectConfig {
+                cli: Some(config.defaults.intake.cli),
+                model: Some(config.defaults.intake.models.primary),
+                github_app: Some(config.defaults.intake.github_app),
+                repository: if config.defaults.play.repository.is_empty() {
+                    None
+                } else {
+                    Some(config.defaults.play.repository)
+                },
+                service: if config.defaults.play.service.is_empty() {
+                    None
+                } else {
+                    Some(config.defaults.play.service)
+                },
+                source_branch: Some(config.defaults.intake.source_branch),
+            })
+        }
+        Err(e) => {
+            warn!(
+                configmap_name = %configmap_name,
+                error = %e,
+                "Failed to parse project config JSON (will use defaults)"
+            );
+            None
+        }
+    }
+}
+
+// =========================================================================
+// CodeRun Direct Creation (New Architecture)
+// =========================================================================
+
+/// Submit an intake CodeRun directly to Kubernetes.
+///
+/// This is the new architecture that replaces the Argo workflow approach.
+/// Benefits:
+/// - Single CodeRun with Linear sidecar logging ALL progress
+/// - No Argo workflow needed (direct CodeRun creation)
+/// - Project-specific cto-config.json settings used
+/// - Simpler architecture
+///
+/// # Arguments
+/// * `kube_client` - Kubernetes client
+/// * `namespace` - Kubernetes namespace
+/// * `request` - Intake request with PRD content and metadata
+/// * `config` - Server-side intake configuration (defaults)
+///
+/// # Returns
+/// `IntakeResult` with the CodeRun name and ConfigMap name
+#[allow(clippy::too_many_lines)]
+pub async fn submit_intake_coderun(
+    kube_client: &KubeClient,
+    namespace: &str,
+    request: &IntakeRequest,
+    config: &IntakeConfig,
+) -> Result<IntakeResult> {
+    let timestamp = chrono::Utc::now().timestamp();
+    let workflow_project_name = sanitize_project_name(&request.prd_identifier);
+    let configmap_name = format!("intake-linear-{workflow_project_name}-{timestamp}");
+
+    info!(
+        prd_identifier = %request.prd_identifier,
+        project_id = ?request.existing_project.as_ref().map(|p| &p.id),
+        "Submitting intake CodeRun (new architecture)"
+    );
+
+    // Try to read project-specific config from ConfigMap
+    let project_config = if let Some(project) = &request.existing_project {
+        read_project_config(kube_client, &project.id).await
+    } else {
+        None
+    };
+
+    // Use issue title for new repo creation
+    let project_name_for_repo = &request.title;
+
+    // Determine CLI and model - priority: project config > issue labels/frontmatter > server defaults
+    let cli = project_config
+        .as_ref()
+        .and_then(|c| c.cli.clone())
+        .or_else(|| request.cto_config.cli.clone())
+        .unwrap_or_else(|| config.cli.clone());
+
+    let primary_model = project_config
+        .as_ref()
+        .and_then(|c| c.model.clone())
+        .or_else(|| request.cto_config.model.clone())
+        .unwrap_or_else(|| config.primary_model.clone());
+
+    let github_app = project_config
+        .as_ref()
+        .and_then(|c| c.github_app.clone())
+        .unwrap_or_else(|| config.github_app.clone());
+
+    let source_branch = project_config
+        .as_ref()
+        .and_then(|c| c.source_branch.clone())
+        .or_else(|| request.source_branch.clone())
+        .unwrap_or_else(|| "main".to_string());
+
+    // Repository URL from project config, request, or empty (will create new)
+    let repository_url = project_config
+        .as_ref()
+        .and_then(|c| c.repository.clone())
+        .or_else(|| request.repository_url.clone())
+        .unwrap_or_default();
+
+    let service_name = project_config
+        .as_ref()
+        .and_then(|c| c.service.clone())
+        .unwrap_or_else(|| sanitize_for_repo_name(project_name_for_repo));
+
+    info!(
+        cli = %cli,
+        model = %primary_model,
+        github_app = %github_app,
+        repository_url = %repository_url,
+        service = %service_name,
+        "Using intake configuration"
+    );
+
+    // Create ConfigMap with PRD content
+    let config_json = serde_json::json!({
+        "project_name": project_name_for_repo,
+        "repository_url": repository_url,
+        "github_app": github_app,
+        "primary_model": primary_model,
+        "research_model": config.research_model,
+        "fallback_model": config.fallback_model,
+        "model": primary_model,
+        "num_tasks": config.num_tasks,
+        "expand_tasks": config.expand_tasks,
+        "analyze_complexity": config.analyze_complexity,
+        "enrich_context": config.enrich_context,
+        "include_codebase": config.include_codebase,
+        "cli": cli,
+        "linear_session_id": request.session_id,
+        "linear_issue_id": request.prd_issue_id,
+        "linear_team_id": request.team_id,
+    });
+
+    let mut data = BTreeMap::new();
+    data.insert("prd.txt".to_string(), request.prd_content.clone());
+    data.insert(
+        "architecture.md".to_string(),
+        request.architecture_content.clone().unwrap_or_default(),
+    );
+    data.insert("config.json".to_string(), config_json.to_string());
+
+    let configmap = ConfigMap {
+        metadata: ObjectMeta {
+            name: Some(configmap_name.clone()),
+            namespace: Some(namespace.to_string()),
+            labels: Some(BTreeMap::from([
+                (
+                    "app.kubernetes.io/name".to_string(),
+                    "cto-intake".to_string(),
+                ),
+                (
+                    "app.kubernetes.io/component".to_string(),
+                    "intake".to_string(),
+                ),
+                ("cto.5dlabs.io/source".to_string(), "linear".to_string()),
+                (
+                    "cto.5dlabs.io/linear-issue".to_string(),
+                    request.prd_identifier.clone(),
+                ),
+            ])),
+            // Add TTL annotation for automatic cleanup (4 hours)
+            annotations: Some(BTreeMap::from([(
+                "cto.5dlabs.io/ttl".to_string(),
+                "14400".to_string(),
+            )])),
+            ..Default::default()
+        },
+        data: Some(data),
+        ..Default::default()
+    };
+
+    let cm_api: Api<ConfigMap> = Api::namespaced(kube_client.clone(), namespace);
+    cm_api
+        .create(&PostParams::default(), &configmap)
+        .await
+        .context("Failed to create intake ConfigMap")?;
+
+    info!(configmap_name = %configmap_name, "Created intake ConfigMap");
+
+    // Generate unique CodeRun name
+    let name_suffix = workflow_project_name
+        .chars()
+        .take(20)
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    let coderun_name = format!("intake-{name_suffix}-{timestamp}");
+
+    // Build CodeRun CR manifest
+    let project_id = request
+        .existing_project
+        .as_ref()
+        .map_or("", |p| p.id.as_str());
+
+    let coderun_json = serde_json::json!({
+        "apiVersion": "agents.platform/v1",
+        "kind": "CodeRun",
+        "metadata": {
+            "name": coderun_name,
+            "namespace": namespace,
+            "labels": {
+                "workflow-type": "intake",
+                "project-name": name_suffix,
+                "github-app": github_app,
+                "cto.5dlabs.io/linear-issue": request.prd_identifier
+            }
+        },
+        "spec": {
+            "runType": "intake",
+            "service": service_name,
+            "repositoryUrl": repository_url,
+            "docsRepositoryUrl": repository_url,
+            "workingDirectory": ".",
+            "githubApp": github_app,
+            "model": primary_model,
+            "enableDocker": false,
+            "env": {
+                "PROJECT_NAME": project_name_for_repo,
+                "REPOSITORY_URL": repository_url,
+                "NUM_TASKS": config.num_tasks.to_string(),
+                "EXPAND_TASKS": config.expand_tasks.to_string(),
+                "ANALYZE_COMPLEXITY": config.analyze_complexity.to_string(),
+                "INTAKE_CLI": cli,
+                "INTAKE_CONFIGMAP": configmap_name,
+                "LINEAR_PROJECT_ID": project_id,
+                // GitHub visibility for repo creation
+                "GITHUB_VISIBILITY": request.github_visibility,
+                "GITHUB_DEFAULT_ORG": config.github_default_org.as_deref().unwrap_or("5dlabs"),
+                // Source branch configuration
+                "SOURCE_BRANCH": source_branch
+            },
+            "linearIntegration": {
+                "enabled": true,
+                "sessionId": request.session_id,
+                "issueId": request.prd_issue_id,
+                "teamId": request.team_id,
+                "projectId": project_id
+            }
+        }
+    });
+
+    // Create CodeRun via Kubernetes API
+    let token = std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token")
+        .context("Failed to read service account token")?;
+
+    let ca_cert = std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+        .context("Failed to read CA certificate")?;
+
+    let cert =
+        reqwest::Certificate::from_pem(&ca_cert).context("Failed to parse CA certificate")?;
+
+    let http_client = reqwest::Client::builder()
+        .add_root_certificate(cert)
+        .build()
+        .context("Failed to create HTTP client")?;
+
+    let api_server = "https://kubernetes.default.svc";
+    let create_url = format!(
+        "{api_server}/apis/agents.platform/v1/namespaces/{namespace}/coderuns"
+    );
+
+    let response = http_client
+        .post(&create_url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Content-Type", "application/json")
+        .json(&coderun_json)
+        .send()
+        .await
+        .context("Failed to send CodeRun create request")?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(anyhow!(
+            "Failed to create CodeRun: HTTP {status} - {error_text}"
+        ));
+    }
+
+    info!(coderun_name = %coderun_name, "Created intake CodeRun");
+
+    Ok(IntakeResult {
+        workflow_name: coderun_name,
+        configmap_name,
+    })
+}
+
 /// Submit an intake workflow to Kubernetes.
+///
+/// DEPRECATED: This function uses the old Argo workflow approach.
+/// New code should use `submit_intake_coderun` instead.
+///
+/// Creates a `ConfigMap` with PRD content and submits an Argo workflow.
 ///
 /// Creates a `ConfigMap` with PRD content and submits an Argo workflow.
 #[allow(clippy::too_many_lines)]
