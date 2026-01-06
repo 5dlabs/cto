@@ -12,6 +12,10 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Secret access for storing OAuth tokens (linear-app-* secrets)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "patch"]
   # Pod access for status checking
   - apiGroups: [""]
     resources: ["pods", "pods/log"]
