@@ -18,14 +18,25 @@
 blaze:
   description: "Frontend implementation expert for React/Next.js"
   default:
+    # Context engineering (all agents)
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    # Tool skills
+    - openmemory
+    - context7
+    - github-mcp
+    # Frontend specific
     - shadcn-stack
-  # Job-type-specific skills (merged with default)
+    - anime-js
+    - effect-frontend-patterns
   coder:
     - tool-design
+    - firecrawl
   healer:
     - incident-response
-  # Optional skills (triggered by keywords in prompt)
+    - observability
+    - kubernetes-mcp
   optional:
     tanstack-stack:
       replaces: shadcn-stack
@@ -33,9 +44,6 @@ blaze:
     better-auth:
       triggers: [auth, login, session, signin, signup, oauth]
       description: "Authentication implementation"
-    anime-js:
-      triggers: [animation, animate, motion, transition]
-      description: "Animation patterns for web interfaces"
     memory-systems:
       triggers: [memory, persistence, state]
       description: "Agent memory architecture patterns"
@@ -44,24 +52,40 @@ tap:
   description: "Expo React Native mobile development"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - expo-patterns
   coder:
     - tool-design
-    - better-auth-expo  # Platform-specific Expo auth patterns
+    - better-auth-expo
+    - firecrawl
   healer:
     - incident-response
+    - observability
+    - kubernetes-mcp
   optional: {}
 
 spark:
   description: "Electron desktop application development"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - electron-patterns
   coder:
     - tool-design
-    - better-auth-electron  # Platform-specific Electron auth patterns
+    - better-auth-electron
+    - firecrawl
   healer:
     - incident-response
+    - observability
+    - kubernetes-mcp
   optional: {}
 
 # ============================================================================
@@ -72,11 +96,19 @@ rex:
   description: "Rust specialist with axum, tokio, sqlx"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - rust-patterns
   coder:
     - tool-design
+    - firecrawl
   healer:
     - incident-response
+    - observability
+    - kubernetes-mcp
   optional:
     better-auth:
       triggers: [auth, session]
@@ -89,11 +121,19 @@ grizz:
   description: "Go specialist with chi, grpc, pgx"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - go-patterns
   coder:
     - tool-design
+    - firecrawl
   healer:
     - incident-response
+    - observability
+    - kubernetes-mcp
   optional:
     better-auth:
       triggers: [auth, session]
@@ -104,12 +144,20 @@ nova:
   description: "Node.js/Bun with Elysia, Effect, Drizzle"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - effect-patterns
   coder:
     - tool-design
-    - better-auth  # Nova handles auth backend setup
+    - better-auth
+    - firecrawl
   healer:
     - incident-response
+    - observability
+    - kubernetes-mcp
   optional:
     shadcn-stack:
       triggers: [frontend, ui, react]
@@ -125,7 +173,14 @@ bolt:
   description: "Infrastructure setup and Task 1 bootstrap"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - kubernetes-operators
+    - kubernetes-mcp
+    - observability
   deploy:
     - tool-design
   healer:
@@ -140,7 +195,13 @@ atlas:
   description: "Integration and merge coordination"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - git-integration
+    - repomix
   integration:
     - multi-agent-patterns
   optional:
@@ -152,6 +213,11 @@ stitch:
   description: "Pull request review and code review"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - pr-review
   review:
     - code-review
@@ -165,8 +231,16 @@ cleo:
   description: "Code quality and review"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - code-review
     - evaluation
+    - advanced-evaluation
+    - repomix
+    - firecrawl
   quality:
     - tool-design
   optional:
@@ -187,8 +261,16 @@ tess:
   description: "Testing and validation"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - testing-strategies
     - evaluation
+    - advanced-evaluation
+    - kubernetes-mcp
+    - observability
   test:
     - tool-design
   optional:
@@ -207,7 +289,13 @@ cipher:
   description: "Security analysis"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - github-mcp
     - security-analysis
+    - observability
   security:
     - tool-design
   optional:
@@ -228,10 +316,17 @@ morgan:
   description: "Project management and PRD intake"
   default:
     - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - firecrawl
+    - repomix
+    - project-development
   intake:
     - prd-analysis
     - multi-agent-patterns
-    - frontend-stack-selection  # Decision framework for frontend stack assignment
+    - frontend-stack-selection
   healer:
     - incident-response
   optional: {}
