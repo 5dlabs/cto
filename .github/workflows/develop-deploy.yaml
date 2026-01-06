@@ -232,8 +232,8 @@ jobs:
 
       - name: Build healer binary
         run: |
-          cargo build --release --package healer
-          cp target/release/healer healer
+          cargo build --profile ci --package healer
+          cp target/ci/healer healer
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -282,10 +282,10 @@ jobs:
 
       - name: Build tools binaries
         run: |
-          cargo build --release --package tools --bin tools-server
-          cargo build --release --package cto-mcp --bin cto-mcp
-          cp target/release/tools-server tools-server
-          cp target/release/cto-mcp cto-mcp
+          cargo build --profile ci --package tools --bin tools-server
+          cargo build --profile ci --package cto-mcp --bin cto-mcp
+          cp target/ci/tools-server tools-server
+          cp target/ci/cto-mcp cto-mcp
           # Copy entrypoint script to build context root
           cp infra/images/tools/entrypoint.sh entrypoint.sh
 
