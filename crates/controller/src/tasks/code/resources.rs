@@ -1072,23 +1072,16 @@ impl<'a> CodeResourceManager<'a> {
 
                 // Add LINEAR_OAUTH_TOKEN from agent-specific secret
                 // Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex", "cto-dev" -> "morgan")
-                let agent_secret_name = if let Some(github_app) = &code_run.spec.github_app {
-                    let agent_name = github_app
-                        .strip_prefix("5DLabs-")
-                        .or_else(|| github_app.strip_prefix("5dlabs-"))
-                        .map(|s| s.to_lowercase())
-                        .unwrap_or_else(|| {
-                            // Default to morgan for cto-dev or other apps
-                            if github_app == "cto-dev" {
-                                "morgan".to_string()
-                            } else {
-                                "morgan".to_string()
-                            }
-                        });
-                    format!("linear-app-{}", agent_name)
-                } else {
-                    "linear-app-morgan".to_string()
-                };
+                let agent_name = code_run
+                    .spec
+                    .github_app
+                    .as_deref()
+                    .and_then(|app| {
+                        app.strip_prefix("5DLabs-")
+                            .or_else(|| app.strip_prefix("5dlabs-"))
+                    })
+                    .map_or_else(|| "morgan".to_string(), str::to_lowercase);
+                let agent_secret_name = format!("linear-app-{agent_name}");
 
                 sidecar_env.push(json!({
                     "name": "LINEAR_OAUTH_TOKEN",
