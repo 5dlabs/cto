@@ -71,7 +71,7 @@ spec:
         # Use script template to capture output as parameter
         script:
           image: ghcr.io/5dlabs/healer:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           command: ["/bin/sh"]
           source: |
             #!/bin/sh

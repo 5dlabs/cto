@@ -146,7 +146,7 @@ spec:
               path: /tmp/repository-url
       container:
         image: "{{workflow.parameters.runtime-image}}"
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         command: ["/bin/bash"]
         args: ["/agent-templates/github_prep.sh"]
         workingDir: /workspace
