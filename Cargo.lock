@@ -797,6 +797,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cto-config"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "cto-mcp"
 version = "0.0.1"
 dependencies = [
@@ -2869,6 +2880,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
+ "cto-config",
  "hex",
  "hmac",
  "k8s-openapi",
@@ -3990,6 +4002,7 @@ dependencies = [
  "cli",
  "colored",
  "comfy-table",
+ "cto-config",
  "dialoguer",
  "futures",
  "handlebars",

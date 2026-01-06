@@ -1331,212 +1331,37 @@ pub async fn create_project_cto_config_document(
 ///
 /// This creates a config with project-specific values for repository,
 /// service name, and other Play workflow settings.
+///
+/// Uses the shared `cto-config` crate for consistent config generation.
 #[must_use]
-#[allow(clippy::too_many_lines)]
 pub fn generate_project_cto_config(request: &IntakeRequest) -> String {
-    use serde_json::json;
+    use cto_config::{generate_project_config, ProjectConfigInput};
 
-    // Extract repository name from URL (e.g., "https://github.com/5dlabs/myapp" -> "5dlabs/myapp")
-    let repository = request
-        .repository_url
-        .as_ref()
-        .and_then(|url| {
-            url.strip_prefix("https://github.com/")
-                .or_else(|| url.strip_prefix("git@github.com:"))
-                .map(|s| s.trim_end_matches(".git").to_string())
-        })
-        .unwrap_or_else(|| "5dlabs/unnamed-project".to_string());
+    // Build input for the shared config generator
+    let input = ProjectConfigInput {
+        repository_url: request.repository_url.clone(),
+        project_name: request
+            .project_name
+            .clone()
+            .or_else(|| Some(request.title.clone())),
+        team_id: request.team_id.clone(),
+        source_branch: request.source_branch.clone(),
+        docs_repository: None,
+        docs_project_directory: None,
+    };
 
-    // Derive service name from project name
-    let service = request.project_name.as_ref().map_or_else(
-        || derive_service_name(&request.title),
-        |n| derive_service_name(n),
-    );
+    // Generate config using shared crate
+    let config = generate_project_config(&input);
 
-    let config = json!({
-        "version": "1.0",
-        "defaults": {
-            "intake": {
-                "githubApp": "5DLabs-Morgan",
-                "cli": "claude",
-                "includeCodebase": false,
-                "sourceBranch": request.source_branch.as_deref().unwrap_or("main"),
-                "models": {
-                    "primary": "claude-opus-4-5-20251101",
-                    "research": "claude-opus-4-5-20251101",
-                    "fallback": "claude-opus-4-5-20251101"
-                }
-            },
-            "linear": {
-                "teamId": request.team_id,
-                "pmServerUrl": "https://pm.5dlabs.ai",
-                "intake": {
-                    "createProject": true,
-                    "projectTemplate": "Play Workflow"
-                }
-            },
-            "play": {
-                "implementationAgent": "5DLabs-Rex",
-                "frontendAgent": "5DLabs-Blaze",
-                "goAgent": "5DLabs-Grizz",
-                "nodeAgent": "5DLabs-Nova",
-                "mobileAgent": "5DLabs-Tap",
-                "desktopAgent": "5DLabs-Spark",
-                "infrastructureAgent": "5DLabs-Bolt",
-                "qualityAgent": "5DLabs-Cleo",
-                "securityAgent": "5DLabs-Cipher",
-                "testingAgent": "5DLabs-Tess",
-                "repository": repository,
-                "service": service,
-                "docsRepository": repository,
-                "docsProjectDirectory": "docs",
-                "workingDirectory": "."
-            }
-        },
-        "agents": {
-            "morgan": {
-                "githubApp": "5DLabs-Morgan",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "context7_resolve_library_id",
-                        "context7_get_library_docs",
-                        "firecrawl_scrape",
-                        "firecrawl_search",
-                        "openmemory_openmemory_query",
-                        "openmemory_openmemory_store"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "rex": {
-                "githubApp": "5DLabs-Rex",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "context7_resolve_library_id",
-                        "context7_get_library_docs",
-                        "firecrawl_scrape",
-                        "firecrawl_search",
-                        "github_create_pull_request",
-                        "github_push_files",
-                        "github_create_branch",
-                        "github_get_file_contents"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "blaze": {
-                "githubApp": "5DLabs-Blaze",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "context7_resolve_library_id",
-                        "context7_get_library_docs",
-                        "firecrawl_scrape",
-                        "firecrawl_search",
-                        "shadcn_list_components",
-                        "shadcn_get_component",
-                        "github_create_pull_request",
-                        "github_push_files",
-                        "github_create_branch",
-                        "github_get_file_contents"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "cleo": {
-                "githubApp": "5DLabs-Cleo",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "github_get_pull_request",
-                        "github_get_pull_request_files",
-                        "github_create_pull_request_review",
-                        "github_get_file_contents"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "tess": {
-                "githubApp": "5DLabs-Tess",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "github_get_pull_request",
-                        "github_get_pull_request_files",
-                        "github_create_pull_request_review"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "cipher": {
-                "githubApp": "5DLabs-Cipher",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "github_list_code_scanning_alerts",
-                        "github_get_code_scanning_alert",
-                        "github_list_secret_scanning_alerts",
-                        "github_get_pull_request",
-                        "github_create_pull_request_review"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "atlas": {
-                "githubApp": "5DLabs-Atlas",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "github_get_pull_request",
-                        "github_merge_pull_request",
-                        "github_update_pull_request_branch",
-                        "github_get_pull_request_status",
-                        "github_create_pull_request_review"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "bolt": {
-                "githubApp": "5DLabs-Bolt",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "kubernetes_listResources",
-                        "kubernetes_getResource",
-                        "kubernetes_createResource",
-                        "github_create_pull_request",
-                        "github_push_files",
-                        "github_create_branch"
-                    ],
-                    "localServers": {}
-                }
-            }
-        }
-    });
-
-    serde_json::to_string_pretty(&config).unwrap_or_else(|_| "{}".to_string())
+    // Serialize to JSON
+    config.to_json().unwrap_or_else(|_| "{}".to_string())
 }
 
 /// Derive a service name from a project name (lowercase, hyphenated).
+///
+/// Re-exports from the shared `cto-config` crate for consistency.
 fn derive_service_name(name: &str) -> String {
-    name.to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
+    cto_config::derive_service_name(name)
 }
 
 /// Derive a clean project name from PRD title.
@@ -2252,5 +2077,243 @@ Content here";
         // Should have summary warning + 3 individual warnings
         assert!(result.warnings.len() >= 3);
         assert!(result.warnings[0].contains("3 tasks"));
+    }
+
+    // =========================================================================
+    // CTO Config Generation Tests
+    // =========================================================================
+
+    /// Helper to create a test IntakeRequest with minimal required fields
+    fn create_test_intake_request() -> IntakeRequest {
+        IntakeRequest {
+            session_id: "test-session-123".to_string(),
+            prd_issue_id: "issue-456".to_string(),
+            prd_identifier: "TSK-1".to_string(),
+            team_id: "team-789".to_string(),
+            title: "My Test Project".to_string(),
+            project_name: Some("my-test-project".to_string()),
+            prd_content: "Test PRD content".to_string(),
+            architecture_content: None,
+            repository_url: Some("https://github.com/5dlabs/my-test-project".to_string()),
+            github_visibility: "private".to_string(),
+            source_branch: Some("main".to_string()),
+            tech_stack: TechStack::default(),
+            cto_config: crate::config::CtoConfig::default(),
+            existing_project: None,
+        }
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_valid_json() {
+        let request = create_test_intake_request();
+        let config_str = generate_project_cto_config(&request);
+
+        // Should produce valid JSON
+        let parsed: serde_json::Value =
+            serde_json::from_str(&config_str).expect("Generated config should be valid JSON");
+
+        // Should have version
+        assert_eq!(parsed["version"], "1.0");
+
+        // Should have defaults section
+        assert!(parsed["defaults"].is_object());
+        assert!(parsed["defaults"]["intake"].is_object());
+        assert!(parsed["defaults"]["linear"].is_object());
+        assert!(parsed["defaults"]["play"].is_object());
+
+        // Should have agents section
+        assert!(parsed["agents"].is_object());
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_repository_extraction() {
+        let mut request = create_test_intake_request();
+        request.repository_url = Some("https://github.com/myorg/myrepo".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Repository should be extracted without https://github.com/ prefix
+        assert_eq!(parsed["defaults"]["play"]["repository"], "myorg/myrepo");
+        assert_eq!(parsed["defaults"]["play"]["docsRepository"], "myorg/myrepo");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_repository_with_git_suffix() {
+        let mut request = create_test_intake_request();
+        request.repository_url = Some("https://github.com/myorg/myrepo.git".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Should strip .git suffix
+        assert_eq!(parsed["defaults"]["play"]["repository"], "myorg/myrepo");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_ssh_repository() {
+        let mut request = create_test_intake_request();
+        request.repository_url = Some("git@github.com:myorg/myrepo.git".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Should handle SSH-style URLs
+        assert_eq!(parsed["defaults"]["play"]["repository"], "myorg/myrepo");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_no_repository() {
+        let mut request = create_test_intake_request();
+        request.repository_url = None;
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Should fall back to default
+        assert_eq!(
+            parsed["defaults"]["play"]["repository"],
+            "5dlabs/unnamed-project"
+        );
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_service_name() {
+        let mut request = create_test_intake_request();
+        request.project_name = Some("My Cool Project!".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Service name should be sanitized (lowercase, hyphenated)
+        assert_eq!(parsed["defaults"]["play"]["service"], "my-cool-project");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_team_id() {
+        let mut request = create_test_intake_request();
+        request.team_id = "team-abc-123".to_string();
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Team ID should be included in linear config
+        assert_eq!(parsed["defaults"]["linear"]["teamId"], "team-abc-123");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_source_branch() {
+        let mut request = create_test_intake_request();
+        request.source_branch = Some("develop".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Source branch should be included
+        assert_eq!(parsed["defaults"]["intake"]["sourceBranch"], "develop");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_default_source_branch() {
+        let mut request = create_test_intake_request();
+        request.source_branch = None;
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Should default to "main"
+        assert_eq!(parsed["defaults"]["intake"]["sourceBranch"], "main");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_all_agents_present() {
+        let request = create_test_intake_request();
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // All expected agents should be present
+        let expected_agents = [
+            "morgan", "rex", "blaze", "cleo", "tess", "cipher", "atlas", "bolt",
+        ];
+
+        for agent in expected_agents {
+            assert!(
+                parsed["agents"][agent].is_object(),
+                "Agent '{}' should be present in config",
+                agent
+            );
+
+            // Each agent should have required fields
+            assert!(
+                parsed["agents"][agent]["githubApp"].is_string(),
+                "Agent '{}' should have githubApp",
+                agent
+            );
+            assert!(
+                parsed["agents"][agent]["cli"].is_string(),
+                "Agent '{}' should have cli",
+                agent
+            );
+            assert!(
+                parsed["agents"][agent]["model"].is_string(),
+                "Agent '{}' should have model",
+                agent
+            );
+            assert!(
+                parsed["agents"][agent]["tools"].is_object(),
+                "Agent '{}' should have tools",
+                agent
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_agent_tools() {
+        let request = create_test_intake_request();
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Rex should have GitHub tools
+        let rex_tools = &parsed["agents"]["rex"]["tools"]["remote"];
+        assert!(rex_tools.is_array());
+        let rex_tools_arr: Vec<&str> = rex_tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert!(rex_tools_arr.contains(&"github_create_pull_request"));
+        assert!(rex_tools_arr.contains(&"github_push_files"));
+
+        // Blaze should have shadcn tools
+        let blaze_tools = &parsed["agents"]["blaze"]["tools"]["remote"];
+        let blaze_tools_arr: Vec<&str> = blaze_tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert!(blaze_tools_arr.contains(&"shadcn_list_components"));
+        assert!(blaze_tools_arr.contains(&"shadcn_get_component"));
+
+        // Cipher should have security scanning tools
+        let cipher_tools = &parsed["agents"]["cipher"]["tools"]["remote"];
+        let cipher_tools_arr: Vec<&str> = cipher_tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert!(cipher_tools_arr.contains(&"github_list_code_scanning_alerts"));
+        assert!(cipher_tools_arr.contains(&"github_list_secret_scanning_alerts"));
+    }
+
+    #[test]
+    fn test_derive_service_name() {
+        assert_eq!(derive_service_name("My Project"), "my-project");
+        assert_eq!(derive_service_name("my-project"), "my-project");
+        assert_eq!(derive_service_name("My Cool App!"), "my-cool-app");
+        assert_eq!(derive_service_name("TEST_PROJECT_123"), "test-project-123");
+        assert_eq!(derive_service_name("  spaces  "), "spaces");
     }
 }

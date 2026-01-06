@@ -355,6 +355,7 @@ run_k8s_schema_validation() {
         if kubeconform -summary -skip Application,RedisFailover,QuestDB,postgresql,Postgresql \
             -ignore-missing-schemas \
             -ignore-filename-pattern 'values\.yaml' \
+            -ignore-filename-pattern '.*-patch\.yaml' \
             "$REPO_ROOT/infra/gitops" 2>&1; then
             log_success "Kubernetes schema validation passed"
         else

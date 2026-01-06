@@ -12,9 +12,3 @@ metadata:
     pod-security.kubernetes.io/warn-version: latest
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/audit-version: latest
-
-
-
-
-
-

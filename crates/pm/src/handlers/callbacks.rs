@@ -229,25 +229,6 @@ pub async fn handle_intake_complete(
                     }
                 }
 
-                // Create CTO config document for the project
-                match create_project_cto_config_document(client, &p, &request).await {
-                    Ok(doc) => {
-                        info!(
-                            document_id = %doc.id,
-                            document_url = ?doc.url,
-                            project_id = %p.id,
-                            "Created CTO config document for project"
-                        );
-                    }
-                    Err(e) => {
-                        warn!(
-                            project_id = %p.id,
-                            error = %e,
-                            "Failed to create CTO config document (continuing without)"
-                        );
-                    }
-                }
-
                 Some(p)
             }
             Err(e) => {
@@ -260,6 +241,28 @@ pub async fn handle_intake_complete(
             }
         }
     };
+
+    // Create CTO config document for the project (both new and existing projects)
+    // This ensures the project always has a cto-config.json document that syncs to ConfigMap
+    if let Some(ref p) = project {
+        match create_project_cto_config_document(client, p, &request).await {
+            Ok(doc) => {
+                info!(
+                    document_id = %doc.id,
+                    document_url = ?doc.url,
+                    project_id = %p.id,
+                    "Created CTO config document for project"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    project_id = %p.id,
+                    error = %e,
+                    "Failed to create CTO config document (continuing without)"
+                );
+            }
+        }
+    }
 
     // Emit progress activity
     if let Err(e) = client

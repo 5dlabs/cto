@@ -247,4 +247,223 @@ More text
         assert_eq!(sanitize_project_id("abc123-def456"), "abc123-def456");
         assert_eq!(sanitize_project_id("ABC123-DEF456"), "abc123-def456");
     }
+
+    #[test]
+    fn test_configmap_name_for_project() {
+        // Standard UUID-style project ID (most common case)
+        assert_eq!(
+            configmap_name_for_project("abc123-def456-789ghi"),
+            "cto-config-project-abc123-def456-789ghi"
+        );
+
+        // Uppercase should be lowercased
+        assert_eq!(
+            configmap_name_for_project("ABC123-DEF456"),
+            "cto-config-project-abc123-def456"
+        );
+    }
+
+    /// Test that ConfigMap naming in document.rs matches the controller's expectations.
+    ///
+    /// The controller (resources.rs) mounts the ConfigMap using:
+    /// ```ignore
+    /// format!("cto-config-project-{}", project_id.to_lowercase())
+    /// ```
+    ///
+    /// This test ensures our naming matches that format for valid Linear project IDs.
+    /// Linear project IDs are UUIDs, which only contain alphanumerics and hyphens.
+    #[test]
+    fn test_configmap_naming_matches_controller_expectations() {
+        // Simulate the controller's naming logic
+        fn controller_configmap_name(project_id: &str) -> String {
+            format!("cto-config-project-{}", project_id.to_lowercase())
+        }
+
+        // Standard Linear project UUID (most common case)
+        let project_id = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+        assert_eq!(
+            configmap_name_for_project(project_id),
+            controller_configmap_name(project_id),
+            "ConfigMap naming should match controller for standard UUIDs"
+        );
+
+        // Uppercase UUID (Linear sometimes returns mixed case)
+        let project_id = "F47AC10B-58CC-4372-A567-0E02B2C3D479";
+        assert_eq!(
+            configmap_name_for_project(project_id),
+            controller_configmap_name(project_id),
+            "ConfigMap naming should match controller for uppercase UUIDs"
+        );
+
+        // Short alphanumeric IDs
+        let project_id = "abc123";
+        assert_eq!(
+            configmap_name_for_project(project_id),
+            controller_configmap_name(project_id),
+            "ConfigMap naming should match controller for short IDs"
+        );
+    }
+
+    // =========================================================================
+    // JSON Extraction Edge Case Tests
+    // =========================================================================
+
+    #[test]
+    fn test_extract_json_from_code_fence_with_extra_whitespace() {
+        let content = r#"# Config
+
+Some description with lots of whitespace
+
+
+```json
+
+{
+  "version": "1.0",
+  "test": true
+}
+
+```
+
+More text
+"#;
+        let result = extract_json_from_code_fence(content);
+        assert!(result.is_some());
+        let json = result.unwrap();
+        // Should still parse correctly after trimming
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["version"], "1.0");
+    }
+
+    #[test]
+    fn test_extract_json_from_code_fence_multiple_fences() {
+        // Should extract from the first ```json fence
+        let content = r#"# Config
+
+Here's some bash:
+```bash
+echo "hello"
+```
+
+Here's the JSON config:
+```json
+{"first": true}
+```
+
+And another one:
+```json
+{"second": true}
+```
+"#;
+        let result = extract_json_from_code_fence(content);
+        assert!(result.is_some());
+        let json = result.unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        // Should get the first json fence, not the bash or second json
+        assert_eq!(parsed["first"], true);
+    }
+
+    #[test]
+    fn test_extract_json_from_document_invalid_json_in_fence() {
+        let document = DocumentWebhookData {
+            id: "doc-123".to_string(),
+            title: "cto-config.json".to_string(),
+            content: Some(
+                r#"# Config
+```json
+{ invalid json here
+```
+"#
+                .to_string(),
+            ),
+            project_id: Some("proj-456".to_string()),
+            project: None,
+            url: None,
+        };
+
+        // The extraction succeeds (gets the text from fence)
+        // but later JSON validation would fail
+        let result = extract_json_from_document(&document);
+        // The function extracts raw content, so it may succeed
+        // The JSON validation happens at sync_document_to_configmap
+        // This tests that invalid content is handled gracefully
+        if let Ok(content) = result {
+            // If extraction succeeded, JSON parse should fail
+            let parse_result: Result<serde_json::Value, _> = serde_json::from_str(&content);
+            assert!(parse_result.is_err(), "Invalid JSON should fail to parse");
+        }
+    }
+
+    #[test]
+    fn test_extract_json_from_document_empty_content() {
+        let document = DocumentWebhookData {
+            id: "doc-123".to_string(),
+            title: "cto-config.json".to_string(),
+            content: None,
+            project_id: Some("proj-456".to_string()),
+            project: None,
+            url: None,
+        };
+
+        let result = extract_json_from_document(&document);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("no content"));
+    }
+
+    #[test]
+    fn test_extract_json_from_document_embedded_in_prose() {
+        // JSON can be found even when embedded in prose text
+        let document = DocumentWebhookData {
+            id: "doc-123".to_string(),
+            title: "cto-config.json".to_string(),
+            content: Some(
+                r#"This is a document with embedded JSON.
+Here it is: {"version": "1.0", "embedded": true}
+And some more text after.
+"#
+                .to_string(),
+            ),
+            project_id: Some("proj-456".to_string()),
+            project: None,
+            url: None,
+        };
+
+        let result = extract_json_from_document(&document);
+        assert!(result.is_ok());
+        let json = result.unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["embedded"], true);
+    }
+
+    #[test]
+    fn test_extract_json_from_code_fence_empty_fence() {
+        let content = r#"# Config
+
+```json
+```
+
+Text after empty fence
+"#;
+        let result = extract_json_from_code_fence(content);
+        // Empty fence should return None
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_json_from_document_no_json_anywhere() {
+        let document = DocumentWebhookData {
+            id: "doc-123".to_string(),
+            title: "cto-config.json".to_string(),
+            content: Some("Just plain text with no JSON at all.".to_string()),
+            project_id: Some("proj-456".to_string()),
+            project: None,
+            url: None,
+        };
+
+        let result = extract_json_from_document(&document);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Could not extract JSON"));
+    }
 }

@@ -72,6 +72,9 @@ which = "7.0"
 # Shared CLI types
 cli = { path = "../cli" }
 
+# Shared CTO config types
+cto-config = { path = "../cto-config" }
+
 # Temporary directories
 tempfile = "3.8"
 
