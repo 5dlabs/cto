@@ -794,12 +794,12 @@ pub struct ProjectConfig {
     pub source_branch: Option<String>,
 }
 
-/// Read project-specific configuration from the Kubernetes ConfigMap.
+/// Read project-specific configuration from the Kubernetes `ConfigMap`.
 ///
-/// Looks up the `cto-config-project-{project_id}` ConfigMap in the `cto` namespace
+/// Looks up the `cto-config-project-{project_id}` `ConfigMap` in the `cto` namespace
 /// and extracts the relevant settings for the intake workflow.
 ///
-/// Returns `None` if the ConfigMap doesn't exist or can't be parsed.
+/// Returns `None` if the `ConfigMap` doesn't exist or can't be parsed.
 pub async fn read_project_config(
     kube_client: &KubeClient,
     project_id: &str,
