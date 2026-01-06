@@ -624,11 +624,25 @@ async fn handle_intake_setup(
 
     // Build issue description (PRD content only, architecture is a separate document)
     let mut issue_description = format!("## PRD Content\n\n{}", request.prd_content);
+
+    // Add links to supporting documents
+    let has_docs = architecture_doc.is_some() || cto_config_doc.is_some();
+    if has_docs {
+        issue_description.push_str("\n\n---\n\n## 📎 Project Documents\n");
+    }
     if let Some(ref arch) = architecture_doc {
         if let Some(ref arch_url) = arch.url {
             let _ = write!(
                 issue_description,
-                "\n\n---\n\n📐 **Architecture Document:** [View Architecture]({arch_url})"
+                "\n- 📐 **Architecture:** [View Architecture]({arch_url})"
+            );
+        }
+    }
+    if let Some(ref config) = cto_config_doc {
+        if let Some(ref config_url) = config.url {
+            let _ = write!(
+                issue_description,
+                "\n- ⚙️ **Agent Configuration:** [View cto-config.json]({config_url})"
             );
         }
     }
