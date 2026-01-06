@@ -1460,7 +1460,7 @@ mod tests {
             // ActionCommandManager INFO log with "command error"
             LogEntry {
                 timestamp: Utc::now(),
-                line: r#"F [WORKER 2026-01-06 05:55:04Z INFO ActionCommandManager] Register action command extension for command error"#.to_string(),
+                line: r"F [WORKER 2026-01-06 05:55:04Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
                 labels: HashMap::new(),
             },
             // Argo workflow info-level log about retryable error
