@@ -103,7 +103,9 @@ spec:
                   value: "3"
             containers:
             - name: runner
-              image: ghcr.io/actions/actions-runner:latest
+              # Use custom rust-builder image with pre-installed Rust toolchain, sccache, mold linker
+              # See: infra/images/builder/Dockerfile
+              image: ghcr.io/5dlabs/rust-builder:latest
               imagePullPolicy: Always
               command: ["/home/runner/run.sh"]
               # Resource limits to prevent OOM on the node

@@ -1,11 +1,14 @@
 ---
 # Composite action for setting up Rust environment on k8s-runner
-# Includes sccache configuration for fast incremental builds
+# OPTIMIZED: Assumes rust-builder image is used (ghcr.io/5dlabs/rust-builder)
+# which pre-installs Rust, sccache, mold, and build dependencies.
 name: Setup Rust (k8s-runner)
 description: |
   Setup optimized Rust environment on k8s-runner with sccache.
-  This action configures the Rust toolchain, sccache, and optionally mold linker
-  for maximum build performance on self-hosted runners.
+  
+  NOTE: This action is optimized for the ghcr.io/5dlabs/rust-builder image
+  which pre-installs all tooling. If running on a vanilla runner, tools will
+  be installed on-demand (slower).
 
 inputs:
   components:
@@ -28,412 +31,104 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: DNS warm-up and network check
+    - name: Setup PATH and check pre-installed tools
       shell: bash
       run: |
-        echo "🌐 Warming up DNS resolution for required hosts..."
-        # List of hosts we need to resolve during setup
-        HOSTS="sh.rustup.rs static.rust-lang.org github.com objects.githubusercontent.com"
-        MAX_WARMUP_ATTEMPTS=10
-        WARMUP_DELAY=15
+        echo "🚀 Setting up Rust build environment..."
         
-        # Function to test DNS resolution for all hosts
-        test_dns() {
-          for host in $HOSTS; do
-            if ! getent hosts "$host" > /dev/null 2>&1; then
-              return 1
-            fi
-          done
-          return 0
-        }
-        
-        # Wait for DNS to become available with longer backoff
-        for attempt in $(seq 1 $MAX_WARMUP_ATTEMPTS); do
-          if test_dns; then
-            echo "✅ DNS resolution successful on attempt $attempt"
-            # Additional warmup - resolve all hosts to prime DNS cache
-            for host in $HOSTS; do
-              resolved=$(getent hosts "$host" 2>/dev/null | head -1 || echo "failed")
-              echo "  ✓ $host -> $resolved"
-            done
-            break
-          fi
-          echo "⚠️ DNS warm-up attempt $attempt/$MAX_WARMUP_ATTEMPTS failed, waiting ${WARMUP_DELAY}s..."
-          sleep $WARMUP_DELAY
-          if [ "$attempt" -eq "$MAX_WARMUP_ATTEMPTS" ]; then
-            echo "⚠️ DNS warm-up did not fully succeed, proceeding anyway (downloads will retry)"
-          fi
-        done
-        
-        # Test actual network connectivity with curl
-        echo "🔗 Testing network connectivity..."
-        for host in "https://static.rust-lang.org" "https://sh.rustup.rs"; do
-          for try in 1 2 3; do
-            if curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null "$host" 2>/dev/null; then
-              echo "  ✓ Connectivity to $host OK"
-              break
-            fi
-            if [ "$try" -eq 3 ]; then
-              echo "  ⚠️ Connectivity to $host unstable (will retry during download)"
-            else
-              sleep 5
-            fi
-          done
-        done
-
-    - name: Install build dependencies
-      shell: bash
-      run: |
-        echo "🔧 Checking build dependencies..."
-        # Check if we have a C compiler
-        if ! command -v cc &> /dev/null && ! command -v gcc &> /dev/null; then
-          echo "📥 Installing build-essential..."
-          if command -v apt-get &> /dev/null; then
-            # Retry apt-get commands with exponential backoff for transient failures
-            # Exit code 130 can occur when network operations are interrupted
-            APT_MAX_RETRIES=5
-            for attempt in $(seq 1 $APT_MAX_RETRIES); do
-              echo "📦 apt-get update attempt $attempt/$APT_MAX_RETRIES..."
-              if sudo apt-get update -qq 2>&1; then
-                echo "✅ apt-get update succeeded on attempt $attempt"
-                break
-              fi
-              if [ "$attempt" -eq "$APT_MAX_RETRIES" ]; then
-                echo "❌ apt-get update failed after $APT_MAX_RETRIES attempts"
-                exit 1
-              fi
-              delay=$((attempt * 10))
-              echo "⚠️ apt-get update failed, retrying in ${delay}s..."
-              sleep "$delay"
-            done
-            
-            for attempt in $(seq 1 $APT_MAX_RETRIES); do
-              echo "📦 apt-get install attempt $attempt/$APT_MAX_RETRIES..."
-              if sudo apt-get install -y -qq build-essential pkg-config libssl-dev 2>&1; then
-                echo "✅ build dependencies installed on attempt $attempt"
-                break
-              fi
-              if [ "$attempt" -eq "$APT_MAX_RETRIES" ]; then
-                echo "❌ apt-get install failed after $APT_MAX_RETRIES attempts"
-                exit 1
-              fi
-              delay=$((attempt * 10))
-              echo "⚠️ apt-get install failed, retrying in ${delay}s..."
-              sleep "$delay"
-            done
-          elif command -v apk &> /dev/null; then
-            # Retry apk commands with exponential backoff
-            APK_MAX_RETRIES=5
-            for attempt in $(seq 1 $APK_MAX_RETRIES); do
-              echo "📦 apk add attempt $attempt/$APK_MAX_RETRIES..."
-              if sudo apk add --no-cache build-base pkgconfig openssl-dev 2>&1; then
-                echo "✅ build dependencies installed on attempt $attempt"
-                break
-              fi
-              if [ "$attempt" -eq "$APK_MAX_RETRIES" ]; then
-                echo "❌ apk add failed after $APK_MAX_RETRIES attempts"
-                exit 1
-              fi
-              delay=$((attempt * 10))
-              echo "⚠️ apk add failed, retrying in ${delay}s..."
-              sleep "$delay"
-            done
-          else
-            echo "⚠️ No package manager found, skipping build dependencies"
-          fi
-        else
-          echo "✅ C compiler already available"
-        fi
-
-    - name: Clean rustup cache
-      shell: bash
-      run: |
-        echo "🧹 Cleaning up stale rustup cache files..."
-        # Remove partial downloads that can cause rename failures
-        rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
-        # Remove stray update hashes that cause conflicts
-        rm -rf /cache/rustup/update-hashes/* 2>/dev/null || true
-        # Remove any lock files from crashed processes
-        rm -f /cache/rustup/.lock 2>/dev/null || true
-        rm -f /cache/cargo/.package-cache-lock 2>/dev/null || true
-        echo "✅ Cache cleanup complete"
-
-    - name: Setup Rust toolchain
-      shell: bash
-      run: |
-        echo "🚀 Setting up optimized Rust build environment..."
-        
-        # Trap SIGINT to prevent abrupt exit during downloads
-        # Exit code 130 (128 + SIGINT signal 2) can occur when network operations
-        # are interrupted on k8s-runner pods. We handle this in the retry loops.
-        trap 'echo "⚠️ Received SIGINT, will retry if in download loop..."' INT
-        # Ensure cargo bin directory exists
+        # Add cargo bin to PATH
         mkdir -p "$HOME/.cargo/bin"
         echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
         export PATH="$HOME/.cargo/bin:$PATH"
-
-        # Helper function to wait for DNS with aggressive retries and diagnostics
-        wait_for_dns() {
-          local host="$1"
-          local max_attempts="${2:-15}"
-          for i in $(seq 1 "$max_attempts"); do
-            if getent hosts "$host" > /dev/null 2>&1; then
-              return 0
-            fi
-            echo "⏳ Waiting for DNS ($host) - attempt $i/$max_attempts..."
-            # Log DNS server info for diagnostics
-            if [ "$i" -eq 5 ] || [ "$i" -eq 10 ]; then
-              echo "🔍 DNS diagnostics:"
-              cat /etc/resolv.conf 2>/dev/null || echo "  (resolv.conf not readable)"
-            fi
-            sleep $((i * 3))
-          done
-          echo "❌ DNS resolution failed for $host after $max_attempts attempts"
-          echo "🔍 Final DNS diagnostics:"
-          cat /etc/resolv.conf 2>/dev/null || true
-          nslookup "$host" 2>/dev/null || true
-          return 1
-        }
-
-        # Helper function to ensure DNS is working before network operations
-        ensure_dns() {
-          local hosts="$@"
-          for host in $hosts; do
-            if ! wait_for_dns "$host" 10; then
-              return 1
-            fi
-          done
-          return 0
-        }
-
-        # Install rustup if not present
-        if ! command -v rustup &> /dev/null; then
-          echo "📥 Installing rustup..."
-          # Retry with exponential backoff for transient network/DNS issues
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            # Pre-check DNS before attempting download
-            if ! ensure_dns "sh.rustup.rs"; then
-              echo "⚠️ DNS for sh.rustup.rs not ready, waiting..."
-              sleep $((attempt * 10))
-              continue
-            fi
-            
-            # Install rustup WITHOUT toolchain first to avoid network dependency during initial setup
-            # This separates the rustup binary installation from toolchain download
-            if curl --proto '=https' --tlsv1.2 -sSf --retry 8 --retry-delay 15 --retry-all-errors --connect-timeout 60 --max-time 600 https://sh.rustup.rs | sh -s -- -y --default-toolchain none; then
-              echo "✅ Rustup installed on attempt $attempt"
-              break
-            fi
-            echo "⚠️ Rustup download attempt $attempt failed, retrying in $((attempt * 10)) seconds..."
-            sleep $((attempt * 10))
-            if [ "$attempt" -eq 10 ]; then
-              echo "❌ Failed to install rustup after 10 attempts"
-              exit 1
-            fi
-          done
-          # Source the env file to get PATH updates
-          if [ -f "$HOME/.cargo/env" ]; then
-            source "$HOME/.cargo/env"
-          fi
-          export PATH="$HOME/.cargo/bin:$PATH"
-        fi
-
-        # Helper function to install toolchain with robust retries
-        # Handles exit code 130 (SIGINT) which can occur when network operations
-        # are interrupted on k8s-runner pods
-        install_toolchain() {
-          echo "🔧 Installing Rust stable toolchain..."
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            # Re-check DNS before each toolchain download attempt
-            # DNS can become unavailable between steps
-            if ! ensure_dns "static.rust-lang.org"; then
-              echo "⚠️ DNS for static.rust-lang.org not ready, waiting..."
-              sleep $((attempt * 10))
-              continue
-            fi
-
-            # Clean before each attempt to handle partial downloads
-            rm -rf /cache/rustup/downloads/*.partial 2>/dev/null || true
-            rm -rf /cache/rustup/update-hashes/* 2>/dev/null || true
-            rm -rf "$HOME/.rustup/downloads/"*.partial 2>/dev/null || true
-            rm -rf "$HOME/.rustup/tmp/"* 2>/dev/null || true
-
-            echo "📦 Toolchain install attempt $attempt/10..."
-            # Capture exit code to handle SIGINT (130) specifically
-            # Note: Removed RUSTUP_USE_CURL=1 as it's deprecated and can cause issues
-            local exit_code=0
-            rustup toolchain install stable --profile minimal || exit_code=$?
-            
-            if [ "$exit_code" -eq 0 ]; then
-              # Toolchain installed, now set default
-              if rustup default stable; then
-                echo "✅ Toolchain installed on attempt $attempt"
-                return 0
-              fi
-              exit_code=$?
-            fi
-            
-            # Handle specific exit codes
-            if [ "$exit_code" -eq 130 ]; then
-              echo "⚠️ Download interrupted by signal (exit 130), this is retriable..."
-            fi
-            
-            local delay=$((attempt * 15))
-            echo "⚠️ Toolchain install attempt $attempt failed (exit code: $exit_code), retrying in ${delay}s..."
-            sleep "$delay"
-          done
-          echo "❌ Failed to install toolchain after 10 attempts"
-          return 1
-        }
-
-        # Check if BOTH rustup command exists AND toolchain is working
-        # This handles the case where rustup was installed but toolchain download failed
-        if command -v rustup &> /dev/null && rustc --version 2>/dev/null && cargo --version 2>/dev/null; then
-          echo "✅ Rust toolchain ready: $(rustc --version)"
+        
+        # Check if running on rust-builder image (tools pre-installed)
+        if command -v rustc &> /dev/null && command -v cargo &> /dev/null; then
+          echo "✅ Rust toolchain found (pre-installed in rust-builder image)"
+          rustc --version
+          cargo --version
         else
-          echo "🔧 Installing/repairing Rust toolchain..."
-          
-          # If rustup exists but no working toolchain, we have a partial install
-          # Clean up completely to avoid state corruption
-          if command -v rustup &> /dev/null && ! rustc --version 2>/dev/null; then
-            echo "⚠️ Detected partial rustup installation (no working toolchain), cleaning up..."
-            rm -rf "$HOME/.rustup" 2>/dev/null || true
-            rm -rf "$HOME/.cargo/bin/rustup" 2>/dev/null || true
-            rm -rf "$HOME/.cargo/bin/cargo" 2>/dev/null || true
-            rm -rf "$HOME/.cargo/bin/rustc" 2>/dev/null || true
-            hash -r 2>/dev/null || true  # Clear command hash table
-            
-            # Re-run rustup installation since we cleaned it
-            echo "📥 Re-installing rustup after cleanup..."
-            for attempt in 1 2 3 4 5 6 7 8 9 10; do
-              if ! ensure_dns "sh.rustup.rs"; then
-                echo "⚠️ DNS for sh.rustup.rs not ready, waiting..."
-                sleep $((attempt * 10))
-                continue
-              fi
-              
-              if curl --proto '=https' --tlsv1.2 -sSf --retry 8 --retry-delay 15 --retry-all-errors --connect-timeout 60 --max-time 600 https://sh.rustup.rs | sh -s -- -y --default-toolchain none; then
-                echo "✅ Rustup re-installed on attempt $attempt"
-                # Source the env file to get PATH updates
-                if [ -f "$HOME/.cargo/env" ]; then
-                  source "$HOME/.cargo/env"
-                fi
-                export PATH="$HOME/.cargo/bin:$PATH"
-                break
-              fi
-              echo "⚠️ Rustup download attempt $attempt failed, retrying in $((attempt * 10)) seconds..."
-              sleep $((attempt * 10))
-              if [ "$attempt" -eq 10 ]; then
-                echo "❌ Failed to reinstall rustup after 10 attempts"
-                exit 1
-              fi
-            done
-          fi
-          
-          # Full cleanup for fresh toolchain install
-          rustup toolchain uninstall stable 2>/dev/null || true
-          rm -rf /cache/rustup/toolchains/stable-* 2>/dev/null || true
-
-          if ! install_toolchain; then
-            exit 1
-          fi
+          echo "⚠️ Rust not found - will install (not using rust-builder image?)"
+          echo "NEEDS_RUST_INSTALL=true" >> "$GITHUB_ENV"
+        fi
+        
+        if command -v sccache &> /dev/null; then
+          echo "✅ sccache found (pre-installed)"
+          sccache --version
+        else
+          echo "⚠️ sccache not found - will install"
+          echo "NEEDS_SCCACHE_INSTALL=true" >> "$GITHUB_ENV"
+        fi
+        
+        if command -v mold &> /dev/null; then
+          echo "✅ mold linker found (pre-installed)"
+          mold --version
+        else
+          echo "ℹ️ mold linker not available (optional)"
         fi
 
-        # Install additional components if specified
-        COMPONENTS="${{ inputs.components }}"
-        if [ -n "$COMPONENTS" ]; then
-          echo "📦 Installing components: $COMPONENTS"
-          # Wait for DNS before component installation
-          ensure_dns "static.rust-lang.org"
-          IFS=',' read -ra COMP_ARRAY <<< "$COMPONENTS"
-          for comp in "${COMP_ARRAY[@]}"; do
-            comp_name="$(echo "$comp" | xargs)"
-            for comp_attempt in 1 2 3 4 5 6 7; do
-              # Re-check DNS before each component install
-              if ! ensure_dns "static.rust-lang.org"; then
-                sleep $((comp_attempt * 10))
-                continue
-              fi
-              # Capture exit code to handle SIGINT (130) properly
-              comp_exit=0
-              rustup component add "$comp_name" || comp_exit=$?
-              if [ "$comp_exit" -eq 0 ]; then
-                echo "  ✅ Component $comp_name installed"
-                break
-              fi
-              if [ "$comp_exit" -eq 130 ]; then
-                echo "  ⚠️ Component install interrupted by signal (exit 130), retriable..."
-              fi
-              echo "  ⚠️ Component $comp_name install attempt $comp_attempt failed (exit: $comp_exit), retrying..."
-              sleep $((comp_attempt * 10))
-              if [ "$comp_attempt" -eq 7 ]; then
-                echo "  ⚠️ Failed to install component $comp_name after 7 attempts"
-              fi
-            done
-          done
-        fi
+    - name: Install Rust (fallback for non-rust-builder images)
+      if: env.NEEDS_RUST_INSTALL == 'true'
+      shell: bash
+      run: |
+        echo "📥 Installing Rust toolchain..."
+        for attempt in 1 2 3 4 5; do
+          if curl --proto '=https' --tlsv1.2 -sSf --retry 5 --retry-delay 10 https://sh.rustup.rs | sh -s -- -y --default-toolchain stable; then
+            echo "✅ Rust installed on attempt $attempt"
+            source "$HOME/.cargo/env"
+            break
+          fi
+          echo "⚠️ Attempt $attempt failed, retrying..."
+          sleep $((attempt * 10))
+        done
+        
+        # Verify installation
+        rustc --version
+        cargo --version
 
-    - name: Setup sccache
+    - name: Install additional components
+      if: inputs.components != ''
+      shell: bash
+      run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        echo "📦 Installing components: ${{ inputs.components }}"
+        IFS=',' read -ra COMP_ARRAY <<< "${{ inputs.components }}"
+        for comp in "${COMP_ARRAY[@]}"; do
+          comp_name="$(echo "$comp" | xargs)"
+          # Check if already installed (rust-builder has clippy, rustfmt)
+          if rustup component list --installed | grep -q "^${comp_name}"; then
+            echo "  ✅ Component $comp_name already installed"
+          else
+            echo "  📥 Installing component $comp_name..."
+            rustup component add "$comp_name"
+          fi
+        done
+
+    - name: Install sccache (fallback for non-rust-builder images)
+      if: env.NEEDS_SCCACHE_INSTALL == 'true'
+      shell: bash
+      run: |
+        echo "📥 Installing sccache..."
+        SCCACHE_VERSION="v0.10.0"
+        SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+        curl -fsSL --retry 5 "$SCCACHE_URL" | tar -xz
+        mv "sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" "$HOME/.cargo/bin/"
+        rm -rf "sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
+        chmod +x "$HOME/.cargo/bin/sccache"
+
+    - name: Start sccache server
       shell: bash
       env:
         SCCACHE_CACHE_SIZE: ${{ inputs.sccache-size }}
         SCCACHE_IDLE_TIMEOUT: '0'
       run: |
-        # Ensure cargo bin directory exists
-        mkdir -p "$HOME/.cargo/bin"
         export PATH="$HOME/.cargo/bin:$PATH"
-        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
-        # Helper function to wait for DNS
-        wait_for_dns_sccache() {
-          local host="$1"
-          local max_attempts="${2:-15}"
-          for i in $(seq 1 "$max_attempts"); do
-            if getent hosts "$host" > /dev/null 2>&1; then
-              return 0
-            fi
-            echo "⏳ Waiting for DNS ($host) - attempt $i/$max_attempts..."
-            sleep $((i * 3))
-          done
-          return 1
-        }
-
-        # Install sccache if not present (use pre-built binary, much faster)
-        if ! command -v sccache &> /dev/null; then
-          echo "📥 Installing sccache (pre-built binary)..."
-          SCCACHE_VERSION="v0.10.0"
-          SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-          # Retry with exponential backoff for transient network/DNS issues
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            # Pre-check DNS before attempting download
-            if ! wait_for_dns_sccache "github.com" 10; then
-              echo "⚠️ DNS for github.com not ready, waiting..."
-              sleep $((attempt * 10))
-              continue
-            fi
-            
-            if curl -fsSL --retry 8 --retry-delay 15 --retry-all-errors --connect-timeout 60 --max-time 600 "$SCCACHE_URL" | tar -xz; then
-              echo "✅ sccache downloaded on attempt $attempt"
-              break
-            fi
-            echo "⚠️ sccache download attempt $attempt failed, retrying in $((attempt * 10)) seconds..."
-            sleep $((attempt * 10))
-            if [ "$attempt" -eq 10 ]; then
-              echo "❌ Failed to download sccache after 10 attempts"
-              exit 1
-            fi
-          done
-          mv "sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" "$HOME/.cargo/bin/"
-          rm -rf "sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
-          chmod +x "$HOME/.cargo/bin/sccache"
-        fi
-
+        
         # Stop any existing sccache server
         sccache --stop-server 2>/dev/null || true
-
+        
         # Start fresh sccache server
         sccache --start-server
-
+        
         echo "📊 sccache stats:"
         sccache --show-stats
 
@@ -441,14 +136,14 @@ runs:
       id: version
       shell: bash
       run: |
-        export PATH="/home/runner/.cargo/bin:$PATH"
+        export PATH="$HOME/.cargo/bin:$PATH"
         echo "rustc=$(rustc --version)" >> "$GITHUB_OUTPUT"
         echo "cargo=$(cargo --version)" >> "$GITHUB_OUTPUT"
 
-        # Log available tools
-        echo "🔧 Build tools:"
-        rustc --version
-        cargo --version
-        sccache --version || echo "⚠️ sccache not found"
-        mold --version 2>/dev/null || echo "ℹ️ mold linker not available"
-
+        # Final summary
+        echo ""
+        echo "🔧 Build environment ready:"
+        echo "  rustc: $(rustc --version)"
+        echo "  cargo: $(cargo --version)"
+        echo "  sccache: $(sccache --version 2>/dev/null || echo 'N/A')"
+        echo "  mold: $(mold --version 2>/dev/null || echo 'N/A')"

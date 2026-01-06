@@ -5,21 +5,12 @@ name: Infrastructure Images
 # Separate from agent images to maintain logical separation
 
 on:
+  # Daily build at 7 AM UTC (after agents build)
   schedule:
-    # Daily at 7 AM UTC (after agents build)
     - cron: '0 7 * * *'
 
-  push:
-    branches:
-      - '**'
-    paths:
-      - 'infra/images/postgresql/**'
-      - 'infra/images/redis/**'
-      - 'infra/images/builder/**'
-      - 'infra/images/openmemory/**'
-      - 'infra/images/tweakcn/**'
-      - '.github/workflows/infrastructure-build.yaml'
-
+  # Manual trigger only - no push trigger to avoid wasting runners
+  # Infrastructure images rarely change, rebuild manually when needed
   workflow_dispatch:
     inputs:
       force_rebuild:

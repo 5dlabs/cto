@@ -6,19 +6,15 @@ name: Agent Images
 # Can also be triggered manually or on agent-related changes
 
 on:
+  # Daily build to pick up new CLI versions (Claude Code, Codex, etc.)
   schedule:
-    # Daily at 6 AM UTC (off-peak)
-    - cron: '0 6 * * *'
+    - cron: '0 6 * * *'  # 6 AM UTC
 
-  push:
-    branches:
-      - '**'
-    paths:
-      - 'infra/images/**'
-      - 'crates/pm/**'
-      - 'templates/**'
-      - '.github/workflows/agents-build.yaml'
-
+  # Manual trigger only - no push trigger to avoid wasting runners
+  # Agent images only need rebuilding when:
+  # 1. Daily schedule picks up new CLI versions
+  # 2. Manual trigger for urgent updates
+  # 3. Dockerfile changes (trigger manually after merging)
   workflow_dispatch:
     inputs:
       force_rebuild:
