@@ -9,9 +9,9 @@ use crate::activities::{
     AgentActivityCreateInput, AgentActivityCreateResponse, AGENT_ACTIVITY_CREATE_MUTATION,
 };
 use crate::models::{
-    AgentStatus, Attachment, AttachmentCreateInput, Comment, CommentCreateInput, Document, Issue,
-    IssueCreateInput, IssueRelationCreateInput, IssueUpdateInput, Label, Project,
-    ProjectCreateInput, ProjectStatus, ProjectTemplate, Team, User, WorkflowState,
+    AgentStatus, Attachment, AttachmentCreateInput, Comment, CommentCreateInput, Document,
+    DocumentCreateInput, Issue, IssueCreateInput, IssueRelationCreateInput, IssueUpdateInput,
+    Label, Project, ProjectCreateInput, ProjectStatus, ProjectTemplate, Team, User, WorkflowState,
 };
 
 /// Linear API endpoint
@@ -1220,6 +1220,52 @@ impl LinearClient {
 
         let response: Response = self.execute(QUERY, Variables { id: document_id }).await?;
         Ok(response.document)
+    }
+
+    /// Create a document (optionally associated with a project or issue)
+    #[instrument(skip(self, input), fields(title = %input.title))]
+    pub async fn create_document(&self, input: DocumentCreateInput) -> Result<Document> {
+        #[derive(Serialize)]
+        struct Variables {
+            input: DocumentCreateInput,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            #[serde(rename = "documentCreate")]
+            document_create: DocumentCreateResult,
+        }
+
+        #[derive(Deserialize)]
+        struct DocumentCreateResult {
+            success: bool,
+            document: Option<Document>,
+        }
+
+        const MUTATION: &str = r"
+            mutation CreateDocument($input: DocumentCreateInput!) {
+                documentCreate(input: $input) {
+                    success
+                    document {
+                        id
+                        title
+                        content
+                        url
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self.execute(MUTATION, Variables { input }).await?;
+
+        if !response.document_create.success {
+            return Err(anyhow!("Failed to create document"));
+        }
+
+        response
+            .document_create
+            .document
+            .ok_or_else(|| anyhow!("Document creation succeeded but no document returned"))
     }
 
     // =========================================================================

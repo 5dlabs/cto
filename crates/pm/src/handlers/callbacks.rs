@@ -10,8 +10,8 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use super::intake::{
-    create_intake_project, create_task_issues_with_project, generate_completion_summary,
-    IntakeRequest, IntakeTask, TasksJson, TechStack,
+    create_intake_project, create_project_cto_config_document, create_task_issues_with_project,
+    generate_completion_summary, IntakeRequest, IntakeTask, TasksJson, TechStack,
 };
 use crate::activities::PlanStep;
 use crate::config::CtoConfig;
@@ -225,6 +225,25 @@ pub async fn handle_intake_complete(
                             project_id = %p.id,
                             error = %e,
                             "Failed to add PRD issue to project"
+                        );
+                    }
+                }
+
+                // Create CTO config document for the project
+                match create_project_cto_config_document(client, &p, &request).await {
+                    Ok(doc) => {
+                        info!(
+                            document_id = %doc.id,
+                            document_url = ?doc.url,
+                            project_id = %p.id,
+                            "Created CTO config document for project"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(
+                            project_id = %p.id,
+                            error = %e,
+                            "Failed to create CTO config document (continuing without)"
                         );
                     }
                 }

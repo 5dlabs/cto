@@ -3,6 +3,7 @@
 pub mod agent_comms;
 pub mod agent_session;
 pub mod callbacks;
+pub mod document;
 pub mod github;
 pub mod intake;
 pub mod oauth;

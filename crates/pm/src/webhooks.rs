@@ -154,6 +154,10 @@ pub enum WebhookType {
     Issue,
     /// Comment event
     Comment,
+    /// Document event
+    Document,
+    /// Project event
+    Project,
     /// App user notification
     AppUserNotification,
     /// Permission change
@@ -340,6 +344,56 @@ impl WebhookPayload {
             .as_ref()
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
+
+    /// Check if this is a Document event
+    #[must_use]
+    pub const fn is_document_event(&self) -> bool {
+        matches!(self.event_type, WebhookType::Document)
+    }
+
+    /// Try to parse the data field as a Document (for Document events)
+    #[must_use]
+    pub fn get_document_data(&self) -> Option<DocumentWebhookData> {
+        self.data
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+}
+
+/// Document data from webhook payload.
+///
+/// This includes additional fields beyond the standard Document model
+/// that are present in webhook payloads.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentWebhookData {
+    /// Document ID
+    pub id: String,
+    /// Document title
+    pub title: String,
+    /// Document content (markdown)
+    #[serde(default)]
+    pub content: Option<String>,
+    /// Project ID if document is associated with a project
+    #[serde(default)]
+    pub project_id: Option<String>,
+    /// Project object if included
+    #[serde(default)]
+    pub project: Option<DocumentProject>,
+    /// Document URL
+    #[serde(default)]
+    pub url: Option<String>,
+}
+
+/// Minimal project info included in document webhooks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentProject {
+    /// Project ID
+    pub id: String,
+    /// Project name
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 /// Parsed webhook headers
@@ -411,7 +465,7 @@ mod tests {
         let mut apps = HashMap::new();
 
         // Create signature for rex
-        let rex_secret = "rex-secret";
+        let rex_secret = "rex-secret"; // pragma: allowlist secret
         let mut mac = HmacSha256::new_from_slice(rex_secret.as_bytes()).unwrap();
         mac.update(body);
         let rex_signature = hex::encode(mac.finalize().into_bytes());
@@ -458,7 +512,7 @@ mod tests {
         use std::collections::HashMap;
 
         let body = b"test payload";
-        let legacy_secret = "legacy-secret";
+        let legacy_secret = "legacy-secret"; // pragma: allowlist secret
 
         // Create signature using legacy secret
         let mut mac = HmacSha256::new_from_slice(legacy_secret.as_bytes()).unwrap();

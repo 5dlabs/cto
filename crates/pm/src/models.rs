@@ -392,6 +392,29 @@ pub struct CommentCreateInput {
     pub body: String,
 }
 
+/// Input for creating a document
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentCreateInput {
+    /// Document title (required)
+    pub title: String,
+    /// Document content as markdown
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// Project ID to associate the document with
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    /// Issue ID to associate the document with
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issue_id: Option<String>,
+    /// Icon for the document (emoji or icon name)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Color for the document icon
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
 /// Mapping task status to Linear workflow state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStatus {

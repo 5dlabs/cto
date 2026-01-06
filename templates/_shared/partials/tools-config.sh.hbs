@@ -1,6 +1,7 @@
 # =========================================================================
 # MCP Tools Configuration
 # Copies client-config.json to where the tool server expects it
+# Merges project-specific config if available from Linear
 # =========================================================================
 
 echo ""
@@ -10,9 +11,45 @@ echo "🔧 MCP Tools Configuration:"
 # Default: /workspace/client-config.json
 TOOLS_CONFIG_DEST="${MCP_CLIENT_CONFIG:-/workspace/client-config.json}"
 
+# Project-specific CTO config location (synced from Linear document)
+PROJECT_CONFIG="/config/project/cto-config.json"
+
 if [ -f /task-files/client-config.json ]; then
     cp /task-files/client-config.json "$TOOLS_CONFIG_DEST"
     echo "  ✓ client-config.json → $TOOLS_CONFIG_DEST"
+    
+    # Check if project-specific config exists and merge if available
+    if [ -f "$PROJECT_CONFIG" ] && command -v jq >/dev/null 2>&1; then
+        echo "  📦 Project-specific config found: $PROJECT_CONFIG"
+        
+        # Extract agent tools from project config if matching agent
+        if [ -n "${GITHUB_APP:-}" ]; then
+            AGENT_KEY=$(echo "$GITHUB_APP" | sed 's/5DLabs-//' | tr '[:upper:]' '[:lower:]')
+            
+            # Try to extract agent-specific tools from project config
+            PROJECT_TOOLS=$(jq -r ".agents.${AGENT_KEY}.tools // empty" "$PROJECT_CONFIG" 2>/dev/null)
+            
+            if [ -n "$PROJECT_TOOLS" ] && [ "$PROJECT_TOOLS" != "null" ]; then
+                echo "  ✓ Merging project config for agent: $AGENT_KEY"
+                
+                # Merge remote tools (union of both)
+                BASE_REMOTE=$(jq -r '.remoteTools // []' "$TOOLS_CONFIG_DEST")
+                PROJ_REMOTE=$(jq -r ".agents.${AGENT_KEY}.tools.remote // []" "$PROJECT_CONFIG" 2>/dev/null || echo "[]")
+                
+                # Create merged config
+                jq --argjson proj_remote "$PROJ_REMOTE" \
+                   '.remoteTools = (.remoteTools + $proj_remote | unique)' \
+                   "$TOOLS_CONFIG_DEST" > "${TOOLS_CONFIG_DEST}.tmp" && \
+                mv "${TOOLS_CONFIG_DEST}.tmp" "$TOOLS_CONFIG_DEST"
+                
+                echo "    └─ Merged project tools for $AGENT_KEY"
+            fi
+        fi
+        
+        # Also copy full project config for reference
+        cp "$PROJECT_CONFIG" "/workspace/project-cto-config.json" 2>/dev/null || true
+        echo "    └─ Project config copied to /workspace/project-cto-config.json"
+    fi
     
     # Display configured tools summary
     if command -v jq >/dev/null 2>&1; then

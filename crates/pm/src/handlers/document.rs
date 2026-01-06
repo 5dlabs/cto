@@ -1,0 +1,250 @@
+//! Document webhook handler for CTO config sync.
+//!
+//! Syncs Linear `cto-config.json` documents to Kubernetes `ConfigMaps`
+//! for project-specific Play workflow configuration.
+
+use anyhow::{anyhow, Context, Result};
+use k8s_openapi::api::core::v1::ConfigMap;
+use kube::{
+    api::{Api, ObjectMeta, Patch, PatchParams},
+    Client as KubeClient,
+};
+use std::collections::BTreeMap;
+use tracing::{debug, info};
+
+use crate::webhooks::DocumentWebhookData;
+
+/// Namespace where project `ConfigMaps` are created.
+const CONFIG_NAMESPACE: &str = "cto";
+
+/// `ConfigMap` name prefix for project configs.
+const CONFIG_PREFIX: &str = "cto-config-project";
+
+/// Sync a CTO config document to a Kubernetes `ConfigMap`.
+///
+/// Creates or updates a `ConfigMap` named `cto-config-project-{project-id}`
+/// in the `cto` namespace with the document's JSON content.
+///
+/// # Arguments
+/// * `document` - The document webhook data containing the config content
+/// * `project_id` - The Linear project ID to associate the config with
+///
+/// # Returns
+/// The name of the created/updated `ConfigMap`
+pub async fn sync_document_to_configmap(
+    document: &DocumentWebhookData,
+    project_id: &str,
+) -> Result<String> {
+    // Extract JSON content from the document
+    let json_content = extract_json_from_document(document)?;
+
+    // Validate it's valid JSON
+    let _: serde_json::Value =
+        serde_json::from_str(&json_content).context("Document content is not valid JSON")?;
+
+    // Generate ConfigMap name from project ID
+    let configmap_name = format!("{CONFIG_PREFIX}-{}", sanitize_project_id(project_id));
+
+    info!(
+        configmap_name = %configmap_name,
+        project_id = %project_id,
+        document_id = %document.id,
+        "Syncing CTO config to ConfigMap"
+    );
+
+    // Create Kubernetes client
+    let client = KubeClient::try_default()
+        .await
+        .context("Failed to create Kubernetes client")?;
+
+    let api: Api<ConfigMap> = Api::namespaced(client, CONFIG_NAMESPACE);
+
+    // Build ConfigMap
+    let mut data = BTreeMap::new();
+    data.insert("cto-config.json".to_string(), json_content);
+
+    // Add metadata about the source
+    data.insert(
+        "source.json".to_string(),
+        serde_json::json!({
+            "linearDocumentId": document.id,
+            "linearProjectId": project_id,
+            "documentUrl": document.url,
+            "syncedAt": chrono::Utc::now().to_rfc3339()
+        })
+        .to_string(),
+    );
+
+    let configmap = ConfigMap {
+        metadata: ObjectMeta {
+            name: Some(configmap_name.clone()),
+            namespace: Some(CONFIG_NAMESPACE.to_string()),
+            labels: Some(BTreeMap::from([
+                (
+                    "app.kubernetes.io/name".to_string(),
+                    "cto-config".to_string(),
+                ),
+                (
+                    "app.kubernetes.io/component".to_string(),
+                    "project-config".to_string(),
+                ),
+                ("linear.app/project-id".to_string(), project_id.to_string()),
+                ("linear.app/document-id".to_string(), document.id.clone()),
+            ])),
+            annotations: Some(BTreeMap::from([
+                (
+                    "linear.app/document-url".to_string(),
+                    document.url.clone().unwrap_or_default(),
+                ),
+                (
+                    "cto.5dlabs.ai/synced-at".to_string(),
+                    chrono::Utc::now().to_rfc3339(),
+                ),
+            ])),
+            ..Default::default()
+        },
+        data: Some(data),
+        ..Default::default()
+    };
+
+    // Use server-side apply for idempotent create/update
+    let patch_params = PatchParams::apply("pm-server").force();
+    api.patch(&configmap_name, &patch_params, &Patch::Apply(configmap))
+        .await
+        .context("Failed to create/update ConfigMap")?;
+
+    info!(
+        configmap_name = %configmap_name,
+        namespace = %CONFIG_NAMESPACE,
+        "Successfully synced CTO config to ConfigMap"
+    );
+
+    Ok(configmap_name)
+}
+
+/// Extract JSON content from a Linear document.
+///
+/// The document content may be:
+/// 1. Raw JSON
+/// 2. Markdown with JSON in a code fence
+fn extract_json_from_document(document: &DocumentWebhookData) -> Result<String> {
+    let content = document
+        .content
+        .as_ref()
+        .ok_or_else(|| anyhow!("Document has no content"))?;
+
+    // Try to extract from markdown code fence first
+    if let Some(json) = extract_json_from_code_fence(content) {
+        debug!("Extracted JSON from code fence");
+        return Ok(json);
+    }
+
+    // Try to parse as raw JSON
+    if content.trim().starts_with('{') {
+        debug!("Content appears to be raw JSON");
+        return Ok(content.trim().to_string());
+    }
+
+    // Last resort: look for JSON-like content anywhere
+    if let Some(start) = content.find('{') {
+        if let Some(end) = content.rfind('}') {
+            if end > start {
+                let potential_json = &content[start..=end];
+                // Validate it's actually JSON
+                if serde_json::from_str::<serde_json::Value>(potential_json).is_ok() {
+                    debug!("Found embedded JSON in document");
+                    return Ok(potential_json.to_string());
+                }
+            }
+        }
+    }
+
+    Err(anyhow!(
+        "Could not extract JSON from document content. Expected raw JSON or markdown with ```json code fence."
+    ))
+}
+
+/// Extract JSON from a markdown code fence.
+///
+/// Looks for ```json ... ``` blocks in the content.
+fn extract_json_from_code_fence(content: &str) -> Option<String> {
+    // Look for ```json block
+    let json_fence_start = content.find("```json")?;
+    let content_start = json_fence_start + "```json".len();
+
+    // Find the closing fence
+    let remaining = &content[content_start..];
+    let fence_end = remaining.find("```")?;
+
+    let json_content = remaining[..fence_end].trim();
+
+    if json_content.is_empty() {
+        return None;
+    }
+
+    Some(json_content.to_string())
+}
+
+/// Sanitize a Linear project ID for use in a Kubernetes resource name.
+///
+/// Linear project IDs are UUIDs, which are already valid for K8s names,
+/// but we ensure lowercase and handle any edge cases.
+fn sanitize_project_id(project_id: &str) -> String {
+    project_id
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-')
+        .collect()
+}
+
+/// Get the `ConfigMap` name for a project.
+#[must_use]
+pub fn configmap_name_for_project(project_id: &str) -> String {
+    format!("{CONFIG_PREFIX}-{}", sanitize_project_id(project_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_json_from_code_fence() {
+        let content = r#"# Config
+Some description
+
+```json
+{
+  "version": "1.0",
+  "test": true
+}
+```
+
+More text
+"#;
+        let result = extract_json_from_code_fence(content);
+        assert!(result.is_some());
+        let json = result.unwrap();
+        assert!(json.contains("\"version\": \"1.0\""));
+    }
+
+    #[test]
+    fn test_extract_json_raw() {
+        let document = DocumentWebhookData {
+            id: "doc-123".to_string(),
+            title: "cto-config.json".to_string(),
+            content: Some(r#"{"version": "1.0"}"#.to_string()),
+            project_id: Some("proj-456".to_string()),
+            project: None,
+            url: None,
+        };
+
+        let result = extract_json_from_document(&document);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_sanitize_project_id() {
+        assert_eq!(sanitize_project_id("abc123-def456"), "abc123-def456");
+        assert_eq!(sanitize_project_id("ABC123-DEF456"), "abc123-def456");
+    }
+}

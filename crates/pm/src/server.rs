@@ -695,6 +695,10 @@ pub async fn linear_webhook_handler(
             info!(agent = %agent_name, "Routing to session prompted handler");
             handle_session_prompted(&state, &payload, agent_name).await
         }
+        (WebhookType::Document, WebhookAction::Create | WebhookAction::Update) => {
+            info!(agent = %agent_name, action = ?payload.action, "Routing to document handler");
+            handle_document_event(&state, &payload).await
+        }
         _ => {
             debug!(
                 agent = %agent_name,
@@ -1301,4 +1305,82 @@ async fn handle_session_prompted(
         "session_id": session_id,
         "message": "Prompt event received (no message body)"
     })))
+}
+
+/// Handle Document events (create/update).
+///
+/// Syncs `cto-config.json` documents to Kubernetes `ConfigMaps` for project-specific
+/// Play workflow configuration.
+async fn handle_document_event(
+    _state: &AppState,
+    payload: &WebhookPayload,
+) -> Result<Json<Value>, StatusCode> {
+    use crate::handlers::document::sync_document_to_configmap;
+
+    let document = payload.get_document_data().ok_or_else(|| {
+        warn!("Missing document data in webhook payload");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    info!(
+        document_id = %document.id,
+        document_title = %document.title,
+        project_id = ?document.project_id,
+        action = ?payload.action,
+        "Received Document webhook"
+    );
+
+    // Only process cto-config.json documents
+    if document.title != "cto-config.json" {
+        debug!(
+            document_title = %document.title,
+            "Ignoring non-config document"
+        );
+        return Ok(Json(json!({
+            "status": "ignored",
+            "reason": "not_cto_config",
+            "document_title": document.title
+        })));
+    }
+
+    // Must have a project association
+    let project_id = document.project_id.as_deref().ok_or_else(|| {
+        warn!(
+            document_id = %document.id,
+            "cto-config.json document has no project association"
+        );
+        StatusCode::BAD_REQUEST
+    })?;
+
+    // Sync to ConfigMap
+    match sync_document_to_configmap(&document, project_id).await {
+        Ok(configmap_name) => {
+            info!(
+                document_id = %document.id,
+                project_id = %project_id,
+                configmap_name = %configmap_name,
+                "Synced CTO config document to ConfigMap"
+            );
+            Ok(Json(json!({
+                "status": "synced",
+                "document_id": document.id,
+                "project_id": project_id,
+                "configmap_name": configmap_name
+            })))
+        }
+        Err(e) => {
+            error!(
+                document_id = %document.id,
+                project_id = %project_id,
+                error = %e,
+                "Failed to sync CTO config document to ConfigMap"
+            );
+            Ok(Json(json!({
+                "status": "error",
+                "error": format!("Failed to sync document: {e}"),
+                "document_id": document.id,
+                "project_id": project_id
+            })))
+        }
+    }
 }

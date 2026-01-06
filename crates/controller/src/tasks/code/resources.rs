@@ -612,6 +612,31 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
+        // Project-specific CTO config from Linear
+        // When LINEAR_PROJECT_ID is set, mount the project's cto-config ConfigMap
+        // This ConfigMap is synced from Linear documents by the PM server
+        if let Some(project_id) = code_run.spec.env.get("LINEAR_PROJECT_ID") {
+            if !project_id.is_empty() {
+                let project_config_cm_name =
+                    format!("cto-config-project-{}", project_id.to_lowercase());
+                info!(
+                    "📁 Mounting project-specific CTO config: {} (project: {})",
+                    project_config_cm_name, project_id
+                );
+                volumes.push(json!({
+                    "name": "project-config",
+                    "configMap": {
+                        "name": project_config_cm_name,
+                        "optional": true  // Don't fail if ConfigMap doesn't exist yet
+                    }
+                }));
+                volume_mounts.push(json!({
+                    "name": "project-config",
+                    "mountPath": "/config/project"
+                }));
+            }
+        }
+
         let cli_type = Self::code_run_cli_type(code_run);
 
         if cli_type == CLIType::Claude {
