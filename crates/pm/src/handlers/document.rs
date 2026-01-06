@@ -263,9 +263,9 @@ More text
         );
     }
 
-    /// Test that ConfigMap naming in document.rs matches the controller's expectations.
+    /// Test that `ConfigMap` naming in document.rs matches the controller's expectations.
     ///
-    /// The controller (resources.rs) mounts the ConfigMap using:
+    /// The controller (resources.rs) mounts the `ConfigMap` using:
     /// ```ignore
     /// format!("cto-config-project-{}", project_id.to_lowercase())
     /// ```
@@ -368,11 +368,11 @@ And another one:
             id: "doc-123".to_string(),
             title: "cto-config.json".to_string(),
             content: Some(
-                r#"# Config
+                r"# Config
 ```json
 { invalid json here
 ```
-"#
+"
                 .to_string(),
             ),
             project_id: Some("proj-456".to_string()),
@@ -436,13 +436,13 @@ And some more text after.
 
     #[test]
     fn test_extract_json_from_code_fence_empty_fence() {
-        let content = r#"# Config
+        let content = r"# Config
 
 ```json
 ```
 
 Text after empty fence
-"#;
+";
         let result = extract_json_from_code_fence(content);
         // Empty fence should return None
         assert!(result.is_none());

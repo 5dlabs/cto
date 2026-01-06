@@ -2083,7 +2083,7 @@ Content here";
     // CTO Config Generation Tests
     // =========================================================================
 
-    /// Helper to create a test IntakeRequest with minimal required fields
+    /// Helper to create a test `IntakeRequest` with minimal required fields
     fn create_test_intake_request() -> IntakeRequest {
         IntakeRequest {
             session_id: "test-session-123".to_string(),
@@ -2239,30 +2239,25 @@ Content here";
         for agent in expected_agents {
             assert!(
                 parsed["agents"][agent].is_object(),
-                "Agent '{}' should be present in config",
-                agent
+                "Agent '{agent}' should be present in config"
             );
 
             // Each agent should have required fields
             assert!(
                 parsed["agents"][agent]["githubApp"].is_string(),
-                "Agent '{}' should have githubApp",
-                agent
+                "Agent '{agent}' should have githubApp"
             );
             assert!(
                 parsed["agents"][agent]["cli"].is_string(),
-                "Agent '{}' should have cli",
-                agent
+                "Agent '{agent}' should have cli"
             );
             assert!(
                 parsed["agents"][agent]["model"].is_string(),
-                "Agent '{}' should have model",
-                agent
+                "Agent '{agent}' should have model"
             );
             assert!(
                 parsed["agents"][agent]["tools"].is_object(),
-                "Agent '{}' should have tools",
-                agent
+                "Agent '{agent}' should have tools"
             );
         }
     }
