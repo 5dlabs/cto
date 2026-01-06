@@ -80,8 +80,8 @@ jobs:
 
       - name: Build pm-server binary
         run: |
-          cargo build --release -p pm --bin pm-server
-          cp target/release/pm-server pm-server
+          cargo build --profile ci -p pm --bin pm-server
+          cp target/ci/pm-server pm-server
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -132,8 +132,8 @@ jobs:
 
       - name: Build controller binary
         run: |
-          cargo build --release --bin agent-controller
-          cp target/release/agent-controller agent-controller
+          cargo build --profile ci --bin agent-controller
+          cp target/ci/agent-controller agent-controller
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -182,8 +182,8 @@ jobs:
 
       - name: Build status-sync binary
         run: |
-          cargo build --release -p pm --bin status-sync
-          cp target/release/status-sync status-sync
+          cargo build --profile ci -p pm --bin status-sync
+          cp target/ci/status-sync status-sync
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
