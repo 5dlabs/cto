@@ -441,6 +441,26 @@ impl GitHubActionsSensor {
             return Ok(());
         }
 
+        // Check for existing remediation for this specific workflow run
+        // This prevents duplicate issues/CodeRuns for the same failure
+        if spawner.has_existing_remediation(failure.run_id)? {
+            debug!(
+                "Skipping failure {} - remediation already exists for this workflow run",
+                failure.run_id
+            );
+            return Ok(());
+        }
+
+        // Check for recent remediation on this branch (time-window deduplication)
+        // This prevents creating duplicate issues/CodeRuns for rapid-fire failures on the same branch
+        if spawner.has_recent_remediation(&failure.branch)? {
+            debug!(
+                "Skipping failure {} - recent remediation exists for branch {}",
+                failure.run_id, failure.branch
+            );
+            return Ok(());
+        }
+
         // Fetch additional details (job info, actor)
         let (job_name, job_id, job_url, actor) = Self::fetch_failed_job_details(failure)?;
         let mut failure = failure.clone();
