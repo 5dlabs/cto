@@ -3962,8 +3962,7 @@ impl CodeTemplateGenerator {
             .prompt_style
             .as_ref()
             .filter(|s| *s == "minimal")
-            .map(|_| "-minimal")
-            .unwrap_or("");
+            .map_or("", |_| "-minimal");
 
         format!("agents/{agent}/{job}{suffix}.md.hbs")
     }
