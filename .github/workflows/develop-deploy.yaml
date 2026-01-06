@@ -72,7 +72,12 @@ jobs:
 
       - name: Configure Rust for fast builds
         run: |
-          # Verify sccache and mold are available from builder image
+          # Source cargo environment
+          source ~/.cargo/env || true
+          # Add cargo to PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # Verify tools are available
+          which cargo && cargo --version || echo "cargo not found"
           which sccache && sccache --version || echo "sccache not found"
           which mold && mold --version || echo "mold not found"
           # Show cargo config
@@ -124,7 +129,12 @@ jobs:
 
       - name: Configure Rust for fast builds
         run: |
-          # Verify sccache and mold are available from builder image
+          # Source cargo environment
+          source ~/.cargo/env || true
+          # Add cargo to PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # Verify tools are available
+          which cargo && cargo --version || echo "cargo not found"
           which sccache && sccache --version || echo "sccache not found"
           which mold && mold --version || echo "mold not found"
           # Show cargo config
@@ -176,7 +186,12 @@ jobs:
 
       - name: Configure Rust for fast builds
         run: |
-          # Verify sccache and mold are available from builder image
+          # Source cargo environment
+          source ~/.cargo/env || true
+          # Add cargo to PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # Verify tools are available
+          which cargo && cargo --version || echo "cargo not found"
           which sccache && sccache --version || echo "sccache not found"
           which mold && mold --version || echo "mold not found"
 
@@ -226,7 +241,12 @@ jobs:
 
       - name: Configure Rust for fast builds
         run: |
-          # Verify sccache and mold are available from builder image
+          # Source cargo environment
+          source ~/.cargo/env || true
+          # Add cargo to PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # Verify tools are available
+          which cargo && cargo --version || echo "cargo not found"
           which sccache && sccache --version || echo "sccache not found"
           which mold && mold --version || echo "mold not found"
 
@@ -276,7 +296,12 @@ jobs:
 
       - name: Configure Rust for fast builds
         run: |
-          # Verify sccache and mold are available from builder image
+          # Source cargo environment
+          source ~/.cargo/env || true
+          # Add cargo to PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # Verify tools are available
+          which cargo && cargo --version || echo "cargo not found"
           which sccache && sccache --version || echo "sccache not found"
           which mold && mold --version || echo "mold not found"
 
