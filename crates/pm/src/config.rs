@@ -206,11 +206,14 @@ impl LinearConfig {
     }
 
     /// Generate OAuth authorization URL for an agent.
+    ///
+    /// Uses `prompt=consent` to force the consent screen even if previously authorized,
+    /// ensuring we always get a callback with a fresh authorization code.
     #[must_use]
     pub fn oauth_url(&self, agent: &str) -> Option<String> {
         self.get_app(agent).map(|app| {
             format!(
-                "https://linear.app/oauth/authorize?client_id={}&redirect_uri={}&response_type=code&scope=read,write,app:assignable,app:mentionable&actor=app",
+                "https://linear.app/oauth/authorize?client_id={}&redirect_uri={}&response_type=code&scope=read,write,app:assignable,app:mentionable&actor=app&prompt=consent",
                 app.client_id,
                 urlencoding::encode(&self.redirect_uri)
             )
