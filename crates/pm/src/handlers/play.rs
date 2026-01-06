@@ -165,6 +165,8 @@ pub async fn submit_play_workflow(
         "-p".to_string(),
         format!("task-id={task_id}"),
         "-p".to_string(),
+        format!("github-app={}", config.github_app),
+        "-p".to_string(),
         format!("model={model}"),
         // Implementation agents
         "-p".to_string(),
