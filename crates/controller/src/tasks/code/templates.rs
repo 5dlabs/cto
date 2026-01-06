@@ -3698,7 +3698,7 @@ impl CodeTemplateGenerator {
         // Intake/documentation runs always use morgan templates regardless of github_app
         // This handles cases like github_app = "cto-dev" for development workflows
         if run_type == "intake" || run_type == "documentation" {
-            return format!("agents/morgan/{}.md.hbs", job_type);
+            return format!("agents/morgan/{job_type}.md.hbs");
         }
 
         // Map GitHub app to agent name
