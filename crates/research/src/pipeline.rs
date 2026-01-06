@@ -30,6 +30,8 @@ pub struct PipelineConfig {
     pub model: String,
     /// Optional digest state path (for tracking entries pending email digest).
     pub digest_state_path: Option<PathBuf>,
+    /// Maximum age of bookmarks to fetch (days).
+    pub max_age_days: i64,
 }
 
 impl Default for PipelineConfig {
@@ -42,6 +44,7 @@ impl Default for PipelineConfig {
             batch_size: 10,
             model: "claude-sonnet-4-5-20250514".to_string(),
             digest_state_path: Some(PathBuf::from("/data/digest-state.json")),
+            max_age_days: 60,
         }
     }
 }
@@ -49,7 +52,11 @@ impl Default for PipelineConfig {
 /// Result of a single poll cycle.
 #[derive(Debug, Default)]
 pub struct PollCycleResult {
-    /// Number of bookmarks fetched.
+    /// Total number of bookmarks found in the time window.
+    pub total_fetched: usize,
+    /// Number of bookmarks already processed (in state).
+    pub already_processed: usize,
+    /// Number of new (unprocessed) bookmarks fetched.
     pub fetched: usize,
     /// Number analyzed.
     pub analyzed: usize,
@@ -104,6 +111,7 @@ impl Pipeline {
         // Set up components
         let poll_config = PollConfig {
             batch_size: self.config.batch_size,
+            max_age_days: self.config.max_age_days,
             ..Default::default()
         };
         let poller = BookmarkPoller::new(self.session.clone(), poll_config);
@@ -117,16 +125,34 @@ impl Pipeline {
         };
         let writer = MarkdownWriter::new(self.config.output_dir.clone());
 
-        // Fetch new bookmarks
-        let bookmarks = match poller.poll(&mut state).await {
-            Ok(b) => b,
+        // Fetch all bookmarks and get stats
+        let fetch_result = match poller.fetch_all_bookmarks(&state).await {
+            Ok(r) => r,
             Err(e) => {
                 state.record_failure();
                 state.save(&self.config.state_path)?;
                 return Err(e);
             }
         };
+
+        // Record stats
+        result.total_fetched = fetch_result.all_bookmarks.len();
+        result.already_processed = fetch_result.already_processed;
+
+        // Take up to batch_size new bookmarks for processing
+        let bookmarks: Vec<_> = fetch_result
+            .new_bookmarks
+            .into_iter()
+            .take(self.config.batch_size)
+            .collect();
         result.fetched = bookmarks.len();
+
+        tracing::info!(
+            total = result.total_fetched,
+            already_processed = result.already_processed,
+            new = result.fetched,
+            "Bookmark fetch complete"
+        );
 
         if bookmarks.is_empty() {
             tracing::info!("No new bookmarks to process");

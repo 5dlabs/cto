@@ -429,6 +429,9 @@ pub struct CtoConfig {
     /// Model to use (e.g., claude-sonnet-4-5-20250514, claude-opus-4-20250514).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// Prompt style variant (e.g., "minimal" for Ralph-style prompts).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_style: Option<String>,
 }
 
 impl CtoConfig {
@@ -441,7 +444,7 @@ impl CtoConfig {
     /// Check if config has any values set.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.cli.is_none() && self.model.is_none()
+        self.cli.is_none() && self.model.is_none() && self.prompt_style.is_none()
     }
 
     /// Merge another config into this one (other takes precedence).

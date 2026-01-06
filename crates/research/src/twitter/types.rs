@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Twitter's snowflake epoch (November 4, 2010, 01:42:54.657 UTC).
 /// Tweet IDs encode timestamps as milliseconds since this epoch.
-const TWITTER_EPOCH_MS: i64 = 1288834974657;
+const TWITTER_EPOCH_MS: i64 = 1_288_834_974_657;
 
 /// Extract the creation timestamp from a Twitter/X snowflake ID.
 ///

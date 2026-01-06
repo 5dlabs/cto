@@ -276,9 +276,11 @@ async fn main() -> Result<()> {
     }
 }
 
+#[allow(clippy::fn_params_excessive_bools)] // CLI flags
+#[allow(clippy::too_many_arguments)] // CLI parameters
 async fn run_poll(
     output: PathBuf,
-    state: PathBuf,
+    state_path: PathBuf,
     min_relevance: f32,
     batch_size: usize,
     model: String,
@@ -286,10 +288,21 @@ async fn run_poll(
     repo: String,
     base_branch: String,
     research_dir: String,
+    reset_state: bool,
+    max_age_days: i64,
 ) -> Result<()> {
+    use research::twitter::PollState;
+
     // Load session from environment
     let session = Session::from_env()?;
     tracing::debug!("Loaded session from environment");
+
+    // Handle state reset
+    if reset_state {
+        println!("🔄 Resetting state (will reprocess all bookmarks)");
+        let empty_state = PollState::default();
+        empty_state.save(&state_path)?;
+    }
 
     // Create AI provider
     let registry = ProviderRegistry::with_defaults();
@@ -300,12 +313,13 @@ async fn run_poll(
     // Configure pipeline
     let config = PipelineConfig {
         output_dir: output.clone(),
-        state_path: state.clone(),
+        state_path: state_path.clone(),
         index_path: output.join("index.json"),
         min_relevance,
         batch_size,
         model,
         digest_state_path: Some(output.join("digest-state.json")),
+        max_age_days,
     };
 
     // Run pipeline
@@ -314,10 +328,13 @@ async fn run_poll(
 
     // Print summary
     println!("\n📊 Poll Cycle Summary");
-    println!("   Fetched: {}", result.fetched);
+    println!("   Total bookmarks found: {}", result.total_fetched);
+    println!("   Already processed: {}", result.already_processed);
+    println!("   New (unprocessed): {}", result.fetched);
+    println!("   ─────────────────────");
     println!("   Analyzed: {}", result.analyzed);
     println!("   Saved: {}", result.saved);
-    println!("   Skipped: {}", result.skipped);
+    println!("   Skipped (below threshold): {}", result.skipped);
 
     if !result.errors.is_empty() {
         println!("   Errors: {}", result.errors.len());
