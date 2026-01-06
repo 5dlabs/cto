@@ -31,6 +31,7 @@ blaze:
     - shadcn-stack
     - anime-js
     - effect-frontend-patterns
+    - frontend-excellence
   coder:
     - tool-design
     - firecrawl
@@ -106,6 +107,7 @@ rex:
     - llm-docs
     - github-mcp
     - rust-patterns
+    - mcp-development
   coder:
     - tool-design
     - firecrawl
@@ -194,6 +196,7 @@ bolt:
     - argocd-gitops
     - secrets-management
     - storage-operators
+    - mcp-development
   deploy:
     - tool-design
   healer:
@@ -291,6 +294,7 @@ tess:
     - advanced-evaluation
     - kubernetes-mcp
     - observability
+    - webapp-testing
   test:
     - tool-design
   optional:
@@ -345,10 +349,12 @@ morgan:
     - firecrawl
     - repomix
     - project-development
+    - skill-authoring
   intake:
     - prd-analysis
     - multi-agent-patterns
     - frontend-stack-selection
+    - doc-coauthoring
   healer:
     - incident-response
   optional: {}
