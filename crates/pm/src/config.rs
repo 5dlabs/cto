@@ -313,7 +313,9 @@ impl Default for IntakeConfig {
             // Container image for intake workflows (derived from CLI selection)
             runtime_image: env::var("RUNTIME_IMAGE")
                 .unwrap_or_else(|_| "ghcr.io/5dlabs/claude:latest".to_string()),
-            github_app: env::var("GITHUB_APP_NAME").unwrap_or_else(|_| "cto-dev".to_string()),
+            // Morgan is the designated intake/PM agent
+            github_app: env::var("GITHUB_APP_NAME")
+                .unwrap_or_else(|_| "5DLabs-Morgan".to_string()),
             // Opus 4.5 with extended thinking for complex intake tasks
             primary_model: env::var("PRIMARY_MODEL")
                 .unwrap_or_else(|_| "claude-opus-4-5-20251101".to_string()),
@@ -384,7 +386,9 @@ pub struct PlayConfig {
 impl Default for PlayConfig {
     fn default() -> Self {
         Self {
-            github_app: env::var("GITHUB_APP_NAME").unwrap_or_else(|_| "cto-dev".to_string()),
+            // Rex is the primary implementation agent for play workflows
+            github_app: env::var("GITHUB_APP_NAME")
+                .unwrap_or_else(|_| "5DLabs-Rex".to_string()),
             repository: env::var("DEFAULT_REPOSITORY").ok(),
             docs_project_directory: env::var("DOCS_PROJECT_DIRECTORY").ok(),
             implementation_agent: env::var("IMPLEMENTATION_AGENT")
