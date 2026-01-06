@@ -50,6 +50,7 @@ git checkout -b feat/my-feature
 |----------|-------------|
 | **[Troubleshooting](docs/troubleshooting.md)** | Known issues, debugging, Healer monitoring |
 | **[Context Engineering](docs/context-engineering.md)** | Best practices for agent context management |
+| **[Prompt Style Variants](docs/prompt-style-variants.md)** | A/B testing minimal vs standard prompts (Ralph-inspired) |
 
 ### Additional Resources
 
