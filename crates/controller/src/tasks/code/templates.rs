@@ -3765,9 +3765,7 @@ impl CodeTemplateGenerator {
             ],
 
             // Atlas/Cleo/Tess/Cipher: need GitHub for integration/review
-            ("atlas" | "cleo" | "tess" | "cipher", _) => vec![
-                "mcp_tools_github_*".to_string(),
-            ],
+            ("atlas" | "cleo" | "tess" | "cipher", _) => vec!["mcp_tools_github_*".to_string()],
 
             // Default: no specific tools (will get whatever is globally available)
             _ => vec![],
@@ -3958,7 +3956,16 @@ impl CodeTemplateGenerator {
             _ => job_type,
         };
 
-        format!("agents/{agent}/{job}.md.hbs")
+        // Check for prompt style variant (e.g., "minimal" for Ralph-style prompts)
+        let suffix = code_run
+            .spec
+            .prompt_style
+            .as_ref()
+            .filter(|s| *s == "minimal")
+            .map(|_| "-minimal")
+            .unwrap_or("");
+
+        format!("agents/{agent}/{job}{suffix}.md.hbs")
     }
 
     /// Select the container template for Claude CLI.
@@ -5142,6 +5149,9 @@ mod tests {
     #[test]
     fn test_get_default_agent_tools_unknown_agent() {
         let tools = CodeTemplateGenerator::get_default_agent_tools("Unknown-Agent", "coder");
-        assert!(tools.is_empty(), "Unknown agent should have no default tools");
+        assert!(
+            tools.is_empty(),
+            "Unknown agent should have no default tools"
+        );
     }
 }

@@ -386,8 +386,7 @@ impl Default for PlayConfig {
     fn default() -> Self {
         Self {
             // Rex is the primary implementation agent for play workflows
-            github_app: env::var("GITHUB_APP_NAME")
-                .unwrap_or_else(|_| "5DLabs-Rex".to_string()),
+            github_app: env::var("GITHUB_APP_NAME").unwrap_or_else(|_| "5DLabs-Rex".to_string()),
             repository: env::var("DEFAULT_REPOSITORY").ok(),
             docs_project_directory: env::var("DOCS_PROJECT_DIRECTORY").ok(),
             implementation_agent: env::var("IMPLEMENTATION_AGENT")
@@ -454,6 +453,9 @@ impl CtoConfig {
         }
         if other.model.is_some() {
             self.model.clone_from(&other.model);
+        }
+        if other.prompt_style.is_some() {
+            self.prompt_style.clone_from(&other.prompt_style);
         }
     }
 }
@@ -538,12 +540,14 @@ mod tests {
         let with_cli = CtoConfig {
             cli: Some("claude".to_string()),
             model: None,
+            prompt_style: None,
         };
         assert!(!with_cli.is_empty());
 
         let with_model = CtoConfig {
             cli: None,
             model: Some("opus".to_string()),
+            prompt_style: None,
         };
         assert!(!with_model.is_empty());
     }
@@ -553,17 +557,20 @@ mod tests {
         let mut base = CtoConfig {
             cli: Some("claude".to_string()),
             model: Some("sonnet".to_string()),
+            prompt_style: None,
         };
 
         let override_config = CtoConfig {
             cli: Some("cursor".to_string()),
             model: None,
+            prompt_style: Some("minimal".to_string()),
         };
 
         base.merge(&override_config);
 
         assert_eq!(base.cli, Some("cursor".to_string()));
         assert_eq!(base.model, Some("sonnet".to_string())); // unchanged
+        assert_eq!(base.prompt_style, Some("minimal".to_string()));
     }
 
     #[test]
@@ -571,6 +578,7 @@ mod tests {
         let mut base = CtoConfig {
             cli: Some("claude".to_string()),
             model: Some("sonnet".to_string()),
+            prompt_style: Some("minimal".to_string()),
         };
 
         let empty = CtoConfig::default();
@@ -578,6 +586,7 @@ mod tests {
 
         assert_eq!(base.cli, Some("claude".to_string()));
         assert_eq!(base.model, Some("sonnet".to_string()));
+        assert_eq!(base.prompt_style, Some("minimal".to_string()));
     }
 
     #[test]
@@ -585,6 +594,7 @@ mod tests {
         let config = CtoConfig {
             cli: Some("cursor".to_string()),
             model: Some("opus".to_string()),
+            prompt_style: None,
         };
 
         let json = serde_json::to_string(&config).unwrap();

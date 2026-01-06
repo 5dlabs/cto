@@ -141,6 +141,10 @@ pub struct CodeRunSpec {
     /// Model identifier to use with the selected CLI (e.g., gpt-5-codex, claude-sonnet-4-20250514)
     pub model: String,
 
+    /// Prompt style variant (e.g., "minimal" for Ralph-style prompts)
+    #[serde(default, rename = "promptStyle")]
+    pub prompt_style: Option<String>,
+
     /// GitHub username for authentication and commits (deprecated - use githubApp)
     #[serde(rename = "githubUser", default)]
     pub github_user: Option<String>,
@@ -227,6 +231,7 @@ impl Default for CodeRunSpec {
             docs_project_directory: None,
             working_directory: None,
             model: String::new(),
+            prompt_style: None,
             github_user: None,
             github_app: None,
             context_version: 1,

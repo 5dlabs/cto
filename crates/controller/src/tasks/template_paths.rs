@@ -39,7 +39,8 @@ pub const PARTIAL_TANSTACK_STACK: &str = "_shared/partials/tanstack-stack.md.hbs
 pub const PARTIAL_SHADCN_STACK: &str = "_shared/partials/shadcn-stack.md.hbs";
 
 // Infrastructure partials (for Bolt agent)
-pub const PARTIAL_INFRASTRUCTURE_OPERATORS: &str = "_shared/partials/infrastructure-operators.md.hbs";
+pub const PARTIAL_INFRASTRUCTURE_OPERATORS: &str =
+    "_shared/partials/infrastructure-operators.md.hbs";
 pub const PARTIAL_INFRASTRUCTURE_SETUP: &str = "_shared/partials/infrastructure-setup.sh.hbs";
 pub const PARTIAL_INFRASTRUCTURE_VERIFY: &str = "_shared/partials/infrastructure-verify.sh.hbs";
 

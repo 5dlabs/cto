@@ -873,7 +873,7 @@ mod tests {
         use crate::crds::coderun::CLIConfig;
 
         let settings = HashMap::new();
-        
+
         let code_run = CodeRun {
             metadata: ObjectMeta {
                 name: Some("intake-run".to_string()),
@@ -894,8 +894,7 @@ mod tests {
                 task_id: Some(0),
                 service: "prd-alerthub-e2e-test".to_string(),
                 repository_url: "https://github.com/5dlabs/prd-alerthub-e2e-test".to_string(),
-                docs_repository_url: "https://github.com/5dlabs/prd-alerthub-e2e-test"
-                    .to_string(),
+                docs_repository_url: "https://github.com/5dlabs/prd-alerthub-e2e-test".to_string(),
                 model: "claude-opus-4-5-20251101".to_string(),
                 github_app: Some("5DLabs-Morgan".to_string()),
                 ..Default::default()

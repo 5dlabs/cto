@@ -176,6 +176,7 @@ pub enum MediaType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Datelike;
 
     #[test]
     fn test_tweet_id_to_datetime() {

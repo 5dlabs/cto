@@ -135,6 +135,9 @@ impl Pipeline {
             }
         };
 
+        // Record successful fetch (resets failure counter, updates last_poll timestamp)
+        state.record_success();
+
         // Record stats
         result.total_fetched = fetch_result.all_bookmarks.len();
         result.already_processed = fetch_result.already_processed;
