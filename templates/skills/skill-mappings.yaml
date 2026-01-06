@@ -172,20 +172,29 @@ nova:
 bolt:
   description: "Infrastructure setup and Task 1 bootstrap"
   default:
+    # Context engineering (all agents)
     - context-fundamentals
     - context-degradation
     - context-optimization
+    # Tool skills
     - openmemory
     - context7
     - github-mcp
-    - kubernetes-operators
     - kubernetes-mcp
     - observability
+    # Infrastructure core
+    - kubernetes-operators
+    - argocd-gitops
+    - secrets-management
+    - storage-operators
   deploy:
     - tool-design
   healer:
     - incident-response
-  optional: {}
+  optional:
+    ai-ml-infra:
+      triggers: [kubeai, gpu, model, inference, vllm, ollama, llm]
+      description: "AI/ML model serving and GPU infrastructure"
 
 # ============================================================================
 # INTEGRATION AGENTS
