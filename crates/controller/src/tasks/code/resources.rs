@@ -983,7 +983,7 @@ impl<'a> CodeResourceManager<'a> {
             containers.push(docker_daemon_spec);
         }
 
-        // Add Linear sidecar if enabled (status sync + log streaming + 2-way comms)
+        // Add Linear sidecar if enabled (status sync + log streaming + 2-way comms + whip cracking)
         if let Some(linear) = &code_run.spec.linear_integration {
             if linear.enabled {
                 let session_id = linear.session_id.clone().unwrap_or_default();
