@@ -127,6 +127,12 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     // These are retry errors from Prometheus-style components that will automatically recover
     // Example: level=error caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: ..."
     r"(?i)runutil\.go.*function\s+failed.*Retrying\s+in\s+next\s+tick",
+    // Kilo mesh network overlay transient errors (self-recovering)
+    // These occur when WireGuard/VPN interfaces are initializing or nodes are joining the mesh
+    // Kilo automatically retries and recovers from these errors
+    // Example: {"component":"kilo","error":"failed to get interface: Link not found","level":"error"}
+    r#"(?i)"component"\s*:\s*"kilo".*"error"\s*:\s*"[^"]*Link not found"#,
+    r#"(?i)"error"\s*:\s*"[^"]*Link not found[^"]*".*"component"\s*:\s*"kilo""#,
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -1492,5 +1498,58 @@ mod tests {
             "Expected all false positives to be filtered, but got: {:?}",
             filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn test_is_false_positive_kilo_mesh_link_not_found() {
+        // Kilo mesh network overlay transient errors when interfaces are initializing
+        // These are automatically retried and recovered by Kilo
+        assert!(is_false_positive(
+            r#"{"caller":"mesh.go:485","component":"kilo","error":"failed to get interface: Link not found","level":"error","ts":"2026-01-06T09:48:23.300916086Z"}"#
+        ));
+        // Different JSON key order
+        assert!(is_false_positive(
+            r#"{"error":"failed to get interface: Link not found","component":"kilo","level":"error"}"#
+        ));
+        // With OTEL Body wrapper
+        assert!(is_false_positive(
+            r#"F Body: Str({"component":"kilo","error":"failed to get interface: Link not found","level":"error"})"#
+        ));
+        // Non-kilo component should NOT be filtered
+        assert!(!is_false_positive(
+            r#"{"component":"other","error":"failed to get interface: Link not found","level":"error"}"#
+        ));
+    }
+
+    #[test]
+    fn test_filter_kilo_mesh_transient_errors() {
+        use chrono::Utc;
+
+        // Test case from the actual log scan
+        let entries = vec![
+            // Kilo mesh "Link not found" error - should be filtered as transient
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"{"caller":"mesh.go:485","component":"kilo","error":"failed to get interface: Link not found","level":"error","ts":"2026-01-06T09:48:23.300916086Z"}"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual error - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"{"component":"controller","error":"database connection failed","level":"error"}"#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out the Kilo transient error
+        assert_eq!(filtered.len(), 1);
+
+        // Only the actual database error should remain
+        assert!(filtered
+            .iter()
+            .any(|e| e.line.contains("database connection failed")));
+        assert!(!filtered.iter().any(|e| e.line.contains("Link not found")));
     }
 }
