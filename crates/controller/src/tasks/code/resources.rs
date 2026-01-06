@@ -129,8 +129,43 @@ impl<'a> CodeResourceManager<'a> {
         info!("📄 Generated ConfigMap name: {}", cm_name);
 
         info!("🔧 Creating ConfigMap template data...");
-        let configmap = self.create_configmap(code_run_ref, &cm_name, None)?;
-        info!("✅ ConfigMap template created successfully");
+        let configmap = match self.create_configmap(code_run_ref, &cm_name, None) {
+            Ok(cm) => {
+                info!("✅ ConfigMap template created successfully");
+                cm
+            }
+            Err(e) => {
+                // Template rendering failed before Job creation
+                // Update CodeRun status with clear error message
+                error!(
+                    "❌ Template rendering failed for CodeRun {}: {}",
+                    code_run_ref.name_any(),
+                    e
+                );
+                
+                // Update status to Failed with detailed message
+                let error_msg = format!(
+                    "Template rendering failed: {e}. Check controller logs for details."
+                );
+                
+                if let Err(status_err) = super::status::CodeStatusManager::update_status(
+                    &Arc::new(code_run_ref.clone()),
+                    self.ctx,
+                    "Failed",
+                    &error_msg,
+                    None,
+                )
+                .await
+                {
+                    warn!(
+                        "Failed to update CodeRun status after template error: {}",
+                        status_err
+                    );
+                }
+                
+                return Err(e);
+            }
+        };
 
         // Always create or update ConfigMap to ensure latest template content
         info!("📤 Attempting to create ConfigMap: {}", cm_name);
@@ -309,8 +344,42 @@ impl<'a> CodeResourceManager<'a> {
         let mut data = BTreeMap::new();
 
         // Generate all templates for code
-        let templates =
-            super::templates::CodeTemplateGenerator::generate_all_templates(code_run, self.config)?;
+        let templates = super::templates::CodeTemplateGenerator::generate_all_templates(
+            code_run,
+            self.config,
+        )
+        .map_err(|e| {
+            // Enhance error message with context for template failures
+            let enhanced_error = match e {
+                crate::tasks::types::Error::ConfigError(msg) if msg.contains("Partial not found") || msg.contains("Failed to load") => {
+                    let partial_name = msg
+                        .split("Partial not found")
+                        .nth(1)
+                        .or_else(|| msg.split("Failed to load").nth(1))
+                        .and_then(|s| s.split_whitespace().next())
+                        .unwrap_or("unknown");
+                    
+                    crate::tasks::types::Error::ConfigError(format!(
+                        "Template rendering failed for CodeRun {}: {}. \
+                        This typically indicates missing template files in the controller image. \
+                        Expected template path: /app/templates/_shared/partials/{}.hbs. \
+                        Check controller logs at startup for template verification warnings.",
+                        code_run.name_any(),
+                        msg,
+                        partial_name
+                    ))
+                }
+                other => other,
+            };
+            error!(
+                coderun = %code_run.name_any(),
+                github_app = ?code_run.spec.github_app,
+                "Template generation failed: {}",
+                enhanced_error
+            );
+            enhanced_error
+        })?;
+        
         for (filename, content) in templates {
             data.insert(filename, content);
         }

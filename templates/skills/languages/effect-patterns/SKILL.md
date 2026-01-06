@@ -6,6 +6,9 @@ triggers: [effect, elysia, bun, typescript backend]
 llm_docs:
   - effect
   - drizzle
+  - elysia
+  - bun
+  - zod
 ---
 
 # Effect TypeScript Patterns

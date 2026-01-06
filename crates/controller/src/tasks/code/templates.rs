@@ -4136,6 +4136,7 @@ impl CodeTemplateGenerator {
             PARTIAL_RETRY_LOOP,
             PARTIAL_RUST_ENV,
             PARTIAL_SHADCN_STACK,
+            PARTIAL_SKILLS_SETUP,
             PARTIAL_TANSTACK_STACK,
             PARTIAL_TASK_FILES,
             PARTIAL_TOOLS_CONFIG,
@@ -4167,6 +4168,7 @@ impl CodeTemplateGenerator {
             ("retry-loop", PARTIAL_RETRY_LOOP),
             ("completion", PARTIAL_COMPLETION),
             ("mcp-check", PARTIAL_MCP_CHECK),
+            ("skills-setup", PARTIAL_SKILLS_SETUP),
             // Frontend stack partials (for Blaze/Morgan)
             ("frontend-toolkits", PARTIAL_FRONTEND_TOOLKITS),
             ("tanstack-stack", PARTIAL_TANSTACK_STACK),

@@ -1,0 +1,68 @@
+# =========================================================================
+# Skills Setup - Copy skills to a native skill directory and print what loaded
+#
+# Usage:
+#   {{> skills-setup skills_target="$CLAUDE_WORK_DIR/.claude/skills" skills_label="Claude Code" }}
+#
+# Required context variables:
+#   - skills: array of skill names (directories under /templates/skills/*/<skill>/SKILL.md)
+#
+# Required partial params:
+#   - skills_target: destination directory (string, may include env vars like $CLAUDE_WORK_DIR)
+#
+# Optional partial params:
+#   - skills_label: friendly label for logs
+# =========================================================================
+
+{{#if skills}}
+echo "═══════════════════════════════════════════════════════════════"
+echo "║               SKILLS SETUP                                   ║"
+echo "═══════════════════════════════════════════════════════════════"
+
+SKILLS_SOURCE="${SKILLS_PATH:-/templates/skills}"
+SKILLS_TARGET="{{skills_target}}"
+
+echo "Setting up {{#if skills_label}}{{skills_label}}{{else}}agent{{/if}} skills..."
+echo "  ✓ Source: $SKILLS_SOURCE"
+echo "  ✓ Target: $SKILLS_TARGET"
+
+mkdir -p "$SKILLS_TARGET"
+
+LOADED_SKILLS=""
+
+{{#each skills}}
+SKILL_NAME="{{this}}"
+FOUND=0
+
+# Find skill in any category subdirectory
+for category in stacks auth context languages platforms quality workflow animations tools; do
+    if [ -f "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" ]; then
+        mkdir -p "$SKILLS_TARGET/$SKILL_NAME"
+        cp "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" "$SKILLS_TARGET/$SKILL_NAME/"
+        echo "  ✓ Loaded skill: $SKILL_NAME"
+        LOADED_SKILLS="${LOADED_SKILLS}${LOADED_SKILLS:+ }$SKILL_NAME"
+        FOUND=1
+        break
+    fi
+done
+
+if [ "$FOUND" -eq 0 ]; then
+    echo "  ⚠️ Skill not found in templates: $SKILL_NAME"
+fi
+{{/each}}
+
+# Deterministic summary (useful for headless logs / parsing)
+SKILLS_LOADED_COUNT=0
+for _s in $LOADED_SKILLS; do
+    SKILLS_LOADED_COUNT=$((SKILLS_LOADED_COUNT + 1))
+done
+
+echo ""
+echo "📚 Skills summary"
+echo "  ✓ Loaded count: $SKILLS_LOADED_COUNT"
+if [ "$SKILLS_LOADED_COUNT" -gt 0 ]; then
+    echo "  ✓ Loaded list: $LOADED_SKILLS"
+fi
+echo ""
+{{/if}}
+

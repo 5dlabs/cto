@@ -67,6 +67,7 @@ const DEFAULT_AGENT_TEMPLATES_PATH: &str = "/app/templates";
 ///
 /// Templates are now embedded in the Docker image rather than loaded from `ConfigMaps`.
 /// This check verifies the templates directory is accessible at startup.
+#[allow(clippy::too_many_lines)]
 fn verify_templates_directory() -> Result<(), Box<dyn std::error::Error>> {
     let templates_path = std::env::var("AGENT_TEMPLATES_PATH")
         .unwrap_or_else(|_| DEFAULT_AGENT_TEMPLATES_PATH.to_string());
@@ -126,6 +127,64 @@ fn verify_templates_directory() -> Result<(), Box<dyn std::error::Error>> {
     info!("  ✓ Templates directory: {}", templates_path);
     for dir in &expected_dirs {
         info!("    ✓ {}/", dir);
+    }
+
+    // Verify critical partials can be loaded
+    info!("  Checking critical template partials...");
+    let critical_partials = vec![
+        ("_shared/partials/infrastructure-operators.md.hbs", "infrastructure-operators"),
+        ("_shared/partials/infrastructure-setup.sh.hbs", "infrastructure-setup"),
+        ("_shared/partials/infrastructure-verify.sh.hbs", "infrastructure-verify"),
+        ("_shared/partials/frontend-toolkits.md.hbs", "frontend-toolkits"),
+        ("_shared/partials/tanstack-stack.md.hbs", "tanstack-stack"),
+        ("_shared/partials/shadcn-stack.md.hbs", "shadcn-stack"),
+        ("_shared/partials/header.sh.hbs", "header"),
+        ("_shared/partials/config.sh.hbs", "config"),
+        ("_shared/partials/github-auth.sh.hbs", "github-auth"),
+    ];
+
+    let mut missing_partials = Vec::new();
+    let mut found_partials = Vec::new();
+
+    for (partial_path, partial_name) in &critical_partials {
+        let direct_path = templates_dir.join(partial_path);
+        let configmap_path = templates_dir.join(partial_path.replace('/', "_"));
+        
+        if direct_path.exists() {
+            found_partials.push((partial_name, "repo structure"));
+        } else if configmap_path.exists() {
+            found_partials.push((partial_name, "ConfigMap mount"));
+        } else {
+            missing_partials.push((partial_name, partial_path));
+        }
+    }
+
+    if !found_partials.is_empty() {
+        info!("    ✓ Found {} critical partials:", found_partials.len());
+        for (name, location) in &found_partials {
+            info!("      • {} (via {})", name, location);
+        }
+    }
+
+    if !missing_partials.is_empty() {
+        warn!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        warn!("⚠️  WARNING: Some critical partials are missing");
+        warn!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        warn!("Templates path: {}", templates_path);
+        warn!("Missing partials:");
+        for (name, path) in &missing_partials {
+            warn!("  - {} (expected at: {})", name, path);
+        }
+        warn!("");
+        warn!("Templates using these partials will fail to render.");
+        warn!("This may cause CodeRuns to fail before Job creation.");
+        warn!("");
+        warn!("To fix:");
+        warn!("  1. Ensure templates/ directory is properly copied in Dockerfile");
+        warn!("  2. Check that _shared/partials/ subdirectory exists in image");
+        warn!("  3. Verify ConfigMap mounts if using production hotfix");
+        warn!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        // Don't fail startup, but warn loudly
     }
 
     Ok(())

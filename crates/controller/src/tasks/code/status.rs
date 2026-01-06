@@ -173,7 +173,7 @@ impl CodeStatusManager {
     }
 
     /// Update the `CodeRun` CRD status
-    async fn update_status(
+    pub async fn update_status(
         code_run: &Arc<CodeRun>,
         ctx: &Arc<Context>,
         phase: &str,

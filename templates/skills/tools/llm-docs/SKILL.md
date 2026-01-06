@@ -18,6 +18,20 @@ Many libraries provide LLM-optimized documentation at `/llms.txt` following the 
 | Drizzle ORM | https://orm.drizzle.team/llms.txt | https://orm.drizzle.team/llms-full.txt |
 | TanStack | https://tanstack.com/llms.txt | - |
 | Better Auth | https://www.better-auth.com/llms.txt | - |
+| Elysia | https://elysiajs.com/llms.txt | - |
+| Bun | https://bun.sh/llms.txt | - |
+| Hono | https://hono.dev/llms.txt | https://hono.dev/llms-full.txt |
+| Expo | https://docs.expo.dev/llms.txt | - |
+| React Native | https://reactnative.dev/llms.txt | - |
+| Zod | https://zod.dev/llms.txt | - |
+| Prisma | https://www.prisma.io/llms.txt | - |
+| tRPC | https://trpc.io/llms.txt | - |
+| Turborepo | https://turbo.build/llms.txt | - |
+| Supabase | https://supabase.com/llms.txt | - |
+| Vercel | https://vercel.com/llms.txt | - |
+| Stripe | https://stripe.com/llms.txt | - |
+| Clerk | https://clerk.com/llms.txt | - |
+| Vitest | https://vitest.dev/llms.txt | - |
 
 ## When to Use llms.txt
 
@@ -89,40 +103,60 @@ context7_get_library_docs({
 
 ## Quick Reference
 
-### shadcn/ui
+### Frontend & UI
 ```
-firecrawl_scrape({ url: "https://ui.shadcn.com/llms.txt" })
+firecrawl_scrape({ url: "https://ui.shadcn.com/llms.txt" })     # shadcn/ui
+firecrawl_scrape({ url: "https://tanstack.com/llms.txt" })      # TanStack (Router, Query, Table)
 ```
-- Component library with Radix UI + Tailwind CSS
-- Installation guides, component docs, theming
 
-### Effect TypeScript
+### TypeScript Ecosystem
 ```
-firecrawl_scrape({ url: "https://effect.website/llms.txt" })
+firecrawl_scrape({ url: "https://effect.website/llms.txt" })    # Effect TypeScript
+firecrawl_scrape({ url: "https://zod.dev/llms.txt" })           # Zod schema validation
+firecrawl_scrape({ url: "https://trpc.io/llms.txt" })           # tRPC typesafe APIs
 ```
-- Type-safe error handling, concurrency, Schema validation
-- Full version available for comprehensive docs
 
-### Drizzle ORM
+### Web Frameworks
 ```
-firecrawl_scrape({ url: "https://orm.drizzle.team/llms.txt" })
+firecrawl_scrape({ url: "https://elysiajs.com/llms.txt" })      # Elysia (Bun framework)
+firecrawl_scrape({ url: "https://hono.dev/llms.txt" })          # Hono (Web Standards)
+firecrawl_scrape({ url: "https://bun.sh/llms.txt" })            # Bun runtime
 ```
-- TypeScript ORM for PostgreSQL, MySQL, SQLite
-- Migrations, queries, relations
 
-### TanStack
+### Database & ORM
 ```
-firecrawl_scrape({ url: "https://tanstack.com/llms.txt" })
+firecrawl_scrape({ url: "https://orm.drizzle.team/llms.txt" })  # Drizzle ORM
+firecrawl_scrape({ url: "https://www.prisma.io/llms.txt" })     # Prisma ORM
+firecrawl_scrape({ url: "https://supabase.com/llms.txt" })      # Supabase
 ```
-- Router, Query, Table, Form, Virtual
-- Framework-agnostic with React/Vue/Solid/Svelte support
 
-### Better Auth
+### Authentication
 ```
-firecrawl_scrape({ url: "https://www.better-auth.com/llms.txt" })
+firecrawl_scrape({ url: "https://www.better-auth.com/llms.txt" }) # Better Auth
+firecrawl_scrape({ url: "https://clerk.com/llms.txt" })           # Clerk
 ```
-- Authentication framework for TypeScript
-- Social providers, sessions, plugins
+
+### Mobile & React Native
+```
+firecrawl_scrape({ url: "https://docs.expo.dev/llms.txt" })     # Expo
+firecrawl_scrape({ url: "https://reactnative.dev/llms.txt" })   # React Native
+```
+
+### Infrastructure & Deployment
+```
+firecrawl_scrape({ url: "https://vercel.com/llms.txt" })        # Vercel
+firecrawl_scrape({ url: "https://turbo.build/llms.txt" })       # Turborepo
+```
+
+### Payments
+```
+firecrawl_scrape({ url: "https://stripe.com/llms.txt" })        # Stripe
+```
+
+### Testing
+```
+firecrawl_scrape({ url: "https://vitest.dev/llms.txt" })        # Vitest
+```
 
 ---
 

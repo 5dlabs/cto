@@ -23,26 +23,7 @@ echo "════════════════════════�
 # =========================================================================
 # Skills Setup - Copy skills to .claude/skills/ for native discovery
 # =========================================================================
-{{#if skills}}
-echo "Setting up Claude Code skills..."
-SKILLS_SOURCE="${SKILLS_PATH:-/templates/skills}"
-SKILLS_TARGET="$CLAUDE_WORK_DIR/.claude/skills"
-mkdir -p "$SKILLS_TARGET"
-
-{{#each skills}}
-SKILL_NAME="{{this}}"
-# Find skill in any category subdirectory
-for category in stacks auth context languages platforms quality workflow animations tools; do
-    if [ -f "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" ]; then
-        mkdir -p "$SKILLS_TARGET/$SKILL_NAME"
-        cp "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" "$SKILLS_TARGET/$SKILL_NAME/"
-        echo "✓ Loaded skill: $SKILL_NAME"
-        break
-    fi
-done
-{{/each}}
-echo ""
-{{/if}}
+{{> skills-setup skills_target="$CLAUDE_WORK_DIR/.claude/skills" skills_label="Claude Code" }}
 
 # =========================================================================
 # MCP Diagnostics - verify tools binary and server connectivity
