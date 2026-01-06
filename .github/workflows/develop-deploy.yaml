@@ -70,18 +70,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
+          # Always source cargo environment if it exists
+          source "$HOME/.cargo/env" 2>/dev/null || true
+          # Always add cargo bin to PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
-          # Show cargo config
-          cat ~/.cargo/config.toml 2>/dev/null || echo "No cargo config"
+          # Check if cargo is available, if not install Rust
+          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
+            echo "Rust not found, installing..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            source "$HOME/.cargo/env"
+          fi
+          # Verify Rust is available
+          cargo --version
+          # Check for optional build accelerators
+          which sccache && sccache --version || echo "sccache not available"
+          which mold && mold --version || echo "mold not available"
 
       - name: Build pm-server binary
         run: |
@@ -127,18 +132,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
+          # Always source cargo environment if it exists
+          source "$HOME/.cargo/env" 2>/dev/null || true
+          # Always add cargo bin to PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
-          # Show cargo config
-          cat ~/.cargo/config.toml 2>/dev/null || echo "No cargo config"
+          # Check if cargo is available, if not install Rust
+          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
+            echo "Rust not found, installing..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            source "$HOME/.cargo/env"
+          fi
+          # Verify Rust is available
+          cargo --version
+          # Check for optional build accelerators
+          which sccache && sccache --version || echo "sccache not available"
+          which mold && mold --version || echo "mold not available"
 
       - name: Build controller binary
         run: |
@@ -184,16 +194,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
+          # Always source cargo environment if it exists
+          source "$HOME/.cargo/env" 2>/dev/null || true
+          # Always add cargo bin to PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
+          # Check if cargo is available, if not install Rust
+          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
+            echo "Rust not found, installing..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            source "$HOME/.cargo/env"
+          fi
+          # Verify Rust is available
+          cargo --version
+          # Check for optional build accelerators
+          which sccache && sccache --version || echo "sccache not available"
+          which mold && mold --version || echo "mold not available"
 
       - name: Build status-sync binary
         run: |
@@ -239,16 +256,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
+          # Always source cargo environment if it exists
+          source "$HOME/.cargo/env" 2>/dev/null || true
+          # Always add cargo bin to PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
+          # Check if cargo is available, if not install Rust
+          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
+            echo "Rust not found, installing..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            source "$HOME/.cargo/env"
+          fi
+          # Verify Rust is available
+          cargo --version
+          # Check for optional build accelerators
+          which sccache && sccache --version || echo "sccache not available"
+          which mold && mold --version || echo "mold not available"
 
       - name: Build healer binary
         run: |
@@ -294,16 +318,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
+          # Always source cargo environment if it exists
+          source "$HOME/.cargo/env" 2>/dev/null || true
+          # Always add cargo bin to PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
+          # Check if cargo is available, if not install Rust
+          if ! command -v cargo &> /dev/null && [ ! -f "$HOME/.cargo/bin/cargo" ]; then
+            echo "Rust not found, installing..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            source "$HOME/.cargo/env"
+          fi
+          # Verify Rust is available
+          cargo --version
+          # Check for optional build accelerators
+          which sccache && sccache --version || echo "sccache not available"
+          which mold && mold --version || echo "mold not available"
 
       - name: Build tools binaries
         run: |
