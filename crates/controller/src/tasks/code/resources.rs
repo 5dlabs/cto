@@ -1070,13 +1070,29 @@ impl<'a> CodeResourceManager<'a> {
                     json!({ "name": "MAX_NUDGE_LEVEL", "value": "3" }),
                 ];
 
-                // Add LINEAR_OAUTH_TOKEN from secret if available (fallback to LINEAR_API_KEY)
+                // Add LINEAR_OAUTH_TOKEN from agent-specific secret
+                // Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex", "cto-dev" -> "morgan")
+                let agent_secret_name = if let Some(github_app) = &code_run.spec.github_app {
+                    let agent_name = github_app
+                        .strip_prefix("5DLabs-")
+                        .or_else(|| github_app.strip_prefix("5dlabs-"))
+                        .map(|s| s.to_lowercase())
+                        .unwrap_or_else(|| {
+                            // Default to morgan for cto-dev or other apps
+                            if github_app == "cto-dev" { "morgan".to_string() }
+                            else { "morgan".to_string() }
+                        });
+                    format!("linear-app-{}", agent_name)
+                } else {
+                    "linear-app-morgan".to_string()
+                };
+
                 sidecar_env.push(json!({
                     "name": "LINEAR_OAUTH_TOKEN",
                     "valueFrom": {
                         "secretKeyRef": {
-                            "name": "linear-secrets",
-                            "key": "LINEAR_OAUTH_TOKEN",
+                            "name": agent_secret_name.clone(),
+                            "key": "access_token",
                             "optional": true
                         }
                     }
@@ -1092,6 +1108,7 @@ impl<'a> CodeResourceManager<'a> {
                         }
                     }
                 }));
+                info!("Using agent secret {} for Linear OAuth token", agent_secret_name);
 
                 let sidecar_spec = json!({
                     "name": "linear-sidecar",
