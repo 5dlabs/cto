@@ -8,6 +8,9 @@ metadata:
   name: argocd-application-controller
   namespace: argocd
 spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-application-controller
   template:
     spec:
       containers:
