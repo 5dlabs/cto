@@ -386,8 +386,7 @@ impl Default for PlayConfig {
     fn default() -> Self {
         Self {
             // Rex is the primary implementation agent for play workflows
-            github_app: env::var("GITHUB_APP_NAME")
-                .unwrap_or_else(|_| "5DLabs-Rex".to_string()),
+            github_app: env::var("GITHUB_APP_NAME").unwrap_or_else(|_| "5DLabs-Rex".to_string()),
             repository: env::var("DEFAULT_REPOSITORY").ok(),
             docs_project_directory: env::var("DOCS_PROJECT_DIRECTORY").ok(),
             implementation_agent: env::var("IMPLEMENTATION_AGENT")

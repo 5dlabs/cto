@@ -142,12 +142,11 @@ impl<'a> CodeResourceManager<'a> {
                     code_run_ref.name_any(),
                     e
                 );
-                
+
                 // Update status to Failed with detailed message
-                let error_msg = format!(
-                    "Template rendering failed: {e}. Check controller logs for details."
-                );
-                
+                let error_msg =
+                    format!("Template rendering failed: {e}. Check controller logs for details.");
+
                 if let Err(status_err) = super::status::CodeStatusManager::update_status(
                     &Arc::new(code_run_ref.clone()),
                     self.ctx,
@@ -162,7 +161,7 @@ impl<'a> CodeResourceManager<'a> {
                         status_err
                     );
                 }
-                
+
                 return Err(e);
             }
         };
@@ -344,42 +343,43 @@ impl<'a> CodeResourceManager<'a> {
         let mut data = BTreeMap::new();
 
         // Generate all templates for code
-        let templates = super::templates::CodeTemplateGenerator::generate_all_templates(
-            code_run,
-            self.config,
-        )
-        .map_err(|e| {
-            // Enhance error message with context for template failures
-            let enhanced_error = match e {
-                crate::tasks::types::Error::ConfigError(msg) if msg.contains("Partial not found") || msg.contains("Failed to load") => {
-                    let partial_name = msg
-                        .split("Partial not found")
-                        .nth(1)
-                        .or_else(|| msg.split("Failed to load").nth(1))
-                        .and_then(|s| s.split_whitespace().next())
-                        .unwrap_or("unknown");
-                    
-                    crate::tasks::types::Error::ConfigError(format!(
-                        "Template rendering failed for CodeRun {}: {}. \
+        let templates =
+            super::templates::CodeTemplateGenerator::generate_all_templates(code_run, self.config)
+                .map_err(|e| {
+                    // Enhance error message with context for template failures
+                    let enhanced_error = match e {
+                        crate::tasks::types::Error::ConfigError(msg)
+                            if msg.contains("Partial not found")
+                                || msg.contains("Failed to load") =>
+                        {
+                            let partial_name = msg
+                                .split("Partial not found")
+                                .nth(1)
+                                .or_else(|| msg.split("Failed to load").nth(1))
+                                .and_then(|s| s.split_whitespace().next())
+                                .unwrap_or("unknown");
+
+                            crate::tasks::types::Error::ConfigError(format!(
+                                "Template rendering failed for CodeRun {}: {}. \
                         This typically indicates missing template files in the controller image. \
                         Expected template path: /app/templates/_shared/partials/{}.hbs. \
                         Check controller logs at startup for template verification warnings.",
-                        code_run.name_any(),
-                        msg,
-                        partial_name
-                    ))
-                }
-                other => other,
-            };
-            error!(
-                coderun = %code_run.name_any(),
-                github_app = ?code_run.spec.github_app,
-                "Template generation failed: {}",
-                enhanced_error
-            );
-            enhanced_error
-        })?;
-        
+                                code_run.name_any(),
+                                msg,
+                                partial_name
+                            ))
+                        }
+                        other => other,
+                    };
+                    error!(
+                        coderun = %code_run.name_any(),
+                        github_app = ?code_run.spec.github_app,
+                        "Template generation failed: {}",
+                        enhanced_error
+                    );
+                    enhanced_error
+                })?;
+
         for (filename, content) in templates {
             data.insert(filename, content);
         }

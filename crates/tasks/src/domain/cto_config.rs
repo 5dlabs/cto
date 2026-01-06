@@ -1,752 +1,83 @@
 //! CTO Config Generation - Generate project-specific cto-config.json from tasks.
 //!
-//! This module generates a `cto-config.json` file during intake that defines:
-//! - Which agents are needed for the project (based on task agent hints)
-//! - CLI settings per agent
-//! - Number of iterations/retries
-//! - Repository settings
+//! This module re-exports types from the shared `cto-config` crate and provides
+//! task-specific wrappers for config generation.
 
-use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use serde::{Deserialize, Serialize};
 use tokio::fs;
 
 use crate::entities::Task;
 use crate::errors::{TasksError, TasksResult};
 
-/// CTO Config version
-pub const CTO_CONFIG_VERSION: &str = "1.0";
+// Re-export all types from the shared crate
+pub use cto_config::{
+    // Functions
+    all_agent_names,
+    analyze_agent_tasks_for_tools,
+    analyze_all_tasks_for_tools,
+    analyze_content_for_tools,
+    analyze_task_for_tools,
+    capitalize,
+    default_remote_tools,
+    derive_service_name,
+    generate_config_with_tasks,
+    generate_project_config,
+    generate_project_config_json,
+    get_agent_config,
+    workflow_agents,
+    // Types
+    AgentConfig,
+    AgentTools,
+    CtoConfig,
+    Defaults,
+    IntakeDefaults,
+    IntakeModels,
+    LinearDefaults,
+    LinearIntakeSettings,
+    PlayDefaults,
+    ProjectConfigInput,
+    // Traits
+    ToolAnalyzable,
+    // Constants
+    CTO_CONFIG_VERSION,
+    DEFAULT_CLI,
+    DEFAULT_MODEL,
+    // Tool mappings
+    TECH_TOOL_MAPPINGS,
+};
 
-/// Agent tool configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AgentTools {
-    /// Remote tools from platform tools-server
-    #[serde(default)]
-    pub remote: Vec<String>,
-
-    /// Local MCP servers to spawn per-agent
-    #[serde(default, rename = "localServers")]
-    pub local_servers: HashMap<String, serde_json::Value>,
-}
-
-/// Individual agent configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentConfig {
-    /// GitHub App name for this agent
-    #[serde(rename = "githubApp")]
-    pub github_app: String,
-
-    /// CLI to use (claude, codex, gemini, opencode)
-    pub cli: String,
-
-    /// AI model to use
-    pub model: String,
-
-    /// MCP tools configuration
-    #[serde(default)]
-    pub tools: AgentTools,
-
-    /// Frontend stack (for Blaze only)
-    #[serde(skip_serializing_if = "Option::is_none", rename = "frontendStack")]
-    pub frontend_stack: Option<String>,
-
-    /// Feature flags
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub features: Option<HashMap<String, bool>>,
-}
-
-/// Play workflow defaults
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlayDefaults {
-    /// Default AI model (deprecated - use agent-specific model config)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-
-    /// Default CLI (deprecated - use agent-specific cli config)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cli: Option<String>,
-
-    /// Implementation agent GitHub App
-    #[serde(rename = "implementationAgent")]
-    pub implementation_agent: String,
-
-    /// Frontend agent GitHub App
-    #[serde(rename = "frontendAgent")]
-    pub frontend_agent: String,
-
-    /// Quality agent GitHub App
-    #[serde(rename = "qualityAgent")]
-    pub quality_agent: String,
-
-    /// Security agent GitHub App
-    #[serde(rename = "securityAgent")]
-    pub security_agent: String,
-
-    /// Testing agent GitHub App
-    #[serde(rename = "testingAgent")]
-    pub testing_agent: String,
-
-    /// Target repository
-    pub repository: String,
-
-    /// Service name for workspace isolation
-    pub service: String,
-
-    /// Docs repository
-    #[serde(rename = "docsRepository")]
-    pub docs_repository: String,
-
-    /// Docs project directory
-    #[serde(rename = "docsProjectDirectory")]
-    pub docs_project_directory: String,
-
-    /// Working directory
-    #[serde(rename = "workingDirectory")]
-    pub working_directory: String,
-
-    /// Maximum retries for all agents
-    #[serde(rename = "maxRetries")]
-    pub max_retries: u32,
-
-    /// Implementation agent max retries
-    #[serde(rename = "implementationMaxRetries")]
-    pub implementation_max_retries: u32,
-
-    /// Frontend agent max retries
-    #[serde(rename = "frontendMaxRetries")]
-    pub frontend_max_retries: u32,
-
-    /// Quality agent max retries
-    #[serde(rename = "qualityMaxRetries")]
-    pub quality_max_retries: u32,
-
-    /// Security agent max retries
-    #[serde(rename = "securityMaxRetries")]
-    pub security_max_retries: u32,
-
-    /// Testing agent max retries
-    #[serde(rename = "testingMaxRetries")]
-    pub testing_max_retries: u32,
-
-    /// Auto-merge after approval
-    #[serde(rename = "autoMerge")]
-    pub auto_merge: bool,
-
-    /// Enable parallel execution
-    #[serde(rename = "parallelExecution")]
-    pub parallel_execution: bool,
-}
-
-/// Intake workflow defaults
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntakeDefaults {
-    /// GitHub App for intake
-    #[serde(rename = "githubApp")]
-    pub github_app: String,
-
-    /// CLI to use for intake (image is derived from cli field)
-    /// Options: claude, codex, gemini, opencode, factory, dexter
-    pub cli: String,
-
-    /// Model configuration (simplified - just model names, CLI-only)
-    pub models: IntakeModels,
-}
-
-/// Simplified model configuration for intake (CLI-only, no provider needed)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct IntakeModels {
-    /// Primary model for task generation
-    #[serde(default)]
-    pub primary: String,
-
-    /// Research model for context enrichment
-    #[serde(default)]
-    pub research: String,
-
-    /// Fallback model if primary fails
-    #[serde(default)]
-    pub fallback: String,
-}
-
-/// All default configurations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Defaults {
-    /// Intake workflow defaults
-    pub intake: IntakeDefaults,
-
-    /// Play workflow defaults
-    pub play: PlayDefaults,
-}
-
-/// Complete CTO Config structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CtoConfig {
-    /// Config version
-    pub version: String,
-
-    /// Default configurations for workflows
-    pub defaults: Defaults,
-
-    /// Agent configurations (only agents needed for this project)
-    pub agents: HashMap<String, AgentConfig>,
-}
-
-impl Default for CtoConfig {
-    fn default() -> Self {
-        Self {
-            version: CTO_CONFIG_VERSION.to_string(),
-            defaults: Defaults {
-                intake: IntakeDefaults {
-                    github_app: "5DLabs-Morgan".to_string(),
-                    cli: "claude".to_string(),
-                    models: IntakeModels {
-                        primary: "claude-opus-4-5-20251101".to_string(),
-                        research: "claude-opus-4-5-20251101".to_string(),
-                        fallback: "claude-opus-4-5-20251101".to_string(),
-                    },
-                },
-                play: PlayDefaults {
-                    model: None,
-                    cli: None,
-                    implementation_agent: "5DLabs-Rex".to_string(),
-                    frontend_agent: "5DLabs-Blaze".to_string(),
-                    quality_agent: "5DLabs-Cleo".to_string(),
-                    security_agent: "5DLabs-Cipher".to_string(),
-                    testing_agent: "5DLabs-Tess".to_string(),
-                    repository: String::new(),
-                    service: String::new(),
-                    docs_repository: String::new(),
-                    docs_project_directory: String::new(),
-                    working_directory: ".".to_string(),
-                    max_retries: 10,
-                    implementation_max_retries: 10,
-                    frontend_max_retries: 10,
-                    quality_max_retries: 5,
-                    security_max_retries: 2,
-                    testing_max_retries: 5,
-                    auto_merge: false,
-                    parallel_execution: true,
-                },
-            },
-            agents: HashMap::new(),
-        }
-    }
-}
-
-/// Default remote tools for all agents
-fn default_remote_tools() -> Vec<String> {
-    vec![
-        "context7_resolve_library_id".to_string(),
-        "context7_get_library_docs".to_string(),
-        "openmemory_openmemory_query".to_string(),
-        "openmemory_openmemory_store".to_string(),
-        "openmemory_openmemory_list".to_string(),
-    ]
-}
-
-/// Technology keywords mapped to tools
-struct TechToolMapping {
-    keywords: &'static [&'static str],
-    tools: &'static [&'static str],
-}
-
-/// Tool mappings based on technology keywords in task content
-const TECH_TOOL_MAPPINGS: &[TechToolMapping] = &[
-    // Database tools
-    TechToolMapping {
-        keywords: &["postgresql", "postgres", "pg_", "psql", "sqlx"],
-        tools: &["postgres_query", "postgres_execute"],
-    },
-    TechToolMapping {
-        keywords: &["redis", "valkey", "cache", "session"],
-        tools: &["redis_get", "redis_set", "redis_del"],
-    },
-    TechToolMapping {
-        keywords: &["mongodb", "mongo", "document store"],
-        tools: &["mongodb_query", "mongodb_aggregate"],
-    },
-    TechToolMapping {
-        keywords: &["elasticsearch", "opensearch", "full-text search"],
-        tools: &["elasticsearch_search", "elasticsearch_index"],
-    },
-    // Storage tools
-    TechToolMapping {
-        keywords: &["s3", "object storage", "file upload", "seaweedfs", "minio"],
-        tools: &["s3_list", "s3_get", "s3_put"],
-    },
-    // Messaging tools
-    TechToolMapping {
-        keywords: &["kafka", "event stream", "message queue"],
-        tools: &["kafka_produce", "kafka_consume"],
-    },
-    TechToolMapping {
-        keywords: &["rabbitmq", "amqp", "message broker"],
-        tools: &["rabbitmq_publish", "rabbitmq_consume"],
-    },
-    TechToolMapping {
-        keywords: &["nats", "jetstream"],
-        tools: &["nats_publish", "nats_subscribe"],
-    },
-    // API tools
-    TechToolMapping {
-        keywords: &["graphql", "apollo", "schema"],
-        tools: &["graphql_query", "graphql_introspect"],
-    },
-    TechToolMapping {
-        keywords: &["websocket", "real-time", "socket.io", "ws://"],
-        tools: &["websocket_connect", "websocket_send"],
-    },
-    TechToolMapping {
-        keywords: &["grpc", "protobuf", "proto"],
-        tools: &["grpc_call", "grpc_stream"],
-    },
-    // Infrastructure tools (for Bolt)
-    TechToolMapping {
-        keywords: &["kubernetes", "k8s", "deployment", "service", "ingress"],
-        tools: &[
-            "kubernetes_applyResource",
-            "kubernetes_listResources",
-            "kubernetes_getResource",
-            "kubernetes_deleteResource",
-        ],
-    },
-    TechToolMapping {
-        keywords: &["helm", "chart"],
-        tools: &["helm_install", "helm_upgrade", "helm_list"],
-    },
-    TechToolMapping {
-        keywords: &["cloudnative-pg", "cnpg", "postgresql operator"],
-        tools: &["kubernetes_applyResource", "kubernetes_getPodsLogs"],
-    },
-    TechToolMapping {
-        keywords: &["redis operator", "redis cluster"],
-        tools: &["kubernetes_applyResource", "kubernetes_getPodsLogs"],
-    },
-    // Frontend tools (for Blaze)
-    TechToolMapping {
-        keywords: &["shadcn", "radix", "ui component"],
-        tools: &[
-            "shadcn_list_components",
-            "shadcn_get_component",
-            "shadcn_get_component_demo",
-            "shadcn_get_component_metadata",
-        ],
-    },
-    TechToolMapping {
-        keywords: &["tanstack", "react-query", "react-table"],
-        tools: &["context7_get_library_docs"],
-    },
-    TechToolMapping {
-        keywords: &["tailwind", "css", "styling"],
-        tools: &["context7_get_library_docs"],
-    },
-    // Mobile tools (for Tap)
-    TechToolMapping {
-        keywords: &["expo", "react-native", "mobile"],
-        tools: &["xcodebuild_simulator_build", "xcodebuild_run_tests"],
-    },
-    TechToolMapping {
-        keywords: &["ios", "swift", "xcode"],
-        tools: &[
-            "xcodebuild_simulator_build",
-            "xcodebuild_device_build",
-            "xcodebuild_run_tests",
-        ],
-    },
-    // Desktop tools (for Spark)
-    TechToolMapping {
-        keywords: &["electron", "desktop app"],
-        tools: &["xcodebuild_macos_build"],
-    },
-    // Auth tools
-    TechToolMapping {
-        keywords: &["authentication", "auth", "oauth", "jwt", "better-auth"],
-        tools: &["better_auth_generate_schema", "better_auth_add_plugin"],
-    },
-    // Testing tools
-    TechToolMapping {
-        keywords: &["playwright", "e2e test", "browser test"],
-        tools: &[
-            "browser_navigate",
-            "browser_click",
-            "browser_type",
-            "browser_snapshot",
-        ],
-    },
-    TechToolMapping {
-        keywords: &["vitest", "jest", "unit test"],
-        tools: &["shell_execute"],
-    },
-    // Search tools
-    TechToolMapping {
-        keywords: &["web search", "research", "documentation"],
-        tools: &["firecrawl_scrape", "firecrawl_search", "brave_search"],
-    },
-];
-
-/// Analyze task content and return additional tools needed
-fn analyze_task_for_tools(task: &Task) -> HashSet<String> {
-    let mut tools = HashSet::new();
-
-    // Combine title, description, and details for analysis
-    let content = format!(
-        "{} {} {}",
-        task.title.to_lowercase(),
-        task.description.to_lowercase(),
-        task.details.to_lowercase()
-    );
-
-    // Check each mapping
-    for mapping in TECH_TOOL_MAPPINGS {
-        let has_keyword = mapping.keywords.iter().any(|kw| content.contains(kw));
-        if has_keyword {
-            for tool in mapping.tools {
-                tools.insert((*tool).to_string());
-            }
-        }
+/// Implement `ToolAnalyzable` for Task to enable task-based config generation.
+impl ToolAnalyzable for Task {
+    fn title(&self) -> &str {
+        &self.title
     }
 
-    tools
-}
-
-/// Analyze all tasks for an agent and return tools needed
-fn analyze_agent_tasks_for_tools(tasks: &[Task], agent_name: &str) -> HashSet<String> {
-    let mut tools = HashSet::new();
-
-    for task in tasks {
-        // Use agent_hint to determine which agent this task belongs to
-        let task_agent = task.agent_hint.as_ref().map(|s: &String| s.to_lowercase());
-
-        if let Some(agent) = task_agent {
-            if agent == agent_name.to_lowercase() {
-                tools.extend(analyze_task_for_tools(task));
-            }
-        }
+    fn description(&self) -> &str {
+        &self.description
     }
 
-    tools
-}
+    fn details(&self) -> &str {
+        &self.details
+    }
 
-/// Get agent configuration based on agent hint
-fn get_agent_config(agent_hint: &str) -> AgentConfig {
-    match agent_hint.to_lowercase().as_str() {
-        "morgan" => AgentConfig {
-            github_app: "5DLabs-Morgan".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        "firecrawl_scrape".to_string(),
-                        "firecrawl_search".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "rex" => AgentConfig {
-            github_app: "5DLabs-Rex".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for PR management
-                        "github_create_pull_request".to_string(),
-                        "github_push_files".to_string(),
-                        "github_create_branch".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "grizz" => AgentConfig {
-            github_app: "5DLabs-Grizz".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for PR management
-                        "github_create_pull_request".to_string(),
-                        "github_push_files".to_string(),
-                        "github_create_branch".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "nova" => AgentConfig {
-            github_app: "5DLabs-Nova".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for PR management
-                        "github_create_pull_request".to_string(),
-                        "github_push_files".to_string(),
-                        "github_create_branch".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "blaze" => AgentConfig {
-            github_app: "5DLabs-Blaze".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for PR management
-                        "github_create_pull_request".to_string(),
-                        "github_push_files".to_string(),
-                        "github_create_branch".to_string(),
-                        // shadcn/ui component tools
-                        "shadcn_list_components".to_string(),
-                        "shadcn_get_component".to_string(),
-                        "shadcn_get_component_demo".to_string(),
-                        // Browser automation for testing
-                        "browser_navigate".to_string(),
-                        "browser_snapshot".to_string(),
-                        "browser_click".to_string(),
-                        "browser_type".to_string(),
-                        "browser_take_screenshot".to_string(),
-                        "browser_console_messages".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: Some("shadcn".to_string()),
-            features: None,
-        },
-        "tap" => AgentConfig {
-            github_app: "5DLabs-Tap".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for PR management
-                        "github_create_pull_request".to_string(),
-                        "github_push_files".to_string(),
-                        "github_create_branch".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "spark" => AgentConfig {
-            github_app: "5DLabs-Spark".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for PR management
-                        "github_create_pull_request".to_string(),
-                        "github_push_files".to_string(),
-                        "github_create_branch".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "cleo" => AgentConfig {
-            github_app: "5DLabs-Cleo".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for code review
-                        "github_get_pull_request".to_string(),
-                        "github_get_pull_request_files".to_string(),
-                        "github_create_pull_request_review".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "cipher" => AgentConfig {
-            github_app: "5DLabs-Cipher".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for security scanning
-                        "github_list_code_scanning_alerts".to_string(),
-                        "github_get_code_scanning_alert".to_string(),
-                        "github_get_pull_request".to_string(),
-                        "github_create_pull_request_review".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "tess" => AgentConfig {
-            github_app: "5DLabs-Tess".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for PR review
-                        "github_get_pull_request".to_string(),
-                        "github_create_pull_request_review".to_string(),
-                        // Kubernetes tools for integration testing
-                        "kubernetes_listResources".to_string(),
-                        "kubernetes_getPodsLogs".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "atlas" => AgentConfig {
-            github_app: "5DLabs-Atlas".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // GitHub tools for PR merging
-                        "github_get_pull_request".to_string(),
-                        "github_merge_pull_request".to_string(),
-                        "github_create_pull_request_review".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        "bolt" => AgentConfig {
-            github_app: "5DLabs-Bolt".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: {
-                    let mut tools = default_remote_tools();
-                    tools.extend([
-                        // Kubernetes tools for resource management
-                        "kubernetes_applyResource".to_string(),
-                        "kubernetes_listResources".to_string(),
-                        "kubernetes_getResource".to_string(),
-                        "kubernetes_deleteResource".to_string(),
-                        "kubernetes_getPodsLogs".to_string(),
-                        // ArgoCD tools for GitOps
-                        "argocd_list_applications".to_string(),
-                        "argocd_get_application".to_string(),
-                        "argocd_sync_application".to_string(),
-                        "argocd_get_application_resource_tree".to_string(),
-                        // GitHub tools for PR creation
-                        "github_create_pull_request".to_string(),
-                        "github_push_files".to_string(),
-                        "github_create_branch".to_string(),
-                        // Linear tools for status updates
-                        "linear_update_issue".to_string(),
-                        "linear_create_comment".to_string(),
-                    ]);
-                    tools
-                },
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
-        // Default to Rex for unknown agents
-        _ => AgentConfig {
-            github_app: "5DLabs-Rex".to_string(),
-            cli: "claude".to_string(),
-            model: "claude-opus-4-5-20251101".to_string(),
-            tools: AgentTools {
-                remote: default_remote_tools(),
-                local_servers: HashMap::new(),
-            },
-            frontend_stack: None,
-            features: None,
-        },
+    fn agent_hint(&self) -> Option<&str> {
+        self.agent_hint.as_deref()
     }
 }
 
 /// Generate CTO config from tasks.
 ///
-/// Analyzes the tasks to determine which agents are needed based on their
-/// `agent_hint` field and generates a project-specific configuration.
-/// Also analyzes task content to determine which tools each agent needs.
+/// This is a convenience wrapper that creates a `ProjectConfigInput` and calls
+/// the shared crate's `generate_config_with_tasks` function.
+///
+/// # Arguments
+/// * `tasks` - Tasks to analyze for agent and tool requirements
+/// * `repository` - Repository in org/repo format (e.g., "5dlabs/myapp")
+/// * `service` - Service name for workspace isolation
+/// * `docs_repository` - Repository for documentation
+/// * `docs_project_directory` - Directory within docs repository
+#[must_use]
 pub fn generate_cto_config(
     tasks: &[Task],
     repository: &str,
@@ -754,104 +85,31 @@ pub fn generate_cto_config(
     docs_repository: &str,
     docs_project_directory: &str,
 ) -> CtoConfig {
-    // Collect unique agents needed
-    let mut needed_agents: HashSet<String> = HashSet::new();
+    let input = ProjectConfigInput {
+        repository_url: Some(format!("https://github.com/{repository}")),
+        project_name: Some(service.to_string()),
+        team_id: String::new(), // Will be set by caller if needed
+        source_branch: None,
+        docs_repository: Some(docs_repository.to_string()),
+        docs_project_directory: Some(docs_project_directory.to_string()),
+    };
 
-    // Always include bolt (infrastructure) and support agents
-    needed_agents.insert("bolt".to_string());
-    needed_agents.insert("cleo".to_string());
-    needed_agents.insert("cipher".to_string());
-    needed_agents.insert("tess".to_string());
-    needed_agents.insert("atlas".to_string());
+    // Use the shared crate's implementation
+    let mut config = generate_config_with_tasks(&input, tasks);
 
-    // Add agents based on agent_hint from tasks
-    for task in tasks {
-        // Use agent_hint to determine which agent this task needs
-        let agent_name = task.agent_hint.as_ref().map(|s: &String| s.to_lowercase());
-
-        if let Some(agent) = agent_name {
-            needed_agents.insert(agent);
-        }
-    }
-
-    // Analyze all tasks for global technology requirements
-    // (support agents need to know about tech used across all tasks)
-    let mut global_tech_tools: HashSet<String> = HashSet::new();
-    for task in tasks {
-        global_tech_tools.extend(analyze_task_for_tools(task));
-    }
-
-    // Build agent configurations with task-specific tools
-    let mut agents = HashMap::new();
-    for agent_name in &needed_agents {
-        let mut agent_config = get_agent_config(agent_name);
-
-        // Analyze tasks assigned to this agent for additional tools
-        let task_tools = analyze_agent_tasks_for_tools(tasks, agent_name);
-
-        // Add task-specific tools to the agent's remote tools
-        for tool in task_tools {
-            if !agent_config.tools.remote.contains(&tool) {
-                agent_config.tools.remote.push(tool);
-            }
-        }
-
-        // Support agents (cleo, cipher, tess) get global tech tools for context
-        if ["cleo", "cipher", "tess"].contains(&agent_name.as_str()) {
-            for tool in &global_tech_tools {
-                if !agent_config.tools.remote.contains(tool) {
-                    agent_config.tools.remote.push(tool.clone());
-                }
-            }
-        }
-
-        // Sort tools for consistent output
-        agent_config.tools.remote.sort();
-        agent_config.tools.remote.dedup();
-
-        agents.insert(agent_name.clone(), agent_config);
-    }
-
-    // Determine primary implementation agent (most common)
-    let implementation_agents = ["rex", "grizz", "nova"];
-    let frontend_agents = ["blaze", "tap", "spark"];
-
-    let primary_impl = implementation_agents
-        .iter()
-        .find(|a| needed_agents.contains(**a))
-        .unwrap_or(&"rex");
-
-    let primary_frontend = frontend_agents
-        .iter()
-        .find(|a| needed_agents.contains(**a))
-        .unwrap_or(&"blaze");
-
-    let mut config = CtoConfig::default();
-
-    // Set play defaults
+    // Override with exact values (the shared crate normalizes repository URL)
     config.defaults.play.repository = repository.to_string();
     config.defaults.play.service = service.to_string();
     config.defaults.play.docs_repository = docs_repository.to_string();
     config.defaults.play.docs_project_directory = docs_project_directory.to_string();
-    config.defaults.play.implementation_agent = format!("5DLabs-{}", capitalize(primary_impl));
-    config.defaults.play.frontend_agent = format!("5DLabs-{}", capitalize(primary_frontend));
-
-    // Set agents
-    config.agents = agents;
 
     config
 }
 
-/// Capitalize first letter
-fn capitalize(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-    }
-}
-
 /// Save CTO config to file.
+///
+/// # Errors
+/// Returns an error if the file cannot be written.
 pub async fn save_cto_config(config: &CtoConfig, output_dir: &Path) -> TasksResult<()> {
     let config_path = output_dir.join("cto-config.json");
 
@@ -865,7 +123,11 @@ pub async fn save_cto_config(config: &CtoConfig, output_dir: &Path) -> TasksResu
             })?;
     }
 
-    let content = serde_json::to_string_pretty(config)?;
+    let content = config.to_json().map_err(|e| TasksError::FileWriteError {
+        path: config_path.display().to_string(),
+        reason: e.to_string(),
+    })?;
+
     fs::write(&config_path, content)
         .await
         .map_err(|e| TasksError::FileWriteError {
@@ -1047,7 +309,6 @@ mod tests {
 
     #[test]
     fn test_agent_hint_used_for_routing() {
-        // Test that agent_hint determines which agent gets the task
         let mut task = Task::new("1", "Test Task", "Test description");
         task.agent_hint = Some("rex".to_string());
 

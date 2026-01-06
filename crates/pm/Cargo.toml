@@ -63,6 +63,9 @@ regex = "1"
 # YAML frontmatter parsing
 serde_yaml = "0.9"
 
+# Shared CTO config types
+cto-config = { path = "../cto-config" }
+
 # URL encoding for OAuth URLs
 urlencoding = "2.1"
 

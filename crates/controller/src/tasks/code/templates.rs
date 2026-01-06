@@ -3765,9 +3765,7 @@ impl CodeTemplateGenerator {
             ],
 
             // Atlas/Cleo/Tess/Cipher: need GitHub for integration/review
-            ("atlas" | "cleo" | "tess" | "cipher", _) => vec![
-                "mcp_tools_github_*".to_string(),
-            ],
+            ("atlas" | "cleo" | "tess" | "cipher", _) => vec!["mcp_tools_github_*".to_string()],
 
             // Default: no specific tools (will get whatever is globally available)
             _ => vec![],
@@ -5142,6 +5140,9 @@ mod tests {
     #[test]
     fn test_get_default_agent_tools_unknown_agent() {
         let tools = CodeTemplateGenerator::get_default_agent_tools("Unknown-Agent", "coder");
-        assert!(tools.is_empty(), "Unknown agent should have no default tools");
+        assert!(
+            tools.is_empty(),
+            "Unknown agent should have no default tools"
+        );
     }
 }

@@ -389,10 +389,7 @@ And another one:
         if let Ok(content) = result {
             // If extraction succeeded, JSON parse should fail
             let parse_result: Result<serde_json::Value, _> = serde_json::from_str(&content);
-            assert!(
-                parse_result.is_err(),
-                "Invalid JSON should fail to parse"
-            );
+            assert!(parse_result.is_err(), "Invalid JSON should fail to parse");
         }
     }
 

@@ -1322,212 +1322,37 @@ pub async fn create_project_cto_config_document(
 ///
 /// This creates a config with project-specific values for repository,
 /// service name, and other Play workflow settings.
+///
+/// Uses the shared `cto-config` crate for consistent config generation.
 #[must_use]
-#[allow(clippy::too_many_lines)]
 pub fn generate_project_cto_config(request: &IntakeRequest) -> String {
-    use serde_json::json;
+    use cto_config::{generate_project_config, ProjectConfigInput};
 
-    // Extract repository name from URL (e.g., "https://github.com/5dlabs/myapp" -> "5dlabs/myapp")
-    let repository = request
-        .repository_url
-        .as_ref()
-        .and_then(|url| {
-            url.strip_prefix("https://github.com/")
-                .or_else(|| url.strip_prefix("git@github.com:"))
-                .map(|s| s.trim_end_matches(".git").to_string())
-        })
-        .unwrap_or_else(|| "5dlabs/unnamed-project".to_string());
+    // Build input for the shared config generator
+    let input = ProjectConfigInput {
+        repository_url: request.repository_url.clone(),
+        project_name: request
+            .project_name
+            .clone()
+            .or_else(|| Some(request.title.clone())),
+        team_id: request.team_id.clone(),
+        source_branch: request.source_branch.clone(),
+        docs_repository: None,
+        docs_project_directory: None,
+    };
 
-    // Derive service name from project name
-    let service = request.project_name.as_ref().map_or_else(
-        || derive_service_name(&request.title),
-        |n| derive_service_name(n),
-    );
+    // Generate config using shared crate
+    let config = generate_project_config(&input);
 
-    let config = json!({
-        "version": "1.0",
-        "defaults": {
-            "intake": {
-                "githubApp": "5DLabs-Morgan",
-                "cli": "claude",
-                "includeCodebase": false,
-                "sourceBranch": request.source_branch.as_deref().unwrap_or("main"),
-                "models": {
-                    "primary": "claude-opus-4-5-20251101",
-                    "research": "claude-opus-4-5-20251101",
-                    "fallback": "claude-opus-4-5-20251101"
-                }
-            },
-            "linear": {
-                "teamId": request.team_id,
-                "pmServerUrl": "https://pm.5dlabs.ai",
-                "intake": {
-                    "createProject": true,
-                    "projectTemplate": "Play Workflow"
-                }
-            },
-            "play": {
-                "implementationAgent": "5DLabs-Rex",
-                "frontendAgent": "5DLabs-Blaze",
-                "goAgent": "5DLabs-Grizz",
-                "nodeAgent": "5DLabs-Nova",
-                "mobileAgent": "5DLabs-Tap",
-                "desktopAgent": "5DLabs-Spark",
-                "infrastructureAgent": "5DLabs-Bolt",
-                "qualityAgent": "5DLabs-Cleo",
-                "securityAgent": "5DLabs-Cipher",
-                "testingAgent": "5DLabs-Tess",
-                "repository": repository,
-                "service": service,
-                "docsRepository": repository,
-                "docsProjectDirectory": "docs",
-                "workingDirectory": "."
-            }
-        },
-        "agents": {
-            "morgan": {
-                "githubApp": "5DLabs-Morgan",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "context7_resolve_library_id",
-                        "context7_get_library_docs",
-                        "firecrawl_scrape",
-                        "firecrawl_search",
-                        "openmemory_openmemory_query",
-                        "openmemory_openmemory_store"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "rex": {
-                "githubApp": "5DLabs-Rex",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "context7_resolve_library_id",
-                        "context7_get_library_docs",
-                        "firecrawl_scrape",
-                        "firecrawl_search",
-                        "github_create_pull_request",
-                        "github_push_files",
-                        "github_create_branch",
-                        "github_get_file_contents"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "blaze": {
-                "githubApp": "5DLabs-Blaze",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "context7_resolve_library_id",
-                        "context7_get_library_docs",
-                        "firecrawl_scrape",
-                        "firecrawl_search",
-                        "shadcn_list_components",
-                        "shadcn_get_component",
-                        "github_create_pull_request",
-                        "github_push_files",
-                        "github_create_branch",
-                        "github_get_file_contents"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "cleo": {
-                "githubApp": "5DLabs-Cleo",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "github_get_pull_request",
-                        "github_get_pull_request_files",
-                        "github_create_pull_request_review",
-                        "github_get_file_contents"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "tess": {
-                "githubApp": "5DLabs-Tess",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "github_get_pull_request",
-                        "github_get_pull_request_files",
-                        "github_create_pull_request_review"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "cipher": {
-                "githubApp": "5DLabs-Cipher",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "github_list_code_scanning_alerts",
-                        "github_get_code_scanning_alert",
-                        "github_list_secret_scanning_alerts",
-                        "github_get_pull_request",
-                        "github_create_pull_request_review"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "atlas": {
-                "githubApp": "5DLabs-Atlas",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "github_get_pull_request",
-                        "github_merge_pull_request",
-                        "github_update_pull_request_branch",
-                        "github_get_pull_request_status",
-                        "github_create_pull_request_review"
-                    ],
-                    "localServers": {}
-                }
-            },
-            "bolt": {
-                "githubApp": "5DLabs-Bolt",
-                "cli": "claude",
-                "model": "claude-opus-4-5-20251101",
-                "tools": {
-                    "remote": [
-                        "kubernetes_listResources",
-                        "kubernetes_getResource",
-                        "kubernetes_createResource",
-                        "github_create_pull_request",
-                        "github_push_files",
-                        "github_create_branch"
-                    ],
-                    "localServers": {}
-                }
-            }
-        }
-    });
-
-    serde_json::to_string_pretty(&config).unwrap_or_else(|_| "{}".to_string())
+    // Serialize to JSON
+    config.to_json().unwrap_or_else(|_| "{}".to_string())
 }
 
 /// Derive a service name from a project name (lowercase, hyphenated).
+///
+/// Re-exports from the shared `cto-config` crate for consistency.
 fn derive_service_name(name: &str) -> String {
-    name.to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
+    cto_config::derive_service_name(name)
 }
 
 /// Derive a clean project name from PRD title.
@@ -2275,8 +2100,8 @@ Content here";
         let config_str = generate_project_cto_config(&request);
 
         // Should produce valid JSON
-        let parsed: serde_json::Value = serde_json::from_str(&config_str)
-            .expect("Generated config should be valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&config_str).expect("Generated config should be valid JSON");
 
         // Should have version
         assert_eq!(parsed["version"], "1.0");

@@ -132,10 +132,22 @@ fn verify_templates_directory() -> Result<(), Box<dyn std::error::Error>> {
     // Verify critical partials can be loaded
     info!("  Checking critical template partials...");
     let critical_partials = vec![
-        ("_shared/partials/infrastructure-operators.md.hbs", "infrastructure-operators"),
-        ("_shared/partials/infrastructure-setup.sh.hbs", "infrastructure-setup"),
-        ("_shared/partials/infrastructure-verify.sh.hbs", "infrastructure-verify"),
-        ("_shared/partials/frontend-toolkits.md.hbs", "frontend-toolkits"),
+        (
+            "_shared/partials/infrastructure-operators.md.hbs",
+            "infrastructure-operators",
+        ),
+        (
+            "_shared/partials/infrastructure-setup.sh.hbs",
+            "infrastructure-setup",
+        ),
+        (
+            "_shared/partials/infrastructure-verify.sh.hbs",
+            "infrastructure-verify",
+        ),
+        (
+            "_shared/partials/frontend-toolkits.md.hbs",
+            "frontend-toolkits",
+        ),
         ("_shared/partials/tanstack-stack.md.hbs", "tanstack-stack"),
         ("_shared/partials/shadcn-stack.md.hbs", "shadcn-stack"),
         ("_shared/partials/header.sh.hbs", "header"),
@@ -149,7 +161,7 @@ fn verify_templates_directory() -> Result<(), Box<dyn std::error::Error>> {
     for (partial_path, partial_name) in &critical_partials {
         let direct_path = templates_dir.join(partial_path);
         let configmap_path = templates_dir.join(partial_path.replace('/', "_"));
-        
+
         if direct_path.exists() {
             found_partials.push((partial_name, "repo structure"));
         } else if configmap_path.exists() {
