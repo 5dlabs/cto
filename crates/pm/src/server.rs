@@ -177,6 +177,9 @@ struct IntakeSetupResponse {
     status: String,
     project: IntakeSetupProject,
     prd_issue: IntakeSetupIssue,
+    /// Architecture document (created if architecture content was provided)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    architecture_document: Option<IntakeSetupDocument>,
     next_step: String,
 }
 
@@ -195,6 +198,14 @@ struct IntakeSetupIssue {
     identifier: String,
     title: String,
     url: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IntakeSetupDocument {
+    id: String,
+    title: String,
+    url: Option<String>,
 }
 
 /// Request body for sending input to a session.
@@ -495,6 +506,44 @@ async fn handle_intake_setup(
         "Created Linear project"
     );
 
+    // Create architecture document if provided (as a separate Linear Document)
+    let mut architecture_doc: Option<IntakeSetupDocument> = None;
+    if let Some(arch) = &request.architecture_content {
+        if !arch.is_empty() {
+            info!("Creating architecture document for project");
+            let arch_input = crate::models::DocumentCreateInput {
+                title: "Architecture".to_string(),
+                content: Some(arch.clone()),
+                project_id: Some(project.id.clone()),
+                issue_id: None,
+                icon: Some("🏗️".to_string()),
+                color: None,
+            };
+            match client.create_document(arch_input).await {
+                Ok(doc) => {
+                    info!(
+                        document_id = %doc.id,
+                        document_url = ?doc.url,
+                        project_id = %project.id,
+                        "Created architecture document for project"
+                    );
+                    architecture_doc = Some(IntakeSetupDocument {
+                        id: doc.id,
+                        title: doc.title,
+                        url: doc.url,
+                    });
+                }
+                Err(e) => {
+                    warn!(
+                        project_id = %project.id,
+                        error = %e,
+                        "Failed to create architecture document (continuing without)"
+                    );
+                }
+            }
+        }
+    }
+
     // Get or create task:intake label for PRD issues
     let intake_label = client
         .get_or_create_label(&team_id, "task:intake")
@@ -505,12 +554,13 @@ async fn handle_intake_setup(
         })
         .ok();
 
-    // Build issue description
+    // Build issue description (PRD content only, architecture is a separate document)
     let mut issue_description = format!("## PRD Content\n\n{}", request.prd_content);
-    if let Some(arch) = &request.architecture_content {
-        if !arch.is_empty() {
-            issue_description.push_str("\n\n---\n\n## Architecture\n\n");
-            issue_description.push_str(arch);
+    if let Some(ref arch) = architecture_doc {
+        if let Some(ref arch_url) = arch.url {
+            issue_description.push_str(&format!(
+                "\n\n---\n\n📐 **Architecture Document:** [View Architecture]({arch_url})"
+            ));
         }
     }
     issue_description.push_str("\n\n---\n\n*Assign to @Morgan to start intake workflow*");
