@@ -117,9 +117,12 @@ impl LinearConfig {
             let webhook_secret =
                 env::var(format!("LINEAR_APP_{upper}_WEBHOOK_SECRET")).unwrap_or_default();
             // Try standard env var first, then fallback to _DIRECT (for bypassing ExternalSecrets)
+            // Note: We filter empty strings because ExternalSecrets may set empty values
             let access_token = env::var(format!("LINEAR_APP_{upper}_ACCESS_TOKEN"))
-                .or_else(|_| env::var(format!("LINEAR_APP_{upper}_ACCESS_TOKEN_DIRECT")))
-                .ok();
+                .ok()
+                .filter(|s| !s.is_empty())
+                .or_else(|| env::var(format!("LINEAR_APP_{upper}_ACCESS_TOKEN_DIRECT")).ok())
+                .filter(|s| !s.is_empty());
 
             if !client_id.is_empty() {
                 let mut config = LinearAppConfig::new(client_id, client_secret, webhook_secret);
