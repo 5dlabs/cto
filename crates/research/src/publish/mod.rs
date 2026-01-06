@@ -83,18 +83,22 @@ impl Publisher {
             "Publishing research entries"
         );
 
-        // Clone the repo
+        // Clone the repo with the correct base branch
         let work_dir = tempfile::tempdir()?;
         let repo_path = work_dir.path().join("repo");
 
         self.git
-            .clone_repo(&owner, &repo, &self.config.github_token, &repo_path)
+            .clone_repo_with_branch(
+                &owner,
+                &repo,
+                &self.config.github_token,
+                &repo_path,
+                &self.config.base_branch,
+            )
             .await?;
 
-        // Create branch
-        self.git
-            .create_branch(&repo_path, &branch_name, &self.config.base_branch)
-            .await?;
+        // Create branch from the base branch (already checked out from clone)
+        self.git.create_branch(&repo_path, &branch_name).await?;
 
         // Copy research files
         let target_dir = repo_path.join(&self.config.research_dir);

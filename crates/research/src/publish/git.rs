@@ -25,20 +25,36 @@ impl GitPublisher {
         }
     }
 
-    /// Clone a repository.
-    pub async fn clone_repo(
+    /// Clone a repository with a specific base branch.
+    ///
+    /// Uses `--branch` to clone the exact branch we need, which is more
+    /// reliable than shallow cloning default and then fetching.
+    pub async fn clone_repo_with_branch(
         &self,
         owner: &str,
         repo: &str,
         token: &str,
         target_dir: &Path,
+        base_branch: &str,
     ) -> Result<()> {
         let url = format!("https://x-access-token:{token}@github.com/{owner}/{repo}.git");
 
-        tracing::debug!(target = %target_dir.display(), "Cloning repository");
+        tracing::debug!(
+            target = %target_dir.display(),
+            branch = %base_branch,
+            "Cloning repository"
+        );
 
         let output = Command::new("git")
-            .args(["clone", "--depth", "1", &url])
+            .args([
+                "clone",
+                "--depth",
+                "1",
+                "--branch",
+                base_branch,
+                "--single-branch",
+                &url,
+            ])
             .arg(target_dir)
             .output()
             .await
@@ -48,6 +64,15 @@ impl GitPublisher {
             let stderr = String::from_utf8_lossy(&output.stderr);
             // Redact token from error message
             let safe_err = stderr.replace(token, "[REDACTED]");
+
+            // Provide helpful error message for missing branch
+            if safe_err.contains("not found") || safe_err.contains("Could not find remote branch") {
+                return Err(anyhow::anyhow!(
+                    "Branch '{base_branch}' not found on remote. \
+                     Try setting RESEARCH_BASE_BRANCH=main if your repo uses main as the default branch."
+                ));
+            }
+
             return Err(anyhow::anyhow!("git clone failed: {safe_err}"));
         }
 
@@ -55,6 +80,20 @@ impl GitPublisher {
         self.configure_user(target_dir).await?;
 
         Ok(())
+    }
+
+    /// Clone a repository (deprecated - use `clone_repo_with_branch`).
+    #[deprecated(note = "Use clone_repo_with_branch for reliable branch handling")]
+    pub async fn clone_repo(
+        &self,
+        owner: &str,
+        repo: &str,
+        token: &str,
+        target_dir: &Path,
+    ) -> Result<()> {
+        // Default to main for backwards compatibility
+        self.clone_repo_with_branch(owner, repo, token, target_dir, "main")
+            .await
     }
 
     /// Configure git user for the repository.
@@ -76,36 +115,17 @@ impl GitPublisher {
         Ok(())
     }
 
-    /// Create and checkout a new branch.
-    pub async fn create_branch(
-        &self,
-        repo_dir: &Path,
-        branch_name: &str,
-        base_branch: &str,
-    ) -> Result<()> {
-        tracing::debug!(branch = %branch_name, base = %base_branch, "Creating branch");
+    /// Create and checkout a new branch from the current HEAD.
+    ///
+    /// Assumes the repo was cloned with `clone_repo_with_branch` so we're
+    /// already on the correct base branch.
+    pub async fn create_branch(&self, repo_dir: &Path, branch_name: &str) -> Result<()> {
+        tracing::debug!(branch = %branch_name, "Creating branch from HEAD");
 
-        // Fetch the base branch
+        // Create and checkout new branch from current HEAD
+        // (HEAD is already the base branch from clone_repo_with_branch)
         let output = Command::new("git")
-            .args(["fetch", "origin", base_branch])
-            .current_dir(repo_dir)
-            .output()
-            .await
-            .context("Failed to fetch base branch")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("git fetch failed: {stderr}"));
-        }
-
-        // Create and checkout new branch
-        let output = Command::new("git")
-            .args([
-                "checkout",
-                "-b",
-                branch_name,
-                &format!("origin/{base_branch}"),
-            ])
+            .args(["checkout", "-b", branch_name])
             .current_dir(repo_dir)
             .output()
             .await
