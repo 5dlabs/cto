@@ -836,6 +836,7 @@ impl CodeTemplateGenerator {
         Ok(templates)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn generate_factory_container_script(
         code_run: &CodeRun,
         cli_config: &Value,
@@ -910,6 +911,9 @@ impl CodeTemplateGenerator {
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
+        // Get skills for agent (Factory supports native skill loading)
+        let skills = Self::get_agent_skills(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -938,6 +942,8 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            // Skills for native skill loading
+            "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             // Watch-specific context
             "iteration": iteration,
@@ -1580,6 +1586,9 @@ impl CodeTemplateGenerator {
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
+        // Get skills for agent (Codex supports native skill loading)
+        let skills = Self::get_agent_skills(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -1603,6 +1612,8 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            // Skills for native skill loading
+            "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
                 "type": cli_type,
@@ -2934,6 +2945,9 @@ impl CodeTemplateGenerator {
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
+        // Get skills for agent (OpenCode supports native skill loading)
+        let skills = Self::get_agent_skills(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -2957,6 +2971,8 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            // Skills for native skill loading
+            "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
                 "type": cli_type,
