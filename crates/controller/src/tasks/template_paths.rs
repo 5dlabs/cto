@@ -33,15 +33,16 @@ pub const PARTIAL_COMPLETION: &str = "_shared/partials/completion.sh.hbs";
 pub const PARTIAL_MCP_CHECK: &str = "_shared/partials/mcp-check.sh.hbs";
 
 // Frontend stack partials (for Blaze agent)
-pub const PARTIAL_FRONTEND_TOOLKITS: &str = "_shared/partials/frontend-toolkits.md.hbs";
-pub const PARTIAL_TANSTACK_STACK: &str = "_shared/partials/tanstack-stack.md.hbs";
-pub const PARTIAL_SHADCN_STACK: &str = "_shared/partials/shadcn-stack.md.hbs";
+// Note: Use flat names to match ConfigMap keys in controller-templates-shared
+pub const PARTIAL_FRONTEND_TOOLKITS: &str = "frontend-toolkits.md.hbs";
+pub const PARTIAL_TANSTACK_STACK: &str = "tanstack-stack.md.hbs";
+pub const PARTIAL_SHADCN_STACK: &str = "shadcn-stack.md.hbs";
 
 // Infrastructure partials (for Bolt agent)
-pub const PARTIAL_INFRASTRUCTURE_OPERATORS: &str =
-    "_shared/partials/infrastructure-operators.md.hbs";
-pub const PARTIAL_INFRASTRUCTURE_SETUP: &str = "_shared/partials/infrastructure-setup.sh.hbs";
-pub const PARTIAL_INFRASTRUCTURE_VERIFY: &str = "_shared/partials/infrastructure-verify.sh.hbs";
+// Note: Use flat names to match ConfigMap keys in controller-templates-shared
+pub const PARTIAL_INFRASTRUCTURE_OPERATORS: &str = "infrastructure-operators.md.hbs";
+pub const PARTIAL_INFRASTRUCTURE_SETUP: &str = "infrastructure-setup.sh.hbs";
+pub const PARTIAL_INFRASTRUCTURE_VERIFY: &str = "infrastructure-verify.sh.hbs";
 
 // ============================================================================
 // CLI-specific templates (invocation scripts)
