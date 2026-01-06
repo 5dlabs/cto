@@ -1785,4 +1785,67 @@ mod tests {
             filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
         );
     }
+
+    #[test]
+    fn test_filter_task_3237942171_scan_08_00_03_jan6_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-06 08:00:03 UTC
+        // These are the 5 sample errors that triggered 1000 error reports
+        // All should be filtered as false positives:
+        // - Sample 1: klog WARNING (W0106) about Endpoints not found
+        // - Samples 2-5: klog INFO (I0106) with "Error processing" in message
+        let entries = vec![
+            // Sample 1: klog WARNING-level log (W0106) - should be filtered
+            // W prefix = WARNING in klog format, even though message contains "Error"
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F W0106 07:50:04.300046       7 controller.go:1113] Error obtaining Endpoints for Service "llama-stack/llamastack-starter": no object matching key "llama-stack/llamastack-starter" in local store"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: klog INFO-level log (I0106) with "Error processing" in message - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F I0106 07:50:05.764339       1 csi_handler.go:243] "Error processing" driver="io.openebs.csi-mayastor" VolumeAttachment="csi-cc3f9ca14e7536934a6d482a1027026ad3bb4870e9c8d72cabd81cf160c5e0e7" err="fai..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: klog INFO-level log (I0106) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F I0106 07:50:06.058234       1 csi_handler.go:243] "Error processing" driver="io.openebs.csi-mayastor" VolumeAttachment="csi-fdb0b66b064c7a78a69f2f5abb1de5d10aab3fedfddd736e624eeeed1c45662a" err="fai..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: klog INFO-level log (I0106) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F I0106 07:50:06.239052       1 csi_handler.go:243] "Error processing" driver="io.openebs.csi-mayastor" VolumeAttachment="csi-1fc6ce666ba5ac4debafbd6f8de1757f4f80f9a7332943640c56ccee09a83d20" err="fai..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: klog INFO-level log (I0106) - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F I0106 07:50:06.313662       1 csi_handler.go:243] "Error processing" driver="io.openebs.csi-mayastor" VolumeAttachment="csi-8444995ce88f11a5a22dabf692f2e6c2ae4d24b9a4934e4f280181c2e2d495a4" err="fai..."#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 samples should be filtered as false positives
+        // - Sample 1: klog WARNING (W0106) - warning-level log, not an error
+        // - Samples 2-5: klog INFO (I0106) - info-level logs with "Error processing" in message
+        assert_eq!(
+            filtered.len(),
+            0,
+            "Expected 0 entries after filtering (all false positives), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+
+        // Also verify individual pattern matching
+        assert!(is_false_positive(r#"F W0106 07:50:04.300046       7 controller.go:1113] Error obtaining Endpoints for Service "llama-stack/llamastack-starter""#),
+            "klog WARNING (W0106) should be detected as false positive");
+        assert!(is_false_positive(r#"F I0106 07:50:05.764339       1 csi_handler.go:243] "Error processing" driver="io.openebs.csi-mayastor""#),
+            "klog INFO (I0106) should be detected as false positive");
+    }
 }
