@@ -4102,7 +4102,9 @@ impl CodeTemplateGenerator {
     /// These partials are used by agent-specific templates via {{> agents/partial-name}}
     fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
-            PARTIAL_FRONTEND_TOOLKITS, PARTIAL_SHADCN_STACK, PARTIAL_TANSTACK_STACK,
+            PARTIAL_FRONTEND_TOOLKITS, PARTIAL_INFRASTRUCTURE_OPERATORS,
+            PARTIAL_INFRASTRUCTURE_SETUP, PARTIAL_INFRASTRUCTURE_VERIFY, PARTIAL_SHADCN_STACK,
+            PARTIAL_TANSTACK_STACK,
         };
 
         // List of shared agent system prompt partials that need to be registered
@@ -4119,6 +4121,13 @@ impl CodeTemplateGenerator {
             ("frontend-toolkits", PARTIAL_FRONTEND_TOOLKITS),
             ("tanstack-stack", PARTIAL_TANSTACK_STACK),
             ("shadcn-stack", PARTIAL_SHADCN_STACK),
+        ];
+
+        // Infrastructure partials used by Morgan (intake) and Bolt (infra) system prompts
+        let infrastructure_partials = vec![
+            ("infrastructure-operators", PARTIAL_INFRASTRUCTURE_OPERATORS),
+            ("infrastructure-setup", PARTIAL_INFRASTRUCTURE_SETUP),
+            ("infrastructure-verify", PARTIAL_INFRASTRUCTURE_VERIFY),
         ];
 
         // Register frontend stack partials first
@@ -4142,6 +4151,32 @@ impl CodeTemplateGenerator {
                     warn!(
                         "Failed to load frontend stack partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
                         Blaze/Morgan templates referencing this partial will fail to render."
+                    );
+                }
+            }
+        }
+
+        // Register infrastructure partials (for Morgan/intake and Bolt/infra templates)
+        for (partial_name, template_path) in infrastructure_partials {
+            match Self::load_template(template_path) {
+                Ok(content) => {
+                    handlebars
+                        .register_partial(partial_name, content)
+                        .map_err(|e| {
+                            crate::tasks::types::Error::ConfigError(format!(
+                                "Failed to register infrastructure partial {partial_name}: {e}"
+                            ))
+                        })?;
+                    debug!(
+                        "Successfully registered infrastructure partial: {}",
+                        partial_name
+                    );
+                }
+                Err(e) => {
+                    // Warn but don't fail - the partial may not be needed for non-infrastructure agents
+                    warn!(
+                        "Failed to load infrastructure partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
+                        Morgan/Bolt templates referencing this partial will fail to render."
                     );
                 }
             }
