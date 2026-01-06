@@ -93,6 +93,9 @@ spec:
       - name: linear-team-id
         description: "Linear team ID"
         value: ""
+      - name: linear-project-id
+        description: "Linear project ID (for ConfigMap mounting)"
+        value: ""
       # Runtime image (can be overridden for dev)
       # Uses claude image which includes the Anthropic Claude CLI
       - name: runtime-image
@@ -291,6 +294,7 @@ spec:
           LINEAR_SESSION_ID="{{workflow.parameters.linear-session-id}}"
           LINEAR_ISSUE_ID="{{workflow.parameters.linear-issue-id}}"
           LINEAR_TEAM_ID="{{workflow.parameters.linear-team-id}}"
+          LINEAR_PROJECT_ID="{{workflow.parameters.linear-project-id}}"
 
           # Validate required parameters
           if [ -z "$PROJECT_NAME" ]; then
@@ -345,6 +349,7 @@ spec:
               INTAKE_CLI: "${INTAKE_CLI}"
               INTAKE_CONFIGMAP: "${CONFIGMAP_NAME}"
               WORKFLOW_NAME: "${WORKFLOW_NAME}"
+              LINEAR_PROJECT_ID: "${LINEAR_PROJECT_ID}"
           MANIFEST_EOF
 
           # Add linearIntegration section if LINEAR_SESSION_ID is provided
@@ -355,6 +360,7 @@ spec:
               sessionId: "${LINEAR_SESSION_ID}"
               issueId: "${LINEAR_ISSUE_ID}"
               teamId: "${LINEAR_TEAM_ID}"
+              projectId: "${LINEAR_PROJECT_ID}"
           LINEAR_EOF
           fi
 

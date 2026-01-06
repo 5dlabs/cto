@@ -914,6 +914,7 @@ pub async fn submit_intake_workflow(
                     {"name": "linear-issue-id", "value": request.prd_issue_id},
                     {"name": "linear-issue-identifier", "value": request.prd_identifier},
                     {"name": "linear-team-id", "value": request.team_id},
+                    {"name": "linear-project-id", "value": request.existing_project.as_ref().map_or("", |p| p.id.as_str())},
                     {"name": "runtime-image", "value": config.runtime_image}
                 ]
             }

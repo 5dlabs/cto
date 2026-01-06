@@ -181,6 +181,9 @@ struct IntakeSetupResponse {
     /// Architecture document (created if architecture content was provided)
     #[serde(skip_serializing_if = "Option::is_none")]
     architecture_document: Option<IntakeSetupDocument>,
+    /// CTO config document (created for agent settings)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cto_config_document: Option<IntakeSetupDocument>,
     next_step: String,
 }
 
@@ -545,6 +548,70 @@ async fn handle_intake_setup(
         }
     }
 
+    // Create cto-config.json document EARLY so user can configure agent settings
+    // before assigning Morgan. This triggers a webhook -> ConfigMap sync.
+    let mut cto_config_doc: Option<IntakeSetupDocument> = None;
+    {
+        info!("Creating cto-config.json document for project");
+
+        // Generate config using shared crate with minimal data
+        // Repository URL will be updated by intake-complete callback after repo is created
+        let config_input = cto_config::ProjectConfigInput {
+            repository_url: None, // Not known yet - repo will be created during intake
+            project_name: Some(request.project_name.clone()),
+            team_id: team_id.clone(),
+            source_branch: None, // Default to main
+            docs_repository: None,
+            docs_project_directory: None,
+        };
+        let config = cto_config::generate_project_config(&config_input);
+        let config_json = config.to_json().unwrap_or_else(|_| "{}".to_string());
+
+        // Derive service name for display
+        let service_name = cto_config::derive_service_name(&request.project_name);
+
+        // Wrap JSON in markdown code fence for better display in Linear
+        let document_content = format!(
+            "# CTO Configuration\n\n\
+             Project-specific configuration for Play workflows.\n\n\
+             **Service:** {service_name}\n\n\
+             > **Note:** Repository URL will be set after intake workflow creates/validates the repo.\n\n\
+             ```json\n{config_json}\n```"
+        );
+
+        let config_input = crate::models::DocumentCreateInput {
+            title: "cto-config.json".to_string(),
+            content: Some(document_content),
+            project_id: Some(project.id.clone()),
+            issue_id: None,
+            icon: None, // Linear API validation issues with emoji icons
+            color: None,
+        };
+
+        match client.create_document(config_input).await {
+            Ok(doc) => {
+                info!(
+                    document_id = %doc.id,
+                    document_url = ?doc.url,
+                    project_id = %project.id,
+                    "Created cto-config.json document for project (early setup)"
+                );
+                cto_config_doc = Some(IntakeSetupDocument {
+                    id: doc.id,
+                    title: doc.title,
+                    url: doc.url,
+                });
+            }
+            Err(e) => {
+                warn!(
+                    project_id = %project.id,
+                    error = %e,
+                    "Failed to create cto-config.json document (continuing without)"
+                );
+            }
+        }
+    }
+
     // Get or create task:intake label for PRD issues
     let intake_label = client
         .get_or_create_label(&team_id, "task:intake")
@@ -630,6 +697,7 @@ async fn handle_intake_setup(
             url: issue_url,
         },
         architecture_document: architecture_doc,
+        cto_config_document: cto_config_doc,
         next_step: "Assign Morgan to the PRD issue in Linear to start intake workflow".to_string(),
     }))
 }
