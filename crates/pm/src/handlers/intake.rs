@@ -248,12 +248,21 @@ pub fn extract_config_from_labels(labels: &[Label]) -> CtoConfig {
                 config.model = Some((*full_model).to_string());
             }
         }
+
+        // Check for prompt style label: "cto:prompt:xxx" (e.g., "cto:prompt:minimal")
+        if let Some(style) = name.strip_prefix("cto:prompt:") {
+            let style = style.trim();
+            if !style.is_empty() {
+                config.prompt_style = Some(style.to_string());
+            }
+        }
     }
 
     if !config.is_empty() {
         info!(
             cli = ?config.cli,
             model = ?config.model,
+            prompt_style = ?config.prompt_style,
             "Extracted CTO config from labels"
         );
     }

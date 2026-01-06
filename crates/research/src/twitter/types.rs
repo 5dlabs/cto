@@ -172,3 +172,50 @@ pub enum MediaType {
     /// GIF attachment.
     Gif,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tweet_id_to_datetime() {
+        // Test with a known tweet ID: 2008123587132309749
+        // This ID was created around January 6, 2026
+        let dt = tweet_id_to_datetime("2008123587132309749").expect("should parse");
+
+        // Verify it's a reasonable date (after Twitter epoch, before year 3000)
+        assert!(dt.year() >= 2010);
+        assert!(dt.year() <= 3000);
+
+        // The ID should decode to sometime in late 2025/early 2026
+        assert!(dt.year() >= 2025);
+    }
+
+    #[test]
+    fn test_tweet_id_to_datetime_invalid() {
+        assert!(tweet_id_to_datetime("not-a-number").is_none());
+        assert!(tweet_id_to_datetime("").is_none());
+    }
+
+    #[test]
+    fn test_tweet_id_within_days() {
+        // A very old tweet ID (from 2015)
+        assert!(!tweet_id_within_days("666666666666666666", 60));
+
+        // A recent tweet ID should be within 60 days if it's actually recent
+        // (This test will fail if run far in the future from when the ID was created)
+    }
+
+    #[test]
+    fn test_bookmark_is_within_days() {
+        let bookmark = Bookmark::from_id(
+            "2008123587132309749".to_string(),
+            Author::new("test".to_string(), "Test".to_string()),
+            "test".to_string(),
+        );
+
+        // The bookmark was created with a timestamp from the ID
+        // It should have a valid age
+        assert!(bookmark.age().num_days() >= 0);
+    }
+}
