@@ -25,6 +25,7 @@ blaze:
     # Tool skills
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     # Frontend specific
     - shadcn-stack
@@ -56,6 +57,7 @@ tap:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - expo-patterns
   coder:
@@ -76,6 +78,7 @@ spark:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - electron-patterns
   coder:
@@ -100,6 +103,7 @@ rex:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - rust-patterns
   coder:
@@ -125,6 +129,7 @@ grizz:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - go-patterns
   coder:
@@ -148,6 +153,7 @@ nova:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - effect-patterns
   coder:
@@ -179,6 +185,7 @@ bolt:
     # Tool skills
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - kubernetes-mcp
     - observability
@@ -208,6 +215,7 @@ atlas:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - git-integration
     - repomix
@@ -226,6 +234,7 @@ stitch:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - pr-review
   review:
@@ -244,6 +253,7 @@ cleo:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - code-review
     - evaluation
@@ -274,6 +284,7 @@ tess:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - testing-strategies
     - evaluation
@@ -302,6 +313,7 @@ cipher:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - github-mcp
     - security-analysis
     - observability
@@ -329,6 +341,7 @@ morgan:
     - context-optimization
     - openmemory
     - context7
+    - llm-docs
     - firecrawl
     - repomix
     - project-development

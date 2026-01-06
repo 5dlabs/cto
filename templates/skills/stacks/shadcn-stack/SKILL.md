@@ -8,6 +8,10 @@ context7_libraries:
   - /tanstack/query
   - /react-hook-form/react-hook-form
   - /effect-ts/effect
+llm_docs:
+  - shadcn
+  - tanstack
+  - effect
 ---
 
 # shadcn Stack

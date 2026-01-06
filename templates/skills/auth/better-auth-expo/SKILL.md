@@ -5,6 +5,8 @@ agents: [tap]
 triggers: [auth, login, expo, mobile, securestore, deep link]
 context7_libraries:
   - /better-auth/better-auth
+llm_docs:
+  - better-auth
 ---
 
 # Better Auth - Expo/React Native Integration

@@ -1016,6 +1016,9 @@ impl CodeTemplateGenerator {
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
+        // Check if CLI supports native skills (for conditional partial rendering)
+        let cli_type_enum = Self::determine_cli_type(code_run);
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": Self::get_github_app_or_default(code_run),
@@ -1032,10 +1035,12 @@ impl CodeTemplateGenerator {
                 .unwrap_or(""),
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
-            "cli_type": Self::determine_cli_type(code_run).to_string(),
+            "cli_type": cli_type_enum.to_string(),
             "iteration": iteration,
+            // Flag to conditionally skip inline partials (for CLIs with native skills)
+            "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
-                "type": Self::determine_cli_type(code_run).to_string(),
+                "type": cli_type_enum.to_string(),
                 "model": render_settings.model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
@@ -1343,7 +1348,8 @@ impl CodeTemplateGenerator {
             .get("settings")
             .cloned()
             .unwrap_or_else(|| json!({}));
-        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let cli_type_enum = Self::determine_cli_type(code_run);
+        let cli_type = cli_type_enum.to_string();
 
         // Extract model from cli_config like other templates do
         let cli_model = cli_config
@@ -1375,6 +1381,8 @@ impl CodeTemplateGenerator {
             "requirements_secret_sources": requirements_secret_sources,
             "cli_config": cli_config,
             "cli_type": cli_type,
+            // Flag to conditionally skip inline partials (for CLIs with native skills)
+            "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
                 "type": cli_type,
                 "model": cli_model, // Use cli_model instead of code_run.spec.model
@@ -1668,7 +1676,8 @@ impl CodeTemplateGenerator {
             .and_then(Value::as_str)
             .unwrap_or(&code_run.spec.model)
             .to_string();
-        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let cli_type_enum = Self::determine_cli_type(code_run);
+        let cli_type = cli_type_enum.to_string();
 
         // Determine frontend stack from agent config (defaults to shadcn)
         // Priority: cli_config.frontendStack > default "shadcn"
@@ -1695,6 +1704,8 @@ impl CodeTemplateGenerator {
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
             "cli_type": cli_type,
+            // Flag to conditionally skip inline partials (for CLIs with native skills)
+            "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -3029,7 +3040,8 @@ impl CodeTemplateGenerator {
             .and_then(Value::as_str)
             .unwrap_or(&code_run.spec.model)
             .to_string();
-        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let cli_type_enum = Self::determine_cli_type(code_run);
+        let cli_type = cli_type_enum.to_string();
 
         // Determine frontend stack from agent config (defaults to shadcn)
         // Priority: cli_config.frontendStack > default "shadcn"
@@ -3054,6 +3066,8 @@ impl CodeTemplateGenerator {
             },
             "cli_config": cli_config,
             "cli_type": cli_type,
+            // Flag to conditionally skip inline partials (for CLIs with native skills)
+            "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
                 "type": cli_type,
                 "model": model,

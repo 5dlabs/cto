@@ -5,6 +5,8 @@ agents: [blaze, nova, rex, grizz]
 triggers: [auth, login, session, signin, signup, oauth, 2fa, passkey, organization]
 context7_libraries:
   - /better-auth/better-auth
+llm_docs:
+  - better-auth
 ---
 
 # Better Auth

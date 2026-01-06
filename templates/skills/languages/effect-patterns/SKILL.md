@@ -3,6 +3,9 @@ name: effect-patterns
 description: Effect TypeScript patterns including services, layers, schema validation, and Elysia integration.
 agents: [nova]
 triggers: [effect, elysia, bun, typescript backend]
+llm_docs:
+  - effect
+  - drizzle
 ---
 
 # Effect TypeScript Patterns

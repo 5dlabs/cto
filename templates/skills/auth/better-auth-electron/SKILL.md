@@ -5,6 +5,8 @@ agents: [spark]
 triggers: [auth, login, electron, desktop, ipc, contextbridge]
 context7_libraries:
   - /better-auth/better-auth
+llm_docs:
+  - better-auth
 ---
 
 # Better Auth - Electron Desktop Integration

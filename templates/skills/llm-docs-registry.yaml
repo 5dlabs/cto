@@ -1,0 +1,100 @@
+# LLM Documentation Registry
+# Maps libraries to their llms.txt endpoints for enriched agent context
+#
+# The llms.txt standard (https://llmstxt.org/) provides LLM-optimized documentation
+# that agents can fetch for up-to-date API references and architecture overviews.
+#
+# Usage:
+# 1. Skills reference entries here via the `llm_docs` frontmatter field
+# 2. Agents can fetch llms.txt content using Firecrawl when needed
+# 3. Build-time caching can pre-fetch content for offline availability
+
+# ============================================================================
+# FRONTEND LIBRARIES
+# ============================================================================
+
+shadcn:
+  name: shadcn/ui
+  description: Beautifully designed, accessible components built with Radix UI and Tailwind CSS
+  llms_txt: https://ui.shadcn.com/llms.txt
+  context7_id: /shadcn-ui/ui
+  skills:
+    - shadcn-stack
+
+tanstack:
+  name: TanStack
+  description: High-quality, open-source libraries for routing, data fetching, state management, tables, and forms
+  llms_txt: https://tanstack.com/llms.txt
+  context7_id: /tanstack/query
+  skills:
+    - shadcn-stack
+    - tanstack-stack
+
+# ============================================================================
+# TYPESCRIPT/EFFECT ECOSYSTEM
+# ============================================================================
+
+effect:
+  name: Effect TypeScript
+  description: Powerful TypeScript library for building complex synchronous and asynchronous programs
+  llms_txt: https://effect.website/llms.txt
+  llms_full_txt: https://effect.website/llms-full.txt
+  context7_id: /effect-ts/effect
+  skills:
+    - effect-patterns
+    - effect-frontend-patterns
+
+# ============================================================================
+# DATABASE / ORM
+# ============================================================================
+
+drizzle:
+  name: Drizzle ORM
+  description: Modern TypeScript ORM - lightweight, tree-shakeable, serverless-ready
+  llms_txt: https://orm.drizzle.team/llms.txt
+  llms_full_txt: https://orm.drizzle.team/llms-full.txt
+  context7_id: /drizzle-team/drizzle-orm
+  skills:
+    - effect-patterns  # Drizzle often used with Effect
+
+# ============================================================================
+# AUTHENTICATION
+# ============================================================================
+
+better-auth:
+  name: Better Auth
+  description: The most comprehensive authentication framework for TypeScript
+  llms_txt: https://www.better-auth.com/llms.txt
+  context7_id: /better-auth/better-auth
+  skills:
+    - better-auth
+    - better-auth-expo
+    - better-auth-electron
+
+# ============================================================================
+# LIBRARIES WITHOUT llms.txt (tracked for future availability)
+# ============================================================================
+
+# next:
+#   name: Next.js
+#   description: The React Framework for the Web
+#   llms_txt: null  # Not available as of 2026-01
+#   context7_id: /vercel/next.js
+#   skills:
+#     - shadcn-stack
+
+# tailwind:
+#   name: Tailwind CSS
+#   description: Utility-first CSS framework
+#   llms_txt: null  # Not available as of 2026-01
+#   context7_id: /tailwindlabs/tailwindcss
+#   skills:
+#     - shadcn-stack
+
+# expo:
+#   name: Expo
+#   description: Open-source platform for universal native apps
+#   llms_txt: null  # Not available as of 2026-01
+#   context7_id: /expo/expo
+#   skills:
+#     - expo-patterns
