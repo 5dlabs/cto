@@ -70,21 +70,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
-          # Show cargo config
-          cat ~/.cargo/config.toml 2>/dev/null || echo "No cargo config"
+          # Check if cargo is already available
+          if command -v cargo &> /dev/null; then
+            echo "Rust already installed"
+            cargo --version
+          elif [ -f "$HOME/.cargo/env" ]; then
+            echo "Sourcing cargo env"
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          else
+            echo "Installing Rust..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
+          # Verify
+          which cargo && cargo --version
 
       - name: Build pm-server binary
         run: |
+          source "$HOME/.cargo/env" 2>/dev/null || true
           cargo build --profile ci -p pm --bin pm-server
           cp target/ci/pm-server pm-server
 
@@ -127,21 +134,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
-          # Show cargo config
-          cat ~/.cargo/config.toml 2>/dev/null || echo "No cargo config"
+          # Check if cargo is already available
+          if command -v cargo &> /dev/null; then
+            echo "Rust already installed"
+            cargo --version
+          elif [ -f "$HOME/.cargo/env" ]; then
+            echo "Sourcing cargo env"
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          else
+            echo "Installing Rust..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
+          # Verify
+          which cargo && cargo --version
 
       - name: Build controller binary
         run: |
+          source "$HOME/.cargo/env" 2>/dev/null || true
           cargo build --profile ci --bin agent-controller
           cp target/ci/agent-controller agent-controller
 
@@ -184,19 +198,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
+          # Check if cargo is already available
+          if command -v cargo &> /dev/null; then
+            echo "Rust already installed"
+            cargo --version
+          elif [ -f "$HOME/.cargo/env" ]; then
+            echo "Sourcing cargo env"
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          else
+            echo "Installing Rust..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
+          # Verify
+          which cargo && cargo --version
 
       - name: Build status-sync binary
         run: |
+          source "$HOME/.cargo/env" 2>/dev/null || true
           cargo build --profile ci -p pm --bin status-sync
           cp target/ci/status-sync status-sync
 
@@ -239,19 +262,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
+          # Check if cargo is already available
+          if command -v cargo &> /dev/null; then
+            echo "Rust already installed"
+            cargo --version
+          elif [ -f "$HOME/.cargo/env" ]; then
+            echo "Sourcing cargo env"
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          else
+            echo "Installing Rust..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
+          # Verify
+          which cargo && cargo --version
 
       - name: Build healer binary
         run: |
+          source "$HOME/.cargo/env" 2>/dev/null || true
           cargo build --profile ci --package healer
           cp target/ci/healer healer
 
@@ -294,19 +326,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Rust for fast builds
+      - name: Setup Rust
         run: |
-          # Source cargo environment
-          source ~/.cargo/env || true
-          # Add cargo to PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          # Verify tools are available
-          which cargo && cargo --version || echo "cargo not found"
-          which sccache && sccache --version || echo "sccache not found"
-          which mold && mold --version || echo "mold not found"
+          # Check if cargo is already available
+          if command -v cargo &> /dev/null; then
+            echo "Rust already installed"
+            cargo --version
+          elif [ -f "$HOME/.cargo/env" ]; then
+            echo "Sourcing cargo env"
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          else
+            echo "Installing Rust..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source "$HOME/.cargo/env"
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
+          # Verify
+          which cargo && cargo --version
 
       - name: Build tools binaries
         run: |
+          source "$HOME/.cargo/env" 2>/dev/null || true
           cargo build --profile ci --package tools --bin tools-server
           cargo build --profile ci --package cto-mcp --bin cto-mcp
           cp target/ci/tools-server tools-server
