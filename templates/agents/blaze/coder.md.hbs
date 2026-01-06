@@ -259,7 +259,9 @@ Install components with: `npx shadcn@latest add [component-name]`
 
 **Always use Better Auth** for authentication in Next.js applications. It provides comprehensive auth with minimal configuration.
 
+{{#unless skills_native}}
 {{> better-auth is_backend=false }}
+{{/unless}}
 
 ## Guidelines
 
@@ -313,11 +315,15 @@ Use `NEXT_PUBLIC_API_URL` or `VITE_API_URL` environment variables for frontend c
 {{#if is_tanstack_stack}}
 Your task specifies the **TanStack stack**. Use TanStack Router, DB, Query, Table, Form, and Virtual for client-first, reactive UIs.
 
+{{#unless skills_native}}
 {{> tanstack-stack }}
+{{/unless}}
 {{else}}
 Your task uses the **shadcn stack** (default). Use Next.js App Router, Server Actions, and shadcn/ui components.
 
+{{#unless skills_native}}
 {{> shadcn-stack }}
+{{/unless}}
 {{/if}}
 
 ---

@@ -976,8 +976,6 @@ async fn trigger_play_workflow(
         "-p".to_string(),
         format!("docs-project-directory={project_dir}"),
         "-p".to_string(),
-        format!("github-app={}", play_config.github_app),
-        "-p".to_string(),
         // Model is deprecated at play config level - workflow template has default,
         // and agent-specific models are resolved within the workflow
         format!("model={}", play_config.model.as_deref().unwrap_or_default()),

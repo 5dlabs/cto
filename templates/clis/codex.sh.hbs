@@ -73,6 +73,20 @@ CODEX_CMD+=("--dangerously-bypass-approvals-and-sandbox")
 echo "⚠️ DANGEROUS: Bypassing all approvals and sandbox"
 {{/if}}
 
+# Copy skills to .codex/skills/ for native skill discovery
+{{#if skills}}
+echo "📚 Setting up agent skills..."
+{{#each skills}}
+SKILL_SOURCE=$(find /templates/skills -name "{{this}}" -type d 2>/dev/null | head -1)
+if [ -n "$SKILL_SOURCE" ] && [ -f "$SKILL_SOURCE/SKILL.md" ]; then
+    mkdir -p "$CODEX_WORK_DIR/.codex/skills/{{this}}"
+    cp "$SKILL_SOURCE/SKILL.md" "$CODEX_WORK_DIR/.codex/skills/{{this}}/"
+    echo "  ✓ Loaded skill: {{this}}"
+fi
+{{/each}}
+echo ""
+{{/if}}
+
 # Determine prompt source
 if [ -n "${PROMPT_CONTENT:-}" ]; then
     PROMPT_TEXT="$PROMPT_CONTENT"

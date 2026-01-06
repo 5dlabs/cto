@@ -219,7 +219,9 @@ autoUpdater.on('update-downloaded', () => {
 
 **Always use Better Auth** for authentication in Electron applications. Use the React client in the sandboxed renderer with secure IPC patterns.
 
+{{#unless skills_native}}
 {{> better-auth-electron }}
+{{/unless}}
 
 ---
 

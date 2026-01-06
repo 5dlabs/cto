@@ -153,6 +153,16 @@ impl CodeTemplateGenerator {
             .map_or(CLIType::Claude, |cfg| cfg.cli_type)
     }
 
+    /// Check if the CLI supports native skill loading.
+    /// CLIs with native skill support: Claude Code, Factory/Droid, OpenCode, Codex
+    /// CLIs without native skill support: Cursor, Gemini, Aider, etc.
+    fn cli_supports_native_skills(cli_type: CLIType) -> bool {
+        matches!(
+            cli_type,
+            CLIType::Claude | CLIType::Factory | CLIType::OpenCode | CLIType::Codex
+        )
+    }
+
     fn generate_claude_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
@@ -498,7 +508,8 @@ impl CodeTemplateGenerator {
 
         let render_settings = Self::build_cli_render_settings(code_run, cli_config);
         let model = render_settings.model.clone();
-        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let cli_type_enum = Self::determine_cli_type(code_run);
+        let cli_type = cli_type_enum.to_string();
 
         let workflow_name = extract_workflow_name(code_run).unwrap_or_else(|_| {
             format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0))
@@ -534,6 +545,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -891,7 +903,8 @@ impl CodeTemplateGenerator {
             .unwrap_or_default();
         let namespace = code_run.metadata.namespace.as_deref().unwrap_or("cto");
 
-        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let cli_type_enum = Self::determine_cli_type(code_run);
+        let cli_type = cli_type_enum.to_string();
         let job_type = Self::determine_job_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
@@ -925,6 +938,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             // Watch-specific context
             "iteration": iteration,
             "max_iterations": max_iterations,
@@ -1189,6 +1203,9 @@ impl CodeTemplateGenerator {
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
 
+        // Get skills for agent (used by Claude Code and Factory for native skill loading)
+        let skills = Self::get_agent_skills(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
             "service": code_run.spec.service,
@@ -1211,6 +1228,10 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            // Skills for native skill loading (Claude Code, Factory, OpenCode, Codex)
+            "skills": skills,
+            // Flag to conditionally render partials (skip for CLIs with native skills)
+            "skills_native": Self::cli_supports_native_skills(cli_type),
         });
 
         handlebars
@@ -1552,7 +1573,8 @@ impl CodeTemplateGenerator {
             .as_ref()
             .map_or_else(|| code_run.spec.model.clone(), |cfg| cfg.model.clone());
 
-        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let cli_type_enum = Self::determine_cli_type(code_run);
+        let cli_type = cli_type_enum.to_string();
         let job_type = Self::determine_job_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
@@ -1581,6 +1603,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
                 "type": cli_type,
                 "model": cli_model,
@@ -2904,7 +2927,8 @@ impl CodeTemplateGenerator {
             format!("play-task-{}-workflow", code_run.spec.task_id.unwrap_or(0))
         });
 
-        let cli_type = Self::determine_cli_type(code_run).to_string();
+        let cli_type_enum = Self::determine_cli_type(code_run);
+        let cli_type = cli_type_enum.to_string();
         let job_type = Self::determine_job_type(code_run);
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
@@ -2933,6 +2957,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
                 "type": cli_type,
                 "model": render_settings.model,
@@ -3650,6 +3675,94 @@ impl CodeTemplateGenerator {
             .or_else(|| code_run.spec.env.get("MAX_RETRIES"))
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(10) // Platform default
+    }
+
+    /// Get the skills for an agent from skill-mappings.yaml based on agent name and job type.
+    /// Returns a list of skill names that should be loaded for the agent.
+    /// For Claude Code, Factory, OpenCode, Codex: skills are copied to native skill directories.
+    ///
+    /// Skill resolution order:
+    /// 1. Agent's `default` skills (always loaded)
+    /// 2. Agent's job-type-specific skills (e.g., `healer`, `coder`) - merged with defaults
+    fn get_agent_skills(code_run: &CodeRun) -> Vec<String> {
+        use crate::tasks::template_paths::SKILLS_MAPPINGS;
+
+        let agent_name = Self::get_agent_name(code_run);
+        let job_type = Self::determine_job_type(code_run);
+        let templates_path = get_templates_path();
+        let mappings_path = format!("{templates_path}/{SKILLS_MAPPINGS}");
+
+        // Try to load and parse the skill mappings YAML
+        let mappings_content = match fs::read_to_string(&mappings_path) {
+            Ok(content) => content,
+            Err(e) => {
+                debug!(
+                    "Could not load skill mappings from {}: {} - using empty skills",
+                    mappings_path, e
+                );
+                return Vec::new();
+            }
+        };
+
+        // Parse YAML to get agent's skills
+        let mappings: serde_yaml::Value = match serde_yaml::from_str(&mappings_content) {
+            Ok(v) => v,
+            Err(e) => {
+                warn!(
+                    "Failed to parse skill mappings YAML: {} - using empty skills",
+                    e
+                );
+                return Vec::new();
+            }
+        };
+
+        let mut skills = Vec::new();
+
+        // Look up the agent in mappings
+        if let Some(agent_config) = mappings.get(&agent_name) {
+            // 1. Get default skills (always loaded)
+            if let Some(defaults) = agent_config.get("default") {
+                if let Some(skills_array) = defaults.as_sequence() {
+                    for skill in skills_array {
+                        if let Some(s) = skill.as_str() {
+                            skills.push(s.to_string());
+                        }
+                    }
+                }
+            }
+
+            // 2. Get job-type-specific skills (merged with defaults)
+            // Job types: coder, healer, intake, quality, test, deploy, security, review, integration
+            if let Some(job_skills) = agent_config.get(job_type) {
+                if let Some(skills_array) = job_skills.as_sequence() {
+                    for skill in skills_array {
+                        if let Some(s) = skill.as_str() {
+                            // Only add if not already present
+                            if !skills.contains(&s.to_string()) {
+                                skills.push(s.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if skills.is_empty() {
+            debug!(
+                "No skill mappings found for agent '{}' job '{}' - using empty skills",
+                agent_name, job_type
+            );
+        } else {
+            debug!(
+                "Loaded {} skills for agent '{}' job '{}': {:?}",
+                skills.len(),
+                agent_name,
+                job_type,
+                skills
+            );
+        }
+
+        skills
     }
 
     /// Determine the job type from a CodeRun based on run_type, service, and template settings.

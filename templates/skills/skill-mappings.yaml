@@ -1,0 +1,237 @@
+# Skill Mappings Configuration
+# Maps agents to their default and job-type-specific skills
+#
+# Skills are loaded based on:
+# 1. Default skills - always loaded for the agent
+# 2. Job-type skills - merged with defaults based on run_type
+# 3. Optional skills - loaded based on triggers or explicit request (future)
+#
+# Job types: coder, healer, intake, quality, test, deploy, security, review, integration
+#
+# For Claude Code, Factory, OpenCode, Codex: skills are copied to native skill directories
+# For other CLIs: skill content is baked into AGENTS.md
+
+# ============================================================================
+# FRONTEND AGENTS
+# ============================================================================
+
+blaze:
+  description: "Frontend implementation expert for React/Next.js"
+  default:
+    - context-fundamentals
+    - shadcn-stack
+  # Job-type-specific skills (merged with default)
+  coder:
+    - tool-design
+  healer:
+    - incident-response
+  # Optional skills (triggered by keywords in prompt)
+  optional:
+    tanstack-stack:
+      replaces: shadcn-stack
+      description: "Use for TanStack-based client-first applications"
+    better-auth:
+      triggers: [auth, login, session, signin, signup, oauth]
+      description: "Authentication implementation"
+    anime-js:
+      triggers: [animation, animate, motion, transition]
+      description: "Animation patterns for web interfaces"
+    memory-systems:
+      triggers: [memory, persistence, state]
+      description: "Agent memory architecture patterns"
+
+tap:
+  description: "Expo React Native mobile development"
+  default:
+    - context-fundamentals
+    - expo-patterns
+  coder:
+    - tool-design
+    - better-auth-expo  # Platform-specific Expo auth patterns
+  healer:
+    - incident-response
+  optional: {}
+
+spark:
+  description: "Electron desktop application development"
+  default:
+    - context-fundamentals
+    - electron-patterns
+  coder:
+    - tool-design
+    - better-auth-electron  # Platform-specific Electron auth patterns
+  healer:
+    - incident-response
+  optional: {}
+
+# ============================================================================
+# BACKEND AGENTS
+# ============================================================================
+
+rex:
+  description: "Rust specialist with axum, tokio, sqlx"
+  default:
+    - context-fundamentals
+    - rust-patterns
+  coder:
+    - tool-design
+  healer:
+    - incident-response
+  optional:
+    better-auth:
+      triggers: [auth, session]
+      description: "When integrating with Better Auth backend"
+    memory-systems:
+      triggers: [memory, persistence, cache]
+      description: "Agent memory architecture patterns"
+
+grizz:
+  description: "Go specialist with chi, grpc, pgx"
+  default:
+    - context-fundamentals
+    - go-patterns
+  coder:
+    - tool-design
+  healer:
+    - incident-response
+  optional:
+    better-auth:
+      triggers: [auth, session]
+    memory-systems:
+      triggers: [memory, persistence, cache]
+
+nova:
+  description: "Node.js/Bun with Elysia, Effect, Drizzle"
+  default:
+    - context-fundamentals
+    - effect-patterns
+  coder:
+    - tool-design
+    - better-auth  # Nova handles auth backend setup
+  healer:
+    - incident-response
+  optional:
+    shadcn-stack:
+      triggers: [frontend, ui, react]
+      description: "When Nova needs to work on frontend code"
+    memory-systems:
+      triggers: [memory, persistence, cache]
+
+# ============================================================================
+# INFRASTRUCTURE AGENTS
+# ============================================================================
+
+bolt:
+  description: "Infrastructure setup and Task 1 bootstrap"
+  default:
+    - context-fundamentals
+    - kubernetes-operators
+  deploy:
+    - tool-design
+  healer:
+    - incident-response
+  optional: {}
+
+# ============================================================================
+# INTEGRATION AGENTS
+# ============================================================================
+
+atlas:
+  description: "Integration and merge coordination"
+  default:
+    - context-fundamentals
+    - git-integration
+  integration:
+    - multi-agent-patterns
+  optional:
+    multi-agent-patterns:
+      triggers: [coordination, orchestration, multi-agent]
+      description: "Multi-agent coordination patterns"
+
+stitch:
+  description: "Pull request review and code review"
+  default:
+    - context-fundamentals
+    - pr-review
+  review:
+    - code-review
+  optional: {}
+
+# ============================================================================
+# QUALITY AGENTS
+# ============================================================================
+
+cleo:
+  description: "Code quality and review"
+  default:
+    - context-fundamentals
+    - code-review
+    - evaluation
+  quality:
+    - tool-design
+  optional:
+    shadcn-stack:
+      triggers: [frontend, react, next]
+    tanstack-stack:
+      triggers: [tanstack, router, query, db]
+    better-auth:
+      triggers: [auth, security]
+    rust-patterns:
+      triggers: [rust, cargo, clippy]
+    go-patterns:
+      triggers: [go, golang]
+    effect-patterns:
+      triggers: [effect, typescript, bun]
+
+tess:
+  description: "Testing and validation"
+  default:
+    - context-fundamentals
+    - testing-strategies
+    - evaluation
+  test:
+    - tool-design
+  optional:
+    shadcn-stack:
+      triggers: [frontend, component, e2e]
+    better-auth:
+      triggers: [auth, security]
+    rust-patterns:
+      triggers: [rust]
+    go-patterns:
+      triggers: [go, golang]
+    effect-patterns:
+      triggers: [effect, typescript]
+
+cipher:
+  description: "Security analysis"
+  default:
+    - context-fundamentals
+    - security-analysis
+  security:
+    - tool-design
+  optional:
+    better-auth:
+      triggers: [auth, oauth, session, token]
+    rust-patterns:
+      triggers: [rust]
+    go-patterns:
+      triggers: [go, golang]
+    effect-patterns:
+      triggers: [effect, typescript]
+
+# ============================================================================
+# PROJECT MANAGEMENT
+# ============================================================================
+
+morgan:
+  description: "Project management and PRD intake"
+  default:
+    - context-fundamentals
+  intake:
+    - prd-analysis
+    - multi-agent-patterns
+    - frontend-stack-selection  # Decision framework for frontend stack assignment
+  healer:
+    - incident-response
+  optional: {}

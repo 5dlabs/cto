@@ -26,6 +26,32 @@ WORK_DIR="${WORK_DIR:-/workspace}"
 cd "$WORK_DIR"
 
 # =========================================================================
+# Skills Setup - Copy skills for native discovery
+# OpenCode supports both .opencode/skill/ and .claude/skills/ paths
+# Reference: https://opencode.ai/docs/skills/
+# =========================================================================
+{{#if skills}}
+echo "Setting up OpenCode skills..."
+SKILLS_SOURCE="${SKILLS_PATH:-/templates/skills}"
+SKILLS_TARGET="$CLAUDE_WORK_DIR/.claude/skills"
+mkdir -p "$SKILLS_TARGET"
+
+{{#each skills}}
+SKILL_NAME="{{this}}"
+# Find skill in any category subdirectory
+for category in stacks auth context languages platforms quality workflow animations tools; do
+    if [ -f "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" ]; then
+        mkdir -p "$SKILLS_TARGET/$SKILL_NAME"
+        cp "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" "$SKILLS_TARGET/$SKILL_NAME/"
+        echo "✓ Loaded skill: $SKILL_NAME"
+        break
+    fi
+done
+{{/each}}
+echo ""
+{{/if}}
+
+# =========================================================================
 # Ensure opencode.json exists for AGENTS.md discovery
 # =========================================================================
 if [ ! -f "$WORK_DIR/opencode.json" ]; then

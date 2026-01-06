@@ -211,7 +211,9 @@ const app = new Elysia()
 
 **Always use Better Auth** for authentication in Node.js/Bun backends. It provides comprehensive auth with minimal configuration.
 
+{{#unless skills_native}}
 {{> better-auth is_backend=true }}
+{{/unless}}
 
 ## Local Validation Commands
 

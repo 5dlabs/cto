@@ -45,6 +45,14 @@ pub const PARTIAL_INFRASTRUCTURE_SETUP: &str = "infrastructure-setup.sh.hbs";
 pub const PARTIAL_INFRASTRUCTURE_VERIFY: &str = "infrastructure-verify.sh.hbs";
 
 // ============================================================================
+// Skills (modular context loaded just-in-time)
+// Structure: skills/{category}/{skill_name}/SKILL.md
+// ============================================================================
+
+pub const SKILLS_DIR: &str = "skills";
+pub const SKILLS_MAPPINGS: &str = "skills/skill-mappings.yaml";
+
+// ============================================================================
 // CLI-specific templates (invocation scripts)
 // Flat structure: clis/{cli}.sh.hbs
 // ============================================================================
