@@ -240,7 +240,7 @@ pub struct RemediationTarget {
     pub repository: String,
     /// GitHub App to use
     pub github_app: String,
-    /// Branch to target (usually main)
+    /// Branch to target (usually develop)
     pub branch: String,
     /// Agent to use for remediation
     pub agent: String,
@@ -255,7 +255,7 @@ impl Default for RemediationTarget {
         Self {
             repository: "5dlabs/cto".to_string(),
             github_app: "5DLabs-Bolt".to_string(),
-            branch: "main".to_string(),
+            branch: "develop".to_string(),
             agent: "bolt".to_string(),
             cli: "claude".to_string(),
             model: "claude-sonnet-4-5-20250514".to_string(),
