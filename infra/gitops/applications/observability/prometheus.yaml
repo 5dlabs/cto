@@ -47,8 +47,10 @@ spec:
           # Data retention
           retention: 15d
           # Enable remote write receiver for OTel collector
+          # Enable lifecycle API for hot-reload support (/-/reload endpoint)
           extraFlags:
             - web.enable-remote-write-receiver
+            - web.enable-lifecycle
           # Global scrape configuration
           global:
             scrape_interval: 15s
@@ -94,10 +96,12 @@ spec:
                       namespace: observability
                       service: otel-collector
               # Loki metrics (for LokiDown alert)
+              # Note: Scrape loki singleBinary pod on port 3100, NOT the nginx gateway
+              # The loki-gateway (nginx) does not expose /metrics - see grafana/loki#13201
               - job_name: loki
                 static_configs:
                   - targets:
-                      - loki-gateway.observability.svc.cluster.local:80
+                      - loki.observability.svc.cluster.local:3100
                     labels:
                       namespace: observability
                       service: loki

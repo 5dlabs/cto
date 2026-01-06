@@ -75,7 +75,8 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     // WORKER/ExecutionContext INFO-level logs with error-related JSON keys
     // Format: F [WORKER ... INFO Worker] "key_with_errors": {
     // These are configuration dumps, not actual errors
-    r"(?i)\[WORKER\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}Z\s+INFO\s+\w+\]",
+    // The optional F prefix comes from Fluent Bit log collection
+    r"(?i)^F?\s*\[WORKER\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}Z\s+INFO\s+\w+\]",
     // JSON keys containing "errors" as a suffix (configuration field names, not actual errors)
     // Examples: "actions_display_helpful_actions_download_errors": {
     r#""[^"]+_errors"\s*:\s*\{"#,
@@ -110,9 +111,11 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     // Loki query state metadata (not actual log content)
     // F State: Error indicates query state, not an application error
     r"^F\s+State:\s*(Error|Success|Pending)",
-    // Kubernetes container log prefix (F/I/W/E) followed by info-level content
+    // Kubernetes container log prefix (F) followed by info-level content
     // The F prefix from k8s logging doesn't indicate error when content is info-level
+    // Patterns: "F time=..." with level=info, "F ..." with level=info anywhere
     r"^F\s+.*level\s*=\s*info",
+    r"^F\s+time=.*level=info",
     // Kubernetes klog-style INFO/WARNING/DEBUG log prefixes
     // Format: I0104 (I=INFO, 0104=Jan 4th), W0104 (W=WARNING), D0104 (D=DEBUG)
     // These are not errors even if the message contains "Error" as a quoted string or field name
@@ -124,6 +127,12 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     // These are retry errors from Prometheus-style components that will automatically recover
     // Example: level=error caller=runutil.go:117 msg="function failed. Retrying in next tick" err="trigger reload: ..."
     r"(?i)runutil\.go.*function\s+failed.*Retrying\s+in\s+next\s+tick",
+    // Kilo mesh network overlay transient errors (self-recovering)
+    // These occur when WireGuard/VPN interfaces are initializing or nodes are joining the mesh
+    // Kilo automatically retries and recovers from these errors
+    // Example: {"component":"kilo","error":"failed to get interface: Link not found","level":"error"}
+    r#"(?i)"component"\s*:\s*"kilo".*"error"\s*:\s*"[^"]*Link not found"#,
+    r#"(?i)"error"\s*:\s*"[^"]*Link not found[^"]*".*"component"\s*:\s*"kilo""#,
 ];
 
 /// Get compiled regex patterns for error level detection (cached)
@@ -1418,5 +1427,129 @@ mod tests {
             .iter()
             .any(|e| e.line.contains("actions_skip_retry")));
         assert!(!filtered.iter().any(|e| e.line.contains("errorMessages")));
+    }
+
+    #[test]
+    fn test_is_false_positive_retryable_error_info_log() {
+        // Argo workflow info-level logs about retryable errors - not actual errors
+        // The log level is explicitly "info" even though the message mentions "error"
+        assert!(is_false_positive(
+            r#"F time="2026-01-06T05:55:04.344Z" level=info msg="Waiting for resource coderun.agents.platform/intake-prd-alerthub-e2e-tes-qd944 in namespace cto resulted in retryable error: Neither success condition..."#
+        ));
+    }
+
+    #[test]
+    fn test_is_false_positive_klog_warning_with_error_message() {
+        // Kubernetes klog WARNING-level logs (W0106 = WARNING on Jan 6th)
+        // The "Error obtaining Endpoints" is a warning about a missing service, not a critical error
+        assert!(is_false_positive(
+            r#"F W0106 05:55:04.388040       7 controller.go:1113] Error obtaining Endpoints for Service "ollama-operator-system/ollama-model-phi4": no object matching key "ollama-operator-system/ollama-model-phi4" in local store"#
+        ));
+        assert!(is_false_positive(
+            r#"F W0106 05:55:04.388067       7 controller.go:1113] Error obtaining Endpoints for Service "llama-stack/llamastack-starter": no object matching key "llama-stack/llamastack-starter" in local store"#
+        ));
+    }
+
+    #[test]
+    fn test_filter_current_log_scan_false_positives() {
+        use chrono::Utc;
+
+        // Test cases from the actual log scan that detected 1000 errors
+        // All of these should be filtered as false positives
+        let entries = vec![
+            // WORKER INFO log with errorMessages JSON key
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-06 05:55:04Z INFO ExecutionContext]   "errorMessages": ["#.to_string(),
+                labels: HashMap::new(),
+            },
+            // ActionCommandManager INFO log with "command error"
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r"F [WORKER 2026-01-06 05:55:04Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+            // Argo workflow info-level log about retryable error
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F time="2026-01-06T05:55:04.344Z" level=info msg="Waiting for resource coderun.agents.platform/intake-prd-alerthub-e2e-tes-qd944 in namespace cto resulted in retryable error: Neither success condition..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // klog WARNING about missing Endpoints (ollama-model-phi4)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F W0106 05:55:04.388040       7 controller.go:1113] Error obtaining Endpoints for Service "ollama-operator-system/ollama-model-phi4": no object matching key "ollama-operator-system/ollama-model-phi4" in local store"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // klog WARNING about missing Endpoints (llamastack-starter)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F W0106 05:55:04.388067       7 controller.go:1113] Error obtaining Endpoints for Service "llama-stack/llamastack-starter": no object matching key "llama-stack/llamastack-starter" in local store"#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All entries should be filtered as false positives
+        assert_eq!(
+            filtered.len(),
+            0,
+            "Expected all false positives to be filtered, but got: {:?}",
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_kilo_mesh_link_not_found() {
+        // Kilo mesh network overlay transient errors when interfaces are initializing
+        // These are automatically retried and recovered by Kilo
+        assert!(is_false_positive(
+            r#"{"caller":"mesh.go:485","component":"kilo","error":"failed to get interface: Link not found","level":"error","ts":"2026-01-06T09:48:23.300916086Z"}"#
+        ));
+        // Different JSON key order
+        assert!(is_false_positive(
+            r#"{"error":"failed to get interface: Link not found","component":"kilo","level":"error"}"#
+        ));
+        // With OTEL Body wrapper
+        assert!(is_false_positive(
+            r#"F Body: Str({"component":"kilo","error":"failed to get interface: Link not found","level":"error"})"#
+        ));
+        // Non-kilo component should NOT be filtered
+        assert!(!is_false_positive(
+            r#"{"component":"other","error":"failed to get interface: Link not found","level":"error"}"#
+        ));
+    }
+
+    #[test]
+    fn test_filter_kilo_mesh_transient_errors() {
+        use chrono::Utc;
+
+        // Test case from the actual log scan
+        let entries = vec![
+            // Kilo mesh "Link not found" error - should be filtered as transient
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"{"caller":"mesh.go:485","component":"kilo","error":"failed to get interface: Link not found","level":"error","ts":"2026-01-06T09:48:23.300916086Z"}"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual error - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"{"component":"controller","error":"database connection failed","level":"error"}"#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have filtered out the Kilo transient error
+        assert_eq!(filtered.len(), 1);
+
+        // Only the actual database error should remain
+        assert!(filtered
+            .iter()
+            .any(|e| e.line.contains("database connection failed")));
+        assert!(!filtered.iter().any(|e| e.line.contains("Link not found")));
     }
 }
