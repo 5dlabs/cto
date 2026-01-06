@@ -3693,6 +3693,13 @@ impl CodeTemplateGenerator {
     fn get_agent_system_prompt_template(code_run: &CodeRun) -> String {
         let github_app = Self::get_github_app_or_default(code_run);
         let job_type = Self::determine_job_type(code_run);
+        let run_type = code_run.spec.run_type.as_str();
+
+        // Intake/documentation runs always use morgan templates regardless of github_app
+        // This handles cases like github_app = "cto-dev" for development workflows
+        if run_type == "intake" || run_type == "documentation" {
+            return format!("agents/morgan/{}.md.hbs", job_type);
+        }
 
         // Map GitHub app to agent name
         // Explicit patterns document known agents even if some share defaults
@@ -4552,6 +4559,18 @@ mod tests {
         assert_eq!(
             template_path, "agents/morgan/intake.md.hbs",
             "Morgan intake run should use intake prompt"
+        );
+    }
+
+    #[test]
+    fn test_system_prompt_template_intake_unknown_github_app() {
+        // Intake runs with unknown github_app (like "cto-dev") should still use morgan templates
+        let mut code_run = create_test_code_run(Some("cto-dev".to_string()));
+        code_run.spec.run_type = "intake".to_string();
+        let template_path = CodeTemplateGenerator::get_agent_system_prompt_template(&code_run);
+        assert_eq!(
+            template_path, "agents/morgan/intake.md.hbs",
+            "Intake run with unknown github_app should use morgan intake template"
         );
     }
 
