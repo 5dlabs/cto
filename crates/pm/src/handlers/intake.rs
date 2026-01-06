@@ -863,13 +863,13 @@ pub async fn read_project_config(
 // CodeRun Direct Creation (New Architecture)
 // =========================================================================
 
-/// Submit an intake CodeRun directly to Kubernetes.
+/// Submit an intake `CodeRun` directly to Kubernetes.
 ///
 /// This is the new architecture that replaces the Argo workflow approach.
 /// Benefits:
-/// - Single CodeRun with Linear sidecar logging ALL progress
-/// - No Argo workflow needed (direct CodeRun creation)
-/// - Project-specific cto-config.json settings used
+/// - Single `CodeRun` with Linear sidecar logging ALL progress
+/// - No Argo workflow needed (direct `CodeRun` creation)
+/// - Project-specific `cto-config.json` settings used
 /// - Simpler architecture
 ///
 /// # Arguments
@@ -879,7 +879,7 @@ pub async fn read_project_config(
 /// * `config` - Server-side intake configuration (defaults)
 ///
 /// # Returns
-/// `IntakeResult` with the CodeRun name and ConfigMap name
+/// `IntakeResult` with the `CodeRun` name and `ConfigMap` name
 #[allow(clippy::too_many_lines)]
 pub async fn submit_intake_coderun(
     kube_client: &KubeClient,
