@@ -2244,4 +2244,242 @@ Content here";
         assert!(result.warnings.len() >= 3);
         assert!(result.warnings[0].contains("3 tasks"));
     }
+
+    // =========================================================================
+    // CTO Config Generation Tests
+    // =========================================================================
+
+    /// Helper to create a test IntakeRequest with minimal required fields
+    fn create_test_intake_request() -> IntakeRequest {
+        IntakeRequest {
+            session_id: "test-session-123".to_string(),
+            prd_issue_id: "issue-456".to_string(),
+            prd_identifier: "TSK-1".to_string(),
+            team_id: "team-789".to_string(),
+            title: "My Test Project".to_string(),
+            project_name: Some("my-test-project".to_string()),
+            prd_content: "Test PRD content".to_string(),
+            architecture_content: None,
+            repository_url: Some("https://github.com/5dlabs/my-test-project".to_string()),
+            github_visibility: "private".to_string(),
+            source_branch: Some("main".to_string()),
+            tech_stack: TechStack::default(),
+            cto_config: crate::config::CtoConfig::default(),
+            existing_project: None,
+        }
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_valid_json() {
+        let request = create_test_intake_request();
+        let config_str = generate_project_cto_config(&request);
+
+        // Should produce valid JSON
+        let parsed: serde_json::Value = serde_json::from_str(&config_str)
+            .expect("Generated config should be valid JSON");
+
+        // Should have version
+        assert_eq!(parsed["version"], "1.0");
+
+        // Should have defaults section
+        assert!(parsed["defaults"].is_object());
+        assert!(parsed["defaults"]["intake"].is_object());
+        assert!(parsed["defaults"]["linear"].is_object());
+        assert!(parsed["defaults"]["play"].is_object());
+
+        // Should have agents section
+        assert!(parsed["agents"].is_object());
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_repository_extraction() {
+        let mut request = create_test_intake_request();
+        request.repository_url = Some("https://github.com/myorg/myrepo".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Repository should be extracted without https://github.com/ prefix
+        assert_eq!(parsed["defaults"]["play"]["repository"], "myorg/myrepo");
+        assert_eq!(parsed["defaults"]["play"]["docsRepository"], "myorg/myrepo");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_repository_with_git_suffix() {
+        let mut request = create_test_intake_request();
+        request.repository_url = Some("https://github.com/myorg/myrepo.git".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Should strip .git suffix
+        assert_eq!(parsed["defaults"]["play"]["repository"], "myorg/myrepo");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_ssh_repository() {
+        let mut request = create_test_intake_request();
+        request.repository_url = Some("git@github.com:myorg/myrepo.git".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Should handle SSH-style URLs
+        assert_eq!(parsed["defaults"]["play"]["repository"], "myorg/myrepo");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_no_repository() {
+        let mut request = create_test_intake_request();
+        request.repository_url = None;
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Should fall back to default
+        assert_eq!(
+            parsed["defaults"]["play"]["repository"],
+            "5dlabs/unnamed-project"
+        );
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_service_name() {
+        let mut request = create_test_intake_request();
+        request.project_name = Some("My Cool Project!".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Service name should be sanitized (lowercase, hyphenated)
+        assert_eq!(parsed["defaults"]["play"]["service"], "my-cool-project");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_team_id() {
+        let mut request = create_test_intake_request();
+        request.team_id = "team-abc-123".to_string();
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Team ID should be included in linear config
+        assert_eq!(parsed["defaults"]["linear"]["teamId"], "team-abc-123");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_source_branch() {
+        let mut request = create_test_intake_request();
+        request.source_branch = Some("develop".to_string());
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Source branch should be included
+        assert_eq!(parsed["defaults"]["intake"]["sourceBranch"], "develop");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_default_source_branch() {
+        let mut request = create_test_intake_request();
+        request.source_branch = None;
+
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Should default to "main"
+        assert_eq!(parsed["defaults"]["intake"]["sourceBranch"], "main");
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_all_agents_present() {
+        let request = create_test_intake_request();
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // All expected agents should be present
+        let expected_agents = [
+            "morgan", "rex", "blaze", "cleo", "tess", "cipher", "atlas", "bolt",
+        ];
+
+        for agent in expected_agents {
+            assert!(
+                parsed["agents"][agent].is_object(),
+                "Agent '{}' should be present in config",
+                agent
+            );
+
+            // Each agent should have required fields
+            assert!(
+                parsed["agents"][agent]["githubApp"].is_string(),
+                "Agent '{}' should have githubApp",
+                agent
+            );
+            assert!(
+                parsed["agents"][agent]["cli"].is_string(),
+                "Agent '{}' should have cli",
+                agent
+            );
+            assert!(
+                parsed["agents"][agent]["model"].is_string(),
+                "Agent '{}' should have model",
+                agent
+            );
+            assert!(
+                parsed["agents"][agent]["tools"].is_object(),
+                "Agent '{}' should have tools",
+                agent
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_project_cto_config_agent_tools() {
+        let request = create_test_intake_request();
+        let config_str = generate_project_cto_config(&request);
+        let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
+
+        // Rex should have GitHub tools
+        let rex_tools = &parsed["agents"]["rex"]["tools"]["remote"];
+        assert!(rex_tools.is_array());
+        let rex_tools_arr: Vec<&str> = rex_tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert!(rex_tools_arr.contains(&"github_create_pull_request"));
+        assert!(rex_tools_arr.contains(&"github_push_files"));
+
+        // Blaze should have shadcn tools
+        let blaze_tools = &parsed["agents"]["blaze"]["tools"]["remote"];
+        let blaze_tools_arr: Vec<&str> = blaze_tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert!(blaze_tools_arr.contains(&"shadcn_list_components"));
+        assert!(blaze_tools_arr.contains(&"shadcn_get_component"));
+
+        // Cipher should have security scanning tools
+        let cipher_tools = &parsed["agents"]["cipher"]["tools"]["remote"];
+        let cipher_tools_arr: Vec<&str> = cipher_tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert!(cipher_tools_arr.contains(&"github_list_code_scanning_alerts"));
+        assert!(cipher_tools_arr.contains(&"github_list_secret_scanning_alerts"));
+    }
+
+    #[test]
+    fn test_derive_service_name() {
+        assert_eq!(derive_service_name("My Project"), "my-project");
+        assert_eq!(derive_service_name("my-project"), "my-project");
+        assert_eq!(derive_service_name("My Cool App!"), "my-cool-app");
+        assert_eq!(derive_service_name("TEST_PROJECT_123"), "test-project-123");
+        assert_eq!(derive_service_name("  spaces  "), "spaces");
+    }
 }
