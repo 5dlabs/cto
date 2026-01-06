@@ -387,7 +387,7 @@ impl RemediationTracker {
                 number: n,
                 title: String::new(),
                 head_ref: tracked.branch.clone(),
-                base_ref: "main".to_string(),
+                base_ref: "develop".to_string(),
                 html_url: format!("https://github.com/{}/pull/{}", tracked.repository, n),
                 state: "open".to_string(),
                 mergeable: None,
