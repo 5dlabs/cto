@@ -31,6 +31,8 @@ jobs:
       pm: ${{ steps.filter.outputs.pm }}
       controller: ${{ steps.filter.outputs.controller }}
       sidecar: ${{ steps.filter.outputs.sidecar }}
+      healer: ${{ steps.filter.outputs.healer }}
+      tools: ${{ steps.filter.outputs.tools }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -47,8 +49,17 @@ jobs:
             sidecar:
               - 'crates/pm/**'
               - 'infra/images/linear-sidecar/**'
+            healer:
+              - 'crates/healer/**'
+              - 'crates/notify/**'
+              - 'infra/images/healer/**'
+              - 'templates/healer/**'
+            tools:
+              - 'crates/tools/**'
+              - 'crates/mcp/**'
+              - 'infra/images/tools/**'
 
-  # Build PM Server
+  # Build PM Server (using Docker multi-stage build for robustness)
   build-pm:
     needs: changes
     if: needs.changes.outputs.pm == 'true' || github.event.inputs.force_all == 'true'
@@ -56,39 +67,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust (k8s-runner)
-        uses: ./.github/actions/setup-rust-k8s
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
         with:
-          sccache-size: '50G'
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build pm-server binary
-        uses: ./.github/actions/rust-build
-        with:
-          package: pm
-          binary: pm-server
-          output-path: pm-server
-          use-sccache: 'true'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Get version info
         id: version
         run: |
-          VERSION=$(cargo metadata --manifest-path crates/pm/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "pm") | .version')
           SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push Docker image
-        uses: ./.github/actions/docker-build-push
+      - name: Build and push pm-server
+        uses: docker/build-push-action@v6
         with:
-          image-name: pm-server
           context: .
-          dockerfile: ./infra/images/pm-server/Dockerfile
-          version: ${{ steps.version.outputs.version }}
-          short-sha: ${{ steps.version.outputs.short-sha }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          tag-latest: 'true'
+          file: ./infra/images/pm-server/Dockerfile
+          target: local
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:${{ steps.version.outputs.short-sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-  # Build Controller
+  # Build Controller (using Docker multi-stage build for robustness)
   build-controller:
     needs: changes
     if: needs.changes.outputs.controller == 'true' || github.event.inputs.force_all == 'true'
@@ -96,37 +107,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust (k8s-runner)
-        uses: ./.github/actions/setup-rust-k8s
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
         with:
-          sccache-size: '50G'
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build controller binary
-        uses: ./.github/actions/rust-build
-        with:
-          package: controller
-          binary: agent-controller
-          working-directory: ./crates/controller
-          output-path: ../../agent-controller
-          use-sccache: 'true'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Get version info
         id: version
         run: |
-          VERSION=$(cargo metadata --manifest-path crates/controller/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "controller") | .version')
           SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push Docker image
-        uses: ./.github/actions/docker-build-push
+      - name: Build and push controller
+        uses: docker/build-push-action@v6
         with:
-          image-name: controller
           context: .
-          dockerfile: ./infra/images/controller/Dockerfile
-          version: ${{ steps.version.outputs.version }}
-          short-sha: ${{ steps.version.outputs.short-sha }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./infra/images/controller/Dockerfile
+          target: local
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.short-sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   # Build Linear Sidecar
   build-sidecar:
@@ -168,9 +179,89 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Build Healer
+  build-healer:
+    needs: changes
+    if: needs.changes.outputs.healer == 'true' || github.event.inputs.force_all == 'true'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get version info
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push healer
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./infra/images/healer/Dockerfile
+          target: local
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.short-sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build Tools Server
+  build-tools:
+    needs: changes
+    if: needs.changes.outputs.tools == 'true' || github.event.inputs.force_all == 'true'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get version info
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push tools
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./infra/images/tools/Dockerfile
+          target: local
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.short-sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # Summary
   summary:
-    needs: [build-pm, build-controller, build-sidecar]
+    needs: [build-pm, build-controller, build-sidecar, build-healer, build-tools]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -184,4 +275,6 @@ jobs:
             echo "| pm-server | ${{ needs.build-pm.result || 'skipped' }} |"
             echo "| controller | ${{ needs.build-controller.result || 'skipped' }} |"
             echo "| linear-sidecar | ${{ needs.build-sidecar.result || 'skipped' }} |"
+            echo "| healer | ${{ needs.build-healer.result || 'skipped' }} |"
+            echo "| tools | ${{ needs.build-tools.result || 'skipped' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
