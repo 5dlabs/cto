@@ -2149,4 +2149,62 @@ mod tests {
             filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
         );
     }
+
+    #[test]
+    fn test_filter_task_3237942171_scan_00_00_12_samples() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-06 00:00:12 UTC
+        // These are the 5 sample errors that triggered 1000 error reports
+        // All should be filtered as false positives:
+        // - Samples 1, 3, 5: WORKER INFO log with command error registration
+        // - Samples 2, 4: WORKER INFO log with empty errorMessages array
+        let entries = vec![
+            // Sample 1: WORKER INFO log with command error registration
+            // "error" is a command name being registered, not an actual error
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 23:52:14Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 2: WORKER INFO log with empty errorMessages array
+            // Empty array indicates NO errors occurred - this is success, not failure
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 23:52:14Z INFO ExecutionContext]   "errorMessages": [],"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 3: WORKER INFO log with command error registration (duplicate pattern)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 23:52:14Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 4: WORKER INFO log with empty errorMessages array (no trailing comma)
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F [WORKER 2026-01-05 23:52:16Z INFO ExecutionContext]   "errorMessages": []"#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Sample 5: WORKER INFO log with command error registration
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "F [WORKER 2026-01-05 23:52:16Z INFO ActionCommandManager] Register action command extension for command error".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 samples should be filtered as false positives:
+        // - Samples 1, 3, 5: WORKER INFO command registration (filtered by command registration and WORKER INFO patterns)
+        // - Samples 2, 4: WORKER INFO empty errorMessages (filtered by errorMessages and WORKER INFO patterns)
+        assert_eq!(
+            filtered.len(),
+            0,
+            "Expected 0 entries after filtering (all false positives), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+    }
 }
