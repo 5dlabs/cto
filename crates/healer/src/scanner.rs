@@ -8,7 +8,7 @@
 //! - JSON field names like "errorMessages" regardless of value
 //! - Empty error arrays that indicate success, not failure
 //! - Containerd/Docker "skip loading plugin" messages with error explanation fields
-//! - Warning-level logs (level=warn/warning) which are not errors
+//! - Warning-level logs (level=warn/warning in both key=value and JSON formats) which are not errors
 //! - ArgoCD notification trigger configuration errors (benign when triggers aren't defined)
 //! - Grafana Alloy/Loki client retry messages (transient, self-recovering)
 
@@ -104,6 +104,12 @@ const FALSE_POSITIVE_PATTERNS: &[&str] = &[
     r#""level"\s*:\s*"INFO""#,
     r#""level"\s*:\s*"debug""#,
     r#""level"\s*:\s*"DEBUG""#,
+    // JSON-style warning levels (argo-events, ArgoCD notifications, etc.)
+    // These use quoted JSON format: {"level":"warn", ...}
+    r#""level"\s*:\s*"warn""#,
+    r#""level"\s*:\s*"warning""#,
+    r#""level"\s*:\s*"WARN""#,
+    r#""level"\s*:\s*"WARNING""#,
     // ArgoCD/Helm manifest cache hits (informational messages)
     r"(?i)manifest\s+cache\s+hit",
     // OTEL-wrapped logs: Body: Str(...) format with inner level=info
@@ -1374,10 +1380,78 @@ mod tests {
     #[test]
     fn test_is_false_positive_warning_level_logs() {
         // Warning-level logs should not be treated as errors
+        // Key=value style
         assert!(is_false_positive(r#"level=warn msg="deprecated API call""#));
         assert!(is_false_positive(r#"level=warning msg="connection retry""#));
         assert!(is_false_positive(r#"level=WARN msg="rate limit approaching""#));
         assert!(is_false_positive(r#"level=WARNING msg="disk space low""#));
+
+        // JSON-style warning levels (argo-events sensors, ArgoCD notifications, etc.)
+        assert!(is_false_positive(
+            r#"{"level":"warn","ts":"2026-01-06T00:54:12.750790215Z","logger":"argo-events.sensor","msg":"Event processing"}"#
+        ));
+        assert!(is_false_positive(
+            r#"{"level":"warning","ts":"2026-01-06T00:54:12Z","msg":"Deprecated field used"}"#
+        ));
+        assert!(is_false_positive(r#"{"level":"WARN","msg":"Rate limit approaching"}"#));
+        assert!(is_false_positive(r#"{"level":"WARNING","msg":"Disk space low"}"#));
+    }
+
+    #[test]
+    fn test_filter_argo_events_sensor_warn_logs() {
+        use chrono::Utc;
+
+        // Exact sample errors from task 3237942171 at scan time 2026-01-06 01:00:07 UTC
+        // These are argo-events sensor warning logs that should be filtered
+        // Format: F {"level":"warn","ts":"...","logger":"argo-events.sensor","caller":"sensors/listener.go:198","msg":"Event [ID ..."
+        let entries = vec![
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F {"level":"warn","ts":"2026-01-06T00:54:12.750790215Z","logger":"argo-events.sensor","caller":"sensors/listener.go:198","msg":"Event [ID '90c24633fbed45ba819673fca2373aa6', Source 'github', Time '202..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F {"level":"warn","ts":"2026-01-06T00:54:12.776289284Z","logger":"argo-events.sensor","caller":"sensors/listener.go:198","msg":"Event [ID '97ab9fb524604d20a6b27fb47f32d5e9', Source 'github', Time '202..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F {"level":"warn","ts":"2026-01-06T00:54:12.825514264Z","logger":"argo-events.sensor","caller":"sensors/listener.go:198","msg":"Event [ID '535eb9c3fe4c4f49aaf0024856fd92d7', Source 'github', Time '202..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F {"level":"warn","ts":"2026-01-06T00:54:12.841263388Z","logger":"argo-events.sensor","caller":"sensors/listener.go:198","msg":"Event [ID 'f9d686b998d04c8fb30beebb81ca4948', Source 'github', Time '202..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F {"level":"warn","ts":"2026-01-06T00:54:12.862527989Z","logger":"argo-events.sensor","caller":"sensors/listener.go:198","msg":"Event [ID 'a24f3e4194114bd6b80bc3241d0820d4', Source 'github', Time '202..."#.to_string(),
+                labels: HashMap::new(),
+            },
+            // Actual ERROR-level log - should be retained
+            LogEntry {
+                timestamp: Utc::now(),
+                line: r#"F {"level":"error","ts":"2026-01-06T00:54:13Z","logger":"argo-events.sensor","msg":"Failed to process event"}"#.to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // All 5 argo-events sensor warn logs should be filtered, only the actual error should remain
+        assert_eq!(
+            filtered.len(),
+            1,
+            "Expected 1 entry after filtering (argo-events sensor warn logs filtered), got {}: {:?}",
+            filtered.len(),
+            filtered.iter().map(|e| &e.line).collect::<Vec<_>>()
+        );
+
+        // Only the actual JSON error should remain
+        assert!(filtered.iter().any(|e| e.line.contains(r#""level":"error""#)));
+        assert!(!filtered.iter().any(|e| e.line.contains(r#""level":"warn""#)));
     }
 
     #[test]
