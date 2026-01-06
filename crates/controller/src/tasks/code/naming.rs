@@ -10,6 +10,7 @@ const REMEDIATION_JOB_PREFIX: &str = "remediation-";
 const HEAL_REMEDIATION_JOB_PREFIX: &str = "heal-remediation-";
 const REVIEW_JOB_PREFIX: &str = "review-";
 const REMEDIATE_JOB_PREFIX: &str = "remediate-";
+const INTAKE_JOB_PREFIX: &str = "intake-";
 const MCP_JOB_PREFIX: &str = "mcp-";
 
 pub struct ResourceNaming;
@@ -19,6 +20,7 @@ impl ResourceNaming {
     ///
     /// Format varies by type:
     /// - Play: `play-coderun-pr{pr}-t{task_id}-{agent}-{cli}-{uid}-v{version}`
+    /// - Intake: `intake-t{task_id}-{agent}-{cli}-{uid}-v{version}`
     /// - Heal Remediation: `heal-remediation-t{task_id}-{agent}-{uid}-v{version}`
     /// - Monitor: `monitor-t{task_id}-{agent}-{uid}-v{version}`
     /// - Remediation: `remediation-t{task_id}-{agent}-{uid}-v{version}`
@@ -92,6 +94,20 @@ impl ResourceNaming {
                 uid_suffix,
                 context_version,
             );
+        }
+
+        // Handle intake tasks (Morgan PRD processing)
+        // Format: intake-t{task_id}-{agent}-{cli}-{uid}-v{version}
+        if run_type == "intake" {
+            // Extract CLI type if available
+            let cli = code_run.spec.cli_config.as_ref().map_or_else(
+                || "unknown".to_string(),
+                |config| config.cli_type.to_string(),
+            );
+            let base_name = format!("t{task_id}-{agent}-{cli}-{uid_suffix}-v{context_version}");
+            let available = MAX_K8S_NAME_LENGTH.saturating_sub(INTAKE_JOB_PREFIX.len());
+            let trimmed = Self::ensure_k8s_name_length(&base_name, available);
+            return format!("{INTAKE_JOB_PREFIX}{trimmed}");
         }
 
         // Check if this is a heal remediation CodeRun
@@ -849,5 +865,62 @@ mod tests {
             job_name.starts_with(HEAL_REMEDIATION_JOB_PREFIX),
             "Service 'heal' should trigger heal-remediation- prefix: {job_name}"
         );
+    }
+
+    #[test]
+    fn intake_job_name_has_correct_prefix() {
+        use crate::cli::types::CLIType;
+        use crate::crds::coderun::CLIConfig;
+
+        let settings = HashMap::new();
+        
+        let code_run = CodeRun {
+            metadata: ObjectMeta {
+                name: Some("intake-run".to_string()),
+                namespace: Some("cto".to_string()),
+                uid: Some("20bce7e0cf424515".to_string()),
+                ..Default::default()
+            },
+            spec: CodeRunSpec {
+                run_type: "intake".to_string(),
+                cli_config: Some(CLIConfig {
+                    cli_type: CLIType::Claude,
+                    model: "claude-opus-4-5-20251101".to_string(),
+                    settings,
+                    max_tokens: None,
+                    temperature: None,
+                    model_rotation: None,
+                }),
+                task_id: Some(0),
+                service: "prd-alerthub-e2e-test".to_string(),
+                repository_url: "https://github.com/5dlabs/prd-alerthub-e2e-test".to_string(),
+                docs_repository_url: "https://github.com/5dlabs/prd-alerthub-e2e-test"
+                    .to_string(),
+                model: "claude-opus-4-5-20251101".to_string(),
+                github_app: Some("5DLabs-Morgan".to_string()),
+                ..Default::default()
+            },
+            status: None,
+        };
+
+        let job_name = ResourceNaming::job_name(&code_run);
+
+        assert!(
+            job_name.starts_with(INTAKE_JOB_PREFIX),
+            "Intake job should start with 'intake-': {job_name}"
+        );
+        assert!(
+            job_name.contains("t0"),
+            "Intake job should contain task ID: {job_name}"
+        );
+        assert!(
+            job_name.contains("morgan"),
+            "Intake job should contain agent name: {job_name}"
+        );
+        assert!(
+            job_name.contains("claude"),
+            "Intake job should contain CLI type: {job_name}"
+        );
+        assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
     }
 }

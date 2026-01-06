@@ -26,7 +26,18 @@ fi
 
 echo "📄 Loading configuration..."
 PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
-REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE")
+
+# Use REPOSITORY_URL from environment if set, otherwise read from config
+# The environment variable takes precedence as it's set by the controller
+if [ -z "$REPOSITORY_URL" ]; then
+    REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE")
+fi
+
+# Validate required fields
+if [ -z "$REPOSITORY_URL" ] || [ "$REPOSITORY_URL" = "null" ]; then
+    echo "❌ REPOSITORY_URL not set in environment or config file"
+    exit 1
+fi
 
 # Model configuration
 PRIMARY_MODEL=$(jq -r '.primary_model' "$CONFIG_FILE")
