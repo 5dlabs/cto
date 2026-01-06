@@ -517,7 +517,7 @@ async fn handle_intake_setup(
                 content: Some(arch.clone()),
                 project_id: Some(project.id.clone()),
                 issue_id: None,
-                icon: Some("🏗️".to_string()),
+                icon: None, // Linear API doesn't support icon field
                 color: None,
             };
             match client.create_document(arch_input).await {
