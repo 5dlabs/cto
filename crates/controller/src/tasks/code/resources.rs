@@ -1079,8 +1079,11 @@ impl<'a> CodeResourceManager<'a> {
                         .map(|s| s.to_lowercase())
                         .unwrap_or_else(|| {
                             // Default to morgan for cto-dev or other apps
-                            if github_app == "cto-dev" { "morgan".to_string() }
-                            else { "morgan".to_string() }
+                            if github_app == "cto-dev" {
+                                "morgan".to_string()
+                            } else {
+                                "morgan".to_string()
+                            }
                         });
                     format!("linear-app-{}", agent_name)
                 } else {
@@ -1108,7 +1111,10 @@ impl<'a> CodeResourceManager<'a> {
                         }
                     }
                 }));
-                info!("Using agent secret {} for Linear OAuth token", agent_secret_name);
+                info!(
+                    "Using agent secret {} for Linear OAuth token",
+                    agent_secret_name
+                );
 
                 let sidecar_spec = json!({
                     "name": "linear-sidecar",
