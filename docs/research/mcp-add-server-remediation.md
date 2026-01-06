@@ -6,13 +6,27 @@ Morgan's intake jobs were loading the wrong MCP tools:
 - **Loaded**: `pg_aiguide_*`, `openmemory_*`, `better_auth_*`, `solana_*`, `ai_elements_*` (generic platform tools)
 - **Needed**: `firecrawl_*` (URL scraping), `context7_*` (library docs), `openmemory_*` (memory)
 
-## Root Cause
+## Root Causes (TWO ISSUES)
+
+### Issue 1: No Default Agent Tools
 
 The controller's `generate_client_config` function had no fallback for agent-specific default tools. When:
 1. No `remoteTools` was specified in the CodeRun spec
 2. No agent config existed in Helm values (`agentCliConfigs: {}` was empty)
 
-It fell back to an empty `remoteTools` array, causing the MCP server to load whatever global tools were available.
+It fell back to an empty `remoteTools` array.
+
+### Issue 2: Environment Variable Mismatch
+
+The `tools-client` binary (MCP bridge) was looking for:
+- `MCP_TOOLS_CONFIG` env var
+- `tools-config.json` file
+
+But the controller was setting:
+- `MCP_CLIENT_CONFIG` env var
+- `client-config.json` file
+
+This mismatch caused the tools-client to not find the config, defaulting to "include all tools".
 
 ## Solution
 
@@ -88,6 +102,21 @@ After deploying, run a new intake and verify:
 1. Log shows `firecrawl_*`, `context7_*`, `openmemory_*` tools in the init message
 2. Morgan can successfully use Firecrawl to scrape URLs
 3. Morgan can lookup library documentation via Context7
+
+### 4. Fixed tools-client env var mismatch
+
+**File**: [`crates/tools/src/client.rs`](../../crates/tools/src/client.rs)
+
+Updated `load_client_config()` to check both legacy and controller-standard paths:
+
+```rust
+// Priority:
+// 1. MCP_TOOLS_CONFIG env var (legacy)
+// 2. MCP_CLIENT_CONFIG env var (controller standard)
+// 3. working_dir/client-config.json (controller standard)
+// 4. working_dir/tools-config.json (legacy)
+// 5. ./tools-config.json (fallback)
+```
 
 ## Why This Approach?
 

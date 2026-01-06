@@ -58,11 +58,24 @@ impl McpClient {
 
     /// Load client configuration from environment variable or default location
     fn load_client_config(working_dir: &Option<String>) -> Result<Option<ClientConfig>> {
-        // Priority: MCP_TOOLS_CONFIG env var > working_dir/tools-config.json > ./tools-config.json
+        // Priority:
+        // 1. MCP_TOOLS_CONFIG env var (legacy)
+        // 2. MCP_CLIENT_CONFIG env var (controller standard)
+        // 3. working_dir/client-config.json (controller standard)
+        // 4. working_dir/tools-config.json (legacy)
+        // 5. ./tools-config.json (fallback)
         let config_path = if let Ok(config_path) = std::env::var("MCP_TOOLS_CONFIG") {
             PathBuf::from(config_path)
+        } else if let Ok(config_path) = std::env::var("MCP_CLIENT_CONFIG") {
+            PathBuf::from(config_path)
         } else if let Some(dir) = working_dir {
-            PathBuf::from(dir).join("tools-config.json")
+            // Check client-config.json first (controller standard), then tools-config.json (legacy)
+            let client_path = PathBuf::from(dir).join("client-config.json");
+            if client_path.exists() {
+                client_path
+            } else {
+                PathBuf::from(dir).join("tools-config.json")
+            }
         } else {
             PathBuf::from("tools-config.json")
         };
