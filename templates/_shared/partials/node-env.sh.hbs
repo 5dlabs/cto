@@ -26,9 +26,10 @@ else
 fi
 
 # Enable corepack for pnpm/yarn if available
-# Suppress errors when symlinks already exist or can't be created
+# Suppress errors/warnings - corepack can throw JS errors on some Node versions
+# or when symlinks already exist. Non-critical, continue regardless.
 if command -v corepack >/dev/null 2>&1; then
-  corepack enable 2>&1 | grep -v "EINVAL\|readlink\|already exists" || true
+  corepack enable >/dev/null 2>&1 || true
 fi
 
 

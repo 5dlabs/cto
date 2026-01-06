@@ -2847,7 +2847,29 @@ impl CodeTemplateGenerator {
             }
         }
 
-        // 4) No clientConfig/tools provided → minimal JSON object
+        // 4) Fall back to built-in defaults based on agent + run_type
+        // This ensures agents get their required tools even without explicit Helm config
+        let run_type = code_run.spec.run_type.as_str();
+        let default_tools = Self::get_default_agent_tools(github_app, run_type);
+
+        if !default_tools.is_empty() {
+            debug!(
+                "code: using built-in default tools for '{}' run_type='{}': {:?}",
+                github_app, run_type, default_tools
+            );
+            let mut client = json!({
+                "remoteTools": default_tools,
+                "localServers": {}
+            });
+            Self::normalize_remote_tools(&mut client);
+            return to_string_pretty(&client).map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to serialize default agent tools: {e}"
+                ))
+            });
+        }
+
+        // 5) No defaults available → minimal JSON object
         debug!("🐛 DEBUG: No matching agent found in Helm config!");
         debug!(
             "code: no tools/clientConfig found for '{}', using minimal config",
@@ -3705,6 +3727,51 @@ impl CodeTemplateGenerator {
             .or_else(|| code_run.spec.env.get("MAX_RETRIES"))
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(10) // Platform default
+    }
+
+    /// Get default MCP tools for an agent based on github_app and run_type.
+    /// This provides built-in tool defaults when no explicit configuration exists.
+    /// Tools are specified as patterns that match the MCP tool server naming convention.
+    fn get_default_agent_tools(github_app: &str, run_type: &str) -> Vec<String> {
+        // Normalize github_app to agent name (e.g., "5DLabs-Morgan" -> "morgan")
+        let agent = github_app
+            .strip_prefix("5DLabs-")
+            .unwrap_or(github_app)
+            .to_lowercase();
+
+        match (agent.as_str(), run_type) {
+            // Morgan: intake/documentation - needs URL scraping, library docs, and memory
+            ("morgan", "intake" | "documentation") => vec![
+                "mcp_tools_firecrawl_*".to_string(),
+                "mcp_tools_context7_*".to_string(),
+                "mcp_tools_openmemory_*".to_string(),
+            ],
+
+            // Implementation agents: need GitHub, context docs, and memory
+            ("rex" | "grizz" | "nova" | "blaze" | "tap" | "spark", "implementation" | "coder") => {
+                vec![
+                    "mcp_tools_github_*".to_string(),
+                    "mcp_tools_context7_*".to_string(),
+                    "mcp_tools_firecrawl_*".to_string(),
+                    "mcp_tools_openmemory_*".to_string(),
+                ]
+            }
+
+            // Bolt: infrastructure - needs Kubernetes and GitHub
+            ("bolt", _) => vec![
+                "mcp_tools_kubernetes_*".to_string(),
+                "mcp_tools_github_*".to_string(),
+                "mcp_tools_context7_*".to_string(),
+            ],
+
+            // Atlas/Cleo/Tess/Cipher: need GitHub for integration/review
+            ("atlas" | "cleo" | "tess" | "cipher", _) => vec![
+                "mcp_tools_github_*".to_string(),
+            ],
+
+            // Default: no specific tools (will get whatever is globally available)
+            _ => vec![],
+        }
     }
 
     /// Get the skills for an agent from skill-mappings.yaml based on agent name and job type.
@@ -5032,5 +5099,49 @@ mod tests {
 
         // workingDirectory should be overlaid
         assert_eq!(fs["workingDirectory"], "overlay_dir");
+    }
+
+    #[test]
+    fn test_get_default_agent_tools_morgan_intake() {
+        let tools = CodeTemplateGenerator::get_default_agent_tools("5DLabs-Morgan", "intake");
+        assert!(!tools.is_empty(), "Morgan intake should have default tools");
+        assert!(
+            tools.iter().any(|t| t.contains("firecrawl")),
+            "Morgan intake should have firecrawl tools"
+        );
+        assert!(
+            tools.iter().any(|t| t.contains("context7")),
+            "Morgan intake should have context7 tools"
+        );
+        assert!(
+            tools.iter().any(|t| t.contains("openmemory")),
+            "Morgan intake should have openmemory tools"
+        );
+    }
+
+    #[test]
+    fn test_get_default_agent_tools_rex_implementation() {
+        let tools = CodeTemplateGenerator::get_default_agent_tools("5DLabs-Rex", "implementation");
+        assert!(!tools.is_empty(), "Rex should have default tools");
+        assert!(
+            tools.iter().any(|t| t.contains("github")),
+            "Rex should have github tools"
+        );
+    }
+
+    #[test]
+    fn test_get_default_agent_tools_bolt_infra() {
+        let tools = CodeTemplateGenerator::get_default_agent_tools("5DLabs-Bolt", "deploy");
+        assert!(!tools.is_empty(), "Bolt should have default tools");
+        assert!(
+            tools.iter().any(|t| t.contains("kubernetes")),
+            "Bolt should have kubernetes tools"
+        );
+    }
+
+    #[test]
+    fn test_get_default_agent_tools_unknown_agent() {
+        let tools = CodeTemplateGenerator::get_default_agent_tools("Unknown-Agent", "coder");
+        assert!(tools.is_empty(), "Unknown agent should have no default tools");
     }
 }

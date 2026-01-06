@@ -89,10 +89,23 @@ else
   cd "$REPO_NAME"
 fi
 
-# Branch setup
-BASE_BRANCH="${PR_BASE_BRANCH:-develop}"
-if ! git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
-  BASE_BRANCH="master"
+# Branch setup - detect default branch with proper fallback order
+BASE_BRANCH="${PR_BASE_BRANCH:-}"
+if [ -z "$BASE_BRANCH" ]; then
+  # Try to detect the remote's default branch
+  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+  if [ -n "$DEFAULT_BRANCH" ] && git show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH"; then
+    BASE_BRANCH="$DEFAULT_BRANCH"
+  elif git show-ref --verify --quiet "refs/remotes/origin/develop"; then
+    BASE_BRANCH="develop"
+  elif git show-ref --verify --quiet "refs/remotes/origin/main"; then
+    BASE_BRANCH="main"
+  elif git show-ref --verify --quiet "refs/remotes/origin/master"; then
+    BASE_BRANCH="master"
+  else
+    # Last resort: use whatever the remote HEAD points to
+    BASE_BRANCH="main"
+  fi
 fi
 
 FEATURE_BRANCH="feat/task-{{task_id}}-{{agent_name}}-{{job_type}}"
