@@ -71,6 +71,14 @@ pub enum Commands {
         /// Directory in repo for research files
         #[arg(long, default_value = "docs/research")]
         research_dir: String,
+
+        /// Reset state before polling (reprocess all bookmarks)
+        #[arg(long)]
+        reset_state: bool,
+
+        /// Maximum age of bookmarks to fetch (days). Scrolls until this boundary.
+        #[arg(long, default_value = "60")]
+        max_age_days: i64,
     },
 
     /// Interactive auth setup (run locally, not in container)
@@ -186,6 +194,8 @@ async fn main() -> Result<()> {
             repo,
             base_branch,
             research_dir,
+            reset_state,
+            max_age_days,
         } => {
             tracing::info!(
                 output = %output.display(),
@@ -195,6 +205,8 @@ async fn main() -> Result<()> {
                 model,
                 create_pr,
                 repo,
+                reset_state,
+                max_age_days,
                 "Starting poll cycle"
             );
             run_poll(
@@ -207,6 +219,8 @@ async fn main() -> Result<()> {
                 repo,
                 base_branch,
                 research_dir,
+                reset_state,
+                max_age_days,
             )
             .await
         }

@@ -104,7 +104,7 @@ PRD → Intake (Morgan) → Infrastructure (Bolt) → Implementation (Rex/Blaze)
 cargo build --release
 cargo test
 cargo fmt --all --check
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets -- -D warnings -W clippy::pedantic
 
 # GitOps
 make -C infra/gitops validate
@@ -135,8 +135,18 @@ kubectl port-forward svc/argo-workflows-server -n automation 2746:2746
 ## Commit Guidelines
 
 - Use Conventional Commits: `feat:`, `fix:`, `chore:`, `refactor:`
-- Before pushing: `cargo fmt`, `cargo clippy -D warnings`, `cargo test`, `pre-commit run --all-files`
 - PRs must include: summary, rationale, scope, verification steps
+
+### Pre-Push Requirements (MANDATORY)
+
+**Before pushing code to origin or creating a pull request, you MUST run ALL of the following and ensure they pass with zero warnings/errors:**
+
+1. **Format check:** `cargo fmt --all --check`
+2. **Clippy Pedantic:** `cargo clippy --all-targets -- -D warnings -W clippy::pedantic`
+3. **Tests:** `cargo test`
+4. **Pre-commit hooks:** `pre-commit run --all-files`
+
+⚠️ **CRITICAL:** Never push code or open a PR without running Clippy in pedantic mode. The `-W clippy::pedantic` flag enables additional lints that catch common mistakes and enforce best practices. All pedantic warnings must be resolved before code is pushed.
 
 ## Security
 

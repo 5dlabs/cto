@@ -1,7 +1,31 @@
 //! Twitter data types.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
+
+/// Twitter's snowflake epoch (November 4, 2010, 01:42:54.657 UTC).
+/// Tweet IDs encode timestamps as milliseconds since this epoch.
+const TWITTER_EPOCH_MS: i64 = 1288834974657;
+
+/// Extract the creation timestamp from a Twitter/X snowflake ID.
+///
+/// Twitter IDs are 64-bit integers where the upper 42 bits encode
+/// the timestamp in milliseconds since the Twitter epoch.
+#[must_use]
+pub fn tweet_id_to_datetime(id: &str) -> Option<DateTime<Utc>> {
+    let id_num: u64 = id.parse().ok()?;
+    // Timestamp is in the upper 42 bits (shift right by 22)
+    let timestamp_ms = (id_num >> 22) as i64 + TWITTER_EPOCH_MS;
+    Utc.timestamp_millis_opt(timestamp_ms).single()
+}
+
+/// Check if a tweet ID is within the given number of days from now.
+#[must_use]
+pub fn tweet_id_within_days(id: &str, days: i64) -> bool {
+    tweet_id_to_datetime(id)
+        .map(|dt| (Utc::now() - dt).num_days() <= days)
+        .unwrap_or(false)
+}
 
 /// A bookmarked tweet with metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +70,27 @@ impl Bookmark {
             quote: None,
             thread: None,
         }
+    }
+
+    /// Create a bookmark, deriving the timestamp from the tweet ID (snowflake).
+    ///
+    /// Twitter/X tweet IDs are snowflake IDs that encode the creation timestamp.
+    #[must_use]
+    pub fn from_id(id: String, author: Author, text: String) -> Self {
+        let posted_at = tweet_id_to_datetime(&id).unwrap_or_else(Utc::now);
+        Self::new(id, author, text, posted_at)
+    }
+
+    /// Get the age of this tweet.
+    #[must_use]
+    pub fn age(&self) -> chrono::Duration {
+        Utc::now() - self.posted_at
+    }
+
+    /// Check if this tweet is within the given number of days.
+    #[must_use]
+    pub fn is_within_days(&self, days: i64) -> bool {
+        self.age().num_days() <= days
     }
 
     /// Extract URLs from tweet text.

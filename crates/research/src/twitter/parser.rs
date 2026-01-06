@@ -4,7 +4,6 @@ use anyhow::Result;
 use scraper::{Html, Selector};
 
 use super::types::{Author, Bookmark};
-use chrono::Utc;
 
 /// Parser for Twitter bookmark page HTML.
 pub struct BookmarkParser;
@@ -80,12 +79,11 @@ impl BookmarkParser {
                 continue;
             }
 
-            // Create the bookmark
-            let mut bookmark = Bookmark::new(
+            // Create the bookmark (timestamp derived from snowflake ID)
+            let mut bookmark = Bookmark::from_id(
                 tweet_id.clone(),
                 Author::new(username.clone(), username), // Display name same as handle for now
                 text,
-                Utc::now(), // We don't have the actual timestamp easily
             );
 
             // Extract URLs from the tweet text
@@ -137,11 +135,10 @@ impl BookmarkParser {
     /// Create a placeholder bookmark for testing.
     #[cfg(test)]
     pub fn placeholder(id: &str, text: &str) -> Bookmark {
-        Bookmark::new(
+        Bookmark::from_id(
             id.to_string(),
             Author::new("test".to_string(), "Test User".to_string()),
             text.to_string(),
-            Utc::now(),
         )
     }
 }

@@ -21,6 +21,11 @@ pub struct PollConfig {
     pub backoff_multiplier: f32,
     /// Max backoff duration.
     pub max_backoff: Duration,
+    /// Maximum age of bookmarks to fetch (in days).
+    /// The poller will keep scrolling until it reaches bookmarks older than this.
+    pub max_age_days: i64,
+    /// Maximum scroll attempts to prevent infinite loops.
+    pub max_scroll_attempts: usize,
 }
 
 impl Default for PollConfig {
@@ -29,6 +34,8 @@ impl Default for PollConfig {
             batch_size: 10,
             backoff_multiplier: 2.0,
             max_backoff: Duration::from_secs(30 * 60), // 30 minutes
+            max_age_days: 60,                          // 60 days by default
+            max_scroll_attempts: 50,                   // ~50 scrolls max
         }
     }
 }
@@ -107,6 +114,21 @@ impl PollState {
     }
 }
 
+/// Result of fetching bookmarks with stats.
+#[derive(Debug, Default)]
+pub struct FetchResult {
+    /// All bookmarks fetched (within time window).
+    pub all_bookmarks: Vec<Bookmark>,
+    /// New bookmarks (not yet processed).
+    pub new_bookmarks: Vec<Bookmark>,
+    /// Number of bookmarks already processed.
+    pub already_processed: usize,
+    /// Number of scroll operations performed.
+    pub scroll_count: usize,
+    /// Whether we reached the time window boundary.
+    pub reached_time_boundary: bool,
+}
+
 /// Bookmark poller that fetches new bookmarks from Twitter.
 pub struct BookmarkPoller {
     #[allow(dead_code)]
@@ -121,54 +143,95 @@ impl BookmarkPoller {
         Self { session, config }
     }
 
-    /// Fetch bookmarks page and return new (unprocessed) bookmarks.
+    /// Fetch bookmarks and return new (unprocessed) ones.
+    ///
+    /// Scrolls the timeline until we've loaded all bookmarks from the past
+    /// `max_age_days` days, then returns the unprocessed ones (up to batch_size).
     pub async fn poll(&self, state: &mut PollState) -> Result<Vec<Bookmark>> {
-        tracing::info!("Fetching bookmarks page");
+        let result = self.fetch_all_bookmarks(state).await?;
 
-        let html = self.fetch_bookmarks_page().await?;
-        let all_bookmarks = BookmarkParser::parse(&html)?;
+        tracing::info!(
+            total = result.all_bookmarks.len(),
+            new = result.new_bookmarks.len(),
+            already_processed = result.already_processed,
+            scrolls = result.scroll_count,
+            reached_boundary = result.reached_time_boundary,
+            "Bookmark fetch complete"
+        );
 
-        // Filter to only new bookmarks
-        let new_bookmarks: Vec<Bookmark> = all_bookmarks
+        // Return up to batch_size new bookmarks for processing
+        let to_process: Vec<Bookmark> = result
+            .new_bookmarks
             .into_iter()
-            .filter(|b| !state.is_processed(&b.id))
             .take(self.config.batch_size)
             .collect();
 
         tracing::info!(
-            total = new_bookmarks.len(),
+            total = result.all_bookmarks.len(),
             batch_size = self.config.batch_size,
             "Found new bookmarks"
         );
 
         state.record_success();
-        Ok(new_bookmarks)
+        Ok(to_process)
     }
 
-    /// Fetch the bookmarks page HTML.
-    async fn fetch_bookmarks_page(&self) -> Result<String> {
+    /// Fetch all bookmarks within the time window, with full stats.
+    pub async fn fetch_all_bookmarks(&self, state: &PollState) -> Result<FetchResult> {
+        tracing::info!(
+            max_age_days = self.config.max_age_days,
+            "Fetching all bookmarks within time window"
+        );
+
+        let (all_bookmarks, scroll_count, reached_boundary) =
+            self.fetch_bookmarks_with_scrolling().await?;
+
+        let mut result = FetchResult {
+            scroll_count,
+            reached_time_boundary: reached_boundary,
+            ..Default::default()
+        };
+
+        // Partition into new and already processed
+        for bookmark in all_bookmarks {
+            if state.is_processed(&bookmark.id) {
+                result.already_processed += 1;
+            } else {
+                result.new_bookmarks.push(bookmark.clone());
+            }
+            result.all_bookmarks.push(bookmark);
+        }
+
+        Ok(result)
+    }
+
+    /// Fetch bookmarks by scrolling until we've loaded all within time window.
+    ///
+    /// Returns (bookmarks, scroll_count, reached_time_boundary).
+    async fn fetch_bookmarks_with_scrolling(&self) -> Result<(Vec<Bookmark>, usize, bool)> {
         use chromiumoxide::browser::{Browser, BrowserConfig};
         use chromiumoxide::cdp::browser_protocol::network::CookieParam;
         use futures::StreamExt;
+        use std::collections::HashMap;
 
         let config = BrowserConfig::builder()
             // Container compatibility
-            .arg("--no-sandbox") // Required for containerized environments
-            .arg("--disable-dev-shm-usage") // Avoid /dev/shm size issues in containers
-            // Anti-detection: Remove automation signals
-            .arg("--disable-blink-features=AutomationControlled") // Hide navigator.webdriver
-            .arg("--disable-features=IsolateOrigins,site-per-process") // Reduce fingerprinting
+            .arg("--no-sandbox")
+            .arg("--disable-dev-shm-usage")
+            // Anti-detection
+            .arg("--disable-blink-features=AutomationControlled")
+            .arg("--disable-features=IsolateOrigins,site-per-process")
             // Realistic browser setup
-            .arg("--window-size=1920,1080") // Standard desktop resolution
+            .arg("--window-size=1920,1080")
             .arg("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
             // Performance
-            .arg("--disable-gpu") // Not needed for headless
+            .arg("--disable-gpu")
             .arg("--disable-software-rasterizer")
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to build browser config: {e}"))?;
+
         let (mut browser, mut handler) = Browser::launch(config).await?;
 
-        // Spawn handler task
         let handle = tokio::spawn(async move {
             while let Some(h) = handler.next().await {
                 if h.is_err() {
@@ -177,15 +240,10 @@ impl BookmarkPoller {
             }
         });
 
-        // Navigate to x.com first to establish domain context for cookies
+        // Navigate and set cookies
         tracing::debug!("Navigating to x.com to set cookies");
         let page = browser.new_page("https://x.com").await?;
-
-        // Wait for initial page load
         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-        // Set auth cookies
-        tracing::debug!("Setting Twitter auth cookies");
 
         let auth_cookie = CookieParam::builder()
             .name("auth_token")
@@ -198,7 +256,6 @@ impl BookmarkPoller {
             .map_err(|e| anyhow::anyhow!("Failed to build auth cookie: {e}"))?;
         page.set_cookie(auth_cookie).await?;
 
-        // Set ct0 if available
         if let Some(ct0) = &self.session.ct0 {
             let ct0_cookie = CookieParam::builder()
                 .name("ct0")
@@ -214,68 +271,120 @@ impl BookmarkPoller {
         // Navigate to bookmarks
         tracing::debug!("Navigating to bookmarks page");
         page.goto("https://x.com/i/bookmarks").await?;
-
-        // Wait for content to load (Twitter is JS-heavy, needs extra time)
         tokio::time::sleep(tokio::time::Duration::from_secs(8)).await;
 
-        // Nudge the timeline to render by scrolling once (helps when content is virtualized)
-        match page
-            .evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            .await
-        {
-            Ok(result) => {
-                if let Err(e) = result.into_value::<serde_json::Value>() {
-                    tracing::warn!(error = %e, "Failed to convert scroll result to value, continuing anyway");
-                }
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "Failed to execute scroll - page may not be fully loaded");
-            }
-        }
-        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-        // Check if we got redirected to login
-        let url = match page.url().await {
-            Ok(Some(u)) => u,
-            Ok(None) => {
-                tracing::warn!("Page URL is None - page may not have loaded properly");
-                String::new()
-            }
-            Err(e) => {
-                tracing::error!(error = %e, "Failed to get page URL - this may indicate browser/page issues");
-                // Try to get HTML anyway - the page might still have content
-                String::new()
-            }
-        };
-
-        if !url.is_empty() && (url.contains("login") || url.contains("flow")) {
-            tracing::error!(
-                url,
-                "Redirected to login - auth cookies are invalid or expired"
-            );
+        // Check for login redirect
+        let url = page.url().await.ok().flatten().unwrap_or_default();
+        if url.contains("login") || url.contains("flow") {
             browser.close().await?;
             handle.await?;
-            anyhow::bail!("Authentication failed: redirected to login page. Twitter session cookies are invalid or expired.");
+            anyhow::bail!("Authentication failed: redirected to login page.");
         }
 
-        let html = page.content().await?;
-        tracing::debug!(len = html.len(), "Got page content");
+        // Scroll and collect bookmarks
+        let mut all_bookmarks: HashMap<String, Bookmark> = HashMap::new();
+        let mut scroll_count = 0;
+        let mut reached_time_boundary = false;
+        let mut consecutive_no_new = 0;
 
-        // Debug: dump HTML to file for inspection
+        loop {
+            // Get current page content
+            let html = page.content().await?;
+            let bookmarks = BookmarkParser::parse(&html)?;
+
+            let before_count = all_bookmarks.len();
+            let mut oldest_in_batch: Option<DateTime<Utc>> = None;
+
+            for bookmark in bookmarks {
+                // Track the oldest tweet in this batch
+                if oldest_in_batch.is_none() || bookmark.posted_at < oldest_in_batch.unwrap() {
+                    oldest_in_batch = Some(bookmark.posted_at);
+                }
+
+                // Check if this bookmark is too old
+                if !bookmark.is_within_days(self.config.max_age_days) {
+                    tracing::debug!(
+                        id = %bookmark.id,
+                        posted_at = %bookmark.posted_at,
+                        "Found bookmark older than {} days, stopping",
+                        self.config.max_age_days
+                    );
+                    reached_time_boundary = true;
+                    continue; // Don't add to collection
+                }
+
+                all_bookmarks.entry(bookmark.id.clone()).or_insert(bookmark);
+            }
+
+            let new_in_scroll = all_bookmarks.len() - before_count;
+            tracing::debug!(
+                scroll = scroll_count,
+                new = new_in_scroll,
+                total = all_bookmarks.len(),
+                oldest = ?oldest_in_batch,
+                "Scroll iteration"
+            );
+
+            // Stop conditions
+            if reached_time_boundary {
+                tracing::info!(
+                    scroll_count,
+                    total = all_bookmarks.len(),
+                    "Reached time boundary ({} days)",
+                    self.config.max_age_days
+                );
+                break;
+            }
+
+            if new_in_scroll == 0 {
+                consecutive_no_new += 1;
+                if consecutive_no_new >= 3 {
+                    tracing::info!(
+                        scroll_count,
+                        total = all_bookmarks.len(),
+                        "No new bookmarks after 3 scrolls, likely reached end"
+                    );
+                    break;
+                }
+            } else {
+                consecutive_no_new = 0;
+            }
+
+            if scroll_count >= self.config.max_scroll_attempts {
+                tracing::warn!(
+                    max = self.config.max_scroll_attempts,
+                    total = all_bookmarks.len(),
+                    "Reached max scroll attempts"
+                );
+                break;
+            }
+
+            // Scroll down
+            scroll_count += 1;
+            if let Err(e) = page
+                .evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                .await
+            {
+                tracing::warn!(error = %e, "Scroll failed");
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        }
+
+        // Debug dump if requested
         if std::env::var("RESEARCH_DUMP_HTML").is_ok() {
             let dump_path = std::env::var("RESEARCH_DUMP_PATH")
                 .unwrap_or_else(|_| "/tmp/twitter-bookmarks.html".to_string());
-            if let Err(e) = std::fs::write(&dump_path, &html) {
-                tracing::warn!(path = %dump_path, error = %e, "Failed to dump HTML");
-            } else {
-                tracing::info!(path = %dump_path, "Dumped HTML for inspection");
+            if let Ok(html) = page.content().await {
+                let _ = std::fs::write(&dump_path, &html);
+                tracing::info!(path = %dump_path, "Dumped final HTML");
             }
         }
 
         browser.close().await?;
         handle.await?;
 
-        Ok(html)
+        let bookmarks: Vec<Bookmark> = all_bookmarks.into_values().collect();
+        Ok((bookmarks, scroll_count, reached_time_boundary))
     }
 }
 
