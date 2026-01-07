@@ -292,7 +292,7 @@ preflight:
       case $svc in
         pm) port=8081 ;; controller) port=8080 ;; healer) port=8082 ;; tools) port=3000 ;;
       esac
-      local_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$port/health 2>/dev/null)
+      local_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$port/health 2>/dev/null || echo "000")
       [ "$local_status" = "200" ] && local_status="✅ UP" || local_status="❌ DOWN"
       [ "$k8s" = "0" ] && k8s="⬇️ (0)" || k8s="🔴 ($k8s)"
       printf "%-20s %-12s %-12s\n" "$svc" "$k8s" "$local_status"
@@ -300,14 +300,15 @@ preflight:
     
     echo ""
     echo "═══ 2. TUNNEL & WEBHOOKS ═══"
-    tunnel=$(curl -s -o /dev/null -w "%{http_code}" https://pm-dev.5dlabs.ai/health 2>/dev/null)
+    tunnel=$(curl -s -o /dev/null -w "%{http_code}" https://pm-dev.5dlabs.ai/health 2>/dev/null || echo "000")
     [ "$tunnel" = "200" ] && echo "✅ Tunnel: pm-dev.5dlabs.ai → localhost:8081" || echo "❌ Tunnel not working"
-    webhook_url=$(gh api repos/5dlabs/cto/hooks 2>/dev/null | jq -r '.[0].config.url')
+    webhook_url=$(gh api repos/5dlabs/cto/hooks 2>/dev/null | jq -r '.[0].config.url' 2>/dev/null || echo "unavailable")
     echo "📎 GitHub Webhook: $webhook_url"
     
     echo ""
     echo "═══ 3. CLUSTER ACCESS ═══"
-    kubectl cluster-info 2>/dev/null | head -1 || echo "❌ Cannot connect to cluster"
+    cluster_info=$(kubectl cluster-info 2>/dev/null | head -1 || true)
+    [ -n "$cluster_info" ] && echo "$cluster_info" || echo "❌ Cannot connect to cluster"
     kubectl get crd coderuns.agents.platform 2>/dev/null > /dev/null && echo "✅ CodeRun CRD available" || echo "❌ CodeRun CRD missing"
     
     echo ""

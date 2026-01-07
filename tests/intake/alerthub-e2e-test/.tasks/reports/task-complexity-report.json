@@ -1,0 +1,130 @@
+{
+  "meta": {
+    "generatedAt": "2026-01-07T23:14:23.507325+00:00",
+    "tasksFile": ".tasks/tasks.json",
+    "model": "sonnet",
+    "threshold": 5
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 1,
+      "taskTitle": "Setup Infrastructure Resources (Bolt - Kubernetes)",
+      "complexityScore": 8,
+      "recommendedSubtasks": 8,
+      "expansionPrompt": "Break down the infrastructure setup into individual operator deployments. Create subtasks for: (1) PostgreSQL cluster deployment with CloudNative-PG, (2) Redis/Valkey deployment with Redis Operator, (3) Kafka cluster deployment with Strimzi, (4) MongoDB deployment with Percona operator, (5) RabbitMQ cluster deployment, (6) SeaweedFS S3-compatible storage setup, (7) ConfigMaps creation for all connection strings, and (8) Secrets management for credentials. Each subtask should include operator CR configuration, resource limits, storage provisioning, and connectivity verification.",
+      "reasoning": "High complexity due to multiple operator deployments with interdependencies. Requires expertise in Kubernetes operators, storage provisioning, and service configuration. Each operator has unique CRs and configuration requirements. Risk of misconfiguration affecting downstream services."
+    },
+    {
+      "taskId": 2,
+      "taskTitle": "Implement Notification Router Service (Rex - Rust/Axum)",
+      "complexityScore": 9,
+      "recommendedSubtasks": 10,
+      "expansionPrompt": "Decompose the Rust service implementation into focused subtasks: (1) Project initialization and dependency setup, (2) Data models and validation schemas, (3) Database layer with sqlx and migrations, (4) Redis integration for rate limiting and caching, (5) Axum router with REST endpoints, (6) Kafka producer implementation, (7) WebSocket handler with pub/sub, (8) Middleware stack (auth, logging, metrics), (9) Dockerfile and build optimization, and (10) Unit and integration test suite. Each subtask should be independently testable.",
+      "reasoning": "Very high complexity involving multiple technologies (Rust, Axum, PostgreSQL, Redis, Kafka, WebSockets). Requires concurrent programming, error handling, rate limiting algorithms, and real-time communication. Performance-critical service with strict SLA requirements. Testing requires testcontainers and load testing infrastructure."
+    },
+    {
+      "taskId": 3,
+      "taskTitle": "Implement Integration Service (Nova - Bun/Elysia + Effect)",
+      "complexityScore": 9,
+      "recommendedSubtasks": 11,
+      "expansionPrompt": "Break down the Effect-based service into: (1) Project setup with Bun, Elysia, and Effect dependencies, (2) Effect service interfaces and Context.Tag definitions, (3) Effect Schema definitions for all channels, (4) Channel service implementations (Slack, Discord, Email, Webhook, Push) with Effect error handling, (5) Effect Layer composition for dependency injection, (6) Elysia API endpoints with validation, (7) Kafka consumer with Effect Stream, (8) RabbitMQ consumer with Effect Stream, (9) Template rendering with Handlebars, (10) Rate limiting with Effect.Semaphore, and (11) Comprehensive Effect-based testing. Focus on type-safe error handling and composability.",
+      "reasoning": "Very high complexity due to Effect framework learning curve, multiple channel integrations, and dual message queue consumers. Requires deep understanding of functional programming, Effect's type system, retry strategies, and backpressure handling. Each channel has unique API requirements and error scenarios. Testing requires mocking external APIs and message queues."
+    },
+    {
+      "taskId": 4,
+      "taskTitle": "Implement Admin API Service (Grizz - Go/gRPC)",
+      "complexityScore": 8,
+      "recommendedSubtasks": 9,
+      "expansionPrompt": "Divide the gRPC service into: (1) Protobuf schema definition for all services and messages, (2) Code generation (Go, gRPC, gateway), (3) Database layer with pgx and migrations, (4) gRPC service handler implementations (Tenant, User, Rule, Analytics), (5) JWT authentication middleware, (6) RBAC authorization layer, (7) Notification rules engine with condition evaluation, (8) Analytics aggregation with Redis caching, (9) grpc-gateway REST mapping and CORS, (10) Audit logging implementation, and (11) Dockerfile and build pipeline. Each service should be independently testable.",
+      "reasoning": "High complexity involving gRPC, REST gateway, complex business logic (rules engine), and multiple concerns (auth, RBAC, analytics, audit). Requires protobuf expertise, concurrent Go programming, and database optimization. Rules engine needs careful design for extensibility. Testing requires grpcurl and both gRPC and REST endpoint coverage."
+    },
+    {
+      "taskId": 5,
+      "taskTitle": "Implement Web Console Frontend (Blaze - React/Next.js + Effect)",
+      "complexityScore": 8,
+      "recommendedSubtasks": 12,
+      "expansionPrompt": "Break down the Next.js application into: (1) Project initialization with App Router and dependencies, (2) Effect Schema definitions for API types, (3) Effect-powered API client with error handling, (4) TanStack Query hooks with Effect integration, (5) Dashboard page with stats and activity, (6) Notifications page with filters and pagination, (7) Integrations page with CRUD operations, (8) Rules page with drag-and-drop builder, (9) Settings page with preferences, (10) Analytics page with charts, (11) WebSocket integration with Effect Stream, (12) Form validation with Effect Schema, (13) Theme system and UI polish, and (14) Comprehensive testing (unit, component, E2E). Focus on type safety and error handling.",
+      "reasoning": "High complexity due to Effect integration in React, real-time WebSocket updates, complex UI components (rule builder, charts), and form validation. Requires expertise in Next.js 15 App Router, Effect in browser context, TanStack Query, and responsive design. Testing requires React Testing Library, Playwright, and accessibility audits."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Implement Mobile App (Tap - Expo/React Native)",
+      "complexityScore": 7,
+      "recommendedSubtasks": 9,
+      "expansionPrompt": "Decompose mobile app into: (1) Expo project initialization with TypeScript and dependencies, (2) Expo Router file-based navigation setup, (3) Push notification registration and handling (FCM/APNs), (4) Home screen with notification feed and pull-to-refresh, (5) Notification detail screen with actions, (6) Integrations screen (read-only), (7) Settings screen with preferences and biometric auth, (8) Profile screen with user info, (9) Offline caching with TanStack Query persistence, (10) Biometric authentication implementation, (11) Deep linking configuration, and (12) EAS Build configuration for iOS and Android. Each screen should be independently testable.",
+      "reasoning": "Moderate-high complexity involving React Native, push notifications, offline support, and biometric auth. Requires platform-specific knowledge (iOS/Android), Expo ecosystem expertise, and careful state management. Testing requires both simulator/emulator and physical device testing. Build process involves EAS Build configuration."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "Implement Desktop Client (Spark - Electron)",
+      "complexityScore": 8,
+      "recommendedSubtasks": 10,
+      "expansionPrompt": "Break down Electron app into: (1) Project initialization with Electron, React, and build tools, (2) Main process implementation with window management, (3) System tray integration with menu and badge, (4) IPC communication setup with contextBridge, (5) MainWindow React component with notification feed, (6) MiniWindow compact view component, (7) SettingsWindow component, (8) Native desktop notifications, (9) Global shortcuts and auto-launch, (10) Auto-updater with electron-updater, (11) electron-builder configuration for all platforms, and (12) Platform-specific testing (Windows, macOS, Linux). Focus on security and native integration.",
+      "reasoning": "High complexity due to Electron's multi-process architecture, IPC communication, native integrations (tray, notifications, shortcuts), and cross-platform builds. Requires expertise in both Node.js and browser contexts, security best practices (contextBridge), and platform-specific APIs. Testing requires manual verification on all target platforms."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Deploy Notification Router Service (Rex - Rust/Axum)",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide deployment into: (1) Kubernetes manifest creation (Deployment, Service, HPA, ConfigMap, Secret), (2) Dockerfile optimization for Rust builds, (3) Docker image build and registry push, (4) Kubernetes manifest application and verification, (5) Ingress configuration with TLS and rate limiting, and (6) Deployment validation with health checks and load testing. Each step should include verification procedures.",
+      "reasoning": "Moderate complexity as it builds on existing service implementation. Main challenges are Kubernetes manifest configuration, Docker multi-stage builds for Rust, and HPA tuning. Requires understanding of Kubernetes resources, health checks, and ingress configuration. Testing involves deployment verification and load testing."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Deploy Integration Service (Nova - Bun/Elysia + Effect)",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down deployment into: (1) Kubernetes manifest creation (Deployment, Service, HPA, ConfigMap, Secret), (2) Dockerfile for Bun application, (3) Docker image build and push, (4) Kubernetes manifest application, (5) Kafka consumer verification, (6) RabbitMQ consumer verification, and (7) Delivery throughput testing. Include verification steps for message queue connectivity.",
+      "reasoning": "Moderate complexity similar to task 8. Additional complexity from verifying Kafka and RabbitMQ consumers are working correctly. Requires testing message consumption and delivery flow. Simpler than task 8 as Bun builds are faster than Rust."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Deploy Admin API Service (Grizz - Go/gRPC)",
+      "complexityScore": 5,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Decompose deployment into: (1) Kubernetes manifest creation with dual ports (gRPC and REST), (2) Multi-stage Dockerfile for Go builds, (3) Docker image build and push, (4) Kubernetes manifest application, (5) gRPC endpoint verification with grpcurl, (6) REST gateway verification, and (7) Ingress configuration for REST endpoints. Include both gRPC and REST testing.",
+      "reasoning": "Moderate complexity with dual-port service (gRPC and REST gateway). Requires configuring both service ports and testing both protocols. Go builds are straightforward. Main challenge is ensuring both gRPC and REST endpoints are accessible and properly configured."
+    },
+    {
+      "taskId": 11,
+      "taskTitle": "Deploy Web Console Frontend (Blaze - React/Next.js + Effect)",
+      "complexityScore": 6,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down frontend deployment into: (1) Kubernetes manifest creation for Next.js app, (2) Production Dockerfile with standalone build, (3) Docker image build and push, (4) Kubernetes manifest application, (5) Ingress configuration with TLS and caching, (6) CDN setup with Cloudflare (caching rules, compression, security headers), and (7) Performance validation with Lighthouse. Focus on optimization and CDN configuration.",
+      "reasoning": "Moderate-high complexity due to Next.js standalone build configuration, CDN setup, and performance optimization. Requires understanding of static asset caching, Cloudflare configuration, and Next.js deployment best practices. Testing includes Lighthouse audits and real-world performance validation."
+    },
+    {
+      "taskId": 12,
+      "taskTitle": "Build and Publish Mobile App (Tap - Expo/React Native)",
+      "complexityScore": 7,
+      "recommendedSubtasks": 7,
+      "expansionPrompt": "Divide app publishing into: (1) EAS Build configuration and environment setup, (2) Production app.json configuration (icons, splash, credentials), (3) iOS build with EAS and IPA generation, (4) Android build with EAS and APK/AAB generation, (5) App Store submission preparation (screenshots, metadata, privacy policy), (6) Google Play submission preparation, (7) Push notification configuration (APNs, FCM), (8) Beta testing with TestFlight and internal testing, and (9) Final submission and review. Each platform should be handled separately.",
+      "reasoning": "Moderate-high complexity due to platform-specific requirements, app store submission processes, and push notification setup. Requires understanding of EAS Build, App Store Connect, Google Play Console, and certificate management. Testing requires beta testing on both platforms before final submission."
+    },
+    {
+      "taskId": 13,
+      "taskTitle": "Build and Distribute Desktop Client (Spark - Electron)",
+      "complexityScore": 7,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down desktop distribution into: (1) electron-builder configuration for all platforms, (2) Code signing setup (macOS certificates, Windows certificates), (3) Platform-specific builds (macOS DMG, Windows NSIS, Linux AppImage/Deb), (4) Auto-updater implementation with electron-updater, (5) GitHub Releases setup for distribution, (6) Download page creation with OS detection, (7) Installer testing on all platforms (Windows, macOS Intel/ARM, Linux), and (8) Auto-update flow testing. Focus on code signing and cross-platform compatibility.",
+      "reasoning": "Moderate-high complexity due to code signing requirements, multi-platform builds, and auto-update implementation. Requires certificates for macOS and Windows, understanding of platform-specific installers, and testing on multiple OS versions. Auto-update adds complexity with server setup and update flow testing."
+    },
+    {
+      "taskId": 14,
+      "taskTitle": "Setup Monitoring and Observability",
+      "complexityScore": 7,
+      "recommendedSubtasks": 7,
+      "expansionPrompt": "Decompose monitoring setup into: (1) Prometheus deployment with kube-prometheus-stack, (2) ServiceMonitor creation for all AlertHub services, (3) Grafana dashboard creation (Service Health, Notification Metrics, Infrastructure, Resources), (4) Prometheus alert rule configuration, (5) Alertmanager setup with Slack and email integration, (6) Loki and Promtail deployment for log aggregation, (7) Optional distributed tracing with Jaeger/Tempo, and (8) Dashboard and alert testing. Each dashboard should be independently created and tested.",
+      "reasoning": "Moderate-high complexity involving multiple observability tools (Prometheus, Grafana, Loki, Alertmanager). Requires expertise in PromQL, Grafana dashboard creation, alert rule configuration, and log aggregation. Testing requires triggering alerts and verifying notification delivery. Optional tracing adds complexity."
+    },
+    {
+      "taskId": 15,
+      "taskTitle": "End-to-End Integration Testing",
+      "complexityScore": 9,
+      "recommendedSubtasks": 8,
+      "expansionPrompt": "Break down E2E testing into: (1) Test framework setup (Playwright, Detox, Spectron), (2) Test data fixtures and database seeding, (3) Web console E2E scenarios (submit notification, configure integration/rule), (4) Mobile app E2E scenarios (push notifications, navigation), (5) Desktop app E2E scenarios (native notifications, system tray), (6) Cross-service integration scenarios (batch submission, retry flow), (7) Performance testing suite (load, stress, spike tests), (8) Security testing (auth, RBAC, rate limiting, input validation), (9) CI/CD pipeline integration, and (10) Test reporting and documentation. Each scenario should be independently executable.",
+      "reasoning": "Very high complexity covering full system integration across all services and clients. Requires multiple testing frameworks, mock external services, performance testing infrastructure, and security testing tools. Scenarios span web, mobile, and desktop with real-time communication. CI/CD integration and comprehensive reporting add complexity. Critical for production readiness."
+    }
+  ]
+}

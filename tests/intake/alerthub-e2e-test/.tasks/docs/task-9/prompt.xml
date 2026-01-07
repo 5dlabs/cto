@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="9" priority="high" agent="nova">
+    <meta>
+        <title>Deploy Integration Service (Nova - Bun/Elysia + Effect)</title>
+        <priority>high</priority>
+        <dependencies>3</dependencies>
+        <agent_hint>nova</agent_hint>
+    </meta>
+
+    <role>You are a Senior Node.js Engineer with expertise in server-side JavaScript and APIs. Implement Task 9 with production-quality code.</role>
+
+    <context>
+        <overview>Create Kubernetes manifests and deploy the Integration Service to the cluster</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 3
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Create Kubernetes manifests in k8s/integration-service/:
+   - deployment.yaml: Deployment with 2 replicas, resource limits (256Mi-512Mi memory, 200m-400m CPU), health check (readiness: /health), env vars from ConfigMaps and Secrets
+   - service.yaml: ClusterIP service on port 3000
+   - hpa.yaml: HorizontalPodAutoscaler targeting 70% CPU, min 2, max 8 replicas
+   - configmap.yaml: ConfigMap with MONGODB_URL, RABBITMQ_URL, KAFKA_BOOTSTRAP_SERVERS
+   - secret.yaml: Secret with SLACK_CLIENT_SECRET, SENDGRID_API_KEY, FCM_SERVICE_ACCOUNT
+
+2. Create Dockerfile in integration-service/:
+   FROM oven/bun:1.1
+   WORKDIR /app
+   COPY package.json bun.lockb ./
+   RUN bun install --frozen-lockfile --production
+   COPY . .
+   EXPOSE 3000
+   CMD [&quot;bun&quot;, &quot;run&quot;, &quot;src/index.ts&quot;]
+
+3. Build and push Docker image:
+   docker build -t alerthub/integration-service:latest .
+   docker push alerthub/integration-service:latest
+
+4. Apply Kubernetes manifests:
+   kubectl apply -f k8s/integration-service/
+
+5. Verify deployment:
+   kubectl get pods -l app=integration-service
+   kubectl logs -l app=integration-service --tail=100
+   kubectl port-forward svc/integration-service 3000:3000
+   curl http://localhost:3000/health
+
+6. Verify Kafka consumer:
+   - Check logs for &quot;Kafka consumer started&quot;
+   - Publish test message to alerthub.notifications.created
+   - Verify message is consumed and processed
+
+7. Verify RabbitMQ consumer:
+   - Check logs for &quot;RabbitMQ consumer started&quot;
+   - Publish test message to integration.slack.delivery queue
+   - Verify message is consumed and delivered</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-9): Deploy Integration Service (Nova - Bun/Elysia + Effect)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>1. Verify pods are running and ready
+2. Test health check endpoint
+3. Test integration CRUD endpoints
+4. Test delivery endpoint with mock integration
+5. Verify Kafka consumer processes messages
+6. Verify RabbitMQ consumer processes tasks
+7. Test retry logic with failing deliveries
+8. Verify Effect error handling
+9. Check logs for errors
+10. Load test delivery throughput</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>bun test</command>
+        <command>bun run lint</command>
+        <command>bun run typecheck</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
+</task>
