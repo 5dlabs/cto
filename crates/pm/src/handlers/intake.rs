@@ -676,39 +676,41 @@ pub async fn extract_intake_request(
     // Derive project name from title (sanitized for repo name)
     let project_name = sanitize_for_repo_name(&issue.title);
 
-    // Try to read PRD and architecture from project ConfigMap (source of truth)
-    let (prd_content, architecture_content) = if let Some(ref project) = issue.project {
-        match crate::handlers::document::read_intake_content(kube_client, &project.id).await {
-            Ok((prd, arch)) => {
-                info!(
-                    project_id = %project.id,
-                    prd_len = prd.len(),
-                    has_arch = arch.is_some(),
-                    "Read PRD and architecture from project ConfigMap"
-                );
-                (prd, arch)
+    // Try to read PRD, architecture, and repository from project ConfigMap (source of truth)
+    let (prd_content, architecture_content, configmap_repo_url) =
+        if let Some(ref project) = issue.project {
+            match crate::handlers::document::read_intake_content(kube_client, &project.id).await {
+                Ok(content) => {
+                    info!(
+                        project_id = %project.id,
+                        prd_len = content.prd.len(),
+                        has_arch = content.architecture.is_some(),
+                        has_repo = content.repository_url.is_some(),
+                        "Read intake content from project ConfigMap"
+                    );
+                    (content.prd, content.architecture, content.repository_url)
+                }
+                Err(e) => {
+                    warn!(
+                        project_id = %project.id,
+                        error = %e,
+                        "Failed to read from ConfigMap, falling back to issue description"
+                    );
+                    // Fallback: strip frontmatter from description
+                    (strip_frontmatter(&raw_description), None, None)
+                }
             }
-            Err(e) => {
-                warn!(
-                    project_id = %project.id,
-                    error = %e,
-                    "Failed to read from ConfigMap, falling back to issue description"
-                );
-                // Fallback: strip frontmatter from description
-                (strip_frontmatter(&raw_description), None)
-            }
-        }
-    } else {
-        // No project attached, fall back to description
-        debug!("Issue has no project, extracting PRD from description");
-        (strip_frontmatter(&raw_description), None)
-    };
+        } else {
+            // No project attached, fall back to description
+            debug!("Issue has no project, extracting PRD from description");
+            (strip_frontmatter(&raw_description), None, None)
+        };
 
-    // Extract repository URL from description (if present)
-    // If not found, the workflow will create a new repo based on the project name
-    let repository_url = extract_repository_url(&raw_description);
+    // Repository URL priority: ConfigMap > description
+    // If not found anywhere, the workflow will create a new repo based on the project name
+    let repository_url = configmap_repo_url.or_else(|| extract_repository_url(&raw_description));
     if let Some(ref url) = repository_url {
-        info!(url = %url, "Extracted repository URL from description");
+        info!(url = %url, "Using repository URL");
     } else {
         info!(project_name = %project_name, "No repository URL found - will create new repo");
     }
