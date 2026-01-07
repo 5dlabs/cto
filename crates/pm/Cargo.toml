@@ -64,7 +64,7 @@ regex = "1"
 serde_yaml = "0.9"
 
 # Shared CTO config types
-cto-config = { path = "../cto-config" }
+config = { path = "../config" }
 
 # URL encoding for OAuth URLs
 urlencoding = "2.1"

@@ -8,7 +8,7 @@
 #   CI/GHCR build (default - downloads binaries from releases):
 #     docker build -t ghcr.io/5dlabs/runtime .
 #
-#   Local/Kind build (compiles tasks/pm-activity from source):
+#   Local/Kind build (compiles intake/pm-activity from source):
 #     docker build --target local -t ghcr.io/5dlabs/runtime:local .
 #
 # =============================================================================
@@ -16,12 +16,12 @@
 # =============================================================================
 # BUILD STAGES (used only for local development builds with --target local)
 # =============================================================================
-FROM rust:latest AS tasks-builder
+FROM rust:latest AS intake-builder
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
-    cargo build --release --package tasks --bin tasks && \
+    cargo build --release --package intake --bin intake && \
     cargo build --release --package pm --bin pm-activity
 
 # =============================================================================
@@ -39,7 +39,7 @@ ENV TZ="$TZ"
 # Frequently-updated tool versions (defined early, used late for better caching)
 # Changing these ARGs only invalidates layers AFTER they are used
 # =============================================================================
-# TaskMaster removed - using Rust tasks CLI instead
+# TaskMaster removed - using Rust intake CLI instead
 
 # Core tools and CLIs (cache apt metadata)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -404,26 +404,26 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; 
       echo "⏭️ Skipping play-monitor installation (no release available)"; \
     fi
 
-# Install tasks CLI from CTO monorepo unified release (skip if version is "skip" or empty)
+# Install intake CLI from CTO monorepo unified release (skip if version is "skip" or empty)
 # This is the Rust replacement for TaskMaster-AI, providing faster task management
 ARG TASKS_VERSION=skip
 RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ]; then \
       ARCH=$(dpkg --print-architecture) && \
       case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
       if [ -n "$DL_ARCH" ]; then \
-        echo "📦 Installing tasks CLI v${TASKS_VERSION} (${DL_ARCH})..." && \
-        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tasks \
-          "https://github.com/5dlabs/cto/releases/download/v${TASKS_VERSION}/tasks-linux-${DL_ARCH}" && \
-        chmod +x /usr/local/bin/tasks && \
-        echo "✅ tasks CLI installed"; \
+        echo "📦 Installing intake CLI v${TASKS_VERSION} (${DL_ARCH})..." && \
+        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/intake \
+          "https://github.com/5dlabs/cto/releases/download/v${TASKS_VERSION}/intake-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/intake && \
+        echo "✅ intake CLI installed"; \
       else \
-        echo "⏭️ Skipping tasks CLI installation (unsupported architecture: ${ARCH})"; \
+        echo "⏭️ Skipping intake CLI installation (unsupported architecture: ${ARCH})"; \
       fi; \
     else \
-      echo "⏭️ Skipping tasks CLI installation (no release available)"; \
+      echo "⏭️ Skipping intake CLI installation (no release available)"; \
     fi
 
-# TaskMaster removed - using Rust tasks CLI instead (see TASKS_VERSION above)
+# TaskMaster removed - using Rust intake CLI instead (see TASKS_VERSION above)
 
 # Install git-delta
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
@@ -610,15 +610,15 @@ RUN echo '#!/bin/sh\n# Ensure Rust environment is always available\nif [ -f "$HO
 
 
 # =============================================================================
-# LOCAL BUILD TARGET (compiles tasks/pm-activity from source)
+# LOCAL BUILD TARGET (compiles intake/pm-activity from source)
 # =============================================================================
 FROM production AS local
 
 # Copy locally-built binaries from builder stage
-COPY --from=tasks-builder /build/target/release/tasks /usr/local/bin/tasks
-COPY --from=tasks-builder /build/target/release/pm-activity /usr/local/bin/pm-activity
-RUN chmod +x /usr/local/bin/tasks /usr/local/bin/pm-activity
+COPY --from=intake-builder /build/target/release/intake /usr/local/bin/intake
+COPY --from=intake-builder /build/target/release/pm-activity /usr/local/bin/pm-activity
+RUN chmod +x /usr/local/bin/intake /usr/local/bin/pm-activity
 
 # Verify installation
-RUN tasks --version 2>&1 || tasks --help 2>&1 | head -5
+RUN intake --version 2>&1 || intake --help 2>&1 | head -5
 RUN pm-activity --help 2>&1 | head -5

@@ -824,7 +824,7 @@ pub struct ProjectConfig {
     /// Source branch
     pub source_branch: Option<String>,
     /// Morgan's tools configuration from cto-config.json agents.morgan.tools
-    pub morgan_tools: Option<cto_config::AgentTools>,
+    pub morgan_tools: Option<config::AgentTools>,
 }
 
 /// Read project-specific configuration from the Kubernetes `ConfigMap`.
@@ -855,7 +855,7 @@ pub async fn read_project_config(
     let data = cm.data?;
     let json_content = data.get("cto-config.json")?;
 
-    match cto_config::CtoConfig::from_json(json_content) {
+    match config::CtoConfig::from_json(json_content) {
         Ok(config) => {
             // Extract Morgan's tools configuration if present
             let morgan_tools = config.agents.get("morgan").map(|agent| {
@@ -1790,7 +1790,7 @@ pub async fn create_project_cto_config_document(
 /// Uses the shared `cto-config` crate for consistent config generation.
 #[must_use]
 pub fn generate_project_cto_config(request: &IntakeRequest) -> String {
-    use cto_config::{generate_project_config, ProjectConfigInput};
+    use config::{generate_project_config, ProjectConfigInput};
 
     // Build input for the shared config generator
     let input = ProjectConfigInput {
@@ -1816,7 +1816,7 @@ pub fn generate_project_cto_config(request: &IntakeRequest) -> String {
 ///
 /// Re-exports from the shared `cto-config` crate for consistency.
 fn derive_service_name(name: &str) -> String {
-    cto_config::derive_service_name(name)
+    config::derive_service_name(name)
 }
 
 /// Derive a clean project name from PRD title.

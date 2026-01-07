@@ -1,5 +1,6 @@
 {
   "version": "1.0",
+  "orgName": "5DLabs",
   "defaults": {
     "intake": {
       "githubApp": "5DLabs-Morgan",
@@ -13,15 +14,6 @@
       }
     },
     "play": {
-      "implementationAgent": "5DLabs-Rex",
-      "frontendAgent": "5DLabs-Blaze",
-      "goAgent": "5DLabs-Grizz",
-      "nodeAgent": "5DLabs-Nova",
-      "mobileAgent": "5DLabs-Tap",
-      "desktopAgent": "5DLabs-Spark",
-      "qualityAgent": "5DLabs-Cleo",
-      "securityAgent": "5DLabs-Cipher",
-      "testingAgent": "5DLabs-Tess",
       "repository": "5dlabs/cto-parallel-test",
       "service": "cto-parallel-test",
       "docsRepository": "5dlabs/cto-parallel-test",

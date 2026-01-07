@@ -57,7 +57,7 @@ walkdir = "2"
 tempfile = "3"
 
 # Local crates
-tasks = { path = "../tasks" }
+intake = { path = "../intake" }
 scraper = "0.24.0"
 
 # Email sending

@@ -1,6 +1,8 @@
 {
   "_comment": "CTO Config Template - Copy to cto-config.json and customize for your project",
   "version": "1.0",
+  "_comment_org_name": "Organization name used to construct agent GitHub App names (e.g., 'Acme' -> 'Acme-Rex', 'Acme-Blaze')",
+  "orgName": "YourOrg",
   "_comment_mcp_servers": "MCP servers available to all TypeScript agents for AI-assisted implementation",
   "mcpServers": {
     "better-auth": {
@@ -42,13 +44,8 @@
         "fallback": "claude-opus-4-5-20251101"
       }
     },
-    "_comment_play": "Default values for play() tool - playground test workflows",
+    "_comment_play": "Default values for play() tool - playground test workflows. Agent names are hardcoded (Rex, Blaze, Grizz, Nova, Tap, Spark, Bolt, Cleo, Cipher, Tess) but can be overridden.",
     "play": {
-      "implementationAgent": "5DLabs-Rex",
-      "frontendAgent": "5DLabs-Blaze",
-      "qualityAgent": "5DLabs-Cleo",
-      "securityAgent": "5DLabs-Cipher",
-      "testingAgent": "5DLabs-Tess",
       "repository": "your-org/your-test-repo",
       "service": "your-test-service",
       "docsRepository": "your-org/your-test-repo",
@@ -101,8 +98,13 @@
     },
     "rex": {
       "githubApp": "5DLabs-Rex",
-      "cli": "codex",
-      "model": "gpt-4o",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "_comment_subagents": "Enable parallel subagent execution (Claude Code only)",
+      "subagents": {
+        "enabled": true,
+        "maxConcurrent": 5
+      },
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -262,6 +264,7 @@
   },
   "_field_documentation": {
     "version": "Config file format version",
+    "orgName": "Organization name used to construct agent GitHub App names. Agent names are built as '{orgName}-{AgentSuffix}' (e.g., 'Acme' -> 'Acme-Rex', 'Acme-Blaze'). Defaults to '5DLabs'.",
     "defaults.docs.model": "Claude model for documentation generation (e.g., claude-opus-4-1-20250805, claude-sonnet-4-20250514, or opus/sonnet for CLAUDE code)",
     "defaults.docs.githubApp": "Default GitHub App for docs workflows",
     "defaults.docs.includeCodebase": "Whether to include existing codebase as markdown context",
@@ -279,11 +282,16 @@
     "defaults.intake.research": "Research model configuration for intake workflows",
     "defaults.intake.fallback": "Fallback model configuration for intake workflows",
     "defaults.play.model": "Default model for play workflows",
-    "defaults.play.implementationAgent": "Default GitHub App for implementation in play workflows",
-    "defaults.play.frontendAgent": "Default GitHub App for frontend tasks in play workflows",
-    "defaults.play.qualityAgent": "Default GitHub App for quality checks in play workflows",
-    "defaults.play.securityAgent": "Default GitHub App for security scanning in play workflows",
-    "defaults.play.testingAgent": "Default GitHub App for testing in play workflows",
+    "defaults.play.implementationAgent": "(Optional) Override {orgName}-Rex",
+    "defaults.play.frontendAgent": "(Optional) Override {orgName}-Blaze",
+    "defaults.play.goAgent": "(Optional) Override {orgName}-Grizz",
+    "defaults.play.nodeAgent": "(Optional) Override {orgName}-Nova",
+    "defaults.play.mobileAgent": "(Optional) Override {orgName}-Tap",
+    "defaults.play.desktopAgent": "(Optional) Override {orgName}-Spark",
+    "defaults.play.infrastructureAgent": "(Optional) Override {orgName}-Bolt",
+    "defaults.play.qualityAgent": "(Optional) Override {orgName}-Cleo",
+    "defaults.play.securityAgent": "(Optional) Override {orgName}-Cipher",
+    "defaults.play.testingAgent": "(Optional) Override {orgName}-Tess",
     "defaults.play.repository": "Default repository for play workspace",
     "defaults.play.service": "Default service name for play workspace isolation",
     "defaults.play.maxRetries": "Default maximum retry attempts for all agents (can be overridden per agent)",
@@ -296,7 +304,10 @@
     "defaults.play.parallelExecution": "Whether to run independent tasks in parallel (true/false)",
     "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access",
     "agents.*.features.effectSolutions": "Enable Effect.ts integration - includes effect-solutions CLI instructions in agent prompts for idiomatic Effect TypeScript patterns",
-    "agents.blaze.frontendStack": "Frontend stack selection: 'shadcn' (default) for Next.js + shadcn/ui, or 'tanstack' for TanStack Router + DB + Query ecosystem. Affects which patterns Blaze uses for routing, data fetching, and UI components"
+    "agents.blaze.frontendStack": "Frontend stack selection: 'shadcn' (default) for Next.js + shadcn/ui, or 'tanstack' for TanStack Router + DB + Query ecosystem. Affects which patterns Blaze uses for routing, data fetching, and UI components",
+    "agents.*.subagents": "Subagent configuration for Claude Code parallel execution (only works with cli: 'claude')",
+    "agents.*.subagents.enabled": "Enable subagent parallel execution - when true, the agent receives coordinator instructions and can dispatch work to parallel subagents",
+    "agents.*.subagents.maxConcurrent": "Maximum concurrent subagents (1-10, default 5) - Claude Code supports up to 10 concurrent subagents"
   },
   "_usage_examples": {
     "minimal_task_call": "task(task_id=1, repository='https://github.com/org/repo')",

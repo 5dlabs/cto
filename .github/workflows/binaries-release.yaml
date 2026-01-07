@@ -122,12 +122,12 @@ jobs:
           - name: cto-cli
             binary: cto
             dir: crates/installer
-          - name: tasks
-            binary: tasks
-            dir: crates/tasks
-          - name: tasks
-            binary: tasks-mcp
-            dir: crates/tasks
+          - name: intake
+            binary: intake
+            dir: crates/intake
+          - name: intake
+            binary: intake-mcp
+            dir: crates/intake
         target:
           - os: ubuntu-22.04
             triple: x86_64-unknown-linux-gnu
@@ -147,7 +147,7 @@ jobs:
             suffix: windows-x86_64
             ext: .exe
         exclude:
-          # healer, controller, utils, cto-cli, and tasks don't need Windows builds
+          # healer, controller, utils, cto-cli, and intake don't need Windows builds
           - package:
               name: healer
             target:
@@ -165,7 +165,7 @@ jobs:
             target:
               os: windows-latest
           - package:
-              name: tasks
+              name: intake
             target:
               os: windows-latest
     runs-on: ${{ matrix.target.os }}

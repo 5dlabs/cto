@@ -87,8 +87,15 @@ struct ServerConfig {
 #[derive(Debug, Deserialize, Clone)]
 struct CtoConfig {
     version: String,
+    /// Organization name used to construct agent GitHub App names (e.g., "5DLabs" -> "5DLabs-Rex")
+    #[serde(rename = "orgName", default = "default_org_name")]
+    org_name: String,
     defaults: WorkflowDefaults,
     agents: HashMap<String, AgentConfig>,
+}
+
+fn default_org_name() -> String {
+    "5DLabs".to_string()
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -198,26 +205,36 @@ struct PlayDefaults {
     /// Default CLI (deprecated - use agent-specific cli config)
     #[serde(default)]
     cli: Option<String>,
+    /// Override implementation agent (defaults to {orgName}-Rex)
     #[serde(rename = "implementationAgent")]
-    implementation_agent: String,
+    implementation_agent: Option<String>,
+    /// Override frontend agent (defaults to {orgName}-Blaze)
     #[serde(rename = "frontendAgent")]
     frontend_agent: Option<String>,
+    /// Override Go agent (defaults to {orgName}-Grizz)
     #[serde(rename = "goAgent")]
     go_agent: Option<String>,
+    /// Override Node agent (defaults to {orgName}-Nova)
     #[serde(rename = "nodeAgent")]
     node_agent: Option<String>,
+    /// Override mobile agent (defaults to {orgName}-Tap)
     #[serde(rename = "mobileAgent")]
     mobile_agent: Option<String>,
+    /// Override desktop agent (defaults to {orgName}-Spark)
     #[serde(rename = "desktopAgent")]
     desktop_agent: Option<String>,
+    /// Override infrastructure agent (defaults to {orgName}-Bolt)
     #[serde(rename = "infrastructureAgent")]
     infrastructure_agent: Option<String>,
+    /// Override quality agent (defaults to {orgName}-Cleo)
     #[serde(rename = "qualityAgent")]
-    quality_agent: String,
+    quality_agent: Option<String>,
+    /// Override security agent (defaults to {orgName}-Cipher)
     #[serde(rename = "securityAgent")]
-    security_agent: String,
+    security_agent: Option<String>,
+    /// Override testing agent (defaults to {orgName}-Tess)
     #[serde(rename = "testingAgent")]
-    testing_agent: String,
+    testing_agent: Option<String>,
     repository: Option<String>,
     service: Option<String>,
     #[serde(rename = "docsRepository")]
@@ -254,6 +271,27 @@ struct PlayDefaults {
     auto_merge: Option<bool>,
     #[serde(rename = "parallelExecution")]
     parallel_execution: Option<bool>,
+}
+
+/// Hardcoded agent suffixes - these are the canonical agent names
+const AGENT_REX: &str = "Rex";
+const AGENT_BLAZE: &str = "Blaze";
+const AGENT_GRIZZ: &str = "Grizz";
+const AGENT_NOVA: &str = "Nova";
+const AGENT_TAP: &str = "Tap";
+const AGENT_SPARK: &str = "Spark";
+const AGENT_BOLT: &str = "Bolt";
+const AGENT_CLEO: &str = "Cleo";
+const AGENT_CIPHER: &str = "Cipher";
+const AGENT_TESS: &str = "Tess";
+#[allow(dead_code)] // Used by intake workflow, not play
+const AGENT_MORGAN: &str = "Morgan";
+#[allow(dead_code)] // Used by integration workflow, not play
+const AGENT_ATLAS: &str = "Atlas";
+
+/// Construct a full agent GitHub App name from org name and agent suffix
+fn make_agent_name(org_name: &str, agent_suffix: &str) -> String {
+    format!("{org_name}-{agent_suffix}")
 }
 
 /// Load configuration from cto-config.json file
@@ -2111,14 +2149,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         eprintln!("ℹ️  Using platform configuration (no repository config)");
     }
 
-    // Handle implementation agent - use provided value or config default
+    // Handle implementation agent - use provided value, config override, or construct from org name
     let implementation_agent_input = arguments
         .get("implementation_agent")
         .and_then(|v| v.as_str())
-        .map_or_else(
-            || effective_config.defaults.play.implementation_agent.clone(),
-            String::from,
-        );
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.implementation_agent.clone())
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_REX));
 
     let implementation_agent_cfg = effective_config
         .agents
@@ -2206,28 +2243,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     let implementation_agent_max_retries = implementation_agent_cfg.and_then(|cfg| cfg.max_retries);
 
-    // Handle frontend agent - use provided value or config default
+    // Handle frontend agent - use provided value, config override, or construct from org name
     let frontend_agent_input = arguments
         .get("frontend_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
         .or_else(|| effective_config.defaults.play.frontend_agent.clone())
-        .unwrap_or_else(|| {
-            let fallback = effective_config.defaults.play.implementation_agent.clone();
-            eprintln!(
-                "⚠️ WARNING: No frontend-agent specified and no defaults.play.frontendAgent in config!"
-            );
-            eprintln!(
-                "   Falling back to implementation-agent: {fallback}"
-            );
-            eprintln!(
-                "   ⚠️ This may cause frontend tasks to be routed incorrectly!"
-            );
-            eprintln!(
-                "   💡 Set defaults.play.frontendAgent in cto-config.json to avoid this"
-            );
-            fallback
-        });
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_BLAZE));
 
     let frontend_agent_cfg = effective_config
         .agents
@@ -2307,13 +2329,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             )
         };
 
-    // Handle Go agent - use provided value or config default
+    // Handle Go agent - use provided value, config override, or construct from org name
     let go_agent_input = arguments
         .get("go_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
         .or_else(|| effective_config.defaults.play.go_agent.clone())
-        .unwrap_or_default();
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_GRIZZ));
 
     let go_agent_cfg = if go_agent_input.is_empty() {
         None
@@ -2370,13 +2392,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         };
     let go_agent_max_retries = go_agent_cfg.and_then(|cfg| cfg.max_retries);
 
-    // Handle Node agent - use provided value or config default
+    // Handle Node agent - use provided value, config override, or construct from org name
     let node_agent_input = arguments
         .get("node_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
         .or_else(|| effective_config.defaults.play.node_agent.clone())
-        .unwrap_or_default();
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_NOVA));
 
     let node_agent_cfg = if node_agent_input.is_empty() {
         None
@@ -2433,13 +2455,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         };
     let node_agent_max_retries = node_agent_cfg.and_then(|cfg| cfg.max_retries);
 
-    // Handle Mobile agent - use provided value or config default
+    // Handle Mobile agent - use provided value, config override, or construct from org name
     let mobile_agent_input = arguments
         .get("mobile_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
         .or_else(|| effective_config.defaults.play.mobile_agent.clone())
-        .unwrap_or_default();
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_TAP));
 
     let mobile_agent_cfg = if mobile_agent_input.is_empty() {
         None
@@ -2496,13 +2518,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         };
     let mobile_agent_max_retries = mobile_agent_cfg.and_then(|cfg| cfg.max_retries);
 
-    // Handle Desktop agent - use provided value or config default
+    // Handle Desktop agent - use provided value, config override, or construct from org name
     let desktop_agent_input = arguments
         .get("desktop_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
         .or_else(|| effective_config.defaults.play.desktop_agent.clone())
-        .unwrap_or_default();
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_SPARK));
 
     let desktop_agent_cfg = if desktop_agent_input.is_empty() {
         None
@@ -2559,13 +2581,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         };
     let desktop_agent_max_retries = desktop_agent_cfg.and_then(|cfg| cfg.max_retries);
 
-    // Handle Infrastructure agent (Bolt) - use provided value or config default
+    // Handle Infrastructure agent (Bolt) - use provided value, config override, or construct from org name
     let infrastructure_agent_input = arguments
         .get("infrastructure_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
         .or_else(|| effective_config.defaults.play.infrastructure_agent.clone())
-        .unwrap_or_default();
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_BOLT));
 
     let infrastructure_agent_cfg = if infrastructure_agent_input.is_empty() {
         None
@@ -2627,14 +2649,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     };
     let infrastructure_agent_max_retries = infrastructure_agent_cfg.and_then(|cfg| cfg.max_retries);
 
-    // Handle quality agent - use provided value or config default
+    // Handle quality agent - use provided value, config override, or construct from org name
     let quality_agent_input = arguments
         .get("quality_agent")
         .and_then(|v| v.as_str())
-        .map_or_else(
-            || effective_config.defaults.play.quality_agent.clone(),
-            String::from,
-        );
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.quality_agent.clone())
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_CLEO));
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
     let quality_agent_cfg = effective_config
@@ -2715,14 +2736,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     let quality_agent_max_retries = quality_agent_cfg.and_then(|cfg| cfg.max_retries);
 
-    // Handle security agent - use provided value or config default
+    // Handle security agent - use provided value, config override, or construct from org name
     let security_agent_input = arguments
         .get("security_agent")
         .and_then(|v| v.as_str())
-        .map_or_else(
-            || effective_config.defaults.play.security_agent.clone(),
-            String::from,
-        );
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.security_agent.clone())
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_CIPHER));
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
     let security_agent_cfg = effective_config
@@ -2803,14 +2823,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     let security_agent_max_retries = security_agent_cfg.and_then(|cfg| cfg.max_retries);
 
-    // Handle testing agent - use provided value or config default
+    // Handle testing agent - use provided value, config override, or construct from org name
     let testing_agent_input = arguments
         .get("testing_agent")
         .and_then(|v| v.as_str())
-        .map_or_else(
-            || effective_config.defaults.play.testing_agent.clone(),
-            String::from,
-        );
+        .map(String::from)
+        .or_else(|| effective_config.defaults.play.testing_agent.clone())
+        .unwrap_or_else(|| make_agent_name(&effective_config.org_name, AGENT_TESS));
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
     let testing_agent_cfg = effective_config
@@ -3379,21 +3398,21 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
         .and_then(|v| v.as_str())
         .unwrap_or("claude-sonnet-4-5-20250514");
 
-    // Build tasks intake command
+    // Build intake command
     // Check for local development binary first, then fall back to PATH
-    let tasks_bin = {
-        let dev_binary = workspace_dir.join("target/debug/tasks");
-        let release_binary = workspace_dir.join("target/release/tasks");
+    let intake_bin = {
+        let dev_binary = workspace_dir.join("target/debug/intake");
+        let release_binary = workspace_dir.join("target/release/intake");
         if dev_binary.exists() {
             dev_binary.display().to_string()
         } else if release_binary.exists() {
             release_binary.display().to_string()
         } else {
-            find_command("tasks")
+            find_command("intake")
         }
     };
 
-    let mut cmd = std::process::Command::new(&tasks_bin);
+    let mut cmd = std::process::Command::new(&intake_bin);
     cmd.arg("intake")
         .arg("--prd")
         .arg(&prd_path)
@@ -3423,7 +3442,7 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
     }
 
     eprintln!(
-        "🔧 Running: tasks intake --prd {} --num-tasks {} --model {}",
+        "🔧 Running: intake intake --prd {} --num-tasks {} --model {}",
         prd_path.display(),
         num_tasks,
         model
@@ -3488,7 +3507,7 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
         }))
     } else {
         Err(anyhow!(
-            "tasks intake failed with exit code {:?}\nstderr: {}",
+            "intake command failed with exit code {:?}\nstderr: {}",
             output.status.code(),
             stderr
         ))

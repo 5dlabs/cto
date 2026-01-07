@@ -4,7 +4,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use tasks::ai::{parse_ai_response, AIMessage, AIProvider, GenerateOptions};
+use intake::ai::{parse_ai_response, AIMessage, AIProvider, GenerateOptions};
 
 use super::categories::Category;
 use super::prompts::PromptManager;

@@ -9,4 +9,3 @@ resources:
 commonLabels:
   app.kubernetes.io/part-of: headscale
   app.kubernetes.io/managed-by: argocd
-

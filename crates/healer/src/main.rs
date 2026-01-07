@@ -663,9 +663,31 @@ enum InsightsCommands {
 // CTO Config Types - parsed from cto-config.json
 // =============================================================================
 
+/// Default org name for constructing agent GitHub App names.
+const DEFAULT_ORG_NAME: &str = "5DLabs";
+
+/// Hardcoded agent suffixes.
+const AGENT_REX: &str = "Rex";
+const AGENT_BLAZE: &str = "Blaze";
+const AGENT_CLEO: &str = "Cleo";
+const AGENT_CIPHER: &str = "Cipher";
+const AGENT_TESS: &str = "Tess";
+
+fn default_org_name() -> String {
+    DEFAULT_ORG_NAME.to_string()
+}
+
+/// Construct a full agent GitHub App name from org name and agent suffix.
+fn make_agent_name(org_name: &str, agent_suffix: &str) -> String {
+    format!("{org_name}-{agent_suffix}")
+}
+
 /// CTO configuration file structure (cto-config.json)
 #[derive(Debug, Deserialize)]
 struct CtoConfig {
+    /// Organization name for constructing agent names (e.g., "5DLabs" -> "5DLabs-Rex")
+    #[serde(rename = "orgName", default = "default_org_name")]
+    org_name: String,
     defaults: CtoDefaults,
     /// Agent configurations (rex, cleo, tess, cipher, blaze, etc.)
     #[serde(default)]
@@ -786,33 +808,36 @@ struct PlayConfig {
     /// CLI tool (e.g., "factory", "cursor", "codex")
     #[serde(default)]
     cli: Option<String>,
-    /// Implementation agent (e.g., "5DLabs-Rex")
-    implementation_agent: String,
-    /// Frontend agent (e.g., "5DLabs-Blaze")
+    /// Implementation agent override (defaults to {orgName}-Rex)
+    #[serde(default)]
+    implementation_agent: Option<String>,
+    /// Frontend agent override (defaults to {orgName}-Blaze)
     #[serde(default)]
     frontend_agent: Option<String>,
-    /// Mobile agent (e.g., "5DLabs-Tap")
+    /// Mobile agent override (defaults to {orgName}-Tap)
     #[serde(default)]
     mobile_agent: Option<String>,
-    /// Go agent (e.g., "5DLabs-Grizz")
+    /// Go agent override (defaults to {orgName}-Grizz)
     #[serde(default)]
     go_agent: Option<String>,
-    /// Node agent (e.g., "5DLabs-Nova")
+    /// Node agent override (defaults to {orgName}-Nova)
     #[serde(default)]
     node_agent: Option<String>,
-    /// Desktop agent (e.g., "5DLabs-Spark")
+    /// Desktop agent override (defaults to {orgName}-Spark)
     #[serde(default)]
     desktop_agent: Option<String>,
-    /// Infrastructure agent (e.g., "5DLabs-Bolt")
+    /// Infrastructure agent override (defaults to {orgName}-Bolt)
     #[serde(default)]
     infrastructure_agent: Option<String>,
-    /// Quality agent (e.g., "5DLabs-Cleo")
-    quality_agent: String,
-    /// Security agent (e.g., "5DLabs-Cipher")
+    /// Quality agent override (defaults to {orgName}-Cleo)
+    #[serde(default)]
+    quality_agent: Option<String>,
+    /// Security agent override (defaults to {orgName}-Cipher)
     #[serde(default)]
     security_agent: Option<String>,
-    /// Testing agent (e.g., "5DLabs-Tess")
-    testing_agent: String,
+    /// Testing agent override (defaults to {orgName}-Tess)
+    #[serde(default)]
+    testing_agent: Option<String>,
     /// Repository (e.g., "5dlabs/cto-parallel-test")
     repository: String,
     /// Service name
@@ -3397,13 +3422,28 @@ async fn run_full_watch(
         .with_context(|| format!("Failed to parse config file: {config_path}"))?;
 
     let play = &config.defaults.play;
+    let org_name = &config.org_name;
     let repository = repository_override.unwrap_or(&play.repository);
+
+    // Resolve agent names with org_name defaults
+    let impl_agent = play
+        .implementation_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_REX));
+    let quality_agent = play
+        .quality_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_CLEO));
+    let testing_agent = play
+        .testing_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_TESS));
 
     println!(
         "{}",
         format!(
             "Loaded config: repo={}, impl={}, quality={}, testing={}",
-            repository, play.implementation_agent, play.quality_agent, play.testing_agent
+            repository, impl_agent, quality_agent, testing_agent
         )
         .cyan()
     );
@@ -3426,11 +3466,11 @@ async fn run_full_watch(
             "-p",
             &format!("repository={repository}"),
             "-p",
-            &format!("implementation-agent={}", play.implementation_agent),
+            &format!("implementation-agent={impl_agent}"),
             "-p",
-            &format!("quality-agent={}", play.quality_agent),
+            &format!("quality-agent={quality_agent}"),
             "-p",
-            &format!("testing-agent={}", play.testing_agent),
+            &format!("testing-agent={testing_agent}"),
             "-o",
             "json",
         ])
@@ -3500,7 +3540,22 @@ async fn run_self_healing_loop(
         .with_context(|| format!("Failed to parse config file: {config_path}"))?;
 
     let play = &config.defaults.play;
+    let org_name = &config.org_name;
     let remediation_config = config.defaults.remediation.clone();
+
+    // Resolve agent names with org_name defaults
+    let impl_agent = play
+        .implementation_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_REX));
+    let quality_agent = play
+        .quality_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_CLEO));
+    let testing_agent = play
+        .testing_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_TESS));
 
     // Check if remediation is enabled
     let Some(remediation) = remediation_config else {
@@ -3584,11 +3639,11 @@ async fn run_self_healing_loop(
                 "-p",
                 &format!("repository={repository}"),
                 "-p",
-                &format!("implementation-agent={}", play.implementation_agent),
+                &format!("implementation-agent={impl_agent}"),
                 "-p",
-                &format!("quality-agent={}", play.quality_agent),
+                &format!("quality-agent={quality_agent}"),
                 "-p",
-                &format!("testing-agent={}", play.testing_agent),
+                &format!("testing-agent={testing_agent}"),
                 "-o",
                 "json",
             ])
@@ -4796,6 +4851,7 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
 
     let play_config = &config.cto_config.defaults.play;
     let agents = &config.cto_config.agents;
+    let org_name = &config.cto_config.org_name;
 
     // Default CLI and model from play config
     let default_cli = play_config.cli.as_deref().unwrap_or("factory");
@@ -4804,68 +4860,73 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         .as_deref()
         .unwrap_or("claude-sonnet-4-5-20250514");
 
-    // Resolve all 5 agent stages from config
-    let impl_agent = resolve_agent_config(
-        &play_config.implementation_agent,
-        agents,
-        default_cli,
-        default_model,
-    );
+    // Resolve all agent stages from config (use org_name to construct defaults)
+    let impl_agent_name = play_config
+        .implementation_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_REX));
+    let impl_agent = resolve_agent_config(&impl_agent_name, agents, default_cli, default_model);
 
-    let frontend_agent = if let Some(ref agent_name) = play_config.frontend_agent {
-        resolve_agent_config(agent_name, agents, default_cli, default_model)
-    } else {
-        // Default frontend agent if not configured
-        resolve_agent_config("5DLabs-Blaze", agents, default_cli, default_model)
-    };
+    let frontend_agent_name = play_config
+        .frontend_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_BLAZE));
+    let frontend_agent =
+        resolve_agent_config(&frontend_agent_name, agents, default_cli, default_model);
 
-    let mobile_agent = if let Some(ref agent_name) = play_config.mobile_agent {
-        resolve_agent_config(agent_name, agents, default_cli, default_model)
-    } else {
-        // Default mobile agent if not configured
-        resolve_agent_config("5DLabs-Tap", agents, default_cli, default_model)
-    };
+    let mobile_agent_name = play_config
+        .mobile_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, "Tap"));
+    let mobile_agent =
+        resolve_agent_config(&mobile_agent_name, agents, default_cli, default_model);
 
-    let go_agent = if let Some(ref agent_name) = play_config.go_agent {
-        resolve_agent_config(agent_name, agents, default_cli, default_model)
-    } else {
-        // Default go agent if not configured
-        resolve_agent_config("5DLabs-Grizz", agents, default_cli, default_model)
-    };
+    let go_agent_name = play_config
+        .go_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, "Grizz"));
+    let go_agent = resolve_agent_config(&go_agent_name, agents, default_cli, default_model);
 
-    let node_agent = if let Some(ref agent_name) = play_config.node_agent {
-        resolve_agent_config(agent_name, agents, default_cli, default_model)
-    } else {
-        // Default node agent if not configured
-        resolve_agent_config("5DLabs-Nova", agents, default_cli, default_model)
-    };
+    let node_agent_name = play_config
+        .node_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, "Nova"));
+    let node_agent = resolve_agent_config(&node_agent_name, agents, default_cli, default_model);
 
-    let desktop_agent = if let Some(ref agent_name) = play_config.desktop_agent {
-        resolve_agent_config(agent_name, agents, default_cli, default_model)
-    } else {
-        // Default desktop agent if not configured
-        resolve_agent_config("5DLabs-Spark", agents, default_cli, default_model)
-    };
+    let desktop_agent_name = play_config
+        .desktop_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, "Spark"));
+    let desktop_agent =
+        resolve_agent_config(&desktop_agent_name, agents, default_cli, default_model);
 
-    let infrastructure_agent = if let Some(ref agent_name) = play_config.infrastructure_agent {
-        resolve_agent_config(agent_name, agents, default_cli, default_model)
-    } else {
-        // Default infrastructure agent if not configured
-        resolve_agent_config("5DLabs-Bolt", agents, default_cli, default_model)
-    };
+    let infrastructure_agent_name = play_config
+        .infrastructure_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, "Bolt"));
+    let infrastructure_agent =
+        resolve_agent_config(&infrastructure_agent_name, agents, default_cli, default_model);
 
+    let quality_agent_name = play_config
+        .quality_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_CLEO));
     let quality_agent =
-        resolve_agent_config(&play_config.quality_agent, agents, "claude", default_model);
+        resolve_agent_config(&quality_agent_name, agents, "claude", default_model);
 
-    let security_agent = if let Some(ref agent_name) = play_config.security_agent {
-        resolve_agent_config(agent_name, agents, "cursor", default_model)
-    } else {
-        // Default security agent if not configured
-        resolve_agent_config("5DLabs-Cipher", agents, "cursor", default_model)
-    };
+    let security_agent_name = play_config
+        .security_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_CIPHER));
+    let security_agent =
+        resolve_agent_config(&security_agent_name, agents, "cursor", default_model);
 
+    let testing_agent_name = play_config
+        .testing_agent
+        .clone()
+        .unwrap_or_else(|| make_agent_name(org_name, AGENT_TESS));
     let testing_agent =
-        resolve_agent_config(&play_config.testing_agent, agents, "claude", default_model);
+        resolve_agent_config(&testing_agent_name, agents, "claude", default_model);
 
     // Get max retries from config with fallbacks
     let default_retries = play_config.max_retries.unwrap_or(10);

@@ -9,7 +9,7 @@ use std::fmt::Write;
 use std::path::Path;
 use std::sync::Arc;
 
-use tasks::ai::{parse_ai_response, AIMessage, AIProvider, GenerateOptions};
+use intake::ai::{parse_ai_response, AIMessage, AIProvider, GenerateOptions};
 
 use crate::storage::{DigestContent, IndexEntry, MarkdownReader};
 

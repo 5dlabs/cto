@@ -577,6 +577,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "config"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "console"
 version = "0.15.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -794,17 +805,6 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "wiremock",
-]
-
-[[package]]
-name = "cto-config"
-version = "0.0.1"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -1931,6 +1931,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "intake"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "chrono",
+ "clap",
+ "cli",
+ "colored",
+ "comfy-table",
+ "config",
+ "dialoguer",
+ "futures",
+ "handlebars",
+ "indicatif",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "which 7.0.3",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2880,7 +2911,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
- "cto-config",
+ "config",
  "hex",
  "hmac",
  "k8s-openapi",
@@ -3296,6 +3327,7 @@ dependencies = [
  "colored",
  "futures",
  "handlebars",
+ "intake",
  "lettre",
  "octocrab",
  "regex",
@@ -3303,7 +3335,6 @@ dependencies = [
  "scraper",
  "serde",
  "serde_json",
- "tasks",
  "tempfile",
  "thiserror 2.0.17",
  "tokio",
@@ -3988,37 +4019,6 @@ dependencies = [
  "ntapi",
  "rayon",
  "windows",
-]
-
-[[package]]
-name = "tasks"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.22.1",
- "chrono",
- "clap",
- "cli",
- "colored",
- "comfy-table",
- "cto-config",
- "dialoguer",
- "futures",
- "handlebars",
- "indicatif",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.17",
- "tokio",
- "tokio-test",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "which 7.0.3",
 ]
 
 [[package]]

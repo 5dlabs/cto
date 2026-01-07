@@ -73,4 +73,3 @@ spec:
     - hubble.5dlabs.ai
   duration: 2160h
   renewBefore: 360h
-

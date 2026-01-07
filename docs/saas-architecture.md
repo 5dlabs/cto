@@ -2,11 +2,23 @@
 
 ## Overview
 
-The CTO Platform operates as a managed service where 5D Labs handles all the complexity of AI agent orchestration, infrastructure management, and integrations. Customers deploy only a lightweight gateway to their cluster, expressing intent via CRDs while all execution happens in the 5D Labs control plane.
+The CTO Platform operates as a **fully managed service** where 5D Labs handles all complexity: AI agent orchestration, infrastructure, Kubernetes, and integrations. Customers interact entirely through the web portal and API—no cluster required.
+
+**Key principle: Zero infrastructure for customers.** They connect their GitHub, describe what they want built, and we handle everything else.
 
 ---
 
-## Architecture Diagram: Managed vs Client-Side
+## Deployment Models
+
+| Model | Customer Deploys | Best For |
+|-------|------------------|----------|
+| **Fully Managed** (default) | Nothing | 99% of customers - zero friction |
+| **Gateway Mode** | Lightweight gateway pod | Customers who want CRD-based workflows |
+| **Enterprise On-Prem** | Full platform | Regulated industries, air-gapped |
+
+---
+
+## Architecture Diagram: Fully Managed (Default)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -58,12 +70,16 @@ The CTO Platform operates as a managed service where 5D Labs handles all the com
 │  └─────────────────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                                     │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐   │
-│  │                              INTEGRATIONS (managed)                                          │   │
+│  │                              INTEGRATIONS (shared public apps)                               │   │
 │  │                                                                                              │   │
 │  │   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │   │
 │  │   │   GitHub    │  │   Linear    │  │   Slack     │  │  Datadog    │  │  PagerDuty  │      │   │
-│  │   │   (Apps)    │  │   (PM)      │  │  (Notifs)   │  │  (Metrics)  │  │  (Alerts)   │      │   │
+│  │   │  (Public    │  │  (Public    │  │  (Public    │  │  (Public    │  │  (Public    │      │   │
+│  │   │   App)      │  │   OAuth)    │  │   OAuth)    │  │   OAuth)    │  │   OAuth)    │      │   │
 │  │   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │   │
+│  │                                                                                              │   │
+│  │   Single 5D Labs app installed by all tenants → per-tenant tokens in isolated vaults        │   │
+│  │   Enterprise option: Bring-your-own-app for compliance requirements                         │   │
 │  └─────────────────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                                     │
 └──────────────────────────────────────────────────────────────────────────────────────────────┬──────┘
@@ -72,12 +88,18 @@ The CTO Platform operates as a managed service where 5D Labs handles all the com
                                                                                                │
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┴──────┐
 │                                                                                                     │
-│                                    CUSTOMER SIDE (Thin Client)                                      │
+│                          CUSTOMER SIDE: NOTHING REQUIRED (Fully Managed)                            │
 │                                                                                                     │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐   │
-│  │                              Customer Kubernetes Cluster                                     │   │
+│  │                         DEFAULT: No infrastructure required!                                 │   │
 │  │                                                                                              │   │
-│  │   What customer deploys (ONE TIME):                                                         │   │
+│  │   • Customer interacts via Web Portal, REST API, or CLI                                    │   │
+│  │   • All execution happens on 5D Labs managed infrastructure                                │   │
+│  │   • Zero Kubernetes knowledge required                                                     │   │
+│  │                                                                                              │   │
+│  │   ─────────────────────────────────────────────────────────────────────────────────────    │   │
+│  │                                                                                              │   │
+│  │   OPTIONAL: Gateway Mode (for K8s-native teams who want CRD workflows)                                                         │   │
 │  │   ┌────────────────────────────────────────────────────────────────────────────────────┐    │   │
 │  │   │                                                                                     │    │   │
 │  │   │   helm install cto-gateway 5dlabs/cto-gateway \                                    │    │   │
@@ -136,13 +158,130 @@ The CTO Platform operates as a managed service where 5D Labs handles all the com
 | **Controller** | All orchestration logic | Nothing |
 | **Agent Execution** | Pods, images, scaling | Nothing |
 | **AI API Keys** | Optional (managed keys) | Own keys (BYOK option) |
-| **GitHub Access** | Token generation, API calls | GitHub App installation |
-| **MCP Tools** | All tool servers | Tool-specific credentials |
-| **Secrets Vault** | OpenBao infrastructure | Secret values |
+| **GitHub Access** | Public GitHub App, token management | Click "Install" button |
+| **Linear Access** | Public Linear OAuth App | Click "Connect" button |
+| **MCP Tools** | All tool servers | Nothing (uses shared apps) |
+| **Secrets Vault** | OpenBao infrastructure, per-tenant isolation | Nothing |
 | **Observability** | Logs, metrics, dashboards | Optional SIEM integration |
-| **Infrastructure** | Provisioning, scaling | Cloud account credentials |
+| **Infrastructure** | Provisioning, scaling | Cloud account credentials (optional) |
 | **CRD Definitions** | Schema, validation | Nothing (auto-synced) |
 | **Updates** | Automatic (SaaS) | Gateway pulls templates |
+
+---
+
+## Shared Integration Model
+
+The platform uses **public OAuth apps** for all third-party integrations. This is the industry-standard approach (used by Vercel, Netlify, CircleCI, etc.) and dramatically reduces onboarding friction.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         SHARED PUBLIC APP ARCHITECTURE                                   │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                        5D Labs GitHub App (Public)                                 │  │
+│  │                                                                                    │  │
+│  │   App ID: 123456                                                                  │  │
+│  │   Permissions: Contents (read/write), Pull Requests, Issues, Actions              │  │
+│  │   Webhook URL: https://api.5dlabs.io/webhooks/github                              │  │
+│  │                                                                                    │  │
+│  │   ┌─────────────────────────────────────────────────────────────────────────────┐ │  │
+│  │   │                        Per-Tenant Installations                              │ │  │
+│  │   │                                                                              │ │  │
+│  │   │   Acme Corp         │  Installation ID: 45678901                            │ │  │
+│  │   │   (tenant: acme)    │  Repos: acme/api, acme/frontend, acme/docs            │ │  │
+│  │   │                     │  Token: encrypted in acme's vault                     │ │  │
+│  │   │                     │                                                        │ │  │
+│  │   │   ─────────────────────────────────────────────────────────────────────────  │ │  │
+│  │   │                     │                                                        │ │  │
+│  │   │   BigCorp Inc       │  Installation ID: 45678902                            │ │  │
+│  │   │   (tenant: bigcorp) │  Repos: bigcorp/monorepo                              │ │  │
+│  │   │                     │  Token: encrypted in bigcorp's vault                  │ │  │
+│  │   │                     │                                                        │ │  │
+│  │   │   ─────────────────────────────────────────────────────────────────────────  │ │  │
+│  │   │                     │                                                        │ │  │
+│  │   │   Startup XYZ       │  Installation ID: 45678903                            │ │  │
+│  │   │   (tenant: xyz)     │  Repos: startupxyz/* (all repos)                      │ │  │
+│  │   │                     │  Token: encrypted in xyz's vault                      │ │  │
+│  │   │                                                                              │ │  │
+│  │   └─────────────────────────────────────────────────────────────────────────────┘ │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  How it works:                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  1. Customer clicks "Connect GitHub" in 5D Labs portal                            │  │
+│  │  2. Redirected to GitHub OAuth flow                                               │  │
+│  │  3. Customer authorizes 5D Labs app for their org/repos                           │  │
+│  │  4. GitHub returns installation_id                                                │  │
+│  │  5. 5D Labs stores installation_id in customer's tenant vault                     │  │
+│  │  6. When agents need GitHub access:                                               │  │
+│  │     → Fetch installation token using installation_id + app private key            │  │
+│  │     → Token is scoped ONLY to that customer's authorized repos                    │  │
+│  │     → Token expires after 1 hour (auto-refreshed)                                 │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  Security properties:                                                                   │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  ✓ Tenant isolation: Installation tokens cannot access other tenants' repos      │  │
+│  │  ✓ Least privilege: Customers choose exactly which repos to authorize            │  │
+│  │  ✓ Revocable: Customer can uninstall app anytime from GitHub settings            │  │
+│  │  ✓ Auditable: All API calls logged with installation_id                          │  │
+│  │  ✓ Rate limits: Per-installation, not shared across tenants                      │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  Same pattern for Linear, Slack, etc.:                                                  │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  Linear:    Public OAuth app → workspace access token → stored per-tenant        │  │
+│  │  Slack:     Public OAuth app → workspace bot token → stored per-tenant           │  │
+│  │  Datadog:   API key provided by customer → stored per-tenant                     │  │
+│  │  PagerDuty: OAuth or API key → stored per-tenant                                 │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Enterprise: Bring Your Own App (BYOA)
+
+For customers with strict compliance requirements (SOC 2, FedRAMP, regulated industries), we offer dedicated app installations:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                     ENTERPRISE: BRING YOUR OWN APP (BYOA)                                │
+│                                                                                          │
+│  When required:                                                                         │
+│  • Regulated industries (finance, healthcare, government)                               │
+│  • Compliance frameworks that require dedicated integrations                            │
+│  • Customers who need full audit trail in their own systems                             │
+│  • Air-gapped or highly restricted environments                                         │
+│                                                                                          │
+│  How it works:                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  1. Customer creates their own GitHub App in their GitHub org                     │  │
+│  │  2. Customer configures permissions per 5D Labs spec                              │  │
+│  │  3. Customer provides:                                                            │  │
+│  │     • App ID                                                                      │  │
+│  │     • Private key (stored in their vault)                                         │  │
+│  │     • Installation ID                                                             │  │
+│  │  4. 5D Labs agents use customer's app credentials                                 │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  Benefits for enterprise:                                                               │
+│  • Full audit trail in customer's GitHub                                               │
+│  • Customer controls all permissions                                                   │
+│  • Can revoke without affecting other tenants                                          │
+│  • Meets compliance requirements for dedicated integrations                            │
+│                                                                                          │
+│  Pricing: Included in Enterprise tier, or +$500/month add-on for Growth tier           │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -292,68 +431,119 @@ The CTO Platform operates as a managed service where 5D Labs handles all the com
 
 ---
 
-## Customer Journey
+## Customer Journey (Fully Managed - Default)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              CUSTOMER JOURNEY                                            │
+│                    CUSTOMER JOURNEY - FULLY MANAGED (2 minutes to first run)            │
 │                                                                                          │
-│  Day 0: Sign Up                                                                         │
+│  Step 1: Sign Up (30 seconds)                                                           │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  1. Create account (email or GitHub OAuth)                                        │  │
-│  │  2. Choose plan (Starter, Team, Enterprise)                                       │  │
-│  │  3. Get tenant_id and api_token                                                   │  │
+│  │  1. Go to app.5dlabs.io                                                           │  │
+│  │  2. Click "Sign up with GitHub"                                                   │  │
+│  │  3. Done - account created, GitHub already connected!                             │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
 │                                             │                                            │
 │                                             ▼                                            │
-│  Day 0: Connect GitHub                                                                  │
+│  Step 2: Select Repositories (30 seconds)                                               │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  1. Install GitHub App on your org                                                │  │
-│  │  2. Select repositories to grant access                                           │  │
-│  │  3. Credentials automatically stored in your vault                                │  │
+│  │  1. See list of your GitHub repos                                                 │  │
+│  │  2. Click to enable repos for agent access                                        │  │
+│  │  3. (Optional) Connect Linear workspace for project management                    │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
 │                                             │                                            │
 │                                             ▼                                            │
-│  Day 0: Connect AI Provider                                                             │
+│  Step 3: Create Your First Task (1 minute)                                              │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  Option A: Use 5D Labs API keys (billed through us)                               │  │
-│  │  Option B: Enter your own API keys (BYOK)                                         │  │
+│  │                                                                                    │  │
+│  │  In the portal:                                                                   │  │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐  │  │
+│  │  │  New Task                                                                    │  │  │
+│  │  │  ─────────────────────────────────────────────────────────────────────────  │  │  │
+│  │  │  Repository:  [acme/my-api           ▼]                                     │  │  │
+│  │  │  Task:        [Add JWT authentication to the /api/users endpoint    ]       │  │  │
+│  │  │  Agent:       [● Auto  ○ Rex (Rust)  ○ Blaze (React)  ○ Nova (Node)]       │  │  │
+│  │  │                                                                              │  │  │
+│  │  │                                            [Create Task & Start Agent]      │  │  │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                                    │  │
+│  │  Or via API:                                                                      │  │
+│  │  curl -X POST https://api.5dlabs.io/v1/tasks \                                   │  │
+│  │    -H "Authorization: Bearer $API_TOKEN" \                                       │  │
+│  │    -d '{"repo": "acme/my-api", "prompt": "Add JWT auth..."}'                     │  │
+│  │                                                                                    │  │
+│  │  Or via CLI:                                                                      │  │
+│  │  5d task create --repo acme/my-api "Add JWT authentication..."                   │  │
+│  │                                                                                    │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
 │                                             │                                            │
 │                                             ▼                                            │
-│  Day 0: Deploy Gateway (5 minutes)                                                      │
+│  Step 4: Watch Progress, Review PR                                                      │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  Live progress in portal:                                                         │  │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐  │  │
+│  │  │  Task: Add JWT authentication                                                │  │  │
+│  │  │  Status: ● Running (2m 34s)                                                  │  │  │
+│  │  │                                                                              │  │  │
+│  │  │  [====================                    ] 50%                              │  │  │
+│  │  │                                                                              │  │  │
+│  │  │  ✓ Cloned repository                                                        │  │  │
+│  │  │  ✓ Analyzed codebase                                                        │  │  │
+│  │  │  ● Implementing changes...                                                  │  │  │
+│  │  │  ○ Running tests                                                            │  │  │
+│  │  │  ○ Creating PR                                                              │  │  │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                                    │  │
+│  │  When complete:                                                                   │  │
+│  │  → PR created: https://github.com/acme/my-api/pull/42                            │  │
+│  │  → Review, merge, done!                                                          │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  No Kubernetes. No infrastructure. No CLI required. Just results.                       │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Alternative: Gateway Mode (For K8s-Native Workflows)
+
+For teams that prefer Kubernetes-native workflows with CRDs:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         GATEWAY MODE (Optional)                                          │
+│                                                                                          │
+│  For teams that want:                                                                   │
+│  • CRD-based declarative workflows                                                      │
+│  • GitOps integration (ArgoCD, Flux)                                                    │
+│  • kubectl-based operations                                                             │
+│                                                                                          │
+│  Setup (5 minutes):                                                                     │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
 │  │  helm install cto-gateway 5dlabs/cto-gateway \                                    │  │
 │  │    --set tenantId=acme --set apiToken=ctop_xxx                                    │  │
-│  │                                                                                    │  │
-│  │  Gateway connects, CRD is auto-installed, ready to use!                           │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
-│                                             │                                            │
-│                                             ▼                                            │
-│  Day 1+: Use the Platform                                                               │
+│                                                                                          │
+│  Usage:                                                                                 │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
-│  │  # Create a CodeRun                                                               │  │
 │  │  kubectl apply -f - <<EOF                                                         │  │
 │  │  apiVersion: agents.platform/v1                                                   │  │
 │  │  kind: CodeRun                                                                    │  │
 │  │  metadata:                                                                        │  │
 │  │    name: add-auth                                                                 │  │
 │  │  spec:                                                                            │  │
-│  │    service: my-api                                                                │  │
 │  │    repositoryUrl: https://github.com/acme/my-api                                  │  │
-│  │    taskId: 1                                                                      │  │
-│  │    model: claude-sonnet-4-20250514                                                │  │
+│  │    prompt: "Add JWT authentication to /api/users"                                 │  │
 │  │  EOF                                                                              │  │
 │  │                                                                                    │  │
-│  │  # Watch progress                                                                 │  │
 │  │  kubectl get coderuns -w                                                          │  │
-│  │                                                                                    │  │
-│  │  # Check status                                                                   │  │
-│  │  kubectl get coderun add-auth -o yaml                                             │  │
-│  │  # status:                                                                        │  │
-│  │  #   phase: Succeeded                                                             │  │
-│  │  #   pullRequestUrl: https://github.com/acme/my-api/pull/42                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  Gateway syncs CRD status with 5D Labs control plane - execution still happens          │
+│  on 5D Labs infrastructure.                                                             │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```

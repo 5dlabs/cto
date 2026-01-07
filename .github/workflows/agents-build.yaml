@@ -116,11 +116,11 @@ jobs:
               fi
             fi
 
-            # Check for tasks CLI if not yet found
+            # Check for intake CLI if not yet found
             if [ -z "$TASKS_VERSION" ]; then
-              TASKS_URL="https://github.com/5dlabs/cto/releases/download/${TAG}/tasks-linux-x86_64"
-              if curl -L --output /dev/null --silent --head --fail "$TASKS_URL"; then
-                echo "📦 Found tasks in release: $VERSION"
+              INTAKE_URL="https://github.com/5dlabs/cto/releases/download/${TAG}/intake-linux-x86_64"
+              if curl -L --output /dev/null --silent --head --fail "$INTAKE_URL"; then
+                echo "📦 Found intake in release: $VERSION"
                 TASKS_VERSION="$VERSION"
               fi
             fi
@@ -149,12 +149,12 @@ jobs:
             echo "play_monitor_version=skip" >> "$GITHUB_OUTPUT"
           fi
 
-          # Output tasks version
+          # Output intake version
           if [ -n "$TASKS_VERSION" ]; then
-            echo "✅ Using tasks version: $TASKS_VERSION"
+            echo "✅ Using intake version: $TASKS_VERSION"
             echo "tasks_version=$TASKS_VERSION" >> "$GITHUB_OUTPUT"
           else
-            echo "⚠️ No release with tasks found, skipping tasks"
+            echo "⚠️ No release with intake found, skipping intake"
             echo "tasks_version=skip" >> "$GITHUB_OUTPUT"
           fi
 
@@ -163,7 +163,7 @@ jobs:
         run: |
           set -euo pipefail
           # Include Dockerfile hash and binary versions in tag to ensure rebuilds
-          # when tools-client, play-monitor, or tasks becomes available or version changes
+          # when tools-client, play-monitor, or intake becomes available or version changes
           DOCKERFILE_HASH=$(git log -1 --format="%h" -- infra/images/runtime/Dockerfile)
           TOOLS_VER="${{ steps.binaries-version.outputs.tools_version }}"
           MONITOR_VER="${{ steps.binaries-version.outputs.play_monitor_version }}"

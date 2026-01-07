@@ -11,4 +11,3 @@ resources:
 commonLabels:
   app.kubernetes.io/part-of: platform
   app.kubernetes.io/managed-by: argocd
-

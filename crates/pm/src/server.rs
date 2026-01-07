@@ -584,7 +584,7 @@ async fn handle_intake_setup(
 
         // Generate config using shared crate with minimal data
         // Repository URL will be updated by intake-complete callback after repo is created
-        let config_input = cto_config::ProjectConfigInput {
+        let config_input = config::ProjectConfigInput {
             repository_url: None, // Not known yet - repo will be created during intake
             project_name: Some(request.project_name.clone()),
             team_id: team_id.clone(),
@@ -592,11 +592,11 @@ async fn handle_intake_setup(
             docs_repository: None,
             docs_project_directory: None,
         };
-        let config = cto_config::generate_project_config(&config_input);
+        let config = config::generate_project_config(&config_input);
         let config_json = config.to_json().unwrap_or_else(|_| "{}".to_string());
 
         // Derive service name for display
-        let service_name = cto_config::derive_service_name(&request.project_name);
+        let service_name = config::derive_service_name(&request.project_name);
 
         // Wrap JSON in markdown code fence for better display in Linear
         let document_content = format!(

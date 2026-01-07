@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
+use intake::ai::ProviderRegistry;
 use research::analysis::Category;
 use research::auth::{BrowserAuth, Session};
 use research::digest::{DigestAnalyzer, DigestConfig, DigestGenerator, DigestState, EmailSender};
@@ -16,7 +17,6 @@ use research::publish::{PublishConfig, Publisher};
 use research::storage::DigestContent;
 use research::storage::ResearchIndex;
 use research::twitter::BookmarkParser;
-use tasks::ai::ProviderRegistry;
 
 /// Research CLI - Monitor Twitter/X bookmarks and curate technical content.
 #[derive(Parser)]

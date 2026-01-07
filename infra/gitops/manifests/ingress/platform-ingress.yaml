@@ -160,4 +160,3 @@ spec:
     - hosts:
         - hubble.5dlabs.ai
       secretName: hubble-ui-tls
-

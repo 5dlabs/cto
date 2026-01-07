@@ -1,0 +1,1285 @@
+//! Integration tests for the intake workflow.
+//!
+//! These tests verify that the intake command works correctly
+//! with various configurations and input files.
+
+use std::path::PathBuf;
+
+use intake::domain::prompts::templates::{
+    generate_acceptance_criteria, generate_all_docs, generate_task_prompt, generate_task_xml,
+};
+use intake::domain::tasks::routing::{infer_agent_hint, infer_agent_hint_with_deps, Agent};
+use intake::domain::IntakeConfig;
+use intake::entities::Task;
+use tempfile::TempDir;
+
+// Note: Arc, IntakeDomain, and FileStorage are used for future integration tests
+// that require mocking AI providers.
+
+/// Test that agent routing correctly identifies task types
+mod routing_tests {
+    use super::*;
+
+    #[test]
+    fn test_routing_frontend_tasks() {
+        let test_cases = vec![
+            (
+                "Create React component",
+                "Build a button component",
+                Some(Agent::Blaze),
+            ),
+            (
+                "UI design system",
+                "Implement CSS variables",
+                Some(Agent::Blaze),
+            ),
+            ("Next.js page", "Server-side rendering", Some(Agent::Blaze)),
+            ("Vue component", "Create form component", Some(Agent::Blaze)),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            assert_eq!(
+                infer_agent_hint(title, desc),
+                expected,
+                "Failed for: {title} - {desc}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_routing_backend_tasks() {
+        let test_cases = vec![
+            ("Rust API endpoint", "Create user handler", Some(Agent::Rex)),
+            (
+                "Backend service",
+                "Database connection pool",
+                Some(Agent::Rex),
+            ),
+            ("Axum router", "Setup routing middleware", Some(Agent::Rex)),
+            ("Cargo workspace", "Multi-crate setup", Some(Agent::Rex)),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            assert_eq!(
+                infer_agent_hint(title, desc),
+                expected,
+                "Failed for: {title} - {desc}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_routing_mobile_tasks() {
+        let test_cases = vec![
+            (
+                "Mobile app screen",
+                "React Native navigation",
+                Some(Agent::Tap),
+            ),
+            (
+                "iOS push notifications",
+                "Background fetch",
+                Some(Agent::Tap),
+            ),
+            ("Expo config", "App store deployment", Some(Agent::Tap)),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            assert_eq!(
+                infer_agent_hint(title, desc),
+                expected,
+                "Failed for: {title} - {desc}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_routing_devops_tasks() {
+        let test_cases = vec![
+            (
+                "Kubernetes deployment",
+                "Helm chart setup",
+                Some(Agent::Bolt),
+            ),
+            (
+                "CI/CD pipeline",
+                "GitHub Actions workflow",
+                Some(Agent::Bolt),
+            ),
+            ("Docker container", "Multi-stage build", Some(Agent::Bolt)),
+            ("Terraform config", "AWS infrastructure", Some(Agent::Bolt)),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            assert_eq!(
+                infer_agent_hint(title, desc),
+                expected,
+                "Failed for: {title} - {desc}"
+            );
+        }
+    }
+
+    // ===========================================================================
+    // PR #72 Regression Tests - Auth/Security Implementation vs Audit
+    // ===========================================================================
+    // These tests ensure auth/security IMPLEMENTATION tasks go to implementation
+    // agents, not Cipher. Cipher should ONLY get explicit security audits.
+
+    #[test]
+    fn test_auth_implementation_not_cipher() {
+        // These are all IMPLEMENTATION tasks that should NOT go to Cipher
+        // Note: Some generic auth tasks without language hints now return None
+        let test_cases = vec![
+            // OAuth with language hint goes to correct agent
+            (
+                "OAuth2 Token Management",
+                "Implement OAuth2 flow with Effect TypeScript",
+                Some(Agent::Nova),
+            ),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            let actual = infer_agent_hint(title, desc);
+            assert_ne!(
+                actual,
+                Some(Agent::Cipher),
+                "Auth implementation '{title}' should NOT go to Cipher (got {actual:?}, expected {expected:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_security_audit_goes_to_cipher() {
+        // These are AUDIT/REVIEW tasks that SHOULD go to Cipher
+        let test_cases = vec![
+            (
+                "Security Audit",
+                "Review codebase for vulnerabilities",
+                Some(Agent::Cipher),
+            ),
+            (
+                "Security Review",
+                "Audit authentication implementation",
+                Some(Agent::Cipher),
+            ),
+            (
+                "Vulnerability Scan",
+                "Check for security vulnerabilities",
+                Some(Agent::Cipher),
+            ),
+            (
+                "Penetration Test",
+                "Security testing of the API",
+                Some(Agent::Cipher),
+            ),
+            (
+                "Security Analysis",
+                "Analyze security posture",
+                Some(Agent::Cipher),
+            ),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            assert_eq!(
+                infer_agent_hint(title, desc),
+                expected,
+                "Security audit '{title}' should go to Cipher"
+            );
+        }
+    }
+
+    // ===========================================================================
+    // PR #72 Regression Tests - Go/gRPC Tasks
+    // ===========================================================================
+
+    #[test]
+    fn test_go_grpc_tasks() {
+        let test_cases = vec![
+            // Go tasks
+            (
+                "Admin API - Go Service",
+                "Go/gRPC backend service",
+                Some(Agent::Grizz),
+            ),
+            ("gRPC Server", "Implement gRPC service", Some(Agent::Grizz)),
+            (
+                "Protobuf Definitions",
+                "Define protobuf messages",
+                Some(Agent::Grizz),
+            ),
+            ("Go Middleware", "Chi router middleware", Some(Agent::Grizz)),
+            // Even with auth keywords, Go tasks should go to Grizz
+            (
+                "JWT Authentication",
+                "Go/gRPC backend with JWT",
+                Some(Agent::Grizz),
+            ),
+            (
+                "RBAC Service",
+                "Go gRPC RBAC implementation",
+                Some(Agent::Grizz),
+            ),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            assert_eq!(
+                infer_agent_hint(title, desc),
+                expected,
+                "Go/gRPC task '{title}' should go to Grizz"
+            );
+        }
+    }
+
+    // ===========================================================================
+    // PR #72 Regression Tests - Node/Bun/Effect Tasks
+    // ===========================================================================
+
+    #[test]
+    fn test_nova_tasks() {
+        let test_cases = vec![
+            // Bun/Elysia tasks
+            (
+                "Integration Service",
+                "Bun with Elysia framework",
+                Some(Agent::Nova),
+            ),
+            (
+                "Slack Delivery Service",
+                "Bun Elysia webhook integration",
+                Some(Agent::Nova),
+            ),
+            (
+                "Effect Schema",
+                "Effect TypeScript schema definitions",
+                Some(Agent::Nova),
+            ),
+            // Even with auth, Node tasks should go to Nova
+            (
+                "OAuth2 Flow",
+                "Effect TypeScript OAuth2 implementation",
+                Some(Agent::Nova),
+            ),
+            (
+                "Webhook Service",
+                "Node.js webhook handler",
+                Some(Agent::Nova),
+            ),
+            (
+                "Drizzle Models",
+                "Drizzle ORM schema for integrations",
+                Some(Agent::Nova),
+            ),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            assert_eq!(
+                infer_agent_hint(title, desc),
+                expected,
+                "Nova task '{}' should go to Nova, not {:?}",
+                title,
+                infer_agent_hint(title, desc)
+            );
+        }
+    }
+
+    // ===========================================================================
+    // PR #72 Regression Tests - Backend Tasks NOT to Tap
+    // ===========================================================================
+
+    #[test]
+    fn test_backend_tasks_not_tap() {
+        // These backend tasks were incorrectly assigned to Tap in PR #72
+        // Updated: "Prometheus Metrics" now correctly goes to Bolt (observability)
+        let test_cases = vec![
+            // Prometheus is observability infrastructure - now goes to Bolt
+            (
+                "Prometheus Metrics",
+                "Add metrics endpoints",
+                Some(Agent::Bolt),
+            ),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            let actual = infer_agent_hint(title, desc);
+            assert_ne!(
+                actual,
+                Some(Agent::Tap),
+                "Backend task '{title}' should NOT go to Tap (mobile)"
+            );
+            assert_eq!(
+                actual, expected,
+                "Backend task '{title}' should go to {expected:?}"
+            );
+        }
+    }
+
+    // ===========================================================================
+    // PR #72 Regression Tests - Dashboard/UI Tasks
+    // ===========================================================================
+
+    #[test]
+    fn test_dashboard_ui_tasks() {
+        // Dashboard and UI tasks should go to Blaze, even if they have
+        // backend-sounding context
+        let test_cases = vec![
+            (
+                "Admin Dashboard",
+                "Build admin dashboard UI",
+                Some(Agent::Blaze),
+            ),
+            (
+                "Notifications Page",
+                "React notifications list page",
+                Some(Agent::Blaze),
+            ),
+            (
+                "Settings Page",
+                "User settings UI component",
+                Some(Agent::Blaze),
+            ),
+            (
+                "Analytics Dashboard",
+                "Chart.js analytics visualization",
+                Some(Agent::Blaze),
+            ),
+            (
+                "Real-time Feed",
+                "WebSocket notification feed component",
+                Some(Agent::Blaze),
+            ),
+            // Auth UI should go to Blaze
+            (
+                "Authentication Layout",
+                "Login/signup UI components",
+                Some(Agent::Blaze),
+            ),
+            (
+                "OAuth Login Page",
+                "Social login buttons UI",
+                Some(Agent::Blaze),
+            ),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            assert_eq!(
+                infer_agent_hint(title, desc),
+                expected,
+                "UI task '{title}' should go to Blaze"
+            );
+        }
+    }
+
+    // ===========================================================================
+    // Explicit Agent Name Tests
+    // ===========================================================================
+
+    #[test]
+    fn test_explicit_agent_name_in_title() {
+        // Explicit agent names in parentheses should override keyword detection
+        let test_cases = vec![
+            (
+                "Integration Service (Nova - Bun/Elysia)",
+                "OAuth2 implementation",
+                Some(Agent::Nova),
+            ),
+            (
+                "Admin API (Grizz - Go/gRPC)",
+                "JWT authentication",
+                Some(Agent::Grizz),
+            ),
+            (
+                "Notification Router (Rex - Rust/Axum)",
+                "Rate limiting",
+                Some(Agent::Rex),
+            ),
+            (
+                "Web Console (Blaze - React)",
+                "Auth flow UI",
+                Some(Agent::Blaze),
+            ),
+        ];
+
+        for (title, desc, expected) in test_cases {
+            assert_eq!(
+                infer_agent_hint(title, desc),
+                expected,
+                "Explicit agent in '{title}' should be respected"
+            );
+        }
+    }
+}
+
+/// Test documentation generation
+mod docs_tests {
+    use super::*;
+
+    fn sample_task() -> Task {
+        let mut task = Task::new("1", "Implement User API", "Create CRUD endpoints for users");
+        task.details = "Use Axum framework with PostgreSQL".to_string();
+        task.test_strategy = "Unit tests for handlers".to_string();
+        task.agent_hint = Some("rex".to_string());
+        task
+    }
+
+    #[test]
+    fn test_xml_generation_structure() {
+        let task = sample_task();
+        let xml = generate_task_xml(&task);
+
+        // Check XML structure
+        assert!(xml.starts_with(r#"<?xml version="1.0" encoding="UTF-8"?>"#));
+        assert!(xml.contains(r#"<task id="1""#));
+        assert!(xml.contains("<meta>"));
+        assert!(xml.contains("</meta>"));
+        assert!(xml.contains("<role>"));
+        assert!(xml.contains("<context>"));
+        assert!(xml.contains("<requirements>"));
+        assert!(xml.contains("<acceptance_criteria>"));
+        assert!(xml.contains("<validation>"));
+        assert!(xml.contains("<deliverables>"));
+        assert!(xml.contains("</task>"));
+    }
+
+    #[test]
+    fn test_xml_contains_task_content() {
+        let task = sample_task();
+        let xml = generate_task_xml(&task);
+
+        assert!(xml.contains("Implement User API"));
+        assert!(xml.contains("Create CRUD endpoints"));
+        assert!(xml.contains("Axum framework"));
+        assert!(xml.contains("rex"));
+        assert!(xml.contains("Rust Engineer"));
+    }
+
+    #[test]
+    fn test_prompt_markdown_structure() {
+        let task = sample_task();
+        let md = generate_task_prompt(&task);
+
+        assert!(md.contains("# Task 1: Implement User API"));
+        assert!(md.contains("## Role"));
+        assert!(md.contains("## Goal"));
+        assert!(md.contains("## Requirements"));
+        assert!(md.contains("## Acceptance Criteria"));
+        assert!(md.contains("## Constraints"));
+    }
+
+    #[test]
+    fn test_acceptance_criteria_markdown() {
+        let task = sample_task();
+        let md = generate_acceptance_criteria(&task);
+
+        assert!(md.contains("# Acceptance Criteria: Task 1"));
+        assert!(md.contains("- [ ]"));
+        assert!(md.contains("All requirements implemented"));
+        assert!(md.contains("Tests passing"));
+        assert!(md.contains("PR created"));
+    }
+
+    #[tokio::test]
+    async fn test_generate_all_docs_creates_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let output_dir = temp_dir.path().to_path_buf();
+
+        let tasks = vec![
+            {
+                let mut t = Task::new("1", "Task One", "Description one");
+                t.agent_hint = Some("rex".to_string());
+                t
+            },
+            {
+                let mut t = Task::new("2", "Task Two", "Description two");
+                t.agent_hint = Some("blaze".to_string());
+                t
+            },
+        ];
+
+        let result = generate_all_docs(&tasks, &output_dir).await.unwrap();
+
+        assert_eq!(result.task_dirs_created, 2);
+        assert_eq!(result.xml_files, 2);
+        assert_eq!(result.prompt_files, 2);
+        assert_eq!(result.acceptance_files, 2);
+
+        // Check files exist
+        assert!(output_dir.join("task-1/prompt.xml").exists());
+        assert!(output_dir.join("task-1/prompt.md").exists());
+        assert!(output_dir.join("task-1/acceptance.md").exists());
+        assert!(output_dir.join("task-2/prompt.xml").exists());
+        assert!(output_dir.join("task-2/prompt.md").exists());
+        assert!(output_dir.join("task-2/acceptance.md").exists());
+    }
+}
+
+/// Test intake configuration
+mod config_tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let config = IntakeConfig::default();
+
+        assert_eq!(config.num_tasks, 15);
+        assert!(config.expand);
+        assert!(config.analyze);
+        assert!(config.research);
+        assert_eq!(config.complexity_threshold, 5);
+        assert_eq!(config.prd_path, PathBuf::from(".tasks/docs/prd.txt"));
+        assert_eq!(config.output_dir, PathBuf::from(".tasks"));
+    }
+
+    #[test]
+    fn test_config_with_custom_values() {
+        let config = IntakeConfig {
+            prd_path: PathBuf::from("custom/prd.txt"),
+            architecture_path: Some(PathBuf::from("custom/arch.md")),
+            num_tasks: 20,
+            expand: false,
+            analyze: true,
+            complexity_threshold: 7,
+            research: false,
+            model: Some("claude-sonnet".to_string()),
+            output_dir: PathBuf::from("custom/output"),
+            repository: Some("5dlabs/test".to_string()),
+            service: Some("test-service".to_string()),
+            docs_repository: Some("5dlabs/test".to_string()),
+            docs_project_directory: Some("test-service".to_string()),
+        };
+
+        assert_eq!(config.num_tasks, 20);
+        assert!(!config.expand);
+        assert!(config.analyze);
+        assert_eq!(config.complexity_threshold, 7);
+        assert_eq!(config.model, Some("claude-sonnet".to_string()));
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Dependency-Based Routing
+// ===========================================================================
+// These tests ensure tasks that depend on platform-specific init tasks
+// inherit the correct agent (Tap for mobile, Spark for desktop, Blaze for web).
+
+mod dependency_routing_tests {
+    use super::*;
+
+    #[test]
+    fn test_mobile_task_inherits_tap_from_dependency() {
+        // Task 42 depends on Task 41 (Expo init) → should be Tap
+        let mut expo_init = Task::new("41", "Initialize Expo project", "Create Expo SDK setup");
+        expo_init.agent_hint = Some("tap".to_string());
+
+        let mut push_task = Task::new(
+            "42",
+            "Implement push notification registration",
+            "Setup FCM/APNs with token storage",
+        );
+        push_task.dependencies = vec!["41".to_string()];
+
+        let tasks = vec![expo_init, push_task.clone()];
+        assert_eq!(
+            infer_agent_hint_with_deps(&push_task, &tasks),
+            Some(Agent::Tap),
+            "Task depending on Expo init should inherit Tap"
+        );
+    }
+
+    #[test]
+    fn test_desktop_task_inherits_spark_from_dependency() {
+        // Task 46 depends on Task 45 (Electron init) → should be Spark
+        let mut electron_init =
+            Task::new("45", "Initialize Electron project", "Create Electron setup");
+        electron_init.agent_hint = Some("spark".to_string());
+
+        let mut tray_task = Task::new(
+            "46",
+            "Implement system tray with notification badge",
+            "Create tray icon with context menu",
+        );
+        tray_task.dependencies = vec!["45".to_string()];
+
+        let tasks = vec![electron_init, tray_task.clone()];
+        assert_eq!(
+            infer_agent_hint_with_deps(&tray_task, &tasks),
+            Some(Agent::Spark),
+            "Task depending on Electron init should inherit Spark"
+        );
+    }
+
+    #[test]
+    fn test_frontend_task_inherits_blaze_from_dependency() {
+        // Task 35 depends on Task 32 (Next.js init) → should be Blaze
+        let mut nextjs_init = Task::new(
+            "32",
+            "Initialize Next.js project",
+            "Create Next.js 15 setup",
+        );
+        nextjs_init.agent_hint = Some("blaze".to_string());
+
+        let mut page_task = Task::new(
+            "35",
+            "Create Notifications history page with filters",
+            "Build filterable paginated notification history table",
+        );
+        page_task.dependencies = vec!["32".to_string()];
+
+        let tasks = vec![nextjs_init, page_task.clone()];
+        assert_eq!(
+            infer_agent_hint_with_deps(&page_task, &tasks),
+            Some(Agent::Blaze),
+            "Task depending on Next.js init should inherit Blaze"
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Bolt Observability Keywords
+// ===========================================================================
+// These tests ensure observability tasks (Grafana, Prometheus, etc.)
+// go to Bolt, not Blaze (which catches generic "dashboard").
+
+mod bolt_observability_tests {
+    use super::*;
+
+    #[test]
+    fn test_grafana_goes_to_bolt_not_blaze() {
+        // "Set up Grafana dashboards" should go to Bolt, not Blaze
+        // "dashboard" keyword would normally match Blaze, but Grafana is infra
+        assert_eq!(
+            infer_agent_hint(
+                "Set up Grafana dashboards and observability",
+                "Create Grafana dashboards for monitoring all services"
+            ),
+            Some(Agent::Bolt),
+            "Grafana dashboards should go to Bolt, not Blaze"
+        );
+    }
+
+    #[test]
+    fn test_prometheus_goes_to_bolt() {
+        assert_eq!(
+            infer_agent_hint("Configure Prometheus", "Metrics collection and alerting"),
+            Some(Agent::Bolt)
+        );
+    }
+
+    #[test]
+    fn test_argocd_goes_to_bolt() {
+        assert_eq!(
+            infer_agent_hint("Setup ArgoCD application", "GitOps deployment pipeline"),
+            Some(Agent::Bolt)
+        );
+    }
+
+    #[test]
+    fn test_observability_keyword() {
+        assert_eq!(
+            infer_agent_hint("Observability setup", "Logging and monitoring"),
+            Some(Agent::Bolt)
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Effect Context-Aware Routing
+// ===========================================================================
+// These tests ensure Effect TypeScript routes correctly based on context:
+// Effect + frontend → Blaze, Effect + backend → Nova
+
+mod effect_context_tests {
+    use super::*;
+
+    #[test]
+    fn test_effect_with_frontend_context() {
+        // Effect Schema in React form validation → Blaze
+        assert_eq!(
+            infer_agent_hint(
+                "Form validation",
+                "Effect Schema validation in React component"
+            ),
+            Some(Agent::Blaze)
+        );
+    }
+
+    #[test]
+    fn test_effect_with_backend_context() {
+        // Effect retry for service delivery → Nova
+        assert_eq!(
+            infer_agent_hint(
+                "Slack delivery service",
+                "Effect retry with exponential backoff"
+            ),
+            Some(Agent::Nova)
+        );
+    }
+
+    #[test]
+    fn test_effect_stream_goes_to_nova() {
+        // Effect Stream for Kafka consumer → Nova
+        assert_eq!(
+            infer_agent_hint("Kafka consumer", "Implement with Effect Stream adapter"),
+            Some(Agent::Nova)
+        );
+    }
+
+    #[test]
+    fn test_effect_semaphore_goes_to_nova() {
+        // Effect Semaphore for concurrency control → Nova (not Bolt!)
+        // Note: "rate limiting" is application code when using Effect primitives
+        // Use simple content that clearly matches Effect backend context
+        assert_eq!(
+            infer_agent_hint("Effect Semaphore", "Use Effect Semaphore for concurrency"),
+            Some(Agent::Nova),
+            "Effect Semaphore is app code, not infrastructure"
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Frontend Page Keywords
+// ===========================================================================
+// These tests ensure web pages route to Blaze, not Rex.
+
+mod frontend_page_tests {
+    use super::*;
+
+    #[test]
+    fn test_notifications_page() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Notifications history page with filters",
+                "Build filterable paginated notification history table"
+            ),
+            Some(Agent::Blaze)
+        );
+    }
+
+    #[test]
+    fn test_integrations_page() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Integrations management page",
+                "List create edit delete channel integrations"
+            ),
+            Some(Agent::Blaze)
+        );
+    }
+
+    #[test]
+    fn test_analytics_page() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Analytics page with delivery metrics charts",
+                "Recharts visualizations for notification metrics"
+            ),
+            Some(Agent::Blaze)
+        );
+    }
+
+    #[test]
+    fn test_settings_page() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Settings page for tenant and user preferences",
+                "Forms for settings using Effect Schema"
+            ),
+            Some(Agent::Blaze)
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Mobile Screen Keywords
+// ===========================================================================
+// These tests ensure mobile screens route to Tap, not Rex.
+
+mod mobile_screen_tests {
+    use super::*;
+
+    #[test]
+    fn test_home_screen() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create Home screen with notification feed",
+                "Recent notifications with pull-to-refresh"
+            ),
+            Some(Agent::Tap)
+        );
+    }
+
+    #[test]
+    fn test_detail_screen() {
+        assert_eq!(
+            infer_agent_hint(
+                "Create notification detail and settings screens",
+                "Full content and user preferences"
+            ),
+            Some(Agent::Tap)
+        );
+    }
+
+    #[test]
+    fn test_push_notification_registration() {
+        assert_eq!(
+            infer_agent_hint(
+                "Implement push notification registration",
+                "FCM/APNs token storage and backend sync"
+            ),
+            Some(Agent::Tap)
+        );
+    }
+}
+
+// ===========================================================================
+// PR #73 Regression Tests - Desktop Window/Tray Keywords
+// ===========================================================================
+// These tests ensure desktop features route to Spark, not Rex.
+
+mod desktop_window_tests {
+    use super::*;
+
+    #[test]
+    fn test_system_tray() {
+        assert_eq!(
+            infer_agent_hint(
+                "Implement system tray with notification badge",
+                "Tray icon with unread count and context menu"
+            ),
+            Some(Agent::Spark)
+        );
+    }
+
+    #[test]
+    fn test_main_window() {
+        // Note: "main window" must be a continuous substring to match
+        assert_eq!(
+            infer_agent_hint(
+                "Create main window for notifications",
+                "Full notification feed"
+            ),
+            Some(Agent::Spark)
+        );
+        // Also test mini window
+        assert_eq!(
+            infer_agent_hint("Create mini window popup", "Quick view notifications"),
+            Some(Agent::Spark)
+        );
+    }
+
+    #[test]
+    fn test_auto_start() {
+        assert_eq!(
+            infer_agent_hint(
+                "Implement auto-start and cross-platform features",
+                "Auto-start on boot with platform-specific handling"
+            ),
+            Some(Agent::Spark)
+        );
+    }
+}
+
+/// Tests for cto-config.json parsing and generation
+/// Verifies the unified config works for MCP, Healer, and Argo workflows
+mod cto_config_tests {
+    use intake::domain::cto_config::generate_cto_config;
+    use intake::entities::Task;
+
+    // Root config structure - matches what MCP/Healer expect (lenient parsing)
+    // Note: CtoConfig in cto_config.rs is for GENERATION, this is for PARSING
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootCtoConfig {
+        version: String,
+        defaults: RootDefaults,
+        agents: std::collections::HashMap<String, RootAgentConfig>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootDefaults {
+        #[serde(default)]
+        code: Option<RootCodeDefaults>,
+        intake: RootIntakeDefaults,
+        play: RootPlayDefaults,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootCodeDefaults {
+        model: String,
+        #[serde(rename = "githubApp")]
+        github_app: String,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootIntakeDefaults {
+        #[serde(rename = "githubApp")]
+        github_app: String,
+        #[serde(default)]
+        mode: Option<String>,
+        cli: String,
+        #[serde(rename = "includeCodebase", default)]
+        include_codebase: bool,
+        #[serde(rename = "sourceBranch", default)]
+        source_branch: Option<String>,
+        models: RootIntakeModels,
+    }
+
+    #[derive(Debug, serde::Deserialize, Default)]
+    #[allow(dead_code)]
+    struct RootIntakeModels {
+        #[serde(default)]
+        primary: String,
+        #[serde(default)]
+        research: String,
+        #[serde(default)]
+        fallback: String,
+    }
+
+    #[derive(Debug, serde::Deserialize, Default)]
+    #[allow(dead_code)]
+    struct RootPlayDefaults {
+        #[serde(default)]
+        model: Option<String>,
+        #[serde(default)]
+        cli: Option<String>,
+        #[serde(default, rename = "implementationAgent")]
+        implementation_agent: Option<String>,
+        #[serde(default, rename = "qualityAgent")]
+        quality_agent: Option<String>,
+        #[serde(default, rename = "securityAgent")]
+        security_agent: Option<String>,
+        #[serde(default, rename = "testingAgent")]
+        testing_agent: Option<String>,
+        #[serde(default)]
+        repository: Option<String>,
+        #[serde(default)]
+        service: Option<String>,
+        #[serde(default, rename = "docsRepository")]
+        docs_repository: Option<String>,
+        #[serde(default, rename = "docsProjectDirectory")]
+        docs_project_directory: Option<String>,
+        #[serde(default, rename = "workingDirectory")]
+        working_directory: Option<String>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootAgentConfig {
+        #[serde(rename = "githubApp")]
+        github_app: String,
+        cli: String,
+        model: String,
+        #[serde(default)]
+        tools: Option<RootAgentTools>,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[allow(dead_code)]
+    struct RootAgentTools {
+        #[serde(default)]
+        remote: Vec<String>,
+    }
+
+    /// Test that the actual cto-config.json in the repo root can be parsed
+    /// This is the primary integration test - if this fails, MCP/Healer will break
+    #[test]
+    fn test_parse_repo_cto_config() {
+        let config_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("cto-config.json");
+
+        let config_content = std::fs::read_to_string(&config_path)
+            .expect("cto-config.json should exist in repo root");
+
+        // Parse as RootCtoConfig (lenient structure matching MCP/Healer expectations)
+        let config: RootCtoConfig = serde_json::from_str(&config_content)
+            .expect("cto-config.json should parse as RootCtoConfig");
+
+        // Verify essential fields exist
+        assert_eq!(config.version, "1.0");
+        assert!(
+            !config.agents.is_empty(),
+            "should have agent configurations"
+        );
+
+        // Verify intake defaults
+        assert_eq!(config.defaults.intake.github_app, "5DLabs-Morgan");
+        assert!(!config.defaults.intake.cli.is_empty());
+        assert!(!config.defaults.intake.models.primary.is_empty());
+
+        // Verify play defaults - check fields that actually exist in the config
+        assert!(
+            config.defaults.play.repository.is_some(),
+            "play should have repository"
+        );
+        assert!(
+            config.defaults.play.service.is_some(),
+            "play should have service"
+        );
+    }
+
+    /// Test that cto-config.json can be parsed with MCP's expected structure
+    /// MCP uses a slightly different struct but should be compatible
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_parse_cto_config_mcp_compatible() {
+        // This mirrors the MCP's CtoConfig structure
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpCtoConfig {
+            version: String,
+            defaults: McpWorkflowDefaults,
+            agents: std::collections::HashMap<String, McpAgentConfig>,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpWorkflowDefaults {
+            #[serde(default)]
+            code: Option<McpCodeDefaults>,
+            #[serde(default)]
+            intake: McpIntakeDefaults,
+            #[serde(default)]
+            play: McpPlayDefaults,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpCodeDefaults {
+            model: String,
+            #[serde(rename = "githubApp")]
+            github_app: String,
+            #[serde(rename = "continueSession")]
+            continue_session: bool,
+            #[serde(rename = "workingDirectory")]
+            working_directory: String,
+        }
+
+        #[derive(Debug, serde::Deserialize, Default)]
+        #[allow(dead_code)]
+        struct McpIntakeDefaults {
+            #[serde(rename = "githubApp")]
+            github_app: String,
+            #[serde(rename = "includeCodebase", default)]
+            include_codebase: bool,
+            #[serde(rename = "sourceBranch", default)]
+            source_branch: Option<String>,
+            #[serde(default)]
+            models: McpIntakeModels,
+        }
+
+        #[derive(Debug, serde::Deserialize, Default)]
+        #[allow(dead_code)]
+        struct McpIntakeModels {
+            #[serde(default)]
+            primary: String,
+            #[serde(default)]
+            research: String,
+            #[serde(default)]
+            fallback: String,
+        }
+
+        #[derive(Debug, serde::Deserialize, Default)]
+        #[allow(dead_code)]
+        struct McpPlayDefaults {
+            #[serde(default)]
+            model: Option<String>,
+            #[serde(default)]
+            cli: Option<String>,
+            #[serde(default, rename = "implementationAgent")]
+            implementation_agent: Option<String>,
+            #[serde(default, rename = "frontendAgent")]
+            frontend_agent: Option<String>,
+            #[serde(default, rename = "qualityAgent")]
+            quality_agent: Option<String>,
+            #[serde(default, rename = "securityAgent")]
+            security_agent: Option<String>,
+            #[serde(default, rename = "testingAgent")]
+            testing_agent: Option<String>,
+            #[serde(default)]
+            repository: Option<String>,
+            #[serde(default)]
+            service: Option<String>,
+            #[serde(default, rename = "docsRepository")]
+            docs_repository: Option<String>,
+            #[serde(default, rename = "docsProjectDirectory")]
+            docs_project_directory: Option<String>,
+            #[serde(default, rename = "workingDirectory")]
+            working_directory: Option<String>,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpAgentConfig {
+            #[serde(rename = "githubApp")]
+            github_app: String,
+            cli: String,
+            model: String,
+            #[serde(default)]
+            tools: Option<McpAgentTools>,
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct McpAgentTools {
+            #[serde(default)]
+            remote: Vec<String>,
+        }
+
+        let config_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("cto-config.json");
+
+        let config_content =
+            std::fs::read_to_string(&config_path).expect("cto-config.json should exist");
+
+        let config: McpCtoConfig = serde_json::from_str(&config_content)
+            .expect("cto-config.json should parse with MCP structure");
+
+        // Verify MCP-specific fields
+        assert_eq!(config.version, "1.0");
+        assert!(config.agents.contains_key("rex"), "should have rex agent");
+        assert!(
+            config.agents.contains_key("blaze"),
+            "should have blaze agent"
+        );
+        assert!(
+            config.agents.contains_key("morgan"),
+            "should have morgan agent"
+        );
+
+        // Verify agent has required fields
+        let rex = config.agents.get("rex").unwrap();
+        assert_eq!(rex.github_app, "5DLabs-Rex");
+        assert!(!rex.cli.is_empty());
+        assert!(!rex.model.is_empty());
+    }
+
+    /// Test that `generate_cto_config` produces valid config for all use cases
+    #[test]
+    #[allow(clippy::similar_names)]
+    fn test_generate_cto_config_roundtrip() {
+        use intake::domain::cto_config::CtoConfig;
+
+        let mut task1 = Task::new(
+            "1",
+            "Build REST API",
+            "Create user endpoints with Rust/Axum",
+        );
+        task1.agent_hint = Some("rex".to_string());
+
+        let mut task2 = Task::new("2", "Build Dashboard", "Create React admin dashboard");
+        task2.agent_hint = Some("blaze".to_string());
+
+        let mut task3 = Task::new("3", "Deploy to K8s", "Create Kubernetes manifests");
+        task3.agent_hint = Some("bolt".to_string());
+
+        let task_list = vec![task1, task2, task3];
+
+        let config = generate_cto_config(
+            &task_list,
+            "5dlabs/test-project",
+            "test-project",
+            "5dlabs/test-project",
+            "docs/test-project",
+        );
+
+        // Verify generated config
+        assert_eq!(config.version, "1.0");
+
+        // Should have the agents from tasks plus support agents
+        assert!(config.agents.contains_key("rex"));
+        assert!(config.agents.contains_key("blaze"));
+        assert!(config.agents.contains_key("bolt"));
+        assert!(config.agents.contains_key("cleo")); // Always included
+        assert!(config.agents.contains_key("tess")); // Always included
+        assert!(config.agents.contains_key("cipher")); // Always included
+        assert!(config.agents.contains_key("atlas")); // Always included
+
+        // Verify play defaults are set
+        assert_eq!(config.defaults.play.repository, "5dlabs/test-project");
+        assert_eq!(config.defaults.play.service, "test-project");
+
+        // Roundtrip: serialize and deserialize
+        let json = serde_json::to_string_pretty(&config).expect("should serialize");
+        let parsed: CtoConfig = serde_json::from_str(&json).expect("should deserialize");
+        assert_eq!(parsed.version, config.version);
+        assert_eq!(parsed.agents.len(), config.agents.len());
+    }
+
+    /// Test that agents have proper tool configurations
+    #[test]
+    fn test_agent_tools_configuration() {
+        let config_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("cto-config.json");
+
+        let config_content = std::fs::read_to_string(&config_path).unwrap();
+        let config: RootCtoConfig = serde_json::from_str(&config_content).unwrap();
+
+        // Bolt should have infrastructure tools
+        if let Some(bolt) = config.agents.get("bolt") {
+            if let Some(tools) = &bolt.tools {
+                assert!(
+                    tools
+                        .remote
+                        .iter()
+                        .any(|t| t.contains("kubernetes") || t.contains("argocd")),
+                    "Bolt should have infrastructure tools"
+                );
+            }
+        }
+
+        // Blaze should have UI tools
+        if let Some(blaze) = config.agents.get("blaze") {
+            if let Some(tools) = &blaze.tools {
+                assert!(
+                    tools.remote.iter().any(|t| t.contains("shadcn")),
+                    "Blaze should have shadcn tools"
+                );
+            }
+        }
+
+        // Cipher should have security tools
+        if let Some(cipher) = config.agents.get("cipher") {
+            if let Some(tools) = &cipher.tools {
+                assert!(
+                    tools
+                        .remote
+                        .iter()
+                        .any(|t| t.contains("scanning") || t.contains("security")),
+                    "Cipher should have security scanning tools"
+                );
+            }
+        }
+    }
+
+    /// Test that config without platform-config.json still works
+    /// (verifies the merge was successful)
+    #[test]
+    fn test_no_platform_config_dependency() {
+        let platform_config_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("platform-config.json");
+
+        assert!(
+            !platform_config_path.exists(),
+            "platform-config.json should not exist (merged into cto-config.json)"
+        );
+    }
+}

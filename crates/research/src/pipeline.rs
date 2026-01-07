@@ -4,7 +4,7 @@ use anyhow::Result;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tasks::ai::AIProvider;
+use intake::ai::AIProvider;
 
 use crate::analysis::RelevanceAnalyzer;
 use crate::auth::Session;

@@ -52,6 +52,14 @@ git checkout -b feat/my-feature
 | **[Context Engineering](docs/context-engineering.md)** | Best practices for agent context management |
 | **[Prompt Style Variants](docs/prompt-style-variants.md)** | A/B testing minimal vs standard prompts (Ralph-inspired) |
 
+### Business & Strategy
+
+| Document | Description |
+|----------|-------------|
+| **[SaaS Architecture](docs/saas-architecture.md)** | Multi-tenant SaaS platform design, shared integrations |
+| **[SaaS Monetization](docs/saas-monetization.md)** | Pricing models, tiers, revenue streams |
+| **[Open Source Strategy](docs/open-source-strategy.md)** | Open-core model, OSS vs SaaS feature split |
+
 ### Additional Resources
 
 | Resource | Description |
