@@ -664,15 +664,12 @@ impl CodeTemplateGenerator {
             model_config["maxOutputTokens"] = json!(max_tokens);
         }
 
-        // Build MCP servers config
+        // Build MCP servers config (HTTP transport format for Claude CLI)
         let mut mcp_servers = json!({});
         if !render_settings.tools_url.is_empty() {
             let mut tools_server = json!({
-                "command": "tools",
-                "args": ["--url", render_settings.tools_url],
-                "env": {
-                    "TOOLS_SERVER_URL": render_settings.tools_url
-                }
+                "type": "http",
+                "url": render_settings.tools_url
             });
             if !remote_tools.is_empty() {
                 tools_server["availableTools"] = json!(remote_tools);
@@ -1512,15 +1509,14 @@ impl CodeTemplateGenerator {
         let remote_tools = Self::extract_remote_tools(&client_config_value);
 
         // Build MCP servers config (serialize directly, no template needed)
+        // Use HTTP transport format for Claude CLI (type + url)
+        // NOT stdio format (command + args) which is for local MCP servers
         let mut mcp_servers = json!({});
 
         if !render_settings.tools_url.is_empty() {
             let mut tools_server = json!({
-                "command": "tools",
-                "args": ["--url", render_settings.tools_url, "--working-dir", "/workspace"],
-                "env": {
-                    "TOOLS_SERVER_URL": render_settings.tools_url
-                }
+                "type": "http",
+                "url": render_settings.tools_url
             });
             if !remote_tools.is_empty() {
                 tools_server["availableTools"] = json!(remote_tools);

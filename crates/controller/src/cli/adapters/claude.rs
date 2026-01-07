@@ -56,6 +56,7 @@ impl ClaudeAdapter {
     }
 
     /// Generate MCP configuration for Claude.
+    /// Uses HTTP transport format (type + url) for remote MCP servers.
     #[must_use]
     fn generate_mcp_config(tools: Option<&ToolConfiguration>) -> Value {
         let mut mcp_servers = json!({});
@@ -66,20 +67,18 @@ impl ClaudeAdapter {
         let tools_url = tools_url.trim_end_matches('/').to_string();
 
         if let Some(tool_config) = tools {
-            // Add remote tools (MCP servers) using a uniform Tools invocation
-            for tool_name in &tool_config.remote {
-                let server_config = json!({
-                    "command": "tools",
-                    "args": ["--url", tools_url.clone(), "--tool", tool_name],
-                    "env": {
-                        "TOOLS_SERVER_URL": tools_url.clone()
-                    }
+            // Add single HTTP MCP server for all remote tools
+            // Claude CLI expects HTTP transport format: { type: "http", url: "..." }
+            if !tool_config.remote.is_empty() {
+                let mut tools_server = json!({
+                    "type": "http",
+                    "url": tools_url.clone()
                 });
-
-                mcp_servers[tool_name] = server_config;
+                tools_server["availableTools"] = json!(tool_config.remote);
+                mcp_servers["tools"] = tools_server;
             }
 
-            // Add local servers
+            // Add local servers (these still use stdio transport)
             if let Some(local_servers) = &tool_config.local_servers {
                 for (server_name, server_config) in local_servers {
                     if server_config.enabled {
