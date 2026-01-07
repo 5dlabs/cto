@@ -125,9 +125,6 @@ jobs:
           - name: intake
             binary: intake
             dir: crates/intake
-          - name: intake
-            binary: intake-mcp
-            dir: crates/intake
         target:
           - os: ubuntu-22.04
             triple: x86_64-unknown-linux-gnu
