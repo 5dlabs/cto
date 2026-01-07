@@ -1,0 +1,68 @@
+{{!-- 
+  Subagent Dispatch Instructions
+  
+  Include this partial in agent prompts when subtasks have subagent metadata.
+  Prerequisites: subtasks array with execution_level and subagent_type fields.
+--}}
+
+## Subagent Execution
+
+You have specialized subagents available for parallel task execution. Each subagent has focused context and capabilities for its role.
+
+### Available Subagents
+
+| Type | Role | Use For |
+|------|------|---------|
+| `implementer` | Code implementation | Writing new code, implementing features |
+| `reviewer` | Code review | Reviewing code quality, finding issues |
+| `tester` | Testing | Writing and running tests |
+| `documenter` | Documentation | Writing docs, comments, READMEs |
+| `researcher` | Research | Technical research, evaluating options |
+| `debugger` | Debugging | Finding and fixing bugs |
+
+### Execution Strategy
+
+Subtasks are grouped by **execution level** for parallel execution:
+- **Level 0**: No dependencies - can start immediately
+- **Level 1+**: Depends on lower levels - wait for dependencies
+
+{{#if subtasks}}
+### Subtask Dispatch Plan
+
+{{#each (group_by subtasks "execution_level")}}
+**Level {{@key}}** ({{this.length}} subtask{{#if (gt this.length 1)}}s{{/if}} - run in parallel):
+{{#each this}}
+- **{{id}}. {{title}}** → Dispatch to `{{#if subagent_type}}{{subagent_type}}{{else}}implementer{{/if}}`
+  {{#if parallelizable}}✓ Parallelizable{{/if}}
+  {{#if dependencies.length}}Dependencies: {{join dependencies ", "}}{{/if}}
+{{/each}}
+
+{{/each}}
+{{/if}}
+
+### Dispatching to Subagents
+
+To dispatch work to a subagent, use explicit invocation:
+
+```
+Dispatch to [subagent_name]: [subtask description]
+```
+
+For example:
+- `Dispatch to implementer: Implement the authentication handler`
+- `Dispatch to reviewer: Review the database migration code`
+- `Dispatch to tester: Write tests for the API endpoints`
+
+### Coordination Rules
+
+1. **Wait for dependencies**: Before starting Level N+1, ensure all Level N subtasks are complete
+2. **Verify parallel work**: After parallel subtasks complete, verify no conflicts
+3. **Aggregate results**: Collect and summarize subagent outputs before proceeding
+4. **Handle failures**: If a subagent fails, retry or escalate as appropriate
+
+### Best Practices
+
+- **Maximize parallelism**: Run independent subtasks simultaneously
+- **Minimize context**: Each subagent works in isolation - keep subtasks self-contained
+- **Review integration points**: After parallel implementation, review how pieces fit together
+- **Use reviewers strategically**: Schedule review subtasks after implementation batches

@@ -1,6 +1,7 @@
 //! Expand task prompt template.
 //!
-//! Breaks down a task into detailed subtasks.
+//! Breaks down a task into detailed subtasks with subagent-aware metadata
+//! for parallel execution.
 
 use serde::Serialize;
 
@@ -29,6 +30,9 @@ pub struct ExpandTaskContext {
     pub gathered_context: String,
     /// Project root path
     pub project_root: String,
+    /// Enable subagent-aware expansion for parallel execution
+    #[serde(default)]
+    pub enable_subagents: bool,
 }
 
 /// Simplified task representation for prompts.
@@ -68,6 +72,7 @@ impl Default for ExpandTaskContext {
             complexity_reasoning_context: String::new(),
             gathered_context: String::new(),
             project_root: String::new(),
+            enable_subagents: false,
         }
     }
 }
@@ -78,7 +83,7 @@ pub fn template() -> PromptTemplate {
         .with_description("Break down a task into detailed subtasks")
 }
 
-const SYSTEM_PROMPT: &str = r#"You are an AI assistant helping with task breakdown for software development. Break down high-level tasks into specific, actionable subtasks that can be implemented sequentially.{{#if use_research}}
+const SYSTEM_PROMPT: &str = r#"You are an AI assistant helping with task breakdown for software development. Break down high-level tasks into specific, actionable subtasks that can be implemented{{#if enable_subagents}} in parallel by specialized subagents{{else}} sequentially{{/if}}.{{#if use_research}}
 
 You have access to current best practices and latest technical information to provide research-backed subtask generation.{{/if}}
 
@@ -89,11 +94,28 @@ IMPORTANT: Your response MUST be a JSON object with a "subtasks" property contai
 - dependencies: An array of subtask IDs this subtask depends on (can be empty [])
 - details: Implementation details (minimum 20 characters)
 - status: Must be "pending" for new subtasks
-- testStrategy: Testing approach (can be null)
+- testStrategy: Testing approach (can be null){{#if enable_subagents}}
+- subagentType: The type of specialized subagent to handle this subtask. MUST be one of:
+  - "implementer": Write/implement code (default for most coding subtasks)
+  - "reviewer": Review code quality, patterns, and best practices
+  - "tester": Write and run tests
+  - "documenter": Write documentation
+  - "researcher": Research and exploration tasks
+  - "debugger": Debug issues and fix bugs
+- parallelizable: Boolean indicating if this subtask can run in parallel with others at the same dependency level (true for independent work, false for coordination-required tasks){{/if}}
 
-You may optionally include a "metadata" object. Do not include any other top-level properties."#;
+You may optionally include a "metadata" object. Do not include any other top-level properties.{{#if enable_subagents}}
 
-const USER_PROMPT: &str = r"Break down this task into {{#if (gt subtask_count 0)}}exactly {{subtask_count}}{{else}}an appropriate number of{{/if}} specific subtasks:
+## Subagent Optimization Guidelines
+
+When breaking down tasks for subagent execution:
+1. **Maximize parallelism**: Group independent work units that can run simultaneously
+2. **Minimize dependencies**: Only add dependencies when strictly necessary
+3. **Match subagent types to work**: Use implementer for coding, tester for tests, etc.
+4. **Consider context isolation**: Each subagent works in isolation, so subtasks should be self-contained
+5. **Plan review phases**: Include reviewer subtasks after implementation phases{{/if}}"#;
+
+const USER_PROMPT: &str = r"Break down this task into {{#if (gt subtask_count 0)}}exactly {{subtask_count}}{{else}}an appropriate number of{{/if}} specific subtasks{{#if enable_subagents}} optimized for parallel subagent execution{{/if}}:
 
 Task ID: {{task.id}}
 Title: {{task.title}}
@@ -110,4 +132,12 @@ Complexity Analysis Reasoning: {{complexity_reasoning_context}}{{/if}}{{#if gath
 
 {{gathered_context}}{{/if}}
 
-CRITICAL: You MUST use sequential IDs starting from {{next_subtask_id}}. The first subtask MUST have id={{next_subtask_id}}, the second MUST have id={{next_subtask_id}}+1, and so on. Do NOT use parent task ID in subtask numbering!";
+CRITICAL: You MUST use sequential IDs starting from {{next_subtask_id}}. The first subtask MUST have id={{next_subtask_id}}, the second MUST have id={{next_subtask_id}}+1, and so on. Do NOT use parent task ID in subtask numbering!{{#if enable_subagents}}
+
+SUBAGENT REQUIREMENTS:
+- Include subagentType for EVERY subtask (implementer, reviewer, tester, documenter, researcher, or debugger)
+- Set parallelizable=true for subtasks that can run concurrently with others at the same dependency level
+- Minimize dependencies to maximize parallel execution potential
+- Group related implementation work so multiple implementer subagents can work simultaneously
+- Include at least one reviewer subtask after implementation subtasks
+- Include tester subtasks for validation work{{/if}}";

@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::entities::{TaskPriority, TaskStatus};
+use crate::entities::{SubagentType, TaskPriority, TaskStatus};
 
 /// Response from parse-prd command.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +77,12 @@ pub struct GeneratedSubtask {
     /// Subtask status
     #[serde(default)]
     pub status: Option<TaskStatus>,
+    /// Subagent type for routing (implementer, reviewer, tester, etc.)
+    #[serde(default, rename = "subagentType")]
+    pub subagent_type: Option<SubagentType>,
+    /// Whether this subtask can run in parallel with others
+    #[serde(default)]
+    pub parallelizable: Option<bool>,
 }
 
 /// Response from analyze-complexity command.
@@ -270,6 +276,39 @@ mod tests {
         let response: ParsePrdResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.tasks.len(), 1);
         assert_eq!(response.tasks[0].title, "Setup project");
+    }
+
+    #[test]
+    fn test_generated_subtask_with_subagent_fields() {
+        let json = r#"{
+            "id": 1,
+            "title": "Implement auth handler",
+            "description": "Create authentication handler",
+            "details": "Use JWT tokens",
+            "testStrategy": "Unit tests",
+            "dependencies": [],
+            "status": "pending",
+            "subagentType": "implementer",
+            "parallelizable": true
+        }"#;
+
+        let subtask: GeneratedSubtask = serde_json::from_str(json).unwrap();
+        assert_eq!(subtask.subagent_type, Some(SubagentType::Implementer));
+        assert_eq!(subtask.parallelizable, Some(true));
+    }
+
+    #[test]
+    fn test_generated_subtask_without_subagent_fields() {
+        // Should still work without the new fields (backwards compatible)
+        let json = r#"{
+            "id": 1,
+            "title": "Implement auth handler",
+            "description": "Create authentication handler"
+        }"#;
+
+        let subtask: GeneratedSubtask = serde_json::from_str(json).unwrap();
+        assert!(subtask.subagent_type.is_none());
+        assert!(subtask.parallelizable.is_none());
     }
 
     #[test]

@@ -140,6 +140,17 @@ impl AIDomain {
     }
 
     /// Expand a task into subtasks.
+    ///
+    /// # Arguments
+    /// * `task` - The task to expand
+    /// * `subtask_count` - Optional target number of subtasks
+    /// * `research` - Use research mode for better subtask generation
+    /// * `additional_context` - Additional context to guide subtask generation
+    /// * `complexity_report` - Optional complexity report for guided expansion
+    /// * `model` - AI model to use
+    ///
+    /// # Returns
+    /// A tuple of (subtasks, token_usage)
     pub async fn expand_task(
         &self,
         task: &Task,
@@ -148,6 +159,81 @@ impl AIDomain {
         additional_context: Option<&str>,
         complexity_report: Option<&ComplexityReport>,
         model: Option<&str>,
+    ) -> TasksResult<(Vec<Subtask>, TokenUsage)> {
+        self.expand_task_internal(
+            task,
+            subtask_count,
+            research,
+            additional_context,
+            complexity_report,
+            model,
+            false, // enable_subagents
+        )
+        .await
+    }
+
+    /// Expand a task into subtasks with subagent support.
+    ///
+    /// This variant enables subagent-aware expansion, which:
+    /// - Generates `subagentType` for each subtask (implementer, reviewer, tester, etc.)
+    /// - Sets `parallelizable` flags based on dependency analysis
+    /// - Computes `executionLevel` for parallel grouping
+    ///
+    /// # Arguments
+    /// * `task` - The task to expand
+    /// * `subtask_count` - Optional target number of subtasks
+    /// * `research` - Use research mode for better subtask generation
+    /// * `additional_context` - Additional context to guide subtask generation
+    /// * `complexity_report` - Optional complexity report for guided expansion
+    /// * `model` - AI model to use
+    ///
+    /// # Returns
+    /// A tuple of (subtasks, token_usage) where subtasks have execution levels computed
+    pub async fn expand_task_with_subagents(
+        &self,
+        task: &Task,
+        subtask_count: Option<i32>,
+        research: bool,
+        additional_context: Option<&str>,
+        complexity_report: Option<&ComplexityReport>,
+        model: Option<&str>,
+    ) -> TasksResult<(Vec<Subtask>, TokenUsage)> {
+        let (mut subtasks, usage) = self
+            .expand_task_internal(
+                task,
+                subtask_count,
+                research,
+                additional_context,
+                complexity_report,
+                model,
+                true, // enable_subagents
+            )
+            .await?;
+
+        // Compute execution levels for parallel grouping
+        let levels = super::compute_subtask_execution_levels(&mut subtasks);
+        tracing::info!(
+            task_id = %task.id,
+            total_subtasks = levels.stats.total_subtasks,
+            execution_levels = levels.stats.total_levels,
+            max_parallelism = levels.stats.max_parallelism,
+            "Computed subtask execution levels"
+        );
+
+        Ok((subtasks, usage))
+    }
+
+    /// Internal expand task implementation.
+    #[allow(clippy::too_many_arguments)]
+    async fn expand_task_internal(
+        &self,
+        task: &Task,
+        subtask_count: Option<i32>,
+        research: bool,
+        additional_context: Option<&str>,
+        complexity_report: Option<&ComplexityReport>,
+        model: Option<&str>,
+        enable_subagents: bool,
     ) -> TasksResult<(Vec<Subtask>, TokenUsage)> {
         let provider = self.get_provider(model)?;
         let model_id = model.unwrap_or_else(|| Self::get_default_model(provider.as_ref()));
@@ -179,6 +265,7 @@ impl AIDomain {
             complexity_reasoning_context: reasoning.unwrap_or_default(),
             gathered_context: String::new(),
             project_root: String::new(),
+            enable_subagents,
         };
 
         let template = self
@@ -202,19 +289,11 @@ impl AIDomain {
             .await?;
         let parsed: ExpandTaskResponse = parse_ai_response(&response)?;
 
-        // Convert to Subtask entities
-        #[allow(clippy::cast_sign_loss)]
+        // Convert to Subtask entities using the helper that handles subagent fields
         let subtasks: Vec<Subtask> = parsed
             .subtasks
             .into_iter()
-            .map(|gs| {
-                let mut subtask = Subtask::new(gs.id as u32, &task.id, gs.title, gs.description);
-                subtask.status = gs.status.unwrap_or(TaskStatus::Pending);
-                subtask.dependencies = gs.dependencies.into_iter().map(|d| d.to_string()).collect();
-                subtask.details = gs.details.unwrap_or_default();
-                subtask.test_strategy = gs.test_strategy.unwrap_or_default();
-                subtask
-            })
+            .map(|gs| Self::generated_subtask_to_subtask(gs, &task.id))
             .collect();
 
         Ok((subtasks, response.usage))
@@ -800,6 +879,11 @@ impl AIDomain {
         subtask.dependencies = gs.dependencies.into_iter().map(|d| d.to_string()).collect();
         subtask.details = gs.details.unwrap_or_default();
         subtask.test_strategy = gs.test_strategy.unwrap_or_default();
+
+        // Set subagent fields if provided by AI
+        subtask.subagent_type = gs.subagent_type;
+        subtask.parallelizable = gs.parallelizable.unwrap_or(false);
+
         subtask
     }
 }
@@ -837,6 +921,8 @@ mod tests {
 
     #[test]
     fn test_generated_task_with_subtasks_conversion() {
+        use crate::entities::SubagentType;
+
         let generated = GeneratedTask {
             id: 1,
             title: "Test task".to_string(),
@@ -855,6 +941,8 @@ mod tests {
                     test_strategy: Some("Subtask test".to_string()),
                     dependencies: vec![],
                     status: Some(TaskStatus::Pending),
+                    subagent_type: Some(SubagentType::Implementer),
+                    parallelizable: Some(true),
                 },
                 GeneratedSubtask {
                     id: 2,
@@ -864,6 +952,8 @@ mod tests {
                     test_strategy: None,
                     dependencies: vec![1],
                     status: None,
+                    subagent_type: None,
+                    parallelizable: None,
                 },
             ],
         };
@@ -876,8 +966,15 @@ mod tests {
         assert_eq!(task.subtasks[0].title, "Subtask 1");
         assert_eq!(task.subtasks[0].parent_id, "1");
         assert_eq!(task.subtasks[0].details, "Subtask details");
+        assert_eq!(
+            task.subtasks[0].subagent_type,
+            Some(SubagentType::Implementer)
+        );
+        assert!(task.subtasks[0].parallelizable);
         assert_eq!(task.subtasks[1].id, 2);
         assert_eq!(task.subtasks[1].title, "Subtask 2");
         assert_eq!(task.subtasks[1].dependencies, vec!["1"]);
+        assert!(task.subtasks[1].subagent_type.is_none());
+        assert!(!task.subtasks[1].parallelizable);
     }
 }

@@ -16,7 +16,9 @@ mod tasks;
 pub use ai::AIDomain;
 pub use config::ConfigDomain;
 pub use cto_config::{generate_cto_config, save_cto_config, CtoConfig};
-pub use deps::DependencyDomain;
+pub use deps::{
+    compute_subtask_execution_levels, DependencyDomain, ExecutionLevels, ExecutionStats,
+};
 pub use intake::{IntakeConfig, IntakeDomain, IntakeResult};
 pub use routing::{
     infer_agent_hint, infer_agent_hint_str, infer_agent_hint_with_deps,
