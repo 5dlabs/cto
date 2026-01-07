@@ -90,10 +90,13 @@ impl Config {
             linear_session_id: std::env::var("LINEAR_SESSION_ID").unwrap_or_default(),
             linear_issue_id: std::env::var("LINEAR_ISSUE_ID").unwrap_or_default(),
             linear_team_id: std::env::var("LINEAR_TEAM_ID").unwrap_or_default(),
+            // Check LINEAR_OAUTH_TOKEN first, fall back to LINEAR_API_KEY
+            // Note: We filter empty strings BEFORE or_else, because Kubernetes
+            // secrets can set an env var to empty string (not missing)
             linear_oauth_token: std::env::var("LINEAR_OAUTH_TOKEN")
-                .or_else(|_| std::env::var("LINEAR_API_KEY"))
                 .ok()
-                .filter(|s| !s.is_empty()),
+                .filter(|s| !s.is_empty())
+                .or_else(|| std::env::var("LINEAR_API_KEY").ok().filter(|s| !s.is_empty())),
             workflow_name: std::env::var("WORKFLOW_NAME").unwrap_or_else(|_| "unknown".to_string()),
 
             // Argo workflow URL for external link in Linear
