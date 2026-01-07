@@ -42,7 +42,7 @@ fi
 # Step 2: Test connectivity to tools server
 echo ""
 echo "🌐 Tools Server Connectivity:"
-TOOLS_SERVER_URL="${TOOLS_SERVER_URL:-http://cto-tools.cto.svc.cluster.local:8080}"
+TOOLS_SERVER_URL="${TOOLS_SERVER_URL:-http://cto-tools.cto.svc.cluster.local:3000}"
 echo "  → Server URL: $TOOLS_SERVER_URL"
 
 if command -v curl >/dev/null 2>&1; then

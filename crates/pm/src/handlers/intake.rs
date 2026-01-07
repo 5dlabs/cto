@@ -1106,6 +1106,15 @@ pub async fn submit_intake_coderun(
         .as_ref()
         .map_or("", |p| p.id.as_str());
 
+    // Build tools-config annotation from Morgan's tools if available
+    let tools_config_annotation = morgan_tools.map(|t| {
+        serde_json::json!({
+            "remote": t.remote,
+            "localServers": t.local_servers
+        })
+        .to_string()
+    });
+
     let coderun_json = serde_json::json!({
         "apiVersion": "agents.platform/v1",
         "kind": "CodeRun",
@@ -1117,6 +1126,10 @@ pub async fn submit_intake_coderun(
                 "project-name": name_suffix,
                 "github-app": github_app,
                 "cto.5dlabs.io/linear-issue": request.prd_identifier
+            },
+            "annotations": {
+                // Pass Morgan's tools to controller via annotation
+                "agents.platform/tools-config": tools_config_annotation.unwrap_or_default()
             }
         },
         "spec": {
