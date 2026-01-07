@@ -75,41 +75,26 @@ pub async fn sync_document_to_configmap(
         .to_string(),
     );
 
-    let configmap = ConfigMap {
-        metadata: ObjectMeta {
-            name: Some(configmap_name.clone()),
-            namespace: Some(CONFIG_NAMESPACE.to_string()),
-            labels: Some(BTreeMap::from([
-                (
-                    "app.kubernetes.io/name".to_string(),
-                    "cto-config".to_string(),
-                ),
-                (
-                    "app.kubernetes.io/component".to_string(),
-                    "project-config".to_string(),
-                ),
-                ("linear.app/project-id".to_string(), project_id.to_string()),
-                ("linear.app/document-id".to_string(), document.id.clone()),
-            ])),
-            annotations: Some(BTreeMap::from([
-                (
-                    "linear.app/document-url".to_string(),
-                    document.url.clone().unwrap_or_default(),
-                ),
-                (
-                    "cto.5dlabs.ai/synced-at".to_string(),
-                    chrono::Utc::now().to_rfc3339(),
-                ),
-            ])),
-            ..Default::default()
+    // Use JSON merge patch to update only the specific keys without removing others
+    // This preserves prd.txt, architecture.md, etc. when syncing cto-config.json
+    let patch = serde_json::json!({
+        "metadata": {
+            "labels": {
+                "app.kubernetes.io/name": "cto-config",
+                "app.kubernetes.io/component": "project-config",
+                "linear.app/project-id": project_id,
+                "linear.app/document-id": document.id
+            },
+            "annotations": {
+                "linear.app/document-url": document.url.clone().unwrap_or_default(),
+                "cto.5dlabs.ai/synced-at": chrono::Utc::now().to_rfc3339()
+            }
         },
-        data: Some(data),
-        ..Default::default()
-    };
+        "data": data
+    });
 
-    // Use server-side apply for idempotent create/update
     let patch_params = PatchParams::apply("pm-server").force();
-    api.patch(&configmap_name, &patch_params, &Patch::Apply(configmap))
+    api.patch(&configmap_name, &patch_params, &Patch::Merge(patch))
         .await
         .context("Failed to create/update ConfigMap")?;
 
@@ -374,38 +359,25 @@ pub async fn sync_architecture_to_configmap(
     });
     data.insert("source.json".to_string(), updated_source.to_string());
 
-    let configmap = ConfigMap {
-        metadata: ObjectMeta {
-            name: Some(configmap_name.clone()),
-            namespace: Some(CONFIG_NAMESPACE.to_string()),
-            labels: Some(BTreeMap::from([
-                (
-                    "app.kubernetes.io/name".to_string(),
-                    "cto-config".to_string(),
-                ),
-                (
-                    "app.kubernetes.io/component".to_string(),
-                    "project-config".to_string(),
-                ),
-                ("linear.app/project-id".to_string(), project_id.to_string()),
-                (
-                    "cto.5dlabs.io/has-architecture".to_string(),
-                    "true".to_string(),
-                ),
-            ])),
-            annotations: Some(BTreeMap::from([(
-                "cto.5dlabs.ai/synced-at".to_string(),
-                chrono::Utc::now().to_rfc3339(),
-            )])),
-            ..Default::default()
+    // Use JSON merge patch to update only specific keys without removing others
+    // This preserves prd.txt, cto-config.json, etc. when syncing architecture.md
+    let patch = serde_json::json!({
+        "metadata": {
+            "labels": {
+                "app.kubernetes.io/name": "cto-config",
+                "app.kubernetes.io/component": "project-config",
+                "linear.app/project-id": project_id,
+                "cto.5dlabs.io/has-architecture": "true"
+            },
+            "annotations": {
+                "cto.5dlabs.ai/synced-at": chrono::Utc::now().to_rfc3339()
+            }
         },
-        data: Some(data),
-        ..Default::default()
-    };
+        "data": data
+    });
 
-    // Use server-side apply for idempotent create/update
     let patch_params = PatchParams::apply("pm-server").force();
-    api.patch(&configmap_name, &patch_params, &Patch::Apply(configmap))
+    api.patch(&configmap_name, &patch_params, &Patch::Merge(patch))
         .await
         .context("Failed to sync architecture to project ConfigMap")?;
 
