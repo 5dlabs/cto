@@ -103,9 +103,9 @@ spec:
                   value: "3"
             containers:
             - name: runner
-              # TEMPORARY: Using vanilla runner while rust-builder is being rebuilt
-              # TODO: Switch back to ghcr.io/5dlabs/rust-builder:latest after infrastructure-build runs
-              image: ghcr.io/actions/actions-runner:latest
+              # Custom rust-builder image with pre-installed Rust toolchain, sccache, and mold linker
+              # Built by infrastructure-build.yaml workflow from infra/images/builder/Dockerfile
+              image: ghcr.io/5dlabs/rust-builder:latest
               imagePullPolicy: Always
               command: ["/home/runner/run.sh"]
               # Resource limits to prevent OOM on the node
