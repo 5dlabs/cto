@@ -196,7 +196,7 @@ secrets:
 # =============================================================================
 controller:
   enabled: true
-  replicaCount: 1
+  replicaCount: 0
 
   image:
     repository: ghcr.io/5dlabs/controller
@@ -276,7 +276,7 @@ agent:
 # =============================================================================
 pm:
   enabled: true
-  replicaCount: 1
+  replicaCount: 0
 
   image:
     repository: ghcr.io/5dlabs/pm-server
@@ -716,7 +716,7 @@ tools:
 # =============================================================================
 healer:
   enabled: true
-  replicaCount: 1
+  replicaCount: 0
 
   image:
     repository: ghcr.io/5dlabs/healer
@@ -823,6 +823,7 @@ healer:
   # GitHub Actions Sensor - monitors CI failures and spawns remediation
   sensor:
     enabled: true
+    replicaCount: 0
     # Comma-separated list of repositories to monitor
     repositories: "5dlabs/cto"
     # Poll interval in seconds (300 = 5 minutes, reduced from 60 to prevent excessive CodeRun spawning)

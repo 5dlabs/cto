@@ -205,6 +205,30 @@ tilt-status:
     ./scripts/dev.sh status
 
 # =============================================================================
+# Cloudflare Tunnel (for receiving webhooks locally)
+# =============================================================================
+
+# Start Cloudflare tunnel for local PM development
+tunnel:
+    @echo "Starting Cloudflare tunnel for pm-dev.5dlabs.ai → localhost:8081"
+    @echo "Webhooks will be routed to your local PM server"
+    cloudflared tunnel --config config/cloudflared-pm-dev.yaml run
+
+# Start tunnel in background
+tunnel-bg:
+    @echo "Starting Cloudflare tunnel in background..."
+    cloudflared tunnel --config config/cloudflared-pm-dev.yaml run &
+    @echo "✅ Tunnel started. pm-dev.5dlabs.ai → localhost:8081"
+
+# Check tunnel status
+tunnel-status:
+    @echo "=== Cloudflare Tunnel Status ==="
+    @cloudflared tunnel list | grep -E "(NAME|pm-local-dev)"
+    @echo ""
+    @echo "=== DNS Check ==="
+    @nslookup pm-dev.5dlabs.ai | grep -A 2 "Name:" || echo "DNS not resolving"
+
+# =============================================================================
 # Cluster Management (for local dev)
 # =============================================================================
 
@@ -219,6 +243,26 @@ cluster-up:
     @echo "Restoring in-cluster services..."
     kubectl scale deployment cto-pm cto-controller cto-healer cto-healer-sensor -n cto --replicas=1
     @echo "✅ In-cluster services restored to 1 replica each"
+    @echo ""
+    @echo "⚠️  Remember to restore the GitHub webhook:"
+    @echo "    gh api repos/5dlabs/cto/hooks/585026279 -X PATCH -f 'config[url]=https://pm.5dlabs.ai/webhooks/github'"
+
+# Restore GitHub webhook to production URL
+webhook-restore:
+    @echo "Restoring GitHub webhook to production URL..."
+    gh api repos/5dlabs/cto/hooks/585026279 -X PATCH -f 'config[url]=https://pm.5dlabs.ai/webhooks/github' -f 'config[content_type]=json'
+    @echo "✅ GitHub webhook restored to pm.5dlabs.ai"
+
+# Point GitHub webhook to local dev tunnel
+webhook-dev:
+    @echo "Pointing GitHub webhook to dev tunnel..."
+    gh api repos/5dlabs/cto/hooks/585026279 -X PATCH -f 'config[url]=https://pm-dev.5dlabs.ai/webhooks/github' -f 'config[content_type]=json'
+    @echo "✅ GitHub webhook now points to pm-dev.5dlabs.ai"
+
+# Show current webhook status
+webhook-status:
+    @echo "=== GitHub Webhook Status ==="
+    @gh api repos/5dlabs/cto/hooks | jq '.[] | {id, url: .config.url, events, active}'
 
 # Show cluster service status
 cluster-status:

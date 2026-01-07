@@ -45,7 +45,10 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
 
     let config = match ControllerConfig::from_mounted_file(&config_path) {
         Ok(cfg) => {
-            debug!("Successfully loaded controller configuration from {}", config_path);
+            debug!(
+                "Successfully loaded controller configuration from {}",
+                config_path
+            );
             debug!("Configuration cleanup enabled = {}", cfg.cleanup.enabled);
 
             // Validate configuration has required fields

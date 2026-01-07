@@ -912,33 +912,26 @@ pub async fn fetch_tasks_json_from_repo(
 /// Result of triggering a play workflow.
 #[derive(Debug)]
 pub struct PlayTriggerResult {
-    /// Workflow name.
+    /// `CodeRun` name (replaces `workflow_name` for backward compatibility).
     pub workflow_name: String,
 }
 
 /// Trigger the play workflow after intake PR is merged.
 ///
-/// Submits a play-project-workflow-template to process all tasks in the project.
+/// Creates a `CodeRun` CRD with Morgan as the agent to start the play workflow.
+/// This ensures the project-specific `ConfigMap` (`cto-config-project-{project_id}`)
+/// is mounted, providing the correct agent assignments and settings.
 #[allow(clippy::too_many_lines)]
 async fn trigger_play_workflow(
     state: &Arc<CallbackState>,
     client: &LinearClient,
     payload: &PullRequestEvent,
     metadata: &IntakeMetadata,
-    _project_result: &IntakeProjectResult,
+    project_result: &IntakeProjectResult,
 ) -> anyhow::Result<PlayTriggerResult> {
     use anyhow::Context;
 
     let timestamp = chrono::Utc::now().timestamp();
-    let workflow_name = format!(
-        "play-intake-{}-{}",
-        metadata.prd_identifier.to_lowercase().replace('-', ""),
-        timestamp
-    );
-
-    // Build workflow parameters
-    // We use the play-project-workflow-template which handles multiple tasks
-    let play_config = &state.play_config;
     let namespace = &state.namespace;
 
     let repository = format!("https://github.com/{}", payload.repository.full_name);
@@ -959,61 +952,21 @@ async fn trigger_play_workflow(
             .join("-")
     });
 
-    let args = vec![
-        "submit".to_string(),
-        "--from".to_string(),
-        "workflowtemplate/play-project-workflow-template".to_string(),
-        "-n".to_string(),
-        namespace.clone(),
-        "--name".to_string(),
-        workflow_name.clone(),
-        "-p".to_string(),
-        format!("repository={repository}"),
-        "-p".to_string(),
-        format!("service={project_dir}"),
-        "-p".to_string(),
-        format!("docs-repository={repository}"),
-        "-p".to_string(),
-        format!("docs-project-directory={project_dir}"),
-        "-p".to_string(),
-        format!("github-app={}", play_config.github_app),
-        "-p".to_string(),
-        // Model is deprecated at play config level - workflow template has default,
-        // and agent-specific models are resolved within the workflow
-        format!("model={}", play_config.model.as_deref().unwrap_or_default()),
-        "-p".to_string(),
-        format!("implementation-agent={}", play_config.implementation_agent),
-        "-p".to_string(),
-        format!("testing-agent={}", play_config.testing_agent),
-        "-p".to_string(),
-        format!("quality-agent={}", play_config.quality_agent),
-        "-p".to_string(),
-        format!("frontend-agent={}", play_config.frontend_agent),
-        "-p".to_string(),
-        format!("parallel-execution={}", play_config.parallel_execution),
-        "-p".to_string(),
-        format!("auto-merge={}", play_config.auto_merge),
-        // Linear metadata for activity updates
-        "-p".to_string(),
-        format!("linear-session-id={}", metadata.session_id),
-        "-p".to_string(),
-        format!("linear-issue-id={}", metadata.prd_issue_id),
-        "-p".to_string(),
-        format!("linear-team-id={}", metadata.team_id),
-        "-l".to_string(),
-        format!("linear-session={}", metadata.session_id),
-        "-l".to_string(),
-        "source=github-pr-merge".to_string(),
-        "-l".to_string(),
-        format!("linear-issue={}", metadata.prd_identifier),
-        "--wait=false".to_string(),
-    ];
+    // Generate CodeRun name
+    let name_suffix = project_dir
+        .chars()
+        .take(20)
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    let coderun_name = format!("play-{name_suffix}-{timestamp}");
 
     info!(
-        workflow_name = %workflow_name,
+        coderun_name = %coderun_name,
         repository = %repository,
         project_dir = %project_dir,
-        "Submitting play-project-workflow-template"
+        project_id = %project_result.project_id,
+        "Creating play CodeRun (project ConfigMap will be mounted)"
     );
 
     // Emit activity before submission
@@ -1022,31 +975,104 @@ async fn trigger_play_workflow(
             &metadata.session_id,
             format!(
                 "## 🚀 Starting Play Workflow\n\n\
-                 **Workflow:** `{workflow_name}`\n\
+                 **CodeRun:** `{coderun_name}`\n\
                  **Repository:** {repository}\n\
                  **Project:** {project_dir}\n\n\
-                 Tasks will be implemented by agents..."
+                 Morgan will start the play workflow with project-specific settings..."
             ),
         )
         .await;
 
-    let output = tokio::process::Command::new("argo")
-        .args(&args)
-        .output()
-        .await
-        .context("Failed to execute argo submit command")?;
+    // Build CodeRun CRD manifest
+    // Using Morgan as the agent with runType: "play" to trigger the play.md.hbs template
+    // LINEAR_PROJECT_ID is set to trigger ConfigMap mounting in the controller
+    let coderun_json = serde_json::json!({
+        "apiVersion": "agents.platform/v1",
+        "kind": "CodeRun",
+        "metadata": {
+            "name": coderun_name,
+            "namespace": namespace,
+            "labels": {
+                "workflow-type": "play",
+                "project-name": name_suffix,
+                "github-app": "5DLabs-Morgan",
+                "cto.5dlabs.io/linear-issue": metadata.prd_identifier,
+                "cto.5dlabs.io/source": "github-pr-merge"
+            }
+        },
+        "spec": {
+            "runType": "play",
+            "service": project_dir,
+            "repositoryUrl": repository,
+            "docsRepositoryUrl": repository,
+            "docsProjectDirectory": project_dir,
+            "workingDirectory": ".",
+            "githubApp": "5DLabs-Morgan",
+            "model": state.play_config.model.as_deref().unwrap_or("claude-sonnet-4-20250514"),
+            "enableDocker": false,
+            "env": {
+                "PROJECT_NAME": metadata.project_name.clone().unwrap_or_else(|| payload.repository.name.clone()),
+                "PROJECT_DIR": project_dir,
+                "REPOSITORY_URL": repository,
+                // This triggers ConfigMap mounting in the controller
+                "LINEAR_PROJECT_ID": project_result.project_id
+            },
+            "linearIntegration": {
+                "enabled": true,
+                "sessionId": metadata.session_id,
+                "issueId": metadata.prd_issue_id,
+                "teamId": metadata.team_id,
+                "projectId": project_result.project_id
+            }
+        }
+    });
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!("Failed to submit play workflow: {stderr}");
+    // Create CodeRun via Kubernetes API
+    let token = std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token")
+        .context("Failed to read service account token")?;
+
+    let ca_cert = std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+        .context("Failed to read CA certificate")?;
+
+    let cert =
+        reqwest::Certificate::from_pem(&ca_cert).context("Failed to parse CA certificate")?;
+
+    let http_client = reqwest::Client::builder()
+        .add_root_certificate(cert)
+        .build()
+        .context("Failed to create HTTP client")?;
+
+    let api_server = "https://kubernetes.default.svc";
+    let create_url =
+        format!("{api_server}/apis/agents.platform/v1/namespaces/{namespace}/coderuns");
+
+    let response = http_client
+        .post(&create_url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Content-Type", "application/json")
+        .json(&coderun_json)
+        .send()
+        .await
+        .context("Failed to send CodeRun create request")?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        anyhow::bail!("Failed to create play CodeRun: HTTP {status} - {error_text}");
     }
 
     info!(
-        workflow_name = %workflow_name,
-        "Play workflow submitted successfully"
+        coderun_name = %coderun_name,
+        project_id = %project_result.project_id,
+        "Play CodeRun created successfully (ConfigMap will be mounted)"
     );
 
-    Ok(PlayTriggerResult { workflow_name })
+    Ok(PlayTriggerResult {
+        workflow_name: coderun_name,
+    })
 }
 
 #[cfg(test)]

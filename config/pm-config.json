@@ -1,0 +1,39 @@
+{
+  "$schema": "./pm-config.schema.json",
+  "description": "PM Server configuration for local development",
+  
+  "webhooks": {
+    "linear": {
+      "url": "https://pm-dev.5dlabs.ai/webhooks/linear",
+      "description": "Linear webhooks for agent issue assignments"
+    },
+    "github": {
+      "url": "https://pm-dev.5dlabs.ai/webhooks/github",
+      "description": "GitHub webhooks for PR merge → play workflow trigger"
+    },
+    "oauth_callback": {
+      "url": "https://pm-dev.5dlabs.ai/oauth/callback",
+      "description": "Linear OAuth callback URL"
+    }
+  },
+  
+  "tunnel": {
+    "name": "pm-dev",
+    "hostname": "pm-dev.5dlabs.ai",
+    "local_port": 8081,
+    "description": "Cloudflare tunnel for local PM development"
+  },
+  
+  "linear": {
+    "team_id": "CTOPA",
+    "enabled": true
+  },
+  
+  "play": {
+    "github_app": "5DLabs-Rex",
+    "implementation_agent": "rex",
+    "testing_agent": "tess",
+    "quality_agent": "cleo",
+    "frontend_agent": "blaze"
+  }
+}

@@ -3882,6 +3882,7 @@ impl CodeTemplateGenerator {
 
         match run_type {
             "documentation" | "intake" => "intake",
+            "play" => "play",
             "quality" => "quality",
             "test" => "test",
             "deploy" => "deploy",
@@ -3899,9 +3900,9 @@ impl CodeTemplateGenerator {
         let job_type = Self::determine_job_type(code_run);
         let run_type = code_run.spec.run_type.as_str();
 
-        // Intake/documentation runs always use morgan templates regardless of github_app
+        // Intake/documentation/play runs always use morgan templates regardless of github_app
         // This handles cases like github_app = "cto-dev" for development workflows
-        if run_type == "intake" || run_type == "documentation" {
+        if run_type == "intake" || run_type == "documentation" || run_type == "play" {
             return format!("agents/morgan/{job_type}.md.hbs");
         }
 

@@ -8,7 +8,7 @@ metadata:
     {{- include "cto.healer.labels" . | nindent 4 }}
     app.kubernetes.io/component: sensor
 spec:
-  replicas: 1
+  replicas: {{ .Values.healer.sensor.replicaCount }}
   selector:
     matchLabels:
       {{- include "cto.healer.selectorLabels" . | nindent 6 }}

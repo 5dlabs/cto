@@ -123,6 +123,51 @@ else
 fi
 
 # =========================================================================
+# GitHub Webhook Setup (for PR merge notifications)
+# =========================================================================
+# Create or update webhook to notify PM server when intake PR is merged
+
+WEBHOOK_CALLBACK_URL="${WEBHOOK_CALLBACK_URL:-}"
+
+if [ -n "$WEBHOOK_CALLBACK_URL" ]; then
+    echo ""
+    echo "🔗 Setting up GitHub webhook..."
+    
+    # Extract repo path for API calls
+    REPO_PATH=$(echo "$REPOSITORY_URL" | sed 's|https://github.com/||' | sed 's|\.git$||')
+    
+    # Check if webhook already exists
+    EXISTING_WEBHOOK=$(gh api "repos/${REPO_PATH}/hooks" --jq ".[] | select(.config.url == \"${WEBHOOK_CALLBACK_URL}\") | .id" 2>/dev/null || echo "")
+    
+    if [ -n "$EXISTING_WEBHOOK" ]; then
+        echo "  ℹ️  Webhook already exists (ID: $EXISTING_WEBHOOK), updating..."
+        # Update existing webhook to ensure correct events
+        gh api "repos/${REPO_PATH}/hooks/${EXISTING_WEBHOOK}" \
+            --method PATCH \
+            --field 'active=true' \
+            --field 'events=["pull_request"]' \
+            --field 'config[content_type]=json' \
+            --silent && echo "  ✅ Webhook updated" || echo "  ⚠️  Failed to update webhook (non-critical)"
+    else
+        echo "  → Creating webhook for PR notifications..."
+        # Create new webhook
+        gh api "repos/${REPO_PATH}/hooks" \
+            --method POST \
+            --field "name=web" \
+            --field "active=true" \
+            --field 'events=["pull_request"]' \
+            --field "config[url]=${WEBHOOK_CALLBACK_URL}" \
+            --field 'config[content_type]=json' \
+            --field 'config[insecure_ssl]=0' \
+            --silent && echo "  ✅ Webhook created: $WEBHOOK_CALLBACK_URL" || echo "  ⚠️  Failed to create webhook (non-critical)"
+    fi
+else
+    echo ""
+    echo "ℹ️  No WEBHOOK_CALLBACK_URL configured, skipping webhook setup"
+    echo "   (Set WEBHOOK_CALLBACK_URL to enable automatic play workflow triggers)"
+fi
+
+# =========================================================================
 # Repository Clone
 # =========================================================================
 

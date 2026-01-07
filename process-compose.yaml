@@ -33,6 +33,17 @@ log_location: ./.process-compose/logs
 # Process definitions
 processes:
   # ===========================================================================
+  # Cloudflare Tunnel (routes pm-dev.5dlabs.ai to localhost:8081)
+  # ===========================================================================
+
+  tunnel:
+    command: cloudflared tunnel --config config/cloudflared-pm-dev.yaml run
+    description: "Cloudflare Tunnel - routes pm-dev.5dlabs.ai to local PM"
+    availability:
+      restart: on_failure
+      max_restarts: 3
+    depends_on: {}
+  # ===========================================================================
   # Long-Running Services
   # ===========================================================================
 

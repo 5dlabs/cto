@@ -247,12 +247,12 @@ jobs:
 
       - name: Prepare binaries for Docker
         run: |
-          cp artifacts/tools-server-linux-x86_64 infra/images/tools/tools-server-linux
-          chmod +x infra/images/tools/tools-server-linux
-          ls -lh infra/images/tools/tools-server-linux
-          cp artifacts/cto-mcp-linux-x86_64 infra/images/tools/cto-mcp-linux
-          chmod +x infra/images/tools/cto-mcp-linux
-          ls -lh infra/images/tools/cto-mcp-linux
+          cp artifacts/tools-server-linux-x86_64 infra/images/tools/tools-server
+          chmod +x infra/images/tools/tools-server
+          ls -lh infra/images/tools/tools-server
+          cp artifacts/cto-mcp-linux-x86_64 infra/images/tools/cto-mcp
+          chmod +x infra/images/tools/cto-mcp
+          ls -lh infra/images/tools/cto-mcp
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3

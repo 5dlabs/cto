@@ -1,0 +1,16 @@
+# Cloudflare Tunnel configuration for local PM development
+# 
+# Usage:
+#   cloudflared tunnel --config config/cloudflared-pm-dev.yaml run
+#
+# This routes pm-dev.5dlabs.ai to your local PM server on port 8081
+
+tunnel: a682e832-7fb7-47b6-9e96-e379b0daa523
+credentials-file: /Users/jonathonfritz/.cloudflared/a682e832-7fb7-47b6-9e96-e379b0daa523.json
+
+ingress:
+  # Route all traffic to local PM server
+  - hostname: pm-dev.5dlabs.ai
+    service: http://localhost:8081
+  # Catch-all (required)
+  - service: http_status:404

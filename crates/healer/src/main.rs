@@ -4878,8 +4878,7 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         .mobile_agent
         .clone()
         .unwrap_or_else(|| make_agent_name(org_name, "Tap"));
-    let mobile_agent =
-        resolve_agent_config(&mobile_agent_name, agents, default_cli, default_model);
+    let mobile_agent = resolve_agent_config(&mobile_agent_name, agents, default_cli, default_model);
 
     let go_agent_name = play_config
         .go_agent
@@ -4904,15 +4903,18 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         .infrastructure_agent
         .clone()
         .unwrap_or_else(|| make_agent_name(org_name, "Bolt"));
-    let infrastructure_agent =
-        resolve_agent_config(&infrastructure_agent_name, agents, default_cli, default_model);
+    let infrastructure_agent = resolve_agent_config(
+        &infrastructure_agent_name,
+        agents,
+        default_cli,
+        default_model,
+    );
 
     let quality_agent_name = play_config
         .quality_agent
         .clone()
         .unwrap_or_else(|| make_agent_name(org_name, AGENT_CLEO));
-    let quality_agent =
-        resolve_agent_config(&quality_agent_name, agents, "claude", default_model);
+    let quality_agent = resolve_agent_config(&quality_agent_name, agents, "claude", default_model);
 
     let security_agent_name = play_config
         .security_agent
@@ -4925,8 +4927,7 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
         .testing_agent
         .clone()
         .unwrap_or_else(|| make_agent_name(org_name, AGENT_TESS));
-    let testing_agent =
-        resolve_agent_config(&testing_agent_name, agents, "claude", default_model);
+    let testing_agent = resolve_agent_config(&testing_agent_name, agents, "claude", default_model);
 
     // Get max retries from config with fallbacks
     let default_retries = play_config.max_retries.unwrap_or(10);
