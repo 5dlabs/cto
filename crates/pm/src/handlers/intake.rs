@@ -2614,11 +2614,9 @@ Content here";
         let config_str = generate_project_cto_config(&request);
         let parsed: serde_json::Value = serde_json::from_str(&config_str).unwrap();
 
-        // Should fall back to default
-        assert_eq!(
-            parsed["defaults"]["play"]["repository"],
-            "5dlabs/unnamed-project"
-        );
+        // Should fall back to empty string when no repository URL is provided
+        // (intake workflow will create a new repository)
+        assert_eq!(parsed["defaults"]["play"]["repository"], "");
     }
 
     #[test]

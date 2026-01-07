@@ -30,6 +30,9 @@ pub struct ProjectConfigInput {
 
 impl ProjectConfigInput {
     /// Extract repository in org/repo format from URL.
+    ///
+    /// Returns empty string if no repository URL is provided.
+    /// The intake workflow will create a new repository in this case.
     #[must_use]
     pub fn repository(&self) -> String {
         self.repository_url
@@ -39,7 +42,7 @@ impl ProjectConfigInput {
                     .or_else(|| url.strip_prefix("git@github.com:"))
                     .map(|s| s.trim_end_matches(".git").to_string())
             })
-            .unwrap_or_else(|| "5dlabs/unnamed-project".to_string())
+            .unwrap_or_default()
     }
 
     /// Derive service name from project name.
