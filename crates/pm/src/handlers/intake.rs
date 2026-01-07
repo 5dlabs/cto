@@ -950,10 +950,7 @@ pub async fn submit_intake_coderun(
 
     // Use sanitized project name for repo creation (strips [PRD] prefix, normalizes)
     // Falls back to title if project_name wasn't set
-    let project_name_for_repo = request
-        .project_name
-        .as_deref()
-        .unwrap_or(&request.title);
+    let project_name_for_repo = request.project_name.as_deref().unwrap_or(&request.title);
 
     // Determine CLI and model - priority: project config > issue labels/frontmatter > server defaults
     let cli = project_config
@@ -985,11 +982,7 @@ pub async fn submit_intake_coderun(
     let repository_url = request
         .repository_url
         .clone()
-        .or_else(|| {
-            project_config
-                .as_ref()
-                .and_then(|c| c.repository.clone())
-        })
+        .or_else(|| project_config.as_ref().and_then(|c| c.repository.clone()))
         .filter(|url| !url.contains("unnamed-project") && !url.is_empty())
         .unwrap_or_default();
 
@@ -1182,9 +1175,8 @@ pub async fn submit_intake_coderun(
         .context("Failed to create HTTP client")?;
 
     let api_server = "https://kubernetes.default.svc";
-    let create_url = format!(
-        "{api_server}/apis/agents.platform/v1/namespaces/{namespace}/coderuns"
-    );
+    let create_url =
+        format!("{api_server}/apis/agents.platform/v1/namespaces/{namespace}/coderuns");
 
     let response = http_client
         .post(&create_url)

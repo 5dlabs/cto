@@ -102,16 +102,23 @@ pub struct Subtask {
     pub assignee: Option<String>,
 
     // ===== Subagent execution fields =====
-
     /// Role/type hint for subagent routing.
     /// Determines which specialized subagent handles this subtask.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "subagentType")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "subagentType"
+    )]
     pub subagent_type: Option<SubagentType>,
 
     /// Execution level for parallel grouping.
     /// Level 0 = no dependencies, higher levels depend on lower levels.
     /// Subtasks at the same level can run in parallel.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "executionLevel")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "executionLevel"
+    )]
     pub execution_level: Option<u32>,
 
     /// Whether this subtask can run in parallel with others at the same execution level.
@@ -223,8 +230,13 @@ mod tests {
 
     #[test]
     fn test_subtask_with_subagent() {
-        let subtask =
-            Subtask::new_with_subagent(1, "task-1", "Implement handler", "Desc", SubagentType::Implementer);
+        let subtask = Subtask::new_with_subagent(
+            1,
+            "task-1",
+            "Implement handler",
+            "Desc",
+            SubagentType::Implementer,
+        );
         assert_eq!(subtask.subagent_type, Some(SubagentType::Implementer));
         assert!(subtask.parallelizable);
     }

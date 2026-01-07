@@ -80,6 +80,11 @@ pub struct Config {
     // Context engineering: artifact summary injection
     pub artifact_injection_enabled: bool,
     pub artifact_injection_interval_turns: u32,
+
+    // Main container exit detection (for graceful sidecar shutdown)
+    pub agent_done_file: String,
+    pub main_exit_watch_enabled: bool,
+    pub main_exit_watch_interval_ms: u64,
 }
 
 impl Config {
@@ -96,7 +101,11 @@ impl Config {
             linear_oauth_token: std::env::var("LINEAR_OAUTH_TOKEN")
                 .ok()
                 .filter(|s| !s.is_empty())
-                .or_else(|| std::env::var("LINEAR_API_KEY").ok().filter(|s| !s.is_empty())),
+                .or_else(|| {
+                    std::env::var("LINEAR_API_KEY")
+                        .ok()
+                        .filter(|s| !s.is_empty())
+                }),
             workflow_name: std::env::var("WORKFLOW_NAME").unwrap_or_else(|_| "unknown".to_string()),
 
             // Argo workflow URL for external link in Linear
@@ -172,6 +181,17 @@ impl Config {
                 .unwrap_or_else(|_| "20".to_string())
                 .parse()
                 .unwrap_or(20),
+
+            // Main container exit detection
+            agent_done_file: std::env::var("AGENT_DONE_FILE")
+                .unwrap_or_else(|_| "/workspace/.agent_done".to_string()),
+            main_exit_watch_enabled: std::env::var("MAIN_EXIT_WATCH_ENABLED")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(true), // Enabled by default for graceful shutdown
+            main_exit_watch_interval_ms: std::env::var("MAIN_EXIT_WATCH_INTERVAL_MS")
+                .unwrap_or_else(|_| "1000".to_string())
+                .parse()
+                .unwrap_or(1000),
         }
     }
 
@@ -1919,6 +1939,125 @@ async fn progress_monitor_task(
 }
 
 // =============================================================================
+// Main Container Exit Watch
+// =============================================================================
+
+/// Watch for main container exit and trigger graceful sidecar shutdown.
+///
+/// This task monitors two signals that indicate the main container has exited:
+/// 1. The `.agent_done` file appearing (explicit completion signal)
+/// 2. Main container process exit via `/proc` (implicit - uses `shareProcessNamespace`)
+///
+/// When either condition is detected, the shutdown flag is set to trigger
+/// graceful termination of all sidecar tasks.
+async fn main_exit_watch_task(config: Arc<Config>, shutdown: Arc<AtomicBool>) {
+    if !config.main_exit_watch_enabled {
+        info!("Main exit watch disabled");
+        return;
+    }
+
+    info!(
+        agent_done_file = %config.agent_done_file,
+        interval_ms = config.main_exit_watch_interval_ms,
+        "👁️ Starting main container exit watch"
+    );
+
+    let check_interval = Duration::from_millis(config.main_exit_watch_interval_ms);
+
+    // Track initial process count to detect when main container processes exit
+    let initial_proc_count = count_non_sidecar_processes().await;
+    info!(initial_proc_count, "Initial process count recorded");
+
+    loop {
+        if shutdown.load(Ordering::Relaxed) {
+            debug!("Exit watch: shutdown already requested");
+            return;
+        }
+
+        sleep(check_interval).await;
+
+        // Check 1: Look for explicit completion signal file
+        if fs::metadata(&config.agent_done_file).await.is_ok() {
+            info!(
+                file = %config.agent_done_file,
+                "🏁 Agent done file detected - main container completed"
+            );
+            shutdown.store(true, Ordering::SeqCst);
+            return;
+        }
+
+        // Check 2: Look for main container process exit via /proc
+        // With shareProcessNamespace, we can see all processes in the pod
+        let current_proc_count = count_non_sidecar_processes().await;
+
+        // If process count dropped significantly and we had processes before,
+        // the main container likely exited
+        if initial_proc_count > 0 && current_proc_count == 0 {
+            info!(
+                initial = initial_proc_count,
+                current = current_proc_count,
+                "🏁 Main container processes exited - triggering shutdown"
+            );
+            shutdown.store(true, Ordering::SeqCst);
+            return;
+        }
+    }
+}
+
+/// Count non-sidecar processes visible in /proc.
+///
+/// With `shareProcessNamespace: true`, we can see processes from other containers.
+/// We filter out our own sidecar processes to detect when main container exits.
+async fn count_non_sidecar_processes() -> usize {
+    let Ok(mut entries) = tokio::fs::read_dir("/proc").await else {
+        return 0;
+    };
+
+    let mut count = 0;
+    let my_pid = std::process::id();
+
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let name = entry.file_name();
+        let Some(name_str) = name.to_str() else {
+            continue;
+        };
+
+        // Only look at numeric directories (PIDs)
+        let Ok(pid) = name_str.parse::<u32>() else {
+            continue;
+        };
+
+        // Skip our own process and kernel threads (PID 1, 2)
+        if pid == my_pid || pid <= 2 {
+            continue;
+        }
+
+        // Try to read the process cmdline to identify it
+        let cmdline_path = format!("/proc/{pid}/cmdline");
+        if let Ok(cmdline) = tokio::fs::read_to_string(&cmdline_path).await {
+            // Skip sidecar-related processes (status-sync, pause container)
+            let cmdline_lower = cmdline.to_lowercase();
+            if cmdline_lower.contains("status-sync")
+                || cmdline_lower.contains("pause")
+                || cmdline_lower.contains("/pause")
+            {
+                continue;
+            }
+
+            // Skip docker daemon sidecar processes
+            if cmdline_lower.contains("dockerd") || cmdline_lower.contains("containerd") {
+                continue;
+            }
+
+            // This looks like a main container process
+            count += 1;
+        }
+    }
+
+    count
+}
+
+// =============================================================================
 // HTTP Server
 // =============================================================================
 
@@ -2208,6 +2347,13 @@ async fn main() -> Result<()> {
         .await;
     });
 
+    // Main container exit watch (triggers graceful shutdown when main container exits)
+    let config_clone = config.clone();
+    let shutdown_clone = shutdown.clone();
+    let exit_watch_handle = tokio::spawn(async move {
+        main_exit_watch_task(config_clone, shutdown_clone).await;
+    });
+
     let config_clone = config.clone();
     let fifo_handle = tokio::spawn(async move {
         fifo_writer_task(config_clone, fifo_rx).await;
@@ -2259,6 +2405,12 @@ async fn main() -> Result<()> {
                 warn!(error = %e, "Whip cracker task panicked");
             }
             info!("Whip cracker task exited");
+        }
+        result = exit_watch_handle => {
+            if let Err(e) = result {
+                warn!(error = %e, "Exit watch task panicked");
+            }
+            info!("Exit watch task detected main container exit");
         }
         result = fifo_handle => {
             if let Err(e) = result {

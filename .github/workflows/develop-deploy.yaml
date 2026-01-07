@@ -98,6 +98,7 @@ jobs:
           sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:develop
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/pm-server:${{ steps.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -138,6 +139,7 @@ jobs:
           sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:develop
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ steps.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -178,6 +180,7 @@ jobs:
           sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:develop
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:${{ steps.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -218,6 +221,7 @@ jobs:
           sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:develop
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/healer:${{ steps.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -258,6 +262,7 @@ jobs:
           sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:develop
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/tools:${{ steps.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

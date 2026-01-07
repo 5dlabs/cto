@@ -136,9 +136,7 @@ pub fn compute_subtask_execution_levels(subtasks: &mut [Subtask]) -> ExecutionLe
             subtask.execution_level = Some(level);
             // Subtasks are parallelizable if they're in a level with multiple items
             // or if they have no dependencies (level 0)
-            let level_size = levels
-                .get(level as usize)
-                .map_or(0, std::vec::Vec::len);
+            let level_size = levels.get(level as usize).map_or(0, std::vec::Vec::len);
             subtask.parallelizable = level_size > 1 || level == 0;
         }
     }

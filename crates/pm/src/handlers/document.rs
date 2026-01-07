@@ -434,7 +434,10 @@ pub async fn read_intake_content(
         .cloned()
         .ok_or_else(|| anyhow!("ConfigMap missing prd.txt"))?;
 
-    let architecture_content = data.get("architecture.md").cloned().filter(|s| !s.is_empty());
+    let architecture_content = data
+        .get("architecture.md")
+        .cloned()
+        .filter(|s| !s.is_empty());
 
     // Read repository URL if stored (for using existing repo instead of creating new)
     let repository_url = data
