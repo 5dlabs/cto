@@ -8,13 +8,173 @@ The CTO Platform operates as a **fully managed service** where 5D Labs handles a
 
 ---
 
-## Deployment Models
+## Core Value Propositions
 
-| Model | Customer Deploys | Best For |
-|-------|------------------|----------|
-| **Fully Managed** (default) | Nothing | 99% of customers - zero friction |
-| **Gateway Mode** | Lightweight gateway pod | Customers who want CRD-based workflows |
-| **Enterprise On-Prem** | Full platform | Regulated industries, air-gapped |
+### 1. Fully Managed Infrastructure on Bare Metal
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                     VALUE PROP #1: FULLY MANAGED INFRASTRUCTURE                          │
+│                                                                                          │
+│  What customers get:                                                                    │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  • Bare metal servers (Latitude.sh) - no cloud markup                             │  │
+│  │  • Full engineering team maintaining infrastructure 24/7                          │  │
+│  │  • Zero Kubernetes knowledge required                                             │  │
+│  │  • No DevOps hiring needed                                                        │  │
+│  │  • Auto-scaling, auto-healing, monitoring included                                │  │
+│  │                                                                                    │  │
+│  │  Customer effort: Connect GitHub → Describe task → Review PR                      │  │
+│  │  Our effort: Everything else                                                      │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  Why bare metal matters:                                                                │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  Cloud VMs          vs      Bare Metal                                            │  │
+│  │  ──────────────────────────────────────────────────────                          │  │
+│  │  Noisy neighbors            Dedicated resources                                   │  │
+│  │  Variable performance       Consistent performance                                │  │
+│  │  High cost (cloud markup)   Lower cost (direct hardware)                         │  │
+│  │  Shared infrastructure      Isolated execution                                    │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 2. Always Current with AI Tooling Evolution
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                     VALUE PROP #2: STAYING AHEAD OF THE CURVE                            │
+│                                                                                          │
+│  The AI tooling landscape moves fast:                                                   │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  • New models every month (Claude, GPT, Gemini, open-source)                      │  │
+│  │  • New CLIs and agents constantly emerging                                        │  │
+│  │  • Best practices evolving weekly                                                 │  │
+│  │  • MCP ecosystem expanding rapidly                                                │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  Our research engine:                                                                   │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     │  │
+│  │  │  Research   │ ──▶ │  Evaluate   │ ──▶ │  Integrate  │ ──▶ │   Deploy    │     │  │
+│  │  │  (Twitter,  │     │  (benchmark │     │  (add to    │     │  (all cust- │     │  │
+│  │  │   papers,   │     │   new tools │     │   platform) │     │   omers get │     │  │
+│  │  │   releases) │     │   & models) │     │             │     │   updates)  │     │  │
+│  │  └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘     │  │
+│  │                                                                                    │  │
+│  │  Continuous cycle - we track so you don't have to                                 │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  What this means for customers:                                                         │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │  ✓ New models added within days of release                                        │  │
+│  │  ✓ Agent prompts continuously optimized                                           │  │
+│  │  ✓ Best-in-class MCP tools always available                                       │  │
+│  │  ✓ No internal AI/ML team needed to stay current                                  │  │
+│  │  ✓ Benefit from learnings across all customers                                    │  │
+│  │                                                                                    │  │
+│  │  "Subscribe to stay ahead" - not "build it yourself and fall behind"             │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Business Model: Freemium (Proprietary)
+
+The CTO Platform is **proprietary software** with a generous free tier. We do not open-source the platform.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                            WHY NOT OPEN SOURCE?                                          │
+│                                                                                          │
+│  Our value is staying current. Open-sourcing would:                                     │
+│                                                                                          │
+│  ✗ Allow competitors to fork and compete on our R&D investment                          │
+│  ✗ Dilute "always current" as our differentiator                                        │
+│  ✗ Create support burden for community contributions                                    │
+│  ✗ Slow velocity (external PR reviews, community coordination)                          │
+│                                                                                          │
+│  Instead, we offer:                                                                     │
+│                                                                                          │
+│  ✓ Generous free tier (experience the platform, no cost)                                │
+│  ✓ Source code access for Enterprise customers (security review under NDA)              │
+│  ✓ Full control = fastest iteration on AI tooling changes                               │
+│  ✓ All customers benefit from continuous improvements                                   │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Deployment Models by Tier
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              DEPLOYMENT BY TIER                                          │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │   FREE / TEAM / GROWTH TIERS                                                      │  │
+│  │   ══════════════════════════                                                      │  │
+│  │                                                                                    │  │
+│  │   Deployment:     FULLY MANAGED (100%)                                            │  │
+│  │   Customer does:  Nothing with infrastructure                                     │  │
+│  │   We handle:      Everything - Kubernetes, bare metal, scaling, monitoring        │  │
+│  │                                                                                    │  │
+│  │   Customer experience:                                                            │  │
+│  │   ┌────────────────────────────────────────────────────────────────────────────┐  │  │
+│  │   │  Sign up → Connect GitHub → Describe task → Review PR → Done              │  │  │
+│  │   │                                                                            │  │  │
+│  │   │  No servers. No Kubernetes. No DevOps. No infrastructure decisions.       │  │  │
+│  │   └────────────────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │   ENTERPRISE TIER (Custom pricing)                                                │  │
+│  │   ═════════════════════════════════                                               │  │
+│  │                                                                                    │  │
+│  │   Options available:                                                              │  │
+│  │                                                                                    │  │
+│  │   Option A: Fully Managed (same as other tiers)                                   │  │
+│  │   └─ Best for: Enterprises who want zero ops                                      │  │
+│  │                                                                                    │  │
+│  │   Option B: Customer-Managed Infrastructure                                       │  │
+│  │   └─ Platform deployed in customer's cloud/data center                            │  │
+│  │   └─ Customer controls infrastructure, security, compliance                       │  │
+│  │   └─ Best for: Regulated industries, air-gapped, data sovereignty                 │  │
+│  │                                                                                    │  │
+│  │   Option C: Hybrid                                                                │  │
+│  │   └─ Control plane managed by 5D Labs                                             │  │
+│  │   └─ Agent execution in customer's infrastructure                                 │  │
+│  │   └─ Best for: "Our code never leaves our network" requirements                   │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Tier | Infrastructure | Customer Kubernetes Knowledge | Best For |
+|------|---------------|------------------------------|----------|
+| **Free** | Fully managed | None required | Individual devs, evaluation |
+| **Team** | Fully managed | None required | Small teams getting started |
+| **Growth** | Fully managed | None required | Scaling teams, production use |
+| **Enterprise** | Choice (managed OR customer) | Optional (if customer-managed) | Regulated, compliance, control |
 
 ---
 
@@ -56,17 +216,18 @@ The CTO Platform operates as a **fully managed service** where 5D Labs handles a
 │  └─────────────────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                                     │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐   │
-│  │                             INFRASTRUCTURE PROVISIONING                                      │   │
+│  │                        INFRASTRUCTURE (Bare Metal Only)                                      │   │
 │  │                                                                                              │   │
-│  │   Bare Metal (via Latitude.sh)         │    Cloud Providers                                 │   │
-│  │   ┌────────────────────────────────┐   │   ┌────────────────────────────────────────────┐  │   │
-│  │   │  • GPU servers for training    │   │   │  • AWS: EKS, EC2, Lambda, S3              │  │   │
-│  │   │  • High-memory nodes           │   │   │  • GCP: GKE, Compute, Cloud Run           │  │   │
-│  │   │  • Dedicated agent execution   │   │   │  • Azure: AKS, VMs, Functions             │  │   │
-│  │   │  • Customer-dedicated hardware │   │   │  • DigitalOcean, Vultr, Hetzner           │  │   │
-│  │   └────────────────────────────────┘   │   └────────────────────────────────────────────┘  │   │
-│  │                                         │                                                   │   │
-│  │   5D Labs provisions on behalf of customer OR customer links their own accounts           │   │
+│  │   5D Labs Managed Infrastructure (via Latitude.sh)                                          │   │
+│  │   ┌───────────────────────────────────────────────────────────────────────────────────┐    │   │
+│  │   │  • GPU servers for ML workloads                                                    │    │   │
+│  │   │  • High-memory nodes for large codebases                                          │    │   │
+│  │   │  • Dedicated agent execution pool                                                 │    │   │
+│  │   │  • Enterprise option: Customer-dedicated hardware                                 │    │   │
+│  │   └───────────────────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                                              │   │
+│  │   Note: 5D Labs does NOT provision cloud resources (AWS/GCP/Azure).                        │   │
+│  │   Enterprise customers who need cloud deployment manage their own infrastructure.           │   │
 │  └─────────────────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                                     │
 │  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐   │
@@ -163,7 +324,7 @@ The CTO Platform operates as a **fully managed service** where 5D Labs handles a
 | **MCP Tools** | All tool servers | Nothing (uses shared apps) |
 | **Secrets Vault** | OpenBao infrastructure, per-tenant isolation | Nothing |
 | **Observability** | Logs, metrics, dashboards | Optional SIEM integration |
-| **Infrastructure** | Provisioning, scaling | Cloud account credentials (optional) |
+| **Infrastructure** | Bare metal provisioning, scaling | Nothing (or their own K8s for Enterprise) |
 | **CRD Definitions** | Schema, validation | Nothing (auto-synced) |
 | **Updates** | Automatic (SaaS) | Gateway pulls templates |
 
@@ -285,95 +446,103 @@ For customers with strict compliance requirements (SOC 2, FedRAMP, regulated ind
 
 ---
 
-## Infrastructure Provider Integration
+## Infrastructure Model
 
-### How It Works
+### 5D Labs Managed (Default for Free/Team/Growth)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                          INFRASTRUCTURE PROVIDER FLOW                                    │
+│                    5D LABS MANAGED INFRASTRUCTURE (Bare Metal)                           │
 │                                                                                          │
-│  Customer Onboarding:                                                                   │
+│  All Free, Team, and Growth customers run on 5D Labs managed bare metal:               │
+│                                                                                          │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
 │  │                                                                                    │  │
-│  │   Step 1: "Connect your infrastructure"                                           │  │
+│  │   Customer experience:                                                            │  │
+│  │   ─────────────────────                                                           │  │
+│  │   • Sign up → Connect GitHub → Create task → Done                                 │  │
+│  │   • Zero infrastructure decisions                                                 │  │
+│  │   • Zero Kubernetes knowledge                                                     │  │
+│  │   • Zero DevOps required                                                          │  │
 │  │                                                                                    │  │
-│  │   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐                   │  │
-│  │   │ ○ Use 5D Labs   │  │ ○ Bring Your    │  │ ○ Hybrid        │                   │  │
-│  │   │   Infrastructure │  │   Own Cloud     │  │   (Both)        │                   │  │
-│  │   └─────────────────┘  └─────────────────┘  └─────────────────┘                   │  │
+│  │   Behind the scenes (5D Labs manages):                                            │  │
+│  │   ─────────────────────────────────────                                           │  │
+│  │   • Bare metal servers via Latitude.sh                                            │  │
+│  │   • Kubernetes cluster orchestration                                              │  │
+│  │   • Agent pod scheduling and scaling                                              │  │
+│  │   • Monitoring, logging, alerting                                                 │  │
+│  │   • Security patching and updates                                                 │  │
 │  │                                                                                    │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                          │
-│  Option A: 5D Labs Infrastructure (simplest)                                            │
+│  Why bare metal (not cloud VMs)?                                                        │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
 │  │                                                                                    │  │
-│  │   • Agents run on 5D Labs managed bare metal (Latitude.sh)                        │  │
-│  │   • No cloud credentials needed from customer                                     │  │
-│  │   • Pay per usage (compute time billed)                                           │  │
-│  │   • Best for: Getting started quickly, predictable costs                          │  │
-│  │                                                                                    │  │
-│  │   Infrastructure is provisioned:                                                  │  │
-│  │     5D Labs Latitude Account → Bare metal servers → Agent execution pool          │  │
-│  │                                                                                    │  │
-│  └───────────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                          │
-│  Option B: Customer's Cloud (BYOC - Bring Your Own Cloud)                               │
-│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                                                                                    │  │
-│  │   Customer provides cloud credentials:                                            │  │
-│  │                                                                                    │  │
-│  │   AWS:                                                                            │  │
-│  │     • IAM Role ARN (cross-account assume role)                                    │  │
-│  │     • Permissions: EC2, EKS, S3, Secrets Manager                                  │  │
-│  │                                                                                    │  │
-│  │   GCP:                                                                            │  │
-│  │     • Service Account JSON key                                                    │  │
-│  │     • Or: Workload Identity Federation                                            │  │
-│  │     • Permissions: Compute, GKE, Storage, Secret Manager                          │  │
-│  │                                                                                    │  │
-│  │   Azure:                                                                          │  │
-│  │     • Service Principal (client ID + secret)                                      │  │
-│  │     • Or: Managed Identity                                                        │  │
-│  │     • Permissions: AKS, VMs, Storage, Key Vault                                   │  │
-│  │                                                                                    │  │
-│  │   5D Labs provisions infrastructure IN customer's account:                        │  │
-│  │     Customer AWS Account → EKS cluster → Agent execution (customer pays AWS)      │  │
-│  │                                                                                    │  │
-│  └───────────────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                          │
-│  Option C: Customer's Bare Metal (Latitude.sh linked account)                           │
-│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                                                                                    │  │
-│  │   Customer has their own Latitude.sh account:                                     │  │
-│  │                                                                                    │  │
-│  │   • Provide Latitude API key                                                      │  │
-│  │   • 5D Labs provisions servers in customer's account                              │  │
-│  │   • Customer pays Latitude directly                                               │  │
-│  │   • Full control over hardware specs                                              │  │
-│  │                                                                                    │  │
-│  │   Benefits:                                                                       │  │
-│  │     • GPU access for ML workloads                                                 │  │
-│  │     • Predictable pricing (no cloud markup)                                       │  │
-│  │     • Data sovereignty (choose regions)                                           │  │
+│  │   ✓ Better performance (dedicated hardware, no noisy neighbors)                   │  │
+│  │   ✓ Lower cost (no cloud markup)                                                  │  │
+│  │   ✓ Predictable pricing                                                           │  │
+│  │   ✓ Full control over hardware allocation                                         │  │
 │  │                                                                                    │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Infrastructure MCP Tools Available
+### Enterprise: Customer-Managed Infrastructure (Optional)
 
-| Tool | What It Does | Credentials Needed |
-|------|--------------|-------------------|
-| `mcp_latitudesh_*` | Provision bare metal servers | Latitude API key |
-| `mcp_kubernetes_*` | Manage K8s resources | Kubeconfig / ServiceAccount |
-| `mcp_terraform_*` | Infrastructure as Code | Provider-specific |
-| `mcp_argocd_*` | GitOps deployments | ArgoCD token |
-| `mcp_docker_*` | Container management | Docker socket access |
-| `mcp_cloudflare_*` | DNS, CDN, Workers | Cloudflare API token |
-| `mcp_aws_*` (future) | EC2, EKS, S3, etc. | IAM credentials |
-| `mcp_gcp_*` (future) | GCE, GKE, GCS, etc. | Service account |
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                    ENTERPRISE: CUSTOMER-MANAGED INFRASTRUCTURE                           │
+│                                                                                          │
+│  Enterprise customers who REQUIRE running in their own infrastructure can do so.        │
+│  This is optional - Enterprise customers can also use 5D Labs managed infra.            │
+│                                                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │   What we provide:                                                                │  │
+│  │   ─────────────────                                                               │  │
+│  │   • Helm chart for deployment                                                     │  │
+│  │   • Container images                                                              │  │
+│  │   • Documentation and runbooks                                                    │  │
+│  │   • Support and updates                                                           │  │
+│  │                                                                                    │  │
+│  │   What customer provides:                                                         │  │
+│  │   ───────────────────────                                                         │  │
+│  │   • Kubernetes cluster (any provider: AWS EKS, GCP GKE, Azure AKS, on-prem)       │  │
+│  │   • Networking and security                                                       │  │
+│  │   • Compliance controls                                                           │  │
+│  │   • Infrastructure operations                                                     │  │
+│  │                                                                                    │  │
+│  │   Important: 5D Labs does NOT provision cloud resources.                          │  │
+│  │   We provide software; customer manages infrastructure.                           │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  When to use customer-managed:                                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                                    │  │
+│  │   • Regulated industries (finance, healthcare, government)                        │  │
+│  │   • "Code never leaves our network" requirements                                  │  │
+│  │   • Air-gapped environments                                                       │  │
+│  │   • Specific compliance frameworks (FedRAMP, HIPAA, SOC 2)                        │  │
+│  │   • Data sovereignty requirements                                                 │  │
+│  │                                                                                    │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### MCP Tools Available
+
+| Tool | What It Does | Available To |
+|------|--------------|--------------|
+| `mcp_latitudesh_*` | Bare metal provisioning | 5D Labs internal |
+| `mcp_kubernetes_*` | K8s resource management | All tiers |
+| `mcp_argocd_*` | GitOps deployments | All tiers |
+| `mcp_docker_*` | Container management | All tiers |
+| `mcp_cloudflare_*` | DNS, CDN, tunnels | All tiers |
+| `mcp_github_*` | Repository operations | All tiers |
+| `mcp_linear_*` | Project management | All tiers |
 
 ---
 
@@ -421,8 +590,8 @@ For customers with strict compliance requirements (SOC 2, FedRAMP, regulated ind
 │  │                                                                                    │  │
 │  │  • US region (default)                                                            │  │
 │  │  • EU region (GDPR compliance)                                                    │  │
-│  │  • Customer's cloud (data never leaves their account)                             │  │
-│  │  • On-premises (air-gapped option)                                                │  │
+│  │  • Customer-managed infrastructure (data never leaves their network)              │  │
+│  │  • On-premises / air-gapped (for highly regulated environments)                   │  │
 │  │                                                                                    │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                          │
@@ -508,26 +677,27 @@ For customers with strict compliance requirements (SOC 2, FedRAMP, regulated ind
 
 ---
 
-## Alternative: Gateway Mode (For K8s-Native Workflows)
+## Enterprise Option: Gateway Mode (Customer Infrastructure)
 
-For teams that prefer Kubernetes-native workflows with CRDs:
+**Enterprise tier only.** For organizations that require code execution within their own infrastructure:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                         GATEWAY MODE (Optional)                                          │
+│                   GATEWAY MODE (Enterprise Only)                                         │
 │                                                                                          │
-│  For teams that want:                                                                   │
-│  • CRD-based declarative workflows                                                      │
-│  • GitOps integration (ArgoCD, Flux)                                                    │
-│  • kubectl-based operations                                                             │
+│  When to use:                                                                           │
+│  • Regulated industries requiring data sovereignty                                      │
+│  • "Code never leaves our network" policies                                             │
+│  • Air-gapped environments                                                              │
+│  • Compliance requirements (FedRAMP, HIPAA, etc.)                                       │
 │                                                                                          │
-│  Setup (5 minutes):                                                                     │
+│  Setup (by customer's DevOps team):                                                     │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
 │  │  helm install cto-gateway 5dlabs/cto-gateway \                                    │  │
 │  │    --set tenantId=acme --set apiToken=ctop_xxx                                    │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                          │
-│  Usage:                                                                                 │
+│  Usage (for K8s-native teams):                                                          │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
 │  │  kubectl apply -f - <<EOF                                                         │  │
 │  │  apiVersion: agents.platform/v1                                                   │  │
@@ -542,8 +712,11 @@ For teams that prefer Kubernetes-native workflows with CRDs:
 │  │  kubectl get coderuns -w                                                          │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                          │
-│  Gateway syncs CRD status with 5D Labs control plane - execution still happens          │
-│  on 5D Labs infrastructure.                                                             │
+│  Important:                                                                             │
+│  • This is NOT available on Free, Team, or Growth tiers                                 │
+│  • Customer is responsible for infrastructure management                                │
+│  • 5D Labs provides software updates, customer handles deployment                       │
+│  • Premium pricing reflects additional support requirements                             │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```

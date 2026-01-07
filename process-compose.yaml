@@ -1,0 +1,166 @@
+# process-compose.yaml - Local Development Process Manager
+# =========================================================
+# A TUI for managing and monitoring all CTO services locally.
+#
+# Usage:
+#   process-compose up        # Start all services with TUI
+#   process-compose up -t     # Start in TUI mode (default)
+#   process-compose up -d     # Start in background (detached)
+#
+# TUI Keybindings:
+#   ↑/↓    Navigate services
+#   Enter  View service logs
+#   f      Follow logs
+#   r      Restart service
+#   x      Stop service
+#   s      Start service
+#   q      Quit
+#
+# Prerequisites:
+#   source .env.local
+#
+# =========================================================
+
+version: "0.5"
+
+# Environment variables (inherited from shell)
+# Make sure to `source .env.local` before running
+
+# Log configuration
+log_level: info
+log_location: ./.process-compose/logs
+
+# Process definitions
+processes:
+  # ===========================================================================
+  # Long-Running Services
+  # ===========================================================================
+
+  pm-server:
+    command: cargo run --bin pm-server
+    description: "PM Server - Linear webhooks & project management"
+    availability:
+      restart: on_failure
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: localhost
+        port: 8081
+        path: /health
+      initial_delay_seconds: 10
+      period_seconds: 5
+    environment:
+      - "RUST_LOG=info,pm=debug"
+    depends_on: {}
+
+  controller:
+    command: cargo run --bin agent-controller
+    description: "Controller - CodeRun CRD orchestrator"
+    availability:
+      restart: on_failure
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: localhost
+        port: 8080
+        path: /health
+      initial_delay_seconds: 10
+      period_seconds: 5
+    environment:
+      - "RUST_LOG=info,controller=debug"
+      - "AGENT_TEMPLATES_PATH=./templates"
+      - "SERVER_HOST=0.0.0.0"
+      - "SERVER_PORT=8080"
+      - "CONTROLLER_CONFIG_PATH=./config/controller-config.yaml"
+    depends_on:
+      pm-server:
+        condition: process_started
+
+  tools-server:
+    command: cargo run --bin tools-server
+    description: "Tools Server - MCP proxy for external tools"
+    availability:
+      restart: on_failure
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: localhost
+        port: 3000
+        path: /health
+      initial_delay_seconds: 10
+      period_seconds: 5
+    environment:
+      - "RUST_LOG=info,tools=debug"
+      - "PORT=3000"
+      - "SYSTEM_CONFIG_PATH=./infra/charts/cto/templates/tools"
+    depends_on: {}
+
+  healer:
+    command: cargo run --bin healer -- server --addr 0.0.0.0:8082
+    description: "Healer - Self-healing monitor daemon"
+    availability:
+      restart: on_failure
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: localhost
+        port: 8082
+        path: /health
+      initial_delay_seconds: 10
+      period_seconds: 5
+    environment:
+      - "RUST_LOG=info,healer=debug"
+      - "HEALER_TEMPLATES_DIR=./templates/healer"
+      - "CTO_CONFIG_PATH=./cto-config.json"
+    depends_on: {}
+
+  healer-sensor:
+    command: cargo run --bin healer -- sensor github-actions --repositories=5dlabs/cto --poll-interval=300 --lookback-mins=60 --create-issues --issue-labels=healer,ci-failure --max-per-poll=3 --namespace=cto --verbose
+    description: "Healer Sensor - GitHub Actions failure monitor"
+    availability:
+      restart: on_failure
+      max_restarts: 3
+    environment:
+      - "RUST_LOG=info,healer=debug"
+      - "HEALER_TEMPLATES_DIR=./templates/healer"
+      - "CTO_CONFIG_PATH=./cto-config.json"
+    depends_on: {}
+
+  # ===========================================================================
+  # Development Helpers (disabled by default)
+  # ===========================================================================
+
+  # Bacon watcher - uncomment to run alongside services
+  # bacon-check:
+  #   command: bacon
+  #   description: "Bacon - cargo check on file changes"
+  #   disabled: true
+
+  # ===========================================================================
+  # One-Shot Tasks (for testing CLIs)
+  # ===========================================================================
+
+  # These are disabled by default - enable when needed
+  # intake:
+  #   command: cargo run --bin intake -- --help
+  #   description: "Intake CLI"
+  #   disabled: true
+
+  # research:
+  #   command: cargo run --bin research -- --help
+  #   description: "Research CLI"
+  #   disabled: true
+
+# ===========================================================================
+# Alternative Profiles
+# ===========================================================================
+# Use: process-compose up --profile minimal
+# profiles:
+#   minimal:
+#     - pm-server
+#     - controller
+#   full:
+#     - pm-server
+#     - controller
+#     - tools-server
+#     - healer

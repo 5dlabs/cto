@@ -38,12 +38,14 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
         namespace
     );
 
-    debug!("Loading controller configuration from mounted file...");
+    // Load controller configuration from mounted file or env var
+    let config_path = std::env::var("CONTROLLER_CONFIG_PATH")
+        .unwrap_or_else(|_| "/config/config.yaml".to_string());
+    debug!("Loading controller configuration from: {}", config_path);
 
-    // Load controller configuration from mounted file
-    let config = match ControllerConfig::from_mounted_file("/config/config.yaml") {
+    let config = match ControllerConfig::from_mounted_file(&config_path) {
         Ok(cfg) => {
-            debug!("Successfully loaded controller configuration");
+            debug!("Successfully loaded controller configuration from {}", config_path);
             debug!("Configuration cleanup enabled = {}", cfg.cleanup.enabled);
 
             // Validate configuration has required fields

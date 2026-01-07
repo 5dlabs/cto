@@ -84,6 +84,8 @@ jobs:
 
       - name: Install cargo-dist
         run: |
+          export CARGO_HOME="$HOME/.cargo"
+          mkdir -p "$CARGO_HOME/bin"
           curl --proto '=https' --tlsv1.2 -LsSf \
             https://github.com/axodotdev/cargo-dist/releases/download/v${{ env.CARGO_DIST_VERSION }}/cargo-dist-installer.sh | sh
 

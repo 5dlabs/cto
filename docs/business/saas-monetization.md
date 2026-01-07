@@ -2,7 +2,14 @@
 
 ## Overview
 
-This document outlines monetization options for the CTO Platform SaaS offering, from self-serve starter tiers to enterprise contracts.
+This document outlines the monetization strategy for the CTO Platform—a **freemium, proprietary SaaS** offering. All tiers up to Growth are fully managed; Enterprise customers have the option of customer-managed infrastructure.
+
+### Key Principles
+
+1. **Freemium entry** - Generous free tier to drive adoption
+2. **Fully managed by default** - Zero Kubernetes knowledge required for Free/Team/Growth
+3. **Enterprise flexibility** - Customer-managed infrastructure option only at Enterprise tier
+4. **Proprietary software** - Not open source (see [Architecture](./saas-architecture.md) for rationale)
 
 ---
 
@@ -156,62 +163,80 @@ This document outlines monetization options for the CTO Platform SaaS offering, 
 
 ---
 
-### Model 4: Hybrid (Recommended)
+### Model 4: Hybrid (Recommended) ✓ CHOSEN MODEL
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                         HYBRID PRICING (RECOMMENDED)                                     │
+│                         HYBRID PRICING (CHOSEN MODEL)                                    │
 │                                                                                          │
 │  Concept: Platform fee + usage-based components                                         │
+│  Key: ALL tiers below Enterprise are FULLY MANAGED (zero Kubernetes for customer)       │
 │                                                                                          │
 │  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
 │  │                                                                                    │  │
-│  │  STARTER: $0/month + usage                                                        │  │
+│  │  FREE: $0/month + usage                                            FULLY MANAGED  │  │
 │  │  ─────────────────────────────────                                                │  │
 │  │  Platform fee:        $0 (free tier)                                              │  │
-│  │  Included:            20 CodeRuns/month free                                      │  │
+│  │  Included:            50 CodeRuns/month free                                      │  │
 │  │  CodeRun overage:     $3.00/run                                                   │  │
 │  │  AI tokens:           BYOK only (bring your own keys)                             │  │
-│  │  Infrastructure:      5D Labs shared pool                                         │  │
-│  │  Support:             Community (Discord/GitHub)                                  │  │
+│  │  Infrastructure:      5D Labs managed (shared pool)                               │  │
+│  │  Support:             Community (Discord)                                         │  │
+│  │  Users:               1                                                           │  │
+│  │  Repos:               5                                                           │  │
+│  │                                                                                    │  │
+│  │  Customer Kubernetes knowledge required: NONE                                     │  │
 │  │                                                                                    │  │
 │  │  ─────────────────────────────────────────────────────────────────────────────    │  │
 │  │                                                                                    │  │
-│  │  TEAM: $199/month + usage                                                         │  │
+│  │  TEAM: $199/month + usage                                          FULLY MANAGED  │  │
 │  │  ─────────────────────────────────                                                │  │
 │  │  Platform fee:        $199/month                                                  │  │
 │  │  Included:            200 CodeRuns/month                                          │  │
 │  │  CodeRun overage:     $1.50/run                                                   │  │
 │  │  AI tokens:           BYOK or managed (+15% margin)                               │  │
-│  │  Infrastructure:      5D Labs shared pool                                         │  │
+│  │  Infrastructure:      5D Labs managed (shared pool)                               │  │
 │  │  Support:             Email (48h response)                                        │  │
 │  │  Features:            Team management, SSO (Google/Microsoft)                     │  │
+│  │  Users:               10                                                          │  │
+│  │  Repos:               Unlimited                                                   │  │
+│  │                                                                                    │  │
+│  │  Customer Kubernetes knowledge required: NONE                                     │  │
 │  │                                                                                    │  │
 │  │  ─────────────────────────────────────────────────────────────────────────────    │  │
 │  │                                                                                    │  │
-│  │  GROWTH: $499/month + usage                                                       │  │
+│  │  GROWTH: $499/month + usage                                        FULLY MANAGED  │  │
 │  │  ─────────────────────────────────                                                │  │
 │  │  Platform fee:        $499/month                                                  │  │
 │  │  Included:            1000 CodeRuns/month                                         │  │
 │  │  CodeRun overage:     $0.75/run                                                   │  │
 │  │  AI tokens:           BYOK or managed (+10% margin)                               │  │
-│  │  Infrastructure:      Dedicated namespace                                         │  │
+│  │  Infrastructure:      5D Labs managed (dedicated namespace)                       │  │
 │  │  Support:             Slack (24h response)                                        │  │
-│  │  Features:            Full SSO/SAML, audit logs, SCIM                             │  │
+│  │  Features:            Full SSO/SAML, audit logs, SCIM, Healer                     │  │
+│  │  Users:               Unlimited                                                   │  │
+│  │  Repos:               Unlimited                                                   │  │
+│  │                                                                                    │  │
+│  │  Customer Kubernetes knowledge required: NONE                                     │  │
 │  │                                                                                    │  │
 │  │  ─────────────────────────────────────────────────────────────────────────────    │  │
 │  │                                                                                    │  │
-│  │  ENTERPRISE: $2,000+/month (custom)                                               │  │
+│  │  ENTERPRISE: $2,000+/month (custom)                    MANAGED OR CUSTOMER-MANAGED│  │
 │  │  ─────────────────────────────────                                                │  │
 │  │  Platform fee:        Custom (based on scale)                                     │  │
 │  │  Included:            Custom CodeRun allotment                                    │  │
 │  │  CodeRun overage:     $0.50/run (negotiable)                                      │  │
 │  │  AI tokens:           BYOK, managed, or volume discount                           │  │
-│  │  Infrastructure:      Dedicated infra, BYOC, or on-prem                           │  │
+│  │  Infrastructure:      CHOICE: 5D Labs managed OR customer's infrastructure        │  │
 │  │  Support:             Dedicated CSM, 4h response SLA                              │  │
-│  │  Features:            Everything + custom integrations                            │  │
+│  │  Features:            Everything + custom integrations + source code access (NDA) │  │
+│  │                                                                                    │  │
+│  │  Customer Kubernetes knowledge required: ONLY IF they choose customer-managed     │  │
 │  │                                                                                    │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                          │
+│  KEY INSIGHT: Infrastructure complexity is OUR problem, not the customer's.             │
+│  Only Enterprise customers who WANT control get the option to self-host.                │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -385,26 +410,34 @@ This document outlines monetization options for the CTO Platform SaaS offering, 
 │  │  Cursor          │  Per-seat       │  $20/seat/mo    │  We're infrastructure,     │  │
 │  │                  │                 │  (pro)          │  not an IDE                │  │
 │  │                  │                 │                 │                            │  │
-│  │  Devin (Cognition)│ Waitlist/      │  Unknown        │  Open architecture,        │  │
-│  │                  │  Enterprise     │  (reportedly    │  multi-agent, customer     │  │
-│  │                  │                 │  high)          │  owns their repos          │  │
+│  │  Devin (Cognition)│ Waitlist/      │  $500/mo        │  Fully managed infra,      │  │
+│  │                  │  Enterprise     │                 │  multi-agent, always       │  │
+│  │                  │                 │                 │  current with tooling      │  │
 │  │                  │                 │                 │                            │  │
 │  │  Replit Agent    │  Per-seat +     │  $25/seat/mo    │  Enterprise-grade,         │  │
 │  │                  │  compute        │  + usage        │  works with existing       │  │
-│  │                  │                 │                 │  codebase                  │  │
+│  │                  │                 │                 │  codebase (not greenfield) │  │
 │  │                  │                 │                 │                            │  │
 │  │  Custom internal │  Build cost     │  $500K-2M/yr    │  10x faster to deploy,     │  │
-│  │  platform        │                 │  (eng time)     │  continuously improved     │  │
+│  │  platform        │                 │  (eng time)     │  we stay current for you   │  │
 │  │                  │                 │                 │                            │  │
 │  └──────────────────┴─────────────────┴─────────────────┴────────────────────────────┘  │
 │                                                                                          │
 │  Key differentiators:                                                                   │
-│    1. Full task completion (not just code suggestions)                                  │
-│    2. Multi-agent orchestration (specialized agents)                                    │
-│    3. Infrastructure management (bare metal + cloud)                                    │
-│    4. Enterprise-grade (SSO, audit, compliance)                                         │
-│    5. Self-healing (Healer auto-fixes CI failures)                                      │
-│    6. Kubernetes-native (works with existing DevOps)                                    │
+│                                                                                          │
+│  1. FULLY MANAGED INFRASTRUCTURE                                                        │
+│     └─ Bare metal performance, zero DevOps burden                                       │
+│     └─ Customer touches nothing - just GitHub + tasks                                   │
+│                                                                                          │
+│  2. ALWAYS CURRENT WITH AI EVOLUTION                                                    │
+│     └─ Research engine tracks new models, tools, techniques                             │
+│     └─ Platform updated continuously - customers get improvements automatically         │
+│     └─ No internal AI/ML team needed to stay competitive                                │
+│                                                                                          │
+│  3. Full task completion (not just code suggestions)                                    │
+│  4. Multi-agent orchestration (specialized agents per task type)                        │
+│  5. Self-healing (Healer auto-fixes CI failures)                                        │
+│  6. Enterprise-grade (SSO, audit, compliance, source access under NDA)                  │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -468,21 +501,25 @@ This document outlines monetization options for the CTO Platform SaaS offering, 
 
 ---
 
-## Summary: Recommended Pricing
+## Summary: Pricing Tiers
 
-| Tier | Monthly | Annual | CodeRuns | Key Features |
-|------|---------|--------|----------|--------------|
-| **Starter** | Free | Free | 20 included | BYOK, 1 user, community support |
-| **Team** | $199 | $1,990 | 200 included | 10 users, basic SSO, email support |
-| **Growth** | $499 | $4,990 | 1000 included | Unlimited users, SAML, audit logs |
-| **Enterprise** | Custom | Custom | Custom | Dedicated infra, SLA, compliance |
+| Tier | Monthly | Annual | CodeRuns | Infrastructure | Key Features |
+|------|---------|--------|----------|----------------|--------------|
+| **Free** | $0 | $0 | 50 included | **Fully managed** | BYOK, 1 user, 5 repos, community support |
+| **Team** | $199 | $1,990 | 200 included | **Fully managed** | 10 users, basic SSO, email support |
+| **Growth** | $499 | $4,990 | 1000 included | **Fully managed** | Unlimited users, SAML, audit logs, Healer |
+| **Enterprise** | Custom | Custom | Custom | **Choice** (managed or customer) | SLA, compliance, source access (NDA) |
 
 **Overage rates:**
-- Starter: $3.00/CodeRun
+- Free: $3.00/CodeRun
 - Team: $1.50/CodeRun
 - Growth: $0.75/CodeRun
 - Enterprise: $0.50/CodeRun (negotiable)
 
 **AI API options:**
-- BYOK: No charge (customer manages)
-- Managed: Pass-through + 10-20% margin
+- BYOK: No charge (customer manages their own Anthropic/OpenAI keys)
+- Managed: Pass-through + 10-20% margin (convenience, no key management)
+
+**Infrastructure:**
+- **Free/Team/Growth:** Customer touches ZERO infrastructure. Fully managed on 5D Labs bare metal.
+- **Enterprise:** Customer can CHOOSE to deploy on their own infrastructure if required for compliance/security.

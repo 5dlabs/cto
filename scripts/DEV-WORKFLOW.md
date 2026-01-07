@@ -1,16 +1,153 @@
 # Fast Development Workflow
 
-This guide explains how to iterate quickly on the Talos cluster without waiting for CI.
+This guide explains how to iterate quickly without waiting for CI.
 
-## Three Options
+## Development Options
 
 | Method | Network | Speed | Best For |
 |--------|---------|-------|----------|
-| `dev-load.sh` + Helm toggle | Local only | ⚡ Fastest | Day-to-day iteration |
+| **Native Local** (`just` + `bacon`) | Cluster API | ⚡⚡ Fastest | Day-to-day iteration |
+| `dev-load.sh` + Helm toggle | Local only | ⚡ Fast | Testing in real pods |
 | `dev-push.sh` | Internet (GHCR) | Fast | Sharing with team |
-| Helm values override | N/A | Instant | Switching image sources |
+| Tilt | Local/Internet | Medium | Full stack testing |
 
-## Quick Reference: Helm Dev Registry Toggle
+---
+
+## Option 0: Native Local Development (Recommended)
+
+Run services directly on your machine as native binaries, connecting to the real cluster via kubeconfig. This is the fastest iteration loop (~5-15s incremental builds vs ~1-3 min Docker builds).
+
+### Prerequisites
+
+```bash
+# Install development tools
+cargo install just bacon
+
+# Or using just itself
+just install-tools
+```
+
+### One-Time Setup
+
+```bash
+# 1. Set up your environment variables
+./scripts/sync-secrets-for-dev.sh   # Fetches from 1Password
+# OR
+cp env.template .env.local          # Manual setup
+# Edit .env.local with your values
+
+# 2. Source the environment
+source .env.local
+
+# 3. Verify setup
+just env-info
+./scripts/dev-local.sh --check
+```
+
+### Quick Start
+
+```bash
+# Source your environment
+source .env.local
+
+# Start all services
+just dev
+
+# Or start specific services
+just dev-pm          # PM server only
+just dev-controller  # Controller only
+just dev-tools       # Tools server only
+just dev-healer      # Healer server only
+```
+
+### Using Bacon (File Watching)
+
+Bacon watches your code and rebuilds automatically:
+
+```bash
+# In one terminal - run a service with watching
+bacon run-pm         # Watch and run PM server
+bacon run-controller # Watch and run controller
+bacon run-tools      # Watch and run tools server
+bacon run-healer     # Watch and run healer
+
+# In another terminal - check/lint while coding
+bacon                # cargo check (default)
+bacon clippy         # clippy with pedantic
+bacon test           # run tests
+```
+
+### Available Just Commands
+
+```bash
+just --list          # Show all commands
+
+# Build
+just build           # Build all binaries (debug)
+just build-release   # Build all binaries (release)
+
+# Check & Lint
+just check           # cargo check
+just clippy          # clippy pedantic (required before push)
+just fmt             # Format code
+just pre-push        # Run all pre-push checks
+
+# Test
+just test            # Run all tests
+just test-verbose    # Tests with output
+
+# Development
+just dev             # Start all services
+just dev-pm          # Start PM server
+just dev-controller  # Start controller
+just dev-tools       # Start tools server
+just dev-healer      # Start healer
+
+# CLIs
+just intake <args>   # Run intake CLI
+just research <args> # Run research CLI
+just healer <args>   # Run healer CLI
+just mcp             # Run MCP server
+```
+
+### Services & Ports
+
+| Service | Port | Binary | Notes |
+|---------|------|--------|-------|
+| PM Server | 8081 | `pm-server` | Linear webhooks |
+| Controller | 8080 | `agent_controller` | CodeRun CRD controller |
+| Tools | 3000 | `tools-server` | MCP proxy |
+| Healer | 8080 | `healer server` | Self-healing monitor |
+
+### Environment Variables
+
+All required secrets are documented in `env.template`. Key variables:
+
+| Variable | Service | Description |
+|----------|---------|-------------|
+| `ANTHROPIC_API_KEY` | All | Claude API key |
+| `LINEAR_OAUTH_TOKEN` | PM | Linear API access |
+| `GITHUB_TOKEN` | Multiple | GitHub operations |
+| `NAMESPACE` | All | Kubernetes namespace (default: `cto`) |
+| `AGENT_TEMPLATES_PATH` | Controller | Path to templates |
+
+### Comparison: Local vs Docker
+
+| Metric | Docker/Tilt | Native Local |
+|--------|-------------|--------------|
+| Initial build | ~3-5 min | ~1-2 min |
+| Incremental rebuild | ~30-60s | ~5-15s |
+| Hot reload | No | Yes (bacon) |
+| Feedback loop | Build → Push → Deploy → Test | Save → Rebuild → Test |
+| Real cluster | Yes (in pods) | Yes (via kubeconfig) |
+
+---
+
+## Option 1: Local Registry (Docker-based)
+
+Build and push to an in-cluster registry. Good for testing in real pods.
+
+### Quick Reference: Helm Dev Registry Toggle
 
 The CTO Helm chart supports a `global.devRegistry` toggle to switch between GHCR and local registry:
 
@@ -30,7 +167,7 @@ helm upgrade cto ./infra/charts/cto -n cto \
   --set global.devRegistry.componentTags.controller=feature-branch
 ```
 
-## Option 1: Local Registry (Recommended)
+### Local Registry Details
 
 Build and push to an in-cluster registry. No internet required!
 
@@ -86,6 +223,8 @@ helm upgrade cto ./infra/charts/cto -n cto \
 1. **Build**: Compiles locally for linux/amd64
 2. **Push**: To in-cluster registry at `<node-ip>:30500` (fast local network)
 3. **Deploy**: Patches deployment and triggers rollout
+
+---
 
 ---
 
@@ -270,16 +409,25 @@ kubectl set image deployment/controller controller=192.168.1.77:30500/controller
 
 ## Comparison
 
-| Aspect | CI Pipeline | dev-load.sh | dev-push.sh |
-|--------|-------------|-------------|-------------|
-| Network | Internet | Local only | Internet |
-| Time | 5-15 min | 1-3 min | 2-5 min |
-| Sharing | Everyone | Just you | Team |
-| Best for | Production | Fast iteration | Team testing |
+| Aspect | CI Pipeline | Native Local | dev-load.sh | dev-push.sh |
+|--------|-------------|--------------|-------------|-------------|
+| Network | Internet | Cluster API | Local only | Internet |
+| Build Time | 5-15 min | 5-15s (incr) | 1-3 min | 2-5 min |
+| Rebuild Time | 5-15 min | 5-15s | 30-60s | 1-2 min |
+| Sharing | Everyone | Just you | Just you | Team |
+| Real Pods | Yes | No (native) | Yes | Yes |
+| Best for | Production | Day-to-day | Pod testing | Team testing |
 
 ## See Also
 
-- [Talos Cluster Setup](../infra/talos/README.md)
-- [Kind Local Development](../tests/kind/README.md)
-- [CI Workflows](../.github/workflows/)
+- **Local Development Files:**
+  - [`justfile`](../justfile) - Command runner configuration
+  - [`bacon.toml`](../bacon.toml) - File watcher configuration
+  - [`env.template`](../env.template) - Environment variable template
+  - [`scripts/sync-secrets-for-dev.sh`](./sync-secrets-for-dev.sh) - 1Password secret sync
+  - [`scripts/dev-local.sh`](./dev-local.sh) - Service orchestration script
+- **Infrastructure:**
+  - [Talos Cluster Setup](../infra/talos/README.md)
+  - [Kind Local Development](../tests/kind/README.md)
+  - [CI Workflows](../.github/workflows/)
 

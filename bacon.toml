@@ -1,0 +1,193 @@
+# bacon.toml - Bacon Configuration for CTO Platform
+# =================================================
+# Bacon is a background code checker for Rust.
+# Run `bacon` to start in check mode, or `bacon <job>` for a specific job.
+# Press `h` in the TUI to see available keybindings.
+#
+# Installation: cargo install bacon
+# Documentation: https://dystroy.org/bacon/
+
+# =============================================================================
+# Default Job
+# =============================================================================
+# The default job runs when you just type `bacon`
+default_job = "check"
+
+# =============================================================================
+# Standard Jobs
+# =============================================================================
+
+[jobs.check]
+command = ["cargo", "check", "--workspace", "--color", "always"]
+need_stdout = false
+
+[jobs.check-all]
+command = ["cargo", "check", "--workspace", "--all-targets", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy]
+command = [
+    "cargo", "clippy",
+    "--all-targets",
+    "--color", "always",
+    "--",
+    "-D", "warnings",
+    "-W", "clippy::pedantic"
+]
+need_stdout = false
+
+[jobs.test]
+command = ["cargo", "test", "--workspace", "--color", "always"]
+need_stdout = true
+
+[jobs.test-quiet]
+command = ["cargo", "test", "--workspace", "--color", "always", "--", "--quiet"]
+need_stdout = true
+
+[jobs.doc]
+command = ["cargo", "doc", "--workspace", "--no-deps", "--color", "always"]
+need_stdout = false
+
+# =============================================================================
+# Service Run Jobs
+# =============================================================================
+# These jobs run specific services with file watching.
+# Use environment variables for configuration (source .env.local first).
+
+[jobs.run-pm]
+command = ["cargo", "run", "--bin", "pm-server", "--color", "always"]
+need_stdout = true
+allow_warnings = true
+background = false
+watch = ["crates/pm/"]
+
+[jobs.run-controller]
+command = ["cargo", "run", "--bin", "agent-controller", "--color", "always"]
+need_stdout = true
+allow_warnings = true
+background = false
+watch = ["crates/controller/", "templates/"]
+env = { AGENT_TEMPLATES_PATH = "./templates" }
+
+[jobs.run-tools]
+command = ["cargo", "run", "--bin", "tools-server", "--color", "always"]
+need_stdout = true
+allow_warnings = true
+background = false
+watch = ["crates/tools/"]
+env = { SYSTEM_CONFIG_PATH = "./infra/charts/cto/templates/tools" }
+
+[jobs.run-healer]
+command = ["cargo", "run", "--bin", "healer", "--", "server", "--color", "always"]
+need_stdout = true
+allow_warnings = true
+background = false
+watch = ["crates/healer/", "templates/healer/"]
+env = { HEALER_TEMPLATES_DIR = "./templates/healer", CTO_CONFIG_PATH = "./cto-config.json" }
+
+# =============================================================================
+# CLI Build Jobs
+# =============================================================================
+# These jobs just build the CLIs (faster than running them)
+
+[jobs.build-intake]
+command = ["cargo", "build", "--bin", "intake", "--color", "always"]
+need_stdout = false
+watch = ["crates/intake/"]
+
+[jobs.build-research]
+command = ["cargo", "build", "--bin", "research", "--color", "always"]
+need_stdout = false
+watch = ["crates/research/"]
+
+[jobs.build-mcp]
+command = ["cargo", "build", "--bin", "mcp", "--color", "always"]
+need_stdout = false
+watch = ["crates/mcp/"]
+
+# =============================================================================
+# Crate-Specific Jobs
+# =============================================================================
+# Check individual crates for faster feedback
+
+[jobs.check-pm]
+command = ["cargo", "check", "-p", "pm", "--color", "always"]
+need_stdout = false
+watch = ["crates/pm/"]
+
+[jobs.check-controller]
+command = ["cargo", "check", "-p", "controller", "--color", "always"]
+need_stdout = false
+watch = ["crates/controller/"]
+
+[jobs.check-tools]
+command = ["cargo", "check", "-p", "tools", "--color", "always"]
+need_stdout = false
+watch = ["crates/tools/"]
+
+[jobs.check-healer]
+command = ["cargo", "check", "-p", "healer", "--color", "always"]
+need_stdout = false
+watch = ["crates/healer/"]
+
+[jobs.check-intake]
+command = ["cargo", "check", "-p", "intake", "--color", "always"]
+need_stdout = false
+watch = ["crates/intake/"]
+
+[jobs.check-research]
+command = ["cargo", "check", "-p", "research", "--color", "always"]
+need_stdout = false
+watch = ["crates/research/"]
+
+[jobs.check-mcp]
+command = ["cargo", "check", "-p", "mcp", "--color", "always"]
+need_stdout = false
+watch = ["crates/mcp/"]
+
+# =============================================================================
+# Test Jobs for Specific Crates
+# =============================================================================
+
+[jobs.test-pm]
+command = ["cargo", "test", "-p", "pm", "--color", "always"]
+need_stdout = true
+watch = ["crates/pm/"]
+
+[jobs.test-controller]
+command = ["cargo", "test", "-p", "controller", "--color", "always"]
+need_stdout = true
+watch = ["crates/controller/"]
+
+[jobs.test-intake]
+command = ["cargo", "test", "-p", "intake", "--color", "always"]
+need_stdout = true
+watch = ["crates/intake/"]
+
+# =============================================================================
+# Key Bindings
+# =============================================================================
+# These are the default key bindings. Uncomment to customize.
+
+[keybindings]
+# c = "job:check"
+# l = "job:clippy"
+# t = "job:test"
+# d = "job:doc"
+# Escape = "back"
+# q = "quit"
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+
+# Files/directories to ignore (in addition to .gitignore)
+[global]
+# Additional paths to ignore
+# ignore = ["target/", ".git/"]
+
+# Summary mode shows condensed output (press `s` to toggle)
+# summary = false
+
+# Wrap long lines (press `w` to toggle)
+# wrap = false

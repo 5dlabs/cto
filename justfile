@@ -1,0 +1,262 @@
+# CTO Platform - Local Development Commands
+# ===========================================
+# Usage: just <command>
+# Run `just --list` to see all available commands
+
+# Default recipe - show help
+default:
+    @just --list
+
+# =============================================================================
+# Development Environment Setup
+# =============================================================================
+
+# Install development tools (just, bacon, process-compose)
+install-tools:
+    @echo "Installing development tools..."
+    cargo install just bacon
+    brew tap f1bonacc1/tap && brew install f1bonacc1/tap/process-compose || echo "Install process-compose manually: https://github.com/F1bonacc1/process-compose"
+    @echo "✅ Development tools installed"
+
+# Sync secrets from 1Password to .env.local
+sync-secrets:
+    @echo "Syncing secrets from 1Password..."
+    ./scripts/sync-secrets-for-dev.sh
+    @echo "✅ Secrets synced to .env.local"
+
+# =============================================================================
+# Build Commands
+# =============================================================================
+
+# Build all binaries in debug mode
+build:
+    cargo build --workspace
+
+# Build all binaries in release mode
+build-release:
+    cargo build --workspace --release
+
+# Build a specific binary
+build-bin BIN:
+    cargo build --bin {{BIN}}
+
+# =============================================================================
+# Check & Lint Commands
+# =============================================================================
+
+# Run cargo check on all crates
+check:
+    cargo check --workspace
+
+# Run clippy with pedantic warnings (required before push)
+clippy:
+    cargo clippy --all-targets -- -D warnings -W clippy::pedantic
+
+# Run cargo fmt check
+fmt-check:
+    cargo fmt --all --check
+
+# Format all code
+fmt:
+    cargo fmt --all
+
+# Run all pre-push checks (fmt, clippy, test)
+pre-push: fmt-check clippy test
+    @echo "✅ All pre-push checks passed"
+
+# =============================================================================
+# Test Commands
+# =============================================================================
+
+# Run all tests
+test:
+    cargo test --workspace
+
+# Run tests with output
+test-verbose:
+    cargo test --workspace -- --nocapture
+
+# Run tests for a specific crate
+test-crate CRATE:
+    cargo test -p {{CRATE}}
+
+# =============================================================================
+# Development Server Commands
+# =============================================================================
+
+# Start all services with file watching (requires bacon)
+dev:
+    @echo "Starting local development environment..."
+    @echo "Make sure you have sourced .env.local first!"
+    ./scripts/dev-local.sh
+
+# Run PM server locally
+dev-pm:
+    @echo "Starting PM server..."
+    cargo run --bin pm-server
+
+# Run PM server with watching
+watch-pm:
+    bacon run-pm
+
+# Run controller locally
+dev-controller:
+    @echo "Starting controller..."
+    AGENT_TEMPLATES_PATH=./templates cargo run --bin agent-controller
+
+# Run controller with watching
+watch-controller:
+    AGENT_TEMPLATES_PATH=./templates bacon run-controller
+
+# Run tools server locally
+dev-tools:
+    @echo "Starting tools server..."
+    SYSTEM_CONFIG_PATH=./infra/charts/cto/templates/tools cargo run --bin tools-server
+
+# Run tools server with watching
+watch-tools:
+    SYSTEM_CONFIG_PATH=./infra/charts/cto/templates/tools bacon run-tools
+
+# Run healer server locally
+dev-healer:
+    @echo "Starting healer server..."
+    HEALER_TEMPLATES_DIR=./templates/healer CTO_CONFIG_PATH=./cto-config.json cargo run --bin healer -- server
+
+# Run healer with watching
+watch-healer:
+    HEALER_TEMPLATES_DIR=./templates/healer CTO_CONFIG_PATH=./cto-config.json bacon run-healer
+
+# =============================================================================
+# CLI Commands (for testing CLIs locally)
+# =============================================================================
+
+# Run intake CLI
+intake *ARGS:
+    cargo run --bin intake -- {{ARGS}}
+
+# Run research CLI
+research *ARGS:
+    cargo run --bin research -- {{ARGS}}
+
+# Run healer CLI
+healer *ARGS:
+    HEALER_TEMPLATES_DIR=./templates/healer CTO_CONFIG_PATH=./cto-config.json cargo run --bin healer -- {{ARGS}}
+
+# Run MCP server (stdio mode)
+mcp:
+    cargo run --bin mcp
+
+# =============================================================================
+# Bacon Watcher Commands (use these for development)
+# =============================================================================
+
+# Start bacon in check mode (default)
+bacon-check:
+    bacon
+
+# Start bacon in clippy mode
+bacon-clippy:
+    bacon clippy
+
+# Start bacon in test mode
+bacon-test:
+    bacon test
+
+# =============================================================================
+# Process Compose (TUI for monitoring services)
+# =============================================================================
+
+# Start all services with process-compose TUI (recommended for monitoring)
+pc:
+    @echo "Starting services with process-compose TUI..."
+    @echo "Make sure you have sourced .env.local first!"
+    process-compose up --port 8090
+
+# Start process-compose in detached mode
+pc-detach:
+    process-compose up -d --port 8090
+
+# Stop all process-compose services
+pc-down:
+    process-compose down --port 8090
+
+# Show process-compose status
+pc-status:
+    process-compose process list --port 8090
+
+# Attach to running process-compose
+pc-attach:
+    process-compose attach --port 8090
+
+# =============================================================================
+# Docker/Tilt Commands (for comparison/fallback)
+# =============================================================================
+
+# Start Tilt development environment (Docker-based)
+tilt-up:
+    ./scripts/dev.sh up
+
+# Stop Tilt development environment
+tilt-down:
+    ./scripts/dev.sh down
+
+# Check Tilt status
+tilt-status:
+    ./scripts/dev.sh status
+
+# =============================================================================
+# Cluster Management (for local dev)
+# =============================================================================
+
+# Scale down cluster services for local development
+cluster-down:
+    @echo "Scaling down in-cluster services..."
+    kubectl scale deployment cto-pm cto-controller cto-healer cto-healer-sensor -n cto --replicas=0
+    @echo "✅ In-cluster services scaled to 0"
+
+# Restore cluster services after local development
+cluster-up:
+    @echo "Restoring in-cluster services..."
+    kubectl scale deployment cto-pm cto-controller cto-healer cto-healer-sensor -n cto --replicas=1
+    @echo "✅ In-cluster services restored to 1 replica each"
+
+# Show cluster service status
+cluster-status:
+    @echo "=== CTO Namespace Services ==="
+    @kubectl get deployments -n cto -o custom-columns='NAME:.metadata.name,REPLICAS:.spec.replicas,READY:.status.readyReplicas' | grep -E "(NAME|pm|controller|healer|tools)"
+
+# =============================================================================
+# Utility Commands
+# =============================================================================
+
+# Clean build artifacts
+clean:
+    cargo clean
+
+# Update dependencies
+update:
+    cargo update
+
+# Check for outdated dependencies
+outdated:
+    cargo outdated
+
+# Generate documentation
+doc:
+    cargo doc --workspace --no-deps --open
+
+# Print environment info for debugging
+env-info:
+    @echo "=== Environment Info ==="
+    @echo "KUBECONFIG: ${KUBECONFIG:-not set}"
+    @echo "NAMESPACE: ${NAMESPACE:-cto}"
+    @echo "RUST_LOG: ${RUST_LOG:-not set}"
+    @echo ""
+    @echo "=== Kubernetes Context ==="
+    @kubectl config current-context 2>/dev/null || echo "kubectl not configured"
+    @echo ""
+    @echo "=== Cargo Version ==="
+    @cargo --version
+    @echo ""
+    @echo "=== Bacon Version ==="
+    @bacon --version 2>/dev/null || echo "bacon not installed (run: just install-tools)"

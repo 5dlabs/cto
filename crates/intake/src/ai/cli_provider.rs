@@ -150,14 +150,14 @@ impl CLITextGenerator {
             return project_config.to_str().map(String::from);
         }
 
-        // Check for tasks-specific MCP config (follows Claude schema)
-        let tasks_config = PathBuf::from("tasks-mcp-config.json");
-        if tasks_config.exists() {
-            return tasks_config.to_str().map(String::from);
+        // Check for intake-specific MCP config (follows Claude schema)
+        let intake_config = PathBuf::from("intake-mcp-config.json");
+        if intake_config.exists() {
+            return intake_config.to_str().map(String::from);
         }
 
-        // Check in crates/tasks directory
-        let crate_config = PathBuf::from("crates/tasks/tasks-mcp-config.json");
+        // Check in crates/intake directory
+        let crate_config = PathBuf::from("crates/intake/intake-mcp-config.json");
         if crate_config.exists() {
             return crate_config.to_str().map(String::from);
         }

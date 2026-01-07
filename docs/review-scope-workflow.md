@@ -158,9 +158,6 @@ Add a new template step to the intake workflow that creates a CodeRun for Morgan
             model: {{inputs.parameters.review-model}}
           promptFile: /tmp/review-prompt.md
           workingDirectory: {{inputs.parameters.docs-project-directory}}/.tasks
-          remoteTools:
-            - name: tasks-mcp
-              url: http://tasks-mcp.cto.svc.cluster.local:8080
         YAML
 ```
 
