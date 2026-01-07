@@ -166,6 +166,9 @@ struct IntakeSetupRequest {
     /// Optional architecture content (markdown)
     #[serde(default)]
     architecture_content: Option<String>,
+    /// Optional repository URL (if not provided, a new repo will be created)
+    #[serde(default)]
+    repository_url: Option<String>,
     /// Optional team ID override (uses config default if not provided)
     #[serde(default)]
     team_id: Option<String>,
@@ -511,13 +514,14 @@ async fn handle_intake_setup(
         "Created Linear project"
     );
 
-    // Store PRD and architecture in project ConfigMap (source of truth for workflow)
+    // Store PRD, architecture, and repository URL in project ConfigMap (source of truth)
     // This makes the workflow Linear-independent - we don't need to re-fetch from Linear
     if let Err(e) = crate::handlers::document::store_intake_content(
         &state.kube_client,
         &project.id,
         &request.prd_content,
         request.architecture_content.as_deref(),
+        request.repository_url.as_deref(),
     )
     .await
     {
@@ -529,6 +533,7 @@ async fn handle_intake_setup(
     } else {
         info!(
             project_id = %project.id,
+            has_repo = request.repository_url.is_some(),
             "Stored PRD and architecture in project ConfigMap"
         );
     }

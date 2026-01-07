@@ -946,8 +946,12 @@ pub async fn submit_intake_coderun(
         None
     };
 
-    // Use issue title for new repo creation
-    let project_name_for_repo = &request.title;
+    // Use sanitized project name for repo creation (strips [PRD] prefix, normalizes)
+    // Falls back to title if project_name wasn't set
+    let project_name_for_repo = request
+        .project_name
+        .as_deref()
+        .unwrap_or(&request.title);
 
     // Determine CLI and model - priority: project config > issue labels/frontmatter > server defaults
     let cli = project_config

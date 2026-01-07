@@ -214,6 +214,7 @@ pub fn configmap_name_for_project(project_id: &str) -> String {
 /// * `project_id` - The Linear project ID
 /// * `prd_content` - The PRD markdown content
 /// * `architecture_content` - Optional architecture markdown content
+/// * `repository_url` - Optional repository URL (if provided, intake uses existing repo)
 ///
 /// # Returns
 /// The name of the updated `ConfigMap`
@@ -222,6 +223,7 @@ pub async fn store_intake_content(
     project_id: &str,
     prd_content: &str,
     architecture_content: Option<&str>,
+    repository_url: Option<&str>,
 ) -> Result<String> {
     let configmap_name = configmap_name_for_project(project_id);
 
@@ -230,6 +232,7 @@ pub async fn store_intake_content(
         project_id = %project_id,
         prd_len = prd_content.len(),
         has_arch = architecture_content.is_some(),
+        has_repo = repository_url.is_some(),
         "Storing PRD and architecture in project ConfigMap"
     );
 
@@ -249,6 +252,11 @@ pub async fn store_intake_content(
         data.insert("architecture.md".to_string(), arch.to_string());
     }
 
+    // Store repository URL if provided (for intake to use existing repo)
+    if let Some(repo) = repository_url {
+        data.insert("repository_url.txt".to_string(), repo.to_string());
+    }
+
     // Update source metadata
     let source_json = data
         .get("source.json")
@@ -260,6 +268,7 @@ pub async fn store_intake_content(
         "syncedAt": chrono::Utc::now().to_rfc3339(),
         "hasPrd": true,
         "hasArchitecture": architecture_content.is_some(),
+        "repositoryUrl": repository_url,
         // Preserve existing fields
         "linearDocumentId": source_json.get("linearDocumentId"),
         "documentUrl": source_json.get("documentUrl"),
@@ -409,6 +418,16 @@ pub async fn sync_architecture_to_configmap(
     Ok(configmap_name)
 }
 
+/// Intake content read from the project `ConfigMap`.
+pub struct IntakeContent {
+    /// PRD markdown content
+    pub prd: String,
+    /// Optional architecture markdown content
+    pub architecture: Option<String>,
+    /// Optional repository URL (if provided, intake uses existing repo)
+    pub repository_url: Option<String>,
+}
+
 /// Read PRD and architecture content from the project `ConfigMap`.
 ///
 /// # Arguments
@@ -416,11 +435,11 @@ pub async fn sync_architecture_to_configmap(
 /// * `project_id` - The Linear project ID
 ///
 /// # Returns
-/// Tuple of (`prd_content`, `architecture_content`) if found
+/// `IntakeContent` with PRD, architecture, and repository URL
 pub async fn read_intake_content(
     kube_client: &KubeClient,
     project_id: &str,
-) -> Result<(String, Option<String>)> {
+) -> Result<IntakeContent> {
     let configmap_name = configmap_name_for_project(project_id);
 
     debug!(
@@ -445,14 +464,25 @@ pub async fn read_intake_content(
 
     let architecture_content = data.get("architecture.md").cloned().filter(|s| !s.is_empty());
 
+    // Read repository URL if stored (for using existing repo instead of creating new)
+    let repository_url = data
+        .get("repository_url.txt")
+        .cloned()
+        .filter(|s| !s.is_empty());
+
     info!(
         configmap_name = %configmap_name,
         prd_len = prd_content.len(),
         has_arch = architecture_content.is_some(),
+        has_repo = repository_url.is_some(),
         "Read intake content from project ConfigMap"
     );
 
-    Ok((prd_content, architecture_content))
+    Ok(IntakeContent {
+        prd: prd_content,
+        architecture: architecture_content,
+        repository_url,
+    })
 }
 
 #[cfg(test)]

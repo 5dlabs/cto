@@ -730,6 +730,7 @@ fn create_linear_intake_setup(
     project_name: &str,
     prd_content: &str,
     architecture_content: Option<&str>,
+    repository_url: Option<&str>,
     config: &CtoConfig,
 ) -> Result<(IntakeSetupProject, IntakeSetupIssue)> {
     let linear_config = &config.defaults.linear;
@@ -743,6 +744,9 @@ fn create_linear_intake_setup(
 
     eprintln!("📋 Setting up Linear project and PRD issue via PM server...");
     eprintln!("   PM Server: {pm_server_url}");
+    if let Some(repo) = repository_url {
+        eprintln!("   Repository: {repo}");
+    }
 
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
@@ -753,6 +757,7 @@ fn create_linear_intake_setup(
         "projectName": project_name,
         "prdContent": prd_content,
         "architectureContent": architecture_content,
+        "repositoryUrl": repository_url,
         "teamId": if linear_config.team_id.is_empty() { Value::Null } else { json!(&linear_config.team_id) }
     });
 
@@ -3664,6 +3669,13 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .and_then(Value::as_bool)
         .unwrap_or(false);
 
+    // Get optional repository URL from arguments (not auto-detected repo used for local mode)
+    // If provided, the intake workflow will use this existing repo instead of creating a new one
+    let intake_repository_url = arguments
+        .get("repository_url")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty());
+
     let linear_result = if !skip_linear
         && config.defaults.linear.intake.create_project
         && !config.defaults.linear.team_id.is_empty()
@@ -3676,6 +3688,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 Some(&architecture_content)
             },
+            intake_repository_url,
             config,
         ) {
             Ok((project, issue)) => {

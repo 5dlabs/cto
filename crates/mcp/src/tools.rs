@@ -51,7 +51,11 @@ fn get_intake_schema() -> Value {
                 },
                 "repository": {
                     "type": "string",
-                    "description": "Target repository in org/repo format (e.g., '5dlabs/agent-sandbox'). Optional - if not provided, auto-detects from git remote in workspace."
+                    "description": "Target repository in org/repo format for LOCAL mode (e.g., '5dlabs/agent-sandbox'). Optional - if not provided, auto-detects from git remote in workspace."
+                },
+                "repository_url": {
+                    "type": "string",
+                    "description": "Existing GitHub repository URL for the project (e.g., 'https://github.com/5dlabs/my-project'). Optional - if not provided, a new repository will be created based on the project name."
                 },
                 "prd_content": {
                     "type": "string",
