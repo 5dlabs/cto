@@ -36,7 +36,7 @@ pub struct Config {
 /// All known agent names for the CTO platform.
 pub const AGENT_NAMES: &[&str] = &[
     "morgan", "rex", "blaze", "grizz", "nova", "tap", "spark", "cleo", "cipher", "tess", "atlas",
-    "bolt",
+    "bolt", "vex",
 ];
 
 /// Configuration for a single Linear OAuth application.

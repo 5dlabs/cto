@@ -3921,6 +3921,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Tap" => "tap",
             "5DLabs-Spark" => "spark",
             "5DLabs-Stitch" => "stitch",
+            "5DLabs-Vex" => "vex",
             // Rex variants and unknown agents default to rex
             _ => "rex",
         };
@@ -4089,6 +4090,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Tess" => "tess",
             "5DLabs-Atlas" => "atlas",
             "5DLabs-Bolt" => "bolt",
+            "5DLabs-Vex" => "vex",
             _ => {
                 return Err(crate::tasks::types::Error::ConfigError(format!(
                     "Unknown GitHub app '{github_app}' - no corresponding agent found"

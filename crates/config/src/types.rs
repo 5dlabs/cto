@@ -144,6 +144,10 @@ pub struct PlayDefaults {
     #[serde(rename = "desktopAgent", skip_serializing_if = "Option::is_none")]
     pub desktop_agent: Option<String>,
 
+    /// Override VR agent (defaults to {orgName}-Vex).
+    #[serde(rename = "vrAgent", skip_serializing_if = "Option::is_none")]
+    pub vr_agent: Option<String>,
+
     /// Override infrastructure agent (defaults to {orgName}-Bolt).
     #[serde(
         rename = "infrastructureAgent",
@@ -242,6 +246,14 @@ impl PlayDefaults {
         self.desktop_agent
             .clone()
             .unwrap_or_else(|| make_agent_name(org_name, AGENT_SPARK))
+    }
+
+    /// Get the VR agent name, using the org name if not overridden.
+    #[must_use]
+    pub fn get_vr_agent(&self, org_name: &str) -> String {
+        self.vr_agent
+            .clone()
+            .unwrap_or_else(|| make_agent_name(org_name, AGENT_VEX))
     }
 
     /// Get the infrastructure agent name, using the org name if not overridden.
@@ -426,6 +438,7 @@ pub const AGENT_CIPHER: &str = "Cipher";
 pub const AGENT_TESS: &str = "Tess";
 pub const AGENT_MORGAN: &str = "Morgan";
 pub const AGENT_ATLAS: &str = "Atlas";
+pub const AGENT_VEX: &str = "Vex";
 
 /// Construct a full agent GitHub App name from org name and agent suffix.
 #[must_use]

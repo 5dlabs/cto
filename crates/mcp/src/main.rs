@@ -206,70 +206,72 @@ struct PlayDefaults {
     #[serde(default)]
     cli: Option<String>,
     /// Override implementation agent (defaults to {orgName}-Rex)
-    #[serde(rename = "implementationAgent")]
+    #[serde(default, rename = "implementationAgent")]
     implementation_agent: Option<String>,
     /// Override frontend agent (defaults to {orgName}-Blaze)
-    #[serde(rename = "frontendAgent")]
+    #[serde(default, rename = "frontendAgent")]
     frontend_agent: Option<String>,
     /// Override Go agent (defaults to {orgName}-Grizz)
-    #[serde(rename = "goAgent")]
+    #[serde(default, rename = "goAgent")]
     go_agent: Option<String>,
     /// Override Node agent (defaults to {orgName}-Nova)
-    #[serde(rename = "nodeAgent")]
+    #[serde(default, rename = "nodeAgent")]
     node_agent: Option<String>,
     /// Override mobile agent (defaults to {orgName}-Tap)
-    #[serde(rename = "mobileAgent")]
+    #[serde(default, rename = "mobileAgent")]
     mobile_agent: Option<String>,
     /// Override desktop agent (defaults to {orgName}-Spark)
-    #[serde(rename = "desktopAgent")]
+    #[serde(default, rename = "desktopAgent")]
     desktop_agent: Option<String>,
     /// Override infrastructure agent (defaults to {orgName}-Bolt)
-    #[serde(rename = "infrastructureAgent")]
+    #[serde(default, rename = "infrastructureAgent")]
     infrastructure_agent: Option<String>,
     /// Override quality agent (defaults to {orgName}-Cleo)
-    #[serde(rename = "qualityAgent")]
+    #[serde(default, rename = "qualityAgent")]
     quality_agent: Option<String>,
     /// Override security agent (defaults to {orgName}-Cipher)
-    #[serde(rename = "securityAgent")]
+    #[serde(default, rename = "securityAgent")]
     security_agent: Option<String>,
     /// Override testing agent (defaults to {orgName}-Tess)
-    #[serde(rename = "testingAgent")]
+    #[serde(default, rename = "testingAgent")]
     testing_agent: Option<String>,
+    #[serde(default)]
     repository: Option<String>,
+    #[serde(default)]
     service: Option<String>,
-    #[serde(rename = "docsRepository")]
+    #[serde(default, rename = "docsRepository")]
     docs_repository: Option<String>,
-    #[serde(rename = "docsProjectDirectory")]
+    #[serde(default, rename = "docsProjectDirectory")]
     docs_project_directory: Option<String>,
-    #[serde(rename = "workingDirectory")]
+    #[serde(default, rename = "workingDirectory")]
     #[allow(dead_code)]
     // Still in config for backward compatibility, but we use docs_project_directory for tasks
     working_directory: Option<String>,
-    #[serde(rename = "maxRetries")]
+    #[serde(default, rename = "maxRetries")]
     max_retries: Option<u32>,
-    #[serde(rename = "implementationMaxRetries")]
+    #[serde(default, rename = "implementationMaxRetries")]
     implementation_max_retries: Option<u32>,
-    #[serde(rename = "goMaxRetries")]
+    #[serde(default, rename = "goMaxRetries")]
     go_max_retries: Option<u32>,
-    #[serde(rename = "nodeMaxRetries")]
+    #[serde(default, rename = "nodeMaxRetries")]
     node_max_retries: Option<u32>,
-    #[serde(rename = "mobileMaxRetries")]
+    #[serde(default, rename = "mobileMaxRetries")]
     mobile_max_retries: Option<u32>,
-    #[serde(rename = "desktopMaxRetries")]
+    #[serde(default, rename = "desktopMaxRetries")]
     desktop_max_retries: Option<u32>,
-    #[serde(rename = "infrastructureMaxRetries")]
+    #[serde(default, rename = "infrastructureMaxRetries")]
     infrastructure_max_retries: Option<u32>,
-    #[serde(rename = "qualityMaxRetries")]
+    #[serde(default, rename = "qualityMaxRetries")]
     quality_max_retries: Option<u32>,
-    #[serde(rename = "securityMaxRetries")]
+    #[serde(default, rename = "securityMaxRetries")]
     security_max_retries: Option<u32>,
-    #[serde(rename = "testingMaxRetries")]
+    #[serde(default, rename = "testingMaxRetries")]
     testing_max_retries: Option<u32>,
-    #[serde(rename = "frontendMaxRetries")]
+    #[serde(default, rename = "frontendMaxRetries")]
     frontend_max_retries: Option<u32>,
-    #[serde(rename = "autoMerge")]
+    #[serde(default, rename = "autoMerge")]
     auto_merge: Option<bool>,
-    #[serde(rename = "parallelExecution")]
+    #[serde(default, rename = "parallelExecution")]
     parallel_execution: Option<bool>,
 }
 

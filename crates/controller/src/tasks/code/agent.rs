@@ -25,9 +25,10 @@ impl AgentClassifier {
     #[must_use]
     pub fn new() -> Self {
         let mut implementation_agents = HashSet::new();
-        // Rex and Blaze are implementation agents that share workspace
+        // Rex, Blaze, and Vex are implementation agents that share workspace
         implementation_agents.insert("rex".to_string());
         implementation_agents.insert("blaze".to_string());
+        implementation_agents.insert("vex".to_string());
 
         Self {
             implementation_agents,

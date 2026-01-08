@@ -1,0 +1,52 @@
+# =========================================================================
+# Unity/C# Environment Setup for VR Development
+# =========================================================================
+# Vex agent uses Unity with OpenXR for cross-platform VR development
+
+echo "Setting up Unity/C# environment..."
+
+# .NET SDK is required for C# tooling (code analysis, formatting)
+if command -v dotnet &> /dev/null; then
+    echo "✓ .NET SDK $(dotnet --version) available"
+else
+    echo "⚠ .NET SDK not found - C# tooling may be limited"
+fi
+
+# Unity Hub CLI for headless operations (if available)
+if command -v unity-hub &> /dev/null; then
+    echo "✓ Unity Hub CLI available"
+    # List installed Unity versions
+    unity-hub editors --installed 2>/dev/null || true
+elif [ -d "/opt/unity/Editor" ]; then
+    echo "✓ Unity Editor found at /opt/unity/Editor"
+    export UNITY_PATH="/opt/unity/Editor/Unity"
+else
+    echo "⚠ Unity not found in standard locations"
+    echo "  Expecting Unity at /opt/unity/Editor or via unity-hub CLI"
+fi
+
+# Android SDK for Quest builds (if targeting Android)
+if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then
+    echo "✓ Android SDK at $ANDROID_HOME"
+    export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
+elif [ -d "$HOME/Android/Sdk" ]; then
+    export ANDROID_HOME="$HOME/Android/Sdk"
+    export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
+    echo "✓ Android SDK at $ANDROID_HOME"
+fi
+
+# ADB for Quest device deployment
+if command -v adb &> /dev/null; then
+    echo "✓ ADB available for device deployment"
+fi
+
+# Set up Unity license (batch mode requires valid license)
+if [ -n "$UNITY_LICENSE" ]; then
+    echo "✓ Unity license configured"
+elif [ -f "$HOME/.local/share/unity3d/Unity/Unity_lic.ulf" ]; then
+    echo "✓ Unity license file found"
+else
+    echo "⚠ No Unity license detected - batch builds may fail"
+fi
+
+echo "Unity/C# environment ready"

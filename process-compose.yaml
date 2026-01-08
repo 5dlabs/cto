@@ -89,7 +89,8 @@ processes:
 
   tools-server:
     command: cargo run --bin tools-server
-    description: "Tools Server - MCP proxy for external tools"
+    description: "Tools Server - MCP proxy for external tools (DISABLED - using cluster)"
+    disabled: true  # Using cluster's tools server instead
     availability:
       restart: on_failure
       max_restarts: 3
