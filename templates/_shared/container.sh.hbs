@@ -16,6 +16,11 @@
 {{> go-env }}
 {{/if}}
 
+{{!-- Unity/C# environment for VR agents (Vex) --}}
+{{#if (or (eq agent_name "vex") (eq task_language "csharp") (eq task_language "unity"))}}
+{{> unity-env }}
+{{/if}}
+
 {{> config }}
 
 {{> github-auth }}
