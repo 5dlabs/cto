@@ -1159,44 +1159,19 @@ pub async fn submit_intake_coderun(
         }
     });
 
-    // Create CodeRun via Kubernetes API
-    let token = std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token")
-        .context("Failed to read service account token")?;
+    // Create CodeRun via kube client (works both in-cluster and locally with kubeconfig)
+    let coderun_gvk = kube::api::GroupVersionKind::gvk("agents.platform", "v1", "CodeRun");
+    let coderun_api_resource = kube::api::ApiResource::from_gvk(&coderun_gvk);
+    let coderuns: Api<kube::api::DynamicObject> =
+        Api::namespaced_with(kube_client.clone(), namespace, &coderun_api_resource);
 
-    let ca_cert = std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
-        .context("Failed to read CA certificate")?;
+    let coderun_obj: kube::api::DynamicObject =
+        serde_json::from_value(coderun_json).context("Failed to parse CodeRun JSON")?;
 
-    let cert =
-        reqwest::Certificate::from_pem(&ca_cert).context("Failed to parse CA certificate")?;
-
-    let http_client = reqwest::Client::builder()
-        .add_root_certificate(cert)
-        .build()
-        .context("Failed to create HTTP client")?;
-
-    let api_server = "https://kubernetes.default.svc";
-    let create_url =
-        format!("{api_server}/apis/agents.platform/v1/namespaces/{namespace}/coderuns");
-
-    let response = http_client
-        .post(&create_url)
-        .header("Authorization", format!("Bearer {token}"))
-        .header("Content-Type", "application/json")
-        .json(&coderun_json)
-        .send()
+    coderuns
+        .create(&PostParams::default(), &coderun_obj)
         .await
-        .context("Failed to send CodeRun create request")?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let error_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Unknown error".to_string());
-        return Err(anyhow!(
-            "Failed to create CodeRun: HTTP {status} - {error_text}"
-        ));
-    }
+        .context("Failed to create CodeRun")?;
 
     info!(coderun_name = %coderun_name, "Created intake CodeRun");
 
@@ -1375,44 +1350,19 @@ pub async fn submit_intake_workflow(
         }
     });
 
-    // Submit via Kubernetes API directly (no kubectl/argo CLI needed in container)
-    let token = std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token")
-        .context("Failed to read service account token")?;
+    // Submit via kube client (works both in-cluster and locally with kubeconfig)
+    let workflow_gvk = kube::api::GroupVersionKind::gvk("argoproj.io", "v1alpha1", "Workflow");
+    let workflow_api_resource = kube::api::ApiResource::from_gvk(&workflow_gvk);
+    let workflows: Api<kube::api::DynamicObject> =
+        Api::namespaced_with(kube_client.clone(), namespace, &workflow_api_resource);
 
-    let ca_cert = std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
-        .context("Failed to read CA certificate")?;
+    let workflow_obj: kube::api::DynamicObject =
+        serde_json::from_value(workflow_json).context("Failed to parse Workflow JSON")?;
 
-    let cert =
-        reqwest::Certificate::from_pem(&ca_cert).context("Failed to parse CA certificate")?;
-
-    let http_client = reqwest::Client::builder()
-        .add_root_certificate(cert)
-        .build()
-        .context("Failed to create HTTP client")?;
-
-    let api_server = "https://kubernetes.default.svc";
-    let create_url =
-        format!("{api_server}/apis/argoproj.io/v1alpha1/namespaces/{namespace}/workflows");
-
-    let response = http_client
-        .post(&create_url)
-        .header("Authorization", format!("Bearer {token}"))
-        .header("Content-Type", "application/json")
-        .json(&workflow_json)
-        .send()
+    workflows
+        .create(&PostParams::default(), &workflow_obj)
         .await
-        .context("Failed to send workflow create request")?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let error_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Unknown error".to_string());
-        return Err(anyhow!(
-            "Failed to create Argo workflow: HTTP {status} - {error_text}"
-        ));
-    }
+        .context("Failed to create Argo workflow")?;
 
     info!(workflow_name = %workflow_name, "Submitted intake workflow");
 

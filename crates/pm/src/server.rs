@@ -86,6 +86,7 @@ pub fn build_router(state: AppState) -> Router {
         github_token,
         namespace: state.config.namespace.clone(),
         play_config: state.config.play.clone(),
+        kube_client: state.kube_client.clone(),
     });
 
     Router::new()

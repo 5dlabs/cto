@@ -69,6 +69,8 @@ pub struct CallbackState {
     pub namespace: String,
     /// Play workflow configuration.
     pub play_config: crate::config::PlayConfig,
+    /// Kubernetes client for CRD operations.
+    pub kube_client: kube::Client,
 }
 
 /// Handle intake workflow completion callback.
