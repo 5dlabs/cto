@@ -100,10 +100,19 @@ Think step-by-step before generating tasks:
    - Include unit, integration, and E2E test guidance
    - Specify edge cases to cover
 
-6. **Self-Verify**
+6. **Identify Decision Points (Captured Discovery)**
+   - Surface areas where agent judgment will be required during implementation
+   - Categorize each decision by type: architecture, error-handling, data-model, api-design, ux-behavior, performance, security
+   - Note known options/alternatives for each decision point
+   - Mark critical decisions that should require human approval before proceeding
+   - Identify constraints from the PRD that guide the decision
+   - Use constraint types: hard (must be this way), soft (prefer this but adjustable), open (agent chooses), escalation (human must decide)
+
+7. **Self-Verify**
    - Ensure all PRD requirements are covered
    - Check dependency ordering is correct
    - Verify no circular dependencies exist
+   - Confirm decision points are identified for ambiguous areas
 
 ## Constraints & Formatting
 Assign sequential IDs starting from {{next_id}}. Set status to 'pending', dependencies to [], and priority to '{{default_task_priority}}' initially.
@@ -117,7 +126,17 @@ Each task must follow this JSON structure:
 	"dependencies": number[] (IDs of prerequisite tasks),
 	"priority": "high" | "medium" | "low",
 	"details": string (how to implement, with pseudo-code),
-	"testStrategy": string (how to validate)
+	"testStrategy": string (how to validate),
+	"decisionPoints": [  // Optional: areas requiring agent judgment
+		{
+			"id": string (e.g., "d1", "d2"),
+			"category": "architecture" | "error-handling" | "data-model" | "api-design" | "ux-behavior" | "performance" | "security",
+			"description": string (what needs to be decided),
+			"options": string[] (known alternatives, may be empty),
+			"requiresApproval": boolean (true if human must approve),
+			"constraintType": "hard" | "soft" | "open" | "escalation"
+		}
+	]
 }
 
 ## Guidelines
@@ -143,6 +162,11 @@ Each task must follow this JSON structure:
     - React frontend: (Blaze - React/Next.js)
     - Mobile app: (Tap - Expo)
     - Desktop app: (Spark - Electron)
+12. **Decision Points (Captured Discovery)**: For each task, identify areas where judgment is needed:
+    - Include decision points for ambiguous requirements, error handling strategies, UX behaviors
+    - Use "escalation" constraint type for decisions with significant user impact
+    - Prefer "open" constraint type for technical choices with clear tradeoffs
+    - Only mark "requiresApproval: true" for decisions that genuinely need human input
 
 ## Self-Critique Checklist
 Before finalizing, verify:
@@ -150,7 +174,8 @@ Before finalizing, verify:
 - [ ] No circular dependencies exist
 - [ ] Task order enables parallel development where possible
 - [ ] Each task is independently completable and testable
-- [ ] Implementation details are specific and actionable"#;
+- [ ] Implementation details are specific and actionable
+- [ ] Decision points identified for ambiguous or high-impact areas"#;
 
 const USER_PROMPT: &str = r#"## PRD Content
 Here is the Product Requirements Document to analyze and break down into {{#if (gt num_tasks 0)}}approximately {{num_tasks}}{{else}}an appropriate number of{{/if}} tasks, starting IDs from {{next_id}}:
@@ -188,7 +213,25 @@ Your response MUST be a JSON object with this exact structure:
       "dependencies": [{{next_id}}],
       "priority": "high",
       "details": "1. Create Axum router\n2. Add database connection pool\n3. Implement endpoints",
-      "testStrategy": "Unit tests for handlers, integration tests for API"
+      "testStrategy": "Unit tests for handlers, integration tests for API",
+      "decisionPoints": [
+        {
+          "id": "d1",
+          "category": "error-handling",
+          "description": "How to handle database connection failures",
+          "options": ["Retry with exponential backoff", "Fail fast with error", "Use circuit breaker pattern"],
+          "requiresApproval": false,
+          "constraintType": "open"
+        },
+        {
+          "id": "d2",
+          "category": "api-design",
+          "description": "Pagination strategy for list endpoints",
+          "options": ["Offset-based", "Cursor-based", "Keyset pagination"],
+          "requiresApproval": false,
+          "constraintType": "soft"
+        }
+      ]
     }
   ],
   "metadata": {
@@ -202,4 +245,5 @@ IMPORTANT:
 - Return ONLY the JSON object. No markdown formatting, no explanatory text before or after.
 - Task 1 MUST be infrastructure setup (Bolt) if the project requires any databases, caches, or storage.
 - Include agent hint in task titles: "(AgentName - Stack)"
+- Include decisionPoints for tasks with ambiguous areas or choices to be made during implementation.
 - The "metadata" object is optional."#;

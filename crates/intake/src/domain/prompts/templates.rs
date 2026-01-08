@@ -363,6 +363,104 @@ pub fn generate_acceptance_criteria(task: &Task) -> String {
     content
 }
 
+/// Generate decisions.md template for a task.
+///
+/// Creates a decision log template that the agent must fill out during implementation.
+/// This enables "captured discovery" - making decisions explicit rather than
+/// discovering them buried in code later.
+#[must_use]
+pub fn generate_decision_template(task: &Task) -> String {
+    let mut content = String::new();
+
+    writeln!(content, "# Decision Log: Task {}\n", task.id).ok();
+    writeln!(
+        content,
+        "This document tracks decisions made during implementation. Fill in each section as you work.\n"
+    )
+    .ok();
+
+    if task.decision_points.is_empty() {
+        writeln!(content, "## Predicted Decision Points\n").ok();
+        writeln!(
+            content,
+            "No decision points were predicted for this task during intake.\n"
+        )
+        .ok();
+        writeln!(
+            content,
+            "Document any significant decisions you make during implementation below.\n"
+        )
+        .ok();
+    } else {
+        writeln!(content, "## Predicted Decision Points\n").ok();
+        writeln!(
+            content,
+            "The following decisions were identified during PRD intake. Document your choice for each:\n"
+        )
+        .ok();
+
+        for dp in &task.decision_points {
+            let approval_marker = if dp.requires_approval {
+                " ⚠️ REQUIRES APPROVAL"
+            } else {
+                ""
+            };
+            writeln!(
+                content,
+                "### {}: {}{}\n",
+                dp.id.to_uppercase(),
+                dp.description,
+                approval_marker
+            )
+            .ok();
+            writeln!(content, "**Category:** {}", dp.category).ok();
+            writeln!(content, "**Constraint:** {}\n", dp.constraint_type).ok();
+
+            if !dp.options.is_empty() {
+                writeln!(content, "**Options to consider:**").ok();
+                for option in &dp.options {
+                    writeln!(content, "- [ ] {option}").ok();
+                }
+                writeln!(content).ok();
+            }
+
+            if let Some(ref constraints) = dp.constraints {
+                writeln!(content, "**Guidance from PRD:** {constraints}\n").ok();
+            }
+
+            writeln!(content, "**Your decision:** _________________\n").ok();
+            writeln!(content, "**Rationale:** _________________\n").ok();
+            writeln!(content, "**Alternatives considered:** _________________\n").ok();
+            writeln!(content, "**Confidence (1-5):** ___\n").ok();
+            writeln!(content, "---\n").ok();
+        }
+    }
+
+    writeln!(content, "## Additional Decisions\n").ok();
+    writeln!(
+        content,
+        "Document any other significant decisions made during implementation that were not predicted:\n"
+    )
+    .ok();
+    writeln!(content, "### (Add decision title here)\n").ok();
+    writeln!(content, "**Category:** (architecture | error-handling | data-model | api-design | ux-behavior | performance | security)").ok();
+    writeln!(content, "**Decision:** _________________\n").ok();
+    writeln!(content, "**Rationale:** _________________\n").ok();
+    writeln!(content, "**Alternatives considered:** _________________\n").ok();
+    writeln!(content, "**Confidence (1-5):** ___\n").ok();
+
+    // Add summary section
+    writeln!(content, "---\n").ok();
+    writeln!(content, "## Summary\n").ok();
+    writeln!(content, "| Decision ID | Choice Made | Confidence |").ok();
+    writeln!(content, "|-------------|-------------|------------|").ok();
+    for dp in &task.decision_points {
+        writeln!(content, "| {} | ___ | ___ |", dp.id.to_uppercase()).ok();
+    }
+
+    content
+}
+
 /// Result of generating documentation for all tasks.
 #[derive(Debug, Clone, Default)]
 pub struct DocsGenerationResult {
@@ -374,6 +472,8 @@ pub struct DocsGenerationResult {
     pub prompt_files: usize,
     /// Number of acceptance-criteria.md files generated.
     pub acceptance_files: usize,
+    /// Number of decisions.md files generated.
+    pub decision_files: usize,
 }
 
 /// Generate all documentation files for a list of tasks.
@@ -384,7 +484,8 @@ pub struct DocsGenerationResult {
 /// ├── task-1/
 /// │   ├── prompt.xml
 /// │   ├── prompt.md
-/// │   └── acceptance.md
+/// │   ├── acceptance.md
+/// │   └── decisions.md
 /// ├── task-2/
 /// │   └── ...
 /// ```
@@ -444,6 +545,17 @@ pub async fn generate_all_docs(
                 reason: e.to_string(),
             })?;
         result.acceptance_files += 1;
+
+        // Generate decisions.md (decision log template)
+        let decisions_path = task_dir.join("decisions.md");
+        let decisions_content = generate_decision_template(task);
+        tokio::fs::write(&decisions_path, &decisions_content)
+            .await
+            .map_err(|e| TasksError::FileWriteError {
+                path: decisions_path.display().to_string(),
+                reason: e.to_string(),
+            })?;
+        result.decision_files += 1;
     }
 
     Ok(result)
@@ -645,5 +757,68 @@ Other requirements."
 
         // Should default to rex
         assert!(xml.contains("<agent_hint>rex</agent_hint>"));
+    }
+
+    #[test]
+    fn test_generate_decision_template_no_decision_points() {
+        let task = sample_task();
+        let md = generate_decision_template(&task);
+
+        assert!(md.contains("# Decision Log: Task 1"));
+        assert!(md.contains("No decision points were predicted"));
+        assert!(md.contains("## Additional Decisions"));
+    }
+
+    #[test]
+    fn test_generate_decision_template_with_decision_points() {
+        use crate::entities::{ConstraintType, DecisionCategory, DecisionPoint};
+
+        let mut task = sample_task();
+        task.decision_points.push(
+            DecisionPoint::new(
+                "d1",
+                DecisionCategory::ErrorHandling,
+                "How to handle database connection failures",
+            )
+            .with_options(vec![
+                "Retry with exponential backoff".to_string(),
+                "Fail fast with error".to_string(),
+            ])
+            .with_constraint_type(ConstraintType::Open),
+        );
+        task.decision_points.push(
+            DecisionPoint::new("d2", DecisionCategory::UxBehavior, "Empty state design")
+                .with_approval_required()
+                .with_constraints("Must be accessible"),
+        );
+
+        let md = generate_decision_template(&task);
+
+        // Check header
+        assert!(md.contains("# Decision Log: Task 1"));
+        assert!(md.contains("## Predicted Decision Points"));
+
+        // Check first decision point
+        assert!(md.contains("### D1: How to handle database connection failures"));
+        assert!(md.contains("**Category:** error-handling"));
+        assert!(md.contains("**Constraint:** open"));
+        assert!(md.contains("- [ ] Retry with exponential backoff"));
+        assert!(md.contains("- [ ] Fail fast with error"));
+
+        // Check second decision point with approval required
+        assert!(md.contains("### D2: Empty state design"));
+        assert!(md.contains("REQUIRES APPROVAL"));
+        assert!(md.contains("**Guidance from PRD:** Must be accessible"));
+
+        // Check fill-in sections
+        assert!(md.contains("**Your decision:**"));
+        assert!(md.contains("**Rationale:**"));
+        assert!(md.contains("**Alternatives considered:**"));
+        assert!(md.contains("**Confidence (1-5):**"));
+
+        // Check summary table
+        assert!(md.contains("## Summary"));
+        assert!(md.contains("| D1 | ___ | ___ |"));
+        assert!(md.contains("| D2 | ___ | ___ |"));
     }
 }

@@ -4212,6 +4212,7 @@ impl CodeTemplateGenerator {
             PARTIAL_TANSTACK_STACK,
             PARTIAL_TASK_FILES,
             PARTIAL_TOOLS_CONFIG,
+            PARTIAL_UNITY_ENV,
             // Legacy partials
             SHARED_BOOTSTRAP_RUST_ENV,
             SHARED_CONTAINER_CORE,
@@ -4231,6 +4232,7 @@ impl CodeTemplateGenerator {
             ("go-env", PARTIAL_GO_ENV),
             ("node-env", PARTIAL_NODE_ENV),
             ("expo-env", PARTIAL_EXPO_ENV),
+            ("unity-env", PARTIAL_UNITY_ENV),
             ("config", PARTIAL_CONFIG),
             ("github-auth", PARTIAL_GITHUB_AUTH),
             ("git-setup", PARTIAL_GIT_SETUP),

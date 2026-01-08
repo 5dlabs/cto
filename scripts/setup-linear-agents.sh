@@ -20,7 +20,7 @@
 set -euo pipefail
 
 # All CTO platform agents
-AGENTS=(morgan rex blaze grizz nova tap spark cleo cipher tess atlas bolt)
+AGENTS=(morgan rex blaze grizz nova tap spark cleo cipher tess atlas bolt vex)
 
 # OAuth configuration
 REDIRECT_URI="https://cto.5dlabs.ai/oauth/callback"

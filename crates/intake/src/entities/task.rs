@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::Subtask;
+use super::{DecisionPoint, Subtask};
 use crate::errors::TasksError;
 
 /// Task status values
@@ -137,6 +137,20 @@ pub struct ComplexityInfo {
     /// Reasoning for complexity score
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+
+    /// Decision surface score (1-10) - how much hidden judgment the task requires.
+    /// Higher scores indicate more decisions will need to be made during implementation.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "decisionSurface"
+    )]
+    pub decision_surface: Option<u8>,
+
+    /// Identified ambiguities that will need resolution during implementation.
+    /// These are areas where the PRD is unclear and agent judgment will be required.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ambiguities: Vec<String>,
 }
 
 /// Core task structure
@@ -216,6 +230,16 @@ pub struct Task {
         alias = "agent"
     )]
     pub agent_hint: Option<String>,
+
+    /// Predicted decision points where agent judgment is required.
+    /// These are surfaced during PRD intake to enable "captured discovery" -
+    /// making decisions explicit rather than discovering them buried in code.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        rename = "decisionPoints"
+    )]
+    pub decision_points: Vec<DecisionPoint>,
 }
 
 impl Task {
@@ -244,6 +268,7 @@ impl Task {
             assignee: None,
             complexity: None,
             agent_hint: None,
+            decision_points: Vec::new(),
         }
     }
 
@@ -366,6 +391,29 @@ impl Task {
         }
         counts
     }
+
+    /// Add a decision point to this task.
+    pub fn add_decision_point(&mut self, decision_point: DecisionPoint) {
+        self.decision_points.push(decision_point);
+        self.updated_at = Some(Utc::now());
+    }
+
+    /// Get decision points that require human approval.
+    #[must_use]
+    pub fn escalation_decisions(&self) -> Vec<&DecisionPoint> {
+        self.decision_points
+            .iter()
+            .filter(|dp| dp.is_escalation())
+            .collect()
+    }
+
+    /// Check if this task has any decisions requiring human approval.
+    #[must_use]
+    pub fn has_escalation_decisions(&self) -> bool {
+        self.decision_points
+            .iter()
+            .any(DecisionPoint::is_escalation)
+    }
 }
 
 #[cfg(test)]
@@ -472,5 +520,80 @@ mod tests {
         let json = serde_json::to_string(&task).unwrap();
         assert!(json.contains("agentHint"));
         assert!(!json.contains(r#""agent":"#));
+    }
+
+    #[test]
+    fn test_task_decision_points() {
+        use super::super::decision::{DecisionCategory, DecisionPoint};
+
+        let mut task = Task::new("1", "Test", "Test");
+        assert!(task.decision_points.is_empty());
+
+        let dp = DecisionPoint::new("d1", DecisionCategory::Architecture, "How to structure API");
+        task.add_decision_point(dp);
+
+        assert_eq!(task.decision_points.len(), 1);
+        assert_eq!(task.decision_points[0].id, "d1");
+    }
+
+    #[test]
+    fn test_task_escalation_decisions() {
+        use super::super::decision::{DecisionCategory, DecisionPoint};
+
+        let mut task = Task::new("1", "Test", "Test");
+
+        // Add a non-escalation decision
+        task.add_decision_point(DecisionPoint::new(
+            "d1",
+            DecisionCategory::Architecture,
+            "API structure",
+        ));
+
+        // Add an escalation decision
+        task.add_decision_point(
+            DecisionPoint::new("d2", DecisionCategory::UxBehavior, "Empty state design")
+                .with_approval_required(),
+        );
+
+        assert!(task.has_escalation_decisions());
+        let escalations = task.escalation_decisions();
+        assert_eq!(escalations.len(), 1);
+        assert_eq!(escalations[0].id, "d2");
+    }
+
+    #[test]
+    fn test_task_serde_with_decision_points() {
+        let json = r#"{
+            "id": "1",
+            "title": "Test Task",
+            "description": "Test description",
+            "decisionPoints": [
+                {
+                    "id": "d1",
+                    "category": "error-handling",
+                    "description": "How to handle rate limits",
+                    "options": ["Retry", "Fail"],
+                    "requiresApproval": false,
+                    "constraintType": "open"
+                }
+            ]
+        }"#;
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.decision_points.len(), 1);
+        assert_eq!(task.decision_points[0].id, "d1");
+        assert_eq!(task.decision_points[0].options.len(), 2);
+    }
+
+    #[test]
+    fn test_complexity_info_with_decision_surface() {
+        let json = r#"{
+            "score": 7,
+            "decisionSurface": 5,
+            "ambiguities": ["Error handling unclear", "Auth flow not specified"]
+        }"#;
+        let complexity: ComplexityInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(complexity.score, 7);
+        assert_eq!(complexity.decision_surface, Some(5));
+        assert_eq!(complexity.ambiguities.len(), 2);
     }
 }

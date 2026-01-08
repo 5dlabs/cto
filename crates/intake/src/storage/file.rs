@@ -252,6 +252,7 @@ impl Storage for FileStorage {
                             assignee: subtask.assignee.clone(),
                             complexity: None,
                             agent_hint: None,
+                            decision_points: Vec::new(),
                         }));
                     }
                 }

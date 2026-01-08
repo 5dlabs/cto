@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="16" priority="high" agent="bolt">
+    <meta>
+        <title>Deploy AlertHub Infrastructure (Bolt - Kubernetes)</title>
+        <priority>high</priority>
+        <dependencies></dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 16 with production-quality code.</role>
+
+    <context>
+        <overview>Provision all required infrastructure components including PostgreSQL, Redis/Valkey, Kafka, MongoDB, RabbitMQ, and SeaweedFS using Kubernetes operators. Configure networking, secrets, and persistent storage for the multi-service architecture.</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Deploy PostgreSQL cluster using CloudNative-PG operator:
+   - Create namespace &apos;databases&apos;
+   - Apply Cluster CRD with 10Gi storage
+   - Initialize &apos;alerthub&apos; database with &apos;alerthub_user&apos;
+   - Create secret with connection string: postgresql://alerthub_user:password@alerthub-postgres-rw.databases.svc.cluster.local:5432/alerthub <!-- pragma: allowlist secret -->
+
+2. Deploy Valkey (Redis) using Redis Operator:
+   - Apply Redis CRD in &apos;databases&apos; namespace
+   - Configure 2Gi memory limit
+   - Expose ClusterIP service on port 6379
+   - Create ConfigMap with connection: alerthub-valkey.databases.svc.cluster.local:6379
+
+3. Deploy Kafka using Strimzi operator:
+   - Create namespace &apos;kafka&apos;
+   - Apply Kafka CRD with single broker
+   - Configure internal listener on port 9092
+   - Create topics: notifications-events, delivery-events, dlq
+   - Bootstrap servers: alerthub-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092
+
+4. Deploy MongoDB using Percona operator:
+   - Apply PerconaServerMongoDB CRD in &apos;databases&apos; namespace
+   - Configure replica set &apos;rs0&apos; with single instance
+   - Create database &apos;alerthub_integrations&apos;
+   - Connection string: mongodb://alerthub-mongodb-rs0-0.alerthub-mongodb-rs0.databases.svc.cluster.local:27017/alerthub_integrations
+
+5. Deploy RabbitMQ cluster:
+   - Create namespace &apos;messaging&apos;
+   - Apply RabbitmqCluster CRD
+   - Create queues: delivery-tasks, webhook-tasks
+   - Connection: amqp://alerthub-rabbitmq.messaging.svc.cluster.local:5672
+
+6. Deploy SeaweedFS for object storage:
+   - Deploy master (1 replica) and volume servers (2 replicas)
+   - Configure S3-compatible API endpoint
+   - Create bucket &apos;alerthub-attachments&apos;
+   - Endpoint: http://seaweedfs-s3.storage.svc.cluster.local:8333
+
+7. Create shared ConfigMap &apos;alerthub-config&apos; with all connection strings
+8. Create Secrets for database credentials, API keys
+9. Apply NetworkPolicies for service isolation
+10. Configure PersistentVolumeClaims for stateful workloads</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-16): Deploy AlertHub Infrastructure (Bolt - Kubernetes)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>1. Verify all operators are installed and running
+2. Check pod status for all infrastructure components (kubectl get pods -A)
+3. Test PostgreSQL connectivity: psql -h alerthub-postgres-rw.databases.svc.cluster.local -U alerthub_user -d alerthub
+4. Test Redis: redis-cli -h alerthub-valkey.databases.svc.cluster.local ping
+5. Test Kafka: kafka-console-producer --bootstrap-server alerthub-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092 --topic test
+6. Test MongoDB: mongosh mongodb://alerthub-mongodb-rs0-0.alerthub-mongodb-rs0.databases.svc.cluster.local:27017
+7. Test RabbitMQ management UI and queue creation
+8. Test SeaweedFS S3 API with curl
+9. Verify ConfigMap and Secrets are created and accessible
+10. Run connectivity tests from a test pod to ensure network policies allow required traffic</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>kubectl get pods -n {namespace} - verify all pods running</command>
+        <command>kubectl get secrets - verify connection secrets created</command>
+        <command>kubectl logs {pod} - check for errors</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
+</task>

@@ -794,7 +794,65 @@ impl PlayMonitor {
                 );
             }
 
-            if !trail.decisions_made.is_empty() {
+            // Prefer structured decisions over legacy format
+            if !trail.decisions.is_empty() {
+                // Generate more specific probes from structured decisions
+                let decision_keywords: Vec<String> =
+                    trail.decisions.iter().map(|d| d.decision.clone()).collect();
+
+                probes.push(
+                    EvaluationProbe::new(
+                        ProbeType::Decision,
+                        "What key decisions were made and what was the rationale?",
+                    )
+                    .with_keywords(decision_keywords),
+                );
+
+                // Add probes for decisions with low confidence
+                let low_confidence_decisions: Vec<_> = trail
+                    .decisions
+                    .iter()
+                    .filter(|d| d.confidence <= 2)
+                    .collect();
+
+                if !low_confidence_decisions.is_empty() {
+                    probes.push(
+                        EvaluationProbe::new(
+                            ProbeType::Decision,
+                            "Were any decisions made with low confidence that should be reviewed?",
+                        )
+                        .with_keywords(
+                            low_confidence_decisions
+                                .iter()
+                                .map(|d| d.decision.clone())
+                                .collect(),
+                        ),
+                    );
+                }
+
+                // Add probes for escalation decisions that need human review
+                let unreviewed_decisions: Vec<_> = trail
+                    .decisions
+                    .iter()
+                    .filter(|d| !d.human_reviewed && d.decision_point_id.is_some())
+                    .collect();
+
+                if !unreviewed_decisions.is_empty() {
+                    probes.push(
+                        EvaluationProbe::new(
+                            ProbeType::Decision,
+                            "Were predicted decision points addressed appropriately?",
+                        )
+                        .with_keywords(
+                            unreviewed_decisions
+                                .iter()
+                                .map(|d| d.decision.clone())
+                                .collect(),
+                        ),
+                    );
+                }
+            } else if !trail.decisions_made.is_empty() {
+                // Fall back to legacy format
                 probes.push(
                     EvaluationProbe::new(
                         ProbeType::Decision,

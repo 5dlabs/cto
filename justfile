@@ -318,7 +318,43 @@ preflight:
     [ -n "${GITHUB_TOKEN:-}" ] && echo "✅ GITHUB_TOKEN" || echo "❌ GITHUB_TOKEN"
     
     echo ""
-    echo "═══ READY FOR LOCAL DEVELOPMENT ═══"
+    echo "═══ 5. LOCAL DEV CONFIGURATION ═══"
+    # Check CTO_PM_SERVER_URL env var
+    if [ -n "${CTO_PM_SERVER_URL:-}" ]; then
+      if [[ "$CTO_PM_SERVER_URL" == *"-dev."* ]] || [[ "$CTO_PM_SERVER_URL" == *"localhost"* ]]; then
+        echo "✅ CTO_PM_SERVER_URL = $CTO_PM_SERVER_URL (dev)"
+      else
+        echo "⚠️  CTO_PM_SERVER_URL = $CTO_PM_SERVER_URL (not dev - may use production!)"
+      fi
+    else
+      echo "⚠️  CTO_PM_SERVER_URL not set (will use cto-config.json or default to production)"
+    fi
+    
+    # Check cto-config.json pmServerUrl
+    if [ -f "cto-config.json" ]; then
+      pm_url=$(jq -r '.defaults.linear.pmServerUrl // empty' cto-config.json 2>/dev/null || echo "")
+      if [ -n "$pm_url" ]; then
+        if [[ "$pm_url" == *"-dev."* ]] || [[ "$pm_url" == *"localhost"* ]]; then
+          echo "✅ cto-config.json pmServerUrl = $pm_url (dev)"
+        else
+          echo "⚠️  cto-config.json pmServerUrl = $pm_url (not dev!)"
+        fi
+      else
+        echo "⚠️  cto-config.json has no pmServerUrl (will use default: pm.5dlabs.ai)"
+      fi
+      team_id=$(jq -r '.defaults.linear.teamId // empty' cto-config.json 2>/dev/null || echo "")
+      [ -n "$team_id" ] && echo "✅ cto-config.json teamId = $team_id" || echo "⚠️  No teamId in cto-config.json"
+    else
+      echo "❌ cto-config.json not found"
+    fi
+    
+    echo ""
+    echo "═══ PRE-FLIGHT COMPLETE ═══"
+    echo ""
+    echo "To start local development:"
+    echo "  1. just pc          # Start all services with process-compose"
+    echo "  2. Wait for tunnel to be healthy"
+    echo "  3. Use MCP tools from Cursor"
 
 # =============================================================================
 # Utility Commands
@@ -355,3 +391,38 @@ env-info:
     @echo ""
     @echo "=== Bacon Version ==="
     @bacon --version 2>/dev/null || echo "bacon not installed (run: just install-tools)"
+
+# Clean up old archived test projects in Linear
+cleanup-test-projects:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source .env.local
+    
+    echo "Fetching archived test projects..."
+    projects=$(curl -s -X POST https://api.linear.app/graphql \
+      -H "Authorization: $LINEAR_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"query": "query { projects(first: 50, includeArchived: true, filter: { name: { containsIgnoreCase: \"tests/intake\" }, archivedAt: { neq: null } }) { nodes { id name archivedAt } } }"}' | jq -r '.data.projects.nodes')
+    
+    count=$(echo "$projects" | jq 'length')
+    echo "Found $count archived test projects"
+    
+    if [ "$count" -gt 0 ]; then
+      echo "Projects to delete:"
+      echo "$projects" | jq -r '.[] | "  - \(.name) (archived: \(.archivedAt))"'
+      echo ""
+      read -p "Delete these projects permanently? (y/N) " -n 1 -r
+      echo ""
+      if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "$projects" | jq -r '.[].id' | while read id; do
+          echo "Deleting project $id..."
+          curl -s -X POST https://api.linear.app/graphql \
+            -H "Authorization: $LINEAR_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": \"mutation { projectDelete(id: \\\"$id\\\") { success } }\"}" | jq -r '.data.projectDelete.success'
+        done
+        echo "✅ Cleanup complete"
+      else
+        echo "Aborted"
+      fi
+    fi

@@ -42,6 +42,11 @@
         "primary": "claude-opus-4-5-20251101",
         "research": "claude-opus-4-5-20251101",
         "fallback": "claude-opus-4-5-20251101"
+      },
+      "deepResearch": {
+        "enabled": true,
+        "maxCredits": 50,
+        "triggers": ["competitive", "like", "similar to", "compare", "best practices", "how do others"]
       }
     },
     "_comment_play": "Default values for play() tool - playground test workflows. Agent names are hardcoded (Rex, Blaze, Grizz, Nova, Tap, Spark, Bolt, Cleo, Cipher, Tess) but can be overridden.",
@@ -281,6 +286,10 @@
     "defaults.intake.primary": "Primary model configuration for intake workflows",
     "defaults.intake.research": "Research model configuration for intake workflows",
     "defaults.intake.fallback": "Fallback model configuration for intake workflows",
+    "defaults.intake.deepResearch": "Deep research configuration for autonomous web investigation during intake",
+    "defaults.intake.deepResearch.enabled": "Enable deep research using Firecrawl Agent for competitive analysis and pattern discovery (default: true)",
+    "defaults.intake.deepResearch.maxCredits": "Maximum Firecrawl credits to spend per research task (default: 50). Controls cost of autonomous web research.",
+    "defaults.intake.deepResearch.triggers": "Keywords that trigger deep research - when found in PRD, agent will use Firecrawl Agent for investigation",
     "defaults.play.model": "Default model for play workflows",
     "defaults.play.implementationAgent": "(Optional) Override {orgName}-Rex",
     "defaults.play.frontendAgent": "(Optional) Override {orgName}-Blaze",

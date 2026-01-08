@@ -81,6 +81,7 @@ git checkout -b feat/my-feature
 - **Blaze** (React/TS) - Next.js 15, shadcn/ui, Better Auth, TailwindCSS
 - **Tap** (Expo) - expo-router, react-native, Better Auth
 - **Spark** (Electron) - electron-builder, react, Better Auth
+- **Vex** (Unity/C#) - XR Interaction Toolkit, OpenXR, Meta XR SDK
 
 **Support Agents:**
 - **Morgan** - Project management, PRD intake

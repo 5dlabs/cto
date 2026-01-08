@@ -22,6 +22,7 @@ pub const PARTIAL_RUST_ENV: &str = "_shared/partials/rust-env.sh.hbs";
 pub const PARTIAL_GO_ENV: &str = "_shared/partials/go-env.sh.hbs";
 pub const PARTIAL_NODE_ENV: &str = "_shared/partials/node-env.sh.hbs";
 pub const PARTIAL_EXPO_ENV: &str = "_shared/partials/expo-env.sh.hbs";
+pub const PARTIAL_UNITY_ENV: &str = "_shared/partials/unity-env.sh.hbs";
 pub const PARTIAL_CONFIG: &str = "_shared/partials/config.sh.hbs";
 pub const PARTIAL_GITHUB_AUTH: &str = "_shared/partials/github-auth.sh.hbs";
 pub const PARTIAL_GIT_SETUP: &str = "_shared/partials/git-setup.sh.hbs";

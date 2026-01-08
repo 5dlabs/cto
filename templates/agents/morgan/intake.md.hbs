@@ -23,11 +23,81 @@ Parse the PRD at `.tasks/docs/prd.txt` and generate `tasks.json` with comprehens
 Before generating tasks, think step-by-step:
 
 1. **Analyze PRD Structure** - Identify features, tech requirements, implicit dependencies
-2. **Map Dependencies** - What depends on what? Shared infrastructure needs?
-3. **Define Task Boundaries** - Atomic, single responsibility, independently testable
-4. **Generate Implementation Details** - Pseudo-code, file structures, library versions
-5. **Define Test Strategies** - Acceptance criteria, unit/integration/E2E guidance
-6. **Self-Verify** - All requirements covered? No circular deps? Valid ordering?
+2. **Identify Research Needs** - Scan for competitive references, unfamiliar patterns
+3. **Map Dependencies** - What depends on what? Shared infrastructure needs?
+4. **Define Task Boundaries** - Atomic, single responsibility, independently testable
+5. **Generate Implementation Details** - Pseudo-code, file structures, library versions
+6. **Define Test Strategies** - Acceptance criteria, unit/integration/E2E guidance
+7. **Self-Verify** - All requirements covered? No circular deps? Valid ordering?
+
+---
+
+## Deep Research (When Needed)
+
+Scan the PRD for patterns that require external research:
+
+| Pattern in PRD | Research Action |
+|----------------|-----------------|
+| "like Auth0" / "similar to Stripe" | Research how they implement it |
+| "competitive with X" | Analyze X's architecture |
+| "best practices for Y" | Survey industry approaches |
+| "how do others handle Z" | Multi-source investigation |
+| Unfamiliar technology | Find implementation examples |
+
+### When to Use Firecrawl Agent
+
+Use `firecrawl_agent` for autonomous web research when:
+- PRD references competitors or external products
+- Requirements mention "like X" or "similar to Y"
+- You need to understand industry patterns
+- Technical requirements are unfamiliar
+
+**Example - Competitive Research:**
+```
+firecrawl_agent({
+  prompt: "How do Auth0, Clerk, and Supabase Auth implement refresh token rotation? Compare their approaches and token lifetimes.",
+  schema: {
+    "type": "object",
+    "properties": {
+      "providers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "approach": { "type": "string" },
+            "token_lifetime": { "type": "string" },
+            "tradeoffs": { "type": "string" }
+          }
+        }
+      },
+      "recommendation": { "type": "string" }
+    }
+  }
+})
+```
+
+### Embedding Research in Tasks
+
+When research informs a task, include findings in the `details` field:
+
+```json
+{
+  "id": "5",
+  "title": "Nova: Implement Refresh Token Rotation",
+  "agentHint": "nova",
+  "details": "## Requirements\nImplement refresh token rotation.\n\n## Research Findings\nBased on competitive analysis of Auth0, Clerk, Supabase:\n- Auth0: 15min access, 7d refresh with rotation\n- Clerk: Session-based with server validation\n- Recommended: Auth0 pattern with 15min/7d tokens\n\n## Code Signatures\n```typescript\nexport const rotateRefreshToken = Effect.gen(function* () { ... })\n```"
+}
+```
+
+### Tool Selection for Research
+
+| Need | Tool |
+|------|------|
+| Competitive analysis, "how do others" | `firecrawl_agent` |
+| Library documentation | `context7` |
+| Code examples from repos | GitHub MCP |
+| Specific URL content | `firecrawl_scrape` |
 
 ---
 
@@ -271,6 +341,7 @@ After your tasks.json is complete:
 
 Before finalizing:
 
+- [ ] **Research completed** - All "like X" and competitive references investigated
 - [ ] **Service table created** - All services from PRD identified with tech stacks
 - [ ] **Task 1 is `agentHint: "bolt"`** - Infrastructure MUST be first
 - [ ] **Every task has `agentHint` set** - No null or empty values
@@ -288,6 +359,7 @@ Before finalizing:
   - [ ] `tess` ONLY for "Write Tests", "E2E Testing", "Test Suite"
   - [ ] `atlas` ONLY for "Merge PRs", "Integration"
 - [ ] **Code signatures in details** - Every implementation task has language-appropriate signatures
+- [ ] **Research findings embedded** - Tasks with competitive requirements include research
 - [ ] **No auth/jwt/oauth tasks assigned to cipher** - These are implementation!
 - [ ] **Dependencies form valid DAG** - No cycles
 - [ ] **Implementation tasks depend on task-1** - Infrastructure first
@@ -358,4 +430,4 @@ When generating tasks for an existing codebase:
 - **Preserve compatibility**: Ensure new code works with existing implementations
 
 {{/if}}
-**Read `.tasks/docs/prd.txt` now.{{#if include_codebase}} Then pack and analyze the existing codebase using Repomix tools.{{/if}} First create the Service-to-Agent mapping table, then generate comprehensive tasks.**
+**Read `.tasks/docs/prd.txt` now.{{#if include_codebase}} Then pack and analyze the existing codebase using Repomix tools.{{/if}} Scan for research needs (competitive references, "like X" patterns). First create the Service-to-Agent mapping table, conduct any needed research using `firecrawl_agent`, then generate comprehensive tasks with research findings embedded.**

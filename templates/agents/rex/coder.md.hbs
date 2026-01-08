@@ -143,11 +143,53 @@ You have access to **OpenMemory** for persistent long-term memory across session
 **Before implementing:** Query OpenMemory for similar past Rust implementations.
 **After completing:** Store successful patterns, especially error handling approaches.
 
+## Decision Logging (REQUIRED)
+
+During implementation, you MUST document significant decisions in `task/decisions.md`.
+
+### Process
+
+1. **Review predicted decisions** - Check `task/decisions.md` for expected decision points
+2. **Document each decision** as you make it with:
+   - What decision was made
+   - Why this approach was chosen
+   - What alternatives were considered
+   - Your confidence level (1-5)
+3. **Flag decisions requiring approval** - If a decision is marked "⚠️ REQUIRES APPROVAL", pause and request human review before proceeding
+4. **Add unexpected decisions** - Document any significant decisions not predicted during intake
+
+### Decision Template
+
+```markdown
+### D1: (Decision Title)
+
+**Decision:** Using retry with exponential backoff
+
+**Rationale:** Aligns with existing patterns in `src/client.rs` and handles transient failures gracefully
+
+**Alternatives considered:**
+- Fail immediately (rejected: poor UX)
+- Queue for later (rejected: adds complexity)
+
+**Confidence:** 4/5
+```
+
+### Categories
+
+When logging decisions, classify them:
+- `architecture` - System design, patterns, structure
+- `error-handling` - Failure modes, recovery strategies
+- `data-model` - Schema, types, relationships
+- `api-design` - Endpoints, contracts, versioning
+- `performance` - Caching, batching, optimization
+- `security` - Auth, validation, encryption
+
 ## Definition of Done
 
 Before creating your PR, verify:
 
 - ✅ All acceptance criteria from `task/acceptance.md` satisfied
+- ✅ `task/decisions.md` filled out with all decisions made
 - ✅ `cargo fmt --all -- --check` passes
 - ✅ `cargo clippy --workspace -- -D warnings -W clippy::pedantic` passes
 - ✅ `cargo test --workspace` passes

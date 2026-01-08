@@ -12,12 +12,12 @@ use crate::ai::{
     parse_ai_response,
     prompts::{AnalyzeComplexityContext, ExpandTaskContext, ParsePrdContext, TaskSummary},
     schemas::{
-        AnalyzeComplexityResponse, ComplexityReport, ExpandTaskResponse, GeneratedSubtask,
-        GeneratedTask, ParsePrdResponse,
+        AnalyzeComplexityResponse, ComplexityReport, ExpandTaskResponse, GeneratedDecisionPoint,
+        GeneratedSubtask, GeneratedTask, ParsePrdResponse,
     },
     AIMessage, AIProvider, GenerateOptions, PromptManager, ProviderRegistry, TokenUsage,
 };
-use crate::entities::{Subtask, Task, TaskPriority, TaskStatus};
+use crate::entities::{DecisionPoint, Subtask, Task, TaskPriority, TaskStatus};
 use crate::errors::{TasksError, TasksResult};
 use crate::storage::Storage;
 
@@ -435,6 +435,11 @@ impl AIDomain {
             .into_iter()
             .map(|gs| Self::generated_subtask_to_subtask(gs, &task_id))
             .collect();
+        let decision_points = gt
+            .decision_points
+            .into_iter()
+            .map(Self::generated_decision_point_to_decision_point)
+            .collect();
         Task {
             id: task_id,
             title: gt.title,
@@ -453,6 +458,20 @@ impl AIDomain {
             assignee: None,
             complexity: None,
             agent_hint: None,
+            decision_points,
+        }
+    }
+
+    /// Convert a generated decision point to a DecisionPoint entity.
+    fn generated_decision_point_to_decision_point(gdp: GeneratedDecisionPoint) -> DecisionPoint {
+        DecisionPoint {
+            id: gdp.id,
+            category: gdp.category,
+            description: gdp.description,
+            options: gdp.options,
+            requires_approval: gdp.requires_approval,
+            constraints: gdp.constraints,
+            constraint_type: gdp.constraint_type,
         }
     }
 
@@ -495,6 +514,7 @@ mod tests {
             dependencies: vec![],
             status: Some(TaskStatus::Pending),
             subtasks: vec![],
+            decision_points: vec![],
         };
 
         let task = AIDomain::generated_task_to_task(generated);
@@ -541,6 +561,7 @@ mod tests {
                     parallelizable: None,
                 },
             ],
+            decision_points: vec![],
         };
 
         let task = AIDomain::generated_task_to_task(generated);

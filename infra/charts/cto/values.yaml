@@ -94,6 +94,8 @@ secrets:
       baoKey: github-app-tap
     - name: stitch
       baoKey: github-app-stitch
+    - name: vex
+      baoKey: github-app-vex
 
   # API keys for agent CLIs (used by Argo Workflow pods)
   agentPlatformKeys:

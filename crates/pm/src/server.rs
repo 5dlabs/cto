@@ -172,6 +172,9 @@ struct IntakeSetupRequest {
     /// Optional team ID override (uses config default if not provided)
     #[serde(default)]
     team_id: Option<String>,
+    /// Auto-assign Morgan to the PRD issue to start intake workflow immediately
+    #[serde(default)]
+    auto_assign_morgan: bool,
 }
 
 /// Response from intake setup.
@@ -674,11 +677,46 @@ async fn handle_intake_setup(
             );
         }
     }
-    issue_description.push_str("\n\n---\n\n*Assign to @Morgan to start intake workflow*");
+    // Look up Morgan's user ID if auto-assign is requested
+    let morgan_delegate_id = if request.auto_assign_morgan {
+        info!("Looking up Morgan agent for auto-assignment");
+        // Search workspace users (not team members) since Morgan is an OAuth app
+        match client.search_users_by_name("morgan").await {
+            Ok(users) => {
+                // Find Morgan by name (case-insensitive, matches "5DLabs-Morgan" or "Morgan")
+                let morgan = users.iter().find(|u| {
+                    u.name.eq_ignore_ascii_case("5DLabs-Morgan")
+                        || u.name.eq_ignore_ascii_case("Morgan")
+                        || u.name.to_lowercase().contains("morgan")
+                });
+                if let Some(m) = morgan {
+                    info!(morgan_id = %m.id, morgan_name = %m.name, "Found Morgan for auto-assignment");
+                    Some(m.id.clone())
+                } else {
+                    warn!("Morgan not found in workspace users, will require manual assignment");
+                    None
+                }
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to search users for Morgan lookup");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Update description based on whether Morgan will be auto-assigned
+    if morgan_delegate_id.is_some() {
+        issue_description
+            .push_str("\n\n---\n\n✅ *Morgan has been auto-assigned to start the intake workflow*");
+    } else {
+        issue_description.push_str("\n\n---\n\n*Assign to @Morgan to start intake workflow*");
+    }
 
     // Create PRD issue
     let issue_title = format!("[PRD] {}", request.project_name);
-    info!(title = %issue_title, "Creating PRD issue");
+    info!(title = %issue_title, auto_assign = request.auto_assign_morgan, "Creating PRD issue");
 
     let mut label_ids = Vec::new();
     if let Some(label) = &intake_label {
@@ -699,7 +737,7 @@ async fn handle_intake_setup(
             },
             project_id: Some(project.id.clone()),
             state_id: None,
-            delegate_id: None,
+            delegate_id: morgan_delegate_id.clone(),
         })
         .await
         .map_err(|e| {
@@ -725,6 +763,12 @@ async fn handle_intake_setup(
         "Created PRD issue"
     );
 
+    let next_step = if morgan_delegate_id.is_some() {
+        "Morgan has been auto-assigned. The intake workflow will start automatically.".to_string()
+    } else {
+        "Assign Morgan to the PRD issue in Linear to start intake workflow".to_string()
+    };
+
     Ok(Json(IntakeSetupResponse {
         status: "success".to_string(),
         project: IntakeSetupProject {
@@ -740,7 +784,7 @@ async fn handle_intake_setup(
         },
         architecture_document: architecture_doc,
         cto_config_document: cto_config_doc,
-        next_step: "Assign Morgan to the PRD issue in Linear to start intake workflow".to_string(),
+        next_step,
     }))
 }
 
@@ -800,7 +844,11 @@ pub async fn linear_webhook_handler(
     );
 
     // Identify agent and verify signature using multi-app configuration
-    let agent_id = if let Some(sig) = &signature {
+    let agent_id = if state.config.skip_signature_verification {
+        // Skip signature verification for local development
+        warn!("⚠️ Skipping webhook signature verification (LOCAL DEV MODE)");
+        None
+    } else if let Some(sig) = &signature {
         // Try multi-app identification first, fall back to legacy single secret
         let id = identify_agent_or_legacy(
             &body,

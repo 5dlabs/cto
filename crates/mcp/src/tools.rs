@@ -103,6 +103,11 @@ fn get_intake_schema() -> Value {
                     "description": "CLI to use for documentation generation (optional, defaults to claude). Supports claude, cursor, codex.",
                     "enum": ["claude", "cursor", "codex"],
                     "default": "claude"
+                },
+                "auto_assign_morgan": {
+                    "type": "boolean",
+                    "description": "Auto-assign Morgan to the PRD issue to start intake workflow immediately (optional, defaults to true)",
+                    "default": true
                 }
             },
             "required": ["project_name"]

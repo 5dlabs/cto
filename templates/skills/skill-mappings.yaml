@@ -49,6 +49,9 @@ blaze:
     memory-systems:
       triggers: [memory, persistence, state]
       description: "Agent memory architecture patterns"
+    deep-research:
+      triggers: [research, competitive, like, similar to, compare, best practices, ui patterns]
+      description: "Deep technical research for UI patterns and competitive analysis"
 
 tap:
   description: "Expo React Native mobile development"
@@ -122,6 +125,9 @@ rex:
     memory-systems:
       triggers: [memory, persistence, cache]
       description: "Agent memory architecture patterns"
+    deep-research:
+      triggers: [research, competitive, like, similar to, compare, best practices]
+      description: "Deep technical research for complex implementation patterns"
 
 grizz:
   description: "Go specialist with chi, grpc, pgx"
@@ -146,6 +152,9 @@ grizz:
       triggers: [auth, session]
     memory-systems:
       triggers: [memory, persistence, cache]
+    deep-research:
+      triggers: [research, competitive, like, similar to, compare, best practices]
+      description: "Deep technical research for complex implementation patterns"
 
 nova:
   description: "Node.js/Bun with Elysia, Effect, Drizzle"
@@ -172,6 +181,9 @@ nova:
       description: "When Nova needs to work on frontend code"
     memory-systems:
       triggers: [memory, persistence, cache]
+    deep-research:
+      triggers: [research, competitive, like, similar to, compare, best practices]
+      description: "Deep technical research for complex implementation patterns"
 
 # ============================================================================
 # INFRASTRUCTURE AGENTS
@@ -278,6 +290,9 @@ cleo:
       triggers: [go, golang]
     effect-patterns:
       triggers: [effect, typescript, bun]
+    deep-research:
+      triggers: [research, competitive, best practices, industry standard]
+      description: "Deep research for quality standards and best practices comparison"
 
 tess:
   description: "Testing and validation"
@@ -355,6 +370,38 @@ morgan:
     - multi-agent-patterns
     - frontend-stack-selection
     - doc-coauthoring
+    - deep-research
   healer:
     - incident-response
-  optional: {}
+  optional:
+    deep-research:
+      triggers: [research, competitive, like, similar to, compare, best practices, how do others]
+      description: "Deep technical research using Firecrawl Agent for competitive analysis and pattern discovery"
+
+# ============================================================================
+# VR AGENTS
+# ============================================================================
+
+vex:
+  description: "Unity VR specialist with OpenXR cross-platform development"
+  default:
+    - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - llm-docs
+    - github-mcp
+    - unity-vr
+    - openxr
+  coder:
+    - tool-design
+    - firecrawl
+  healer:
+    - incident-response
+    - observability
+    - kubernetes-mcp
+  optional:
+    meta-xr:
+      triggers: [quest, meta, passthrough, hand tracking, avatars]
+      description: "Meta Quest specific features beyond OpenXR"

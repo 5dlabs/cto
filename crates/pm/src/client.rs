@@ -1190,6 +1190,66 @@ impl LinearClient {
         Ok(response.team.members.nodes)
     }
 
+    /// Search for users in the workspace by name
+    ///
+    /// This searches all workspace users including OAuth apps (agents).
+    /// Use this to find agent accounts like Morgan, Rex, etc.
+    #[instrument(skip(self), fields(name_filter = %name_filter))]
+    pub async fn search_users_by_name(&self, name_filter: &str) -> Result<Vec<User>> {
+        #[derive(Serialize)]
+        struct Variables<'a> {
+            filter: UserFilter<'a>,
+        }
+
+        #[derive(Serialize)]
+        struct UserFilter<'a> {
+            name: NameFilter<'a>,
+        }
+
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct NameFilter<'a> {
+            contains_ignore_case: &'a str,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            users: UsersConnection,
+        }
+
+        #[derive(Deserialize)]
+        struct UsersConnection {
+            nodes: Vec<User>,
+        }
+
+        const QUERY: &str = r"
+            query SearchUsers($filter: UserFilter!) {
+                users(filter: $filter) {
+                    nodes {
+                        id
+                        name
+                        email
+                        isMe
+                    }
+                }
+            }
+        ";
+
+        let response: Response = self
+            .execute(
+                QUERY,
+                Variables {
+                    filter: UserFilter {
+                        name: NameFilter {
+                            contains_ignore_case: name_filter,
+                        },
+                    },
+                },
+            )
+            .await?;
+        Ok(response.users.nodes)
+    }
+
     // =========================================================================
     // Document Operations
     // =========================================================================

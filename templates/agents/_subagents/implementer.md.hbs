@@ -45,10 +45,27 @@ Mark your subtask complete when:
 - [ ] Relevant tests pass
 - [ ] No linter errors introduced
 
+## Decision Logging
+
+When you make significant decisions during implementation:
+
+1. **Check `task/decisions.md`** for predicted decision points relevant to your subtask
+2. **Document your choices** with rationale
+3. **Flag for approval** if a decision is marked as requiring human review
+
+Report decisions in your output using this format:
+```
+DECISION: [category] - [brief description]
+CHOICE: [what you decided]
+RATIONALE: [why this choice]
+ALTERNATIVES: [what else was considered]
+```
+
 ## Output
 
 When complete, provide a summary of:
 1. Files modified/created
-2. Key implementation decisions
+2. Key implementation decisions (use format above)
 3. Any edge cases handled
 4. Tests added or verified
+5. Decisions made with rationale

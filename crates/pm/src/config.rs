@@ -27,6 +27,8 @@ pub struct Config {
     pub play: PlayConfig,
     /// Multi-agent Linear OAuth configuration.
     pub linear: LinearConfig,
+    /// Skip webhook signature verification (for local development only).
+    pub skip_signature_verification: bool,
 }
 
 // =============================================================================
@@ -261,6 +263,9 @@ impl Default for Config {
             intake: IntakeConfig::default(),
             play: PlayConfig::default(),
             linear: LinearConfig::from_env(),
+            skip_signature_verification: env::var("LINEAR_SKIP_SIGNATURE_VERIFICATION")
+                .map(|v| v == "true" || v == "1")
+                .unwrap_or(false),
         }
     }
 }

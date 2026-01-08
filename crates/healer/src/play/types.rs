@@ -406,6 +406,74 @@ pub struct ProbeResult {
     pub notes: Option<String>,
 }
 
+/// Category of a decision made during implementation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum DecisionCategory {
+    /// System design, patterns, structure choices
+    #[default]
+    Architecture,
+    /// Failure modes, recovery strategies, error responses
+    ErrorHandling,
+    /// Schema design, types, relationships, migrations
+    DataModel,
+    /// Endpoints, contracts, versioning, backwards compatibility
+    ApiDesign,
+    /// Empty states, loading states, user interactions, feedback
+    UxBehavior,
+    /// Caching, batching, optimization, resource usage
+    Performance,
+    /// Auth, validation, encryption, access control
+    Security,
+}
+
+impl std::fmt::Display for DecisionCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Architecture => write!(f, "architecture"),
+            Self::ErrorHandling => write!(f, "error-handling"),
+            Self::DataModel => write!(f, "data-model"),
+            Self::ApiDesign => write!(f, "api-design"),
+            Self::UxBehavior => write!(f, "ux-behavior"),
+            Self::Performance => write!(f, "performance"),
+            Self::Security => write!(f, "security"),
+        }
+    }
+}
+
+/// A recorded decision made during implementation.
+///
+/// Decision records capture what was decided, why, and what alternatives
+/// were considered. This creates an audit trail and enables review of
+/// agent judgment calls.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecisionRecord {
+    /// The decision that was made
+    pub decision: String,
+    /// Category of decision
+    pub category: DecisionCategory,
+    /// Alternatives that were considered
+    #[serde(default, rename = "alternativesConsidered")]
+    pub alternatives_considered: Vec<String>,
+    /// Why this choice was made
+    pub rationale: String,
+    /// Confidence level (1-5, where 5 is highest confidence)
+    pub confidence: u8,
+    /// Whether this was reviewed by a human
+    #[serde(default, rename = "humanReviewed")]
+    pub human_reviewed: bool,
+    /// Related decision point ID if this was a predicted decision
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "decisionPointId"
+    )]
+    pub decision_point_id: Option<String>,
+    /// When the decision was made (ISO 8601 timestamp)
+    #[serde(rename = "madeAt")]
+    pub made_at: String,
+}
+
 /// Artifact trail for tracking file operations (mirrors sidecar struct).
 ///
 /// This addresses the "artifact trail problem" where file tracking scores
@@ -418,7 +486,11 @@ pub struct ArtifactTrail {
     pub files_modified: std::collections::HashMap<String, String>,
     /// Files read but not modified
     pub files_read: Vec<String>,
-    /// Key decisions made during the session
+    /// Structured decision records (new format)
+    #[serde(default)]
+    pub decisions: Vec<DecisionRecord>,
+    /// Key decisions made during the session (legacy format, kept for backward compatibility)
+    #[serde(default)]
     pub decisions_made: Vec<String>,
     /// Last update timestamp
     pub updated_at: Option<String>,

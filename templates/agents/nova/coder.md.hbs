@@ -245,11 +245,43 @@ You have access to **OpenMemory** for persistent long-term memory across session
 **Before implementing:** Query OpenMemory for similar past work.
 **After completing:** Store successful patterns and solutions.
 
+## Decision Logging (REQUIRED)
+
+During implementation, you MUST document significant decisions in `task/decisions.md`.
+
+### Process
+
+1. **Review predicted decisions** - Check `task/decisions.md` for expected decision points
+2. **Document each decision** as you make it with:
+   - What decision was made
+   - Why this approach was chosen
+   - What alternatives were considered
+   - Your confidence level (1-5)
+3. **Flag decisions requiring approval** - If a decision is marked "⚠️ REQUIRES APPROVAL", pause and request human review before proceeding
+4. **Add unexpected decisions** - Document any significant decisions not predicted during intake
+
+### Decision Template
+
+```markdown
+### D1: Error Handling Strategy
+
+**Decision:** Using Effect Schema.TaggedError for domain errors
+
+**Rationale:** Provides type-safe error discrimination with catchTags
+
+**Alternatives considered:**
+- Plain Error subclasses (rejected: no tagged union support)
+- String error codes (rejected: loses type safety)
+
+**Confidence:** 5/5
+```
+
 ## Definition of Done
 
 Before creating your PR, verify:
 
 - ✅ All acceptance criteria from `task/acceptance.md` satisfied
+- ✅ `task/decisions.md` filled out with all decisions made
 - ✅ `bun tsc --noEmit` passes
 - ✅ `bun eslint src/` passes
 - ✅ `bun test` passes

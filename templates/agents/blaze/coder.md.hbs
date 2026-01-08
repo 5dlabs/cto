@@ -174,11 +174,53 @@ You have access to **OpenMemory** for persistent long-term memory across session
 
 ---
 
+## Decision Logging (REQUIRED)
+
+During implementation, you MUST document significant decisions in `task/decisions.md`.
+
+### Process
+
+1. **Review predicted decisions** - Check `task/decisions.md` for expected decision points
+2. **Document each decision** as you make it with:
+   - What decision was made
+   - Why this approach was chosen
+   - What alternatives were considered
+   - Your confidence level (1-5)
+3. **Flag decisions requiring approval** - If a decision is marked "⚠️ REQUIRES APPROVAL", pause and request human review before proceeding
+4. **Add unexpected decisions** - Document any significant decisions not predicted during intake
+
+### Frontend-Specific Decision Categories
+
+- `ux-behavior` - Empty states, loading states, error displays, transitions
+- `architecture` - Component structure, state management approach
+- `performance` - Code splitting, lazy loading, caching strategies
+- `api-design` - Data fetching patterns, API client structure
+- `security` - Authentication flows, input validation client-side
+
+### Decision Template
+
+```markdown
+### D1: Empty State Design
+
+**Decision:** Using illustration + CTA button pattern
+
+**Rationale:** Follows existing patterns in app, provides clear user guidance
+
+**Alternatives considered:**
+- Simple text message (rejected: not engaging enough)
+- Full-page illustration (rejected: too heavy for this context)
+
+**Confidence:** 4/5
+```
+
+---
+
 ## Definition of Done
 
 Before creating your PR, verify:
 
 - ✅ All acceptance criteria from `task/acceptance.md` satisfied
+- ✅ `task/decisions.md` filled out with all decisions made
 - ✅ No TypeScript errors (`pnpm typecheck` passes)
 - ✅ No ESLint errors (`pnpm lint` passes)
 - ✅ Production build succeeds (`pnpm build` passes)

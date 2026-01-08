@@ -300,6 +300,11 @@ fn make_agent_name(org_name: &str, agent_suffix: &str) -> String {
 /// Looks in current directory, workspace root, or `WORKSPACE_FOLDER_PATHS` for cto-config.json
 #[allow(clippy::disallowed_macros)]
 fn load_cto_config() -> Result<CtoConfig> {
+    // Debug: Show current working directory
+    if let Ok(cwd) = std::env::current_dir() {
+        eprintln!("🔍 DEBUG: Current working directory: {}", cwd.display());
+    }
+
     let mut config_paths = vec![
         std::path::PathBuf::from("cto-config.json"),
         std::path::PathBuf::from("../cto-config.json"),
@@ -307,15 +312,29 @@ fn load_cto_config() -> Result<CtoConfig> {
 
     // Add workspace folder paths if available (Cursor provides this)
     if let Ok(workspace_paths) = std::env::var("WORKSPACE_FOLDER_PATHS") {
+        eprintln!("🔍 DEBUG: WORKSPACE_FOLDER_PATHS = {workspace_paths}");
         for workspace_path in workspace_paths.split(',') {
             let workspace_path = workspace_path.trim();
             config_paths.push(std::path::PathBuf::from(workspace_path).join("cto-config.json"));
         }
+    } else {
+        eprintln!("🔍 DEBUG: WORKSPACE_FOLDER_PATHS not set");
+    }
+
+    // Debug: Show all paths being checked
+    eprintln!("🔍 DEBUG: Checking config paths:");
+    for path in &config_paths {
+        let abs_path = path.canonicalize().unwrap_or_else(|_| path.clone());
+        let exists = path.exists();
+        eprintln!("   - {} (exists: {})", abs_path.display(), exists);
     }
 
     for config_path in config_paths {
         if config_path.exists() {
-            eprintln!("📋 Loading configuration from: {}", config_path.display());
+            let abs_path = config_path
+                .canonicalize()
+                .unwrap_or_else(|_| config_path.clone());
+            eprintln!("📋 Loading configuration from: {}", abs_path.display());
             let config_content = std::fs::read_to_string(&config_path).with_context(|| {
                 format!("Failed to read config file: {}", config_path.display())
             })?;
@@ -332,7 +351,25 @@ fn load_cto_config() -> Result<CtoConfig> {
                 ));
             }
 
+            // Debug: Show key config values
             eprintln!("✅ Configuration loaded successfully");
+            eprintln!(
+                "🔍 DEBUG: linear.pmServerUrl = {}",
+                config
+                    .defaults
+                    .linear
+                    .pm_server_url
+                    .as_deref()
+                    .unwrap_or("(not set, will use default)")
+            );
+            eprintln!(
+                "🔍 DEBUG: linear.teamId = {}",
+                if config.defaults.linear.team_id.is_empty() {
+                    "(not set)"
+                } else {
+                    &config.defaults.linear.team_id
+                }
+            );
             return Ok(config);
         }
     }
@@ -772,6 +809,7 @@ fn create_linear_intake_setup(
     architecture_content: Option<&str>,
     repository_url: Option<&str>,
     config: &CtoConfig,
+    auto_assign_morgan: bool,
 ) -> Result<(IntakeSetupProject, IntakeSetupIssue)> {
     let linear_config = &config.defaults.linear;
 
@@ -782,8 +820,65 @@ fn create_linear_intake_setup(
         .or_else(|| std::env::var("CTO_PM_SERVER_URL").ok())
         .unwrap_or_else(|| "https://pm.5dlabs.ai".to_string());
 
+    // Debug: Show which source provided the PM server URL
+    let pm_url_source = if linear_config.pm_server_url.is_some() {
+        "cto-config.json"
+    } else if std::env::var("CTO_PM_SERVER_URL").is_ok() {
+        "CTO_PM_SERVER_URL env var"
+    } else {
+        "default (production fallback)"
+    };
+    eprintln!("🔍 DEBUG: PM server URL source: {pm_url_source}");
+
     eprintln!("📋 Setting up Linear project and PRD issue via PM server...");
     eprintln!("   PM Server: {pm_server_url}");
+
+    // Health check: Verify PM server is reachable before making intake request
+    let health_client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .context("Failed to create HTTP client for health check")?;
+
+    let health_url = format!("{pm_server_url}/health");
+    eprintln!("🔍 Checking PM server health: {health_url}");
+
+    match health_client.get(&health_url).send() {
+        Ok(response) if response.status().is_success() => {
+            eprintln!("✅ PM server is healthy");
+        }
+        Ok(response) => {
+            let status = response.status();
+            return Err(anyhow!(
+                "PM server at {} returned unhealthy status: {}\n\n\
+                 Make sure the local PM server is running:\n\
+                 - Run: just pc   (starts process-compose with all services)\n\
+                 - Or: cargo run -p pm --bin pm-server",
+                pm_server_url,
+                status
+            ));
+        }
+        Err(e) => {
+            // Check if this is a dev URL that's unreachable
+            if pm_server_url.contains("-dev.") || pm_server_url.contains("localhost") {
+                return Err(anyhow!(
+                    "Cannot reach PM server at {}: {}\n\n\
+                     The PM server appears to be a development URL but is not reachable.\n\
+                     Make sure the local environment is running:\n\
+                     - Run: just pc   (starts process-compose with tunnel and services)\n\
+                     - Or: just tunnel   (starts Cloudflare tunnel separately)\n\n\
+                     If you want to use production, remove pmServerUrl from cto-config.json",
+                    pm_server_url,
+                    e
+                ));
+            }
+            return Err(anyhow!(
+                "Cannot reach PM server at {}: {}",
+                pm_server_url,
+                e
+            ));
+        }
+    }
+
     if let Some(repo) = repository_url {
         eprintln!("   Repository: {repo}");
     }
@@ -798,7 +893,8 @@ fn create_linear_intake_setup(
         "prdContent": prd_content,
         "architectureContent": architecture_content,
         "repositoryUrl": repository_url,
-        "teamId": if linear_config.team_id.is_empty() { Value::Null } else { json!(&linear_config.team_id) }
+        "teamId": if linear_config.team_id.is_empty() { Value::Null } else { json!(&linear_config.team_id) },
+        "autoAssignMorgan": auto_assign_morgan
     });
 
     let response = client
@@ -3337,6 +3433,49 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
     let workspace_dir = resolve_workspace_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
     eprintln!("🔍 Using workspace directory: {}", workspace_dir.display());
 
+    // Load .env.local for local development (contains API keys, etc.)
+    let env_local_path = workspace_dir.join(".env.local");
+    eprintln!("🔍 Looking for .env.local at: {}", env_local_path.display());
+    let local_env_vars: Vec<(String, String)> = if env_local_path.exists() {
+        eprintln!("📦 Loading environment from .env.local");
+        let vars: Vec<(String, String)> = std::fs::read_to_string(&env_local_path)
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| {
+                let line = line.trim();
+                // Skip comments and empty lines
+                if line.is_empty() || line.starts_with('#') {
+                    return None;
+                }
+                // Handle "export KEY=value" format
+                let line = line.strip_prefix("export ").unwrap_or(line);
+                // Split on first '='
+                let mut parts = line.splitn(2, '=');
+                let key = parts.next()?.trim().to_string();
+                let value = parts.next()?.trim();
+                // Remove surrounding quotes if present
+                let value = value
+                    .strip_prefix('"')
+                    .and_then(|v| v.strip_suffix('"'))
+                    .unwrap_or(value)
+                    .to_string();
+                Some((key, value))
+            })
+            .collect();
+        eprintln!(
+            "📦 Loaded {} env vars (has ANTHROPIC_API_KEY: {})",
+            vars.len(),
+            vars.iter().any(|(k, _)| k == "ANTHROPIC_API_KEY")
+        );
+        vars
+    } else {
+        eprintln!(
+            "⚠️ No .env.local found at {} - subprocess may lack API keys",
+            env_local_path.display()
+        );
+        Vec::new()
+    };
+
     // Get project name (required)
     let project_name = arguments
         .get("project_name")
@@ -3415,6 +3554,12 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
     };
 
     let mut cmd = std::process::Command::new(&intake_bin);
+
+    // Pass loaded .env.local variables to subprocess
+    for (key, value) in &local_env_vars {
+        cmd.env(key, value);
+    }
+
     cmd.arg("intake")
         .arg("--prd")
         .arg(&prd_path)
@@ -3444,14 +3589,19 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
     }
 
     eprintln!(
-        "🔧 Running: intake intake --prd {} --num-tasks {} --model {}",
+        "🔧 Running: {} intake --prd {} --num-tasks {} --model {} --project {}",
+        intake_bin,
         prd_path.display(),
         num_tasks,
-        model
+        model,
+        project_path.display()
     );
 
     // Execute
-    let output = cmd.output()?;
+    let output = cmd.output().map_err(|e| {
+        eprintln!("❌ Failed to execute intake: {e}");
+        e
+    })?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -3697,6 +3847,12 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty());
 
+    // Auto-assign Morgan to start intake immediately (defaults to true for smoother UX)
+    let auto_assign_morgan = arguments
+        .get("auto_assign_morgan")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+
     let linear_result = if !skip_linear
         && config.defaults.linear.intake.create_project
         && !config.defaults.linear.team_id.is_empty()
@@ -3711,6 +3867,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             },
             intake_repository_url,
             config,
+            auto_assign_morgan,
         ) {
             Ok((project, issue)) => {
                 eprintln!("✅ Linear setup complete!");

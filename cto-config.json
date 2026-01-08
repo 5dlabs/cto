@@ -15,7 +15,7 @@
     },
     "linear": {
       "teamId": "CTOPA",
-      "pmServerUrl": "https://pm.5dlabs.ai",
+      "pmServerUrl": "https://pm-dev.5dlabs.ai",
       "intake": {
         "createProject": true,
         "projectTemplate": "Play Workflow"
@@ -391,6 +391,31 @@
           "github_update_pull_request_branch",
           "github_get_pull_request_status",
           "github_create_pull_request_review",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      }
+    },
+    "vex": {
+      "githubApp": "5DLabs-Vex",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "firecrawl_scrape",
+          "firecrawl_crawl",
+          "firecrawl_map",
+          "firecrawl_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
           "github_get_file_contents"
         ],
         "localServers": {}
