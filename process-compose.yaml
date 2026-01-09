@@ -65,8 +65,9 @@ processes:
     depends_on: {}
 
   controller:
-    command: cargo run --bin agent-controller
-    description: "Controller - CodeRun CRD orchestrator"
+    # Auto-rebuilds and restarts on code changes in crates/controller/
+    command: cargo watch -w crates/controller -w crates/config -w templates -x "run --bin agent-controller"
+    description: "Controller - CodeRun CRD orchestrator (auto-reload on changes)"
     availability:
       restart: on_failure
       max_restarts: 3
@@ -75,8 +76,8 @@ processes:
         host: localhost
         port: 8080
         path: /health
-      initial_delay_seconds: 10
-      period_seconds: 5
+      initial_delay_seconds: 30  # Increased for initial compile time
+      period_seconds: 10         # Less aggressive during rebuilds
     environment:
       - "RUST_LOG=info,controller=debug"
       - "AGENT_TEMPLATES_PATH=./templates"
