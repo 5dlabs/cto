@@ -147,7 +147,7 @@ jobs:
             suffix: windows-x86_64
             ext: .exe
         exclude:
-          # healer, controller, utils, cto-cli, and intake don't need Windows builds
+          # Skip Windows builds - not needed for our deployment and causes CI issues
           - package:
               name: healer
             target:
@@ -166,6 +166,14 @@ jobs:
               os: windows-latest
           - package:
               name: intake
+            target:
+              os: windows-latest
+          - package:
+              name: cto-mcp
+            target:
+              os: windows-latest
+          - package:
+              name: tools
             target:
               os: windows-latest
     runs-on: ${{ matrix.target.os }}
