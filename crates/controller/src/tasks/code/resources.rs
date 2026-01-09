@@ -112,6 +112,15 @@ impl<'a> CodeResourceManager<'a> {
             format!("workspace-{service_name}")
         };
 
+        // Check if fresh workspace is requested (explicit or defaulted for intake)
+        if Self::should_use_fresh_workspace(code_run_ref) {
+            info!(
+                "🧹 Fresh workspace requested for run_type='{}' - will delete existing PVC",
+                code_run_ref.spec.run_type
+            );
+            self.delete_pvc_if_exists(&pvc_name).await?;
+        }
+
         info!("📦 Ensuring PVC exists: {}", pvc_name);
         self.ensure_pvc_exists(
             &pvc_name,
@@ -230,6 +239,76 @@ impl<'a> CodeResourceManager<'a> {
         self.cleanup_old_configmaps(code_run).await?;
 
         Ok(Action::await_change())
+    }
+
+    /// Determines if a fresh workspace should be used.
+    /// Returns true if:
+    /// - `fresh_workspace` is explicitly set to `true`, OR
+    /// - `fresh_workspace` is not set AND `run_type` is "intake"
+    fn should_use_fresh_workspace(code_run: &CodeRun) -> bool {
+        match code_run.spec.fresh_workspace {
+            Some(true) => true,
+            Some(false) => false,
+            None => code_run.spec.run_type == "intake",
+        }
+    }
+
+    /// Deletes the PVC if it exists, waiting for deletion to complete.
+    /// Used when `fresh_workspace` is true to ensure a clean slate.
+    async fn delete_pvc_if_exists(&self, pvc_name: &str) -> Result<()> {
+        match self.pvcs.get(pvc_name).await {
+            Ok(_) => {
+                info!(
+                    "🗑️ Fresh workspace requested - deleting existing PVC: {}",
+                    pvc_name
+                );
+                match self.pvcs.delete(pvc_name, &DeleteParams::default()).await {
+                    Ok(_) => {
+                        info!("✅ PVC {} deletion initiated", pvc_name);
+                        // Wait for PVC to be fully deleted (up to 30 seconds)
+                        for i in 0..30 {
+                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                            match self.pvcs.get(pvc_name).await {
+                                Err(kube::Error::Api(ae)) if ae.code == 404 => {
+                                    info!("✅ PVC {} fully deleted after {}s", pvc_name, i + 1);
+                                    return Ok(());
+                                }
+                                Ok(_) => {
+                                    if i % 5 == 0 {
+                                        info!(
+                                            "⏳ Waiting for PVC {} deletion... ({}s)",
+                                            pvc_name, i
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Error checking PVC deletion status: {}", e);
+                                }
+                            }
+                        }
+                        // If still exists after 30s, log warning but continue
+                        info!(
+                            "⚠️ PVC {} still exists after 30s, proceeding anyway",
+                            pvc_name
+                        );
+                        Ok(())
+                    }
+                    Err(kube::Error::Api(ae)) if ae.code == 404 => {
+                        info!("PVC {} already deleted", pvc_name);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        error!("Failed to delete PVC {}: {}", pvc_name, e);
+                        Err(e.into())
+                    }
+                }
+            }
+            Err(kube::Error::Api(ae)) if ae.code == 404 => {
+                info!("PVC {} doesn't exist, nothing to delete", pvc_name);
+                Ok(())
+            }
+            Err(e) => Err(e.into()),
+        }
     }
 
     async fn ensure_pvc_exists(

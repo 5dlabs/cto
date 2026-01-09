@@ -218,6 +218,11 @@ pub struct CodeRunSpec {
     /// Example: "postgres,filesystem"
     #[serde(default, rename = "localTools")]
     pub local_tools: Option<String>,
+
+    /// Whether to delete existing PVC and start with a fresh workspace
+    /// Defaults to true for intake runs, false otherwise
+    #[serde(default, rename = "freshWorkspace")]
+    pub fresh_workspace: Option<bool>,
 }
 
 impl Default for CodeRunSpec {
@@ -249,6 +254,7 @@ impl Default for CodeRunSpec {
             acceptance_criteria: None,
             remote_tools: None,
             local_tools: None,
+            fresh_workspace: None,
         }
     }
 }

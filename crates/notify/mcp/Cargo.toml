@@ -1,3 +1,6 @@
+# This crate is intentionally outside the main workspace - it's a standalone MCP server binary
+[workspace]
+
 [package]
 name = "cto-mcp"
 version = "0.0.1"
