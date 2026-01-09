@@ -52,6 +52,9 @@ blaze:
     deep-research:
       triggers: [research, competitive, like, similar to, compare, best practices, ui patterns]
       description: "Deep technical research for UI patterns and competitive analysis"
+    ralph-technique:
+      triggers: [minimal, ralph, loop, autonomous, simple]
+      description: "Minimal prompting technique for loop-based autonomous execution"
 
 tap:
   description: "Expo React Native mobile development"
@@ -128,6 +131,9 @@ rex:
     deep-research:
       triggers: [research, competitive, like, similar to, compare, best practices]
       description: "Deep technical research for complex implementation patterns"
+    ralph-technique:
+      triggers: [minimal, ralph, loop, autonomous, simple]
+      description: "Minimal prompting technique for loop-based autonomous execution"
 
 grizz:
   description: "Go specialist with chi, grpc, pgx"
