@@ -953,6 +953,24 @@ async fn trigger_play_workflow(
             .join("-")
     });
 
+    // Determine docs directory - use "." for new repos where tasks are at root
+    // New repos have the same name as the normalized project (repo was created for this project)
+    let docs_project_dir = if project_dir == payload.repository.name {
+        info!(
+            project_dir = %project_dir,
+            repo_name = %payload.repository.name,
+            "New repo detected - using '.' for docs directory"
+        );
+        ".".to_string()
+    } else {
+        info!(
+            project_dir = %project_dir,
+            repo_name = %payload.repository.name,
+            "Existing repo - using project subdirectory for docs"
+        );
+        project_dir.clone()
+    };
+
     // Generate CodeRun name
     let name_suffix = project_dir
         .chars()
@@ -1006,7 +1024,7 @@ async fn trigger_play_workflow(
             "service": project_dir,
             "repositoryUrl": repository,
             "docsRepositoryUrl": repository,
-            "docsProjectDirectory": project_dir,
+            "docsProjectDirectory": docs_project_dir,
             "workingDirectory": ".",
             "githubApp": "5DLabs-Morgan",
             "model": state.play_config.model.as_deref().unwrap_or("claude-sonnet-4-20250514"),

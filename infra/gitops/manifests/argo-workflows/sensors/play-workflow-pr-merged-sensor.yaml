@@ -314,7 +314,20 @@ spec:
                             exit 1
                           fi
 
+                          # Check if tasks are at repo root (new repo) vs subdirectory (existing repo)
+                          REPO_DIR="/tmp/check-root-$$"
+                          git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY}.git" "$REPO_DIR" 2>/dev/null
+                          if [ -d "$REPO_DIR/.tasks" ]; then
+                            echo "📁 Tasks found at repo root - using '.' for docs directory"
+                            DOCS_PROJECT_DIR="."
+                          else
+                            echo "📁 Tasks found in subdirectory: $PROJECT_DIR_NAME"
+                            DOCS_PROJECT_DIR="$PROJECT_DIR_NAME"
+                          fi
+                          rm -rf "$REPO_DIR"
+
                           echo "🎯 Project Directory: $PROJECT_DIR_NAME"
+                          echo "🎯 Docs Directory: $DOCS_PROJECT_DIR"
                           echo "📦 Repository: $REPOSITORY"
 
                           # Check if play workflow already exists for this repo
@@ -356,7 +369,7 @@ spec:
                               - name: repository
                                 value: "${REPOSITORY}"
                               - name: docs-project-directory
-                                value: "${PROJECT_DIR_NAME}"
+                                value: "${DOCS_PROJECT_DIR}"
                               - name: docs-repository
                                 value: "${REPOSITORY}"
                               - name: docs-branch

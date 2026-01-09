@@ -279,6 +279,9 @@ preflight:
     set -euo pipefail
     source .env.local 2>/dev/null || true
     
+    ERRORS=0
+    WARNINGS=0
+    
     echo ""
     echo "╔══════════════════════════════════════════════════════════════════════════════╗"
     echo "║                    CTO LOCAL DEVELOPMENT PRE-FLIGHT CHECK                    ║"
@@ -293,7 +296,7 @@ preflight:
         pm) port=8081 ;; controller) port=8080 ;; healer) port=8082 ;; tools) port=3000 ;;
       esac
       local_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$port/health 2>/dev/null || echo "000")
-      [ "$local_status" = "200" ] && local_status="✅ UP" || local_status="❌ DOWN"
+      [ "$local_status" = "200" ] && local_status="✅ UP" || { local_status="❌ DOWN"; ERRORS=$((ERRORS+1)); }
       [ "$k8s" = "0" ] && k8s="⬇️ (0)" || k8s="🔴 ($k8s)"
       printf "%-20s %-12s %-12s\n" "$svc" "$k8s" "$local_status"
     done
@@ -301,36 +304,63 @@ preflight:
     echo ""
     echo "═══ 2. TUNNEL & WEBHOOKS ═══"
     tunnel=$(curl -s -o /dev/null -w "%{http_code}" https://pm-dev.5dlabs.ai/health 2>/dev/null || echo "000")
-    [ "$tunnel" = "200" ] && echo "✅ Tunnel: pm-dev.5dlabs.ai → localhost:8081" || echo "❌ Tunnel not working"
+    [ "$tunnel" = "200" ] && echo "✅ Tunnel: pm-dev.5dlabs.ai → localhost:8081" || { echo "❌ Tunnel not working (run: just tunnel)"; ERRORS=$((ERRORS+1)); }
     webhook_url=$(gh api repos/5dlabs/cto/hooks 2>/dev/null | jq -r '.[0].config.url' 2>/dev/null || echo "unavailable")
-    echo "📎 GitHub Webhook: $webhook_url"
+    if [[ "$webhook_url" == *"-dev."* ]]; then
+      echo "✅ GitHub Webhook: $webhook_url (dev)"
+    else
+      echo "⚠️  GitHub Webhook: $webhook_url (run: just webhook-dev)"
+      WARNINGS=$((WARNINGS+1))
+    fi
     
     echo ""
     echo "═══ 3. CLUSTER ACCESS ═══"
     cluster_info=$(kubectl cluster-info 2>/dev/null | head -1 || true)
-    [ -n "$cluster_info" ] && echo "$cluster_info" || echo "❌ Cannot connect to cluster"
-    kubectl get crd coderuns.agents.platform 2>/dev/null > /dev/null && echo "✅ CodeRun CRD available" || echo "❌ CodeRun CRD missing"
+    [ -n "$cluster_info" ] && echo "$cluster_info" || { echo "❌ Cannot connect to cluster"; ERRORS=$((ERRORS+1)); }
+    kubectl get crd coderuns.agents.platform 2>/dev/null > /dev/null && echo "✅ CodeRun CRD available" || { echo "❌ CodeRun CRD missing"; ERRORS=$((ERRORS+1)); }
+    kubectl get crd workflows.argoproj.io 2>/dev/null > /dev/null && echo "✅ Argo Workflow CRD available" || { echo "❌ Argo Workflow CRD missing"; ERRORS=$((ERRORS+1)); }
     
     echo ""
-    echo "═══ 4. API KEYS ═══"
-    [ -n "${LINEAR_API_KEY:-}" ] && echo "✅ LINEAR_API_KEY" || echo "❌ LINEAR_API_KEY"
-    [ -n "${ANTHROPIC_API_KEY:-}" ] && echo "✅ ANTHROPIC_API_KEY" || echo "❌ ANTHROPIC_API_KEY"
-    [ -n "${GITHUB_TOKEN:-}" ] && echo "✅ GITHUB_TOKEN" || echo "❌ GITHUB_TOKEN"
+    echo "═══ 4. API KEYS & SECRETS ═══"
+    [ -n "${LINEAR_API_KEY:-}" ] && echo "✅ LINEAR_API_KEY" || { echo "❌ LINEAR_API_KEY"; ERRORS=$((ERRORS+1)); }
+    [ -n "${ANTHROPIC_API_KEY:-}" ] && echo "✅ ANTHROPIC_API_KEY" || { echo "❌ ANTHROPIC_API_KEY"; ERRORS=$((ERRORS+1)); }
+    [ -n "${GITHUB_TOKEN:-}" ] && echo "✅ GITHUB_TOKEN" || { echo "❌ GITHUB_TOKEN"; ERRORS=$((ERRORS+1)); }
+    [ -n "${LINEAR_WEBHOOK_SECRET:-}" ] && echo "✅ LINEAR_WEBHOOK_SECRET" || { echo "❌ LINEAR_WEBHOOK_SECRET"; ERRORS=$((ERRORS+1)); }
     
     echo ""
-    echo "═══ 5. LOCAL DEV CONFIGURATION ═══"
-    # Check CTO_PM_SERVER_URL env var
+    echo "═══ 5. AGENT OAUTH TOKENS ═══"
+    for agent in morgan rex blaze bolt atlas cleo cipher tess; do
+      var_name="LINEAR_APP_$(echo $agent | tr '[:lower:]' '[:upper:]')_WEBHOOK_SECRET"
+      token_var="LINEAR_APP_$(echo $agent | tr '[:lower:]' '[:upper:]')_ACCESS_TOKEN"
+      eval "secret=\${$var_name:-}"
+      eval "token=\${$token_var:-}"
+      [ -n "$secret" ] && secret_status="✓ secret" || secret_status="✗ secret"
+      [ -n "$token" ] && token_status="✓ token" || token_status="✗ token"
+      if [ -n "$secret" ] && [ -n "$token" ]; then
+        echo "✅ $agent: $secret_status, $token_status"
+      elif [ -n "$secret" ]; then
+        echo "⚠️  $agent: $secret_status, $token_status (need OAuth: /oauth/start?agent=$agent)"
+        WARNINGS=$((WARNINGS+1))
+      else
+        echo "❌ $agent: $secret_status, $token_status"
+        ERRORS=$((ERRORS+1))
+      fi
+    done
+    
+    echo ""
+    echo "═══ 6. LOCAL DEV CONFIGURATION ═══"
     if [ -n "${CTO_PM_SERVER_URL:-}" ]; then
       if [[ "$CTO_PM_SERVER_URL" == *"-dev."* ]] || [[ "$CTO_PM_SERVER_URL" == *"localhost"* ]]; then
         echo "✅ CTO_PM_SERVER_URL = $CTO_PM_SERVER_URL (dev)"
       else
         echo "⚠️  CTO_PM_SERVER_URL = $CTO_PM_SERVER_URL (not dev - may use production!)"
+        WARNINGS=$((WARNINGS+1))
       fi
     else
       echo "⚠️  CTO_PM_SERVER_URL not set (will use cto-config.json or default to production)"
+      WARNINGS=$((WARNINGS+1))
     fi
     
-    # Check cto-config.json pmServerUrl
     if [ -f "cto-config.json" ]; then
       pm_url=$(jq -r '.defaults.linear.pmServerUrl // empty' cto-config.json 2>/dev/null || echo "")
       if [ -n "$pm_url" ]; then
@@ -338,23 +368,49 @@ preflight:
           echo "✅ cto-config.json pmServerUrl = $pm_url (dev)"
         else
           echo "⚠️  cto-config.json pmServerUrl = $pm_url (not dev!)"
+          WARNINGS=$((WARNINGS+1))
         fi
       else
         echo "⚠️  cto-config.json has no pmServerUrl (will use default: pm.5dlabs.ai)"
+        WARNINGS=$((WARNINGS+1))
       fi
       team_id=$(jq -r '.defaults.linear.teamId // empty' cto-config.json 2>/dev/null || echo "")
-      [ -n "$team_id" ] && echo "✅ cto-config.json teamId = $team_id" || echo "⚠️  No teamId in cto-config.json"
+      [ -n "$team_id" ] && echo "✅ cto-config.json teamId = $team_id" || { echo "⚠️  No teamId in cto-config.json"; WARNINGS=$((WARNINGS+1)); }
     else
       echo "❌ cto-config.json not found"
+      ERRORS=$((ERRORS+1))
     fi
     
     echo ""
-    echo "═══ PRE-FLIGHT COMPLETE ═══"
+    echo "═══ 7. RECENT CODERUN STATUS ═══"
+    echo "Last 5 CodeRuns:"
+    kubectl get coderuns -n cto --sort-by=.metadata.creationTimestamp -o custom-columns='NAME:.metadata.name,TYPE:.spec.runType,PHASE:.status.phase,AGE:.metadata.creationTimestamp' 2>/dev/null | tail -6 | head -6 || echo "Could not fetch CodeRuns"
+    
+    failed_count=$(kubectl get coderuns -n cto -o json 2>/dev/null | jq '[.items[] | select(.status.phase == "Failed")] | length' 2>/dev/null || echo "0")
+    if [ "$failed_count" -gt 0 ]; then
+      echo ""
+      echo "⚠️  $failed_count failed CodeRuns in cluster"
+      WARNINGS=$((WARNINGS+1))
+    fi
+    
     echo ""
-    echo "To start local development:"
-    echo "  1. just pc          # Start all services with process-compose"
-    echo "  2. Wait for tunnel to be healthy"
-    echo "  3. Use MCP tools from Cursor"
+    echo "════════════════════════════════════════════════════════════════════════════════"
+    if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
+      echo "✅ PRE-FLIGHT PASSED - Ready for intake/play workflows!"
+    elif [ $ERRORS -eq 0 ]; then
+      echo "⚠️  PRE-FLIGHT PASSED WITH $WARNINGS WARNING(S)"
+      echo "   Workflows may run but some features (like Linear activities) may be limited"
+    else
+      echo "❌ PRE-FLIGHT FAILED - $ERRORS error(s), $WARNINGS warning(s)"
+      echo "   Fix the errors above before running intake/play workflows"
+    fi
+    echo "════════════════════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "Quick commands:"
+    echo "  just pc              # Start all services"
+    echo "  just tunnel          # Start Cloudflare tunnel"
+    echo "  just webhook-dev     # Point GitHub webhook to dev"
+    echo "  just cluster-down    # Scale down in-cluster services"
 
 # =============================================================================
 # Utility Commands

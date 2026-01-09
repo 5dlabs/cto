@@ -59,6 +59,9 @@ echo "  ✓ Tasks: ~$NUM_TASKS"
 # Normalize repo name from project name (used for new repo creation)
 REPO_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-*//;s/-*$//')
 
+# Track whether we created a new repo (affects directory structure)
+REPO_CREATED="false"
+
 if [ -z "$REPOSITORY_URL" ] || [ "$REPOSITORY_URL" = "null" ]; then
     # =========================================================================
     # Create New Repository
@@ -73,6 +76,7 @@ if [ -z "$REPOSITORY_URL" ] || [ "$REPOSITORY_URL" = "null" ]; then
         echo "  ⚠️ Repository $FULL_REPO_NAME already exists, using it"
         REPOSITORY_URL="https://github.com/${FULL_REPO_NAME}"
     else
+        REPO_CREATED="true"
         echo "  → Creating $GITHUB_VISIBILITY repository: $FULL_REPO_NAME"
         if ! gh repo create "$FULL_REPO_NAME" \
             --"$GITHUB_VISIBILITY" \
@@ -181,9 +185,20 @@ cd "$CLONE_DIR" || exit 1
 git config user.name "Morgan Intake"
 git config user.email "morgan@5dlabs.com"
 
+# Determine working directory based on whether we created the repo
+# - New repos: work in root (single-project repo)
+# - Existing repos: create subdirectory (multi-project support)
 PROJECT_DIR_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-*//;s/-*$//')
-PROJECT_DIR="$CLONE_DIR/$PROJECT_DIR_NAME"
-mkdir -p "$PROJECT_DIR"
+if [ "$REPO_CREATED" = "true" ]; then
+    # New repo - work in root, no subdirectory needed
+    PROJECT_DIR="$CLONE_DIR"
+    echo "  ℹ️  New repository - working in repo root"
+else
+    # Existing repo - create project subdirectory
+    PROJECT_DIR="$CLONE_DIR/$PROJECT_DIR_NAME"
+    mkdir -p "$PROJECT_DIR"
+    echo "  ℹ️  Existing repository - using subdirectory: $PROJECT_DIR_NAME"
+fi
 cd "$PROJECT_DIR" || exit 1
 
 # =========================================================================

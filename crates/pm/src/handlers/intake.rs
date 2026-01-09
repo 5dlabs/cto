@@ -785,9 +785,12 @@ fn extract_repository_url(description: &str) -> Option<String> {
 }
 
 /// Sanitize a string for use as a GitHub repository name.
+/// Converts to lowercase, replaces non-alphanumeric chars with dashes,
+/// collapses consecutive dashes, and trims leading/trailing dashes.
 #[must_use]
 fn sanitize_for_repo_name(name: &str) -> String {
-    name.to_lowercase()
+    let sanitized: String = name
+        .to_lowercase()
         .chars()
         .map(|c| {
             if c.is_alphanumeric() || c == '-' {
@@ -796,9 +799,14 @@ fn sanitize_for_repo_name(name: &str) -> String {
                 '-'
             }
         })
-        .collect::<String>()
-        .trim_matches('-')
-        .to_string()
+        .collect();
+
+    // Collapse consecutive dashes and trim
+    sanitized
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 // =========================================================================
