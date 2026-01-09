@@ -38,6 +38,7 @@
     "intake": {
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
+      "local": false,
       "models": {
         "primary": "claude-opus-4-5-20251101",
         "research": "claude-opus-4-5-20251101",
@@ -283,6 +284,7 @@
     "defaults.code.docsRepository": "Default documentation repository URL (where Task Master docs are stored)",
     "defaults.code.docsProjectDirectory": "Default project directory within docs repository",
     "defaults.code.service": "Default service name for workspace isolation (creates workspace-{service} PVC)",
+    "defaults.intake.local": "Run intake locally using tasks CLI instead of submitting Argo workflow (default: false)",
     "defaults.intake.primary": "Primary model configuration for intake workflows",
     "defaults.intake.research": "Research model configuration for intake workflows",
     "defaults.intake.fallback": "Fallback model configuration for intake workflows",

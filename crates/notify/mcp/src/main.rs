@@ -137,6 +137,9 @@ struct IntakeDefaults {
     /// Model configuration (simplified - just model names, no providers)
     #[serde(default)]
     models: IntakeModels,
+    /// Run intake locally using tasks CLI instead of submitting Argo workflow
+    #[serde(default)]
+    local: bool,
 }
 
 fn default_source_branch() -> String {
@@ -151,6 +154,7 @@ impl Default for IntakeDefaults {
             include_codebase: false,
             source_branch: "main".to_string(),
             models: IntakeModels::default(),
+            local: false,
         }
     }
 }
@@ -3671,11 +3675,16 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
 #[allow(clippy::disallowed_macros)]
 #[allow(clippy::too_many_lines)]
 fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
-    // Check for local mode first
+    // Get configuration early so we can use defaults
+    let config = CTO_CONFIG
+        .get()
+        .ok_or_else(|| anyhow!("Configuration not loaded"))?;
+
+    // Check for local mode first (can be overridden by argument, defaults to config value)
     let local_mode = arguments
         .get("local")
         .and_then(Value::as_bool)
-        .unwrap_or(false);
+        .unwrap_or(config.defaults.intake.local);
 
     if local_mode {
         return handle_intake_local(arguments);
@@ -3738,11 +3747,6 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     } else {
         String::new()
     };
-
-    // Get configuration
-    let config = CTO_CONFIG
-        .get()
-        .ok_or_else(|| anyhow!("Configuration not loaded"))?;
 
     // Get repository - use provided value or auto-detect from git
     let repository_name = if let Some(repo) = arguments.get("repository").and_then(|v| v.as_str()) {

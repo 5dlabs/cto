@@ -3,6 +3,7 @@
   "orgName": "5DLabs",
   "defaults": {
     "intake": {
+    "local": false,
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
       "includeCodebase": false,
