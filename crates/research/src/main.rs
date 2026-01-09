@@ -168,6 +168,7 @@ pub enum Commands {
 }
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)] // CLI command dispatch function
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 

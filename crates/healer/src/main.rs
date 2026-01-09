@@ -3441,11 +3441,8 @@ async fn run_full_watch(
 
     println!(
         "{}",
-        format!(
-            "Loaded config: repo={}, impl={}, quality={}, testing={}",
-            repository, impl_agent, quality_agent, testing_agent
-        )
-        .cyan()
+        format!("Loaded config: repo={repository}, impl={impl_agent}, quality={quality_agent}, testing={testing_agent}")
+            .cyan()
     );
 
     // Step 2: Submit the workflow with config values

@@ -22,9 +22,7 @@ pub fn tweet_id_to_datetime(id: &str) -> Option<DateTime<Utc>> {
 /// Check if a tweet ID is within the given number of days from now.
 #[must_use]
 pub fn tweet_id_within_days(id: &str, days: i64) -> bool {
-    tweet_id_to_datetime(id)
-        .map(|dt| (Utc::now() - dt).num_days() <= days)
-        .unwrap_or(false)
+    tweet_id_to_datetime(id).is_some_and(|dt| (Utc::now() - dt).num_days() <= days)
 }
 
 /// A bookmarked tweet with metadata.

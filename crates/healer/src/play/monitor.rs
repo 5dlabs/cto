@@ -766,113 +766,118 @@ impl PlayMonitor {
         serde_json::from_slice(&output.stdout).ok()
     }
 
-    /// Generate evaluation probes for a play based on its context.
-    ///
-    /// Uses the artifact trail and anomaly history to create targeted probes
-    /// that test whether the agent retained critical information.
-    #[must_use]
-    pub fn generate_probes(&self, play: &MonitoredPlay) -> Vec<EvaluationProbe> {
+    /// Generate artifact probes from the artifact trail.
+    fn generate_artifact_probes(trail: &ArtifactTrail) -> Vec<EvaluationProbe> {
         let mut probes = Vec::new();
 
-        // Artifact probes - test file tracking
-        if let Some(trail) = &play.artifact_trail {
-            if !trail.files_modified.is_empty() {
-                let files: Vec<_> = trail.files_modified.keys().cloned().collect();
-                probes.push(
-                    EvaluationProbe::new(
-                        ProbeType::Artifact,
-                        "Which files have been modified in this session?",
-                    )
-                    .with_keywords(files),
-                );
-            }
+        if !trail.files_modified.is_empty() {
+            let files: Vec<_> = trail.files_modified.keys().cloned().collect();
+            probes.push(
+                EvaluationProbe::new(
+                    ProbeType::Artifact,
+                    "Which files have been modified in this session?",
+                )
+                .with_keywords(files),
+            );
+        }
 
-            if !trail.files_created.is_empty() {
-                probes.push(
-                    EvaluationProbe::new(ProbeType::Artifact, "What new files were created?")
-                        .with_keywords(trail.files_created.clone()),
-                );
-            }
+        if !trail.files_created.is_empty() {
+            probes.push(
+                EvaluationProbe::new(ProbeType::Artifact, "What new files were created?")
+                    .with_keywords(trail.files_created.clone()),
+            );
+        }
 
-            // Prefer structured decisions over legacy format
-            if !trail.decisions.is_empty() {
-                // Generate more specific probes from structured decisions
-                let decision_keywords: Vec<String> =
-                    trail.decisions.iter().map(|d| d.decision.clone()).collect();
+        probes
+    }
 
-                probes.push(
-                    EvaluationProbe::new(
-                        ProbeType::Decision,
-                        "What key decisions were made and what was the rationale?",
-                    )
-                    .with_keywords(decision_keywords),
-                );
+    /// Generate decision probes from structured decisions or legacy format.
+    fn generate_decision_probes(trail: &ArtifactTrail) -> Vec<EvaluationProbe> {
+        let mut probes = Vec::new();
 
-                // Add probes for decisions with low confidence
-                let low_confidence_decisions: Vec<_> = trail
-                    .decisions
-                    .iter()
-                    .filter(|d| d.confidence <= 2)
-                    .collect();
+        // Prefer structured decisions over legacy format
+        if !trail.decisions.is_empty() {
+            // Generate more specific probes from structured decisions
+            let decision_keywords: Vec<String> =
+                trail.decisions.iter().map(|d| d.decision.clone()).collect();
 
-                if !low_confidence_decisions.is_empty() {
-                    probes.push(
-                        EvaluationProbe::new(
-                            ProbeType::Decision,
-                            "Were any decisions made with low confidence that should be reviewed?",
-                        )
-                        .with_keywords(
-                            low_confidence_decisions
-                                .iter()
-                                .map(|d| d.decision.clone())
-                                .collect(),
-                        ),
-                    );
-                }
+            probes.push(
+                EvaluationProbe::new(
+                    ProbeType::Decision,
+                    "What key decisions were made and what was the rationale?",
+                )
+                .with_keywords(decision_keywords),
+            );
 
-                // Add probes for escalation decisions that need human review
-                let unreviewed_decisions: Vec<_> = trail
-                    .decisions
-                    .iter()
-                    .filter(|d| !d.human_reviewed && d.decision_point_id.is_some())
-                    .collect();
+            // Add probes for decisions with low confidence
+            let low_confidence_decisions: Vec<_> = trail
+                .decisions
+                .iter()
+                .filter(|d| d.confidence <= 2)
+                .collect();
 
-                if !unreviewed_decisions.is_empty() {
-                    probes.push(
-                        EvaluationProbe::new(
-                            ProbeType::Decision,
-                            "Were predicted decision points addressed appropriately?",
-                        )
-                        .with_keywords(
-                            unreviewed_decisions
-                                .iter()
-                                .map(|d| d.decision.clone())
-                                .collect(),
-                        ),
-                    );
-                }
-            } else if !trail.decisions_made.is_empty() {
-                // Fall back to legacy format
+            if !low_confidence_decisions.is_empty() {
                 probes.push(
                     EvaluationProbe::new(
                         ProbeType::Decision,
-                        "What key decisions were made during this task?",
+                        "Were any decisions made with low confidence that should be reviewed?",
                     )
                     .with_keywords(
-                        trail
-                            .decisions_made
+                        low_confidence_decisions
                             .iter()
-                            .flat_map(|d| d.split_whitespace().take(3).map(String::from))
+                            .map(|d| d.decision.clone())
                             .collect(),
                     ),
                 );
             }
+
+            // Add probes for escalation decisions that need human review
+            let unreviewed_decisions: Vec<_> = trail
+                .decisions
+                .iter()
+                .filter(|d| !d.human_reviewed && d.decision_point_id.is_some())
+                .collect();
+
+            if !unreviewed_decisions.is_empty() {
+                probes.push(
+                    EvaluationProbe::new(
+                        ProbeType::Decision,
+                        "Were predicted decision points addressed appropriately?",
+                    )
+                    .with_keywords(
+                        unreviewed_decisions
+                            .iter()
+                            .map(|d| d.decision.clone())
+                            .collect(),
+                    ),
+                );
+            }
+        } else if !trail.decisions_made.is_empty() {
+            // Fall back to legacy format
+            probes.push(
+                EvaluationProbe::new(
+                    ProbeType::Decision,
+                    "What key decisions were made during this task?",
+                )
+                .with_keywords(
+                    trail
+                        .decisions_made
+                        .iter()
+                        .flat_map(|d| d.split_whitespace().take(3).map(String::from))
+                        .collect(),
+                ),
+            );
         }
 
-        // Recall probes - test error retention if anomalies occurred
-        if !play.anomalies.is_empty() {
-            let error_keywords: Vec<_> = play
-                .anomalies
+        probes
+    }
+
+    /// Generate recall probes from anomaly history.
+    fn generate_recall_probes(anomalies: &[DetectedAnomaly]) -> Vec<EvaluationProbe> {
+        let mut probes = Vec::new();
+
+        if !anomalies.is_empty() {
+            let error_keywords: Vec<_> = anomalies
                 .iter()
                 .flat_map(|a| {
                     a.analysis
@@ -894,6 +899,26 @@ impl PlayMonitor {
                 );
             }
         }
+
+        probes
+    }
+
+    /// Generate evaluation probes for a play based on its context.
+    ///
+    /// Uses the artifact trail and anomaly history to create targeted probes
+    /// that test whether the agent retained critical information.
+    #[must_use]
+    pub fn generate_probes(&self, play: &MonitoredPlay) -> Vec<EvaluationProbe> {
+        let mut probes = Vec::new();
+
+        // Artifact and decision probes from trail
+        if let Some(trail) = &play.artifact_trail {
+            probes.extend(Self::generate_artifact_probes(trail));
+            probes.extend(Self::generate_decision_probes(trail));
+        }
+
+        // Recall probes from anomalies
+        probes.extend(Self::generate_recall_probes(&play.anomalies));
 
         // Continuation probe - always useful
         probes.push(EvaluationProbe::new(
