@@ -1,7 +1,7 @@
 ---
 name: ralph-technique
 description: The Ralph Wiggum technique for minimal, declarative prompts that enable loop-based autonomous execution.
-agents: [rex, nova, blaze, grizz, tess, bolt]
+agents: [rex, nova, blaze, grizz, tess]
 triggers: [minimal, ralph, loop, autonomous, simple prompt, deterministic]
 ---
 
