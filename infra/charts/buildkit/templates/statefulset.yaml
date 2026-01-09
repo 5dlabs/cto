@@ -33,10 +33,8 @@ spec:
             - unix:///run/buildkit/buildkitd.sock
             - --addr
             - tcp://0.0.0.0:1234
-            {{- if .Values.config.insecureRegistries }}
             - --config
             - /etc/buildkit/buildkitd.toml
-            {{- end }}
           ports:
             - name: buildkit
               containerPort: 1234
@@ -54,10 +52,8 @@ spec:
             - name: tmpfs-workspace
               mountPath: /tmp
             {{- end }}
-            {{- if .Values.config.insecureRegistries }}
             - name: buildkit-config
               mountPath: /etc/buildkit
-            {{- end }}
           env:
             - name: BUILDKIT_STEP_LOG_MAX_SIZE
               value: "{{ .Values.config.maxLogSize }}"
@@ -71,11 +67,9 @@ spec:
             medium: Memory
             sizeLimit: {{ .Values.workspace.sizeLimit }}
         {{- end }}
-        {{- if .Values.config.insecureRegistries }}
         - name: buildkit-config
           configMap:
             name: buildkit-config
-        {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: buildkit-cache

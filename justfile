@@ -163,11 +163,31 @@ bacon-test:
     bacon test
 
 # =============================================================================
-# Process Compose (TUI for monitoring services)
+# mprocs (TUI for monitoring services) - RECOMMENDED
 # =============================================================================
 
-# Start all services with process-compose TUI (recommended for monitoring)
-pc:
+# Kill processes on dev ports (8080, 8081, 8082, 3000)
+kill-ports:
+    @echo "🧹 Cleaning up stale processes..."
+    -lsof -ti :8080 | xargs kill -9 2>/dev/null || true
+    -lsof -ti :8081 | xargs kill -9 2>/dev/null || true
+    -lsof -ti :8082 | xargs kill -9 2>/dev/null || true
+    -lsof -ti :3000 | xargs kill -9 2>/dev/null || true
+    @sleep 1
+    @echo "✅ Ports cleared"
+
+# Start all services with mprocs TUI (recommended)
+mp: kill-ports
+    @echo "Starting services with mprocs TUI..."
+    @echo "Make sure you have sourced .env.local first!"
+    mprocs
+
+# =============================================================================
+# Process Compose (legacy - use mprocs instead)
+# =============================================================================
+
+# Start all services with process-compose TUI
+pc: kill-ports
     @echo "Starting services with process-compose TUI..."
     @echo "Make sure you have sourced .env.local first!"
     process-compose up --port 8090
@@ -407,7 +427,7 @@ preflight:
     echo "════════════════════════════════════════════════════════════════════════════════"
     echo ""
     echo "Quick commands:"
-    echo "  just pc              # Start all services"
+    echo "  just mp              # Start all services with mprocs (kills stale ports first)"
     echo "  just tunnel          # Start Cloudflare tunnel"
     echo "  just webhook-dev     # Point GitHub webhook to dev"
     echo "  just cluster-down    # Scale down in-cluster services"
