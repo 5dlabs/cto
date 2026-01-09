@@ -4,6 +4,7 @@ members = [
     "crates/cli",
     "crates/config",
     "crates/controller",
+    "crates/controller/installer",
     "crates/gpu",
     "crates/healer",
     "crates/intake",

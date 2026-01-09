@@ -105,7 +105,8 @@ jobs:
         package:
           - name: cto-mcp
             binary: cto-mcp
-            dir: crates/mcp
+            dir: crates/notify/mcp
+            standalone: true  # Has own [workspace], build from dir
           - name: tools
             binary: tools-server
             dir: crates/tools
@@ -123,7 +124,7 @@ jobs:
             dir: crates/utils
           - name: cto-cli
             binary: cto
-            dir: crates/installer
+            dir: crates/controller/installer
           - name: intake
             binary: intake
             dir: crates/intake
@@ -196,14 +197,29 @@ jobs:
 
       - name: Build binary
         run: |
-          cargo build --release --package ${{ matrix.package.name }} --target ${{ matrix.target.triple }}
+          if [ "${{ matrix.package.standalone }}" = "true" ]; then
+            # Standalone crate with own workspace - build from its directory
+            echo "Building standalone crate from ${{ matrix.package.dir }}"
+            cd "${{ matrix.package.dir }}"
+            cargo build --release --target ${{ matrix.target.triple }}
+          else
+            # Part of main workspace - build from root
+            cargo build --release --package ${{ matrix.package.name }} --target ${{ matrix.target.triple }}
+          fi
 
       - name: Prepare artifact
         shell: bash
         run: |
           mkdir -p dist
           BINARY_NAME="${{ matrix.package.binary }}${{ matrix.target.ext || '' }}"
-          SOURCE="target/${{ matrix.target.triple }}/release/$BINARY_NAME"
+          
+          if [ "${{ matrix.package.standalone }}" = "true" ]; then
+            # Standalone crate builds to its own target directory
+            SOURCE="${{ matrix.package.dir }}/target/${{ matrix.target.triple }}/release/$BINARY_NAME"
+          else
+            SOURCE="target/${{ matrix.target.triple }}/release/$BINARY_NAME"
+          fi
+          
           DEST="dist/${{ matrix.package.binary }}-${{ matrix.target.suffix }}${{ matrix.target.ext || '' }}"
 
           cp "$SOURCE" "$DEST"

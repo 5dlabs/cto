@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Internal crates
-metal = { path = "../metal" }
+metal = { path = "../../metal" }
 
 # CLI framework
 clap = { workspace = true }

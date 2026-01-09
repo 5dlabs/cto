@@ -26,21 +26,21 @@ impl BootstrapResources {
         Self::apply_yaml(
             kubeconfig,
             "gpu-operator namespace",
-            include_str!("../../../infra/cluster-config/gpu-operator-namespace.yaml"),
+            include_str!("../../../../infra/cluster-config/gpu-operator-namespace.yaml"),
         )?;
 
         // Mayastor namespace with Pod Security labels
         Self::apply_yaml(
             kubeconfig,
             "mayastor namespace",
-            include_str!("../../../infra/cluster-config/mayastor-namespace.yaml"),
+            include_str!("../../../../infra/cluster-config/mayastor-namespace.yaml"),
         )?;
 
         // Observability namespace with Pod Security labels
         Self::apply_yaml(
             kubeconfig,
             "observability namespace",
-            include_str!("../../../infra/cluster-config/observability-namespace.yaml"),
+            include_str!("../../../../infra/cluster-config/observability-namespace.yaml"),
         )?;
 
         // NOTE: local-path-config is now applied directly in deploy_local_path_provisioner()
@@ -156,8 +156,8 @@ mod tests {
     fn test_bootstrap_resources_compile() {
         // Just verify that the include_str! macros work
         // (i.e., the files exist at compile time)
-        let _ = include_str!("../../../infra/cluster-config/gpu-operator-namespace.yaml");
-        let _ = include_str!("../../../infra/cluster-config/mayastor-namespace.yaml");
-        let _ = include_str!("../../../infra/cluster-config/observability-namespace.yaml");
+        let _ = include_str!("../../../../infra/cluster-config/gpu-operator-namespace.yaml");
+        let _ = include_str!("../../../../infra/cluster-config/mayastor-namespace.yaml");
+        let _ = include_str!("../../../../infra/cluster-config/observability-namespace.yaml");
     }
 }
