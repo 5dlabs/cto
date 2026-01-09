@@ -49,10 +49,17 @@ runs:
       run: |
         echo "🚀 Setting up Rust build environment..."
         
-        # Add cargo bin to PATH
-        mkdir -p "$HOME/.cargo/bin"
-        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-        export PATH="$HOME/.cargo/bin:$PATH"
+        # Override RUSTUP_HOME and CARGO_HOME to use writable paths
+        # The rust-builder image may set these to /cache/* which isn't writable on all runners
+        export RUSTUP_HOME="$HOME/.rustup"
+        export CARGO_HOME="$HOME/.cargo"
+        echo "RUSTUP_HOME=$RUSTUP_HOME" >> "$GITHUB_ENV"
+        echo "CARGO_HOME=$CARGO_HOME" >> "$GITHUB_ENV"
+        
+        # Create directories and add cargo bin to PATH
+        mkdir -p "$RUSTUP_HOME" "$CARGO_HOME/bin"
+        echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
+        export PATH="$CARGO_HOME/bin:$PATH"
         
         # Check if running on rust-builder image (tools pre-installed)
         if command -v rustc &> /dev/null && command -v cargo &> /dev/null; then
@@ -102,7 +109,7 @@ runs:
       if: inputs.components != ''
       shell: bash
       run: |
-        export PATH="$HOME/.cargo/bin:$PATH"
+        export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
         echo "📦 Installing components: ${{ inputs.components }}"
         IFS=',' read -ra COMP_ARRAY <<< "${{ inputs.components }}"
         for comp in "${COMP_ARRAY[@]}"; do
@@ -124,9 +131,9 @@ runs:
         SCCACHE_VERSION="v0.10.0"
         SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
         curl -fsSL --retry 5 "$SCCACHE_URL" | tar -xz
-        mv "sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" "$HOME/.cargo/bin/"
+        mv "sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" "${CARGO_HOME:-$HOME/.cargo}/bin/"
         rm -rf "sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl"
-        chmod +x "$HOME/.cargo/bin/sccache"
+        chmod +x "${CARGO_HOME:-$HOME/.cargo}/bin/sccache"
 
     - name: Start sccache server
       shell: bash
@@ -134,7 +141,7 @@ runs:
         SCCACHE_CACHE_SIZE: ${{ inputs.sccache-size }}
         SCCACHE_IDLE_TIMEOUT: '0'
       run: |
-        export PATH="$HOME/.cargo/bin:$PATH"
+        export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
         
         # Stop any existing sccache server
         sccache --stop-server 2>/dev/null || true
@@ -149,7 +156,7 @@ runs:
       id: version
       shell: bash
       run: |
-        export PATH="$HOME/.cargo/bin:$PATH"
+        export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
         echo "rustc=$(rustc --version)" >> "$GITHUB_OUTPUT"
         echo "cargo=$(cargo --version)" >> "$GITHUB_OUTPUT"
 
