@@ -440,9 +440,10 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
   && rustup component add rustfmt clippy rust-analyzer
 
 # Install cursor-rust-tools MCP server for AI agent Rust analysis
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
-    . $HOME/.cargo/env \
-  && cargo install --git https://github.com/terhechte/cursor-rust-tools
+# TEMPORARILY DISABLED - compilation fails in CI (exit code 101)
+# RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
+#     . $HOME/.cargo/env \
+#   && cargo install --git https://github.com/terhechte/cursor-rust-tools
 
 # Install Qlty for unified code quality across all languages
 RUN curl -fsSL https://qlty.sh | bash \
