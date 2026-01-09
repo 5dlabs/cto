@@ -143,6 +143,12 @@ runs:
       run: |
         export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
         
+        # Override SCCACHE_DIR to use writable path
+        # The rust-builder image may set this to /cache/sccache which isn't writable on all runners
+        export SCCACHE_DIR="$HOME/.cache/sccache"
+        echo "SCCACHE_DIR=$SCCACHE_DIR" >> "$GITHUB_ENV"
+        mkdir -p "$SCCACHE_DIR"
+        
         # Stop any existing sccache server
         sccache --stop-server 2>/dev/null || true
         
