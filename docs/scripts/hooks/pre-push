@@ -12,7 +12,7 @@
 # - Bypass with: git push --no-verify
 #
 # Installation:
-#   ./scripts/install-hooks.sh
+#   ./docs/scripts/install-hooks.sh
 # =============================================================================
 
 set -euo pipefail
@@ -39,7 +39,7 @@ else
     REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 fi
 
-LOCAL_CI="$REPO_ROOT/scripts/local-ci.sh"
+LOCAL_CI="$REPO_ROOT/docs/scripts/local-ci.sh"
 OUTPUT_FILE=$(mktemp)
 trap 'rm -f "$OUTPUT_FILE"' EXIT
 
@@ -221,13 +221,13 @@ main() {
         # If auto-fix is disabled or Claude not available, fail immediately
         if [ "$AUTO_FIX" != "true" ]; then
             log_error "Checks failed. Auto-fix is disabled."
-            log_info "Fix manually or run: ./scripts/local-ci.sh"
+            log_info "Fix manually or run: ./docs/scripts/local-ci.sh"
             exit 1
         fi
         
         if ! check_claude; then
             log_error "Checks failed and Claude is not available for auto-fix"
-            log_info "Fix manually or run: ./scripts/local-ci.sh"
+            log_info "Fix manually or run: ./docs/scripts/local-ci.sh"
             exit 1
         fi
         
@@ -259,7 +259,7 @@ main() {
         echo ""
         echo "Options:"
         echo "  1. Fix manually and commit --amend"
-        echo "  2. Run checks: ./scripts/local-ci.sh"
+        echo "  2. Run checks: ./docs/scripts/local-ci.sh"
         echo "  3. Bypass hook: git push --no-verify"
         echo ""
         exit 1
