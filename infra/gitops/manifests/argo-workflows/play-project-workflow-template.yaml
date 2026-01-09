@@ -494,11 +494,12 @@ spec:
             JWT_HEADER=$(echo -n "$JWT_HEADER" | tr '+/' '-_' | tr -d '=')
             JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || base64)
             JWT_PAYLOAD=$(echo -n "$JWT_PAYLOAD" | tr '+/' '-_' | tr -d '=')
-            JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || base64)
+            JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | \
+              openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || base64)
             JWT_SIGNATURE=$(echo -n "$JWT_SIGNATURE" | tr '+/' '-_' | tr -d '=')
             JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
 
-            # Derive owner/repo from input if possible for repo-scoped installation lookup
+            # Derive owner/repo for repo-scoped installation lookup
             OWNER=""
             REPO=""
             case "$DOCS_REPO_INPUT" in
@@ -549,50 +550,92 @@ spec:
 
           cd /workspace/"{{inputs.parameters.docs-directory}}"
 
-          # Resilient task directory discovery - check both possible locations
+          # Resilient task discovery - check task-* directories first, then tasks.json
           TASK_DIR=""
+          TASKS_JSON=""
+
+          # Method 1: Check for task-* directories (legacy format)
           if [ -d ".tasks/docs" ] && [ -n "$(ls -A .tasks/docs/task-* 2>/dev/null)" ]; then
             TASK_DIR=".tasks/docs"
-            echo "✓ Found task files in docs/ directory"
+            echo "✓ Found task directories in docs/ directory"
           elif [ -d ".tasks/tasks" ] && [ -n "$(ls -A .tasks/tasks/task-* 2>/dev/null)" ]; then
             TASK_DIR=".tasks/tasks"
-            echo "✓ Found task files in tasks/ directory"
+            echo "✓ Found task directories in tasks/ directory"
           fi
 
+          # Method 2: Check for tasks.json (new unified format)
           if [ -z "$TASK_DIR" ]; then
-            echo "❌ No tasks task directories found. Checked:"
-            echo "   - .tasks/docs/task-*"
-            echo "   - .tasks/tasks/task-*"
+            if [ -f ".tasks/tasks/tasks.json" ]; then
+              TASKS_JSON=".tasks/tasks/tasks.json"
+              echo "✓ Found tasks.json in tasks/ directory"
+            elif [ -f ".tasks/docs/tasks.json" ]; then
+              TASKS_JSON=".tasks/docs/tasks.json"
+              echo "✓ Found tasks.json in docs/ directory"
+            fi
+          fi
+
+          # Fail if neither format found
+          if [ -z "$TASK_DIR" ] && [ -z "$TASKS_JSON" ]; then
+            echo "❌ No task sources found. Checked:"
+            echo "   - .tasks/docs/task-* (directories)"
+            echo "   - .tasks/tasks/task-* (directories)"
+            echo "   - .tasks/tasks/tasks.json (unified file)"
+            echo "   - .tasks/docs/tasks.json (unified file)"
             # Create empty output files so Argo can read them
             echo "" > /tmp/task-list.txt
             echo "0" > /tmp/task-count.txt
             exit 1
           fi
 
-          # Discover task directories
-          echo "📋 Scanning for task-* directories in $TASK_DIR..."
           tasks=""
           count=0
 
-          for dir in $(ls -1d $TASK_DIR/task-* 2>/dev/null | sort -V); do
-            task_num=$(basename "$dir" | sed 's/task-//')
+          if [ -n "$TASKS_JSON" ]; then
+            # Parse tasks.json to extract task IDs
+            echo "📋 Parsing tasks from $TASKS_JSON..."
 
-            # Check if task number is >= start-from
-            if [ "$task_num" -ge "{{inputs.parameters.start-from}}" ]; then
-              if [ -z "$tasks" ]; then
-                tasks="$task_num"
-              else
-                tasks="$tasks,$task_num"
-              fi
-              count=$((count + 1))
+            # Extract task IDs using jq - handles both "task-N" and "N" formats
+            for task_id in $(jq -r '.tasks[].id // empty' "$TASKS_JSON" | sed 's/task-//' | sort -n); do
+              # Check if task number is >= start-from
+              if [ "$task_id" -ge "{{inputs.parameters.start-from}}" ]; then
+                if [ -z "$tasks" ]; then
+                  tasks="$task_id"
+                else
+                  tasks="$tasks,$task_id"
+                fi
+                count=$((count + 1))
 
-              # Check max tasks limit
-              if [ "$count" -ge "{{inputs.parameters.max-tasks}}" ]; then
-                echo "⚠️ Reached max tasks limit: {{inputs.parameters.max-tasks}}"
-                break
+                # Check max tasks limit
+                if [ "$count" -ge "{{inputs.parameters.max-tasks}}" ]; then
+                  echo "⚠️ Reached max tasks limit: {{inputs.parameters.max-tasks}}"
+                  break
+                fi
               fi
-            fi
-          done
+            done
+          else
+            # Discover task directories (legacy method)
+            echo "📋 Scanning for task-* directories in $TASK_DIR..."
+
+            for dir in $(ls -1d $TASK_DIR/task-* 2>/dev/null | sort -V); do
+              task_num=$(basename "$dir" | sed 's/task-//')
+
+              # Check if task number is >= start-from
+              if [ "$task_num" -ge "{{inputs.parameters.start-from}}" ]; then
+                if [ -z "$tasks" ]; then
+                  tasks="$task_num"
+                else
+                  tasks="$tasks,$task_num"
+                fi
+                count=$((count + 1))
+
+                # Check max tasks limit
+                if [ "$count" -ge "{{inputs.parameters.max-tasks}}" ]; then
+                  echo "⚠️ Reached max tasks limit: {{inputs.parameters.max-tasks}}"
+                  break
+                fi
+              fi
+            done
+          fi
 
           if [ -z "$tasks" ]; then
             echo "❌ No tasks found starting from task-{{inputs.parameters.start-from}}"
@@ -709,11 +752,12 @@ spec:
             JWT_HEADER=$(echo -n "$JWT_HEADER" | tr '+/' '-_' | tr -d '=')
             JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || base64)
             JWT_PAYLOAD=$(echo -n "$JWT_PAYLOAD" | tr '+/' '-_' | tr -d '=')
-            JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || base64)
+            JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | \
+              openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || base64)
             JWT_SIGNATURE=$(echo -n "$JWT_SIGNATURE" | tr '+/' '-_' | tr -d '=')
             JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
 
-            # Derive owner/repo from input if possible for repo-scoped installation lookup
+            # Derive owner/repo for repo-scoped installation lookup
             OWNER=""
             REPO=""
             case "$DOCS_REPO_INPUT" in
@@ -1230,7 +1274,9 @@ spec:
                   JWT_HEADER=$(echo -n "$JWT_HEADER" | tr '+/' '-_' | tr -d '=')
                   JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || base64)
                   JWT_PAYLOAD=$(echo -n "$JWT_PAYLOAD" | tr '+/' '-_' | tr -d '=')
-                  JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || base64)
+                  JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | \
+                    openssl dgst -sha256 -sign "$TEMP_KEY" -binary | \
+                    base64 -w 0 2>/dev/null || base64)
                   JWT_SIGNATURE=$(echo -n "$JWT_SIGNATURE" | tr '+/' '-_' | tr -d '=')
                   JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
 
@@ -1347,8 +1393,9 @@ spec:
                     git push -f origin "$INTEGRATION_BRANCH"
 
                     PR_TITLE="Integration PR: Level $level_index for {{workflow.name}}"
-                    PR_BODY="This PR merges task branches for level $level_index: $(echo $task_array | tr '\n' ' ')"
-                    CREATE_BODY=$(printf '{"title":"%s","head":"%s","base":"%s","body":"%s"}' "$PR_TITLE" "$INTEGRATION_BRANCH" "$BASE_BRANCH" "$PR_BODY")
+                    PR_BODY="Merges task branches for level $level_index: $(echo $task_array | tr '\n' ' ')"
+                    CREATE_BODY=$(printf '{"title":"%s","head":"%s","base":"%s","body":"%s"}' \
+                      "$PR_TITLE" "$INTEGRATION_BRANCH" "$BASE_BRANCH" "$PR_BODY")
                     EXISTING=$(curl -s -L \
                       -H "Authorization: Bearer $JWT_TOKEN" \
                       -H "Accept: application/vnd.github+json" \
@@ -1542,7 +1589,9 @@ spec:
 
           # Create telemetry summary
           WORKFLOW_END=$(date +%s)
-          WORKFLOW_START=$(kubectl get workflow "{{workflow.name}}" -n cto -o jsonpath='{.status.startedAt}' | xargs -I {} date -d {} +%s 2>/dev/null || echo "$WORKFLOW_END")
+          WORKFLOW_START=$(kubectl get workflow "{{workflow.name}}" -n cto \
+            -o jsonpath='{.status.startedAt}' | \
+            xargs -I {} date -d {} +%s 2>/dev/null || echo "$WORKFLOW_END")
           TOTAL_DURATION=$((WORKFLOW_END - WORKFLOW_START))
 
           # Estimate sequential time (sum of all task durations)
