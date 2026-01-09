@@ -27,7 +27,11 @@ Ralph-inspired concise prompts with:
 - ~40-50 lines per agent
 
 Currently implemented for:
-- **Rex** (`templates/agents/rex/coder-minimal.md.hbs`)
+- **Rex** (`templates/agents/rex/coder-minimal.md.hbs`) - Rust backend
+- **Blaze** (`templates/agents/blaze/coder-minimal.md.hbs`) - React/Next.js frontend
+- **Nova** (`templates/agents/nova/coder-minimal.md.hbs`) - Bun/Effect backend
+- **Grizz** (`templates/agents/grizz/coder-minimal.md.hbs`) - Go backend
+- **Tess** (`templates/agents/tess/test-minimal.md.hbs`) - Testing
 
 ## Usage
 
@@ -150,12 +154,23 @@ You are {Agent}. Your job is to {primary task} in `task/`.
 Read `task/` directory and implement.
 ```
 
+## Skills Integration
+
+The Ralph technique is available as a skill at `templates/skills/workflow/ralph-technique/SKILL.md`. This skill:
+
+- Documents the Ralph philosophy and loop-based execution
+- Provides the "signs on the playground" tuning methodology
+- Is mapped as an optional skill for Rex, Blaze, Nova, Grizz, and Tess
+
+Load the skill via triggers: `minimal`, `ralph`, `loop`, `autonomous`, `simple`
+
 ## Future Enhancements
 
-- [ ] Add minimal variants for other agents (Blaze, Tess, etc.)
+- [x] ~~Add minimal variants for other agents (Blaze, Tess, etc.)~~ ✓ Done
 - [ ] Implement metrics collection for automated comparison
 - [ ] Add `verbose` variant for complex tasks requiring more guidance
 - [ ] Dashboard for comparing variant performance over time
+- [ ] Add minimal variants for remaining agents (Bolt, Atlas, Cipher)
 
 ## References
 
