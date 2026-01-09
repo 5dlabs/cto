@@ -140,6 +140,9 @@ struct IntakeDefaults {
     /// Run intake locally using tasks CLI instead of submitting Argo workflow
     #[serde(default)]
     local: bool,
+    /// Auto-assign Morgan to the PRD issue to start intake workflow immediately
+    #[serde(default = "default_true", rename = "autoAssignMorgan")]
+    auto_assign_morgan: bool,
 }
 
 fn default_source_branch() -> String {
@@ -155,6 +158,7 @@ impl Default for IntakeDefaults {
             source_branch: "main".to_string(),
             models: IntakeModels::default(),
             local: false,
+            auto_assign_morgan: true,
         }
     }
 }
@@ -3851,11 +3855,11 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty());
 
-    // Auto-assign Morgan to start intake immediately (defaults to true for smoother UX)
+    // Auto-assign Morgan to start intake immediately (defaults from config)
     let auto_assign_morgan = arguments
         .get("auto_assign_morgan")
         .and_then(Value::as_bool)
-        .unwrap_or(true);
+        .unwrap_or(config.defaults.intake.auto_assign_morgan);
 
     let linear_result = if !skip_linear
         && config.defaults.linear.intake.create_project

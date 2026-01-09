@@ -39,6 +39,7 @@
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
       "local": false,
+      "autoAssignMorgan": true,
       "models": {
         "primary": "claude-opus-4-5-20251101",
         "research": "claude-opus-4-5-20251101",
@@ -285,6 +286,7 @@
     "defaults.code.docsProjectDirectory": "Default project directory within docs repository",
     "defaults.code.service": "Default service name for workspace isolation (creates workspace-{service} PVC)",
     "defaults.intake.local": "Run intake locally using tasks CLI instead of submitting Argo workflow (default: false)",
+    "defaults.intake.autoAssignMorgan": "Auto-assign Morgan to the PRD issue to start intake workflow immediately (default: true). Set to false to review/edit cto-config first.",
     "defaults.intake.primary": "Primary model configuration for intake workflows",
     "defaults.intake.research": "Research model configuration for intake workflows",
     "defaults.intake.fallback": "Fallback model configuration for intake workflows",
