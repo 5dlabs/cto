@@ -386,7 +386,7 @@ FIRECRAWL_KEY=$(get_op_field "Firecrawl API Key" "credential")
 
 if [[ -n "$FIRECRAWL_KEY" ]]; then
     echo "📥 Found Firecrawl API key in 1Password"
-    update_openbao "tools-firecrawl" "FIRECRAWL_API_KEY='$FIRECRAWL_KEY'"
+    update_openbao "tools-firecrawl" "FIRECRAWL_API_KEY=$FIRECRAWL_KEY"
 else
     echo -e "${YELLOW}⚠ Firecrawl API key not found in 1Password${NC}"
     SKIP_COUNT=$((SKIP_COUNT + 1))
@@ -404,7 +404,7 @@ LATITUDE_KEY=$(get_op_field "Latitude.sh API" "credential")
 
 if [[ -n "$LATITUDE_KEY" ]]; then
     echo "📥 Found Latitude API key in 1Password"
-    update_openbao "tools-latitude" "LATITUDE_API_KEY='$LATITUDE_KEY'"
+    update_openbao "tools-latitude" "LATITUDE_API_KEY=$LATITUDE_KEY"
 else
     echo -e "${YELLOW}⚠ Latitude API key not found in 1Password${NC}"
     SKIP_COUNT=$((SKIP_COUNT + 1))
