@@ -1,0 +1,9 @@
+apiVersion: v2
+name: tenant-agents
+description: Per-tenant agent deployment for CTO SaaS platform
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: 5D Labs
+    email: team@5dlabs.ai

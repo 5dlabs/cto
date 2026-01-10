@@ -1,0 +1,32 @@
+---
+# Tenant CRD ArgoCD Application
+# Installs the Tenant Custom Resource Definition for multi-tenancy support
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tenant-crd
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: tenant-crd
+    app.kubernetes.io/part-of: cto-platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/gitops/manifests/tenant-crd
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

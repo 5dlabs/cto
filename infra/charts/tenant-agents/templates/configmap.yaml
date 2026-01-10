@@ -1,0 +1,21 @@
+{{- if .Values.tenant.id }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tenant-agents.fullname" . }}-config
+  namespace: {{ .Values.tenant.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "tenant-agents.labels" . | nindent 4 }}
+data:
+  TENANT_ID: {{ .Values.tenant.id | quote }}
+  TENANT_NAMESPACE: {{ .Values.tenant.namespace | default .Release.Namespace | quote }}
+  
+  # Enabled agents
+  {{- $enabledAgents := list }}
+  {{- range $agent, $config := .Values.agents }}
+  {{- if $config.enabled }}
+  {{- $enabledAgents = append $enabledAgents $agent }}
+  {{- end }}
+  {{- end }}
+  ENABLED_AGENTS: {{ join "," $enabledAgents | quote }}
+{{- end }}

@@ -1,0 +1,64 @@
+# Tenant-specific agent configuration
+# These values are typically set by the Tenant Operator via ArgoCD
+
+tenant:
+  # Tenant identifier (e.g., "acme-corp")
+  id: ""
+  # Namespace for tenant resources
+  namespace: ""
+
+# Enabled agents for this tenant
+# Each agent can be toggled on/off
+agents:
+  morgan:
+    enabled: true
+  rex:
+    enabled: false
+  blaze:
+    enabled: false
+  nova:
+    enabled: false
+  grizz:
+    enabled: false
+  tap:
+    enabled: false
+  spark:
+    enabled: false
+  vex:
+    enabled: false
+  cleo:
+    enabled: true
+  cipher:
+    enabled: false
+  tess:
+    enabled: true
+  atlas:
+    enabled: false
+  bolt:
+    enabled: false
+  stitch:
+    enabled: false
+
+# Secret configuration
+secrets:
+  # Name of the ExternalSecret that provides API keys
+  externalSecret: ""
+
+# Resource defaults for agent pods
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+# Image configuration
+image:
+  repository: ghcr.io/5dlabs/agent-runner
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Image pull secrets
+imagePullSecrets:
+  - name: ghcr-secret
