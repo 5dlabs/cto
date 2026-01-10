@@ -1,12 +1,11 @@
 ---
-# CTO Platform - Single Application Deployment (Develop Branch)
+# CTO Platform - Single Application Deployment (Main Branch)
 # =============================================================================
 # Deploys all CTO platform components from a single Helm chart.
-# This application tracks the 'develop' branch and uses 'develop' tagged images.
+# This application tracks the 'main' branch and uses 'latest' tagged images.
 #
 # Branch-based image tagging:
-#   - develop branch → images tagged 'develop'
-#   - main branch → images tagged 'latest' (for production app)
+#   - main branch → images tagged 'latest'
 #
 # Components:
 # - Controller: Agent orchestration and CodeRun management
@@ -28,32 +27,32 @@ metadata:
     app.kubernetes.io/branch: main
   annotations:
     # Image Updater for all CTO images
-    # Uses digest strategy to track the 'develop' tag specifically
-    # NOTE: Version constraint (:develop) required for digest strategy
+    # Uses digest strategy to track the 'latest' tag specifically
+    # NOTE: Version constraint (:latest) required for digest strategy
     argocd-image-updater.argoproj.io/image-list: |
-      controller=ghcr.io/5dlabs/controller:develop,
-      pm=ghcr.io/5dlabs/pm-server:develop,
-      tools=ghcr.io/5dlabs/tools:develop,
-      openmemory=ghcr.io/5dlabs/openmemory:develop,
-      healer=ghcr.io/5dlabs/healer:develop,
-      tweakcn=ghcr.io/5dlabs/tweakcn:develop,
-      research=ghcr.io/5dlabs/research:develop
-    # Use 'digest' strategy to track the 'develop' tag and auto-update on new pushes
-    # This ensures we always get the latest digest when CI pushes a new develop image
+      controller=ghcr.io/5dlabs/controller:latest,
+      pm=ghcr.io/5dlabs/pm-server:latest,
+      tools=ghcr.io/5dlabs/tools:latest,
+      openmemory=ghcr.io/5dlabs/openmemory:latest,
+      healer=ghcr.io/5dlabs/healer:latest,
+      tweakcn=ghcr.io/5dlabs/tweakcn:latest,
+      research=ghcr.io/5dlabs/research:latest
+    # Use 'digest' strategy to track the 'latest' tag and auto-update on new pushes
+    # This ensures we always get the latest digest when CI pushes a new image
     argocd-image-updater.argoproj.io/controller.update-strategy: "digest"
-    argocd-image-updater.argoproj.io/controller.allow-tags: "regexp:^develop$"
+    argocd-image-updater.argoproj.io/controller.allow-tags: "regexp:^latest$"
     argocd-image-updater.argoproj.io/pm.update-strategy: "digest"
-    argocd-image-updater.argoproj.io/pm.allow-tags: "regexp:^develop$"
+    argocd-image-updater.argoproj.io/pm.allow-tags: "regexp:^latest$"
     argocd-image-updater.argoproj.io/tools.update-strategy: "digest"
-    argocd-image-updater.argoproj.io/tools.allow-tags: "regexp:^develop$"
+    argocd-image-updater.argoproj.io/tools.allow-tags: "regexp:^latest$"
     argocd-image-updater.argoproj.io/openmemory.update-strategy: "digest"
-    argocd-image-updater.argoproj.io/openmemory.allow-tags: "regexp:^develop$"
+    argocd-image-updater.argoproj.io/openmemory.allow-tags: "regexp:^latest$"
     argocd-image-updater.argoproj.io/healer.update-strategy: "digest"
-    argocd-image-updater.argoproj.io/healer.allow-tags: "regexp:^develop$"
+    argocd-image-updater.argoproj.io/healer.allow-tags: "regexp:^latest$"
     argocd-image-updater.argoproj.io/tweakcn.update-strategy: "digest"
-    argocd-image-updater.argoproj.io/tweakcn.allow-tags: "regexp:^develop$"
+    argocd-image-updater.argoproj.io/tweakcn.allow-tags: "regexp:^latest$"
     argocd-image-updater.argoproj.io/research.update-strategy: "digest"
-    argocd-image-updater.argoproj.io/research.allow-tags: "regexp:^develop$"
+    argocd-image-updater.argoproj.io/research.allow-tags: "regexp:^latest$"
     argocd-image-updater.argoproj.io/write-back-method: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -67,7 +66,7 @@ spec:
     helm:
       valueFiles:
         - values.yaml
-      # Develop branch overrides - uses 'develop' tagged images
+      # Main branch overrides - uses 'latest' tagged images
       # =======================================================================
       # CLUSTER: Latitude.sh (cto-dal)
       # Worker: hardware-219s058355, Control: hardware-21bs002557
@@ -91,13 +90,13 @@ spec:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/controller
-            tag: develop
+            tag: latest
 
         pm:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/pm-server
-            tag: develop
+            tag: latest
           github:
             defaultOrg: "5dlabs"
             webhookCallbackUrl: "https://pm.5dlabs.ai/webhooks/github"
@@ -106,19 +105,19 @@ spec:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/tools
-            tag: develop
+            tag: latest
 
         healer:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/healer
-            tag: develop
+            tag: latest
 
         openmemory:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/openmemory
-            tag: develop
+            tag: latest
 
         sensors:
           enabled: true
@@ -130,14 +129,14 @@ spec:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/tweakcn
-            tag: develop
+            tag: latest
 
         # Research - Twitter/X bookmark research pipeline
         research:
           enabled: true
           image:
             repository: ghcr.io/5dlabs/research
-            tag: develop
+            tag: latest
           # CronJob schedule (every 5 minutes)
           schedule: "*/5 * * * *"
           # Research configuration
