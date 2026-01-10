@@ -1,0 +1,21 @@
+{{- if and .Values.cloudflare.enabled .Values.web.enabled }}
+---
+# TunnelBinding: Web App
+# Routes cto.5dlabs.ai (or configured hostname) to the web app service
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: web-tunnel
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.web.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflare-binding
+tunnelRef:
+  kind: ClusterTunnel
+  name: {{ .Values.cloudflare.tunnel.name }}
+subjects:
+  - name: {{ include "cto.web.fullname" . }}
+    spec:
+      fqdn: {{ .Values.cloudflare.bindings.web.hostname }}
+      target: http://{{ include "cto.web.fullname" . }}.{{ include "cto.namespace" . }}.svc:{{ .Values.web.service.port }}
+{{- end }}

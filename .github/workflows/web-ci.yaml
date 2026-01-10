@@ -1,0 +1,181 @@
+---
+name: Web App CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/web/**'
+      - 'infra/images/web/**'
+      - 'infra/charts/cto/templates/web/**'
+      - '.github/workflows/web-ci.yaml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/web/**'
+      - 'infra/images/web/**'
+      - 'infra/charts/cto/templates/web/**'
+      - '.github/workflows/web-ci.yaml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Change detection job (lightweight - stays on ubuntu)
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      docker: ${{ steps.filter.outputs.docker }}
+      helm: ${{ steps.filter.outputs.helm }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - '!apps/web/**/*.md'
+            docker:
+              - 'infra/images/web/**'
+            helm:
+              - 'infra/charts/cto/templates/web/**'
+
+  # TypeScript linting
+  lint-typescript:
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: apps/web
+        run: npm run lint
+
+  # Build check - verify Next.js builds successfully
+  build-check:
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Build Next.js app
+        working-directory: apps/web
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run build
+
+  # Helm chart validation
+  helm-lint:
+    needs: changes
+    if: needs.changes.outputs.helm == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
+        with:
+          version: 'latest'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint Helm chart
+        run: |
+          echo "🔍 Linting CTO Helm chart (contains web templates)..."
+          helm lint infra/charts/cto
+          echo "✅ Helm lint passed"
+
+      - name: Template Helm chart
+        run: |
+          echo "📋 Testing Helm template rendering..."
+          helm template cto infra/charts/cto > /dev/null
+          echo "✅ Helm template passed"
+
+  # Dockerfile validation
+  docker-lint:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/images/web/Dockerfile
+          failure-threshold: error
+
+  # Build and push Docker image (on push to main or develop)
+  build-docker:
+    needs: [lint-typescript, build-check]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Build Next.js app
+        working-directory: apps/web
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run build
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' apps/web/package.json)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: web
+          context: .
+          dockerfile: ./infra/images/web/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ steps.version.outputs.short-sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tag-latest: 'true'
