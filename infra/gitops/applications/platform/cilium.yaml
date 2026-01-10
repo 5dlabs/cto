@@ -17,14 +17,18 @@ metadata:
     argocd.argoproj.io/sync-wave: "-10"
 spec:
   project: platform
-  source:
-    repoURL: https://helm.cilium.io/
-    chart: cilium
-    targetRevision: 1.16.4
-    helm:
-      # Values are defined in the manifests directory for per-cluster customization
-      valueFiles:
-        - https://raw.githubusercontent.com/5dlabs/cto/main/infra/gitops/manifests/cilium/values.yaml
+  # Multi-source: Helm chart + values from private Git repo
+  sources:
+    - repoURL: https://helm.cilium.io/
+      chart: cilium
+      targetRevision: 1.16.4
+      helm:
+        valueFiles:
+          # Reference values from the Git source ($values is the ref name)
+          - $values/infra/gitops/manifests/cilium/values.yaml
+    - repoURL: https://github.com/5dlabs/cto
+      targetRevision: main
+      ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
