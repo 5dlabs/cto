@@ -8,6 +8,7 @@
 //! - Type definitions for Linear entities
 //! - HTTP server for webhook handling (standalone service)
 //! - Handlers for intake and play workflows
+//! - Onboarding state machine for tenant setup
 
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
@@ -19,6 +20,7 @@ pub mod config;
 pub mod emitter;
 pub mod handlers;
 pub mod models;
+pub mod onboarding;
 pub mod server;
 pub mod state;
 pub mod webhooks;
