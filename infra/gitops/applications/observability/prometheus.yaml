@@ -17,7 +17,7 @@ spec:
     targetRevision: 25.27.0
     chart: prometheus
     helm:
-      values: |
+      values: |  # pragma: allowlist secret
         # Prometheus configuration
         server:
           persistentVolume:
@@ -196,6 +196,29 @@ spec:
                       namespace: observability
                       service: blackbox-exporter
 
+              # External Secrets Operator metrics
+              # Uses kubernetes_sd_config to discover ESO pods and scrape metrics port
+              - job_name: external-secrets
+                kubernetes_sd_configs:
+                  - role: pod
+                    namespaces:
+                      names:
+                        - external-secrets
+                relabel_configs:
+                  # Only scrape pods with the metrics port
+                  - source_labels: [__meta_kubernetes_pod_container_port_name]
+                    action: keep
+                    regex: metrics
+                  # Set the instance label to pod name
+                  - source_labels: [__meta_kubernetes_pod_name]
+                    target_label: pod
+                  # Add namespace label
+                  - source_labels: [__meta_kubernetes_namespace]
+                    target_label: namespace
+                  # Add service label based on app name
+                  - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+                    target_label: service
+
           # =================================================================
           # Alerting Rules for External Endpoint Monitoring
           # =================================================================
@@ -280,6 +303,61 @@ spec:
                       description: |
                         The Blackbox exporter is not responding. External endpoint monitoring is disabled.
                         Check the blackbox-exporter deployment in the observability namespace.
+
+              # =================================================================
+              # External Secrets Operator Monitoring
+              # =================================================================
+              - name: external-secrets
+                rules:
+                  # Alert when an ExternalSecret fails to sync
+                  - alert: ExternalSecretSyncFailed
+                    expr: |
+                      external_secrets_sync_calls_error{status="SecretSyncedError"} > 0
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "ExternalSecret sync failed: {{ $labels.name }}"
+                      description: |
+                        The ExternalSecret {{ $labels.name }} in namespace {{ $labels.namespace }} has been failing to sync for more than 5 minutes.
+                        This usually means the secret does not exist in OpenBao.
+
+                        To fix, run from your workstation:
+                          ./infra/scripts/openbao/seed-from-1password.sh
+
+                        Then refresh ExternalSecrets:
+                          kubectl annotate externalsecret {{ $labels.name }} -n {{ $labels.namespace }} force-sync="$(date +%s)" --overwrite
+
+                  # Alert when multiple ExternalSecrets are failing
+                  - alert: MultipleExternalSecretsFailing
+                    expr: |
+                      count(external_secrets_sync_calls_error{status="SecretSyncedError"} > 0) > 3
+                    for: 10m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "Multiple ExternalSecrets are failing to sync"
+                      description: |
+                        {{ $value }} ExternalSecrets are failing to sync. This may indicate:
+                        - OpenBao connectivity issues
+                        - OpenBao was reset and secrets need to be re-seeded
+                        - ClusterSecretStore misconfiguration
+
+                        Run the seeding script to fix:
+                          ./infra/scripts/openbao/seed-from-1password.sh
+
+                  # Warning when ExternalSecret hasn't been refreshed recently
+                  - alert: ExternalSecretStale
+                    expr: |
+                      (time() - external_secrets_sync_calls_status{status="SecretSynced"}) > 86400
+                    for: 1h
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "ExternalSecret {{ $labels.name }} is stale"
+                      description: |
+                        The ExternalSecret {{ $labels.name }} hasn't synced successfully in over 24 hours.
+                        This may indicate a connectivity issue with the secret store.
 
         # Disable components we don't need (using separate Alertmanager deployment)
         alertmanager:

@@ -1,0 +1,212 @@
+---
+# ArgoCD PreSync Hook - Validates OpenBao secrets exist before deploying ExternalSecrets
+#
+# This Job runs before each sync of external-secrets-config and will FAIL the sync
+# if any required OpenBao secrets are missing. This provides early feedback rather
+# than waiting for ExternalSecrets to fail.
+#
+# If this hook fails, run:
+#   ./infra/scripts/openbao/seed-from-1password.sh
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: validate-openbao-secrets
+  namespace: openbao
+  labels:
+    app.kubernetes.io/name: openbao-validation
+    app.kubernetes.io/component: presync-hook
+    app.kubernetes.io/part-of: external-secrets-config
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openbao-validation
+    spec:
+      restartPolicy: Never
+      serviceAccountName: openbao-validator
+      containers:
+        - name: validate
+          image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BAO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: openbao-token
+                  key: token
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              echo "╔═══════════════════════════════════════════════════════════════╗"
+              echo "║        OpenBao Secrets Validation - PreSync Hook              ║"
+              echo "╚═══════════════════════════════════════════════════════════════╝"
+              echo ""
+
+              # Required secrets for ExternalSecrets to work
+              REQUIRED_SECRETS="
+                github-app-atlas
+                github-app-blaze
+                github-app-bolt
+                github-app-cipher
+                github-app-cleo
+                github-app-grizz
+                github-app-morgan
+                github-app-nova
+                github-app-rex
+                github-app-spark
+                github-app-stitch
+                github-app-tap
+                github-app-tess
+                github-app-vex
+                linear-app-atlas
+                linear-app-blaze
+                linear-app-bolt
+                linear-app-cipher
+                linear-app-cleo
+                linear-app-grizz
+                linear-app-morgan
+                linear-app-nova
+                linear-app-rex
+                linear-app-spark
+                linear-app-tap
+                linear-app-tess
+                linear-app-vex
+                api-keys
+                tools-github
+                tools-firecrawl
+                tools-latitude
+                cloudflare
+                ghcr-secret
+                alertmanager-discord
+                linear-sync
+              "
+
+              # Optional secrets (warn but don't fail)
+              OPTIONAL_SECRETS="
+                tools-kubernetes
+                tools-appstore-connect
+                research-twitter
+                research-digest
+                tailscale-auth
+                mayastor
+                seaweedfs-s3-credentials
+              "
+
+              MISSING=""
+              MISSING_OPTIONAL=""
+              FOUND=0
+              TOTAL=0
+
+              echo "Checking required secrets..."
+              for secret in $REQUIRED_SECRETS; do
+                TOTAL=$((TOTAL + 1))
+                # Use kubectl exec to check if secret exists in OpenBao
+                if kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN='$BAO_TOKEN' bao kv get secret/$secret" >/dev/null 2>&1; then
+                  echo "  ✓ $secret"
+                  FOUND=$((FOUND + 1))
+                else
+                  echo "  ✗ $secret (MISSING)"
+                  MISSING="$MISSING $secret"
+                fi
+              done
+
+              echo ""
+              echo "Checking optional secrets..."
+              for secret in $OPTIONAL_SECRETS; do
+                if kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN='$BAO_TOKEN' bao kv get secret/$secret" >/dev/null 2>&1; then
+                  echo "  ✓ $secret"
+                else
+                  echo "  ⚠ $secret (optional, missing)"
+                  MISSING_OPTIONAL="$MISSING_OPTIONAL $secret"
+                fi
+              done
+
+              echo ""
+              echo "═══════════════════════════════════════════════════════════════"
+              echo "Results: $FOUND/$TOTAL required secrets found"
+              echo "═══════════════════════════════════════════════════════════════"
+
+              if [ -n "$MISSING" ]; then
+                echo ""
+                echo "ERROR: Missing required secrets:$MISSING"
+                echo ""
+                echo "To fix, run from your workstation:"
+                echo "  ./infra/scripts/openbao/seed-from-1password.sh"
+                echo ""
+                exit 1
+              fi
+
+              if [ -n "$MISSING_OPTIONAL" ]; then
+                echo ""
+                echo "WARNING: Missing optional secrets:$MISSING_OPTIONAL"
+                echo "These may cause some ExternalSecrets to fail."
+              fi
+
+              echo ""
+              echo "✓ All required secrets present. Proceeding with sync."
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+---
+# ServiceAccount for the validation job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openbao-validator
+  namespace: openbao
+  labels:
+    app.kubernetes.io/name: openbao-validation
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+---
+# Role to allow exec into openbao pod
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openbao-validator
+  namespace: openbao
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openbao-validator
+  namespace: openbao
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+subjects:
+  - kind: ServiceAccount
+    name: openbao-validator
+    namespace: openbao
+roleRef:
+  kind: Role
+  name: openbao-validator
+  apiGroup: rbac.authorization.k8s.io
