@@ -135,7 +135,7 @@ spec:
         value: "."  # Default to repository root
       - name: pr-base-branch
         description: "Base branch for pull requests"
-        value: "main"  # Default to main
+        value: "develop"  # Default to develop (main is protected, releases only)
 
       # CLI configuration per agent (multi-CLI aware)
       - name: implementation-cli
