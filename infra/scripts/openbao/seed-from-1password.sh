@@ -63,21 +63,44 @@ get_bao_token() {
     kubectl get secret openbao-token -n openbao -o jsonpath='{.data.token}' | base64 -d
 }
 
-# Put a secret in OpenBao
+# Put a secret in OpenBao safely using JSON via stdin
+# Usage: bao_put "path" "key1" "value1" "key2" "value2" ...
+# Each key and value is passed as a separate argument to avoid shell injection
 bao_put() {
     local path=$1
     shift
-    local data="$*"
     
     if [[ "$DRY_RUN" == "true" ]]; then
         log_info "(dry-run) Would put secret/$path"
         return 0
     fi
     
+    # Build JSON object from key-value pairs
+    local json="{"
+    local first=true
+    while [[ $# -ge 2 ]]; do
+        local key=$1
+        local value=$2
+        shift 2
+        
+        # Escape JSON special characters in value
+        local escaped_value
+        escaped_value=$(printf '%s' "$value" | jq -Rs '.')
+        
+        if [[ "$first" == "true" ]]; then
+            first=false
+        else
+            json="$json,"
+        fi
+        json="$json\"$key\":$escaped_value"
+    done
+    json="$json}"
+    
     local token
     token=$(get_bao_token)
     
-    if kubectl exec -n openbao openbao-0 -- sh -c "export BAO_TOKEN='$token' && bao kv put secret/$path $data" >/dev/null 2>&1; then
+    # Pass JSON via stdin to avoid shell escaping issues entirely
+    if printf '%s' "$json" | kubectl exec -i -n openbao openbao-0 -- sh -c "export BAO_TOKEN='$token' && bao kv put secret/$path -" >/dev/null 2>&1; then
         log_success "secret/$path"
         return 0
     else
@@ -138,10 +161,7 @@ seed_github_apps() {
             continue
         fi
         
-        # Escape single quotes in private key for shell
-        private_key_escaped=$(printf '%s' "$private_key" | sed "s/'/'\\\\''/g")
-        
-        if bao_put "github-app-$agent" "app-id='$app_id' client-id='$client_id' private-key='$private_key_escaped'"; then
+        if bao_put "github-app-$agent" "app-id" "$app_id" "client-id" "$client_id" "private-key" "$private_key"; then
             ((success++))
         else
             ((failed++))
@@ -192,7 +212,7 @@ seed_linear_apps() {
         webhook_secret="${webhook_secret:-}"
         access_token="${access_token:-}"
         
-        if bao_put "linear-app-$agent" "client_id='$client_id' client_secret='$client_secret' webhook_secret='$webhook_secret' access_token='$access_token'"; then
+        if bao_put "linear-app-$agent" "client_id" "$client_id" "client_secret" "$client_secret" "webhook_secret" "$webhook_secret" "access_token" "$access_token"; then
             ((success++))
         else
             ((failed++))
@@ -221,7 +241,8 @@ seed_api_keys() {
         ["MINIMAX_GROUP_ID"]="MiniMax API Keys:Group ID"
     )
     
-    local kv_pairs=""
+    # Build array of key-value pairs for bao_put
+    local kv_args=()
     local success=0
     local failed=0
     
@@ -243,12 +264,12 @@ seed_api_keys() {
             continue
         fi
         
-        kv_pairs="$kv_pairs $key='$value'"
+        kv_args+=("$key" "$value")
         ((success++))
     done
     
-    if [[ -n "$kv_pairs" ]]; then
-        bao_put "api-keys" "$kv_pairs"
+    if [[ ${#kv_args[@]} -gt 0 ]]; then
+        bao_put "api-keys" "${kv_args[@]}"
     fi
     
     log_info "API Keys: $success found, $failed missing"

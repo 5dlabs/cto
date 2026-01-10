@@ -65,14 +65,22 @@ if ! op account list &> /dev/null; then
     eval "$(op signin)"
 fi
 
-# Get OpenBao root token
-echo "📋 Getting OpenBao root token from 1Password..."
-OPENBAO_TOKEN=$(op item get "OpenBao Unseal Keys - CTO Platform" --fields "Root Token" --reveal 2>/dev/null || \
-                op item get "OpenBao Unseal Keys - CTO Platform" --fields "password" --reveal 2>/dev/null || echo "")
+# Get OpenBao root token - prefer Kubernetes secret, fallback to 1Password
+echo "📋 Getting OpenBao root token..."
+
+# First try to get from Kubernetes (most reliable, always current)
+OPENBAO_TOKEN=$(kubectl get secret openbao-token -n openbao -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || echo "")
 
 if [[ -z "$OPENBAO_TOKEN" ]]; then
-    echo -e "${RED}Error: Could not get OpenBao root token from 1Password${NC}"
-    echo "Expected item: 'OpenBao Unseal Keys - CTO Platform' with field 'Root Token' or 'password'"
+    echo "  Kubernetes secret not found, trying 1Password..."
+    OPENBAO_TOKEN=$(op item get "OpenBao Unseal Keys - CTO Platform" --fields "Root Token" --reveal 2>/dev/null || \
+                    op item get "OpenBao Unseal Keys - CTO Platform" --fields "password" --reveal 2>/dev/null || echo "")
+fi
+
+if [[ -z "$OPENBAO_TOKEN" ]]; then
+    echo -e "${RED}Error: Could not get OpenBao root token${NC}"
+    echo "Tried: 1) kubectl get secret openbao-token -n openbao"
+    echo "       2) 1Password item 'OpenBao Unseal Keys - CTO Platform'"
     exit 1
 fi
 echo -e "${GREEN}✓ Got OpenBao token${NC}"

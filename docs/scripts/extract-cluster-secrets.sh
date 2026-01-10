@@ -227,7 +227,7 @@ EXISTING_KUBECONFIG=$(kubectl get secret tools-kubernetes-secrets -n cto -o json
 
 if [[ -n "$EXISTING_KUBECONFIG" ]]; then
     echo "📥 Found existing kubeconfig in Kubernetes secret"
-    update_openbao "tools-kubernetes" "KUBECONFIG='$EXISTING_KUBECONFIG'"
+    update_openbao "tools-kubernetes" "KUBECONFIG=${EXISTING_KUBECONFIG}"
 else
     echo -e "${YELLOW}⚠ Tools kubeconfig not found${NC}"
     echo ""
