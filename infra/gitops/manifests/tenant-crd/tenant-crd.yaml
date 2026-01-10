@@ -1,0 +1,248 @@
+---
+# Tenant Custom Resource Definition
+# Defines a tenant (customer) in the CTO SaaS platform
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: tenants.cto.5dlabs.ai
+  labels:
+    app.kubernetes.io/name: tenant-operator
+    app.kubernetes.io/part-of: cto-platform
+spec:
+  group: cto.5dlabs.ai
+  names:
+    kind: Tenant
+    listKind: TenantList
+    plural: tenants
+    singular: tenant
+    shortNames:
+      - tn
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - owner
+              properties:
+                owner:
+                  type: object
+                  description: Owner information for the tenant
+                  required:
+                    - email
+                  properties:
+                    email:
+                      type: string
+                      description: Email of the tenant owner
+                    githubId:
+                      type: string
+                      description: GitHub user ID of the owner
+                    name:
+                      type: string
+                      description: Display name of the owner
+
+                tier:
+                  type: string
+                  description: Subscription tier
+                  enum:
+                    - starter
+                    - pro
+                    - team
+                    - enterprise
+                  default: starter
+
+                github:
+                  type: object
+                  description: GitHub integration configuration
+                  properties:
+                    installationId:
+                      type: integer
+                      description: GitHub App installation ID
+                    repos:
+                      type: array
+                      description: List of authorized repositories
+                      items:
+                        type: object
+                        properties:
+                          owner:
+                            type: string
+                          name:
+                            type: string
+                          fullName:
+                            type: string
+
+                aiProvider:
+                  type: object
+                  description: AI provider configuration
+                  properties:
+                    type:
+                      type: string
+                      description: Primary AI provider
+                      enum:
+                        - anthropic
+                        - openai
+                        - google
+                      default: anthropic
+                    secretRef:
+                      type: string
+                      description: Reference to secret in OpenBao (e.g., tenants/acme/anthropic)
+                    additionalProviders:
+                      type: array
+                      description: Additional AI provider secret refs
+                      items:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                          secretRef:
+                            type: string
+
+                agents:
+                  type: object
+                  description: Agent configuration
+                  properties:
+                    enabled:
+                      type: array
+                      description: List of enabled agents
+                      items:
+                        type: string
+                        enum:
+                          - morgan
+                          - rex
+                          - blaze
+                          - nova
+                          - grizz
+                          - tap
+                          - spark
+                          - vex
+                          - cleo
+                          - cipher
+                          - tess
+                          - atlas
+                          - bolt
+                          - stitch
+                    defaultCli:
+                      type: string
+                      description: Default CLI for agents
+                      enum:
+                        - claude
+                        - cursor
+                        - codex
+                        - factory
+                        - gemini
+                        - opencode
+                      default: claude
+
+                infrastructure:
+                  type: object
+                  description: Infrastructure configuration
+                  properties:
+                    mode:
+                      type: string
+                      description: Infrastructure mode
+                      enum:
+                        - cto_cloud
+                        - managed
+                        - byoc
+                      default: cto_cloud
+                    provider:
+                      type: string
+                      description: Bare metal provider (for managed mode)
+                      enum:
+                        - latitude
+                        - hetzner
+                        - ovh
+                        - vultr
+                        - scaleway
+                        - cherry
+                        - digitalocean
+                        - onprem
+                    region:
+                      type: string
+                      description: Deployment region
+                    clusterRef:
+                      type: string
+                      description: Reference to existing cluster (for BYOC mode)
+
+                resourceQuotas:
+                  type: object
+                  description: Resource quotas for the tenant
+                  properties:
+                    maxConcurrentAgents:
+                      type: integer
+                      description: Maximum concurrent agent runs
+                      default: 3
+                    maxStorageGb:
+                      type: integer
+                      description: Maximum storage in GB
+                      default: 10
+                    maxProjectsPerMonth:
+                      type: integer
+                      description: Maximum projects per month
+                      default: 5
+
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  description: Current phase of the tenant
+                  enum:
+                    - Pending
+                    - Provisioning
+                    - Ready
+                    - Error
+                    - Suspended
+                namespace:
+                  type: string
+                  description: Kubernetes namespace for this tenant
+                argocdApp:
+                  type: string
+                  description: ArgoCD Application name for tenant agents
+                externalSecretName:
+                  type: string
+                  description: ExternalSecret resource name
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                observedGeneration:
+                  type: integer
+                  description: Last observed generation
+
+      subresources:
+        status: {}
+
+      additionalPrinterColumns:
+        - name: Tier
+          type: string
+          jsonPath: .spec.tier
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Namespace
+          type: string
+          jsonPath: .status.namespace
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

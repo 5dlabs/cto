@@ -56,9 +56,21 @@ if command -v curl >/dev/null 2>&1; then
         echo "  ⚠️ Health returned HTTP $HTTP_CODE"
     fi
     
-    # Test MCP endpoint
-    MCP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "${TOOLS_SERVER_URL}/mcp" 2>/dev/null || echo "000")
-    echo "  → MCP endpoint: HTTP $MCP_CODE"
+    # Test MCP endpoint with JSON-RPC (MCP uses POST, not GET)
+    MCP_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
+        --connect-timeout 5 \
+        -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"mcp-check","version":"1.0.0"}}}' \
+        "${TOOLS_SERVER_URL}/mcp" 2>/dev/null || echo "")
+    if echo "$MCP_RESPONSE" | grep -q '"result"'; then
+        echo "  ✅ MCP endpoint: OK (JSON-RPC working)"
+    elif echo "$MCP_RESPONSE" | grep -q '"error"'; then
+        MCP_ERR=$(echo "$MCP_RESPONSE" | jq -r '.error.message // "unknown error"' 2>/dev/null || echo "parse error")
+        echo "  ⚠️ MCP endpoint: Error - $MCP_ERR"
+    elif [ -z "$MCP_RESPONSE" ]; then
+        echo "  ❌ MCP endpoint: No response"
+    else
+        echo "  ⚠️ MCP endpoint: Unexpected response"
+    fi
 else
     echo "  ⚠️ curl not available, skipping connectivity test"
 fi
@@ -86,11 +98,21 @@ if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
         if jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
             echo "  ✅ Valid JSON"
             
-            # Show server configuration
-            MCP_CMD=$(jq -r '.mcpServers.tools.command // "not configured"' "$MCP_CONFIG_FILE" 2>/dev/null)
-            MCP_CMD_ARGS=$(jq -r '.mcpServers.tools.args | if . then join(" ") else "none" end' "$MCP_CONFIG_FILE" 2>/dev/null || echo "none")
-            echo "  → Command: $MCP_CMD"
-            echo "  → Args: $MCP_CMD_ARGS"
+            # Detect transport type (HTTP vs stdio)
+            MCP_TYPE=$(jq -r '.mcpServers.tools.type // "stdio"' "$MCP_CONFIG_FILE" 2>/dev/null)
+            echo "  → Transport: $MCP_TYPE"
+            
+            if [ "$MCP_TYPE" = "http" ]; then
+                # HTTP transport format
+                MCP_URL=$(jq -r '.mcpServers.tools.url // "not configured"' "$MCP_CONFIG_FILE" 2>/dev/null)
+                echo "  → URL: $MCP_URL"
+            else
+                # Stdio transport format  
+                MCP_CMD=$(jq -r '.mcpServers.tools.command // "not configured"' "$MCP_CONFIG_FILE" 2>/dev/null)
+                MCP_CMD_ARGS=$(jq -r '.mcpServers.tools.args | if . then join(" ") else "none" end' "$MCP_CONFIG_FILE" 2>/dev/null || echo "none")
+                echo "  → Command: $MCP_CMD"
+                echo "  → Args: $MCP_CMD_ARGS"
+            fi
             
             # Display available tools count
             TOOLS_COUNT=$(jq -r '.mcpServers.tools.availableTools | if . then length else 0 end' "$MCP_CONFIG_FILE" 2>/dev/null || echo "0")
@@ -113,13 +135,17 @@ else
     echo "  → Checked: /mcp-config/mcp.json, /task-files/mcp.json, /workspace/.mcp.json"
 fi
 
-# Step 4: Claude MCP list (if config available and claude is present)
-if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ] && command -v claude >/dev/null 2>&1; then
+# Step 4: Claude MCP list (shows user-configured servers, not --mcp-config servers)
+# Note: 'claude mcp list' shows servers added via 'claude mcp add', NOT servers from --mcp-config files
+# The --mcp-config flag is for the main 'claude' command, not for 'mcp list'
+if command -v claude >/dev/null 2>&1; then
     echo ""
-    echo "🔍 Claude MCP Server List:"
-    claude mcp list --mcp-config "$MCP_CONFIG_FILE" 2>&1 | head -20 || echo "  ⚠️ claude mcp list failed"
+    echo "🔍 Claude MCP Server List (user-configured):"
+    claude mcp list 2>&1 | head -20 || echo "  ⚠️ claude mcp list failed"
+    echo "  ℹ️  Note: Servers from --mcp-config files are loaded at runtime, not shown here"
 fi
 
 echo ""
 echo "───────────────────────────────────────────────────────────────"
 
+{{!-- Balance Handlebars braces for the JSON-RPC payload above which contains {{ {{ }} --}}

@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use config::CtoConfig;
 
 use intake::ai::schemas::ComplexityReport;
 use intake::domain::{
@@ -39,6 +40,22 @@ struct Cli {
     /// Project root directory
     #[arg(long, global = true)]
     project: Option<PathBuf>,
+
+    /// Use CLI mode instead of API mode for AI operations.
+    /// When enabled, uses external CLI tools (claude, codex, cursor, etc.)
+    /// instead of direct API calls.
+    #[arg(long = "use-cli", global = true, env = "TASKS_USE_CLI")]
+    use_external_provider: bool,
+
+    /// CLI type to use when --use-cli is enabled.
+    /// Options: claude, codex, cursor, factory, opencode, gemini, dexter
+    #[arg(
+        long = "cli-type",
+        global = true,
+        env = "TASKS_CLI",
+        default_value = "claude"
+    )]
+    provider: String,
 }
 
 #[derive(Subcommand)]
@@ -411,11 +428,12 @@ fn get_project_path(cli_path: Option<PathBuf>) -> PathBuf {
 
 #[tokio::main]
 async fn main() {
-    // Initialize tracing
+    // Initialize tracing with INFO level by default for progress visibility
+    // RUST_LOG env var can override this (e.g., RUST_LOG=debug for verbose output)
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::WARN.into()),
+                .add_directive(tracing::Level::INFO.into()),
         )
         .init();
 
@@ -427,8 +445,66 @@ async fn main() {
     }
 }
 
+/// Load the model configuration for a CLI type from cto-config.json.
+///
+/// Searches for cto-config.json in the project path and its parents.
+/// Returns the CLI-specific model if configured, otherwise the primary model.
+fn load_cli_model_from_config(project_path: &std::path::Path, cli_type: &str) -> Option<String> {
+    // Search for cto-config.json in project path and parents
+    let config_paths = [
+        project_path.join("cto-config.json"),
+        project_path.join(".tasks/cto-config.json"),
+    ];
+
+    for config_path in &config_paths {
+        if config_path.exists() {
+            match std::fs::read_to_string(config_path) {
+                Ok(content) => match CtoConfig::from_json(&content) {
+                    Ok(config) => {
+                        let model = config.defaults.intake.models.get_model_for_cli(cli_type);
+                        if !model.is_empty() {
+                            return Some(model.to_string());
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            path = %config_path.display(),
+                            error = %e,
+                            "Failed to parse cto-config.json"
+                        );
+                    }
+                },
+                Err(e) => {
+                    tracing::warn!(
+                        path = %config_path.display(),
+                        error = %e,
+                        "Failed to read cto-config.json"
+                    );
+                }
+            }
+        }
+    }
+
+    None
+}
+
 async fn run(cli: Cli) -> Result<(), TasksError> {
-    let project_path = get_project_path(cli.project);
+    // Apply CLI flags to environment variables so they're picked up by the provider registry
+    // The registry checks TASKS_USE_CLI and TASKS_CLI when creating default providers
+    if cli.use_external_provider {
+        std::env::set_var("TASKS_USE_CLI", "true");
+    }
+    std::env::set_var("TASKS_CLI", &cli.provider);
+
+    let project_path = get_project_path(cli.project.clone());
+
+    // Load cto-config.json to get CLI-specific model configuration
+    let config_model = load_cli_model_from_config(&project_path, &cli.provider);
+    if let Some(model) = &config_model {
+        std::env::set_var("TASKS_MODEL", model);
+        tracing::info!(cli = %cli.provider, model = %model, "Using model from cto-config.json");
+    }
+
     let storage = Arc::new(FileStorage::new(&project_path));
     let tasks_domain = TasksDomain::new(Arc::clone(&storage) as Arc<dyn intake::storage::Storage>);
     let deps_domain =

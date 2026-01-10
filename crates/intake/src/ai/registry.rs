@@ -9,6 +9,7 @@ use std::sync::{Arc, RwLock};
 use crate::errors::{TasksError, TasksResult};
 
 use super::anthropic::AnthropicProvider;
+use super::cli_provider::CLITextGenerator;
 use super::openai::OpenAIProvider;
 use super::provider::AIProvider;
 
@@ -26,17 +27,51 @@ impl ProviderRegistry {
     }
 
     /// Create a registry with default providers registered.
+    ///
+    /// Provider selection is controlled by `TASKS_USE_CLI` env var:
+    /// - `TASKS_USE_CLI=true` or `TASKS_USE_CLI=1`: Use CLI provider (claude, codex, etc.)
+    /// - Otherwise: Use API providers (Anthropic, OpenAI)
+    ///
+    /// When CLI mode is enabled, the specific CLI is selected via `TASKS_CLI` env var
+    /// (defaults to "claude"). Supported values: claude, codex, cursor, factory, opencode, gemini, dexter
     pub fn with_defaults() -> Self {
         let registry = Self::new();
 
-        // Register Anthropic provider
-        if let Ok(provider) = AnthropicProvider::from_env() {
-            registry.register(Arc::new(provider));
+        // Check if CLI mode is enabled
+        let use_cli = std::env::var("TASKS_USE_CLI")
+            .map(|v| v == "1" || v.to_lowercase() == "true")
+            .unwrap_or(false);
+
+        let mut cli_provider_registered = false;
+
+        if use_cli {
+            // Register CLI provider (uses TASKS_CLI env var for CLI type selection)
+            match CLITextGenerator::from_env() {
+                Ok(provider) => {
+                    tracing::info!(
+                        cli_type = %provider.cli_type(),
+                        "Using CLI provider for AI operations"
+                    );
+                    registry.register(Arc::new(provider));
+                    cli_provider_registered = true;
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to create CLI provider: {e}, falling back to API providers"
+                    );
+                }
+            }
         }
 
-        // Register OpenAI provider
-        if let Ok(provider) = OpenAIProvider::from_env() {
-            registry.register(Arc::new(provider));
+        // Only register API providers if CLI mode is not enabled OR CLI provider failed
+        if !cli_provider_registered {
+            if let Ok(provider) = AnthropicProvider::from_env() {
+                registry.register(Arc::new(provider));
+            }
+
+            if let Ok(provider) = OpenAIProvider::from_env() {
+                registry.register(Arc::new(provider));
+            }
         }
 
         registry
@@ -113,7 +148,8 @@ impl ProviderRegistry {
     pub fn require_any(&self) -> TasksResult<Arc<dyn AIProvider>> {
         self.get_configured().ok_or_else(|| {
             TasksError::Ai(
-                "No AI provider is configured. Please set ANTHROPIC_API_KEY or OPENAI_API_KEY"
+                "No AI provider is configured. Set TASKS_USE_CLI=true to use CLI mode, \
+                 or set ANTHROPIC_API_KEY/OPENAI_API_KEY for API mode"
                     .to_string(),
             )
         })

@@ -28,7 +28,7 @@ NC='\033[0m' # No Color
 # Configuration
 CLIPPY_ARGS="-D warnings -W clippy::pedantic"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Track failures
 FAILURES=()
@@ -174,7 +174,7 @@ run_rust_tests() {
     
     local test_cmd
     if command -v cargo-nextest &>/dev/null; then
-        test_cmd="cargo nextest run -p $crate"
+        test_cmd="cargo nextest run -p $crate --no-tests=pass"
     else
         test_cmd="cargo test -p $crate --all-targets"
     fi

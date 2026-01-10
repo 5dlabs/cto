@@ -38,12 +38,17 @@ COPY --from=planner /build/recipe.json recipe.json
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
     cargo chef cook --release --recipe-path recipe.json
 
-# Copy source and build
+# Copy source and build tools-server (part of main workspace)
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
-    cargo build --release --package tools --bin tools-server && \
-    cargo build --release --package cto-mcp --bin cto-mcp
+    cargo build --release --package tools --bin tools-server
+
+# Build cto-mcp from its standalone workspace
+WORKDIR /build/crates/notify/mcp
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
+    cargo build --release --bin cto-mcp
+WORKDIR /build
 
 # =============================================================================
 # RUNTIME BASE (shared by all targets)
@@ -127,7 +132,7 @@ FROM runtime-base AS local
 
 # Copy binaries from builder
 COPY --from=builder /build/target/release/tools-server /usr/local/bin/tools-server
-COPY --from=builder /build/target/release/cto-mcp /usr/local/bin/cto-mcp
+COPY --from=builder /build/crates/notify/mcp/target/release/cto-mcp /usr/local/bin/cto-mcp
 RUN chmod +x /usr/local/bin/tools-server /usr/local/bin/cto-mcp
 
 # Copy entrypoint script

@@ -36,8 +36,11 @@ node_modules/
 *~
 
 # Kubernetes Files
-kubeconfig*
+kubeconfig
+kubeconfig-*
 *.kubeconfig
+# Don't ignore kubeconfig.rs source files
+!**/kubeconfig.rs
 
 
 # Test and Debug Files

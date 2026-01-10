@@ -92,6 +92,7 @@ pub fn generate_project_config(input: &ProjectConfigInput) -> CtoConfig {
                     primary: "claude-opus-4-5-20251101".to_string(),
                     research: "claude-opus-4-5-20251101".to_string(),
                     fallback: "claude-opus-4-5-20251101".to_string(),
+                    cli_models: HashMap::new(),
                 },
             },
             linear: LinearDefaults {
@@ -223,6 +224,7 @@ pub fn generate_config_with_tasks<T: ToolAnalyzable>(
                     primary: "claude-opus-4-5-20251101".to_string(),
                     research: "claude-opus-4-5-20251101".to_string(),
                     fallback: "claude-opus-4-5-20251101".to_string(),
+                    cli_models: HashMap::new(),
                 },
             },
             linear: LinearDefaults {

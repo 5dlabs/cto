@@ -406,7 +406,7 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; 
 
 # Install intake CLI from CTO monorepo unified release (skip if version is "skip" or empty)
 # This is the Rust replacement for TaskMaster-AI, providing faster task management
-ARG TASKS_VERSION=skip
+ARG TASKS_VERSION=0.2.2
 RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ]; then \
       ARCH=$(dpkg --print-architecture) && \
       case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
@@ -440,9 +440,10 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
   && rustup component add rustfmt clippy rust-analyzer
 
 # Install cursor-rust-tools MCP server for AI agent Rust analysis
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
-    . $HOME/.cargo/env \
-  && cargo install --git https://github.com/terhechte/cursor-rust-tools
+# TEMPORARILY DISABLED - compilation fails in CI (exit code 101)
+# RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
+#     . $HOME/.cargo/env \
+#   && cargo install --git https://github.com/terhechte/cursor-rust-tools
 
 # Install Qlty for unified code quality across all languages
 RUN curl -fsSL https://qlty.sh | bash \

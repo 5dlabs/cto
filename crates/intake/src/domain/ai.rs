@@ -61,12 +61,31 @@ impl AIDomain {
     }
 
     /// Get the default model for a provider.
-    fn get_default_model(provider: &dyn AIProvider) -> &str {
-        if provider.name() == "anthropic" {
-            "claude-sonnet-4-5-20250514"
-        } else {
-            "gpt-4o"
+    ///
+    /// Model selection priority:
+    /// 1. TASKS_MODEL env var (set from cto-config.json cliModels)
+    /// 2. Fallback hard-coded defaults (for when config is not available)
+    fn get_default_model(provider: &dyn AIProvider) -> String {
+        // Check for model from config (set by bin/cli.rs from cto-config.json)
+        if let Ok(model) = std::env::var("TASKS_MODEL") {
+            if !model.is_empty() {
+                return model;
+            }
         }
+
+        // Fallback to hard-coded defaults when config is not available
+        let name = provider.name();
+        let model = match name {
+            // Anthropic API and Claude CLI
+            "anthropic" | "cli-claude" | "cli-dexter" => "claude-opus-4-5-20251101",
+            // Cursor uses short model names
+            "cli-cursor" => "opus-4.5",
+            // Gemini CLI
+            "cli-gemini" => "gemini-2.0-flash",
+            // OpenAI-based CLIs (codex, opencode, factory) and default
+            _ => "gpt-4o",
+        };
+        model.to_string()
     }
 
     /// Parse a PRD file and generate tasks.
@@ -79,7 +98,8 @@ impl AIDomain {
         model: Option<&str>,
     ) -> TasksResult<(Vec<Task>, TokenUsage)> {
         let provider = self.get_provider(model)?;
-        let model_id = model.unwrap_or_else(|| Self::get_default_model(provider.as_ref()));
+        let default_model = Self::get_default_model(provider.as_ref());
+        let model_id = model.unwrap_or(&default_model);
 
         // Get the next task ID
         let existing_tasks = self.storage.load_tasks(None).await?;
@@ -231,7 +251,8 @@ impl AIDomain {
         enable_subagents: bool,
     ) -> TasksResult<(Vec<Subtask>, TokenUsage)> {
         let provider = self.get_provider(model)?;
-        let model_id = model.unwrap_or_else(|| Self::get_default_model(provider.as_ref()));
+        let default_model = Self::get_default_model(provider.as_ref());
+        let model_id = model.unwrap_or(&default_model);
 
         // Get expansion prompt from complexity report if available
         let (expansion_prompt, recommended_count, reasoning) = complexity_report
@@ -303,7 +324,8 @@ impl AIDomain {
         model: Option<&str>,
     ) -> TasksResult<(ComplexityReport, TokenUsage)> {
         let provider = self.get_provider(model)?;
-        let model_id = model.unwrap_or_else(|| Self::get_default_model(provider.as_ref()));
+        let default_model = Self::get_default_model(provider.as_ref());
+        let model_id = model.unwrap_or(&default_model);
 
         // Filter to non-done tasks
         let pending_tasks: Vec<_> = tasks

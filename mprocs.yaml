@@ -1,0 +1,78 @@
+# mprocs.yaml - Local Development Process Manager
+# ===============================================
+# A Rust-native TUI for managing CTO services locally.
+#
+# Usage:
+#   mprocs                    # Start with default config
+#   mprocs --config mprocs.yaml
+#
+# TUI Keybindings:
+#   ↑/↓ or j/k   Navigate processes
+#   Enter        Focus process logs
+#   x            Stop process
+#   s            Start process
+#   r            Restart process
+#   a            Add new process
+#   q            Quit (sends SIGTERM to all)
+#   Ctrl+C       Force quit
+#
+# Prerequisites:
+#   source .env.local
+#   brew install mprocs (or cargo install mprocs)
+#
+# ===============================================
+
+procs:
+  # ===========================================================================
+  # PM Server - Linear webhooks & project management
+  # ===========================================================================
+  pm-server:
+    # Source .env.local for secrets (LINEAR_OAUTH_TOKEN), then run server
+    # Non-secret env vars (WEBHOOK_CALLBACK_URL, etc.) are set in the env section below
+    shell: "bash -c 'source .env.local 2>/dev/null || true; cargo run --bin pm-server'"
+    env:
+      LINEAR_ENABLED: "true"
+      RUST_LOG: "info,pm=debug"
+      WEBHOOK_CALLBACK_URL: "https://pm-dev.5dlabs.ai/webhooks/github"
+    cwd: "."
+    
+  # ===========================================================================
+  # Controller - CodeRun CRD orchestrator
+  # ===========================================================================
+  controller:
+    shell: "RUST_LOG=info,controller=debug AGENT_TEMPLATES_PATH=./templates SERVER_HOST=0.0.0.0 SERVER_PORT=8080 CONTROLLER_CONFIG_PATH=./config/controller-config.yaml cargo run --bin agent-controller"
+    cwd: "."
+
+  # ===========================================================================
+  # Healer - Self-healing monitor daemon
+  # ===========================================================================
+  healer:
+    shell: "RUST_LOG=info,healer=debug HEALER_TEMPLATES_DIR=./templates/healer CTO_CONFIG_PATH=./cto-config.json cargo run --bin healer -- server --addr 0.0.0.0:8082"
+    cwd: "."
+
+  # ===========================================================================
+  # Cloudflare Tunnel - Routes pm-dev.5dlabs.ai to localhost:8081
+  # ===========================================================================
+  tunnel:
+    shell: "cloudflared tunnel --config config/cloudflared-pm-dev.yaml run"
+    cwd: "."
+
+# ===========================================================================
+# Optional: Additional services (uncomment as needed)
+# ===========================================================================
+#
+#   healer-sensor:
+#     shell: "cargo run --bin healer -- sensor github-actions --repositories=5dlabs/cto --poll-interval=300 --lookback-mins=60 --create-issues --issue-labels=healer,ci-failure --max-per-poll=3 --namespace=cto --verbose"
+#     env:
+#       RUST_LOG: "info,healer=debug"
+#       HEALER_TEMPLATES_DIR: "./templates/healer"
+#       CTO_CONFIG_PATH: "./cto-config.json"
+#     cwd: "."
+#
+#   tools-server:
+#     shell: "cargo run --bin tools-server"
+#     env:
+#       RUST_LOG: "info,tools=debug"
+#       PORT: "3000"
+#       SYSTEM_CONFIG_PATH: "./infra/charts/cto/templates/tools"
+#     cwd: "."

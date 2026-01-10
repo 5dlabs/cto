@@ -33,6 +33,26 @@ log_location: ./.process-compose/logs
 # Process definitions
 processes:
   # ===========================================================================
+  # Port Cleanup (runs first to kill any stale processes)
+  # ===========================================================================
+
+  port-cleanup:
+    command: |
+      echo "🧹 Cleaning up stale processes on ports 8080, 8081, 8082..."
+      for port in 8080 8081 8082; do
+        pid=$(lsof -ti :$port 2>/dev/null)
+        if [ -n "$pid" ]; then
+          echo "  Killing process $pid on port $port"
+          kill -9 $pid 2>/dev/null || true
+        fi
+      done
+      sleep 1
+      echo "✅ Port cleanup complete"
+    description: "Cleanup stale processes on required ports"
+    availability:
+      restart: "no"
+
+  # ===========================================================================
   # Cloudflare Tunnel (routes pm-dev.5dlabs.ai to localhost:8081)
   # ===========================================================================
 
@@ -42,7 +62,9 @@ processes:
     availability:
       restart: on_failure
       max_restarts: 3
-    depends_on: {}
+    depends_on:
+      port-cleanup:
+        condition: process_completed_successfully
   # ===========================================================================
   # Long-Running Services
   # ===========================================================================
@@ -62,12 +84,13 @@ processes:
       period_seconds: 5
     environment:
       - "RUST_LOG=info,pm=debug"
-    depends_on: {}
+    depends_on:
+      port-cleanup:
+        condition: process_completed_successfully
 
   controller:
-    # Auto-rebuilds and restarts on code changes in crates/controller/
-    command: cargo watch -w crates/controller -w crates/config -w templates -x "run --bin agent-controller"
-    description: "Controller - CodeRun CRD orchestrator (auto-reload on changes)"
+    command: cargo run --bin agent-controller
+    description: "Controller - CodeRun CRD orchestrator"
     availability:
       restart: on_failure
       max_restarts: 3
@@ -76,8 +99,8 @@ processes:
         host: localhost
         port: 8080
         path: /health
-      initial_delay_seconds: 30  # Increased for initial compile time
-      period_seconds: 10         # Less aggressive during rebuilds
+      initial_delay_seconds: 15
+      period_seconds: 5
     environment:
       - "RUST_LOG=info,controller=debug"
       - "AGENT_TEMPLATES_PATH=./templates"
@@ -125,7 +148,9 @@ processes:
       - "RUST_LOG=info,healer=debug"
       - "HEALER_TEMPLATES_DIR=./templates/healer"
       - "CTO_CONFIG_PATH=./cto-config.json"
-    depends_on: {}
+    depends_on:
+      port-cleanup:
+        condition: process_completed_successfully
 
   healer-sensor:
     command: cargo run --bin healer -- sensor github-actions --repositories=5dlabs/cto --poll-interval=300 --lookback-mins=60 --create-issues --issue-labels=healer,ci-failure --max-per-poll=3 --namespace=cto --verbose

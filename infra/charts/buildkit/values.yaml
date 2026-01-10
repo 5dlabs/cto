@@ -68,9 +68,12 @@ config:
   # Log settings
   maxLogSize: "10000000"
   maxLogSpeed: "10000000"
-  # Garbage collection - keep cache for 7 days, up to 80GB
-  gcKeepDuration: "168h"
-  gcKeepBytes: 85899345920
+  # Garbage collection settings (always enabled)
+  # Policy 1: Keep recent builds for specified duration up to max bytes
+  gcKeepDuration: "168h"  # 7 days
+  gcKeepBytes: 85899345920  # ~80GB
+  # Policy 2: Orphaned blob cleanup runs automatically after 48h
+  # This prevents cache corruption from stale blob references
   # Allow pushing to insecure (HTTP) registries
   # Override per-cluster with local registry IPs
   # Example: ["192.168.1.72:30500", "192.168.1.77:30500"]

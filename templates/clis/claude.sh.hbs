@@ -49,7 +49,8 @@ if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
     # Validate the config is valid JSON before passing to Claude
     if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
         echo "✓ Adding MCP configuration: $MCP_CONFIG_FILE"
-        CLAUDE_CMD="$CLAUDE_CMD --mcp-config $MCP_CONFIG_FILE"
+        # Use --strict-mcp-config to only use servers from our config, ignoring user configs
+        CLAUDE_CMD="$CLAUDE_CMD --mcp-config $MCP_CONFIG_FILE --strict-mcp-config"
     else
         echo "⚠️ MCP config at $MCP_CONFIG_FILE is not valid JSON, skipping"
     fi
@@ -131,11 +132,23 @@ echo "🚀 Claude Command: $CLAUDE_CMD \"<prompt>\""
 echo ""
 echo "✓ Prompt loaded ($(echo "$USER_PROMPT" | wc -c) bytes)"
 
-# Execute Claude with prompt piped via stdin
-# Use tee to capture output to both stream file and agent log
-if command -v stdbuf >/dev/null 2>&1; then
-    echo "$USER_PROMPT" | $CLAUDE_CMD | stdbuf -oL tee "$STREAM_OUTPUT" "$AGENT_LOG"
+# Execute Claude with pseudo-terminal to force line buffering
+# The script command emulates a TTY which forces stdout line buffering
+# This ensures the sidecar receives stream events in real-time
+if command -v script >/dev/null 2>&1; then
+    echo "✓ Using script for unbuffered output"
+    # macOS: script -q /dev/null
+    # Linux: script -q -c "command" /dev/null
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "$USER_PROMPT" | script -q /dev/null $CLAUDE_CMD | tee "$STREAM_OUTPUT" "$AGENT_LOG"
+    else
+        echo "$USER_PROMPT" | script -q -c "$CLAUDE_CMD" /dev/null | tee "$STREAM_OUTPUT" "$AGENT_LOG"
+    fi
+elif command -v stdbuf >/dev/null 2>&1; then
+    echo "⚠️ Falling back to stdbuf (may have buffering issues)"
+    echo "$USER_PROMPT" | stdbuf -oL $CLAUDE_CMD | tee "$STREAM_OUTPUT" "$AGENT_LOG"
 else
+    echo "⚠️ No buffering control available"
     echo "$USER_PROMPT" | $CLAUDE_CMD | tee "$STREAM_OUTPUT" "$AGENT_LOG"
 fi
 CLAUDE_EXIT_CODE=$?

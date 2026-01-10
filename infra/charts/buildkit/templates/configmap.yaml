@@ -1,4 +1,3 @@
-{{- if .Values.config.insecureRegistries }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -12,15 +11,23 @@ data:
     [worker.oci]
       max-parallelism = {{ .Values.config.maxParallelism }}
 
+    {{- if .Values.config.insecureRegistries }}
     # Allow pushing to insecure (HTTP) registries
     {{- range .Values.config.insecureRegistries }}
     [registry."{{ . }}"]
       http = true
       insecure = true
     {{- end }}
+    {{- end }}
 
-    # Garbage collection settings
+    # Garbage collection policies (always enabled)
+    # Policy 1: Keep recent builds for specified duration up to max bytes
     [[worker.oci.gcpolicy]]
       keepDuration = "{{ .Values.config.gcKeepDuration }}"
       keepBytes = {{ int64 .Values.config.gcKeepBytes }}
-{{- end }}
+
+    # Policy 2: Aggressively prune orphaned/unreferenced blobs after 48h
+    # This prevents cache corruption from accumulating stale blob references
+    [[worker.oci.gcpolicy]]
+      all = true
+      keepDuration = "48h"

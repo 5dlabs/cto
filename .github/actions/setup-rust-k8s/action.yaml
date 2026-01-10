@@ -49,17 +49,28 @@ runs:
       run: |
         echo "🚀 Setting up Rust build environment..."
         
-        # Override RUSTUP_HOME and CARGO_HOME to use writable paths
-        # The rust-builder image may set these to /cache/* which isn't writable on all runners
-        export RUSTUP_HOME="$HOME/.rustup"
-        export CARGO_HOME="$HOME/.cargo"
-        echo "RUSTUP_HOME=$RUSTUP_HOME" >> "$GITHUB_ENV"
-        echo "CARGO_HOME=$CARGO_HOME" >> "$GITHUB_ENV"
+        # Override cache paths to use HOME directory (writable by runner)
+        # The builder image sets CARGO_HOME=/cache/cargo etc. but /cache may not be mounted
+        mkdir -p "$HOME/.cargo/bin" "$HOME/.cargo/registry" "$HOME/.rustup" "$HOME/.sccache"
         
-        # Create directories and add cargo bin to PATH
-        mkdir -p "$RUSTUP_HOME" "$CARGO_HOME/bin"
-        echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
-        export PATH="$CARGO_HOME/bin:$PATH"
+        # Export environment variables for this step and subsequent steps
+        echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
+        echo "RUSTUP_HOME=$HOME/.rustup" >> "$GITHUB_ENV"
+        echo "SCCACHE_DIR=$HOME/.sccache" >> "$GITHUB_ENV"
+        
+        # Also export for current step
+        export CARGO_HOME="$HOME/.cargo"
+        export RUSTUP_HOME="$HOME/.rustup"
+        export SCCACHE_DIR="$HOME/.sccache"
+        
+        # Add cargo bin to PATH
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        export PATH="$HOME/.cargo/bin:$PATH"
+        
+        echo "📁 Using paths:"
+        echo "  CARGO_HOME=$CARGO_HOME"
+        echo "  RUSTUP_HOME=$RUSTUP_HOME"
+        echo "  SCCACHE_DIR=$SCCACHE_DIR"
         
         # Check if running on rust-builder image (tools pre-installed)
         if command -v rustc &> /dev/null && command -v cargo &> /dev/null; then
