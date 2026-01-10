@@ -1,0 +1,42 @@
+[package]
+name = "tenant-operator"
+version = "0.1.0"
+edition = "2021"
+description = "Kubernetes operator for CTO tenant management"
+authors = ["5D Labs <team@5dlabs.ai>"]
+license = "MIT"
+
+[[bin]]
+name = "tenant-operator"
+path = "src/bin/operator.rs"
+
+[dependencies]
+# Kubernetes
+kube = { version = "0.98", features = ["runtime", "derive", "client"] }
+k8s-openapi = { version = "0.24", features = ["v1_31"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# HTTP client for OpenBao
+reqwest = { version = "0.12", features = ["json"] }
+
+# Schema validation
+schemars = "0.8"
+
+[dev-dependencies]
+tokio-test = "0.4"

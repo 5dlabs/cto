@@ -11,7 +11,7 @@ members = [
     "crates/metal",
     "crates/notify",
     "crates/pm",
-    "crates/research",
+    "crates/research", "crates/tenant-operator",
     "crates/tools",
     "crates/utils",
 ]
