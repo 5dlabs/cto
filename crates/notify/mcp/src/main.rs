@@ -811,6 +811,7 @@ struct IntakeSetupIssue {
 
 /// Create Linear project and PRD issue for intake via PM server.
 /// This avoids needing the Linear API key on the client side.
+#[allow(clippy::too_many_lines)]
 fn create_linear_intake_setup(
     project_name: &str,
     prd_content: &str,

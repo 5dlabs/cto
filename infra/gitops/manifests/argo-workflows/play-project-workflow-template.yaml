@@ -193,7 +193,7 @@ spec:
         description: "Create an integration PR per level merging all task branches"
       - name: integration-base-branch
         value: "develop"
-        description: "Base branch for integration merges"
+        description: "Base branch for integration merges (develop per Git workflow policy)"
       - name: conflict-detection
         value: "true"
         description: "Detect overlapping changed files across PRs within a level"

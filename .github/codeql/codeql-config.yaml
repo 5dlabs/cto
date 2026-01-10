@@ -10,6 +10,9 @@ paths-ignore:
   # Generated files
   - "**/target/**"
   - "**/node_modules/**"
+  # Test starter/template code - standalone Cargo.toml not part of main workspace
+  # These are example projects used as templates for e2e testing
+  - "tests/agent-cli-matrix/e2e/starter-code/**"
 
 # Query filters - exclude false positives for internal/local services
 # The tools MCP server and monitor service intentionally use HTTP:

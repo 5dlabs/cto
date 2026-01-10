@@ -203,7 +203,7 @@ controller:
   image:
     repository: ghcr.io/5dlabs/controller
     pullPolicy: Always
-    tag: "develop"
+    tag: "main"
 
   service:
     type: ClusterIP
@@ -723,7 +723,7 @@ healer:
   image:
     repository: ghcr.io/5dlabs/healer
     pullPolicy: Always
-    tag: "develop"
+    tag: "main"
 
   service:
     type: ClusterIP
@@ -787,7 +787,7 @@ healer:
       repositoryUrl: "https://github.com/5dlabs/cto"
       docsRepositoryUrl: "https://github.com/5dlabs/cto"
       docsProjectDirectory: "docs"
-      docsBranch: "develop"
+      docsBranch: "main"
       workingDirectory: "."
       service: "heal"
       runType: "implementation"
@@ -961,7 +961,7 @@ research:
   # PR creation
   createPR: true
   repo: "5dlabs/cto"
-  baseBranch: "develop"
+  baseBranch: "main"
   researchDir: "docs/research"
 
   persistence:

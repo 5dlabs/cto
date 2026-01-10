@@ -134,8 +134,8 @@ spec:
         description: "Working directory for code implementation (where agents write code)"
         value: "."  # Default to repository root
       - name: pr-base-branch
-        description: "Base branch for pull requests (e.g., develop, main)"
-        value: "develop"  # Default to develop per git workflow
+        description: "Base branch for pull requests"
+        value: "develop"  # Default to develop (main is protected, releases only)
 
       # CLI configuration per agent (multi-CLI aware)
       - name: implementation-cli
@@ -1765,7 +1765,7 @@ spec:
             kubectl create configmap "$CONFIGMAP_NAME" \
               -n cto \
               --from-literal=repository="$REPO" \
-              --from-literal=branch="main" \
+              --from-literal=branch="{{workflow.parameters.pr-base-branch}}" \
               --from-literal=current-task-id="$TASK_ID" \
               --from-literal=workflow-name="{{workflow.name}}" \
               --from-literal=status="in-progress" \

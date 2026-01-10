@@ -7,10 +7,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Onboarding state machine states
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum OnboardingState {
     /// Initial welcome state
+    #[default]
     Welcome,
 
     /// Waiting for GitHub OAuth connection
@@ -68,12 +69,6 @@ pub enum OnboardingState {
         /// State to retry from
         retry_from: Box<OnboardingState>,
     },
-}
-
-impl Default for OnboardingState {
-    fn default() -> Self {
-        Self::Welcome
-    }
 }
 
 /// GitHub repository info

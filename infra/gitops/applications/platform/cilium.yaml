@@ -24,7 +24,7 @@ spec:
     helm:
       # Values are defined in the manifests directory for per-cluster customization
       valueFiles:
-        - https://raw.githubusercontent.com/5dlabs/cto/develop/infra/gitops/manifests/cilium/values.yaml
+        - https://raw.githubusercontent.com/5dlabs/cto/main/infra/gitops/manifests/cilium/values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
