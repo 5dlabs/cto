@@ -6,3 +6,6 @@ metadata:
   labels:
     app.kubernetes.io/name: buildkit
     app.kubernetes.io/component: build-infrastructure
+    # Buildkit requires privileged containers to build container images
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
