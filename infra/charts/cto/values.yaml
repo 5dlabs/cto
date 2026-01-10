@@ -723,7 +723,7 @@ healer:
   image:
     repository: ghcr.io/5dlabs/healer
     pullPolicy: Always
-    tag: "main"
+    tag: "latest"
 
   service:
     type: ClusterIP
