@@ -431,10 +431,10 @@ for agent in vex; do
     
     if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
         echo "📥 Found ${OP_ITEM}"
-        LINEAR_APP_CMD="client_id='$CLIENT_ID' client_secret='$CLIENT_SECRET'"
-        [[ -n "$WEBHOOK_SECRET" ]] && LINEAR_APP_CMD+=" webhook_secret='$WEBHOOK_SECRET'"
-        [[ -n "$ACCESS_TOKEN" ]] && LINEAR_APP_CMD+=" access_token='$ACCESS_TOKEN'"
-        update_openbao "linear-app-${agent}" $LINEAR_APP_CMD
+        LINEAR_APP_ARGS=("client_id=$CLIENT_ID" "client_secret=$CLIENT_SECRET")
+        [[ -n "$WEBHOOK_SECRET" ]] && LINEAR_APP_ARGS+=("webhook_secret=$WEBHOOK_SECRET")
+        [[ -n "$ACCESS_TOKEN" ]] && LINEAR_APP_ARGS+=("access_token=$ACCESS_TOKEN")
+        update_openbao "linear-app-${agent}" "${LINEAR_APP_ARGS[@]}"
     else
         echo -e "${YELLOW}⚠ ${OP_ITEM} not found in 1Password${NC}"
         echo "   Create Linear OAuth app at: https://linear.app/settings/api"
