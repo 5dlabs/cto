@@ -56,7 +56,9 @@ impl ProviderRegistry {
                     cli_provider_registered = true;
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to create CLI provider: {e}, falling back to API providers");
+                    tracing::warn!(
+                        "Failed to create CLI provider: {e}, falling back to API providers"
+                    );
                 }
             }
         }

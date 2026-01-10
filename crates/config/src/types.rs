@@ -317,8 +317,7 @@ impl IntakeModels {
     pub fn get_model_for_cli(&self, cli_type: &str) -> &str {
         self.cli_models
             .get(cli_type)
-            .map(String::as_str)
-            .unwrap_or(&self.primary)
+            .map_or(&self.primary, String::as_str)
     }
 }
 

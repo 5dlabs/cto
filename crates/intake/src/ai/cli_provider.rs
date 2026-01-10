@@ -858,8 +858,9 @@ mod tests {
     #[test]
     fn test_supported_models() {
         let provider = CLITextGenerator::new(CLIType::Claude).unwrap();
-        assert!(provider.supports_model("claude-sonnet-4-5-20250514"));
-        assert!(!provider.supports_model("gpt-4"));
+        assert!(provider.supports_model("claude-opus-4-5-20251101"));
+        assert!(provider.supports_model("opus")); // Short alias
+        assert!(!provider.supports_model("gpt-4")); // Not a Claude model
     }
 
     #[test]
