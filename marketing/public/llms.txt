@@ -1,0 +1,63 @@
+# CTO by 5D Labs
+
+> CTO is an AI-powered engineering collective that deploys thirteen specialized AI agents to build, ship, and maintain your software on self-healing bare metal infrastructure. Zero cloud markup, full CLI agnosticism, bring your own keys.
+
+## About
+
+CTO provides a complete AI engineering team, not just another coding assistant. Our agents work together across the full software development lifecycle:
+
+- **Morgan** - Project management, PRD intake, task breakdown
+- **Rex** - Rust backend specialist (axum, tokio, sqlx)
+- **Grizz** - Go backend specialist (chi, grpc, pgx)
+- **Nova** - Node.js/Bun specialist (Elysia, Effect, Drizzle)
+- **Blaze** - React/TypeScript frontend (Next.js, shadcn/ui, TailwindCSS)
+- **Tap** - Mobile development (Expo, React Native)
+- **Spark** - Desktop development (Electron)
+- **Vex** - XR/Unity development (OpenXR, Meta XR SDK)
+- **Cleo** - Code quality review
+- **Cipher** - Security analysis
+- **Tess** - Testing specialist
+- **Atlas** - Integration and merge
+- **Bolt** - Infrastructure setup (Kubernetes, Helm, GitOps)
+
+## Key Features
+
+- **CLI Agnostic**: Works with Claude Code, Cursor, Factory, Codex, OpenCode, and more
+- **Multi-Agent Orchestration**: Thirteen specialists collaborate on tasks
+- **Bare Metal Infrastructure**: 60-80% cost savings vs cloud providers
+- **Self-Healing**: Automated recovery, scaling, and maintenance
+- **BYOK**: Bring your own API keys, maintain full control
+- **GitHub-Driven**: All deployments through Git PRs and reviews
+
+## Infrastructure Providers
+
+CTO deploys to bare metal providers including:
+- Latitude
+- Hetzner
+- OVH
+- Vultr
+- Scaleway
+- Cherry Servers
+- DigitalOcean
+- On-premises hardware
+
+## Integrations
+
+- GitHub (PRs, reviews, deployments)
+- Linear (project management)
+- MCP servers (extensible tooling)
+- Prometheus, Grafana, Loki (observability)
+
+## Links
+
+- [Website](https://cto.5dlabs.ai)
+- [GitHub Organization](https://github.com/5dlabs)
+- [Join Waitlist](https://cto.5dlabs.ai/#cta)
+
+## Contact
+
+For inquiries about CTO, join our waitlist at https://cto.5dlabs.ai or reach out via GitHub.
+
+## Optional
+
+- [5D Labs GitHub](https://github.com/5dlabs): Source code and documentation
