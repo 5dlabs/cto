@@ -99,8 +99,20 @@ bao_put() {
     local token
     token=$(get_bao_token)
     
-    # Pass JSON via stdin to avoid shell escaping issues entirely
-    if printf '%s' "$json" | kubectl exec -i -n openbao openbao-0 -- sh -c "export BAO_TOKEN='$token' && bao kv put secret/$path -" >/dev/null 2>&1; then
+    # Pass token, path, and JSON via stdin using newline delimiters to avoid shell injection
+    # Format: TOKEN\nPATH\nJSON - the script inside reads each value safely
+    # This avoids interpolating any values into sh -c which could allow injection
+    # if values contained shell metacharacters (quotes, backticks, $, etc.)
+    local payload
+    payload=$(printf '%s\n%s\n%s' "$token" "$path" "$json")
+    
+    # shellcheck disable=SC2016 # Variables are intentionally expanded inside container, not locally
+    if printf '%s' "$payload" | kubectl exec -i -n openbao openbao-0 -- sh -c '
+        read -r BAO_TOKEN
+        read -r SECRET_PATH
+        export BAO_TOKEN
+        cat | bao kv put "secret/${SECRET_PATH}" -
+    ' >/dev/null 2>&1; then
         log_success "secret/$path"
         return 0
     else
@@ -282,7 +294,7 @@ seed_tools() {
     local github_token
     github_token=$(op_get_field "GitHub PAT - Tools MCP Server" "credential")
     if [[ -n "$github_token" ]]; then
-        bao_put "tools-github" "GITHUB_PERSONAL_ACCESS_TOKEN='$github_token'"
+        bao_put "tools-github" "GITHUB_PERSONAL_ACCESS_TOKEN" "$github_token"
     else
         log_warning "Missing: GitHub PAT - Tools MCP Server"
     fi
@@ -291,7 +303,7 @@ seed_tools() {
     local firecrawl_key
     firecrawl_key=$(op_get_field "Firecrawl API Key" "credential")
     if [[ -n "$firecrawl_key" ]]; then
-        bao_put "tools-firecrawl" "FIRECRAWL_API_KEY='$firecrawl_key'"
+        bao_put "tools-firecrawl" "FIRECRAWL_API_KEY" "$firecrawl_key"
     else
         log_warning "Missing: Firecrawl API Key"
     fi
@@ -300,7 +312,7 @@ seed_tools() {
     local latitude_key
     latitude_key=$(op_get_field "Latitude.sh API" "credential")
     if [[ -n "$latitude_key" ]]; then
-        bao_put "tools-latitude" "LATITUDE_API_KEY='$latitude_key'"
+        bao_put "tools-latitude" "LATITUDE_API_KEY" "$latitude_key"
     else
         log_warning "Missing: Latitude.sh API"
     fi
@@ -309,9 +321,7 @@ seed_tools() {
     local kubeconfig
     kubeconfig=$(op_get_field "Kubeconfig - Latitude cto-dal" "credential")
     if [[ -n "$kubeconfig" ]]; then
-        # Escape for shell
-        kubeconfig_escaped=$(printf '%s' "$kubeconfig" | sed "s/'/'\\\\''/g")
-        bao_put "tools-kubernetes" "KUBECONFIG='$kubeconfig_escaped'"
+        bao_put "tools-kubernetes" "KUBECONFIG" "$kubeconfig"
     else
         log_warning "Missing: Kubeconfig - Latitude cto-dal"
     fi
@@ -324,8 +334,7 @@ seed_tools() {
         p8_key=$(op_get_field "App Store Connect API" "private-key")
         
         if [[ -n "$key_id" && -n "$issuer_id" && -n "$p8_key" ]]; then
-            p8_key_escaped=$(printf '%s' "$p8_key" | sed "s/'/'\\\\''/g")
-            bao_put "tools-appstore-connect" "APP_STORE_KEY_ID='$key_id' APP_STORE_ISSUER_ID='$issuer_id' APP_STORE_P8_KEY='$p8_key_escaped'"
+            bao_put "tools-appstore-connect" "APP_STORE_KEY_ID" "$key_id" "APP_STORE_ISSUER_ID" "$issuer_id" "APP_STORE_P8_KEY" "$p8_key"
         else
             log_warning "Missing fields in App Store Connect API"
         fi
@@ -342,7 +351,7 @@ seed_infrastructure() {
     cf_email=$(op item get "Cloudflare API" --fields "username" --reveal 2>/dev/null || echo "")
     cf_key=$(op item get "Cloudflare API" --fields "credential" --reveal 2>/dev/null || echo "")
     if [[ -n "$cf_email" && -n "$cf_key" ]]; then
-        bao_put "cloudflare" "email='$cf_email' api-key='$cf_key'"
+        bao_put "cloudflare" "email" "$cf_email" "api-key" "$cf_key"
     else
         log_warning "Missing: Cloudflare API credentials"
     fi
@@ -356,8 +365,7 @@ seed_infrastructure() {
         local auth
         auth=$(echo -n "$ghcr_user:$ghcr_pass" | base64)
         local dockerconfig="{\"auths\":{\"ghcr.io\":{\"username\":\"$ghcr_user\",\"password\":\"$ghcr_pass\",\"auth\":\"$auth\"}}}"
-        dockerconfig_escaped=$(printf '%s' "$dockerconfig" | sed "s/'/'\\\\''/g")
-        bao_put "ghcr-secret" ".dockerconfigjson='$dockerconfig_escaped'"
+        bao_put "ghcr-secret" ".dockerconfigjson" "$dockerconfig"
     else
         log_warning "Missing: GHCR Pull Secret"
     fi
@@ -366,7 +374,7 @@ seed_infrastructure() {
     local discord_webhook
     discord_webhook=$(op item get "Discord Alertmanager Webhook" --fields "credential" --reveal 2>/dev/null || echo "")
     if [[ -n "$discord_webhook" ]]; then
-        bao_put "alertmanager-discord" "webhook-url='$discord_webhook'"
+        bao_put "alertmanager-discord" "webhook-url" "$discord_webhook"
     else
         log_warning "Missing: Discord Alertmanager Webhook"
     fi
@@ -383,7 +391,13 @@ seed_infrastructure() {
         linear_oauth_token=$(op item get "Linear API Credentials" --fields "oauth_token" --reveal 2>/dev/null || echo "")
         github_pat=$(op item get "GitHub PAT - Tools MCP Server" --fields "credential" --reveal 2>/dev/null || echo "")
         
-        bao_put "linear-sync" "LINEAR_API_KEY='$linear_api_key' LINEAR_WEBHOOK_SECRET='${linear_webhook_secret:-}' LINEAR_CLIENT_ID='${linear_client_id:-}' LINEAR_CLIENT_SECRET='${linear_client_secret:-}' LINEAR_OAUTH_TOKEN='${linear_oauth_token:-}' GITHUB_PERSONAL_ACCESS_TOKEN='${github_pat:-}'"
+        bao_put "linear-sync" \
+            "LINEAR_API_KEY" "$linear_api_key" \
+            "LINEAR_WEBHOOK_SECRET" "${linear_webhook_secret:-}" \
+            "LINEAR_CLIENT_ID" "${linear_client_id:-}" \
+            "LINEAR_CLIENT_SECRET" "${linear_client_secret:-}" \
+            "LINEAR_OAUTH_TOKEN" "${linear_oauth_token:-}" \
+            "GITHUB_PERSONAL_ACCESS_TOKEN" "${github_pat:-}"
     else
         log_warning "Missing: Linear API Credentials"
     fi
@@ -408,7 +422,7 @@ seed_research() {
         ct0=$(op item get "Twitter/X Research Auth" --fields "ct0" --reveal 2>/dev/null || echo "")
         
         if [[ -n "$auth_token" ]]; then
-            bao_put "research-twitter" "TWITTER_AUTH_TOKEN='$auth_token' TWITTER_CT0='${ct0:-}'"
+            bao_put "research-twitter" "TWITTER_AUTH_TOKEN" "$auth_token" "TWITTER_CT0" "${ct0:-}"
         else
             log_warning "Missing auth_token in Twitter/X Research Auth"
         fi
