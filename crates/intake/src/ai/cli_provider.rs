@@ -18,10 +18,10 @@ use super::provider::{
     AIMessage, AIProvider, AIResponse, AIRole, GenerateOptions, TokenUsage, DEFAULT_THINKING_BUDGET,
 };
 
-/// Default model for CLI-based generation
-const DEFAULT_MODEL: &str = "claude-sonnet-4-5-20250514";
+/// Default model for CLI-based generation - Opus 4.5 (most intelligent)
+const DEFAULT_MODEL: &str = "claude-opus-4-5-20251101";
 
-/// Default model for extended thinking (Opus 4.5 - latest with thinking)
+/// Default model for extended thinking (same as default - Opus 4.5)
 pub const DEFAULT_THINKING_MODEL: &str = "claude-opus-4-5-20251101";
 
 /// CLI-based AI provider that uses CLI adapters for text generation.
@@ -232,6 +232,11 @@ impl CLITextGenerator {
     /// Get the executable name for the CLI type.
     fn get_executable(&self) -> &str {
         self.adapter.get_executable_name()
+    }
+
+    /// Get the CLI type.
+    pub fn cli_type(&self) -> CLIType {
+        self.cli_type
     }
 
     /// Convert messages to a single prompt string.
@@ -620,20 +625,23 @@ impl CLITextGenerator {
     fn get_supported_models(&self) -> Vec<&str> {
         match self.cli_type {
             CLIType::Claude => vec![
-                // Opus 4.5 (latest with extended thinking)
+                // Claude 4.5 models (current - Jan 2025)
                 "claude-opus-4-5-20251101",
-                "opus",
-                // Sonnet 4.5 (latest sonnet with thinking)
                 "claude-sonnet-4-5-20250929",
+                "claude-haiku-4-5-20251001",
+                // Short names
+                "opus",
                 "sonnet",
-                // Opus 4.1
-                "claude-opus-4-1-20250805",
-                // Sonnet 4.0
-                "claude-sonnet-4-5-20250514",
-                // Haiku
-                "claude-3-5-haiku-20241022",
                 "haiku",
-                // Legacy models
+                // Aliases
+                "claude-opus-4-5",
+                "claude-sonnet-4-5",
+                "claude-haiku-4-5",
+                // Claude 4.1 (legacy)
+                "claude-opus-4-1-20250805",
+                // Claude 3.5 (deprecated)
+                "claude-3-5-haiku-20241022",
+                // Claude 3 (deprecated)
                 "claude-3-opus-20240229",
                 "claude-3-sonnet-20240229",
                 "claude-3-haiku-20240307",

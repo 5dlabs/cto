@@ -179,7 +179,14 @@ kill-ports:
 # Start all services with mprocs TUI (recommended)
 mp: kill-ports
     @echo "Starting services with mprocs TUI..."
-    @echo "Make sure you have sourced .env.local first!"
+    @if [ -f .env.local ]; then \
+        echo "Sourcing .env.local to load environment variables..."; \
+        set -a; \
+        source .env.local; \
+        set +a; \
+    else \
+        echo "⚠️  .env.local not found - some services may not work"; \
+    fi
     mprocs
 
 # =============================================================================

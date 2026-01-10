@@ -62,8 +62,17 @@ impl AIDomain {
 
     /// Get the default model for a provider.
     fn get_default_model(provider: &dyn AIProvider) -> &str {
-        if provider.name() == "anthropic" {
-            "claude-sonnet-4-5-20250514"
+        let name = provider.name();
+        // CLI providers use names like "cli-claude", "cli-codex", etc.
+        // API providers use "anthropic", "openai"
+        if name == "anthropic" || name == "cli-claude" || name == "cli-dexter" {
+            "claude-opus-4-5-20251101"
+        } else if name == "cli-codex" || name == "cli-opencode" || name == "cli-factory" {
+            "gpt-4o" // OpenAI-based CLIs default to gpt-4o
+        } else if name == "cli-cursor" {
+            "opus-4.5" // Cursor uses short model names
+        } else if name == "cli-gemini" {
+            "gemini-2.0-flash" // Gemini's default
         } else {
             "gpt-4o"
         }

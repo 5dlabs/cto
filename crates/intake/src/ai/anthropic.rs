@@ -15,41 +15,42 @@ const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 /// Anthropic API version
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
-/// Default model
-const DEFAULT_MODEL: &str = "claude-sonnet-4-5-20250514";
+/// Default model - Opus 4.5 (most intelligent, best for complex task generation)
+const DEFAULT_MODEL: &str = "claude-opus-4-5-20251101";
 
-/// Supported Anthropic models
+/// Supported Anthropic models (as of Jan 2025)
+/// See: https://console.anthropic.com/docs/en/about-claude/models/overview
 const SUPPORTED_MODELS: &[&str] = &[
-    // Claude 4.5 models (latest)
+    // Claude 4.5 models (latest - Jan 2025)
     "claude-opus-4-5-20251101",
-    "claude-opus-4-5-20250929", // Alias: common typo (Sonnet date used for Opus)
     "claude-sonnet-4-5-20250929",
-    // Short names for convenience
+    "claude-haiku-4-5-20251001",
+    // Short names for convenience (map to latest versions)
     "opus",
     "sonnet",
     "haiku",
-    // Claude 4.1 models
+    // Aliases (used by Claude CLI and API)
+    "claude-opus-4-5",
+    "claude-sonnet-4-5",
+    "claude-haiku-4-5",
+    // Claude 4.1 models (legacy)
     "claude-opus-4-1-20250805",
-    // Claude 4 models
-    "claude-sonnet-4-5-20250514",
-    // Claude 3.5 models (deprecated, but kept for backwards compatibility tests)
-    // Note: claude-3-5-sonnet-20241022 was removed from Anthropic API
+    // Claude 3.5 models (deprecated but kept for compatibility)
     "claude-3-5-haiku-20241022",
-    // Claude 3 models
+    // Claude 3 models (deprecated)
     "claude-3-opus-20240229",
     "claude-3-sonnet-20240229",
     "claude-3-haiku-20240307",
 ];
 
 /// Normalize model name to the canonical API model name.
-/// Maps short names and common aliases to their correct API identifiers.
+/// Maps short names and aliases to their correct API identifiers.
 fn normalize_model(model: &str) -> &str {
     match model {
-        // Short names → latest versions
-        // Also handles common typo: using Sonnet 4.5 date for Opus 4.5
-        "opus" | "claude-opus-4-5-20250929" => "claude-opus-4-5-20251101",
-        "sonnet" => "claude-sonnet-4-5-20250929",
-        "haiku" => "claude-3-5-haiku-20241022",
+        // Short names and aliases → latest 4.5 versions
+        "opus" | "claude-opus-4-5" => "claude-opus-4-5-20251101",
+        "sonnet" | "claude-sonnet-4-5" => "claude-sonnet-4-5-20250929",
+        "haiku" | "claude-haiku-4-5" => "claude-haiku-4-5-20251001",
         // Everything else passes through
         _ => model,
     }
@@ -469,14 +470,16 @@ mod tests {
     #[test]
     fn test_supported_models() {
         let provider = AnthropicProvider::default();
-        // Claude 4.5 models
+        // Claude 4.5 models (current)
         assert!(provider.supports_model("claude-opus-4-5-20251101"));
         assert!(provider.supports_model("claude-sonnet-4-5-20250929"));
-        // Claude 4.1 models
+        assert!(provider.supports_model("claude-haiku-4-5-20251001"));
+        // Claude 4.5 aliases
+        assert!(provider.supports_model("claude-opus-4-5"));
+        assert!(provider.supports_model("claude-sonnet-4-5"));
+        // Claude 4.1 models (legacy)
         assert!(provider.supports_model("claude-opus-4-1-20250805"));
-        // Claude 4 models
-        assert!(provider.supports_model("claude-sonnet-4-5-20250514"));
-        // Claude 3 models
+        // Claude 3 models (deprecated)
         assert!(provider.supports_model("claude-3-opus-20240229"));
         // Non-Anthropic models
         assert!(!provider.supports_model("gpt-4"));

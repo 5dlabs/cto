@@ -39,6 +39,17 @@ struct Cli {
     /// Project root directory
     #[arg(long, global = true)]
     project: Option<PathBuf>,
+
+    /// Use CLI mode instead of API mode for AI operations.
+    /// When enabled, uses external CLI tools (claude, codex, cursor, etc.)
+    /// instead of direct API calls.
+    #[arg(long, global = true, env = "TASKS_USE_CLI")]
+    use_cli: bool,
+
+    /// CLI type to use when --use-cli is enabled.
+    /// Options: claude, codex, cursor, factory, opencode, gemini, dexter
+    #[arg(long, global = true, env = "TASKS_CLI", default_value = "claude")]
+    cli_type: String,
 }
 
 #[derive(Subcommand)]
@@ -411,11 +422,12 @@ fn get_project_path(cli_path: Option<PathBuf>) -> PathBuf {
 
 #[tokio::main]
 async fn main() {
-    // Initialize tracing
+    // Initialize tracing with INFO level by default for progress visibility
+    // RUST_LOG env var can override this (e.g., RUST_LOG=debug for verbose output)
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::WARN.into()),
+                .add_directive(tracing::Level::INFO.into()),
         )
         .init();
 
@@ -428,7 +440,14 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<(), TasksError> {
-    let project_path = get_project_path(cli.project);
+    // Apply CLI flags to environment variables so they're picked up by the provider registry
+    // The registry checks TASKS_USE_CLI and TASKS_CLI when creating default providers
+    if cli.use_cli {
+        std::env::set_var("TASKS_USE_CLI", "true");
+    }
+    std::env::set_var("TASKS_CLI", &cli.cli_type);
+
+    let project_path = get_project_path(cli.project.clone());
     let storage = Arc::new(FileStorage::new(&project_path));
     let tasks_domain = TasksDomain::new(Arc::clone(&storage) as Arc<dyn intake::storage::Storage>);
     let deps_domain =

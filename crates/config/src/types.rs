@@ -303,6 +303,23 @@ pub struct IntakeModels {
     /// Fallback model if primary fails.
     #[serde(default)]
     pub fallback: String,
+
+    /// Per-CLI model overrides. Maps CLI name (claude, codex, cursor, etc.)
+    /// to the model name that CLI should use.
+    #[serde(default, rename = "cliModels")]
+    pub cli_models: HashMap<String, String>,
+}
+
+impl IntakeModels {
+    /// Get the model for a specific CLI type.
+    /// Falls back to the primary model if no CLI-specific model is configured.
+    #[must_use]
+    pub fn get_model_for_cli(&self, cli_type: &str) -> &str {
+        self.cli_models
+            .get(cli_type)
+            .map(String::as_str)
+            .unwrap_or(&self.primary)
+    }
 }
 
 /// Intake workflow defaults.
@@ -342,6 +359,7 @@ impl Default for IntakeDefaults {
                 primary: "claude-opus-4-5-20251101".to_string(),
                 research: "claude-opus-4-5-20251101".to_string(),
                 fallback: "claude-opus-4-5-20251101".to_string(),
+                cli_models: HashMap::new(), // Will be populated from config
             },
         }
     }

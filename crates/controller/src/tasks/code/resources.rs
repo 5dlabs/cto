@@ -1213,8 +1213,13 @@ impl<'a> CodeResourceManager<'a> {
                             "name": "LOG_FILE_PATH",
                             "value": "/workspace/agent.log"
                         }));
+                        // Enable info-level logging so progress is visible (and streamed to Linear)
+                        env_arr.push(json!({
+                            "name": "RUST_LOG",
+                            "value": "info"
+                        }));
                     } else {
-                        warn!("Failed to add STATUS_FILE/LOG_FILE_PATH env vars to main container");
+                        warn!("Failed to add STATUS_FILE/LOG_FILE_PATH/RUST_LOG env vars to main container");
                     }
                 } else {
                     warn!("No main container found to configure for Linear integration");

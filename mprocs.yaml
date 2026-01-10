@@ -27,7 +27,13 @@ procs:
   # PM Server - Linear webhooks & project management
   # ===========================================================================
   pm-server:
-    shell: "LINEAR_ENABLED=true RUST_LOG=info,pm=debug cargo run --bin pm-server"
+    # Source .env.local for secrets (LINEAR_OAUTH_TOKEN), then run server
+    # Non-secret env vars (WEBHOOK_CALLBACK_URL, etc.) are set in the env section below
+    shell: "bash -c 'source .env.local 2>/dev/null || true; cargo run --bin pm-server'"
+    env:
+      LINEAR_ENABLED: "true"
+      RUST_LOG: "info,pm=debug"
+      WEBHOOK_CALLBACK_URL: "https://pm-dev.5dlabs.ai/webhooks/github"
     cwd: "."
     
   # ===========================================================================

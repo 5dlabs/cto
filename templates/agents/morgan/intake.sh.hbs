@@ -314,7 +314,8 @@ if [ "$INTAKE_CLI" = "claude" ]; then
     if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
         if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
             echo "  ✅ Using MCP configuration: $MCP_CONFIG_FILE"
-            MCP_ARGS="--mcp-config $MCP_CONFIG_FILE"
+            # Use --strict-mcp-config to only use servers from our config
+            MCP_ARGS="--mcp-config $MCP_CONFIG_FILE --strict-mcp-config"
         fi
     fi
     
