@@ -940,6 +940,51 @@ tweakcn:
       memory: 256Mi
 
 # =============================================================================
+# Web App - Next.js Application
+# =============================================================================
+web:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/5dlabs/web
+    pullPolicy: Always
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  # Environment variables (can be overridden in envFrom)
+  env: {}
+  
+  # Environment variables from secrets/configmaps
+  envFrom: []
+  
+  # Database connection (optional - for Better Auth and Drizzle)
+  databaseUrl:
+    enabled: false
+    secretName: web-database-url  # pragma: allowlist secret
+  
+  # Auth secret for Better Auth (required if using auth)
+  authSecret:
+    enabled: false
+    secretName: web-auth-secret  # pragma: allowlist secret
+  
+  # Secrets configuration
+  secrets:
+    databaseUrlSecretName: web-database-url  # pragma: allowlist secret
+    authSecretName: web-auth-secret  # pragma: allowlist secret
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# =============================================================================
 # Research - Twitter/X Research Pipeline
 # =============================================================================
 research:
@@ -1032,8 +1077,12 @@ cloudflare:
     pm:
       hostname: pm.5dlabs.ai
     # CTO platform main URL - routes to PM service for OAuth callbacks
+    # Note: This can be changed to route to web app if desired
     cto:
       hostname: cto.5dlabs.ai
+    # Web app - main marketing/web application
+    web:
+      hostname: cto.5dlabs.ai  # Can be changed to app.5dlabs.ai or www.5dlabs.ai
     webhooks:
       hostname: github-webhooks.5dlabs.ai
     # Platform services (external to CTO namespace)
