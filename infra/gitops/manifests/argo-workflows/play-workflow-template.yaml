@@ -135,7 +135,7 @@ spec:
         value: "."  # Default to repository root
       - name: pr-base-branch
         description: "Base branch for pull requests (e.g., develop, main)"
-        value: "develop"  # Default to develop per git workflow
+        value: "main"  # Default to develop per git workflow
 
       # CLI configuration per agent (multi-CLI aware)
       - name: implementation-cli

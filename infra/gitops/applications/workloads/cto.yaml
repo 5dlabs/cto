@@ -25,7 +25,7 @@ metadata:
   labels:
     app.kubernetes.io/name: cto
     app.kubernetes.io/part-of: cto-platform
-    app.kubernetes.io/branch: develop
+    app.kubernetes.io/branch: main
   annotations:
     # Image Updater for all CTO images
     # Uses digest strategy to track the 'develop' tag specifically
@@ -62,7 +62,7 @@ spec:
 
   source:
     repoURL: https://github.com/5dlabs/cto
-    targetRevision: develop
+    targetRevision: main
     path: infra/charts/cto
     helm:
       valueFiles:

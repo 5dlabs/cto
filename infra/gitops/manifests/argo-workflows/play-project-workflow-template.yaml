@@ -192,7 +192,7 @@ spec:
         value: "true"
         description: "Create an integration PR per level merging all task branches"
       - name: integration-base-branch
-        value: "develop"
+        value: "main"
         description: "Base branch for integration merges"
       - name: conflict-detection
         value: "true"
