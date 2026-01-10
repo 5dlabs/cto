@@ -14,21 +14,32 @@ use crate::crd::Tenant;
 use crate::error::{Error, Result};
 
 /// Create the tenant namespace
+///
+/// # Errors
+/// Returns an error if namespace creation fails.
 pub async fn create_namespace(client: &Client, tenant: &Tenant) -> Result<()> {
     let namespaces: Api<Namespace> = Api::all(client.clone());
     let namespace_name = tenant.namespace_name();
-    let tenant_name = tenant.metadata.name.as_ref().ok_or_else(|| {
-        Error::InvalidConfig("Tenant must have a name".to_string())
-    })?;
+    let tenant_name = tenant
+        .metadata
+        .name
+        .as_ref()
+        .ok_or_else(|| Error::InvalidConfig("Tenant must have a name".to_string()))?;
 
     let ns = Namespace {
         metadata: ObjectMeta {
             name: Some(namespace_name.clone()),
             labels: Some(
                 [
-                    ("app.kubernetes.io/managed-by".to_string(), "tenant-operator".to_string()),
+                    (
+                        "app.kubernetes.io/managed-by".to_string(),
+                        "tenant-operator".to_string(),
+                    ),
                     ("cto.5dlabs.ai/tenant".to_string(), tenant_name.clone()),
-                    ("cto.5dlabs.ai/tier".to_string(), format!("{:?}", tenant.spec.tier).to_lowercase()),
+                    (
+                        "cto.5dlabs.ai/tier".to_string(),
+                        format!("{:?}", tenant.spec.tier).to_lowercase(),
+                    ),
                 ]
                 .into_iter()
                 .collect(),
@@ -52,6 +63,9 @@ pub async fn create_namespace(client: &Client, tenant: &Tenant) -> Result<()> {
 }
 
 /// Delete the tenant namespace
+///
+/// # Errors
+/// Returns an error if namespace deletion fails.
 pub async fn delete_namespace(client: &Client, namespace: &str) -> Result<()> {
     let namespaces: Api<Namespace> = Api::all(client.clone());
 
@@ -69,11 +83,16 @@ pub async fn delete_namespace(client: &Client, namespace: &str) -> Result<()> {
 }
 
 /// Create RBAC resources for the tenant
+///
+/// # Errors
+/// Returns an error if RBAC setup fails.
 pub async fn create_rbac(client: &Client, tenant: &Tenant) -> Result<()> {
     let namespace = tenant.namespace_name();
-    let tenant_name = tenant.metadata.name.as_ref().ok_or_else(|| {
-        Error::InvalidConfig("Tenant must have a name".to_string())
-    })?;
+    let tenant_name = tenant
+        .metadata
+        .name
+        .as_ref()
+        .ok_or_else(|| Error::InvalidConfig("Tenant must have a name".to_string()))?;
 
     // Create ServiceAccount
     let service_accounts: Api<ServiceAccount> = Api::namespaced(client.clone(), &namespace);
@@ -83,7 +102,10 @@ pub async fn create_rbac(client: &Client, tenant: &Tenant) -> Result<()> {
             namespace: Some(namespace.clone()),
             labels: Some(
                 [
-                    ("app.kubernetes.io/managed-by".to_string(), "tenant-operator".to_string()),
+                    (
+                        "app.kubernetes.io/managed-by".to_string(),
+                        "tenant-operator".to_string(),
+                    ),
                     ("cto.5dlabs.ai/tenant".to_string(), tenant_name.clone()),
                 ]
                 .into_iter()
@@ -110,7 +132,10 @@ pub async fn create_rbac(client: &Client, tenant: &Tenant) -> Result<()> {
             namespace: Some(namespace.clone()),
             labels: Some(
                 [
-                    ("app.kubernetes.io/managed-by".to_string(), "tenant-operator".to_string()),
+                    (
+                        "app.kubernetes.io/managed-by".to_string(),
+                        "tenant-operator".to_string(),
+                    ),
                     ("cto.5dlabs.ai/tenant".to_string(), tenant_name.clone()),
                 ]
                 .into_iter()
@@ -142,13 +167,18 @@ pub async fn create_rbac(client: &Client, tenant: &Tenant) -> Result<()> {
     Ok(())
 }
 
-/// Create ExternalSecret for the tenant's API keys
+/// Create `ExternalSecret` for the tenant's API keys
+///
+/// # Errors
+/// Returns an error if the tenant has no name.
 pub async fn create_external_secret(client: &Client, tenant: &Tenant) -> Result<()> {
     let namespace = tenant.namespace_name();
     let secret_name = tenant.external_secret_name();
-    let tenant_name = tenant.metadata.name.as_ref().ok_or_else(|| {
-        Error::InvalidConfig("Tenant must have a name".to_string())
-    })?;
+    let tenant_name = tenant
+        .metadata
+        .name
+        .as_ref()
+        .ok_or_else(|| Error::InvalidConfig("Tenant must have a name".to_string()))?;
 
     // ExternalSecret CRD - using dynamic API
     let external_secrets = Api::<kube::core::DynamicObject>::namespaced_with(
@@ -230,7 +260,10 @@ pub async fn create_external_secret(client: &Client, tenant: &Tenant) -> Result<
     }
 }
 
-/// Delete ExternalSecret
+/// Delete `ExternalSecret`
+///
+/// # Errors
+/// Returns an error if `ExternalSecret` deletion fails.
 pub async fn delete_external_secret(client: &Client, tenant: &Tenant) -> Result<()> {
     let namespace = tenant.namespace_name();
     let secret_name = tenant.external_secret_name();
@@ -263,13 +296,19 @@ pub async fn delete_external_secret(client: &Client, tenant: &Tenant) -> Result<
     }
 }
 
-/// Create ArgoCD Application for tenant agents
+/// Create `ArgoCD` Application for tenant agents
+///
+/// # Errors
+/// Returns an error if Application creation fails.
+#[allow(clippy::too_many_lines)]
 pub async fn create_argocd_app(client: &Client, tenant: &Tenant) -> Result<()> {
     let app_name = tenant.argocd_app_name();
     let namespace = tenant.namespace_name();
-    let tenant_name = tenant.metadata.name.as_ref().ok_or_else(|| {
-        Error::InvalidConfig("Tenant must have a name".to_string())
-    })?;
+    let tenant_name = tenant
+        .metadata
+        .name
+        .as_ref()
+        .ok_or_else(|| Error::InvalidConfig("Tenant must have a name".to_string()))?;
 
     // Get enabled agents or use defaults
     let enabled_agents = tenant
@@ -278,13 +317,15 @@ pub async fn create_argocd_app(client: &Client, tenant: &Tenant) -> Result<()> {
         .as_ref()
         .map(|a| &a.enabled)
         .filter(|e| !e.is_empty())
-        .map(|agents| {
-            agents
-                .iter()
-                .map(|a| format!("{:?}", a).to_lowercase())
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_else(|| vec!["morgan".to_string(), "cleo".to_string(), "tess".to_string()]);
+        .map_or_else(
+            || vec!["morgan".to_string(), "cleo".to_string(), "tess".to_string()],
+            |agents| {
+                agents
+                    .iter()
+                    .map(|a| format!("{a:?}").to_lowercase())
+                    .collect::<Vec<_>>()
+            },
+        );
 
     // ArgoCD Application CRD - using dynamic API
     let applications = Api::<kube::core::DynamicObject>::namespaced_with(
@@ -370,7 +411,10 @@ pub async fn create_argocd_app(client: &Client, tenant: &Tenant) -> Result<()> {
     }
 }
 
-/// Delete ArgoCD Application
+/// Delete `ArgoCD` Application
+///
+/// # Errors
+/// Returns an error if Application deletion fails.
 pub async fn delete_argocd_app(client: &Client, tenant: &Tenant) -> Result<()> {
     let app_name = tenant.argocd_app_name();
 
@@ -386,7 +430,10 @@ pub async fn delete_argocd_app(client: &Client, tenant: &Tenant) -> Result<()> {
         },
     );
 
-    match applications.delete(&app_name, &DeleteParams::default()).await {
+    match applications
+        .delete(&app_name, &DeleteParams::default())
+        .await
+    {
         Ok(_) => {
             info!(app = %app_name, "Deleted ArgoCD Application");
             Ok(())

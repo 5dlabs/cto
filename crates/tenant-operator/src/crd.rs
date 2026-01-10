@@ -107,7 +107,7 @@ pub struct AiProviderConfig {
     /// Primary AI provider type
     #[serde(default = "default_ai_provider")]
     pub provider_type: AiProviderType,
-    /// Reference to secret in OpenBao
+    /// Reference to secret in `OpenBao`
     #[serde(default)]
     pub secret_ref: Option<String>,
     /// Additional provider configurations
@@ -267,10 +267,10 @@ pub struct TenantStatus {
     /// Kubernetes namespace for this tenant
     #[serde(default)]
     pub namespace: Option<String>,
-    /// ArgoCD Application name
+    /// `ArgoCD` Application name
     #[serde(default)]
     pub argocd_app: Option<String>,
-    /// ExternalSecret resource name
+    /// `ExternalSecret` resource name
     #[serde(default)]
     pub external_secret_name: Option<String>,
     /// Status conditions
@@ -310,10 +310,16 @@ impl Tenant {
     /// Generate the namespace name for this tenant
     #[must_use]
     pub fn namespace_name(&self) -> String {
-        format!("tenant-{}", self.metadata.name.as_ref().unwrap_or(&"unknown".to_string()))
+        format!(
+            "tenant-{}",
+            self.metadata
+                .name
+                .as_ref()
+                .unwrap_or(&"unknown".to_string())
+        )
     }
 
-    /// Generate the ArgoCD application name
+    /// Generate the `ArgoCD` application name
     #[must_use]
     pub fn argocd_app_name(&self) -> String {
         format!("{}-agents", self.namespace_name())

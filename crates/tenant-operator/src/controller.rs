@@ -31,6 +31,9 @@ pub struct Context {
 }
 
 /// Run the tenant controller
+///
+/// # Errors
+/// Returns an error if the Kubernetes client cannot be initialized.
 pub async fn run_controller() -> Result<()> {
     let client = Client::try_default().await?;
     let tenants: Api<Tenant> = Api::all(client.clone());
@@ -153,13 +156,15 @@ async fn update_status(
 ) -> Result<()> {
     let tenants: Api<Tenant> = Api::all(client.clone());
 
-    let conditions = message.map(|m| {
-        vec![serde_json::json!({
-            "type": "Ready",
-            "status": if phase == TenantPhase::Ready { "True" } else { "False" },
-            "message": m,
-        })]
-    }).unwrap_or_default();
+    let conditions = message
+        .map(|m| {
+            vec![serde_json::json!({
+                "type": "Ready",
+                "status": if phase == TenantPhase::Ready { "True" } else { "False" },
+                "message": m,
+            })]
+        })
+        .unwrap_or_default();
 
     let status = serde_json::json!({
         "status": {
@@ -197,6 +202,7 @@ async fn update_status_full(client: &Client, name: &str, status: TenantStatus) -
 }
 
 /// Error policy for the controller
+#[allow(clippy::needless_pass_by_value)]
 fn error_policy(tenant: Arc<Tenant>, error: &Error, _ctx: Arc<Context>) -> Action {
     error!(
         tenant = %tenant.name_any(),

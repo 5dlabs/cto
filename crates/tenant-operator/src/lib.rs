@@ -1,10 +1,10 @@
-//! Tenant Operator for CTO SaaS Platform
+//! Tenant Operator for CTO `SaaS` Platform
 //!
 //! This operator watches Tenant Custom Resources and provisions:
 //! - Kubernetes namespaces for tenant isolation
-//! - RBAC (ServiceAccounts, RoleBindings)
-//! - ExternalSecrets for OpenBao integration
-//! - ArgoCD Applications for tenant agent deployments
+//! - RBAC (`ServiceAccounts`, `RoleBindings`)
+//! - `ExternalSecrets` for `OpenBao` integration
+//! - `ArgoCD` Applications for tenant agent deployments
 
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]

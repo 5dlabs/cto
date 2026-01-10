@@ -12,13 +12,13 @@ use std::collections::HashMap;
 pub enum OnboardingState {
     /// Initial welcome state
     Welcome,
-    
+
     /// Waiting for GitHub OAuth connection
     GitHubConnect {
         /// OAuth state parameter for CSRF protection
         oauth_state: Option<String>,
     },
-    
+
     /// User selecting repositories to authorize
     RepoSelection {
         /// GitHub installation ID after OAuth
@@ -26,7 +26,7 @@ pub enum OnboardingState {
         /// Available repositories from GitHub
         available_repos: Vec<GitHubRepo>,
     },
-    
+
     /// User entering API key
     ApiKeyEntry {
         /// Selected repositories
@@ -34,7 +34,7 @@ pub enum OnboardingState {
         /// Provider being configured
         provider: String,
     },
-    
+
     /// User selecting agents for their squad
     AgentSelection {
         /// Selected repositories
@@ -44,7 +44,7 @@ pub enum OnboardingState {
         /// Detected stack from repo analysis
         detected_stack: Option<DetectedStack>,
     },
-    
+
     /// Tenant provisioning in progress
     Provisioning {
         /// Tenant configuration
@@ -52,7 +52,7 @@ pub enum OnboardingState {
         /// Current provisioning step
         step: ProvisioningStep,
     },
-    
+
     /// Onboarding complete
     Complete {
         /// Final tenant configuration
@@ -60,7 +60,7 @@ pub enum OnboardingState {
         /// Kubernetes namespace
         namespace: String,
     },
-    
+
     /// Error state
     Error {
         /// Error message
@@ -127,38 +127,28 @@ pub enum ProvisioningStep {
 pub enum OnboardingAction {
     /// Start onboarding
     Start,
-    
+
     /// GitHub OAuth completed
     GitHubConnected {
         installation_id: i64,
         access_token: String,
     },
-    
+
     /// User selected repositories
-    SelectRepos {
-        repos: Vec<String>,
-    },
-    
+    SelectRepos { repos: Vec<String> },
+
     /// User submitted API key
-    SubmitApiKey {
-        provider: String,
-        api_key: String,
-    },
-    
+    SubmitApiKey { provider: String, api_key: String },
+
     /// User selected agents
-    SelectAgents {
-        agents: Vec<String>,
-        cli: String,
-    },
-    
+    SelectAgents { agents: Vec<String>, cli: String },
+
     /// User confirmed organization name
-    ConfirmOrganization {
-        name: String,
-    },
-    
+    ConfirmOrganization { name: String },
+
     /// Go back to previous state
     Back,
-    
+
     /// Retry from error
     Retry,
 }
@@ -220,6 +210,7 @@ impl OnboardingMachine {
     }
 
     /// Process an action and transition state
+    #[allow(clippy::too_many_lines)]
     pub fn transition(&mut self, action: OnboardingAction) -> OnboardingResponse {
         let (new_state, message, actions, progress) = match (&self.state, action) {
             // Welcome -> GitHubConnect
@@ -314,8 +305,8 @@ impl OnboardingMachine {
                     },
                     format!(
                         "API key validated! Based on your {} codebase, I recommend: {}",
-                        detected_stack.as_ref().map(|s| s.primary_language.as_str()).unwrap_or(""),
-                        detected_stack.as_ref().map(|s| s.recommended_agents.join(", ")).unwrap_or_default()
+                        detected_stack.as_ref().map_or("", |s| s.primary_language.as_str()),
+                        detected_stack.as_ref().map_or_else(String::new, |s| s.recommended_agents.join(", "))
                     ),
                     vec![AvailableAction {
                         action_type: "button".to_string(),
@@ -328,7 +319,7 @@ impl OnboardingMachine {
             }
 
             // AgentSelection -> Provisioning
-            (OnboardingState::AgentSelection { selected_repos, api_keys, detected_stack }, OnboardingAction::SelectAgents { agents, cli }) => {
+            (OnboardingState::AgentSelection { selected_repos, api_keys, detected_stack: _ }, OnboardingAction::SelectAgents { agents, cli }) => {
                 let config = TenantConfig {
                     owner_email: "user@example.com".to_string(), // Would come from session
                     owner_github_id: "12345".to_string(),
@@ -414,20 +405,27 @@ mod tests {
     fn test_welcome_to_github_connect() {
         let mut machine = OnboardingMachine::new();
         let response = machine.transition(OnboardingAction::Start);
-        
-        assert!(matches!(response.state, OnboardingState::GitHubConnect { .. }));
+
+        assert!(matches!(
+            response.state,
+            OnboardingState::GitHubConnect { .. }
+        ));
         assert_eq!(response.progress, 10);
     }
 
     #[test]
     fn test_github_connected() {
-        let mut machine = OnboardingMachine::from_state(OnboardingState::GitHubConnect { oauth_state: None });
+        let mut machine =
+            OnboardingMachine::from_state(OnboardingState::GitHubConnect { oauth_state: None });
         let response = machine.transition(OnboardingAction::GitHubConnected {
             installation_id: 12345,
             access_token: "token".to_string(),
         });
-        
-        assert!(matches!(response.state, OnboardingState::RepoSelection { .. }));
+
+        assert!(matches!(
+            response.state,
+            OnboardingState::RepoSelection { .. }
+        ));
         assert_eq!(response.progress, 30);
     }
 }
