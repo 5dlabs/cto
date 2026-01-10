@@ -181,19 +181,30 @@ echo "════════════════════════�
 echo -e "${BLUE}SECTION 2: GHCR Docker Registry${NC}"
 echo "═══════════════════════════════════════════════════════════════════════════════"
 
-GHCR_USER=$(get_op_field "GHCR Pull Secret" "username")
-GHCR_TOKEN=$(get_op_field "GHCR Pull Secret" "credential")
+# GHCR credential may already contain full dockerconfigjson
+GHCR_CRED=$(get_op_field "GHCR Pull Secret" "credential")
 
-if [[ -n "$GHCR_USER" && -n "$GHCR_TOKEN" ]]; then
+if [[ -n "$GHCR_CRED" ]]; then
     echo "📥 Found GHCR credentials in 1Password"
-    echo "  Username: $GHCR_USER"
-    # Build dockerconfigjson
-    AUTH_B64=$(echo -n "${GHCR_USER}:${GHCR_TOKEN}" | base64)
-    DOCKER_CONFIG="{\"auths\":{\"ghcr.io\":{\"auth\":\"${AUTH_B64}\"}}}"
-    update_openbao "ghcr-secret" ".dockerconfigjson=$DOCKER_CONFIG"
+    # Check if credential is already dockerconfigjson format
+    if echo "$GHCR_CRED" | grep -q '"auths"'; then
+        echo "  Format: dockerconfigjson"
+        update_openbao "ghcr-secret" ".dockerconfigjson=$GHCR_CRED"
+    else
+        # Assume it's a PAT and build dockerconfigjson
+        GHCR_USER=$(get_op_field "GHCR Pull Secret" "username")
+        if [[ -n "$GHCR_USER" ]]; then
+            AUTH_B64=$(echo -n "${GHCR_USER}:${GHCR_CRED}" | base64)
+            DOCKER_CONFIG="{\"auths\":{\"ghcr.io\":{\"auth\":\"${AUTH_B64}\"}}}"
+            update_openbao "ghcr-secret" ".dockerconfigjson=$DOCKER_CONFIG"
+        else
+            echo -e "${YELLOW}⚠ GHCR username not found${NC}"
+            SKIP_COUNT=$((SKIP_COUNT + 1))
+        fi
+    fi
 else
     echo -e "${YELLOW}⚠ GHCR credentials not found in 1Password${NC}"
-    echo "   Expected: Item 'GHCR Pull Secret' with fields 'username' and 'credential'"
+    echo "   Expected: Item 'GHCR Pull Secret' with field 'credential'"
     SKIP_COUNT=$((SKIP_COUNT + 1))
 fi
 
@@ -205,8 +216,10 @@ echo "════════════════════════�
 echo -e "${BLUE}SECTION 3: Cloudflare API${NC}"
 echo "═══════════════════════════════════════════════════════════════════════════════"
 
-CF_KEY=$(get_op_field "Cloudflare API" "credential")
-CF_EMAIL=$(get_op_field "Cloudflare API" "username")
+# Try to get Cloudflare API credentials
+# Note: If multiple items match "Cloudflare API", use item ID yljt57qq5vo5eocnb4fl6epf3q
+CF_KEY=$(op item get "yljt57qq5vo5eocnb4fl6epf3q" --fields credential --reveal 2>/dev/null || echo "")
+CF_EMAIL=$(op item get "yljt57qq5vo5eocnb4fl6epf3q" --fields username --reveal 2>/dev/null || echo "")
 
 if [[ -n "$CF_KEY" && -n "$CF_EMAIL" ]]; then
     echo "📥 Found Cloudflare credentials in 1Password"
@@ -214,6 +227,7 @@ if [[ -n "$CF_KEY" && -n "$CF_EMAIL" ]]; then
     update_openbao "cloudflare" "api-key=$CF_KEY" "email=$CF_EMAIL"
 else
     echo -e "${YELLOW}⚠ Cloudflare credentials not found in 1Password${NC}"
+    echo "   Expected: Item 'CloudFlare API' (ID: yljt57qq5vo5eocnb4fl6epf3q)"
     SKIP_COUNT=$((SKIP_COUNT + 1))
 fi
 
@@ -257,7 +271,8 @@ echo "════════════════════════�
 AGENTS=(morgan rex blaze bolt cleo tess atlas cipher spark grizz nova tap stitch vex)
 
 for agent in "${AGENTS[@]}"; do
-    AGENT_TITLE=$(echo "$agent" | sed 's/.*/\u&/')  # Capitalize first letter
+    # Capitalize first letter (bash-compatible)
+    AGENT_TITLE="$(tr '[:lower:]' '[:upper:]' <<< ${agent:0:1})${agent:1}"
     OP_ITEM="GitHub-App-${AGENT_TITLE}"
     
     APP_ID=$(get_op_field "$OP_ITEM" "app-id")
@@ -429,7 +444,8 @@ echo "════════════════════════�
 # Note: Linear OAuth apps are typically stored with specific naming convention
 # For now, we check for the vex agent which was identified as missing
 for agent in vex; do
-    AGENT_TITLE=$(echo "$agent" | sed 's/.*/\u&/')
+    # Capitalize first letter (bash-compatible)
+    AGENT_TITLE="$(tr '[:lower:]' '[:upper:]' <<< ${agent:0:1})${agent:1}"
     OP_ITEM="Linear-App-${AGENT_TITLE}"
     
     CLIENT_ID=$(get_op_field "$OP_ITEM" "client_id")

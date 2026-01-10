@@ -82,21 +82,31 @@ fi
 echo -e "${GREEN}✓ Connected to OpenBao${NC}"
 echo ""
 
-# Function to update OpenBao secret safely using positional arguments
-# Usage: update_openbao "path" "key1=value1" "key2=value2" ...
-# Each key=value pair is passed as a separate argument to avoid shell injection
+# Function to update OpenBao secret safely using separate key/value arguments
+# Usage: update_openbao "path" "key1" "value1" "key2" "value2" ...
+# Each key and value is passed as a separate argument to avoid shell injection
+# when secret values contain special characters (quotes, =, spaces, etc.)
 update_openbao() {
     local path=$1
     shift
-    # Remaining arguments are key=value pairs passed directly (not concatenated)
     
     if [[ "$DRY_RUN" == "true" ]]; then
         echo "    (dry run - would update secret/${path})"
         return 0
     fi
     
-    # Pass arguments directly to vault CLI using "$@" - no eval needed
-    if vault kv put "secret/${path}" "$@" > /dev/null 2>&1; then
+    # Build key=value pairs safely by iterating through pairs
+    local args=()
+    while [[ $# -ge 2 ]]; do
+        local key=$1
+        local value=$2
+        shift 2
+        # Construct key=value as a single argument - the value is NOT re-parsed by shell
+        args+=("${key}=${value}")
+    done
+    
+    # Pass arguments directly to vault CLI using "${args[@]}" - no eval needed
+    if vault kv put "secret/${path}" "${args[@]}" > /dev/null 2>&1; then
         echo -e "    ${GREEN}✓ Updated secret/${path}${NC}"
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
         return 0
@@ -122,7 +132,7 @@ if [[ -n "$JWT_ROOT" ]]; then
     echo "📥 Found Mayastor JWT token in Kubernetes"
     # Use the same token for sign key if not present
     [[ -z "$JWT_SIGN_KEY" ]] && JWT_SIGN_KEY="$JWT_ROOT"
-    update_openbao "mayastor" "jwt-token-root=${JWT_ROOT}" "jwt-token-sign-key=${JWT_SIGN_KEY}"
+    update_openbao "mayastor" "jwt-token-root" "$JWT_ROOT" "jwt-token-sign-key" "$JWT_SIGN_KEY"
 else
     echo -e "${YELLOW}⚠ Mayastor JWT token not found in Kubernetes${NC}"
     echo "   This is normal if Mayastor hasn't been initialized yet"
@@ -163,7 +173,7 @@ fi
 if [[ -n "$S3_ACCESS" && -n "$S3_SECRET" ]]; then
     echo "📥 Found SeaweedFS S3 credentials in Kubernetes"
     echo "  Access Key: ${S3_ACCESS:0:8}..."
-    update_openbao "seaweedfs-s3-credentials" "access_key=${S3_ACCESS}" "secret_key=${S3_SECRET}"
+    update_openbao "seaweedfs-s3-credentials" "access_key" "$S3_ACCESS" "secret_key" "$S3_SECRET"
 else
     echo -e "${YELLOW}⚠ SeaweedFS S3 credentials not found in Kubernetes${NC}"
     echo "   This is normal if SeaweedFS hasn't been deployed yet"
@@ -188,7 +198,7 @@ TS_AUTHKEY=$(kubectl get secret tailscale-auth -n headscale -o jsonpath='{.data.
 
 if [[ -n "$TS_AUTHKEY" ]]; then
     echo "📥 Found existing Tailscale auth key in Kubernetes"
-    update_openbao "tailscale-auth" "TS_AUTHKEY=${TS_AUTHKEY}"
+    update_openbao "tailscale-auth" "TS_AUTHKEY" "$TS_AUTHKEY"
 else
     echo "🔑 Generating new Headscale pre-auth key..."
     
@@ -198,7 +208,7 @@ else
         
         if [[ -n "$NEW_KEY" ]]; then
             echo "📥 Generated new Headscale pre-auth key"
-            update_openbao "tailscale-auth" "TS_AUTHKEY=${NEW_KEY}"
+            update_openbao "tailscale-auth" "TS_AUTHKEY" "$NEW_KEY"
         else
             echo -e "${YELLOW}⚠ Could not generate Headscale pre-auth key${NC}"
             echo "   Headscale may not be fully initialized"
@@ -227,7 +237,7 @@ EXISTING_KUBECONFIG=$(kubectl get secret tools-kubernetes-secrets -n cto -o json
 
 if [[ -n "$EXISTING_KUBECONFIG" ]]; then
     echo "📥 Found existing kubeconfig in Kubernetes secret"
-    update_openbao "tools-kubernetes" "KUBECONFIG=${EXISTING_KUBECONFIG}"
+    update_openbao "tools-kubernetes" "KUBECONFIG" "$EXISTING_KUBECONFIG"
 else
     echo -e "${YELLOW}⚠ Tools kubeconfig not found${NC}"
     echo ""
