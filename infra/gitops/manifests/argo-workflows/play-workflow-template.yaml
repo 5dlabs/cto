@@ -134,8 +134,8 @@ spec:
         description: "Working directory for code implementation (where agents write code)"
         value: "."  # Default to repository root
       - name: pr-base-branch
-        description: "Base branch for pull requests (e.g., develop, main)"
-        value: "main"  # Default to develop per git workflow
+        description: "Base branch for pull requests"
+        value: "main"  # Default to main
 
       # CLI configuration per agent (multi-CLI aware)
       - name: implementation-cli
