@@ -52,10 +52,16 @@ if ! command -v kubectl &> /dev/null; then
     exit 1
 fi
 
-if ! command -v vault &> /dev/null && ! command -v bao &> /dev/null; then
+# Determine which CLI is available (prefer bao since we're using OpenBao)
+if command -v bao &> /dev/null; then
+    VAULT_CLI="bao"
+elif command -v vault &> /dev/null; then
+    VAULT_CLI="vault"
+else
     echo -e "${RED}Error: Neither vault nor bao CLI found${NC}"
     exit 1
 fi
+echo "Using CLI: $VAULT_CLI"
 
 # Get OpenBao token from Kubernetes secret
 echo "📋 Getting OpenBao token from Kubernetes secret..."
@@ -73,7 +79,7 @@ export VAULT_ADDR="${VAULT_ADDR:-http://localhost:8200}"
 export VAULT_TOKEN="$OPENBAO_TOKEN"
 
 # Check OpenBao connectivity
-if ! vault status &>/dev/null; then
+if ! $VAULT_CLI status &>/dev/null; then
     echo -e "${RED}Error: Cannot connect to OpenBao at $VAULT_ADDR${NC}"
     echo "Make sure OpenBao is port-forwarded:"
     echo "  kubectl port-forward svc/openbao -n openbao 8200:8200"
@@ -105,8 +111,8 @@ update_openbao() {
         args+=("${key}=${value}")
     done
     
-    # Pass arguments directly to vault CLI using "${args[@]}" - no eval needed
-    if vault kv put "secret/${path}" "${args[@]}" > /dev/null 2>&1; then
+    # Pass arguments directly to CLI using "${args[@]}" - no eval needed
+    if $VAULT_CLI kv put "secret/${path}" "${args[@]}" > /dev/null 2>&1; then
         echo -e "    ${GREEN}✓ Updated secret/${path}${NC}"
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
         return 0
