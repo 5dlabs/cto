@@ -257,6 +257,29 @@ kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$ROOT_TOKEN" \
 
 The ExternalSecret will automatically sync this to the `web-database-url` secret in the `cto` namespace within the refresh interval (1 hour).
 
+### Populating OpenBao with GitHub OAuth Credentials
+
+Create a GitHub OAuth app at https://github.com/settings/developers with:
+- **Application name**: `CTO Web App`
+- **Homepage URL**: `https://app.5dlabs.ai`
+- **Authorization callback URL**: `https://app.5dlabs.ai/api/auth/callback/github`
+
+Then store the credentials in OpenBao:
+
+```bash
+# Get OpenBao root token (from 1Password)
+ROOT_TOKEN=$(op item get "OpenBao Unseal Keys - CTO Platform" --format=json | \
+  jq -r '.fields[] | select(.label == "password" or .label == "Root Token") | .value')
+
+# Store GitHub OAuth credentials in OpenBao
+kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$ROOT_TOKEN" \
+  bao kv put secret/web-app/github-oauth \
+    client_id="<your-github-client-id>" \
+    client_secret="<your-github-client-secret>"
+```
+
+The ExternalSecret will automatically sync this to the `web-github-oauth` secret in the `cto` namespace.
+
 ## CI/CD
 
 The GitHub Actions workflow (`.github/workflows/web-ci.yaml`) handles:

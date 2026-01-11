@@ -955,6 +955,10 @@ web:
     type: ClusterIP
     port: 3000
 
+  # Public URL for OAuth trusted origins (required for production auth)
+  # This should match the external hostname (e.g., from Cloudflare tunnel)
+  publicUrl: "https://app.5dlabs.ai"
+
   # Environment variables (can be overridden in envFrom)
   env: {}
   
@@ -971,10 +975,16 @@ web:
     enabled: true
     secretName: web-auth-secret  # pragma: allowlist secret
   
+  # GitHub OAuth credentials (required for GitHub login)
+  githubOAuth:
+    enabled: true
+    secretName: web-github-oauth  # pragma: allowlist secret
+  
   # Secrets configuration
   secrets:
     databaseUrlSecretName: web-database-url  # pragma: allowlist secret
     authSecretName: web-auth-secret  # pragma: allowlist secret
+    githubOAuthSecretName: web-github-oauth  # pragma: allowlist secret
 
   resources:
     limits:

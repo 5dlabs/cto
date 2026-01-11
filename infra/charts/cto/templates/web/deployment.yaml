@@ -40,6 +40,10 @@ spec:
               value: {{ .Values.web.service.port | quote }}
             - name: HOSTNAME
               value: "0.0.0.0"
+            {{- if .Values.web.publicUrl }}
+            - name: NEXT_PUBLIC_APP_URL
+              value: {{ .Values.web.publicUrl | quote }}
+            {{- end }}
             {{- if .Values.web.env }}
             {{- range $key, $value := .Values.web.env }}
             - name: {{ $key }}
@@ -60,6 +64,20 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.web.secrets.authSecretName }}
                   key: secret
+                  optional: false
+            {{- end }}
+            {{- if .Values.web.githubOAuth.enabled }}
+            - name: GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.web.secrets.githubOAuthSecretName }}
+                  key: client_id
+                  optional: false
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.web.secrets.githubOAuthSecretName }}
+                  key: client_secret
                   optional: false
             {{- end }}
           {{- if .Values.web.envFrom }}
