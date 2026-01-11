@@ -1077,12 +1077,11 @@ cloudflare:
     pm:
       hostname: pm.5dlabs.ai
     # CTO platform main URL - routes to PM service for OAuth callbacks
-    # Note: This can be changed to route to web app if desired
     cto:
       hostname: cto.5dlabs.ai
     # Web app - main marketing/web application
     web:
-      hostname: cto.5dlabs.ai  # Can be changed to app.5dlabs.ai or www.5dlabs.ai
+      hostname: app.5dlabs.ai
     webhooks:
       hostname: github-webhooks.5dlabs.ai
     # Platform services (external to CTO namespace)
