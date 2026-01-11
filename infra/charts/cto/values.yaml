@@ -963,7 +963,7 @@ web:
   
   # Database connection (optional - for Better Auth and Drizzle)
   databaseUrl:
-    enabled: false
+    enabled: true
     secretName: web-database-url  # pragma: allowlist secret
   
   # Auth secret for Better Auth (required if using auth)

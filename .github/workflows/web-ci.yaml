@@ -48,7 +48,7 @@ jobs:
   lint-typescript:
     needs: changes
     if: needs.changes.outputs.web == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
 
@@ -71,9 +71,25 @@ jobs:
   build-check:
     needs: changes
     if: needs.changes.outputs.web == 'true' || github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch secrets from OpenBao
+        id: secrets
+        run: |
+          # Get OpenBao token from Kubernetes secret
+          OPENBAO_TOKEN=$(kubectl get secret openbao-token -n openbao -o jsonpath='{.data.token}' | base64 -d)
+
+          # Fetch DATABASE_URL from OpenBao
+          DATABASE_URL=$(kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$OPENBAO_TOKEN" \
+            bao kv get -field=url secret/web-app/database-url)
+          echo "DATABASE_URL=$DATABASE_URL" >> "$GITHUB_OUTPUT"
+
+          # Fetch BETTER_AUTH_SECRET from OpenBao (or generate for CI if not exists)
+          BETTER_AUTH_SECRET=$(kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$OPENBAO_TOKEN" \
+            bao kv get -field=secret secret/web-app/auth 2>/dev/null || openssl rand -base64 32)
+          echo "BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -90,6 +106,10 @@ jobs:
         working-directory: apps/web
         env:
           NEXT_TELEMETRY_DISABLED: 1
+          DATABASE_URL: ${{ steps.secrets.outputs.DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ steps.secrets.outputs.BETTER_AUTH_SECRET }}
+          GITHUB_CLIENT_ID: dummy-client-id
+          GITHUB_CLIENT_SECRET: dummy-client-secret  # pragma: allowlist secret
         run: npm run build
 
   # Helm chart validation
@@ -136,12 +156,28 @@ jobs:
   build-docker:
     needs: [lint-typescript, build-check]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch secrets from OpenBao
+        id: secrets
+        run: |
+          # Get OpenBao token from Kubernetes secret
+          OPENBAO_TOKEN=$(kubectl get secret openbao-token -n openbao -o jsonpath='{.data.token}' | base64 -d)
+
+          # Fetch DATABASE_URL from OpenBao
+          DATABASE_URL=$(kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$OPENBAO_TOKEN" \
+            bao kv get -field=url secret/web-app/database-url)
+          echo "DATABASE_URL=$DATABASE_URL" >> "$GITHUB_OUTPUT"
+
+          # Fetch BETTER_AUTH_SECRET from OpenBao (or generate for CI if not exists)
+          BETTER_AUTH_SECRET=$(kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$OPENBAO_TOKEN" \
+            bao kv get -field=secret secret/web-app/auth 2>/dev/null || openssl rand -base64 32)
+          echo "BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -159,6 +195,10 @@ jobs:
         env:
           NODE_ENV: production
           NEXT_TELEMETRY_DISABLED: 1
+          DATABASE_URL: ${{ steps.secrets.outputs.DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ steps.secrets.outputs.BETTER_AUTH_SECRET }}
+          GITHUB_CLIENT_ID: dummy-client-id
+          GITHUB_CLIENT_SECRET: dummy-client-secret  # pragma: allowlist secret
         run: npm run build
 
       - name: Get version info
