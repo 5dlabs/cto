@@ -957,7 +957,7 @@ web:
 
   # Public URL for OAuth trusted origins (required for production auth)
   # This should match the external hostname (e.g., from Cloudflare tunnel)
-  publicUrl: "https://app.5dlabs.ai"
+  publicUrl: "https://cto.5dlabs.ai"
 
   # Environment variables (can be overridden in envFrom)
   env: {}
@@ -1086,12 +1086,12 @@ cloudflare:
   bindings:
     pm:
       hostname: pm.5dlabs.ai
-    # CTO platform main URL - routes to PM service for OAuth callbacks
+    # CTO platform main URL - routes to web app
     cto:
       hostname: cto.5dlabs.ai
-    # Web app - main marketing/web application
+    # Web app - same as cto URL
     web:
-      hostname: app.5dlabs.ai
+      hostname: cto.5dlabs.ai
     webhooks:
       hostname: github-webhooks.5dlabs.ai
     # Platform services (external to CTO namespace)
