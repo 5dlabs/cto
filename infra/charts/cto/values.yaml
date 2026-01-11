@@ -255,6 +255,9 @@ agent:
     codex:
       repository: ghcr.io/5dlabs/codex
       tag: latest
+    code:
+      repository: ghcr.io/5dlabs/code
+      tag: latest
     gemini:
       repository: ghcr.io/5dlabs/gemini
       tag: latest

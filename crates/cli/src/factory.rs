@@ -4,8 +4,8 @@
 
 use crate::adapter::{AdapterResult, CliAdapter};
 use crate::adapters::{
-    ClaudeAdapter, CodexAdapter, CursorAdapter, DexterAdapter, FactoryAdapter, GeminiAdapter,
-    OpenCodeAdapter,
+    ClaudeAdapter, CodeAdapter, CodexAdapter, CursorAdapter, DexterAdapter, FactoryAdapter,
+    GeminiAdapter, OpenCodeAdapter,
 };
 use crate::base_adapter::AdapterConfig;
 use crate::types::CLIType;
@@ -30,6 +30,7 @@ impl AdapterFactory {
 
         let adapter: Arc<dyn CliAdapter> = match cli_type {
             CLIType::Claude => Arc::new(ClaudeAdapter::with_config(config)?),
+            CLIType::Code => Arc::new(CodeAdapter::with_config(config)?),
             CLIType::Codex => Arc::new(CodexAdapter::with_config(config)?),
             CLIType::Cursor => Arc::new(CursorAdapter::with_config(config)?),
             CLIType::Dexter => Arc::new(DexterAdapter::with_config(config)?),
@@ -46,6 +47,7 @@ impl AdapterFactory {
     pub fn supported_types() -> Vec<CLIType> {
         vec![
             CLIType::Claude,
+            CLIType::Code,
             CLIType::Codex,
             CLIType::Cursor,
             CLIType::Dexter,
