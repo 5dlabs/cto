@@ -152,6 +152,7 @@ spec:
           image:
             repository: ghcr.io/5dlabs/research
             tag: latest
+            pullPolicy: Always
           # CronJob schedule (every 5 minutes)
           schedule: "*/5 * * * *"
           # Research configuration
