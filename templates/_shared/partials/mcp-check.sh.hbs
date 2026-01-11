@@ -135,16 +135,6 @@ else
     echo "  → Checked: /mcp-config/mcp.json, /task-files/mcp.json, /workspace/.mcp.json"
 fi
 
-# Step 4: Claude MCP list (shows user-configured servers, not --mcp-config servers)
-# Note: 'claude mcp list' shows servers added via 'claude mcp add', NOT servers from --mcp-config files
-# The --mcp-config flag is for the main 'claude' command, not for 'mcp list'
-if command -v claude >/dev/null 2>&1; then
-    echo ""
-    echo "🔍 Claude MCP Server List (user-configured):"
-    claude mcp list 2>&1 | head -20 || echo "  ⚠️ claude mcp list failed"
-    echo "  ℹ️  Note: Servers from --mcp-config files are loaded at runtime, not shown here"
-fi
-
 echo ""
 echo "───────────────────────────────────────────────────────────────"
 

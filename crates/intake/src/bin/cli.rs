@@ -430,11 +430,15 @@ fn get_project_path(cli_path: Option<PathBuf>) -> PathBuf {
 async fn main() {
     // Initialize tracing with INFO level by default for progress visibility
     // RUST_LOG env var can override this (e.g., RUST_LOG=debug for verbose output)
+    // Use compact format without timestamps/targets to match ui::print_info style
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
                 .add_directive(tracing::Level::INFO.into()),
         )
+        .without_time()
+        .with_target(false)
+        .with_level(false)
         .init();
 
     let cli = Cli::parse();

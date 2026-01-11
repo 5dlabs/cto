@@ -1155,7 +1155,9 @@ pub async fn submit_intake_coderun(
                 "GITHUB_VISIBILITY": request.github_visibility,
                 "GITHUB_DEFAULT_ORG": config.github_default_org.as_deref().unwrap_or("5dlabs"),
                 // Source branch configuration
-                "SOURCE_BRANCH": source_branch
+                "SOURCE_BRANCH": source_branch,
+                // Webhook callback URL for automatic play workflow triggers
+                "WEBHOOK_CALLBACK_URL": config.webhook_callback_url.as_deref().unwrap_or("")
             },
             "linearIntegration": {
                 "enabled": true,
