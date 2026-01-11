@@ -968,7 +968,7 @@ web:
   
   # Auth secret for Better Auth (required if using auth)
   authSecret:
-    enabled: false
+    enabled: true
     secretName: web-auth-secret  # pragma: allowlist secret
   
   # Secrets configuration
