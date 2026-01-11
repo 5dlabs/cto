@@ -32,6 +32,9 @@ FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
+# Build arguments for Next.js public env vars (inlined at build time)
+ARG NEXT_PUBLIC_APP_URL=https://app.5dlabs.ai
+
 # Copy source code
 COPY apps/web ./apps/web
 
@@ -44,6 +47,7 @@ WORKDIR /app/apps/web
 # Set environment variables for build
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 
 # Build Next.js application (creates .next/standalone in apps/web)
 RUN npm run build
