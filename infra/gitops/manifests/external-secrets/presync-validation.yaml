@@ -63,7 +63,6 @@ spec:
                 github-app-nova
                 github-app-rex
                 github-app-spark
-                github-app-stitch
                 github-app-tap
                 github-app-tess
                 github-app-vex
@@ -77,7 +76,6 @@ spec:
                 linear-app-nova
                 linear-app-rex
                 linear-app-spark
-                linear-app-stitch
                 linear-app-tap
                 linear-app-tess
                 linear-app-vex
@@ -100,6 +98,11 @@ spec:
                 tailscale-auth
                 mayastor
                 seaweedfs-s3-credentials
+                web-app/database-url
+                web-app/auth-secret
+                web-app/github-oauth
+                github-app-stitch
+                linear-app-stitch
               "
 
               MISSING=""
