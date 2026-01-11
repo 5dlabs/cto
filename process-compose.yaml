@@ -131,6 +131,29 @@ processes:
       - "SYSTEM_CONFIG_PATH=./infra/charts/cto/templates/tools"
     depends_on: {}
 
+  web-app:
+    command: npm run dev
+    description: "Web App - Next.js application"
+    working_dir: ./apps/web
+    availability:
+      restart: on_failure
+      max_restarts: 3
+    readiness_probe:
+      http_get:
+        host: localhost
+        port: 3000
+        path: /api/health
+      initial_delay_seconds: 10
+      period_seconds: 5
+    environment:
+      - "NODE_ENV=development"
+      - "PORT=3000"
+      - "HOSTNAME=0.0.0.0"
+      - "NEXT_TELEMETRY_DISABLED=1"
+    depends_on:
+      port-cleanup:
+        condition: process_completed_successfully
+
   healer:
     command: cargo run --bin healer -- server --addr 0.0.0.0:8082
     description: "Healer - Self-healing monitor daemon"

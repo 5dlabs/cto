@@ -1,0 +1,46 @@
+---
+# Web App Database URL - ExternalSecret for database connection
+# Syncs database connection string from OpenBao to web-database-url secret in cto namespace
+#
+# The CloudNative-PG operator automatically creates a secret named 'web-postgres-app'
+# in the 'databases' namespace with connection credentials. This ExternalSecret syncs
+# the connection URI to the 'cto' namespace for the web app to use.
+#
+# To populate OpenBao with the connection string (after CNPG creates the secret):
+#   1. Get the connection URI from CNPG secret:
+#      kubectl get secret web-postgres-app -n databases -o jsonpath='{.data.uri}' | base64 -d
+#   2. Store in OpenBao:
+#      kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$ROOT_TOKEN" \
+#        bao kv put secret/web-app/database-url url="<connection-uri>"
+#
+# Alternatively, a sync job can be created to automatically copy the URI from CNPG secret to OpenBao
+
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: web-database-url
+  namespace: cto
+  labels:
+    app.kubernetes.io/managed-by: external-secrets
+    app.kubernetes.io/instance: external-secrets-config
+    app.kubernetes.io/component: database
+    app.kubernetes.io/application: web
+  annotations:
+    argocd.argoproj.io/tracking-id: external-secrets-config:external-secrets.io/ExternalSecret:cto/web-database-url  # pragma: allowlist secret
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: web-database-url
+    creationPolicy: Owner
+    template:
+      type: Opaque
+      data:
+        url: "{{ .url }}"
+  data:
+    - secretKey: url  # pragma: allowlist secret
+      remoteRef:
+        key: secret/web-app/database-url
+        property: url

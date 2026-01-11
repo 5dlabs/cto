@@ -1,0 +1,56 @@
+---
+# Web App PostgreSQL cluster using CloudNativePG
+# Dedicated database instance for the Next.js web application
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: web-postgres
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: web-postgres
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: database
+    app.kubernetes.io/application: web
+spec:
+  # Single instance for development (can scale to 3 for HA later)
+  instances: 1
+
+  # PostgreSQL configuration
+  postgresql:
+    parameters:
+      # Basic tuning for web app workload
+      max_connections: "100"
+      shared_buffers: "128MB"
+      effective_cache_size: "512MB"
+      maintenance_work_mem: "64MB"
+      work_mem: "4MB"
+      # Logging
+      log_statement: "mod"
+      log_min_duration_statement: "500ms"
+
+  # Storage configuration
+  storage:
+    size: 5Gi
+    storageClass: mayastor
+
+  # Resource allocation (small preset)
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+      cpu: 500m
+
+  # Bootstrap configuration - create web app database
+  bootstrap:
+    initdb:
+      database: web_app
+      owner: web_user
+
+  # Enable superuser access for migrations (can be disabled later)
+  enableSuperuserAccess: true
+
+  # Monitoring
+  monitoring:
+    enablePodMonitor: false
