@@ -74,7 +74,7 @@ spec:
       # CLUSTER: Latitude.sh (cto-dal)
       # Worker: hardware-219s058355, Control: hardware-21bs002557
       # Registry: ghcr.io/5dlabs (GitHub Container Registry)
-      # Storage: local-path (no mayastor on Latitude)
+      # Storage: mayastor (OpenEBS Mayastor for distributed storage)
       # Dev Registry: 10.8.0.2:30500 (internal VPN IP, disabled by default)
       # =======================================================================
       values: |
@@ -82,7 +82,7 @@ spec:
           namespace: cto
           imagePullSecrets:
             - name: ghcr-secret
-          storageClass: "local-path"  # Latitude uses local-path (no mayastor)
+          storageClass: "mayastor"  # OpenEBS Mayastor for distributed storage
           # Dev registry for local development builds (disabled - use ghcr.io)
           devRegistry:
             enabled: false
