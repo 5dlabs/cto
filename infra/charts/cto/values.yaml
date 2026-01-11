@@ -955,6 +955,10 @@ web:
     type: ClusterIP
     port: 3000
 
+  # Public URL for OAuth trusted origins (required for production auth)
+  # This should match the external hostname (e.g., from Cloudflare tunnel)
+  publicUrl: "https://app.5dlabs.ai"
+
   # Environment variables (can be overridden in envFrom)
   env: {}
   
