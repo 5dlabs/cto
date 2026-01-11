@@ -308,7 +308,7 @@ jobs:
   build-agents:
     needs: build-runtime
     runs-on: [k8s-runner]
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
