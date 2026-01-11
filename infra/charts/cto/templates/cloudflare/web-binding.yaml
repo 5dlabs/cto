@@ -1,7 +1,7 @@
 {{- if and .Values.cloudflare.enabled .Values.web.enabled }}
 ---
 # TunnelBinding: Web App
-# Routes cto.5dlabs.ai (or configured hostname) to the web app service
+# Routes app.cto.5dlabs.ai (or configured hostname) to the web app service
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
 metadata:

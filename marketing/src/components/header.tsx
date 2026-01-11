@@ -52,7 +52,7 @@ export function Header() {
             GitHub
           </a>
           <a
-            href="https://cto.5dlabs.ai/"
+            href="https://app.cto.5dlabs.ai"
             className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium text-sm hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40"
           >
             Start Now
