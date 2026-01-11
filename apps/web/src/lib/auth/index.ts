@@ -32,8 +32,15 @@ export const auth = betterAuth({
       maxAge: 60 * 5, // 5 minutes
     },
   },
+  // Base URL for auth callbacks - uses NEXT_PUBLIC_APP_URL if set, otherwise auto-detects
+  baseURL: process.env.NEXT_PUBLIC_APP_URL,
   trustedOrigins: [
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    // Production URL
+    "https://app.5dlabs.ai",
+    // Development
+    "http://localhost:3000",
+    // Allow env override
+    ...(process.env.NEXT_PUBLIC_APP_URL ? [process.env.NEXT_PUBLIC_APP_URL] : []),
   ],
 });
 
