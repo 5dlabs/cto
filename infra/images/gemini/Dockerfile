@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7-labs
 ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:latest
 FROM ${BASE_IMAGE}
 
@@ -19,8 +20,10 @@ USER root
 # Install Google Gemini CLI
 # Note: Gemini CLI installation method - using npm global install
 # The actual package name may need to be updated based on Google's official release
+# Use BuildKit cache mount for npm to speed up repeated builds
 ARG VERSION=latest
-RUN set -eux; \
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    set -eux; \
     # Install Gemini CLI (adjust package name when official package is available)
     # For now, creating a placeholder that can be updated
     npm install -g @google-cloud/generative-ai@${VERSION} || \

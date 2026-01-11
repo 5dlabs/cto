@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7-labs
 ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:latest
 FROM ${BASE_IMAGE}
 
@@ -11,13 +12,16 @@ USER root
 
 # Install Every Code CLI (fork of Codex with multi-agent support)
 # https://github.com/just-every/code
+# Use BuildKit cache mount for npm to speed up repeated builds
 ARG VERSION=latest
-RUN npm install -g @just-every/code@${VERSION} \
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g @just-every/code@${VERSION} \
   && echo "✅ Every Code CLI installed" \
   && (code --version || echo "⚠️ Every Code CLI verification failed")
 
 # Install OpenAI Node.js SDK globally for compatibility (Every Code supports OpenAI provider)
-RUN npm install -g openai@latest \
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g openai@latest \
   && echo "✅ OpenAI Node.js SDK installed" \
   && (node -e "console.log('OpenAI Node.js SDK version:', require('openai/package.json').version)" || echo "⚠️ Node.js SDK verification failed")
 

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7-labs
 ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:latest
 FROM ${BASE_IMAGE}
 
@@ -11,8 +12,10 @@ ENV DEVCONTAINER=true
 USER root
 
 # Install Claude CLI as root (before modifying permissions)
+# Use BuildKit cache mount for npm to speed up repeated builds
 ARG VERSION=latest
-RUN npm install -g @anthropic-ai/claude-code@${VERSION}
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g @anthropic-ai/claude-code@${VERSION}
 
 # Setup workspace and user environment with proper permissions
 # Create all directories Claude CLI needs and ensure node user owns entire home

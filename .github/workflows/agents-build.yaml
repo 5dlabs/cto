@@ -315,7 +315,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      max-parallel: 3  # Limit parallelism to reduce resource contention
+      max-parallel: 2  # Limit parallelism to reduce resource contention on k8s-runner
       matrix:
         include:
           - id: claude
@@ -370,6 +370,13 @@ jobs:
           #   version_type: dir_hash
     steps:
       - uses: actions/checkout@v4
+
+      - name: Pre-pull runtime base image
+        run: |
+          echo "📥 Pre-pulling runtime base image to warm up cache..."
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }} || \
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:latest || \
+            echo "⚠️ Pre-pull failed, build will pull during build step"
 
       - name: Setup Node.js (ensure npm available in runner)
         uses: actions/setup-node@v4

@@ -1,16 +1,20 @@
+# syntax=docker/dockerfile:1.7-labs
 ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:latest
 FROM ${BASE_IMAGE}
 
 USER root
 
 # Install OpenAI Codex CLI
+# Use BuildKit cache mount for npm to speed up repeated builds
 ARG VERSION=latest
-RUN npm install -g @openai/codex@${VERSION} \
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g @openai/codex@${VERSION} \
   && echo "✅ OpenAI Codex CLI installed" \
   && (codex --version || echo "⚠️ Codex CLI verification failed")
 
 # Install OpenAI Node.js SDK globally for compatibility
-RUN npm install -g openai@latest \
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g openai@latest \
   && echo "✅ OpenAI Node.js SDK installed" \
   && (node -e "console.log('OpenAI Node.js SDK version:', require('openai/package.json').version)" || echo "⚠️ Node.js SDK verification failed")
 
