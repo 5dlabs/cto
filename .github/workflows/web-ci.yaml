@@ -156,7 +156,7 @@ jobs:
 
   # Build and push Docker image (on push to main or develop)
   build-docker:
-    needs: [lint-typescript, build-check]
+    needs: [lint-typescript, build-check, docker-lint]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     runs-on: [k8s-runner]
     permissions:

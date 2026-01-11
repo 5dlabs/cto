@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
 export const auth = betterAuth({
+  // Secret for encryption, signing, and hashing operations
+  // Required for production - defaults to dummy for build time only
+  secret: process.env.BETTER_AUTH_SECRET || "build-time-dummy-secret-not-for-production",
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
