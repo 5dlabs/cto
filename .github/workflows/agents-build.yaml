@@ -315,6 +315,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
+      max-parallel: 3  # Limit parallelism to reduce resource contention
       matrix:
         include:
           - id: claude
@@ -488,10 +489,15 @@ jobs:
             BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
             VERSION=${{ steps.version.outputs.version }}
             CACHE_BUST=${{ github.run_id }}
-          # Cache can be disabled via no_cache input when builds hang due to corruption
+          # Cache strategy: GHA cache (fast) + registry cache (persistent fallback)
+          # Registry cache survives even when no_cache=true (only disables GHA cache)
           no-cache: ${{ inputs.no_cache == true }}
-          cache-from: ${{ inputs.no_cache != true && format('type=gha,scope={0}', matrix.id) || '' }}
-          cache-to: ${{ inputs.no_cache != true && format('type=gha,scope={0},mode=max', matrix.id) || '' }}
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache
+            ${{ inputs.no_cache != true && format('type=gha,scope={0}', matrix.id) || '' }}
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache,mode=max
+            ${{ inputs.no_cache != true && format('type=gha,scope={0},mode=max', matrix.id) || '' }}
 
       - name: Append summary
         run: |
