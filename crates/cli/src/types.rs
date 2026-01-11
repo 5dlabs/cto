@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const CLI_TYPE_VARIANTS: &[&str] = &[
-    "claude", "codex", "opencode", "cursor", "factory", "gemini", "dexter",
+    "claude", "code", "codex", "opencode", "cursor", "factory", "gemini", "dexter",
 ];
 
 /// Supported CLI types
@@ -15,6 +15,8 @@ pub enum CLIType {
     /// Anthropic Claude Code CLI
     #[default]
     Claude,
+    /// Every Code CLI (just-every/code fork of Codex)
+    Code,
     /// `OpenAI` Codex CLI
     Codex,
     /// `OpenCode` AI CLI
@@ -33,6 +35,7 @@ impl std::fmt::Display for CLIType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CLIType::Claude => write!(f, "claude"),
+            CLIType::Code => write!(f, "code"),
             CLIType::Codex => write!(f, "codex"),
             CLIType::OpenCode => write!(f, "opencode"),
             CLIType::Cursor => write!(f, "cursor"),
@@ -51,6 +54,7 @@ impl CLIType {
 
         match normalized.as_str() {
             "" | "claude" => Some(CLIType::Claude),
+            "code" | "every-code" => Some(CLIType::Code),
             "codex" => Some(CLIType::Codex),
             "opencode" | "open-code" => Some(CLIType::OpenCode),
             "cursor" => Some(CLIType::Cursor),

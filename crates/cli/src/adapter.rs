@@ -450,6 +450,18 @@ impl CommandBuilder {
             CLIType::Claude => {
                 vec!["claude".to_string(), "-p".to_string(), task.to_string()]
             }
+            CLIType::Code => {
+                // Every Code uses --no-approval for auto mode
+                if auto_mode {
+                    vec![
+                        "code".to_string(),
+                        "--no-approval".to_string(),
+                        task.to_string(),
+                    ]
+                } else {
+                    vec!["code".to_string(), task.to_string()]
+                }
+            }
             CLIType::Codex => {
                 if auto_mode {
                     vec![
@@ -495,6 +507,7 @@ impl CommandBuilder {
     pub fn build_version_command(&self) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => vec!["claude".to_string(), "--version".to_string()],
+            CLIType::Code => vec!["code".to_string(), "--version".to_string()],
             CLIType::Codex => vec!["codex".to_string(), "--version".to_string()],
             CLIType::Cursor => vec!["cursor".to_string(), "--version".to_string()],
             CLIType::OpenCode => vec!["opencode".to_string(), "--version".to_string()],
@@ -509,6 +522,7 @@ impl CommandBuilder {
     pub fn build_help_command(&self) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => vec!["claude".to_string(), "--help".to_string()],
+            CLIType::Code => vec!["code".to_string(), "--help".to_string()],
             CLIType::Codex => vec!["codex".to_string(), "--help".to_string()],
             CLIType::Cursor => vec!["cursor".to_string(), "--help".to_string()],
             CLIType::OpenCode => vec!["opencode".to_string(), "--help".to_string()],

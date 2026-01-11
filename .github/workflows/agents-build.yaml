@@ -335,6 +335,12 @@ jobs:
             file: ./infra/images/codex/Dockerfile
             version_type: npm
             version_pkg: "@openai/codex"
+          - id: code
+            image: code
+            context: ./infra/images/code
+            file: ./infra/images/code/Dockerfile
+            version_type: npm
+            version_pkg: "@just-every/code"
           - id: factory
             image: factory
             context: ./infra/images/factory

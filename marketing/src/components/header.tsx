@@ -26,22 +26,28 @@ export function Header() {
         {/* Nav links - can be expanded later */}
         <nav className="hidden sm:flex items-center gap-6">
           <a
-            href="#agents"
+            href="/#agents"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Team
           </a>
           <a
-            href="#infrastructure"
+            href="/#infrastructure"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Infrastructure
           </a>
           <a
-            href="#platform"
+            href="/#platform"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Platform
+          </a>
+          <a
+            href="/pricing"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Pricing
           </a>
           <a
             href="https://github.com/5dlabs"
