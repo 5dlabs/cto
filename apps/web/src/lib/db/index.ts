@@ -1,22 +1,35 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
 
-// Provide a dummy connection string for build time if DATABASE_URL is not set or empty
-// The neon client will be initialized but won't actually connect during build
-// Use a valid Neon connection string format even for dummy values
+// Check if we're in build phase (Next.js static generation)
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
+// Get database URL with build-time fallback
 const getDatabaseUrl = (): string => {
   const envUrl = process.env.DATABASE_URL;
-  if (!envUrl) {
-    return "postgresql://dummy:password@ep-dummy-12345678.us-east-2.aws.neon.tech/dbname?sslmode=require"; // pragma: allowlist secret
+  if (!envUrl || envUrl.trim().length === 0) {
+    // During build phase, use a dummy URL that won't actually be used
+    if (isBuildPhase) {
+      return "postgresql://dummy:password@localhost:5432/dummy"; // pragma: allowlist secret
+    }
+    console.error("[DB] DATABASE_URL is not set!");
+    return "";
   }
-  const trimmed = envUrl.trim();
-  if (trimmed.length === 0) {
-    return "postgresql://dummy:password@ep-dummy-12345678.us-east-2.aws.neon.tech/dbname?sslmode=require"; // pragma: allowlist secret
-  }
-  return trimmed;
+  return envUrl.trim();
 };
 
 const databaseUrl = getDatabaseUrl();
-const sql = neon(databaseUrl);
-export const db = drizzle(sql, { schema });
+
+// Create postgres.js client
+// During build phase, create a dummy client that won't connect
+const sql = databaseUrl
+  ? postgres(databaseUrl, {
+      // Connection pool settings
+      max: 10,
+      idle_timeout: 20,
+      connect_timeout: 10,
+    })
+  : (null as unknown as ReturnType<typeof postgres>);
+
+export const db = sql ? drizzle(sql, { schema }) : (null as unknown as ReturnType<typeof drizzle>);
