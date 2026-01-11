@@ -119,6 +119,14 @@ spec:
             repository: ghcr.io/5dlabs/openmemory
             tag: latest
 
+        # Web App - CTO Platform Dashboard
+        web:
+          enabled: true
+          # Disable GitHub OAuth until credentials are configured in OpenBao
+          # To enable: store client_id and client_secret at secret/web-app/github-oauth
+          githubOAuth:
+            enabled: false
+
         sensors:
           enabled: true
 
