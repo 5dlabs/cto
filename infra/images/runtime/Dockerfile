@@ -406,7 +406,7 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; 
 
 # Install intake CLI from CTO monorepo unified release (skip if version is "skip" or empty)
 # This is the Rust replacement for TaskMaster-AI, providing faster task management
-ARG TASKS_VERSION=0.2.2
+ARG TASKS_VERSION=0.2.3
 RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ]; then \
       ARCH=$(dpkg --print-architecture) && \
       case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
