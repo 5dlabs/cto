@@ -130,7 +130,7 @@ spec:
             repository: ghcr.io/5dlabs/web
             tag: latest
           # Public URL for OAuth and external access
-          publicUrl: "https://app.cto.5dlabs.ai"
+          publicUrl: "https://app.5dlabs.ai"
           # Disable GitHub OAuth until credentials are configured in OpenBao
           # To enable: store client_id and client_secret at secret/web-app/github-oauth
           githubOAuth:
@@ -178,10 +178,10 @@ spec:
               hostname: pm.5dlabs.ai
             # CTO platform main URL - routes to web app
             cto:
-              hostname: app.cto.5dlabs.ai
+              hostname: app.5dlabs.ai
             # Web app - same as cto URL
             web:
-              hostname: app.cto.5dlabs.ai
+              hostname: app.5dlabs.ai
 
   destination:
     server: https://kubernetes.default.svc
