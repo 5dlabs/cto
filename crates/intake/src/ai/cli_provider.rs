@@ -809,9 +809,7 @@ impl AIProvider for CLITextGenerator {
         // Code (Every Code) supports multiple providers but uses OpenAI as primary
         match self.cli_type {
             CLIType::Claude | CLIType::Dexter => "ANTHROPIC_API_KEY",
-            CLIType::Code | CLIType::Codex | CLIType::Factory | CLIType::OpenCode => {
-                "OPENAI_API_KEY"
-            }
+            CLIType::Code | CLIType::Codex | CLIType::Factory | CLIType::OpenCode => "OPENAI_API_KEY",
             CLIType::Cursor => "CURSOR_API_KEY",
             CLIType::Gemini => "GOOGLE_API_KEY",
         }
