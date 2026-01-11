@@ -186,6 +186,22 @@ app.kubernetes.io/name: openmemory
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{/* Web App */}}
+{{- define "cto.web.fullname" -}}
+{{- printf "%s-web" (include "cto.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "cto.web.labels" -}}
+{{ include "cto.labels" . }}
+app.kubernetes.io/name: web
+app.kubernetes.io/component: web-app
+{{- end }}
+
+{{- define "cto.web.selectorLabels" -}}
+app.kubernetes.io/name: web
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
 {{/* ============================================================ */}}
 {{/* Platform/Agent helpers for workflow templates */}}
 {{/* ============================================================ */}}
