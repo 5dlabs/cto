@@ -66,6 +66,20 @@ spec:
                   key: secret
                   optional: false
             {{- end }}
+            {{- if .Values.web.githubOAuth.enabled }}
+            - name: GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.web.secrets.githubOAuthSecretName }}
+                  key: client_id
+                  optional: false
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.web.secrets.githubOAuthSecretName }}
+                  key: client_secret
+                  optional: false
+            {{- end }}
           {{- if .Values.web.envFrom }}
           envFrom:
             {{- toYaml .Values.web.envFrom | nindent 12 }}

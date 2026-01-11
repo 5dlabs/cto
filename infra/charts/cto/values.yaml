@@ -975,10 +975,16 @@ web:
     enabled: true
     secretName: web-auth-secret  # pragma: allowlist secret
   
+  # GitHub OAuth credentials (required for GitHub login)
+  githubOAuth:
+    enabled: true
+    secretName: web-github-oauth  # pragma: allowlist secret
+  
   # Secrets configuration
   secrets:
     databaseUrlSecretName: web-database-url  # pragma: allowlist secret
     authSecretName: web-auth-secret  # pragma: allowlist secret
+    githubOAuthSecretName: web-github-oauth  # pragma: allowlist secret
 
   resources:
     limits:
