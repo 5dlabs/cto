@@ -107,6 +107,31 @@ PRD → Intake (Morgan) → Infrastructure (Bolt) → Implementation (Rex/Blaze)
 | `jobs` | List running workflows |
 | `stop_job` | Cancel running workflow |
 
+### MCP Tool Usage Guidelines
+
+#### `intake` Tool - Production Flow Only
+
+⚠️ **NEVER use `local=true`** for the intake tool. Always use the production flow:
+
+```
+intake(project_name="my-project")  ← Correct (local defaults to false)
+intake(project_name="my-project", local=true)  ← WRONG - bypasses production
+```
+
+**Production Intake Flow:**
+1. MCP `intake()` creates Linear Project + PRD Issue
+2. PRD content → issue description
+3. `architecture.md` + `cto-config.json` → attachments
+4. Morgan auto-assigned as delegate
+5. PM Server webhook triggers Argo Workflow **in-cluster**
+6. Actual intake processing runs in Kubernetes (not locally)
+
+The `local=true` mode exists only for debugging the intake binary itself. It:
+- Skips Linear entirely
+- Runs the binary on your local machine
+- Requires local API keys in `.env.local`
+- Does NOT test the production workflow
+
 ### Build Commands
 
 ```bash

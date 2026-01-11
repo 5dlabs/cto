@@ -61,6 +61,7 @@ spec:
           "service": "{{workflow.parameters.service}}",
           "docs-repository": "{{workflow.parameters.docs-repository}}",
           "docs-project-directory": "{{workflow.parameters.docs-project-directory}}",
+          "docs-branch": "{{workflow.parameters.docs-branch}}",
           "working-directory": "{{workflow.parameters.working-directory}}",
           "implementation-max-retries": "{{workflow.parameters.implementation-max-retries}}",
           "frontend-max-retries": "{{workflow.parameters.frontend-max-retries}}",
@@ -73,7 +74,8 @@ spec:
           "security-max-retries": "{{workflow.parameters.security-max-retries}}",
           "testing-max-retries": "{{workflow.parameters.testing-max-retries}}",
           "auto-merge": "{{workflow.parameters.auto-merge}}",
-          "final-task": "{{workflow.parameters.final-task}}"
+          "final-task": "{{workflow.parameters.final-task}}",
+          "model": "{{workflow.parameters.model}}"
         }
 
   # Main entry point
@@ -130,6 +132,9 @@ spec:
       - name: docs-project-directory
         description: "Directory within docs repository containing project documentation"
         value: ""  # Must be provided by MCP client
+      - name: docs-branch
+        description: "Branch to use for documentation repository"
+        value: "main"  # Default to main branch
       - name: working-directory
         description: "Working directory for code implementation (where agents write code)"
         value: "."  # Default to repository root
@@ -339,6 +344,9 @@ spec:
       - name: final-task
         description: "Whether this is the final task requiring deployment verification (true/false)"
         value: "false"
+      - name: model
+        description: "Default model to use for agent executions (overridden by agent-specific models)"
+        value: ""  # Optional - agent-specific models take precedence
 
   # Workflow instance naming pattern
   onExit: cleanup-handler
@@ -585,6 +593,8 @@ spec:
                   value: "{{workflow.parameters.docs-repository}}"
                 - name: docs-project-directory
                   value: "{{workflow.parameters.docs-project-directory}}"
+                - name: docs-branch
+                  value: "{{workflow.parameters.docs-branch}}"
         - - name: implementation
             when: "'{{steps.should-run-implementation.outputs.parameters.should-run}}' == 'true'"
             template: implementation-cycle
@@ -1908,6 +1918,8 @@ spec:
           - name: task-id
           - name: docs-repository
           - name: docs-project-directory
+          - name: docs-branch
+            default: "main"
       outputs:
         parameters:
           - name: github-app
@@ -1952,10 +1964,12 @@ spec:
           TASK_ID="{{inputs.parameters.task-id}}"
           DOCS_REPO="{{inputs.parameters.docs-repository}}"
           DOCS_PROJECT_DIR="{{inputs.parameters.docs-project-directory}}"
+          DOCS_BRANCH="{{inputs.parameters.docs-branch}}"
 
           echo "🔍 Determining agent for task ${TASK_ID}"
           echo "   Docs repository: ${DOCS_REPO}"
           echo "   Project directory: ${DOCS_PROJECT_DIR}"
+          echo "   Docs branch: ${DOCS_BRANCH}"
 
           # Install tools
           apk add --no-cache curl jq openssl git >/dev/null 2>&1 || true
@@ -2002,8 +2016,8 @@ spec:
           CLONE_DIR="/tmp/docs-repo"
           rm -rf "$CLONE_DIR"
 
-          echo "📥 Cloning docs repository..."
-          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${DOCS_REPO}.git" "$CLONE_DIR" 2>&1 || {
+          echo "📥 Cloning docs repository (branch: ${DOCS_BRANCH})..."
+          git clone --depth 1 --branch "${DOCS_BRANCH}" "https://x-access-token:${TOKEN}@github.com/${DOCS_REPO}.git" "$CLONE_DIR" 2>&1 || {
             echo "❌ Failed to clone repository"
             # Fallback to implementation agent
             echo "{{workflow.parameters.implementation-agent}}" > /tmp/github-app.txt

@@ -29,6 +29,11 @@ done
 if [ -z "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
   echo "🔐 Generating GitHub token from app credentials..."
   
+  # Write private key to temp file (process substitution doesn't work in sh/dash)
+  TEMP_KEY="/tmp/github-app-key-$$"
+  printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
+  chmod 600 "$TEMP_KEY"
+  
   # Generate JWT token using openssl (available in factory image)
   NOW=$(date +%s)
   IAT=$((NOW - 60))
@@ -38,8 +43,11 @@ if [ -z "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_A
   HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e | tr -d '=' | tr '/+' '_-' | tr -d '\n')
   PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${GITHUB_APP_ID}\"}" | openssl base64 -e | tr -d '=' | tr '/+' '_-' | tr -d '\n')
   
-  # Create signature
-  SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign <(echo "$GITHUB_APP_PRIVATE_KEY") | openssl base64 -e | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+  # Create signature using temp file (not process substitution which requires bash)
+  SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$TEMP_KEY" | openssl base64 -e | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+  
+  # Clean up temp key
+  rm -f "$TEMP_KEY"
   
   JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
   

@@ -127,10 +127,11 @@ op_item_exists() {
 }
 
 # Get field from 1Password item
+# Uses JSON format to avoid shell quoting issues with multiline values (like private keys)
 op_get_field() {
     local item=$1
     local field=$2
-    op item get "$item" --fields "$field" --reveal 2>/dev/null || echo ""
+    op item get "$item" --format json 2>/dev/null | jq -r ".fields[] | select(.label == \"$field\") | .value" 2>/dev/null || echo ""
 }
 
 # Get field from 1Password item by section
