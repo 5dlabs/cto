@@ -36,7 +36,8 @@ metadata:
       openmemory=ghcr.io/5dlabs/openmemory:latest,
       healer=ghcr.io/5dlabs/healer:latest,
       tweakcn=ghcr.io/5dlabs/tweakcn:latest,
-      research=ghcr.io/5dlabs/research:latest
+      research=ghcr.io/5dlabs/research:latest,
+      web=ghcr.io/5dlabs/web:latest
     # Use 'digest' strategy to track the 'latest' tag and auto-update on new pushes
     # This ensures we always get the latest digest when CI pushes a new image
     argocd-image-updater.argoproj.io/controller.update-strategy: "digest"
@@ -53,6 +54,8 @@ metadata:
     argocd-image-updater.argoproj.io/tweakcn.allow-tags: "regexp:^latest$"
     argocd-image-updater.argoproj.io/research.update-strategy: "digest"
     argocd-image-updater.argoproj.io/research.allow-tags: "regexp:^latest$"
+    argocd-image-updater.argoproj.io/web.update-strategy: "digest"
+    argocd-image-updater.argoproj.io/web.allow-tags: "regexp:^latest$"
     argocd-image-updater.argoproj.io/write-back-method: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -70,8 +73,9 @@ spec:
       # =======================================================================
       # CLUSTER: Latitude.sh (cto-dal)
       # Worker: hardware-219s058355, Control: hardware-21bs002557
-      # Registry: 10.8.0.2:30500 (internal VPN IP)
+      # Registry: ghcr.io/5dlabs (GitHub Container Registry)
       # Storage: local-path (no mayastor on Latitude)
+      # Dev Registry: 10.8.0.2:30500 (internal VPN IP, disabled by default)
       # =======================================================================
       values: |
         global:
@@ -79,9 +83,9 @@ spec:
           imagePullSecrets:
             - name: ghcr-secret
           storageClass: "local-path"  # Latitude uses local-path (no mayastor)
-          # Dev registry for local development builds
+          # Dev registry for local development builds (disabled - use ghcr.io)
           devRegistry:
-            enabled: true
+            enabled: false
             url: "10.8.0.2:30500"
             tag: "tilt-dev"
             pullPolicy: Always
@@ -122,6 +126,9 @@ spec:
         # Web App - CTO Platform Dashboard
         web:
           enabled: true
+          image:
+            repository: ghcr.io/5dlabs/web
+            tag: latest
           # Disable GitHub OAuth until credentials are configured in OpenBao
           # To enable: store client_id and client_secret at secret/web-app/github-oauth
           githubOAuth:
