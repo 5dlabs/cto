@@ -22,6 +22,11 @@ on:
         required: false
         default: false
         type: boolean
+      no_cache:
+        description: 'Disable buildx cache (use when builds hang due to cache corruption)'
+        required: false
+        default: false
+        type: boolean
       factory_version_override:
         description: 'Override Factory CLI version (e.g., "1.2.3"). If not provided, auto-detection will be used.'
         required: false
@@ -40,6 +45,7 @@ permissions:
 jobs:
   build-runtime:
     runs-on: [k8s-runner]
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -230,13 +236,10 @@ jobs:
             PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
             TASKS_VERSION=${{ steps.binaries-version.outputs.tasks_version }}
             TASKMASTER_VERSION=${{ steps.taskmaster-version.outputs.version }}
-          # Use GHA cache (built-in, fast) and registry cache (persistent fallback)
-          cache-from: |
-            type=gha,scope=runtime
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
-          cache-to: |
-            type=gha,scope=runtime,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache,mode=max
+          # Cache can be disabled via no_cache input when builds hang due to corruption
+          no-cache: ${{ inputs.no_cache == true }}
+          cache-from: ${{ inputs.no_cache != true && 'type=gha,scope=runtime' || '' }}
+          cache-to: ${{ inputs.no_cache != true && 'type=gha,scope=runtime,mode=max' || '' }}
 
       - name: Set build output
         id: set-built
@@ -249,6 +252,7 @@ jobs:
 
   build-sidecar:
     runs-on: [k8s-runner]
+    timeout-minutes: 15
     permissions:
       contents: read
       packages: write
@@ -288,8 +292,9 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:${{ steps.version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: ${{ inputs.no_cache == true }}
+          cache-from: ${{ inputs.no_cache != true && 'type=gha,scope=sidecar' || '' }}
+          cache-to: ${{ inputs.no_cache != true && 'type=gha,scope=sidecar,mode=max' || '' }}
 
       - name: Summary
         run: |
@@ -303,6 +308,7 @@ jobs:
   build-agents:
     needs: build-runtime
     runs-on: [k8s-runner]
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -482,8 +488,10 @@ jobs:
             BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
             VERSION=${{ steps.version.outputs.version }}
             CACHE_BUST=${{ github.run_id }}
-          cache-from: type=gha,scope=${{ matrix.id }}
-          cache-to: type=gha,scope=${{ matrix.id }},mode=max
+          # Cache can be disabled via no_cache input when builds hang due to corruption
+          no-cache: ${{ inputs.no_cache == true }}
+          cache-from: ${{ inputs.no_cache != true && format('type=gha,scope={0}', matrix.id) || '' }}
+          cache-to: ${{ inputs.no_cache != true && format('type=gha,scope={0},mode=max', matrix.id) || '' }}
 
       - name: Append summary
         run: |
