@@ -172,6 +172,7 @@ impl CLITextGenerator {
     fn check_cli_available(cli_type: CLIType) -> bool {
         let executable = match cli_type {
             CLIType::Claude => "claude",
+            CLIType::Code => "code",
             CLIType::Codex => "codex",
             CLIType::Cursor => "cursor",
             CLIType::Factory => "droid",
@@ -202,6 +203,7 @@ impl CLITextGenerator {
     fn get_executable_path(cli_type: CLIType) -> String {
         let executable = match cli_type {
             CLIType::Claude => "claude",
+            CLIType::Code => "code",
             CLIType::Codex => "codex",
             CLIType::Cursor => "cursor",
             CLIType::Factory => "droid",
@@ -309,6 +311,26 @@ impl CLITextGenerator {
                 args.push("--".to_string());
 
                 // The prompt is the final positional argument
+                args.push(prompt.to_string());
+            }
+            CLIType::Code => {
+                // Every Code CLI (fork of Codex): code exec --json -m <model> -c max_output_tokens=16000 -- "prompt"
+                // Must use 'exec' subcommand for non-interactive mode
+                args.push("exec".to_string());
+                args.push("--json".to_string());
+                args.push("-m".to_string());
+                args.push(model.to_string());
+
+                // Set max output tokens (default to 16000 for detailed task breakdowns)
+                let tokens = options.max_tokens.unwrap_or(16000);
+                args.push("-c".to_string());
+                args.push(format!("max_output_tokens={tokens}"));
+
+                // Skip sandbox for task generation
+                args.push("--skip-git-repo-check".to_string());
+
+                // Use -- to separate options from prompt
+                args.push("--".to_string());
                 args.push(prompt.to_string());
             }
             CLIType::Codex => {
@@ -646,6 +668,25 @@ impl CLITextGenerator {
                 "claude-3-sonnet-20240229",
                 "claude-3-haiku-20240307",
             ],
+            CLIType::Code => vec![
+                // Every Code supports multi-provider models (fork of Codex)
+                // OpenAI GPT-5.1 Codex models
+                "gpt-5.1-codex-max",
+                "gpt-5.1-codex",
+                "gpt-5.1",
+                // o-series reasoning models
+                "o3",
+                "o3-mini",
+                "o1",
+                "o1-preview",
+                "o1-mini",
+                // Claude models via Anthropic
+                "claude-opus-4-5-20251101",
+                "claude-sonnet-4-5-20250929",
+                // Legacy GPT models
+                "gpt-4-turbo",
+                "gpt-4",
+            ],
             CLIType::Codex => vec![
                 // GPT-5.1 Codex models (latest ChatGPT models)
                 "gpt-5.1-codex-max",
@@ -751,6 +792,7 @@ impl AIProvider for CLITextGenerator {
     fn name(&self) -> &'static str {
         match self.cli_type {
             CLIType::Claude => "cli-claude",
+            CLIType::Code => "cli-code",
             CLIType::Codex => "cli-codex",
             CLIType::Cursor => "cli-cursor",
             CLIType::Factory => "cli-factory",
@@ -764,9 +806,12 @@ impl AIProvider for CLITextGenerator {
         // CLI tools manage their own authentication
         // Note: Dexter supports multiple API keys (Anthropic, OpenAI, Google)
         // but we return Anthropic as the primary since Claude is commonly used
+        // Code (Every Code) supports multiple providers but uses OpenAI as primary
         match self.cli_type {
             CLIType::Claude | CLIType::Dexter => "ANTHROPIC_API_KEY",
-            CLIType::Codex | CLIType::Factory | CLIType::OpenCode => "OPENAI_API_KEY",
+            CLIType::Code | CLIType::Codex | CLIType::Factory | CLIType::OpenCode => {
+                "OPENAI_API_KEY"
+            }
             CLIType::Cursor => "CURSOR_API_KEY",
             CLIType::Gemini => "GOOGLE_API_KEY",
         }

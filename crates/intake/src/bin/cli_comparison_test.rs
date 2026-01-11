@@ -141,6 +141,8 @@ fn get_default_model(cli_type: CLIType) -> &'static str {
         CLIType::Gemini => "gemini-2.5-flash",
         // Dexter: Use Claude Sonnet 4
         CLIType::Dexter => "claude-sonnet-4-20250514",
+        // Code (Every Code): Use GPT-5.1 Codex (fork of Codex)
+        CLIType::Code => "gpt-5.1-codex",
     }
 }
 
@@ -148,6 +150,7 @@ fn get_default_model(cli_type: CLIType) -> &'static str {
 fn check_cli_available(cli_type: CLIType) -> bool {
     let executable = match cli_type {
         CLIType::Claude => "claude",
+        CLIType::Code => "code",
         CLIType::Codex => "codex",
         CLIType::Cursor => "cursor",
         CLIType::Factory => "droid",
