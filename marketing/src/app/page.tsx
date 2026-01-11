@@ -200,13 +200,19 @@ export default function Home() {
               Thirteen specialists from the Fifth Dimension. Bare metal infrastructure. Zero cloud tax.
             </motion.p>
 
-            {/* Waitlist Form */}
+            {/* CTA Buttons */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7, duration: 0.8 }}
-              className="flex justify-center mb-16"
+              className="flex flex-col sm:flex-row justify-center gap-4 mb-16"
             >
+              <a
+                href="https://cto.5dlabs.ai/"
+                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
+              >
+                Start Now
+              </a>
               <WaitlistForm />
             </motion.div>
 
@@ -824,7 +830,13 @@ export default function Home() {
             <p className="text-lg text-muted-foreground mb-8">
               Your engineering team is ready. No hiring, no onboarding—just results.
             </p>
-            <div className="flex justify-center">
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <a
+                href="https://cto.5dlabs.ai/"
+                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
+              >
+                Start Now
+              </a>
               <WaitlistForm />
             </div>
           </motion.div>
