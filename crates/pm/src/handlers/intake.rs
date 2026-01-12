@@ -1157,7 +1157,9 @@ pub async fn submit_intake_coderun(
                 // Source branch configuration
                 "SOURCE_BRANCH": source_branch,
                 // Webhook callback URL for automatic play workflow triggers
-                "WEBHOOK_CALLBACK_URL": config.webhook_callback_url.as_deref().unwrap_or("")
+                "WEBHOOK_CALLBACK_URL": config.webhook_callback_url.as_deref().unwrap_or(""),
+                // Enable extended thinking for better task generation
+                "TASKS_EXTENDED_THINKING": "true"
             },
             "linearIntegration": {
                 "enabled": true,
