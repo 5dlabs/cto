@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::{self, File, OpenOptions};
-use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader, SeekFrom};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::time::{sleep, Instant};
@@ -1024,9 +1024,10 @@ async fn log_stream_task(config: Arc<Config>, linear_client: Option<LinearApiCli
     };
 
     let mut reader = BufReader::new(file);
-    if let Err(e) = reader.seek(SeekFrom::End(0)).await {
-        warn!(error = %e, "Failed to seek to end of log file");
-    }
+    // Start from beginning of file (not end) to catch any output written before
+    // the sidecar started watching. This is important for short-lived tasks like
+    // intake where the agent may fail quickly before sidecar starts streaming.
+    // Note: SeekFrom::Start(0) is the default, but explicit for clarity.
 
     let mut buffer = String::new();
     let mut last_post = Instant::now();
