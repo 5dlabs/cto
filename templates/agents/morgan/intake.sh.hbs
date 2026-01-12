@@ -149,12 +149,13 @@ if [ -n "$WEBHOOK_CALLBACK_URL" ]; then
         # Note: gh api -F (--field) flag syntax:
         #   -F key=value      → string value
         #   -F key:=true      → raw JSON (boolean/number/null)
-        #   -F key[]=value    → array element
-        #   -F obj[key]=value → nested object property
+        #   -F 'key[]=value'  → array element (quote to prevent shell glob expansion)
+        #   -F 'obj[key]=val' → nested object property
         gh api "repos/${REPO_PATH}/hooks/${EXISTING_WEBHOOK}" \
             --method PATCH \
             -F active:=true \
-            -F events[]="pull_request" \
+            -F 'events[]=pull_request' \
+            -F "config[url]=${WEBHOOK_CALLBACK_URL}" \
             -F 'config[content_type]=json' \
             --silent && echo "  ✅ Webhook updated" || echo "  ⚠️  Failed to update webhook (non-critical)"
     else
@@ -163,13 +164,13 @@ if [ -n "$WEBHOOK_CALLBACK_URL" ]; then
         # Note: gh api -F (--field) flag syntax:
         #   -F key=value      → string value
         #   -F key:=true      → raw JSON (boolean/number/null)
-        #   -F key[]=value    → array element
-        #   -F obj[key]=value → nested object property
+        #   -F 'key[]=value'  → array element (quote to prevent shell glob expansion)
+        #   -F 'obj[key]=val' → nested object property
         gh api "repos/${REPO_PATH}/hooks" \
             --method POST \
             -F name=web \
             -F active:=true \
-            -F events[]="pull_request" \
+            -F 'events[]=pull_request' \
             -F "config[url]=${WEBHOOK_CALLBACK_URL}" \
             -F 'config[content_type]=json' \
             -F 'config[insecure_ssl]:=0' \
