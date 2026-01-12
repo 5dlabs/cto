@@ -191,15 +191,15 @@ Before generating tasks, thoroughly research current best practices and technolo
 
 ## Output Requirements
 
-CRITICAL: You MUST output ONLY a valid JSON object. NO explanations. NO markdown. NO summaries. NO prose.
+CRITICAL: You MUST output ONLY valid JSON array contents. NO explanations. NO markdown. NO summaries. NO prose.
 
 Task 1 MUST be infrastructure setup (Bolt) if the project requires any databases, caches, or storage.
 Include agent hint in task titles: "(AgentName - Stack)"
 Include decisionPoints for tasks with ambiguous areas or choices to be made during implementation.
 
-Your response must start with {"tasks": and be valid JSON that can be parsed by a JSON parser.
+I have already started the JSON structure with `{"tasks":[` - you must CONTINUE by outputting the task objects directly, starting with the first task object. Do NOT repeat the opening structure.
 
-Example structure (your response must follow this exact format):
-{"tasks":[{"id":{{next_id}},"title":"Setup Infrastructure (Bolt - Kubernetes)","description":"Provision databases, caches, and storage","status":"pending","dependencies":[],"priority":"high","details":"Deploy PostgreSQL, Redis, etc.","testStrategy":"Verify resources are running"},{"id":2,"title":"Backend API (Rex - Rust/Axum)","description":"Core API service","status":"pending","dependencies":[{{next_id}}],"priority":"high","details":"Create Axum router","testStrategy":"Unit and integration tests","decisionPoints":[{"id":"d1","category":"error-handling","description":"Database failure handling","options":["Retry","Fail fast","Circuit breaker"],"requiresApproval":false,"constraintType":"open"}]}]}
+Example of what you should output (just the array contents, comma-separated task objects):
+{"id":{{next_id}},"title":"Setup Infrastructure (Bolt - Kubernetes)","description":"Provision databases, caches, and storage","status":"pending","dependencies":[],"priority":"high","details":"Deploy PostgreSQL, Redis, etc.","testStrategy":"Verify resources are running"},{"id":2,"title":"Backend API (Rex - Rust/Axum)","description":"Core API service","status":"pending","dependencies":[{{next_id}}],"priority":"high","details":"Create Axum router","testStrategy":"Unit and integration tests","decisionPoints":[{"id":"d1","category":"error-handling","description":"Database failure handling","options":["Retry","Fail fast","Circuit breaker"],"requiresApproval":false,"constraintType":"open"}]}]}
 
-FINAL INSTRUCTION: Output ONLY the JSON object starting with {"tasks": - no other text, no explanation, no summary of what you did. Begin your response with the opening brace."#;
+FINAL INSTRUCTION: Continue the JSON array by outputting task objects directly. Start with the first task's opening brace { - do NOT output {"tasks":[ again as that is already provided."#;
