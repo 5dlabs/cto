@@ -49,12 +49,12 @@ IMPORTANT: For each task, provide an analysis object with ALL of the following f
 - expansionPrompt: A prompt to guide subtask generation
 - reasoning: Your reasoning for the complexity score
 
-Your response MUST be a JSON object with a single "complexityAnalysis" property containing an array of these analysis objects. You may optionally include a "metadata" object, but no other top-level properties.
-
 CRITICAL OUTPUT FORMAT:
-- Return ONLY the JSON object. No markdown formatting, no explanatory text before or after.
-- Do NOT explain your reasoning outside the JSON. Do NOT include any text outside the JSON.
-- Start your response with { and end with }"#;
+- The JSON structure `{"complexityAnalysis":[` has already been started for you
+- You must CONTINUE by outputting analysis objects directly as array elements
+- Do NOT repeat the opening structure - just output the analysis objects
+- No markdown formatting, no explanatory text before or after
+- Do NOT explain your reasoning outside the JSON objects"#;
 
 const USER_PROMPT: &str = r#"Analyze the following tasks to determine their complexity (1-10 scale) and recommend the number of subtasks for expansion. Provide a brief reasoning and an initial expansion prompt for each.{{#if use_research}} Consider current best practices, common implementation patterns, and industry standards in your analysis.{{/if}}
 
@@ -67,4 +67,4 @@ Tasks:
 {{gathered_context}}
 {{/if}}
 
-FINAL INSTRUCTION: Output ONLY a JSON object starting with {"complexityAnalysis": - no other text, no explanation, no summary. Begin your response with the opening brace."#;
+FINAL INSTRUCTION: Continue the JSON array by outputting analysis objects directly. Start with the first analysis object's opening brace { - do NOT output {"complexityAnalysis":[ again as that is already provided. End with ]} to close the array and object."#;

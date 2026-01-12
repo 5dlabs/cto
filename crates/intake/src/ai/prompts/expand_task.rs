@@ -87,7 +87,7 @@ const SYSTEM_PROMPT: &str = r#"You are an AI assistant helping with task breakdo
 
 You have access to current best practices and latest technical information to provide research-backed subtask generation.{{/if}}
 
-IMPORTANT: Your response MUST be a JSON object with a "subtasks" property containing an array of subtask objects. Each subtask must include ALL of the following fields:
+IMPORTANT: Each subtask object must include ALL of the following fields:
 - id: MUST be sequential integers starting EXACTLY from {{next_subtask_id}}. First subtask id={{next_subtask_id}}, second id={{next_subtask_id}}+1, etc. DO NOT use any other numbering pattern!
 - title: A clear, actionable title (5-200 characters)
 - description: A detailed description (minimum 10 characters)
@@ -104,12 +104,12 @@ IMPORTANT: Your response MUST be a JSON object with a "subtasks" property contai
   - "debugger": Debug issues and fix bugs
 - parallelizable: Boolean indicating if this subtask can run in parallel with others at the same dependency level (true for independent work, false for coordination-required tasks){{/if}}
 
-You may optionally include a "metadata" object. Do not include any other top-level properties.
-
 CRITICAL OUTPUT FORMAT:
-- Return ONLY the JSON object. No markdown formatting, no explanatory text before or after.
-- Do NOT explain your reasoning. Do NOT summarize the subtasks. Do NOT include any text outside the JSON.
-- Start your response with { and end with }{{#if enable_subagents}}
+- The JSON structure `{"subtasks":[` has already been started for you
+- You must CONTINUE by outputting subtask objects directly as array elements
+- Do NOT repeat the opening structure - just output the subtask objects
+- No markdown formatting, no explanatory text before or after
+- Do NOT explain your reasoning or summarize the subtasks{{#if enable_subagents}}
 
 ## Subagent Optimization Guidelines
 
@@ -120,7 +120,7 @@ When breaking down tasks for subagent execution:
 4. **Consider context isolation**: Each subagent works in isolation, so subtasks should be self-contained
 5. **Plan review phases**: Include reviewer subtasks after implementation phases{{/if}}"#;
 
-const USER_PROMPT: &str = r"Break down this task into {{#if (gt subtask_count 0)}}exactly {{subtask_count}}{{else}}an appropriate number of{{/if}} specific subtasks{{#if enable_subagents}} optimized for parallel subagent execution{{/if}}:
+const USER_PROMPT: &str = r#"Break down this task into {{#if (gt subtask_count 0)}}exactly {{subtask_count}}{{else}}an appropriate number of{{/if}} specific subtasks{{#if enable_subagents}} optimized for parallel subagent execution{{/if}}:
 
 Task ID: {{task.id}}
 Title: {{task.title}}
@@ -147,4 +147,4 @@ SUBAGENT REQUIREMENTS:
 - Include at least one reviewer subtask after implementation subtasks
 - Include tester subtasks for validation work{{/if}}
 
-OUTPUT: Return ONLY valid JSON. No explanations, no summaries, no markdown. Start with { and end with }.";
+OUTPUT: Continue the JSON array by outputting subtask objects directly. Start with the first subtask's opening brace { - do NOT output {"subtasks":[ again as that is already provided. End with ]} to close the array and object."#;
