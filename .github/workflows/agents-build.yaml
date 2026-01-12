@@ -38,9 +38,9 @@ env:
   IMAGE_BASE: 5dlabs
 
 # Prevent auto-cancellation of in-progress runs when new runs are triggered
-# Each workflow_dispatch run should complete independently
+# With cancel-in-progress: false, new runs queue instead of cancelling existing ones
 concurrency:
-  group: agents-build-${{ github.run_id }}
+  group: agents-build
   cancel-in-progress: false
 
 # Workflow-level permissions for GHCR pushes
