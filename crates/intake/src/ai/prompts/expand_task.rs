@@ -104,7 +104,12 @@ IMPORTANT: Your response MUST be a JSON object with a "subtasks" property contai
   - "debugger": Debug issues and fix bugs
 - parallelizable: Boolean indicating if this subtask can run in parallel with others at the same dependency level (true for independent work, false for coordination-required tasks){{/if}}
 
-You may optionally include a "metadata" object. Do not include any other top-level properties.{{#if enable_subagents}}
+You may optionally include a "metadata" object. Do not include any other top-level properties.
+
+CRITICAL OUTPUT FORMAT:
+- Return ONLY the JSON object. No markdown formatting, no explanatory text before or after.
+- Do NOT explain your reasoning. Do NOT summarize the subtasks. Do NOT include any text outside the JSON.
+- Start your response with { and end with }{{#if enable_subagents}}
 
 ## Subagent Optimization Guidelines
 
@@ -140,4 +145,6 @@ SUBAGENT REQUIREMENTS:
 - Minimize dependencies to maximize parallel execution potential
 - Group related implementation work so multiple implementer subagents can work simultaneously
 - Include at least one reviewer subtask after implementation subtasks
-- Include tester subtasks for validation work{{/if}}";
+- Include tester subtasks for validation work{{/if}}
+
+OUTPUT: Return ONLY valid JSON. No explanations, no summaries, no markdown. Start with { and end with }.";
