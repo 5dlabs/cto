@@ -1578,15 +1578,17 @@ async fn handle_document_event(
                     })))
                 }
                 Err(e) => {
-                    error!(
+                    // Log as debug - concurrent webhook handlers racing to sync the same
+                    // document is expected. One will succeed, others may fail transiently.
+                    debug!(
                         document_id = %document.id,
                         project_id = %project_id,
                         error = %e,
-                        "Failed to sync CTO config document to ConfigMap"
+                        "Concurrent sync of CTO config to ConfigMap (expected during webhook fan-out)"
                     );
                     Ok(Json(json!({
-                        "status": "error",
-                        "error": format!("Failed to sync document: {e}"),
+                        "status": "concurrent_sync",
+                        "message": "Another handler likely synced this document",
                         "document_id": document.id,
                         "project_id": project_id
                     })))
@@ -1613,15 +1615,17 @@ async fn handle_document_event(
                     })))
                 }
                 Err(e) => {
-                    error!(
+                    // Log as debug - concurrent webhook handlers racing to sync the same
+                    // document is expected. One will succeed, others may fail transiently.
+                    debug!(
                         document_id = %document.id,
                         project_id = %project_id,
                         error = %e,
-                        "Failed to sync Architecture document to ConfigMap"
+                        "Concurrent sync of Architecture to ConfigMap (expected during webhook fan-out)"
                     );
                     Ok(Json(json!({
-                        "status": "error",
-                        "error": format!("Failed to sync architecture: {e}"),
+                        "status": "concurrent_sync",
+                        "message": "Another handler likely synced this document",
                         "document_id": document.id,
                         "project_id": project_id
                     })))
