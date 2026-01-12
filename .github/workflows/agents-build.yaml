@@ -105,9 +105,9 @@ jobs:
             VERSION="${TAG#v}"  # Strip leading 'v'
 
             # Check for tools-client if not yet found
+            # Note: Use gh CLI instead of curl for private repo asset checks
             if [ -z "$TOOLS_VERSION" ]; then
-              TOOLS_URL="https://github.com/5dlabs/cto/releases/download/${TAG}/tools-client-linux-x86_64"
-              if curl -L --output /dev/null --silent --head --fail "$TOOLS_URL"; then
+              if gh release download "$TAG" --pattern 'tools-client-linux-x86_64' --skip-existing --dir /tmp/bin-check 2>/dev/null; then
                 echo "📦 Found tools-client in release: $VERSION"
                 TOOLS_VERSION="$VERSION"
               fi
@@ -115,8 +115,7 @@ jobs:
 
             # Check for play-monitor if not yet found
             if [ -z "$MONITOR_VERSION" ]; then
-              MONITOR_URL="https://github.com/5dlabs/cto/releases/download/${TAG}/play-monitor-linux-x86_64"
-              if curl -L --output /dev/null --silent --head --fail "$MONITOR_URL"; then
+              if gh release download "$TAG" --pattern 'play-monitor-linux-x86_64' --skip-existing --dir /tmp/bin-check 2>/dev/null; then
                 echo "📦 Found play-monitor in release: $VERSION"
                 MONITOR_VERSION="$VERSION"
               fi
@@ -124,8 +123,7 @@ jobs:
 
             # Check for intake CLI if not yet found
             if [ -z "$TASKS_VERSION" ]; then
-              INTAKE_URL="https://github.com/5dlabs/cto/releases/download/${TAG}/intake-linux-x86_64"
-              if curl -L --output /dev/null --silent --head --fail "$INTAKE_URL"; then
+              if gh release download "$TAG" --pattern 'intake-linux-x86_64' --skip-existing --dir /tmp/bin-check 2>/dev/null; then
                 echo "📦 Found intake in release: $VERSION"
                 TASKS_VERSION="$VERSION"
               fi
@@ -136,6 +134,9 @@ jobs:
               break
             fi
           done
+
+          # Cleanup temp directory
+          rm -rf /tmp/bin-check
 
           # Output tools version
           if [ -n "$TOOLS_VERSION" ]; then

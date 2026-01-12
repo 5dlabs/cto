@@ -25,6 +25,28 @@ spec:
         logs.platform.5dlabs.io/service: web
     spec:
       {{- include "cto.imagePullSecrets" . | nindent 6 }}
+      {{- if .Values.web.migrations.enabled }}
+      initContainers:
+        - name: migrate
+          image: "{{ .Values.web.migrations.image.repository }}:{{ .Values.web.migrations.image.tag }}"
+          imagePullPolicy: {{ .Values.web.migrations.image.pullPolicy }}
+          env:
+            {{- if .Values.web.databaseUrl.enabled }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.web.secrets.databaseUrlSecretName }}
+                  key: url
+                  optional: false
+            {{- end }}
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+      {{- end }}
       containers:
         - name: web
           image: "{{ include "cto.imageRef" (dict "component" "web" "image" .Values.web.image "global" .Values.global) }}"

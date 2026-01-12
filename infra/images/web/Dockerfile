@@ -91,3 +91,33 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 
 # Next.js standalone creates server.js in the standalone root
 CMD ["node", "server.js"]
+
+# =============================================================================
+# Migration stage - for database schema migrations
+# =============================================================================
+# Build with: docker build --target migrate -f infra/images/web/Dockerfile -t ghcr.io/5dlabs/web-migrate:latest .
+# This is a separate image used as an init container to run database migrations
+FROM node:20-bookworm-slim AS migrate
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files and source for migration
+COPY apps/web/package.json apps/web/package-lock.json* ./
+COPY apps/web/drizzle.config.ts ./
+COPY apps/web/src/lib/db ./src/lib/db
+COPY apps/web/tsconfig.json ./
+
+# Install all dependencies (including devDependencies for drizzle-kit)
+RUN npm ci --legacy-peer-deps
+
+# Create non-root user
+RUN useradd -r -u 1001 -m -d /app -s /bin/bash migrate
+USER migrate
+
+# Run migration script
+CMD ["npx", "drizzle-kit", "push", "--force"]

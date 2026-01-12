@@ -223,3 +223,15 @@ jobs:
           short-sha: ${{ steps.version.outputs.short-sha }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tag-latest: 'true'
+
+      - name: Build and push Migration Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: web-migrate
+          context: .
+          dockerfile: ./infra/images/web/Dockerfile
+          target: migrate
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ steps.version.outputs.short-sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tag-latest: 'true'

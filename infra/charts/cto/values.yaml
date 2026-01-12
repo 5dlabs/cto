@@ -954,6 +954,14 @@ web:
     pullPolicy: Always
     tag: "latest"
 
+  # Database migrations (runs as init container before app starts)
+  migrations:
+    enabled: true
+    image:
+      repository: ghcr.io/5dlabs/web-migrate
+      pullPolicy: Always
+      tag: "latest"
+
   service:
     type: ClusterIP
     port: 3000

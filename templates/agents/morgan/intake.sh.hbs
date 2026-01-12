@@ -146,23 +146,25 @@ if [ -n "$WEBHOOK_CALLBACK_URL" ]; then
     if [ -n "$EXISTING_WEBHOOK" ]; then
         echo "  ℹ️  Webhook already exists (ID: $EXISTING_WEBHOOK), updating..."
         # Update existing webhook to ensure correct events
+        # Note: Use -f events[]=value syntax for JSON arrays (not --field 'events=["value"]')
         gh api "repos/${REPO_PATH}/hooks/${EXISTING_WEBHOOK}" \
             --method PATCH \
-            --field 'active=true' \
-            --field 'events=["pull_request"]' \
-            --field 'config[content_type]=json' \
+            -f active=true \
+            -f events[]="pull_request" \
+            -f 'config[content_type]=json' \
             --silent && echo "  ✅ Webhook updated" || echo "  ⚠️  Failed to update webhook (non-critical)"
     else
         echo "  → Creating webhook for PR notifications..."
         # Create new webhook
+        # Note: Use -f events[]=value syntax for JSON arrays (not --field 'events=["value"]')
         gh api "repos/${REPO_PATH}/hooks" \
             --method POST \
-            --field "name=web" \
-            --field "active=true" \
-            --field 'events=["pull_request"]' \
-            --field "config[url]=${WEBHOOK_CALLBACK_URL}" \
-            --field 'config[content_type]=json' \
-            --field 'config[insecure_ssl]=0' \
+            -f name=web \
+            -f active=true \
+            -f events[]="pull_request" \
+            -f "config[url]=${WEBHOOK_CALLBACK_URL}" \
+            -f 'config[content_type]=json' \
+            -f 'config[insecure_ssl]=0' \
             --silent && echo "  ✅ Webhook created: $WEBHOOK_CALLBACK_URL" || echo "  ⚠️  Failed to create webhook (non-critical)"
     fi
 else
@@ -248,6 +250,10 @@ fi
 # Build intake CLI arguments
 INTAKE_ARGS="--prd .tasks/docs/prd.txt"
 INTAKE_ARGS="$INTAKE_ARGS --num-tasks $NUM_TASKS"
+
+# Use CLI mode instead of API mode for AI operations
+# This uses the external CLI (claude, codex, etc.) instead of direct API calls
+INTAKE_ARGS="$INTAKE_ARGS --use-cli"
 
 # Add architecture if available
 if [ -f ".tasks/docs/architecture.md" ] && [ -s ".tasks/docs/architecture.md" ]; then

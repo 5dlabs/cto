@@ -368,14 +368,24 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 
 # Install tools client from CTO monorepo unified release (skip if version is "skip" or empty)
 # Downloads binary directly from v*.*.* unified releases
+# Note: Uses BuildKit secret for authentication with private repos
 ARG TOOLS_VERSION=skip
-RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
       ARCH=$(dpkg --print-architecture) && \
       case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
       if [ -n "$DL_ARCH" ]; then \
         echo "📦 Installing tools client v${TOOLS_VERSION} (${DL_ARCH})..." && \
-        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tools \
-          "https://github.com/5dlabs/cto/releases/download/v${TOOLS_VERSION}/tools-client-linux-${DL_ARCH}" && \
+        GH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN 2>/dev/null || echo "") && \
+        if [ -n "$GH_TOKEN" ]; then \
+          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tools \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/5dlabs/cto/releases/assets/$(curl -sL -H "Authorization: token ${GH_TOKEN}" "https://api.github.com/repos/5dlabs/cto/releases/tags/v${TOOLS_VERSION}" | grep -B2 "tools-client-linux-${DL_ARCH}" | grep '"id"' | head -1 | grep -oE '[0-9]+')"; \
+        else \
+          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tools \
+            "https://github.com/5dlabs/cto/releases/download/v${TOOLS_VERSION}/tools-client-linux-${DL_ARCH}"; \
+        fi && \
         chmod +x /usr/local/bin/tools && \
         echo "✅ tools client installed"; \
       else \
@@ -388,13 +398,22 @@ RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
 # Install play-monitor from CTO monorepo unified release (skip if version is "skip" or empty)
 # Downloads binary directly from v*.*.* unified releases
 ARG PLAY_MONITOR_VERSION=skip
-RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; then \
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; then \
       ARCH=$(dpkg --print-architecture) && \
       case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
       if [ -n "$DL_ARCH" ]; then \
         echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION} (${DL_ARCH})..." && \
-        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/play-monitor \
-          "https://github.com/5dlabs/cto/releases/download/v${PLAY_MONITOR_VERSION}/play-monitor-linux-${DL_ARCH}" && \
+        GH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN 2>/dev/null || echo "") && \
+        if [ -n "$GH_TOKEN" ]; then \
+          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/play-monitor \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/5dlabs/cto/releases/assets/$(curl -sL -H "Authorization: token ${GH_TOKEN}" "https://api.github.com/repos/5dlabs/cto/releases/tags/v${PLAY_MONITOR_VERSION}" | grep -B2 "play-monitor-linux-${DL_ARCH}" | grep '"id"' | head -1 | grep -oE '[0-9]+')"; \
+        else \
+          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/play-monitor \
+            "https://github.com/5dlabs/cto/releases/download/v${PLAY_MONITOR_VERSION}/play-monitor-linux-${DL_ARCH}"; \
+        fi && \
         chmod +x /usr/local/bin/play-monitor && \
         echo "✅ play-monitor installed"; \
       else \
@@ -407,13 +426,22 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; 
 # Install intake CLI from CTO monorepo unified release (skip if version is "skip" or empty)
 # This is the Rust replacement for TaskMaster-AI, providing faster task management
 ARG TASKS_VERSION=0.2.3
-RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ]; then \
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ]; then \
       ARCH=$(dpkg --print-architecture) && \
       case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
       if [ -n "$DL_ARCH" ]; then \
         echo "📦 Installing intake CLI v${TASKS_VERSION} (${DL_ARCH})..." && \
-        curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/intake \
-          "https://github.com/5dlabs/cto/releases/download/v${TASKS_VERSION}/intake-linux-${DL_ARCH}" && \
+        GH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN 2>/dev/null || echo "") && \
+        if [ -n "$GH_TOKEN" ]; then \
+          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/intake \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/5dlabs/cto/releases/assets/$(curl -sL -H "Authorization: token ${GH_TOKEN}" "https://api.github.com/repos/5dlabs/cto/releases/tags/v${TASKS_VERSION}" | grep -B2 "intake-linux-${DL_ARCH}" | grep '"id"' | head -1 | grep -oE '[0-9]+')"; \
+        else \
+          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/intake \
+            "https://github.com/5dlabs/cto/releases/download/v${TASKS_VERSION}/intake-linux-${DL_ARCH}"; \
+        fi && \
         chmod +x /usr/local/bin/intake && \
         echo "✅ intake CLI installed"; \
       else \
