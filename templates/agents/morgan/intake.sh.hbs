@@ -146,30 +146,32 @@ if [ -n "$WEBHOOK_CALLBACK_URL" ]; then
     if [ -n "$EXISTING_WEBHOOK" ]; then
         echo "  ℹ️  Webhook already exists (ID: $EXISTING_WEBHOOK), updating..."
         # Update existing webhook to ensure correct events
-        # Note: gh api -F flag syntax:
-        #   -F key=value     → string
-        #   -F key:=true     → raw JSON (boolean/number)
-        #   -F key[]=value   → array element
+        # Note: gh api -F (--field) flag syntax:
+        #   -F key=value      → string value
+        #   -F key:=true      → raw JSON (boolean/number/null)
+        #   -F key[]=value    → array element
+        #   -F obj[key]=value → nested object property
         gh api "repos/${REPO_PATH}/hooks/${EXISTING_WEBHOOK}" \
             --method PATCH \
             -F active:=true \
             -F events[]="pull_request" \
-            -f 'config[content_type]=json' \
+            -F 'config[content_type]=json' \
             --silent && echo "  ✅ Webhook updated" || echo "  ⚠️  Failed to update webhook (non-critical)"
     else
         echo "  → Creating webhook for PR notifications..."
         # Create new webhook
-        # Note: gh api -F flag syntax:
-        #   -F key=value     → string
-        #   -F key:=true     → raw JSON (boolean/number)
-        #   -F key[]=value   → array element
+        # Note: gh api -F (--field) flag syntax:
+        #   -F key=value      → string value
+        #   -F key:=true      → raw JSON (boolean/number/null)
+        #   -F key[]=value    → array element
+        #   -F obj[key]=value → nested object property
         gh api "repos/${REPO_PATH}/hooks" \
             --method POST \
-            -f name=web \
+            -F name=web \
             -F active:=true \
             -F events[]="pull_request" \
-            -f "config[url]=${WEBHOOK_CALLBACK_URL}" \
-            -f 'config[content_type]=json' \
+            -F "config[url]=${WEBHOOK_CALLBACK_URL}" \
+            -F 'config[content_type]=json' \
             -F 'config[insecure_ssl]:=0' \
             --silent && echo "  ✅ Webhook created: $WEBHOOK_CALLBACK_URL" || echo "  ⚠️  Failed to create webhook (non-critical)"
     fi
