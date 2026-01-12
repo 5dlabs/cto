@@ -366,90 +366,48 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
   && touch /commandhistory/.bash_history \
   && chown -R $USERNAME /commandhistory
 
-# Install tools client from CTO monorepo unified release (skip if version is "skip" or empty)
-# Downloads binary directly from v*.*.* unified releases
-# Note: Uses BuildKit secret for authentication with private repos
+# Install CTO binaries from pre-downloaded files in build context
+# The workflow downloads these from GitHub releases before building
+# This avoids authentication issues with private repos during Docker build
+
+# Copy pre-downloaded binaries directory (created by workflow with .gitkeep placeholder)
+COPY .docker-binaries/ /tmp/binaries/
+
+# Install tools client
 ARG TOOLS_VERSION=skip
-RUN --mount=type=secret,id=GITHUB_TOKEN \
-    if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ]; then \
-      ARCH=$(dpkg --print-architecture) && \
-      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
-      if [ -n "$DL_ARCH" ]; then \
-        echo "📦 Installing tools client v${TOOLS_VERSION} (${DL_ARCH})..." && \
-        GH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN 2>/dev/null || echo "") && \
-        if [ -n "$GH_TOKEN" ]; then \
-          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tools \
-            -H "Authorization: token ${GH_TOKEN}" \
-            -H "Accept: application/octet-stream" \
-            "https://api.github.com/repos/5dlabs/cto/releases/assets/$(curl -sL -H "Authorization: token ${GH_TOKEN}" "https://api.github.com/repos/5dlabs/cto/releases/tags/v${TOOLS_VERSION}" | grep -B2 "tools-client-linux-${DL_ARCH}" | grep '"id"' | head -1 | grep -oE '[0-9]+')"; \
-        else \
-          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/tools \
-            "https://github.com/5dlabs/cto/releases/download/v${TOOLS_VERSION}/tools-client-linux-${DL_ARCH}"; \
-        fi && \
-        chmod +x /usr/local/bin/tools && \
-        echo "✅ tools client installed"; \
-      else \
-        echo "⏭️ Skipping tools client installation (unsupported architecture: ${ARCH})"; \
-      fi; \
+RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
+      echo "📦 Installing tools client v${TOOLS_VERSION}..." && \
+      mv /tmp/binaries/tools-client-linux-x86_64 /usr/local/bin/tools && \
+      chmod +x /usr/local/bin/tools && \
+      echo "✅ tools client installed"; \
     else \
-      echo "⏭️ Skipping tools client installation (no release available)"; \
+      echo "⏭️ Skipping tools client installation (binary not available)"; \
     fi
 
-# Install play-monitor from CTO monorepo unified release (skip if version is "skip" or empty)
-# Downloads binary directly from v*.*.* unified releases
+# Install play-monitor
 ARG PLAY_MONITOR_VERSION=skip
-RUN --mount=type=secret,id=GITHUB_TOKEN \
-    if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ]; then \
-      ARCH=$(dpkg --print-architecture) && \
-      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
-      if [ -n "$DL_ARCH" ]; then \
-        echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION} (${DL_ARCH})..." && \
-        GH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN 2>/dev/null || echo "") && \
-        if [ -n "$GH_TOKEN" ]; then \
-          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/play-monitor \
-            -H "Authorization: token ${GH_TOKEN}" \
-            -H "Accept: application/octet-stream" \
-            "https://api.github.com/repos/5dlabs/cto/releases/assets/$(curl -sL -H "Authorization: token ${GH_TOKEN}" "https://api.github.com/repos/5dlabs/cto/releases/tags/v${PLAY_MONITOR_VERSION}" | grep -B2 "play-monitor-linux-${DL_ARCH}" | grep '"id"' | head -1 | grep -oE '[0-9]+')"; \
-        else \
-          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/play-monitor \
-            "https://github.com/5dlabs/cto/releases/download/v${PLAY_MONITOR_VERSION}/play-monitor-linux-${DL_ARCH}"; \
-        fi && \
-        chmod +x /usr/local/bin/play-monitor && \
-        echo "✅ play-monitor installed"; \
-      else \
-        echo "⏭️ Skipping play-monitor installation (unsupported architecture: ${ARCH})"; \
-      fi; \
+RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
+      echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION}..." && \
+      mv /tmp/binaries/play-monitor-linux-x86_64 /usr/local/bin/play-monitor && \
+      chmod +x /usr/local/bin/play-monitor && \
+      echo "✅ play-monitor installed"; \
     else \
-      echo "⏭️ Skipping play-monitor installation (no release available)"; \
+      echo "⏭️ Skipping play-monitor installation (binary not available)"; \
     fi
 
-# Install intake CLI from CTO monorepo unified release (skip if version is "skip" or empty)
-# This is the Rust replacement for TaskMaster-AI, providing faster task management
+# Install intake CLI (Rust replacement for TaskMaster-AI)
 ARG TASKS_VERSION=0.2.3
-RUN --mount=type=secret,id=GITHUB_TOKEN \
-    if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ]; then \
-      ARCH=$(dpkg --print-architecture) && \
-      case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH="" ;; esac && \
-      if [ -n "$DL_ARCH" ]; then \
-        echo "📦 Installing intake CLI v${TASKS_VERSION} (${DL_ARCH})..." && \
-        GH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN 2>/dev/null || echo "") && \
-        if [ -n "$GH_TOKEN" ]; then \
-          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/intake \
-            -H "Authorization: token ${GH_TOKEN}" \
-            -H "Accept: application/octet-stream" \
-            "https://api.github.com/repos/5dlabs/cto/releases/assets/$(curl -sL -H "Authorization: token ${GH_TOKEN}" "https://api.github.com/repos/5dlabs/cto/releases/tags/v${TASKS_VERSION}" | grep -B2 "intake-linux-${DL_ARCH}" | grep '"id"' | head -1 | grep -oE '[0-9]+')"; \
-        else \
-          curl --proto '=https' --tlsv1.2 -LsSf -o /usr/local/bin/intake \
-            "https://github.com/5dlabs/cto/releases/download/v${TASKS_VERSION}/intake-linux-${DL_ARCH}"; \
-        fi && \
-        chmod +x /usr/local/bin/intake && \
-        echo "✅ intake CLI installed"; \
-      else \
-        echo "⏭️ Skipping intake CLI installation (unsupported architecture: ${ARCH})"; \
-      fi; \
+RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
+      echo "📦 Installing intake CLI v${TASKS_VERSION}..." && \
+      mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && \
+      chmod +x /usr/local/bin/intake && \
+      echo "✅ intake CLI installed"; \
     else \
-      echo "⏭️ Skipping intake CLI installation (no release available)"; \
+      echo "⏭️ Skipping intake CLI installation (binary not available)"; \
     fi
+
+# Cleanup temp binaries directory
+RUN rm -rf /tmp/binaries
 
 # TaskMaster removed - using Rust intake CLI instead (see TASKS_VERSION above)
 
