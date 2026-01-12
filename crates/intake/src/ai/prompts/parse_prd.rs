@@ -189,61 +189,17 @@ Here is the Product Requirements Document to analyze and break down into {{#if (
 Before generating tasks, thoroughly research current best practices and technologies to provide specific, actionable implementation details. Apply your findings to the details and testStrategy fields.
 {{/if}}
 
-## Output Format
-Your response MUST be a JSON object with this exact structure:
+## Output Requirements
 
-```json
-{
-  "tasks": [
-    {
-      "id": {{next_id}},
-      "title": "Setup Infrastructure (Bolt - Kubernetes)",
-      "description": "Provision databases, caches, and storage required by all services",
-      "status": "pending",
-      "dependencies": [],
-      "priority": "high",
-      "details": "1. Deploy PostgreSQL cluster using CloudNative-PG operator\n2. Deploy Redis using Redis Operator\n3. Create ConfigMap with connection strings for other services",
-      "testStrategy": "Verify all infrastructure resources are running and accessible"
-    },
-    {
-      "id": {{next_id}} + 1,
-      "title": "Setup Backend API (Rex - Rust/Axum)",
-      "description": "Implement the core API service",
-      "status": "pending",
-      "dependencies": [{{next_id}}],
-      "priority": "high",
-      "details": "1. Create Axum router\n2. Add database connection pool\n3. Implement endpoints",
-      "testStrategy": "Unit tests for handlers, integration tests for API",
-      "decisionPoints": [
-        {
-          "id": "d1",
-          "category": "error-handling",
-          "description": "How to handle database connection failures",
-          "options": ["Retry with exponential backoff", "Fail fast with error", "Use circuit breaker pattern"],
-          "requiresApproval": false,
-          "constraintType": "open"
-        },
-        {
-          "id": "d2",
-          "category": "api-design",
-          "description": "Pagination strategy for list endpoints",
-          "options": ["Offset-based", "Cursor-based", "Keyset pagination"],
-          "requiresApproval": false,
-          "constraintType": "soft"
-        }
-      ]
-    }
-  ],
-  "metadata": {
-    "totalTasks": 2,
-    "analyzedAt": "ISO timestamp"
-  }
-}
-```
+CRITICAL: You MUST output ONLY a valid JSON object. NO explanations. NO markdown. NO summaries. NO prose.
 
-IMPORTANT:
-- Return ONLY the JSON object. No markdown formatting, no explanatory text before or after.
-- Task 1 MUST be infrastructure setup (Bolt) if the project requires any databases, caches, or storage.
-- Include agent hint in task titles: "(AgentName - Stack)"
-- Include decisionPoints for tasks with ambiguous areas or choices to be made during implementation.
-- The "metadata" object is optional."#;
+Task 1 MUST be infrastructure setup (Bolt) if the project requires any databases, caches, or storage.
+Include agent hint in task titles: "(AgentName - Stack)"
+Include decisionPoints for tasks with ambiguous areas or choices to be made during implementation.
+
+Your response must start with {"tasks": and be valid JSON that can be parsed by a JSON parser.
+
+Example structure (your response must follow this exact format):
+{"tasks":[{"id":{{next_id}},"title":"Setup Infrastructure (Bolt - Kubernetes)","description":"Provision databases, caches, and storage","status":"pending","dependencies":[],"priority":"high","details":"Deploy PostgreSQL, Redis, etc.","testStrategy":"Verify resources are running"},{"id":2,"title":"Backend API (Rex - Rust/Axum)","description":"Core API service","status":"pending","dependencies":[{{next_id}}],"priority":"high","details":"Create Axum router","testStrategy":"Unit and integration tests","decisionPoints":[{"id":"d1","category":"error-handling","description":"Database failure handling","options":["Retry","Fail fast","Circuit breaker"],"requiresApproval":false,"constraintType":"open"}]}]}
+
+FINAL INSTRUCTION: Output ONLY the JSON object starting with {"tasks": - no other text, no explanation, no summary of what you did. Begin your response with the opening brace."#;

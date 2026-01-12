@@ -56,7 +56,7 @@ CRITICAL OUTPUT FORMAT:
 - Do NOT explain your reasoning outside the JSON. Do NOT include any text outside the JSON.
 - Start your response with { and end with }"#;
 
-const USER_PROMPT: &str = r"Analyze the following tasks to determine their complexity (1-10 scale) and recommend the number of subtasks for expansion. Provide a brief reasoning and an initial expansion prompt for each.{{#if use_research}} Consider current best practices, common implementation patterns, and industry standards in your analysis.{{/if}}
+const USER_PROMPT: &str = r#"Analyze the following tasks to determine their complexity (1-10 scale) and recommend the number of subtasks for expansion. Provide a brief reasoning and an initial expansion prompt for each.{{#if use_research}} Consider current best practices, common implementation patterns, and industry standards in your analysis.{{/if}}
 
 Tasks:
 {{{json tasks}}}
@@ -65,4 +65,6 @@ Tasks:
 # Project Context
 
 {{gathered_context}}
-{{/if}}";
+{{/if}}
+
+FINAL INSTRUCTION: Output ONLY a JSON object starting with {"complexityAnalysis": - no other text, no explanation, no summary. Begin your response with the opening brace."#;

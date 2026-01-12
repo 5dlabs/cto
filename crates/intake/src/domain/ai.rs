@@ -127,7 +127,13 @@ impl AIDomain {
 
         let (system, user) = template.render(&context)?;
 
-        let messages = vec![AIMessage::system(system), AIMessage::user(user)];
+        // Use prefill technique: add an assistant message starting with JSON opening
+        // This forces the model to continue in JSON format rather than explaining
+        let messages = vec![
+            AIMessage::system(system),
+            AIMessage::user(user),
+            AIMessage::assistant(r#"{"tasks":["#.to_string()),
+        ];
 
         // Use maximum output tokens to ensure complete response
         // Claude 4.5 models support up to 64k output tokens (128k with extended thinking)
@@ -142,7 +148,16 @@ impl AIDomain {
         let response = provider
             .generate_text(model_id, &messages, &options)
             .await?;
-        let parsed: ParsePrdResponse = parse_ai_response(&response)?;
+
+        // Reconstruct the full JSON by prepending the prefill
+        let full_json = format!(r#"{{"tasks":[{}"#, response.text);
+        let reconstructed_response = crate::ai::AIResponse {
+            text: full_json,
+            usage: response.usage.clone(),
+            model: response.model.clone(),
+            provider: response.provider.clone(),
+        };
+        let parsed: ParsePrdResponse = parse_ai_response(&reconstructed_response)?;
 
         // Convert generated tasks to Task entities
         let tasks: Vec<Task> = parsed
@@ -291,7 +306,12 @@ impl AIDomain {
 
         let (system, user) = template.render(&context)?;
 
-        let messages = vec![AIMessage::system(system), AIMessage::user(user)];
+        // Use prefill technique for JSON-only output
+        let messages = vec![
+            AIMessage::system(system),
+            AIMessage::user(user),
+            AIMessage::assistant(r#"{"subtasks":["#.to_string()),
+        ];
 
         let options = GenerateOptions {
             temperature: Some(0.7),
@@ -303,7 +323,16 @@ impl AIDomain {
         let response = provider
             .generate_text(model_id, &messages, &options)
             .await?;
-        let parsed: ExpandTaskResponse = parse_ai_response(&response)?;
+
+        // Reconstruct the full JSON by prepending the prefill
+        let full_json = format!(r#"{{"subtasks":[{}"#, response.text);
+        let reconstructed_response = crate::ai::AIResponse {
+            text: full_json,
+            usage: response.usage.clone(),
+            model: response.model.clone(),
+            provider: response.provider.clone(),
+        };
+        let parsed: ExpandTaskResponse = parse_ai_response(&reconstructed_response)?;
 
         // Convert to Subtask entities using the helper that handles subagent fields
         let subtasks: Vec<Subtask> = parsed
@@ -348,7 +377,12 @@ impl AIDomain {
 
         let (system, user) = template.render(&context)?;
 
-        let messages = vec![AIMessage::system(system), AIMessage::user(user)];
+        // Use prefill technique for JSON-only output
+        let messages = vec![
+            AIMessage::system(system),
+            AIMessage::user(user),
+            AIMessage::assistant(r#"{"complexityAnalysis":["#.to_string()),
+        ];
 
         let options = GenerateOptions {
             temperature: Some(0.5),
@@ -360,7 +394,16 @@ impl AIDomain {
         let response = provider
             .generate_text(model_id, &messages, &options)
             .await?;
-        let parsed: AnalyzeComplexityResponse = parse_ai_response(&response)?;
+
+        // Reconstruct the full JSON by prepending the prefill
+        let full_json = format!(r#"{{"complexityAnalysis":[{}"#, response.text);
+        let reconstructed_response = crate::ai::AIResponse {
+            text: full_json,
+            usage: response.usage.clone(),
+            model: response.model.clone(),
+            provider: response.provider.clone(),
+        };
+        let parsed: AnalyzeComplexityResponse = parse_ai_response(&reconstructed_response)?;
 
         let report = ComplexityReport::new(
             ".tasks/tasks.json",
