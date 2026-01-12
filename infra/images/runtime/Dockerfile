@@ -396,7 +396,7 @@ RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ] &
     fi
 
 # Install intake CLI (Rust replacement for TaskMaster-AI)
-ARG TASKS_VERSION=0.2.3
+ARG TASKS_VERSION=0.2.5
 RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
       echo "📦 Installing intake CLI v${TASKS_VERSION}..." && \
       mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && \
