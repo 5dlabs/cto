@@ -1158,8 +1158,9 @@ pub async fn submit_intake_coderun(
                 "SOURCE_BRANCH": source_branch,
                 // Webhook callback URL for automatic play workflow triggers
                 "WEBHOOK_CALLBACK_URL": config.webhook_callback_url.as_deref().unwrap_or(""),
-                // Enable extended thinking for better task generation
-                "TASKS_EXTENDED_THINKING": "true"
+                // Extended thinking configuration for task generation
+                "TASKS_EXTENDED_THINKING": config.extended_thinking.to_string(),
+                "TASKS_THINKING_BUDGET": config.thinking_budget.map_or(String::new(), |b| b.to_string())
             },
             "linearIntegration": {
                 "enabled": true,

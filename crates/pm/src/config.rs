@@ -310,6 +310,12 @@ pub struct IntakeConfig {
     /// Default GitHub organization for creating new repositories.
     /// Used when no repository URL is provided in the intake request.
     pub github_default_org: Option<String>,
+    /// Whether to enable extended thinking for better task generation.
+    /// When enabled, the AI model will use extended thinking capabilities.
+    pub extended_thinking: bool,
+    /// Budget for extended thinking in tokens.
+    /// Only used when `extended_thinking` is true.
+    pub thinking_budget: Option<i32>,
 }
 
 impl Default for IntakeConfig {
@@ -348,6 +354,13 @@ impl Default for IntakeConfig {
             // These should be configured via environment variables for each deployment
             webhook_callback_url: env::var("WEBHOOK_CALLBACK_URL").ok(),
             github_default_org: env::var("GITHUB_DEFAULT_ORG").ok(),
+            // Extended thinking is enabled by default for complex intake tasks
+            extended_thinking: env::var("TASKS_EXTENDED_THINKING")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(true),
+            thinking_budget: env::var("TASKS_THINKING_BUDGET")
+                .ok()
+                .and_then(|s| s.parse().ok()),
         }
     }
 }
