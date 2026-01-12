@@ -76,6 +76,10 @@ inputs:
     description: 'Whether to tag as latest (default: true for main branch builds)'
     required: false
     default: 'auto'
+  target:
+    description: 'Docker build target stage (for multi-stage builds)'
+    required: false
+    default: ''
 
 outputs:
   image-tags:
@@ -158,6 +162,7 @@ runs:
       with:
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile }}
+        target: ${{ inputs.target }}
         platforms: ${{ inputs.platforms }}
         push: ${{ inputs.push }}
         # Attestations disabled by default - avoids GHCR permission issues
