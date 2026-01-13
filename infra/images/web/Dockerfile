@@ -9,7 +9,7 @@
 #   3. Production stage - runtime with minimal dependencies
 #
 # Build commands:
-#   docker build -f infra/images/web/Dockerfile -t ghcr.io/5dlabs/web:latest .
+#   docker build --target production -f infra/images/web/Dockerfile -t ghcr.io/5dlabs/web:latest .
 # =============================================================================
 
 # =============================================================================
