@@ -18,6 +18,15 @@ on:
       - '.github/workflows/web-ci.yaml'
   workflow_dispatch:
 
+# Workflow-level permissions for all jobs
+# - contents: read for checkout
+# - pull-requests: read for dorny/paths-filter to access PR info
+# - packages: write for GHCR push (used by build-docker job)
+permissions:
+  contents: read
+  pull-requests: read
+  packages: write
+
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: 5dlabs
