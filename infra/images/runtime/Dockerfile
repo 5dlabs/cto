@@ -420,8 +420,9 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 
 # Switch to non-root and install Rust for node as well
 # Ensure .cargo directory structure exists with correct ownership before rustup
+# Create bin directory explicitly to avoid permission issues with cache mounts
 USER root
-RUN mkdir -p /home/node/.cargo/registry /home/node/.cache && \
+RUN mkdir -p /home/node/.cargo/bin /home/node/.cargo/registry /home/node/.cache && \
     chown -R 1000:1000 /home/node/.cargo /home/node/.cache
 USER node
 RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
@@ -556,7 +557,7 @@ ENV DEVCONTAINER=true
 
 # Rust dev tooling for node user (install via cargo) - ensure ownership first
 USER root
-RUN mkdir -p /home/node/.cargo/registry /home/node/.cache && \
+RUN mkdir -p /home/node/.cargo/bin /home/node/.cargo/registry /home/node/.cache && \
     chown -R 1000:1000 /home/node/.cache /home/node/.cargo
 USER node
 RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
