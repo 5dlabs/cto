@@ -420,15 +420,12 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 
 # Switch to non-root and install Rust for node as well
 # Ensure .cargo directory structure exists with correct ownership before rustup
-# Cache mounts include bin (compiled binaries), registry (crate sources), and general cache
+# NOTE: Don't use cache mounts for rustup - it needs to write to .cargo/env and other files
 USER root
-RUN mkdir -p /home/node/.cargo/bin /home/node/.cargo/registry /home/node/.cache && \
+RUN mkdir -p /home/node/.cargo /home/node/.cache && \
     chown -R 1000:1000 /home/node/.cargo /home/node/.cache
 USER node
-RUN --mount=type=cache,target=/home/node/.cache,id=node-cache-v2,uid=1000,gid=1000,mode=0777 \
-    --mount=type=cache,target=/home/node/.cargo/bin,id=node-cargo-bin-v2,uid=1000,gid=1000,mode=0777 \
-    --mount=type=cache,target=/home/node/.cargo/registry,id=node-cargo-registry-v2,uid=1000,gid=1000,mode=0777 \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
 
@@ -556,15 +553,10 @@ USER node
 WORKDIR /workspace
 ENV DEVCONTAINER=true
 
-# Rust dev tooling for node user (install via cargo) - ensure ownership first
-# Cache mounts include bin (compiled binaries), registry (crate sources), and general cache
-USER root
-RUN mkdir -p /home/node/.cargo/bin /home/node/.cargo/registry /home/node/.cache && \
-    chown -R 1000:1000 /home/node/.cache /home/node/.cargo
+# Rust dev tooling for node user (install via cargo)
+# Only cache the registry for faster rebuilds - bin directory is written to image
 USER node
-RUN --mount=type=cache,target=/home/node/.cache,id=node-cache-v2,uid=1000,gid=1000,mode=0777 \
-    --mount=type=cache,target=/home/node/.cargo/bin,id=node-cargo-bin-v2,uid=1000,gid=1000,mode=0777 \
-    --mount=type=cache,target=/home/node/.cargo/registry,id=node-cargo-registry-v2,uid=1000,gid=1000,mode=0777 \
+RUN --mount=type=cache,target=/home/node/.cargo/registry,id=node-cargo-registry-v3,uid=1000,gid=1000,mode=0777 \
   . $HOME/.cargo/env && \
   mkdir -p "$HOME/.cache/sccache" 2>/dev/null || true && \
   cargo --version && \
