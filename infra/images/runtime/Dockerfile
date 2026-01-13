@@ -425,9 +425,9 @@ USER root
 RUN mkdir -p /home/node/.cargo/bin /home/node/.cargo/registry /home/node/.cache && \
     chown -R 1000:1000 /home/node/.cargo /home/node/.cache
 USER node
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
-    --mount=type=cache,target=/home/node/.cargo/bin,uid=1000,gid=1000,mode=0777 \
-    --mount=type=cache,target=/home/node/.cargo/registry,uid=1000,gid=1000,mode=0777 \
+RUN --mount=type=cache,target=/home/node/.cache,id=node-cache-v2,uid=1000,gid=1000,mode=0777 \
+    --mount=type=cache,target=/home/node/.cargo/bin,id=node-cargo-bin-v2,uid=1000,gid=1000,mode=0777 \
+    --mount=type=cache,target=/home/node/.cargo/registry,id=node-cargo-registry-v2,uid=1000,gid=1000,mode=0777 \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
@@ -562,9 +562,9 @@ USER root
 RUN mkdir -p /home/node/.cargo/bin /home/node/.cargo/registry /home/node/.cache && \
     chown -R 1000:1000 /home/node/.cache /home/node/.cargo
 USER node
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
-    --mount=type=cache,target=/home/node/.cargo/bin,uid=1000,gid=1000,mode=0777 \
-    --mount=type=cache,target=/home/node/.cargo/registry,uid=1000,gid=1000,mode=0777 \
+RUN --mount=type=cache,target=/home/node/.cache,id=node-cache-v2,uid=1000,gid=1000,mode=0777 \
+    --mount=type=cache,target=/home/node/.cargo/bin,id=node-cargo-bin-v2,uid=1000,gid=1000,mode=0777 \
+    --mount=type=cache,target=/home/node/.cargo/registry,id=node-cargo-registry-v2,uid=1000,gid=1000,mode=0777 \
   . $HOME/.cargo/env && \
   mkdir -p "$HOME/.cache/sccache" 2>/dev/null || true && \
   cargo --version && \
