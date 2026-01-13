@@ -419,13 +419,10 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
   && rm -f "git-delta_0.18.2_${ARCH}.deb"
 
 # Switch to non-root and install Rust for node as well
-# Ensure .cargo directory structure exists with correct ownership before rustup
-# NOTE: Don't use cache mounts for rustup - it needs to write to .cargo/env and other files
-USER root
-RUN mkdir -p /home/node/.cargo /home/node/.cache && \
-    chown -R 1000:1000 /home/node/.cargo /home/node/.cache
+# Combined into single RUN to avoid BuildKit layer cache issues with permissions
 USER node
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
+RUN mkdir -p $HOME/.cargo $HOME/.cache \
+  && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
 
