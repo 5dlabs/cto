@@ -3,6 +3,10 @@
 - Task file structure: `.tasks/tasks/tasks.json` with `metadata` and `tasks` arrays
 - Agent hints: Task 1 should always be infrastructure (agentHint='bolt')
 - Provider.rs fix commit: 9ee45367d - handles prefill-generated output from Claude
+- Linear webhooks: Regular webhooks don't include AgentSession events - use OAuth app webhooks
+- Manual trigger: POST /trigger/intake with {"issueId": "CTOPA-XXX"} bypasses webhook dependency
+- CodeRuns vs Argo: cto___jobs shows Argo workflows, use `kubectl get coderuns -n cto` for CodeRuns
+- In-cluster vs local: Always verify in-cluster image matches local fix before E2E testing
 
 ---
 
