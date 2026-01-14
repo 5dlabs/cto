@@ -1568,6 +1568,7 @@ fn clear_play_progress(repo: &str) {
 /// - Expected tools per agent
 /// - Task dependencies
 /// - Repository and service details
+#[allow(clippy::too_many_lines)]
 fn notify_healer(
     healer_endpoint: &str,
     play_id: &str,
@@ -1652,30 +1653,29 @@ fn notify_healer(
 
     // Resolve hostname to socket addresses using ToSocketAddrs (supports DNS resolution)
     // This works with both IP addresses ("127.0.0.1:8083") and hostnames ("localhost:8083")
-    let socket_addrs: Vec<_> = match host_port.to_socket_addrs() {
-        Ok(addrs) => addrs.collect(),
-        Err(_) => {
-            // Try adding default port if not specified
-            // Check if port is already present (last colon followed by digits only)
-            let has_port = host_port
-                .rfind(':')
-                .map(|idx| host_port[idx + 1..].chars().all(|c| c.is_ascii_digit()))
-                .unwrap_or(false);
+    let socket_addrs: Vec<_> = if let Ok(addrs) = host_port.to_socket_addrs() {
+        addrs.collect()
+    } else {
+        // Try adding default port if not specified
+        // Check if port is already present (last colon followed by digits only)
+        let has_port = host_port
+            .rfind(':')
+            .map(|idx| host_port[idx + 1..].chars().all(|c| c.is_ascii_digit()))
+            .unwrap_or(false);
 
-            if has_port {
-                // Port already present but resolution failed - give up
-                eprintln!("⚠️  Failed to resolve Healer endpoint '{healer_endpoint}'");
+        if has_port {
+            // Port already present but resolution failed - give up
+            eprintln!("⚠️  Failed to resolve Healer endpoint '{healer_endpoint}'");
+            eprintln!("   (This is non-fatal - play workflow will continue)");
+            return;
+        }
+
+        match format!("{host_port}:80").to_socket_addrs() {
+            Ok(addrs) => addrs.collect(),
+            Err(e) => {
+                eprintln!("⚠️  Failed to resolve Healer endpoint '{healer_endpoint}': {e}");
                 eprintln!("   (This is non-fatal - play workflow will continue)");
                 return;
-            }
-
-            match format!("{host_port}:80").to_socket_addrs() {
-                Ok(addrs) => addrs.collect(),
-                Err(e) => {
-                    eprintln!("⚠️  Failed to resolve Healer endpoint '{healer_endpoint}': {e}");
-                    eprintln!("   (This is non-fatal - play workflow will continue)");
-                    return;
-                }
             }
         }
     };
