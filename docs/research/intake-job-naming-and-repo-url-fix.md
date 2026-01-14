@@ -45,7 +45,7 @@ kubectl get jobs -n cto | grep intake-
 
 ```
 📄 Loading configuration...
-  ✓ Repository: 
+  ✓ Repository:
 fatal: repository '' does not exist
 ```
 

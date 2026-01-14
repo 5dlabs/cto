@@ -4,7 +4,7 @@
 
 CodeRuns were being created successfully but the controller failed **before Job creation**, leaving:
 - `.status.jobName` unset (missing)
-- `.status.phase` unset or stuck  
+- `.status.phase` unset or stuck
 - No corresponding Kubernetes `Job`/`Pod`
 - No Linear sidecar activity updates
 

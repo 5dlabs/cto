@@ -1,7 +1,7 @@
 # Ralph Methodology: Software Development Economics in 2026
 
-> **Source:** [YouTube Video](https://www.youtube.com/watch?v=4Nna09dG_c0)  
-> **Topic:** Ralph autonomous software development methodology and the Loom platform  
+> **Source:** [YouTube Video](https://www.youtube.com/watch?v=4Nna09dG_c0)
+> **Topic:** Ralph autonomous software development methodology and the Loom platform
 > **Key Insight:** Software development now costs ~$1,042 USD/hour using AI loops
 
 ---
