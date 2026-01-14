@@ -12,6 +12,25 @@
 {{> mcp-check }}
 
 # =========================================================================
+# Set MCP Config for Intake CLI
+# =========================================================================
+# The controller generates mcp.json and mounts it to /task-files/mcp.json
+# We need to tell the intake CLI where to find it via TASKS_MCP_CONFIG
+for mcp_path in "/mcp-config/mcp.json" "/task-files/mcp.json"; do
+    if [ -f "$mcp_path" ]; then
+        export TASKS_MCP_CONFIG="$mcp_path"
+        export MCP_CONFIG_FILE="$mcp_path"
+        echo "📋 MCP Config for intake CLI: $TASKS_MCP_CONFIG"
+        break
+    fi
+done
+
+if [ -z "$TASKS_MCP_CONFIG" ]; then
+    echo "⚠️ No MCP config found for intake CLI"
+    echo "   Intake will run without MCP tools (Firecrawl, Context7, etc.)"
+fi
+
+# =========================================================================
 # Intake Configuration
 # =========================================================================
 
