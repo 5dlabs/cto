@@ -1,0 +1,48 @@
+## Codebase Patterns
+- Intake CLI JSON parsing: Use `text.contains("```json")` not `text.find()` for code block detection
+- Task file structure: `.tasks/tasks/tasks.json` with `metadata` and `tasks` arrays
+- Agent hints: Task 1 should always be infrastructure (agentHint='bolt')
+- Provider.rs fix commit: 9ee45367d - handles prefill-generated output from Claude
+
+---
+
+## 2026-01-14 13:44 - US-000
+- Verified provider.rs fix from commit 9ee45367d works correctly
+- Built intake locally with `cargo build -p intake`
+- Confirmed tasks.json generated with valid JSON (15 tasks, not mixed with text)
+- Task 1 has agentHint='bolt' (infrastructure) as required
+- All 155 unit tests pass + 44 integration tests pass
+- **Local intake test: PASS**
+
+**Files verified:**
+- crates/intake/src/ai/provider.rs (contains the fix)
+- alerthub-e2e-test/.tasks/tasks/tasks.json (valid JSON with 15 tasks)
+
+**Learnings for future iterations:**
+- The intake CLI requires project initialization before parse-prd works standalone
+- The `intake intake` command handles initialization automatically
+- Provider.rs uses `text.contains()` for code block detection to handle AI responses with mixed text/JSON
+---
+
+## 2026-01-14 16:25 - US-001
+- Verified all services were already running (started previously)
+- All health checks passed:
+  - PM Server (localhost:8081/health): OK
+  - Healer Play API (localhost:8083/health): OK  
+  - Cloudflare Tunnel (pm-dev.5dlabs.ai/health): OK
+  - Argo Workflows (localhost:2746): OK
+- Process PIDs verified:
+  - agent-controller: 11704
+  - pm-server: 72085
+  - healer: 72105
+  - cloudflared: 78094
+- **Services started at timestamp: PM=OK, Healer=OK, Tunnel=OK, Argo=OK**
+
+**Files verified:**
+- config/cloudflared-pm-dev.yaml (tunnel config)
+
+**Learnings for future iterations:**
+- Services may already be running from previous sessions - always check first
+- ArgoCD port forward isn't strictly required for intake/play workflows
+- Use `pgrep -la` to check running Rust services by binary name
+---
