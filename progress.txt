@@ -1,49 +1,17 @@
-# CTO E2E Play Test Progress Log
-# Append-only file for recording learnings during Ralph execution
-
-## Codebase Patterns
-- Skills are in `.factory/skills/<name>/SKILL.md` - load with `/skill <name>`
-- Subagents are in `~/.factory/droids/<name>.md` - delegate with `@<name>`
-- Three skills: `cto-platform`, `healer`, `linear-agent-api`
-- Two subagents: `@healer-monitor`, `@linear-monitor`
-- Intake runs in-cluster when `local: false` in cto-config.json
-- Play sequence: Bolt → Rex/Blaze → Cleo → Cipher → Tess → Atlas
-
----
-Started: 2026-01-14
-Project: AlertHub E2E Test
+# Ralph Progress Log
+Started: Wed 14 Jan 2026 07:56:24 PST
 ---
 
-## 2026-01-14 - US-001: Verify configuration for in-cluster execution
-- **Status**: PASSED
-- **Verification results**:
-  - defaults.intake.local: ✅ false (intake runs as Argo workflow)
-  - defaults.play.autoMerge: ✅ true
-  - defaults.play.healerEndpoint: ✅ "http://localhost:8083"
-  - defaults.linear.pmServerUrl: ✅ "http://localhost:8081"
-  - PM Server (localhost:8081): ✅ `{"status":"healthy"}`
-  - Healer (localhost:8083): ✅ `{"status":"healthy","version":"0.0.1","service":"healer-play-api"}`
-  - kubectl context: ✅ admin@simple-cluster
-  - cto namespace: ✅ Active (35d)
-- **Learnings for future iterations**:
-  - All config verification must be done before calling MCP tools
-  - The local=false config is critical - means workflows run in Kubernetes, not locally
-  - PM server and Healer must be running locally to receive webhooks from in-cluster workflows
+## Wed 14 Jan 2026 07:57:53 PST - US-000
+- Started all local services from scratch (ports were cleared first)
+- Services started: PM (8081), Healer Play API (8083)
+- Port forwards established: ArgoCD (8080), Argo Workflows (2746)
+- Health checks passed: PM=OK, Healer=OK, Ports=OK
+- PIDs: PM=72085, Healer=72105
+- Cluster context: admin@simple-cluster
+- **Learnings for future iterations:**
+  - Use `just kill-ports` to cleanly clear ports 8080, 8081, 8082, 8083, 3000 before starting services
+  - PM server runs on 8081, Healer Play API runs on 8083
+  - Controller runs on 8080 but ArgoCD port-forward also uses 8080 - may conflict
+  - Health endpoints: `/health` for both PM and Healer
 ---
-
-## 2026-01-14 - US-002: Initiate intake via CTO MCP tool (in-cluster)
-- **Status**: PASSED
-- **Verification results**:
-  - Called MCP tool: `cto___intake(project_name='alerthub-e2e-test', repository='5dlabs/agent-sandbox')`
-  - Linear Project: ✅ Created - alerthub-e2e-test (URL: https://linear.app/jonathonfritz/project/alerthub-e2e-test-f8d41858e295)
-  - PRD Issue: ✅ Created - CTOPA-791 "[PRD] alerthub-e2e-test" (URL: https://linear.app/jonathonfritz/issue/CTOPA-791/prd-alerthub-e2e-test)
-  - Intake Status: ✅ ready - "Linear intake setup complete"
-  - Next Step: Assign Morgan to PRD issue to trigger intake workflow via webhook
-  - Initial jobs check: 0 intake workflows running (expected - waiting for Morgan assignment)
-- **Learnings for future iterations**:
-  - Intake MCP tool creates Linear project and PRD issue synchronously
-  - Morgan must be assigned as delegate to trigger the webhook → Argo workflow chain
-  - The `auto_assign_morgan` parameter should auto-assign, but actual assignment triggers workflow
-  - PRD content can be passed via prd_content parameter when not in standard location
----
-

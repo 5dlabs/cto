@@ -4,6 +4,26 @@
   "description": "E2E test of CTO Play workflow using alerthub-e2e-test PRD. Tests full lifecycle from intake through deployment. All workflows run in-cluster. Includes Linear Agent API validation and two-way communication testing.",
   "userStories": [
     {
+      "id": "US-000",
+      "title": "Start all local services from scratch",
+      "description": "As a tester, I need to start all services from a stopped state before running E2E tests",
+      "acceptanceCriteria": [
+        "ASSUMPTION: All services are currently STOPPED - starting fresh",
+        "Delegate to @local-services: 'Start all services from scratch using background processes'",
+        "Start in order: 1) just dev-controller &, 2) just dev-pm &, 3) just dev-healer-play-api &",
+        "Wait 10 seconds for services to initialize",
+        "Start port forwards: kubectl port-forward svc/argocd-server -n argocd 8080:80 &",
+        "Start port forwards: kubectl port-forward svc/argo-workflows-server -n automation 2746:2746 &",
+        "Delegate to @local-services: 'Health check all services with retries (max 3 attempts, 5s between)'",
+        "Health checks must pass: curl -sf http://localhost:8081/health (PM), curl -sf http://localhost:8083/health (Healer)",
+        "Delegate to @local-services: 'Report full status including PIDs and port forward status'",
+        "Log to progress.txt: 'Services started at [timestamp]: PM=OK, Healer=OK, Ports=OK'"
+      ],
+      "priority": 0,
+      "passes": true,
+      "notes": "FIRST STORY - Must complete before any other work. Uses Droid /bg-process for persistence."
+    },
+    {
       "id": "US-001",
       "title": "Verify configuration for in-cluster execution",
       "description": "As a tester, I need to verify cto-config.json is configured for in-cluster (not local) execution",
@@ -12,8 +32,7 @@
         "Verify defaults.play.autoMerge is true for full autonomy",
         "Verify defaults.play.healerEndpoint is set (http://localhost:8083 for local Healer API)",
         "Verify defaults.linear.pmServerUrl points to PM server (http://localhost:8081 for local)",
-        "Run: curl http://localhost:8081/health - PM Server must be running to receive webhooks",
-        "Run: curl http://localhost:8083/health - Healer API must be running",
+        "Delegate to @local-services: 'Health check all services and report status'",
         "Verify kubectl context is set to correct cluster with CTO deployed"
       ],
       "priority": 1,
@@ -47,6 +66,7 @@
         "Task 1 should have agentHint='bolt' (infrastructure always first)",
         "Delegate to @linear-monitor: 'Check Morgan session activities: thought/action/response flow, plan checklist updates'",
         "Delegate to @healer-monitor: 'Check for any errors in intake workflow logs'",
+        "Delegate to @local-services: 'Check in-cluster pod status for intake workflow'",
         "Verify Linear PRD issue has agent dialogue populated (not empty)",
         "Log task count and agent assignments to progress.txt"
       ],
@@ -64,6 +84,7 @@
         "Call mcp_cto_jobs(include=['play']) to confirm play workflow running",
         "Delegate to @healer-monitor: 'Verify Healer received session with expected tools per agent'",
         "Delegate to @linear-monitor: 'Verify Bolt assigned as delegate to Task 1 issue, session created'",
+        "Delegate to @local-services: 'Ensure all services still healthy, restart if needed'",
         "Log play workflow name and starting task_id to progress.txt"
       ],
       "priority": 4,
@@ -79,6 +100,7 @@
         "Verify stages: infrastructure (Bolt) → implementation (Rex/Blaze) → quality (Cleo) → security (Cipher) → testing (Tess) → integration (Atlas)",
         "Delegate to @linear-monitor: 'For each agent stage, verify: delegate assignment, first thought within 10s, activities streaming, final response'",
         "Delegate to @healer-monitor: 'Watch pod logs for tool inventory mismatch, MCP init failures (A10/A11/A12)'",
+        "Delegate to @local-services: 'Monitor service health throughout, restart any crashed services'",
         "Log each stage transition to progress.txt with timestamps"
       ],
       "priority": 5,
@@ -108,6 +130,7 @@
       "acceptanceCriteria": [
         "Delegate to @healer-monitor: 'Final report: any A10/A11/A12 alerts? GitHub issues created?'",
         "Delegate to @linear-monitor: 'Final report: all sessions complete? Any missing activities? Delegates correct throughout?'",
+        "Delegate to @local-services: 'Final status report: any service restarts during test?'",
         "Cross-reference: Healer session tracking matches Linear session states",
         "Log combined monitoring summary to progress.txt"
       ],
@@ -125,6 +148,7 @@
         "Verify PR was merged by Atlas (autoMerge=true)",
         "All CodeRun pods should have completed successfully",
         "Delegate to @linear-monitor: 'Verify all agent sessions show state=complete with final response activity'",
+        "Delegate to @local-services: 'Cleanup: stop all background services if test complete'",
         "Log final summary to progress.txt: workflow names, duration, success/failure"
       ],
       "priority": 8,
