@@ -1,17 +1,38 @@
-# Ralph Progress Log
-Started: Wed 14 Jan 2026 07:56:24 PST
+## Codebase Patterns
+- Intake workflow requires Morgan OAuth app to be installed in Linear workspace
+- `auto_assign_morgan` only works if Morgan user exists in Linear workspace users search
+- Local intake mode requires `tasks` CLI to be installed
+- Linear issues created: CTOPA-792, CTOPA-793, CTOPA-794 for alerthub-e2e-test
+
 ---
 
-## Wed 14 Jan 2026 07:57:53 PST - US-000
-- Started all local services from scratch (ports were cleared first)
-- Services started: PM (8081), Healer Play API (8083)
-- Port forwards established: ArgoCD (8080), Argo Workflows (2746)
-- Health checks passed: PM=OK, Healer=OK, Ports=OK
-- PIDs: PM=72085, Healer=72105
-- Cluster context: admin@simple-cluster
-- **Learnings for future iterations:**
-  - Use `just kill-ports` to cleanly clear ports 8080, 8081, 8082, 8083, 3000 before starting services
-  - PM server runs on 8081, Healer Play API runs on 8083
-  - Controller runs on 8080 but ArgoCD port-forward also uses 8080 - may conflict
-  - Health endpoints: `/health` for both PM and Healer
+## 2026-01-14 08:08 - US-003 (Blocked)
+- **Status**: BLOCKED - Cannot complete
+- **Reason**: Intake workflow cannot be initiated automatically
+  - Morgan agent (5DLabs-Morgan) not found in Linear workspace users
+  - auto_assign_morgan fails silently, returns "Assign Morgan manually" message
+  - Local intake mode requires `tasks` CLI which is not installed
+- **What was verified**:
+  - PM server health: OK (localhost:8081)
+  - Healer health: OK (localhost:8083)
+  - Linear projects created successfully (CTOPA-792, CTOPA-793)
+  - cto-config.json has correct settings (local=false, autoMerge=true)
+  - tasks.json exists but is empty (no tasks generated)
+- **Files checked**:
+  - /Users/jonathonfritz/code/work-projects/5dlabs/cto/cto-config.json
+  - /Users/jonathonfritz/code/work-projects/5dlabs/cto/alerthub-e2e-test/.tasks/tasks/tasks.json
+  - /Users/jonathonfritz/code/work-projects/5dlabs/cto/tests/intake/alerthub-e2e-test/prd.md
+- **Learnings for future iterations**:
+  - Morgan OAuth app must be installed in Linear workspace before intake E2E tests
+  - The MCP intake tool returns "ready" status even when Morgan auto-assign fails
+  - Need to check `nextStep` field to determine if Morgan was successfully assigned
+  - Empty tasks.json indicates intake didn't complete, not that there are no tasks
+
+**CRITICAL BLOCKER**: All remaining stories (US-004 through US-008) depend on US-003 completing.
+The entire E2E test is blocked until Morgan OAuth app is installed in Linear workspace.
+
+**To unblock**:
+1. Install Morgan OAuth app in Linear workspace (search for "5DLabs-Morgan" or create integration)
+2. OR: Install `tasks` CLI for local intake mode: `cargo install --path crates/intake`
+3. OR: Manually run intake CLI in a CodeRun pod
 ---
