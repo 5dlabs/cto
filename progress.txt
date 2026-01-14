@@ -1,38 +1,76 @@
 ## Codebase Patterns
-- Intake workflow requires Morgan OAuth app to be installed in Linear workspace
+- Intake workflow requires Morgan OAuth app to be installed in Linear workspace for auto-assign
 - `auto_assign_morgan` only works if Morgan user exists in Linear workspace users search
-- Local intake mode requires `tasks` CLI to be installed
+- Local intake CLI mode has JSON parsing issues when Claude CLI prefill is used
+- The Claude CLI wraps assistant messages in `<assistant>` tags, breaking prefill technique
+- API mode for intake requires ANTHROPIC_API_KEY and may timeout on large PRDs (>20k chars)
 - Linear issues created: CTOPA-792, CTOPA-793, CTOPA-794 for alerthub-e2e-test
+- Empty tasks.json indicates intake didn't complete, not that there are no tasks
 
 ---
 
-## 2026-01-14 08:08 - US-003 (Blocked)
-- **Status**: BLOCKED - Cannot complete
-- **Reason**: Intake workflow cannot be initiated automatically
-  - Morgan agent (5DLabs-Morgan) not found in Linear workspace users
-  - auto_assign_morgan fails silently, returns "Assign Morgan manually" message
-  - Local intake mode requires `tasks` CLI which is not installed
-- **What was verified**:
-  - PM server health: OK (localhost:8081)
-  - Healer health: OK (localhost:8083)
-  - Linear projects created successfully (CTOPA-792, CTOPA-793)
-  - cto-config.json has correct settings (local=false, autoMerge=true)
-  - tasks.json exists but is empty (no tasks generated)
-- **Files checked**:
-  - /Users/jonathonfritz/code/work-projects/5dlabs/cto/cto-config.json
-  - /Users/jonathonfritz/code/work-projects/5dlabs/cto/alerthub-e2e-test/.tasks/tasks/tasks.json
-  - /Users/jonathonfritz/code/work-projects/5dlabs/cto/tests/intake/alerthub-e2e-test/prd.md
+## 2026-01-14 08:08 - US-000 through US-002 (Completed)
+- Started all local services (PM, Healer, tunnel)
+- Verified pre-flight checks
+- Initiated intake via MCP tool (Morgan auto-assign failed, issue created)
+- See git history for details
+
+---
+
+## 2026-01-14 ~09:30 - US-003 (In Progress - BLOCKED)
+- **Status**: BLOCKED - Intake cannot generate tasks due to JSON parsing bug
+- **Root Cause Analysis**:
+  1. **CLI Mode JSON Parsing Bug**: The intake CLI uses a "prefill" technique where it sends `{"tasks":[` as an assistant message to force JSON continuation. However:
+     - The `messages_to_prompt()` function in `cli_provider.rs` wraps this in `<assistant>` tags
+     - Claude CLI doesn't support native prefill like the API does
+     - The model interprets this as "continue with explanation" instead of "continue JSON"
+     - Result: `{"tasks":[Based on the PRD...` (explanatory text inside JSON array)
+  2. **API Mode Timeout**: Using API mode (`intake parse-prd` without `--use-cli`) times out after 600s
+     - The alerthub-e2e-test PRD is ~22K chars
+     - Large PRDs may require extended timeout or chunking
+  3. **No Argo Workflow**: There's no intake workflow to monitor/retry because the issue is local
+
+- **Files Analyzed**:
+  - `/Users/jonathonfritz/code/work-projects/5dlabs/cto/crates/intake/src/ai/cli_provider.rs` - CLI message handling
+  - `/Users/jonathonfritz/code/work-projects/5dlabs/cto/crates/intake/src/ai/provider.rs` - JSON parsing logic
+  - `/Users/jonathonfritz/code/work-projects/5dlabs/cto/crates/intake/src/ai/prompts/parse_prd.rs` - Prompt template
+  - `/Users/jonathonfritz/code/work-projects/5dlabs/cto/crates/intake/src/domain/ai.rs` - Prefill technique usage
+
+- **Error Output**:
+```
+AI response parse error: Failed to parse AI response as JSON: expected value at line 1 column 1
+Response: {"tasks":[Based on the PRD for AlertHub, I'll generate the task breakdown. Let me produce the JSON task objects:
+{"id":1,"title":"Setup Infrastructure...
+```
+
+- **Attempted Fixes**:
+  1. Installed `intake` CLI locally via `cargo install --path crates/intake`
+  2. Ran `intake parse-prd prd.md --num-tasks 15 --use-cli --cli-type claude` - JSON parsing error
+  3. Ran `intake parse-prd prd.md --num-tasks 15` (API mode) - timeout after 600s
+  4. Tried `mcp_cto_intake(local=true)` - same parsing error
+
+- **Proposed Solutions** (requires code changes):
+  1. **Fix parse_ai_response()** - Add post-processing to strip explanatory text from inside JSON arrays
+  2. **Fix messages_to_prompt()** - Handle assistant prefill differently (append directly without tags)
+  3. **Add retry with stricter prompt** - If JSON parse fails, retry with "ONLY JSON, NO TEXT" emphasis
+  4. **Increase API timeout** - Allow longer timeout for large PRDs
+
+- **Workaround (Manual)**:
+  - Manually create tasks.json based on PRD analysis
+  - This would require significant manual effort for a 15-task breakdown
+
 - **Learnings for future iterations**:
-  - Morgan OAuth app must be installed in Linear workspace before intake E2E tests
-  - The MCP intake tool returns "ready" status even when Morgan auto-assign fails
-  - Need to check `nextStep` field to determine if Morgan was successfully assigned
-  - Empty tasks.json indicates intake didn't complete, not that there are no tasks
+  - CLI mode and API mode have different behaviors for prefill/continuation
+  - Large PRDs (>20K chars) may need special handling
+  - The intake CLI's JSON extraction assumes clean output, doesn't handle embedded explanatory text
+  - Parser at `provider.rs:161-199` tries multiple strategies but none handle this malformed output
 
-**CRITICAL BLOCKER**: All remaining stories (US-004 through US-008) depend on US-003 completing.
-The entire E2E test is blocked until Morgan OAuth app is installed in Linear workspace.
+**CRITICAL BLOCKER**: US-003 through US-008 are blocked until intake generates tasks.json.
+The E2E test cannot proceed without tasks to execute in Play workflow.
 
-**To unblock**:
-1. Install Morgan OAuth app in Linear workspace (search for "5DLabs-Morgan" or create integration)
-2. OR: Install `tasks` CLI for local intake mode: `cargo install --path crates/intake`
-3. OR: Manually run intake CLI in a CodeRun pod
+**To unblock** (choose one):
+1. Fix intake CLI JSON parsing to handle explanatory text (PR needed)
+2. Use direct Anthropic API with larger timeout
+3. Manually create tasks.json from PRD analysis
+4. Use a different, smaller PRD for E2E testing
 ---
