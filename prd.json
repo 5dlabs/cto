@@ -115,7 +115,7 @@
         "Log to progress.txt: intake workflow name, Linear issue ID, Morgan assigned as delegate"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Morgan is assigned as DELEGATE (sub-assignment), not primary assignee. This still triggers the webhook. ⚠️ BLOCKER: If in-cluster intake fails with JSON parse error, the provider.rs fix needs to be deployed first (see US-000)."
     },
     {

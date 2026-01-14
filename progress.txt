@@ -69,3 +69,22 @@
 - cto-config.json contains defaults.intake.local and defaults.play.autoMerge settings
 - Check .env.local is sourced by echoing a known variable
 ---
+
+## 2026-01-14 16:50 - US-003
+- Linear PRD issue created: CTOPA-800 (id: 0a5e0ced-1128-46a2-9295-c5938930c20e)
+- Linear project created: alerthub-e2e-test (id: f2ba036b-0665-4091-a7a3-64414b403086)
+- Morgan assigned as delegate via Linear API
+- Linear OAuth agent session webhook not firing (resourceTypes doesn't include AgentSession)
+- Used manual trigger endpoint: POST /trigger/intake to bypass webhook issue
+- CodeRun created successfully: intake-ctopa-800-1768427139
+- ConfigMap created: intake-linear-ctopa-800-1768427139
+- Pod running: intake-t0-morgan-claude-8b5f57ea-v1-fjd29 (2/2 containers)
+- Intake CLI running: Step 1/4 parsing PRD with claude-opus-4-5-20251101
+- **Intake workflow started: CodeRun intake-ctopa-800-1768427139**
+
+**Learnings for future iterations:**
+- Linear webhooks with resourceTypes [Issue, Comment, IssueLabel] don't include AgentSession events
+- AgentSession events are delivered through OAuth app webhooks, not workspace webhooks
+- Manual trigger available at POST /trigger/intake with {"issueId": "CTOPA-XXX"}
+- cto___jobs only shows Argo workflows, not CodeRuns - use kubectl get coderuns instead
+---
