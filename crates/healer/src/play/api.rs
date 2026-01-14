@@ -100,6 +100,9 @@ async fn health_handler() -> impl IntoResponse {
 }
 
 /// Start a new Play session.
+///
+/// Uses atomic check-and-insert to prevent TOCTOU race conditions.
+/// Concurrent requests with the same `play_id` will be properly rejected with 409.
 async fn start_session_handler(
     State(state): State<Arc<PlayApiState>>,
     Json(request): Json<StartSessionRequest>,
@@ -116,47 +119,47 @@ async fn start_session_handler(
         "Received session start request from MCP server"
     );
 
-    // Check if session already exists
-    if let Some(existing) = state.sessions.get_session(&play_id).await {
-        if existing.status == SessionStatus::Active {
-            return (
+    // Atomically try to start the session - this holds the write lock during
+    // both the existence check and insertion, preventing race conditions
+    match state.sessions.try_start_session(request).await {
+        Ok(session) => {
+            // Log expected tools for each agent
+            for (agent_name, agent_config) in &session.cto_config.agents {
+                let remote_tools = agent_config.tools.remote.len();
+                let local_servers = agent_config.tools.local_servers.len();
+                info!(
+                    play_id = %play_id,
+                    agent = %agent_name,
+                    remote_tools = %remote_tools,
+                    local_servers = %local_servers,
+                    "Agent tool expectations registered"
+                );
+            }
+
+            (
+                StatusCode::OK,
+                Json(StartSessionResponse {
+                    status: "ok",
+                    session_id: session.play_id,
+                    message: format!(
+                        "Session started with {} tasks and {} agent configurations",
+                        task_count, agent_count
+                    ),
+                }),
+            )
+        }
+        Err(_existing) => {
+            // Session already exists and is active - return 409 Conflict
+            (
                 StatusCode::CONFLICT,
                 Json(StartSessionResponse {
                     status: "error",
                     session_id: play_id,
                     message: "Session already exists and is active".to_string(),
                 }),
-            );
+            )
         }
     }
-
-    // Start the session
-    let session = state.sessions.start_session(request).await;
-
-    // Log expected tools for each agent
-    for (agent_name, agent_config) in &session.cto_config.agents {
-        let remote_tools = agent_config.tools.remote.len();
-        let local_servers = agent_config.tools.local_servers.len();
-        info!(
-            play_id = %play_id,
-            agent = %agent_name,
-            remote_tools = %remote_tools,
-            local_servers = %local_servers,
-            "Agent tool expectations registered"
-        );
-    }
-
-    (
-        StatusCode::OK,
-        Json(StartSessionResponse {
-            status: "ok",
-            session_id: session.play_id,
-            message: format!(
-                "Session started with {} tasks and {} agent configurations",
-                task_count, agent_count
-            ),
-        }),
-    )
 }
 
 /// Session detail response.

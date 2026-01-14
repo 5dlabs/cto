@@ -235,6 +235,9 @@ impl SessionStore {
     }
 
     /// Start a new Play session.
+    ///
+    /// Note: This method always inserts, potentially overwriting existing sessions.
+    /// For concurrent-safe insertion that rejects duplicates, use [`try_start_session`].
     pub async fn start_session(&self, request: StartSessionRequest) -> PlaySession {
         let now = Utc::now();
         let session = PlaySession {
@@ -261,6 +264,65 @@ impl SessionStore {
         sessions.insert(session.play_id.clone(), session.clone());
 
         session
+    }
+
+    /// Atomically try to start a new Play session, rejecting if one already exists.
+    ///
+    /// This method holds the write lock during both the existence check and insertion,
+    /// preventing TOCTOU race conditions where concurrent requests could both pass
+    /// the duplicate check.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(existing_session)` if a session with the same `play_id` already
+    /// exists and is active. The returned error contains the existing session data.
+    pub async fn try_start_session(
+        &self,
+        request: StartSessionRequest,
+    ) -> Result<PlaySession, PlaySession> {
+        let mut sessions = self.sessions.write().await;
+
+        // Check for existing active session while holding the write lock
+        if let Some(existing) = sessions.get(&request.play_id) {
+            if existing.status == SessionStatus::Active {
+                warn!(
+                    play_id = %request.play_id,
+                    "Rejecting duplicate session start - active session already exists"
+                );
+                return Err(existing.clone());
+            }
+            // Session exists but is not active - allow overwrite
+            debug!(
+                play_id = %request.play_id,
+                status = ?existing.status,
+                "Existing session is not active, allowing new session"
+            );
+        }
+
+        // Create and insert the new session
+        let now = Utc::now();
+        let session = PlaySession {
+            play_id: request.play_id.clone(),
+            repository: request.repository,
+            service: request.service,
+            cto_config: request.cto_config,
+            tasks: request.tasks,
+            namespace: request.namespace,
+            started_at: now,
+            last_updated: now,
+            issues: Vec::new(),
+            status: SessionStatus::Active,
+        };
+
+        info!(
+            play_id = %session.play_id,
+            repository = %session.repository,
+            tasks = %session.tasks.len(),
+            "Started new Play session (atomic)"
+        );
+
+        sessions.insert(session.play_id.clone(), session.clone());
+        Ok(session)
     }
 
     /// Get a session by `play_id`.
@@ -417,5 +479,98 @@ mod tests {
         let completed = store.get_session("test-play-1").await.unwrap();
         assert_eq!(completed.status, SessionStatus::Failed);
         assert_eq!(completed.issues.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_try_start_session_rejects_duplicate() {
+        let store = SessionStore::new();
+
+        let request = StartSessionRequest {
+            play_id: "test-play-dup".to_string(),
+            repository: "5dlabs/test".to_string(),
+            service: None,
+            cto_config: CtoConfig::default(),
+            tasks: vec![],
+            namespace: "cto".to_string(),
+        };
+
+        // First start should succeed
+        let result = store.try_start_session(request.clone()).await;
+        assert!(result.is_ok());
+
+        // Second start with same play_id should fail
+        let result2 = store.try_start_session(request).await;
+        assert!(result2.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_try_start_session_allows_overwrite_of_completed() {
+        let store = SessionStore::new();
+
+        let request = StartSessionRequest {
+            play_id: "test-play-completed".to_string(),
+            repository: "5dlabs/test".to_string(),
+            service: None,
+            cto_config: CtoConfig::default(),
+            tasks: vec![],
+            namespace: "cto".to_string(),
+        };
+
+        // Start initial session
+        let result = store.try_start_session(request.clone()).await;
+        assert!(result.is_ok());
+
+        // Complete the session
+        store.complete_session("test-play-completed", true).await;
+
+        // Starting new session with same ID should succeed (old one is completed)
+        let result2 = store.try_start_session(request).await;
+        assert!(result2.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_try_start_session_concurrent_race_protection() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let store = Arc::new(SessionStore::new());
+        let success_count = Arc::new(AtomicUsize::new(0));
+        let failure_count = Arc::new(AtomicUsize::new(0));
+
+        // Spawn 10 concurrent tasks all trying to start the same session
+        let mut handles = vec![];
+        for i in 0..10 {
+            let store = Arc::clone(&store);
+            let success = Arc::clone(&success_count);
+            let failure = Arc::clone(&failure_count);
+
+            handles.push(tokio::spawn(async move {
+                let request = StartSessionRequest {
+                    play_id: "race-test-session".to_string(),
+                    repository: format!("5dlabs/test-{i}"),
+                    service: None,
+                    cto_config: CtoConfig::default(),
+                    tasks: vec![],
+                    namespace: "cto".to_string(),
+                };
+
+                match store.try_start_session(request).await {
+                    Ok(_) => success.fetch_add(1, Ordering::SeqCst),
+                    Err(_) => failure.fetch_add(1, Ordering::SeqCst),
+                };
+            }));
+        }
+
+        // Wait for all tasks to complete
+        for handle in handles {
+            handle.await.unwrap();
+        }
+
+        // Exactly one should succeed, 9 should fail
+        assert_eq!(success_count.load(Ordering::SeqCst), 1);
+        assert_eq!(failure_count.load(Ordering::SeqCst), 9);
+
+        // Verify only one session exists
+        let all_sessions = store.get_all_sessions().await;
+        assert_eq!(all_sessions.len(), 1);
     }
 }
