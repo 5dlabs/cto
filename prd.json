@@ -109,8 +109,8 @@
         "Log play workflow name and starting task_id to progress.txt"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "Play orchestrates: Argo Workflow → Controller → CodeRuns (pods) per agent"
+      "passes": true,
+      "notes": "Play orchestrates: Argo Workflow → Controller → CodeRuns (pods) per agent. Started workflow play-workflow-template-krlpl for Task 1 (Setup Infrastructure with Bolt)."
     },
     {
       "id": "US-005",

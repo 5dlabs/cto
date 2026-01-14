@@ -6,6 +6,8 @@
 - Linear issues created: CTOPA-792, CTOPA-793, CTOPA-794 for alerthub-e2e-test
 - Empty tasks.json indicates intake didn't complete, not that there are no tasks
 - When AI wraps JSON in markdown code blocks, extract from code block BEFORE brace-matching
+- cto_play() requires `model` parameter explicitly when `defaults.play.model` not set in config
+- cto_play() requires `docs_project_directory` when tasks.json is not in default `docs/` folder
 
 ---
 
@@ -62,4 +64,30 @@
   - When extracting JSON from AI responses, ALWAYS check for markdown code blocks first
   - `text.contains()` is better than `text.find().is_some()` when order of checks matters
   - CLI mode prefill produces different output than API mode - parser must handle both
+---
+
+## 2026-01-14 09:25 - US-004 (COMPLETED ✓)
+- **Status**: COMPLETED - Play workflow started successfully
+- **Workflow**: `play-workflow-template-krlpl` submitted for Task 1
+- **Task**: Task 1 - "Setup Infrastructure (Bolt - Kubernetes)" - infrastructure agent (5DLabs-Bolt)
+- **Model**: claude-opus-4-5-20251101
+- **Agents configured**: Rex, Blaze, Grizz, Nova, Tap, Spark, Bolt, Cleo, Cipher, Tess
+
+- **Services Verified Healthy**:
+  - PM Server: http://localhost:8081/health ✓
+  - Healer: http://localhost:8083/health ✓
+  - Tunnel: https://pm-dev.5dlabs.ai/health ✓
+  - Argo Workflows: http://localhost:2746/api/v1/info ✓
+
+- **Workflow Parameters**:
+  - task-id=1
+  - repository=5dlabs/cto
+  - docs-project-directory=alerthub-e2e-test
+  - auto-merge=true
+  - parallel-execution=false
+
+- **Learnings for future iterations**:
+  - Must explicitly pass `model` parameter to cto_play() - empty model validation fails
+  - Must specify `docs_project_directory` if tasks are not in default `docs` folder
+  - Workflow started at "initialize-stage" → "agent-sequence" → "check-resume-point"
 ---
