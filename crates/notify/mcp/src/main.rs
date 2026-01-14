@@ -1586,19 +1586,26 @@ fn notify_healer(
     // Convert CtoConfig to the format Healer expects
     let mut agents_map: BTreeMap<String, Value> = BTreeMap::new();
     for (agent_key, agent_config) in &cto_config.agents {
-        let tools = agent_config.tools.as_ref().map(|t| {
-            json!({
-                "remote": t.remote,
-                "localServers": t.local_servers
+        let tools = agent_config
+            .tools
+            .as_ref()
+            .map(|t| {
+                json!({
+                    "remote": t.remote,
+                    "localServers": t.local_servers
+                })
             })
-        }).unwrap_or_else(|| json!({"remote": [], "localServers": {}}));
+            .unwrap_or_else(|| json!({"remote": [], "localServers": {}}));
 
-        agents_map.insert(agent_key.clone(), json!({
-            "githubApp": agent_config.github_app,
-            "cli": agent_config.cli,
-            "model": agent_config.model,
-            "tools": tools
-        }));
+        agents_map.insert(
+            agent_key.clone(),
+            json!({
+                "githubApp": agent_config.github_app,
+                "cli": agent_config.cli,
+                "model": agent_config.model,
+                "tools": tools
+            }),
+        );
     }
 
     let request_body = json!({
@@ -1630,16 +1637,18 @@ fn notify_healer(
     // Attempt HTTP POST using a simple TCP connection
     // (We use raw TCP to avoid adding reqwest as a dependency in the MCP server)
     let body = serde_json::to_string(&request_body).unwrap_or_default();
-    let http_request = format!(
-        "POST /api/v1/session/start HTTP/1.1\r\n\
-         Host: {host_port}\r\n\
-         Content-Type: application/json\r\n\
-         Content-Length: {}\r\n\
-         Connection: close\r\n\
-         \r\n\
-         {body}",
-        body.len()
-    );
+    // Build HTTP request manually - line continuations with `\` include leading whitespace,
+    // and rustfmt re-indents them, so we concatenate explicitly to avoid malformed headers.
+    let http_request = [
+        "POST /api/v1/session/start HTTP/1.1\r\n",
+        &format!("Host: {host_port}\r\n"),
+        "Content-Type: application/json\r\n",
+        &format!("Content-Length: {}\r\n", body.len()),
+        "Connection: close\r\n",
+        "\r\n",
+        &body,
+    ]
+    .concat();
 
     // Try to parse as SocketAddr (host:port), or add :80 if no port specified
     let socket_addr = match host_port.parse() {
