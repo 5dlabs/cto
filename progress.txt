@@ -8,6 +8,10 @@
 - When AI wraps JSON in markdown code blocks, extract from code block BEFORE brace-matching
 - cto_play() requires `model` parameter explicitly when `defaults.play.model` not set in config
 - cto_play() requires `docs_project_directory` when tasks.json is not in default `docs/` folder
+- **Play workflow task files**: Must be on the branch workflow clones (main/develop by default)
+- **Play workflow docs-branch**: Available in Argo template but NOT in MCP cto_play() - use argo CLI
+- **CodeRun task file location**: `$REPO_ROOT/$DOCS_PROJECT_DIR/.tasks/docs/task-$TASK_ID`
+- **Agent configuration**: Required via workflow params or cto-config.json in docs repo
 
 ---
 
@@ -90,4 +94,43 @@
   - Must explicitly pass `model` parameter to cto_play() - empty model validation fails
   - Must specify `docs_project_directory` if tasks are not in default `docs` folder
   - Workflow started at "initialize-stage" → "agent-sequence" → "check-resume-point"
+---
+
+## 2026-01-14 09:45 - US-005 (PARTIAL - Configuration Blocker)
+- **Status**: PARTIAL - Play workflow monitoring attempted, hit E2E test setup issues
+- **Issue**: CodeRun pods failed because task files were not on the docs branch
+
+- **Root Cause Analysis**:
+  1. Task files were generated locally via `intake generate-docs` and committed to `ralph/e2e-alerthub-test` branch
+  2. Play workflow clones from `main`/`develop` branch by default, where task files don't exist
+  3. The `docs-branch` parameter is not exposed in the MCP `cto_play()` tool
+  4. Submitting via `argo submit` with `docs-branch=ralph/e2e-alerthub-test` hit another issue: missing agent configuration
+
+- **Workflow Attempts**:
+  - `play-workflow-template-krlpl` - Failed (prompt not found, main branch)
+  - `play-workflow-template-ttxtl` - Failed (same issue)
+  - `play-workflow-template-tcwzk` - Failed (same issue)
+  - `play-workflow-template-fzb4t` - Failed (agent configuration missing when using custom docs-branch)
+
+- **Actions Taken**:
+  1. Generated task docs: `intake generate-docs --project alerthub-e2e-test`
+  2. Copied task files to `docs/.tasks/` for compatibility
+  3. Committed and pushed to `ralph/e2e-alerthub-test`
+  4. Tried `argo submit` with `docs-branch` parameter
+
+- **Key Learnings (Added to Codebase Patterns)**:
+  - Task files MUST be on the branch that Play workflow clones (main/develop by default)
+  - The `docs-branch` parameter is available in the Argo template but NOT in MCP `cto_play()` tool
+  - For proper E2E testing, intake workflow should commit task files to the docs repository
+  - CodeRun pods look for task files at: `$REPO_ROOT/$DOCS_PROJECT_DIR/.tasks/docs/task-$TASK_ID`
+  - Agent configuration (infrastructure-agent, etc.) must be provided via workflow params or cto-config.json
+
+- **Files Changed**:
+  - Created: `docs/.tasks/` (copied from `alerthub-e2e-test/.tasks/`)
+  - Created: `alerthub-e2e-test/.tasks/docs/task-{1-15}/` (prompt.md, prompt.xml, acceptance.md, decisions.md)
+
+- **Recommendation**: For complete E2E testing, either:
+  1. Run intake in-cluster to auto-commit task files to docs repo main branch
+  2. OR manually merge task files to main/develop before starting Play
+  3. OR add `docs_branch` parameter to MCP `cto_play()` tool
 ---
