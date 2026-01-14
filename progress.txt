@@ -46,3 +46,26 @@
 - ArgoCD port forward isn't strictly required for intake/play workflows
 - Use `pgrep -la` to check running Rust services by binary name
 ---
+
+## 2026-01-14 16:28 - US-002
+- Cleanup completed (no stuck resources found):
+  - kubectl delete coderuns -n cto --all: No resources found
+  - kubectl delete pods -n cto -l component=code-runner: No resources found
+  - kubectl delete jobs -n cto -l component=code-runner: No resources found
+- All pre-flight checks PASSED:
+  - PRE-FLIGHT CHECK 1: LINEAR_WEBHOOK_URL is set: YES
+  - PRE-FLIGHT CHECK 2: PM Server health: OK
+  - PRE-FLIGHT CHECK 3: Healer health: OK
+  - PRE-FLIGHT CHECK 4: Tunnel health: OK
+  - PRE-FLIGHT CHECK 5: Argo Workflows: OK
+  - PRE-FLIGHT CHECK 6: kubectl cluster-info: Kubernetes control plane running
+  - PRE-FLIGHT CHECK 7: No stuck pods
+  - CONFIG CHECK: defaults.intake.local = false (correct)
+  - CONFIG CHECK: defaults.play.autoMerge = true (correct)
+- **Pre-flight complete at 16:28: Cleanup done, all checks PASSED**
+
+**Learnings for future iterations:**
+- Cleanup commands are idempotent - safe to run even with no resources
+- cto-config.json contains defaults.intake.local and defaults.play.autoMerge settings
+- Check .env.local is sourced by echoing a known variable
+---

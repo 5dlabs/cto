@@ -93,7 +93,7 @@
         "Log to progress.txt: 'Pre-flight complete at [timestamp]: Cleanup done, all checks PASSED'"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "GATE - Do NOT proceed to intake (US-003) until ALL pre-flight checks pass. Cleanup CodeRuns FIRST - they are the source of pods/jobs."
     },
     {
