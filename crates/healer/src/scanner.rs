@@ -307,8 +307,10 @@ pub fn is_actual_error(line: &str) -> bool {
         || line_lower.contains("unresolved tool")
         || line_lower.contains("cto-config")
         || line_lower.contains("cto config")
-        || line_lower.contains("mcp")
-        || line_lower.contains("tools-server");
+        || (line_lower.contains("mcp")
+            && (line_lower.contains("failed") || line_lower.contains("unreachable")))
+        || (line_lower.contains("tools-server")
+            && (line_lower.contains("unreachable") || line_lower.contains("refused")));
 
     // Check for klog-style error prefixes (E0104, E0105, etc.)
     // These are Kubernetes-style errors that don't contain "error" keyword
