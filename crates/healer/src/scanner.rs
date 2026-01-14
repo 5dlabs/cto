@@ -433,9 +433,10 @@ pub fn filter_actual_errors(entries: Vec<LogEntry>) -> Vec<LogEntry> {
                 return false;
             }
 
-            // Keep lines that match actual error patterns (e.g., E0104, level=error)
-            // even if they don't have error/fatal/panic keywords
-            is_actual_error(&entry.line)
+            // Keep all other lines:
+            // - Lines with error/config keywords that passed is_actual_error() above
+            // - Lines without error/config keywords (backward compatibility)
+            true
         })
         .collect();
 
