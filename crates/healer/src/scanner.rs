@@ -315,12 +315,7 @@ pub fn is_actual_error(line: &str) -> bool {
     // Format: E{MMDD} where MMDD is month+day (e.g., E0104 = Jan 4th)
     // The optional F prefix comes from Fluent Bit log collection
     // Must match the regex pattern: ^F?\s*E\d{4}\s
-    let has_klog_error_prefix = line.len() >= 5
-        && line.starts_with('E')
-        && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit())
-        || line.starts_with("F E")
-            && line.len() >= 7
-            && line.chars().nth(3).is_some_and(|c| c.is_ascii_digit());
+    let has_klog_error_prefix = is_klog_error_format(line);
 
     if !has_error_keyword && !has_config_keyword && !has_klog_error_prefix {
         return false;
@@ -328,6 +323,49 @@ pub fn is_actual_error(line: &str) -> bool {
 
     // Check against actual error level patterns
     get_error_level_regexes().iter().any(|re| re.is_match(line))
+}
+
+/// Check if a line matches the klog error format: E{4 digits} followed by whitespace.
+///
+/// Klog (Kubernetes logging) uses a format like `E0104 12:34:56.789` where:
+/// - `E` indicates error level
+/// - `0104` is MMDD (month + day)
+/// - Optional `F ` prefix from Fluent Bit log collection
+///
+/// This validates the complete regex pattern: `^F?\s*E\d{4}\s`
+#[inline]
+fn is_klog_error_format(line: &str) -> bool {
+    let bytes = line.as_bytes();
+
+    // Try pattern: E{4 digits}{whitespace}
+    // Minimum: "E1234 " = 6 chars
+    if bytes.len() >= 6
+        && bytes[0] == b'E'
+        && bytes[1].is_ascii_digit()
+        && bytes[2].is_ascii_digit()
+        && bytes[3].is_ascii_digit()
+        && bytes[4].is_ascii_digit()
+        && bytes[5].is_ascii_whitespace()
+    {
+        return true;
+    }
+
+    // Try pattern: F E{4 digits}{whitespace}
+    // "F E" prefix = 3 chars, then E + 4 digits + space = "F E1234 " = 8 chars minimum
+    if bytes.len() >= 8
+        && bytes[0] == b'F'
+        && bytes[1] == b' '
+        && bytes[2] == b'E'
+        && bytes[3].is_ascii_digit()
+        && bytes[4].is_ascii_digit()
+        && bytes[5].is_ascii_digit()
+        && bytes[6].is_ascii_digit()
+        && bytes[7].is_ascii_whitespace()
+    {
+        return true;
+    }
+
+    false
 }
 
 /// Check if a log line matches known false positive patterns.
@@ -1119,6 +1157,58 @@ mod tests {
         assert!(!is_actual_error(
             "Register command extension for command error"
         ));
+    }
+
+    #[test]
+    fn test_is_klog_error_format_valid_patterns() {
+        // Valid klog error patterns: E{4 digits}{whitespace}
+        assert!(is_klog_error_format("E0104 12:34:56.789 some log text"));
+        assert!(is_klog_error_format("E1231 23:59:59.999 end of year"));
+        assert!(is_klog_error_format("E0601 00:00:00.000 start of June"));
+
+        // Valid with Fluent Bit "F " prefix
+        assert!(is_klog_error_format("F E0104 12:34:56.789 some log text"));
+        assert!(is_klog_error_format("F E1231 23:59:59.999 end of year"));
+    }
+
+    #[test]
+    fn test_is_klog_error_format_rejects_partial_digits() {
+        // These were incorrectly matched before the fix - only first digit was checked
+        // E0abc should NOT match (only E0 has digit, abc are not digits)
+        assert!(!is_klog_error_format("E0abc some text"));
+        assert!(!is_klog_error_format("E0xyz error message"));
+        assert!(!is_klog_error_format("E01ab 12:34:56"));
+        assert!(!is_klog_error_format("E012x 12:34:56"));
+
+        // Same for F prefix
+        assert!(!is_klog_error_format("F E0abc some text"));
+        assert!(!is_klog_error_format("F E01xy some text"));
+    }
+
+    #[test]
+    fn test_is_klog_error_format_requires_trailing_whitespace() {
+        // Must have whitespace after 4 digits
+        assert!(!is_klog_error_format("E0104")); // No trailing whitespace
+        assert!(!is_klog_error_format("E0104x")); // Non-whitespace after digits
+        assert!(is_klog_error_format("E0104 ")); // Trailing space - valid
+        assert!(is_klog_error_format("E0104\t")); // Trailing tab - valid
+    }
+
+    #[test]
+    fn test_is_klog_error_format_minimum_length() {
+        // Minimum length checks
+        assert!(!is_klog_error_format("E0104")); // 5 chars, needs 6 min
+        assert!(!is_klog_error_format("F E01")); // Too short
+        assert!(!is_klog_error_format("")); // Empty
+        assert!(!is_klog_error_format("E")); // Just E
+    }
+
+    #[test]
+    fn test_is_klog_error_format_does_not_match_rust_errors() {
+        // Rust compiler errors have a different format: error[E0382]
+        // Should NOT match klog format
+        assert!(!is_klog_error_format("error[E0382]: borrow of moved value"));
+        assert!(!is_klog_error_format("E[0123] something")); // Has brackets
     }
 
     #[test]
