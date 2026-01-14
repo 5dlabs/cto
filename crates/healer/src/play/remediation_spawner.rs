@@ -209,7 +209,10 @@ impl RemediationSpawner {
     pub fn get_remediation_strategy(issue: &SessionIssue) -> RemediationStrategy {
         match (&issue.issue_type, &issue.severity) {
             // Config issues need config fixes
-            (IssueType::PreFlightFailure | IssueType::ToolMismatch, IssueSeverity::Critical)
+            (
+                IssueType::PreFlightFailure | IssueType::ToolMismatch | IssueType::ConfigError,
+                IssueSeverity::Critical,
+            )
             | (IssueType::LanguageMismatch, _) => RemediationStrategy::FixConfig,
 
             // Build/test failures can be auto-fixed
@@ -270,7 +273,7 @@ fn build_remediation_prompt(
 
     // Retry context
     prompt.push_str("## Retry Status\n\n");
-    prompt.push_str(&format!("- **Attempt:** {} of {}\n", attempt, max_retries));
+    prompt.push_str(&format!("- **Attempt:** {attempt} of {max_retries}\n"));
     if attempt > 1 {
         prompt.push_str("- **Note:** Previous attempts failed. Try a different approach.\n");
     }

@@ -142,8 +142,7 @@ async fn start_session_handler(
                     status: "ok",
                     session_id: session.play_id,
                     message: format!(
-                        "Session started with {} tasks and {} agent configurations",
-                        task_count, agent_count
+                        "Session started with {task_count} tasks and {agent_count} agent configurations"
                     ),
                 }),
             )

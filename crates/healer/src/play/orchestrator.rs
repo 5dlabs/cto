@@ -24,11 +24,18 @@ use super::remediation_spawner::{
 use super::session::{IssueSeverity, IssueType, PlaySession, SessionIssue, SessionStoreHandle};
 
 /// Truncate a log line for display purposes.
+/// Uses character-aware truncation to avoid panicking on multi-byte UTF-8 sequences.
 fn truncate_log_line(line: &str, max_len: usize) -> String {
     if line.len() <= max_len {
         line.to_string()
     } else {
-        format!("{}...", &line[..max_len])
+        // Find the last valid char boundary at or before max_len bytes
+        let truncate_at = line
+            .char_indices()
+            .take_while(|(idx, _)| *idx < max_len)
+            .last()
+            .map_or(0, |(idx, ch)| idx + ch.len_utf8());
+        format!("{}...", &line[..truncate_at])
     }
 }
 
@@ -360,8 +367,13 @@ impl HealerOrchestrator {
             .iter()
             .filter(|e| {
                 let line = e.line.to_lowercase();
+                // Exclude all patterns that match specific error types to prevent duplicate issues
                 !line.contains("tool inventory")
+                    && !line.contains("missing from cli")
+                    && !line.contains("tool not found")
                     && !line.contains("cto-config")
+                    && !line.contains("config missing")
+                    && !line.contains("config invalid")
                     && !(line.contains("mcp")
                         && (line.contains("failed") || line.contains("unreachable")))
             })
@@ -846,6 +858,89 @@ mod tests {
         let tools = ImplementationLanguage::Go.security_tools();
         assert!(tools.contains(&"gosec"));
         assert!(tools.contains(&"govulncheck"));
+    }
+
+    #[test]
+    fn test_truncate_log_line_ascii() {
+        // ASCII text - should truncate at exact byte boundary
+        let line = "This is a test log line that exceeds the maximum length";
+        let truncated = truncate_log_line(line, 20);
+        assert!(truncated.starts_with("This is a test"));
+        assert!(truncated.ends_with("..."));
+        assert!(truncated.len() <= 23); // max_len + "..."
+    }
+
+    #[test]
+    fn test_truncate_log_line_emoji() {
+        // Emoji are multi-byte UTF-8 characters
+        // 🚀 is 4 bytes, 😀 is 4 bytes, 👍 is 4 bytes
+        let line = "Starting process 🚀 with status 😀 and feedback 👍 complete";
+
+        // Truncate at 25 bytes - should not panic even if it falls mid-emoji
+        let truncated = truncate_log_line(line, 25);
+
+        // Should not panic and should produce valid UTF-8
+        assert!(truncated.ends_with("..."));
+
+        // Verify it's valid UTF-8 by converting back from string
+        let _chars: Vec<char> = truncated.chars().collect();
+    }
+
+    #[test]
+    fn test_truncate_log_line_chinese() {
+        // Chinese characters are typically 3 bytes each in UTF-8
+        let line = "日志条目：处理完成，状态正常";
+
+        // Truncate at 10 bytes - may fall in middle of multi-byte character
+        let truncated = truncate_log_line(line, 10);
+
+        // Should not panic and should produce valid UTF-8
+        assert!(truncated.ends_with("..."));
+
+        // Verify all characters are valid
+        for ch in truncated.chars() {
+            assert!(ch.is_alphabetic() || ch == '.' || ch == '：');
+        }
+    }
+
+    #[test]
+    fn test_truncate_log_line_mixed_unicode() {
+        // Mix of ASCII, emoji, and non-ASCII characters
+        let line = "Error in module 模块 🔥 failed with code 错误代码 123";
+
+        // Try various truncation lengths
+        for max_len in [10, 20, 30, 40] {
+            let truncated = truncate_log_line(line, max_len);
+
+            // Should never panic regardless of where we truncate
+            // The key is that it produces valid UTF-8, not exact length
+            // (may be slightly shorter than max_len to preserve full characters)
+            if line.len() > max_len {
+                assert!(
+                    truncated.ends_with("..."),
+                    "Should have ellipsis for truncated line"
+                );
+                // Truncated string should be close to max_len but may vary by a few bytes
+                // due to character boundaries
+                assert!(
+                    truncated.len() < line.len(),
+                    "Should be shorter than original"
+                );
+            } else {
+                assert_eq!(truncated, line, "Short lines should be unchanged");
+            }
+
+            // Verify it's valid UTF-8
+            let _chars: Vec<char> = truncated.chars().collect();
+        }
+    }
+
+    #[test]
+    fn test_truncate_log_line_short() {
+        // Line shorter than max_len should be returned unchanged
+        let line = "Short line";
+        let truncated = truncate_log_line(line, 100);
+        assert_eq!(truncated, line);
     }
 
     #[test]
