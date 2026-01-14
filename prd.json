@@ -30,7 +30,7 @@
         "Delegate to @healer-monitor subagent to verify session: 'Check http://localhost:8083/api/v1/sessions/active'"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Uses tests/intake/alerthub-e2e-test/prd.md as source"
     },
     {

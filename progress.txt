@@ -23,3 +23,17 @@ Project: AlertHub E2E Test
   - E2E test PRDs are in tests/intake/{project-name}/prd.md
 ---
 
+
+## 2026-01-14 - US-002: Initiate intake via CTO MCP tool
+- **Status**: PASSED
+- **Verification results**:
+  - Called MCP tool cto___intake with project_name='alerthub-e2e-test' and prd_content from tests/intake/alerthub-e2e-test/prd.md
+  - Linear Project: ✅ Created - alerthub-e2e-test (URL: https://linear.app/jonathonfritz/project/alerthub-e2e-test-299943756741)
+  - PRD Issue: ✅ Created - CTOPA-789 "[PRD] alerthub-e2e-test" (URL: https://linear.app/jonathonfritz/issue/CTOPA-789/prd-alerthub-e2e-test)
+  - Note: Morgan needs to be assigned to PRD issue to trigger intake workflow
+  - Healer sessions endpoint: ✅ Responding - 0 active sessions (expected at this stage)
+- **Learnings for future iterations**:
+  - Test PRDs are in tests/intake/{project-name}/prd.md but must be provided via prd_content parameter
+  - Intake tool doesn't auto-discover PRDs from test directories - need to read and pass content
+  - Linear setup completes synchronously; actual intake workflow starts when Morgan is assigned
+---
