@@ -1,0 +1,25 @@
+# CTO E2E Play Test Progress Log
+# Append-only file for recording learnings during Ralph execution
+
+## Codebase Patterns
+- PM Server health endpoint: http://localhost:8081/health
+- Healer health endpoint: http://localhost:8083/health
+- E2E test PRDs are stored in tests/intake/{project-name}/
+
+---
+Started: 2026-01-14
+Project: AlertHub E2E Test
+---
+
+## 2026-01-14 - US-001: Verify local services and configuration
+- **Status**: PASSED
+- **Verification results**:
+  - PM Server (localhost:8081): ✅ `{"status":"healthy"}`
+  - Healer (localhost:8083): ✅ `{"status":"healthy","version":"0.0.1","service":"healer-play-api"}`
+  - cto-config.json defaults.play.autoMerge: ✅ `true`
+  - cto-config.json defaults.play.healerEndpoint: ✅ `"http://localhost:8083"`
+- **Learnings for future iterations**:
+  - Local services must be started with `mprocs` or `just dev-*` before running E2E tests
+  - E2E test PRDs are in tests/intake/{project-name}/prd.md
+---
+

@@ -1,0 +1,111 @@
+{
+  "project": "CTO E2E Play Test - AlertHub",
+  "branchName": "ralph/e2e-alerthub-test",
+  "description": "E2E test of CTO Play workflow using alerthub-e2e-test PRD. Tests full lifecycle from intake through deployment with Healer monitoring. NOTE: This is a platform test using MCP tools, not a coding task.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Verify local services and configuration",
+      "description": "As a tester, I need all local services running with correct configuration",
+      "acceptanceCriteria": [
+        "Run: curl http://localhost:8081/health - PM Server responds OK",
+        "Run: curl http://localhost:8083/health - Healer responds OK",
+        "Read cto-config.json and verify defaults.play.autoMerge is true",
+        "Read cto-config.json and verify defaults.play.healerEndpoint is 'http://localhost:8083'",
+        "If services not running, log to progress.txt: 'BLOCKED: Start services with `mprocs` or `just dev-*`'"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "This story verifies prerequisites before calling MCP tools"
+    },
+    {
+      "id": "US-002",
+      "title": "Initiate intake via CTO MCP tool",
+      "description": "As a tester, I want to start intake using the mcp_cto_intake tool",
+      "acceptanceCriteria": [
+        "Call MCP tool: mcp_cto_intake(project_name='alerthub-e2e-test')",
+        "Verify Linear project created in response",
+        "Verify PRD issue created with Morgan assigned",
+        "Log intake workflow name to progress.txt",
+        "Delegate to @healer-monitor subagent to verify session: 'Check http://localhost:8083/api/v1/sessions/active'"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Uses tests/intake/alerthub-e2e-test/prd.md as source"
+    },
+    {
+      "id": "US-003",
+      "title": "Monitor intake completion",
+      "description": "As a tester, I want to verify intake workflow completes successfully",
+      "acceptanceCriteria": [
+        "Call MCP tool: mcp_cto_jobs() to list running workflows",
+        "Wait for intake workflow to show 'Succeeded'",
+        "Verify tasks.json was generated (check docs repository)",
+        "Log task count and agentHints to progress.txt",
+        "Delegate to @healer-monitor: 'Check for any A10/A11/A12 alerts in logs'"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "May need to poll mcp_cto_jobs() until intake completes"
+    },
+    {
+      "id": "US-004",
+      "title": "Start Play workflow",
+      "description": "As a tester, I want to start the Play workflow using MCP tool",
+      "acceptanceCriteria": [
+        "Call MCP tool: mcp_cto_play()",
+        "Verify workflow submitted (check response for workflow name)",
+        "Call MCP tool: mcp_cto_play_status() to confirm task started",
+        "Log play workflow name and task_id to progress.txt",
+        "Delegate to @healer-monitor: 'Verify Healer received session notification and shows expected tools'"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Play auto-detects next task from tasks.json"
+    },
+    {
+      "id": "US-005",
+      "title": "Monitor Play agent sequence",
+      "description": "As a tester, I want to verify agents execute in correct order",
+      "acceptanceCriteria": [
+        "Call MCP tool: mcp_cto_play_status() periodically",
+        "Verify stages progress: implementation → quality → security → testing → integration",
+        "Log each stage transition to progress.txt with timestamps",
+        "Delegate to @healer-monitor: 'Watch for tool inventory mismatch or MCP init failures'",
+        "If any stage fails, log error details and do NOT mark as passing"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Sequence: Bolt/Rex → Cleo → Cipher → Tess → Atlas"
+    },
+    {
+      "id": "US-006",
+      "title": "Verify Healer monitoring",
+      "description": "As a tester, I want to confirm Healer caught any issues",
+      "acceptanceCriteria": [
+        "Delegate to @healer-monitor: 'Query http://localhost:8083/api/v1/sessions/active and report all detected issues'",
+        "If issues detected, verify GitHub issues were created",
+        "Log any escalations (Discord notifications, GitHub issues) to progress.txt",
+        "Verify no unhandled errors in Healer logs"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "This validates the Healer dual-model architecture"
+    },
+    {
+      "id": "US-007",
+      "title": "Complete full lifecycle verification",
+      "description": "As a tester, I want to confirm the entire lifecycle completed",
+      "acceptanceCriteria": [
+        "Call MCP tool: mcp_cto_play_status() to verify workflow Succeeded",
+        "Verify PR was merged (autoMerge=true should have triggered Atlas merge)",
+        "Delegate to @healer-monitor: 'Final status report - any unresolved alerts?'",
+        "Log final summary to progress.txt with success/failure count",
+        "If ALL checks pass, lifecycle is complete"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Success means full E2E from intake to merged PR"
+    }
+  ]
+}
