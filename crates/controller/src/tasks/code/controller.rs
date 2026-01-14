@@ -2,6 +2,7 @@ use super::naming::ResourceNaming;
 use super::resources::CodeResourceManager;
 use crate::crds::CodeRun;
 use crate::tasks::cleanup;
+use crate::tasks::tool_inventory::log_tool_inventory;
 use crate::tasks::types::{Context, Result, CODE_FINALIZER_NAME};
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use k8s_openapi::api::{
@@ -217,6 +218,35 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             }
 
             debug!("No existing job found, using optimistic job creation");
+
+            // Log tool inventory for Healer monitoring
+            // This allows Healer to detect config-to-CLI tool mismatches
+            let agent_name = code_run.spec.github_app.as_deref().unwrap_or("unknown");
+            let declared_tools: Vec<String> = code_run
+                .spec
+                .remote_tools
+                .as_ref()
+                .map(|s| {
+                    s.split(',')
+                        .map(|t| t.trim().to_string())
+                        .filter(|t| !t.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            if !declared_tools.is_empty() {
+                let diff = log_tool_inventory(agent_name, &declared_tools);
+                if !diff.all_resolved {
+                    warn!(
+                        code_run = %code_run_name,
+                        agent = %agent_name,
+                        unresolved_count = diff.unresolved_tools.len(),
+                        "⚠️ tool inventory mismatch - declared tools: {:?} - missing: {:?}",
+                        declared_tools,
+                        diff.unresolved_tools
+                    );
+                }
+            }
 
             // STEP 3: Optimistic job creation with conflict handling (copied from working docs controller)
             let ctx_arc = Arc::new(ctx.clone());
