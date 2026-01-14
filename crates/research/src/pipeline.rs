@@ -96,7 +96,12 @@ impl Pipeline {
 
         // Load state
         let mut state = PollState::load(&self.config.state_path)?;
-        tracing::debug!(processed = state.processed.len(), "Loaded state");
+        tracing::info!(
+            processed_count = state.processed.len(),
+            last_poll = ?state.last_poll,
+            failures = state.failures,
+            "Loaded poll state"
+        );
 
         // Load index
         let mut index = ResearchIndex::load(&self.config.index_path)?;

@@ -205,7 +205,7 @@ impl BookmarkPoller {
             }
             result.all_bookmarks.push(bookmark);
         }
-        
+
         // Log summary of partition
         tracing::info!(
             total = result.all_bookmarks.len(),
@@ -341,22 +341,20 @@ impl BookmarkPoller {
                     continue; // Don't add to collection
                 }
 
-                if all_bookmarks.entry(bookmark.id.clone()).or_insert(bookmark).id.is_empty() {
-                    // Entry was just inserted
-                }
+                // Add to collection (HashMap ensures no duplicates)
+                all_bookmarks.entry(bookmark.id.clone()).or_insert(bookmark);
                 added += 1;
             }
 
             // Log batch summary at INFO level for better visibility
-            if skipped_age > 0 {
-                tracing::info!(
-                    batch_count,
-                    skipped_age,
-                    added,
-                    max_age_days = self.config.max_age_days,
-                    "Bookmarks filtered by age in batch"
-                );
-            }
+            tracing::info!(
+                batch_count,
+                skipped_age,
+                added,
+                total_collected = all_bookmarks.len(),
+                max_age_days = self.config.max_age_days,
+                "Batch processing complete"
+            );
 
             let new_in_scroll = all_bookmarks.len() - before_count;
             tracing::debug!(

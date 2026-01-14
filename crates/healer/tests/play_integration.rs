@@ -720,7 +720,10 @@ async fn test_list_all_sessions_endpoint() {
     let list_response: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(list_response["status"], "ok");
     assert!(list_response["count"].as_u64().unwrap() >= 1);
-    println!("✅ /api/v1/sessions returns sessions (count: {})", list_response["count"]);
+    println!(
+        "✅ /api/v1/sessions returns sessions (count: {})",
+        list_response["count"]
+    );
 
     // Test /api/v1/sessions/active (should also return at least 1 active)
     let response = app
@@ -893,7 +896,10 @@ async fn test_evaluation_prompt_context() {
     println!("\n📝 Prompt would include:");
     println!("  - Play ID: {}", session.play_id);
     println!("  - Repository: {}", session.repository);
-    println!("  - Agents: {:?}", session.cto_config.agents.keys().collect::<Vec<_>>());
+    println!(
+        "  - Agents: {:?}",
+        session.cto_config.agents.keys().collect::<Vec<_>>()
+    );
     println!("  - Rex remote tools: {:?}", rex_config.tools.remote);
     println!("  - Tasks: {} total", session.tasks.len());
 }
@@ -901,9 +907,7 @@ async fn test_evaluation_prompt_context() {
 /// Test the full round-trip: session start → issue detection → remediation.
 #[tokio::test]
 async fn test_full_monitoring_roundtrip() {
-    use healer::play::{
-        IssueSeverity, IssueType, RemediationSpawner, SessionIssue,
-    };
+    use healer::play::{IssueSeverity, IssueType, RemediationSpawner, SessionIssue};
 
     let state = Arc::new(PlayApiState::new("cto"));
     let app = build_play_api_router(state.clone());
@@ -962,7 +966,10 @@ async fn test_full_monitoring_roundtrip() {
         github_issue: None,
     };
 
-    let add_result = state.sessions.add_issue("roundtrip-test", issue.clone()).await;
+    let add_result = state
+        .sessions
+        .add_issue("roundtrip-test", issue.clone())
+        .await;
     assert!(add_result.is_ok());
     println!("✅ Step 2: Issue detected and added");
 

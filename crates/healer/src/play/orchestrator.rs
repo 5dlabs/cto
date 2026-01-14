@@ -12,7 +12,7 @@ use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
-use crate::loki::{LokiClient, LokiConfig, LogEntry};
+use crate::loki::{LogEntry, LokiClient, LokiConfig};
 use crate::scanner::{is_actual_error, is_false_positive};
 
 use super::evaluation_spawner::{
@@ -316,7 +316,11 @@ impl HealerOrchestrator {
 
     /// Convert error log entries into session issues.
     #[allow(clippy::too_many_lines, clippy::unused_self)]
-    fn logs_to_issues(&self, _session: &PlaySession, error_logs: &[&LogEntry]) -> Vec<SessionIssue> {
+    fn logs_to_issues(
+        &self,
+        _session: &PlaySession,
+        error_logs: &[&LogEntry],
+    ) -> Vec<SessionIssue> {
         if error_logs.is_empty() {
             return Vec::new();
         }
@@ -358,7 +362,8 @@ impl HealerOrchestrator {
                 let line = e.line.to_lowercase();
                 !line.contains("tool inventory")
                     && !line.contains("cto-config")
-                    && !(line.contains("mcp") && (line.contains("failed") || line.contains("unreachable")))
+                    && !(line.contains("mcp")
+                        && (line.contains("failed") || line.contains("unreachable")))
             })
             .collect();
 
@@ -481,7 +486,10 @@ impl HealerOrchestrator {
         context.insert("repository".to_string(), session.repository.clone());
         context.insert(
             "service".to_string(),
-            session.service.clone().unwrap_or_else(|| "unknown".to_string()),
+            session
+                .service
+                .clone()
+                .unwrap_or_else(|| "unknown".to_string()),
         );
         context.insert("issue_type".to_string(), format!("{:?}", issue.issue_type));
         context.insert("severity".to_string(), format!("{:?}", issue.severity));
@@ -540,12 +548,20 @@ impl HealerOrchestrator {
             let _ = writeln!(body, "- **Service**: `{service}`");
         }
         let _ = writeln!(body, "- **Namespace**: `{}`", session.namespace);
-        let _ = writeln!(body, "- **Started**: {}", session.started_at.format("%Y-%m-%d %H:%M:%S UTC"));
+        let _ = writeln!(
+            body,
+            "- **Started**: {}",
+            session.started_at.format("%Y-%m-%d %H:%M:%S UTC")
+        );
 
         body.push_str("\n### Issue Details\n\n");
         let _ = writeln!(body, "- **Type**: `{:?}`", issue.issue_type);
         let _ = writeln!(body, "- **Severity**: `{:?}`", issue.severity);
-        let _ = writeln!(body, "- **Detected**: {}", issue.detected_at.format("%Y-%m-%d %H:%M:%S UTC"));
+        let _ = writeln!(
+            body,
+            "- **Detected**: {}",
+            issue.detected_at.format("%Y-%m-%d %H:%M:%S UTC")
+        );
         if let Some(agent) = &issue.agent {
             let _ = writeln!(body, "- **Agent**: {agent}");
         }
@@ -562,7 +578,11 @@ impl HealerOrchestrator {
             body.push_str("### Tasks in This Play\n\n");
             for task in &session.tasks {
                 let agent_hint = task.agent_hint.as_deref().unwrap_or("unassigned");
-                let _ = writeln!(body, "- **Task {}**: {} (agent: {})", task.id, task.title, agent_hint);
+                let _ = writeln!(
+                    body,
+                    "- **Task {}**: {} (agent: {})",
+                    task.id, task.title, agent_hint
+                );
             }
             body.push('\n');
         }
@@ -609,7 +629,10 @@ impl HealerOrchestrator {
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        info!("Created GitHub issue for Play escalation: {}", stdout.trim());
+        info!(
+            "Created GitHub issue for Play escalation: {}",
+            stdout.trim()
+        );
 
         Ok(())
     }

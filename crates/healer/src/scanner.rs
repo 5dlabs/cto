@@ -312,7 +312,15 @@ pub fn is_actual_error(line: &str) -> bool {
 
     // Check for klog-style error prefixes (E0104, E0105, etc.)
     // These are Kubernetes-style errors that don't contain "error" keyword
-    let has_klog_error_prefix = line.starts_with("E") || line.starts_with("F E");
+    // Format: E{MMDD} where MMDD is month+day (e.g., E0104 = Jan 4th)
+    // The optional F prefix comes from Fluent Bit log collection
+    // Must match the regex pattern: ^F?\s*E\d{4}\s
+    let has_klog_error_prefix = line.len() >= 5
+        && line.starts_with('E')
+        && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit())
+        || line.starts_with("F E")
+            && line.len() >= 7
+            && line.chars().nth(3).is_some_and(|c| c.is_ascii_digit());
 
     if !has_error_keyword && !has_config_keyword && !has_klog_error_prefix {
         return false;
@@ -371,8 +379,10 @@ pub fn filter_actual_errors(entries: Vec<LogEntry>) -> Vec<LogEntry> {
                 || line_lower.contains("unresolved tool")
                 || line_lower.contains("cto-config")
                 || line_lower.contains("cto config")
-                || (line_lower.contains("mcp") && (line_lower.contains("failed") || line_lower.contains("unreachable")))
-                || (line_lower.contains("tools-server") && (line_lower.contains("unreachable") || line_lower.contains("refused")));
+                || (line_lower.contains("mcp")
+                    && (line_lower.contains("failed") || line_lower.contains("unreachable")))
+                || (line_lower.contains("tools-server")
+                    && (line_lower.contains("unreachable") || line_lower.contains("refused")));
 
             // If the line has relevant keywords, it must match an actual error pattern
             if (has_error_keyword || has_config_keyword) && !is_actual_error(&entry.line) {
@@ -1616,38 +1626,74 @@ mod tests {
     #[test]
     fn test_is_actual_error_a10_tool_inventory_mismatch() {
         // A10: Tool inventory mismatch patterns - must include error level prefix
-        assert!(is_actual_error("ERROR: Tool inventory MISMATCH - missing from CLI: [brave_search]"));
-        assert!(is_actual_error("[ERROR] tool inventory mismatch: declared tools not available"));
-        assert!(is_actual_error("level=error msg=\"Tool not found: brave_web_search\""));
-        assert!(is_actual_error("ERROR: Tool not available: memory_create_entities"));
-        assert!(is_actual_error("[ERROR] Unresolved tools: [github_issues, brave_search]"));
-        assert!(is_actual_error("ERROR: missing from cli: brave_web_search, github_file_operations"));
+        assert!(is_actual_error(
+            "ERROR: Tool inventory MISMATCH - missing from CLI: [brave_search]"
+        ));
+        assert!(is_actual_error(
+            "[ERROR] tool inventory mismatch: declared tools not available"
+        ));
+        assert!(is_actual_error(
+            "level=error msg=\"Tool not found: brave_web_search\""
+        ));
+        assert!(is_actual_error(
+            "ERROR: Tool not available: memory_create_entities"
+        ));
+        assert!(is_actual_error(
+            "[ERROR] Unresolved tools: [github_issues, brave_search]"
+        ));
+        assert!(is_actual_error(
+            "ERROR: missing from cli: brave_web_search, github_file_operations"
+        ));
     }
 
     #[test]
     fn test_is_actual_error_a11_cto_config_issues() {
         // A11: CTO config missing or invalid - must include error level prefix
-        assert!(is_actual_error("ERROR: cto-config missing - cannot start agent"));
+        assert!(is_actual_error(
+            "ERROR: cto-config missing - cannot start agent"
+        ));
         assert!(is_actual_error("[ERROR] cto-config invalid: expected JSON"));
-        assert!(is_actual_error("FATAL: cto-config not found at /workspace/cto-config.json"));
-        assert!(is_actual_error("level=error cto-config parse error: unexpected token"));
-        assert!(is_actual_error("ERROR: Failed to load cto-config: file not found"));
+        assert!(is_actual_error(
+            "FATAL: cto-config not found at /workspace/cto-config.json"
+        ));
+        assert!(is_actual_error(
+            "level=error cto-config parse error: unexpected token"
+        ));
+        assert!(is_actual_error(
+            "ERROR: Failed to load cto-config: file not found"
+        ));
         assert!(is_actual_error("[FATAL] Invalid CTO config structure"));
-        assert!(is_actual_error("level=fatal Config missing: cto-config.json"));
+        assert!(is_actual_error(
+            "level=fatal Config missing: cto-config.json"
+        ));
     }
 
     #[test]
     fn test_is_actual_error_a12_mcp_init_failures() {
         // A12: MCP server initialization failures - must include error level prefix
-        assert!(is_actual_error("ERROR: MCP failed to initialize - tools-server unreachable"));
-        assert!(is_actual_error("[ERROR] MCP initialization failed: connection refused"));
-        assert!(is_actual_error("level=error mcp unreachable at http://cto-tools:3000"));
+        assert!(is_actual_error(
+            "ERROR: MCP failed to initialize - tools-server unreachable"
+        ));
+        assert!(is_actual_error(
+            "[ERROR] MCP initialization failed: connection refused"
+        ));
+        assert!(is_actual_error(
+            "level=error mcp unreachable at http://cto-tools:3000"
+        ));
         assert!(is_actual_error("[ERR] MCP connection failed: timeout"));
-        assert!(is_actual_error("ERROR: tools-server unreachable: ECONNREFUSED"));
-        assert!(is_actual_error("level=error tools-server connection refused at localhost:3000"));
-        assert!(is_actual_error("ERROR: tools-server unavailable - retrying..."));
+        assert!(is_actual_error(
+            "ERROR: tools-server unreachable: ECONNREFUSED"
+        ));
+        assert!(is_actual_error(
+            "level=error tools-server connection refused at localhost:3000"
+        ));
+        assert!(is_actual_error(
+            "ERROR: tools-server unavailable - retrying..."
+        ));
         assert!(is_actual_error("[ERROR] Failed to connect to MCP server"));
-        assert!(is_actual_error("level=error MCP server not responding after 30s"));
+        assert!(is_actual_error(
+            "level=error MCP server not responding after 30s"
+        ));
     }
 
     #[test]
@@ -1687,8 +1733,14 @@ mod tests {
         assert_eq!(filtered.len(), 3);
 
         // Verify each A10-A12 error was detected
-        assert!(filtered.iter().any(|e| e.line.contains("Tool inventory MISMATCH")));
-        assert!(filtered.iter().any(|e| e.line.contains("cto-config not found")));
-        assert!(filtered.iter().any(|e| e.line.contains("MCP failed to initialize")));
+        assert!(filtered
+            .iter()
+            .any(|e| e.line.contains("Tool inventory MISMATCH")));
+        assert!(filtered
+            .iter()
+            .any(|e| e.line.contains("cto-config not found")));
+        assert!(filtered
+            .iter()
+            .any(|e| e.line.contains("MCP failed to initialize")));
     }
 }

@@ -400,7 +400,7 @@ enum Commands {
     /// [SERVER] Run Play API server for MCP integration
     PlayApi {
         /// Address to bind to
-        #[arg(long, default_value = "0.0.0.0:8081")]
+        #[arg(long, default_value = "0.0.0.0:8083")]
         addr: String,
 
         /// Kubernetes namespace

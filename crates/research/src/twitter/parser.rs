@@ -60,7 +60,7 @@ impl BookmarkParser {
                 tracing::debug!(href, "Could not parse tweet URL");
                 continue;
             };
-            
+
             // Validate tweet ID is a valid snowflake (numeric, reasonable range)
             if let Ok(id_num) = tweet_id.parse::<u64>() {
                 // Twitter IDs for tweets from 2020+ should be > 1200000000000000000
@@ -74,11 +74,7 @@ impl BookmarkParser {
                     );
                 }
             } else {
-                tracing::warn!(
-                    tweet_id,
-                    href,
-                    "Tweet ID is not a valid numeric value"
-                );
+                tracing::warn!(tweet_id, href, "Tweet ID is not a valid numeric value");
             }
 
             // Extract the tweet text.
