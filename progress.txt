@@ -88,3 +88,21 @@
 - Manual trigger available at POST /trigger/intake with {"issueId": "CTOPA-XXX"}
 - cto___jobs only shows Argo workflows, not CodeRuns - use kubectl get coderuns instead
 ---
+
+## 2026-01-14 17:00 - US-004 BLOCKED
+- Intake CodeRun intake-ctopa-800-1768427139 failed
+- Pod status: Error (intake-t0-morgan-claude-8b5f57ea-v1-fjd29)
+- Error: AI response parse error - JSON parsing failure
+- Root cause: Claude prefill continuation produced mixed text/JSON:
+  - `{"tasks":[Based on the PRD...Here is the JSON output:\n\n{"id":1...`
+- This matches ISSUE-001 in the PRD: "Intake CLI JSON parsing bug in provider.rs"
+- Local fix verified in US-000, but IN-CLUSTER intake image hasn't been rebuilt
+- Retry pod pending: intake-t0-morgan-claude-b5b77de5-v1-hjggb (0/2 Pending)
+
+**Action Required:**
+- Create PR to merge provider.rs fix to develop branch
+- Rebuild and deploy intake image to cluster
+- Then retry intake workflow
+
+**US-004 Status: BLOCKED** - Cannot proceed until provider.rs fix is deployed to cluster
+---

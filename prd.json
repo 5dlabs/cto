@@ -6,11 +6,11 @@
     {
       "id": "ISSUE-001",
       "title": "Intake CLI JSON parsing bug in provider.rs",
-      "status": "FIXED_LOCALLY_NOT_DEPLOYED",
-      "description": "The intake CLI in CLI mode fails to parse JSON when Claude returns explanation text mixed with JSON. Fix: Change text.find() to text.contains() in provider.rs line ~162.",
+      "status": "BLOCKING_E2E_TEST",
+      "description": "The intake CLI in CLI mode fails to parse JSON when Claude returns explanation text mixed with JSON. In-cluster intake failed with: 'Failed to parse AI response as JSON: expected value at line 1 column 11'. Fix exists locally but image not rebuilt.",
       "fixCommit": "9ee45367d",
       "fixFile": "crates/intake/src/ai/provider.rs",
-      "action": "Test fix locally, then create PR to merge to develop, rebuild intake image"
+      "action": "URGENT: Create PR to merge to develop, rebuild intake image, redeploy to cluster"
     },
     {
       "id": "ISSUE-002", 
@@ -138,7 +138,7 @@
       ],
       "priority": 4,
       "passes": false,
-      "notes": "Morgan runs IN-CLUSTER, generates tasks, commits to repo, creates PR. The PR must be merged before Play can start."
+      "notes": "BLOCKED: JSON parsing error - provider.rs fix needs deployment. Morgan runs IN-CLUSTER, generates tasks, commits to repo, creates PR. The PR must be merged before Play can start."
     },
     {
       "id": "US-005",
@@ -156,7 +156,7 @@
       ],
       "priority": 5,
       "passes": false,
-      "notes": "Play is triggered by merging Morgan's PR, not by manually calling cto___play(). The merge webhook starts the orchestration."
+      "notes": "BLOCKED: Depends on US-004. Play is triggered by merging Morgan's PR, not by manually calling cto___play(). The merge webhook starts the orchestration."
     },
     {
       "id": "US-006",
@@ -172,7 +172,7 @@
       ],
       "priority": 6,
       "passes": false,
-      "notes": "Each agent runs as CodeRun pod with Linear sidecar emitting activities."
+      "notes": "BLOCKED: Depends on US-005. Each agent runs as CodeRun pod with Linear sidecar emitting activities."
     },
     {
       "id": "US-007",
@@ -188,7 +188,7 @@
       ],
       "priority": 7,
       "passes": false,
-      "notes": "Tests the input_poll_task in status-sync.rs. REQUIRES: Active CodeRun with agent running."
+      "notes": "BLOCKED: Depends on US-006. Tests the input_poll_task in status-sync.rs. REQUIRES: Active CodeRun with agent running."
     },
     {
       "id": "US-008",
@@ -203,7 +203,7 @@
       ],
       "priority": 8,
       "passes": false,
-      "notes": "Validates both monitoring layers caught all events. REQUIRES: Play workflow must complete first."
+      "notes": "BLOCKED: Depends on US-006. Validates both monitoring layers caught all events. REQUIRES: Play workflow must complete first."
     },
     {
       "id": "US-009",
@@ -220,7 +220,7 @@
       ],
       "priority": 9,
       "passes": false,
-      "notes": "Full E2E: cto___intake() → Linear → Webhook → Morgan pod → tasks.json PR → Merge → Play workflow → CodeRuns → Merged implementation PR. This is the final verification."
+      "notes": "BLOCKED: Depends on US-008. Full E2E: cto___intake() → Linear → Webhook → Morgan pod → tasks.json PR → Merge → Play workflow → CodeRuns → Merged implementation PR. This is the final verification."
     }
   ]
 }
