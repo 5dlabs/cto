@@ -1630,14 +1630,16 @@ fn notify_healer(
     // Attempt HTTP POST using a simple TCP connection
     // (We use raw TCP to avoid adding reqwest as a dependency in the MCP server)
     let body = serde_json::to_string(&request_body).unwrap_or_default();
+    // Note: Line continuations with `\` include leading whitespace from the next line,
+    // so each continuation line must start at column 0 to produce valid HTTP headers.
     let http_request = format!(
         "POST /api/v1/session/start HTTP/1.1\r\n\
-         Host: {host_port}\r\n\
-         Content-Type: application/json\r\n\
-         Content-Length: {}\r\n\
-         Connection: close\r\n\
-         \r\n\
-         {body}",
+Host: {host_port}\r\n\
+Content-Type: application/json\r\n\
+Content-Length: {}\r\n\
+Connection: close\r\n\
+\r\n\
+{body}",
         body.len()
     );
 
