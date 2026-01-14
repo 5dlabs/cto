@@ -1587,13 +1587,14 @@ fn notify_healer(
     // Convert CtoConfig to the format Healer expects
     let mut agents_map: BTreeMap<String, Value> = BTreeMap::new();
     for (agent_key, agent_config) in &cto_config.agents {
+        // Ensure localServers is always an object (never null) for schema consistency
         let tools = agent_config
             .tools
             .as_ref()
             .map(|t| {
                 json!({
                     "remote": t.remote,
-                    "localServers": t.local_servers
+                    "localServers": t.local_servers.clone().unwrap_or_default()
                 })
             })
             .unwrap_or_else(|| json!({"remote": [], "localServers": {}}));
