@@ -2,38 +2,32 @@
 # Append-only file for recording learnings during Ralph execution
 
 ## Codebase Patterns
-- PM Server health endpoint: http://localhost:8081/health
-- Healer health endpoint: http://localhost:8083/health
-- E2E test PRDs are stored in tests/intake/{project-name}/
+- Skills are in `.factory/skills/<name>/SKILL.md` - load with `/skill <name>`
+- Subagents are in `~/.factory/droids/<name>.md` - delegate with `@<name>`
+- Three skills: `cto-platform`, `healer`, `linear-agent-api`
+- Two subagents: `@healer-monitor`, `@linear-monitor`
+- Intake runs in-cluster when `local: false` in cto-config.json
+- Play sequence: Bolt → Rex/Blaze → Cleo → Cipher → Tess → Atlas
 
 ---
 Started: 2026-01-14
 Project: AlertHub E2E Test
 ---
 
-## 2026-01-14 - US-001: Verify local services and configuration
+## 2026-01-14 - US-001: Verify configuration for in-cluster execution
 - **Status**: PASSED
 - **Verification results**:
+  - defaults.intake.local: ✅ false (intake runs as Argo workflow)
+  - defaults.play.autoMerge: ✅ true
+  - defaults.play.healerEndpoint: ✅ "http://localhost:8083"
+  - defaults.linear.pmServerUrl: ✅ "http://localhost:8081"
   - PM Server (localhost:8081): ✅ `{"status":"healthy"}`
   - Healer (localhost:8083): ✅ `{"status":"healthy","version":"0.0.1","service":"healer-play-api"}`
-  - cto-config.json defaults.play.autoMerge: ✅ `true`
-  - cto-config.json defaults.play.healerEndpoint: ✅ `"http://localhost:8083"`
+  - kubectl context: ✅ admin@simple-cluster
+  - cto namespace: ✅ Active (35d)
 - **Learnings for future iterations**:
-  - Local services must be started with `mprocs` or `just dev-*` before running E2E tests
-  - E2E test PRDs are in tests/intake/{project-name}/prd.md
+  - All config verification must be done before calling MCP tools
+  - The local=false config is critical - means workflows run in Kubernetes, not locally
+  - PM server and Healer must be running locally to receive webhooks from in-cluster workflows
 ---
 
-
-## 2026-01-14 - US-002: Initiate intake via CTO MCP tool
-- **Status**: PASSED
-- **Verification results**:
-  - Called MCP tool cto___intake with project_name='alerthub-e2e-test' and prd_content from tests/intake/alerthub-e2e-test/prd.md
-  - Linear Project: ✅ Created - alerthub-e2e-test (URL: https://linear.app/jonathonfritz/project/alerthub-e2e-test-299943756741)
-  - PRD Issue: ✅ Created - CTOPA-789 "[PRD] alerthub-e2e-test" (URL: https://linear.app/jonathonfritz/issue/CTOPA-789/prd-alerthub-e2e-test)
-  - Note: Morgan needs to be assigned to PRD issue to trigger intake workflow
-  - Healer sessions endpoint: ✅ Responding - 0 active sessions (expected at this stage)
-- **Learnings for future iterations**:
-  - Test PRDs are in tests/intake/{project-name}/prd.md but must be provided via prd_content parameter
-  - Intake tool doesn't auto-discover PRDs from test directories - need to read and pass content
-  - Linear setup completes synchronously; actual intake workflow starts when Morgan is assigned
----

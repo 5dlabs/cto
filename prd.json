@@ -1,111 +1,135 @@
 {
   "project": "CTO E2E Play Test - AlertHub",
   "branchName": "ralph/e2e-alerthub-test",
-  "description": "E2E test of CTO Play workflow using alerthub-e2e-test PRD. Tests full lifecycle from intake through deployment with Healer monitoring. NOTE: This is a platform test using MCP tools, not a coding task.",
+  "description": "E2E test of CTO Play workflow using alerthub-e2e-test PRD. Tests full lifecycle from intake through deployment. All workflows run in-cluster. Includes Linear Agent API validation and two-way communication testing.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Verify local services and configuration",
-      "description": "As a tester, I need all local services running with correct configuration",
+      "title": "Verify configuration for in-cluster execution",
+      "description": "As a tester, I need to verify cto-config.json is configured for in-cluster (not local) execution",
       "acceptanceCriteria": [
-        "Run: curl http://localhost:8081/health - PM Server responds OK",
-        "Run: curl http://localhost:8083/health - Healer responds OK",
-        "Read cto-config.json and verify defaults.play.autoMerge is true",
-        "Read cto-config.json and verify defaults.play.healerEndpoint is 'http://localhost:8083'",
-        "If services not running, log to progress.txt: 'BLOCKED: Start services with `mprocs` or `just dev-*`'"
+        "Read cto-config.json and verify defaults.intake.local is FALSE - intake must run as Argo workflow",
+        "Verify defaults.play.autoMerge is true for full autonomy",
+        "Verify defaults.play.healerEndpoint is set (http://localhost:8083 for local Healer API)",
+        "Verify defaults.linear.pmServerUrl points to PM server (http://localhost:8081 for local)",
+        "Run: curl http://localhost:8081/health - PM Server must be running to receive webhooks",
+        "Run: curl http://localhost:8083/health - Healer API must be running",
+        "Verify kubectl context is set to correct cluster with CTO deployed"
       ],
       "priority": 1,
       "passes": true,
-      "notes": "This story verifies prerequisites before calling MCP tools"
+      "notes": "CRITICAL: local=false means intake runs as Argo workflow in cluster, not as local binary"
     },
     {
       "id": "US-002",
-      "title": "Initiate intake via CTO MCP tool",
-      "description": "As a tester, I want to start intake using the mcp_cto_intake tool",
+      "title": "Initiate intake via CTO MCP tool (in-cluster)",
+      "description": "As a tester, I want to start intake using mcp_cto_intake which submits an Argo workflow",
       "acceptanceCriteria": [
         "Call MCP tool: mcp_cto_intake(project_name='alerthub-e2e-test')",
-        "Verify Linear project created in response",
-        "Verify PRD issue created with Morgan assigned",
-        "Log intake workflow name to progress.txt",
-        "Delegate to @healer-monitor subagent to verify session: 'Check http://localhost:8083/api/v1/sessions/active'"
+        "Verify response indicates Linear project was created",
+        "Verify PRD issue created with Morgan auto-assigned as delegate",
+        "Morgan assignment triggers webhook to PM server → Argo Workflow created",
+        "Call mcp_cto_jobs() to see intake workflow running in Argo",
+        "Delegate to @linear-monitor: 'Verify Morgan agent session created in Linear, first thought activity within 10s'",
+        "Log intake workflow name to progress.txt"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Uses tests/intake/alerthub-e2e-test/prd.md as source"
+      "passes": false,
+      "notes": "Intake: PRD → Linear → Webhook → Argo Workflow → Morgan pod"
     },
     {
       "id": "US-003",
-      "title": "Monitor intake completion",
-      "description": "As a tester, I want to verify intake workflow completes successfully",
+      "title": "Monitor intake and verify Linear agent dialogue",
+      "description": "As a tester, I want to verify intake completes AND Linear agent activities are populated",
       "acceptanceCriteria": [
-        "Call MCP tool: mcp_cto_jobs() to list running workflows",
-        "Wait for intake workflow to show 'Succeeded'",
-        "Verify tasks.json was generated (check docs repository)",
-        "Log task count and agentHints to progress.txt",
-        "Delegate to @healer-monitor: 'Check for any A10/A11/A12 alerts in logs'"
+        "Call MCP tool: mcp_cto_jobs(include=['intake']) - poll until 'Succeeded'",
+        "Verify tasks.json generated and committed to docs repository",
+        "Task 1 should have agentHint='bolt' (infrastructure always first)",
+        "Delegate to @linear-monitor: 'Check Morgan session activities: thought/action/response flow, plan checklist updates'",
+        "Delegate to @healer-monitor: 'Check for any errors in intake workflow logs'",
+        "Verify Linear PRD issue has agent dialogue populated (not empty)",
+        "Log task count and agent assignments to progress.txt"
       ],
       "priority": 3,
       "passes": false,
-      "notes": "May need to poll mcp_cto_jobs() until intake completes"
+      "notes": "Morgan runs in pod, emits activities to Linear via sidecar"
     },
     {
       "id": "US-004",
-      "title": "Start Play workflow",
-      "description": "As a tester, I want to start the Play workflow using MCP tool",
+      "title": "Start Play workflow and verify session notification",
+      "description": "As a tester, I want to start Play and verify both Healer and Linear are notified",
       "acceptanceCriteria": [
         "Call MCP tool: mcp_cto_play()",
-        "Verify workflow submitted (check response for workflow name)",
-        "Call MCP tool: mcp_cto_play_status() to confirm task started",
-        "Log play workflow name and task_id to progress.txt",
-        "Delegate to @healer-monitor: 'Verify Healer received session notification and shows expected tools'"
+        "Verify Argo workflow submitted (check response)",
+        "Call mcp_cto_jobs(include=['play']) to confirm play workflow running",
+        "Delegate to @healer-monitor: 'Verify Healer received session with expected tools per agent'",
+        "Delegate to @linear-monitor: 'Verify Bolt assigned as delegate to Task 1 issue, session created'",
+        "Log play workflow name and starting task_id to progress.txt"
       ],
       "priority": 4,
       "passes": false,
-      "notes": "Play auto-detects next task from tasks.json"
+      "notes": "Play orchestrates: Argo Workflow → Controller → CodeRuns (pods) per agent"
     },
     {
       "id": "US-005",
-      "title": "Monitor Play agent sequence",
-      "description": "As a tester, I want to verify agents execute in correct order",
+      "title": "Monitor Play agent sequence with Linear dialogue verification",
+      "description": "As a tester, I want to verify agents execute in order AND Linear activities stream correctly",
       "acceptanceCriteria": [
-        "Call MCP tool: mcp_cto_play_status() periodically",
-        "Verify stages progress: implementation → quality → security → testing → integration",
-        "Log each stage transition to progress.txt with timestamps",
-        "Delegate to @healer-monitor: 'Watch for tool inventory mismatch or MCP init failures'",
-        "If any stage fails, log error details and do NOT mark as passing"
+        "Call MCP tool: mcp_cto_play_status() periodically to track progress",
+        "Verify stages: infrastructure (Bolt) → implementation (Rex/Blaze) → quality (Cleo) → security (Cipher) → testing (Tess) → integration (Atlas)",
+        "Delegate to @linear-monitor: 'For each agent stage, verify: delegate assignment, first thought within 10s, activities streaming, final response'",
+        "Delegate to @healer-monitor: 'Watch pod logs for tool inventory mismatch, MCP init failures (A10/A11/A12)'",
+        "Log each stage transition to progress.txt with timestamps"
       ],
       "priority": 5,
       "passes": false,
-      "notes": "Sequence: Bolt/Rex → Cleo → Cipher → Tess → Atlas"
+      "notes": "Each agent runs as CodeRun pod with Linear sidecar emitting activities"
     },
     {
       "id": "US-006",
-      "title": "Verify Healer monitoring",
-      "description": "As a tester, I want to confirm Healer caught any issues",
+      "title": "Test two-way communication (user input)",
+      "description": "As a tester, I want to verify users can send input to running agents via Linear",
       "acceptanceCriteria": [
-        "Delegate to @healer-monitor: 'Query http://localhost:8083/api/v1/sessions/active and report all detected issues'",
-        "If issues detected, verify GitHub issues were created",
-        "Log any escalations (Discord notifications, GitHub issues) to progress.txt",
-        "Verify no unhandled errors in Healer logs"
+        "Delegate to @linear-monitor: 'Test user input capability during an active agent session'",
+        "While an agent is running, send a comment/prompt via Linear mentioning the agent",
+        "Verify prompt activity appears in agent session",
+        "Verify agent's sidecar detects input via polling (get_session_activities)",
+        "Verify input is forwarded to agent via FIFO (if implemented)",
+        "Log test result to progress.txt: 'User input test: PASS/FAIL'"
       ],
       "priority": 6,
       "passes": false,
-      "notes": "This validates the Healer dual-model architecture"
+      "notes": "Tests the input_poll_task in status-sync.rs. Nice-to-have if not fully implemented."
     },
     {
       "id": "US-007",
-      "title": "Complete full lifecycle verification",
-      "description": "As a tester, I want to confirm the entire lifecycle completed",
+      "title": "Verify Healer and Linear monitoring integration",
+      "description": "As a tester, I want to confirm both monitoring subagents detected all relevant events",
       "acceptanceCriteria": [
-        "Call MCP tool: mcp_cto_play_status() to verify workflow Succeeded",
-        "Verify PR was merged (autoMerge=true should have triggered Atlas merge)",
-        "Delegate to @healer-monitor: 'Final status report - any unresolved alerts?'",
-        "Log final summary to progress.txt with success/failure count",
-        "If ALL checks pass, lifecycle is complete"
+        "Delegate to @healer-monitor: 'Final report: any A10/A11/A12 alerts? GitHub issues created?'",
+        "Delegate to @linear-monitor: 'Final report: all sessions complete? Any missing activities? Delegates correct throughout?'",
+        "Cross-reference: Healer session tracking matches Linear session states",
+        "Log combined monitoring summary to progress.txt"
       ],
       "priority": 7,
       "passes": false,
-      "notes": "Success means full E2E from intake to merged PR"
+      "notes": "Validates both monitoring layers caught all events"
+    },
+    {
+      "id": "US-008",
+      "title": "Complete full lifecycle verification",
+      "description": "As a tester, I want to confirm entire in-cluster lifecycle completed successfully",
+      "acceptanceCriteria": [
+        "Call MCP tool: mcp_cto_play_status() - verify workflow 'Succeeded'",
+        "Verify PR was created by implementation agent's GitHub App",
+        "Verify PR was merged by Atlas (autoMerge=true)",
+        "All CodeRun pods should have completed successfully",
+        "Delegate to @linear-monitor: 'Verify all agent sessions show state=complete with final response activity'",
+        "Log final summary to progress.txt: workflow names, duration, success/failure"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Full E2E: MCP intake() → Argo → Linear → MCP play() → CodeRuns → Merged PR"
     }
   ]
 }
