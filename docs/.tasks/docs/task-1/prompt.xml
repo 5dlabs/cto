@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="1" priority="high" agent="bolt">
+    <meta>
+        <title>Setup Infrastructure (Bolt - Kubernetes)</title>
+        <priority>high</priority>
+        <dependencies></dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 1 with production-quality code.</role>
+
+    <context>
+        <overview>Provision all infrastructure components including PostgreSQL, Redis/Valkey, Kafka, MongoDB, RabbitMQ, and SeaweedFS using Kubernetes operators and CRDs</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <code_signatures expected_language="yaml">
+        <signature language="yaml">
+<![CDATA[
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: alerthub-postgres
+  namespace: databases
+spec:
+  instances: 1
+  storage:
+    size: 10Gi
+  bootstrap:
+    initdb:
+      database: alerthub
+      owner: alerthub_user
+]]>
+        </signature>
+    </code_signatures>
+
+    <requirements>
+        <description>Deploy infrastructure resources using CRDs:
+
+1. Create namespaces: databases, kafka, messaging, storage
+
+2. PostgreSQL (CloudNative-PG):
+
+3. Redis/Valkey, Kafka (Strimzi), MongoDB (Percona), RabbitMQ, and SeaweedFS CRDs as specified in PRD
+
+4. Create ConfigMaps and Secrets for connection strings
+5. Apply Network Policies for service isolation</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-1): Setup Infrastructure (Bolt - Kubernetes)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>1. Verify all pods reach Running state
+2. Test connectivity to each service from a debug pod
+3. Validate PostgreSQL accepts connections
+4. Confirm Redis responds to PING
+5. Verify Kafka topic creation works
+6. Test MongoDB connection</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>kubectl get pods -n {namespace} - verify all pods running</command>
+        <command>kubectl get secrets - verify connection secrets created</command>
+        <command>kubectl logs {pod} - check for errors</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
+</task>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="8" priority="high" agent="blaze">
+    <meta>
+        <title>Web Console Dashboard (Blaze - React/Next.js)</title>
+        <priority>high</priority>
+        <dependencies>2, 3</dependencies>
+        <agent_hint>blaze</agent_hint>
+    </meta>
+
+    <role>You are a Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX. Implement Task 8 with production-quality code.</role>
+
+    <context>
+        <overview>Build Next.js 15 web console with dashboard, notification history, and real-time WebSocket feed</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 2, 3
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>Next.js 15 App Router with React 19, shadcn/ui, TailwindCSS 4, Effect for validation and data fetching, TanStack Query, WebSocket Stream.</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-8): Web Console Dashboard (Blaze - React/Next.js)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>Unit tests, E2E with Playwright, visual regression tests</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>npm run build</command>
+        <command>npm run lint</command>
+        <command>npm run test</command>
+        <command>npm run typecheck</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
+</task>
