@@ -5,8 +5,8 @@
 Morgan intake workflow failed to create PRs for repositories that don't have a `develop` branch:
 
 ```
-pull request create failed: GraphQL: Head sha can't be blank, Base sha can't be blank, 
-No commits between develop and intake-prd-alerthub-e2e-test-20260106-113834, 
+pull request create failed: GraphQL: Head sha can't be blank, Base sha can't be blank,
+No commits between develop and intake-prd-alerthub-e2e-test-20260106-113834,
 Base ref must be a branch (createPullRequest)
 ```
 
