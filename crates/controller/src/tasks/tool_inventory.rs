@@ -5,9 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
-use super::tool_catalog::resolve_tool_name;
+use super::tool_catalog::{resolve_tool_name, try_resolve_tool_strict, ToolResolutionResult};
 
 /// Result of comparing declared vs available tools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,22 +22,50 @@ pub struct ToolInventoryDiff {
     pub all_resolved: bool,
     /// Agent name this diff is for
     pub agent: String,
+    /// Whether the tool catalog was available for validation
+    pub catalog_available: bool,
 }
 
 /// Log the tool inventory status for an agent.
 ///
 /// Returns a `ToolInventoryDiff` that summarizes the comparison.
+///
+/// Uses strict tool resolution to properly detect tools that are declared
+/// in the config but not present in the tool catalog.
 pub fn log_tool_inventory(agent_name: &str, declared_tools: &[String]) -> ToolInventoryDiff {
     let mut resolved_tools = Vec::new();
     let mut unresolved_tools = Vec::new();
+    let mut catalog_available = true;
 
     for tool in declared_tools {
-        match resolve_tool_name(tool) {
-            Some(resolved) => {
-                resolved_tools.push(resolved);
+        match try_resolve_tool_strict(tool) {
+            ToolResolutionResult::Resolved(canonical) => {
+                debug!(
+                    agent = %agent_name,
+                    tool = %tool,
+                    canonical = %canonical,
+                    "Tool resolved to canonical name"
+                );
+                resolved_tools.push(canonical);
             }
-            None => {
+            ToolResolutionResult::NotFound => {
+                warn!(
+                    agent = %agent_name,
+                    tool = %tool,
+                    "Tool declared but not found in catalog"
+                );
                 unresolved_tools.push(tool.clone());
+            }
+            ToolResolutionResult::CatalogUnavailable => {
+                // Catalog not loaded - we can't validate, treat as resolved for now
+                // but mark that catalog wasn't available
+                debug!(
+                    agent = %agent_name,
+                    tool = %tool,
+                    "Tool catalog unavailable, skipping validation"
+                );
+                catalog_available = false;
+                resolved_tools.push(tool.clone());
             }
         }
     }
@@ -46,7 +74,13 @@ pub fn log_tool_inventory(agent_name: &str, declared_tools: &[String]) -> ToolIn
     let declared_count = declared_tools.len();
 
     // Log the inventory status
-    if all_resolved {
+    if !catalog_available {
+        info!(
+            agent = %agent_name,
+            declared = declared_count,
+            "⏭️ Tool catalog unavailable, validation skipped"
+        );
+    } else if all_resolved {
         info!(
             agent = %agent_name,
             declared = declared_count,
@@ -64,9 +98,9 @@ pub fn log_tool_inventory(agent_name: &str, declared_tools: &[String]) -> ToolIn
         );
     }
 
-    // Log individual tools for debugging
+    // Log individual tools for debugging (only at debug level)
     for (i, tool) in resolved_tools.iter().enumerate() {
-        info!(
+        debug!(
             agent = %agent_name,
             tool_index = i + 1,
             tool_name = %tool,
@@ -80,6 +114,7 @@ pub fn log_tool_inventory(agent_name: &str, declared_tools: &[String]) -> ToolIn
         declared_count,
         all_resolved,
         agent: agent_name.to_string(),
+        catalog_available,
     }
 }
 
@@ -149,9 +184,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_log_tool_inventory_all_resolved() {
-        // Note: In tests, the tool catalog won't be loaded from the real path
-        // so resolve_tool_name will return the tool unchanged
+    fn test_log_tool_inventory_catalog_unavailable() {
+        // In tests, the tool catalog won't be loaded from the real path
+        // so try_resolve_tool_strict returns CatalogUnavailable
         let tools = vec![
             "memory_create_entities".to_string(),
             "brave_search_brave_web_search".to_string(),
@@ -159,11 +194,16 @@ mod tests {
 
         let diff = log_tool_inventory("rex", &tools);
 
-        // Since catalog won't be loaded in tests, all tools should "resolve"
-        // (they're returned unchanged)
+        // Since catalog won't be loaded in tests:
+        // - all_resolved should be true (we can't detect unresolved)
+        // - catalog_available should be false
+        // - tools are returned unchanged
         assert_eq!(diff.agent, "rex");
         assert_eq!(diff.declared_count, 2);
         assert!(diff.all_resolved);
+        assert!(!diff.catalog_available);
+        assert_eq!(diff.resolved_tools.len(), 2);
+        assert!(diff.unresolved_tools.is_empty());
     }
 
     #[test]
@@ -199,6 +239,7 @@ mod tests {
             declared_count: 2,
             all_resolved: false,
             agent: "blaze".to_string(),
+            catalog_available: true,
         };
 
         let formatted = format_inventory_diff(&diff);
@@ -208,5 +249,24 @@ mod tests {
         assert!(formatted.contains("Resolved: 1"));
         assert!(formatted.contains("Unresolved: 1"));
         assert!(formatted.contains("missing_tool"));
+    }
+
+    #[test]
+    fn test_format_inventory_diff_catalog_unavailable() {
+        let diff = ToolInventoryDiff {
+            resolved_tools: vec!["tool_a".to_string(), "tool_b".to_string()],
+            unresolved_tools: vec![],
+            declared_count: 2,
+            all_resolved: true,
+            agent: "rex".to_string(),
+            catalog_available: false,
+        };
+
+        let formatted = format_inventory_diff(&diff);
+
+        assert!(formatted.contains("rex"));
+        assert!(formatted.contains("Declared: 2"));
+        assert!(formatted.contains("Resolved: 2"));
+        assert!(formatted.contains("✅ OK"));
     }
 }
