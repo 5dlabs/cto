@@ -58,6 +58,32 @@ const ERROR_LEVEL_PATTERNS: &[&str] = &[
     r"(?i)traceback\s*\(",
     r"(?i)Traceback\s+\(most recent",
     r"(?i)exception\s*:",
+    // ==================== Healer Play-specific patterns (A10-A12) ====================
+    // A10: Tool inventory mismatch - tool declared in CTO config but not available in CLI
+    r"(?i)tool\s+inventory\s+mismatch",
+    r"(?i)missing\s+from\s+cli",
+    r"(?i)tool\s+not\s+found",
+    r"(?i)tool\s+not\s+available",
+    r"(?i)declared\s+tools?\s*:.*missing",
+    r"(?i)unresolved\s+tools?\s*:",
+    // A11: CTO config issues - config file missing, invalid, or parse errors
+    r"(?i)cto-config\s+missing",
+    r"(?i)cto-config\s+invalid",
+    r"(?i)cto-config\s+not\s+found",
+    r"(?i)cto-config.*parse\s+error",
+    r"(?i)failed\s+to\s+load\s+cto-config",
+    r"(?i)invalid\s+cto\s+config",
+    r"(?i)config\s+missing:\s+cto",
+    // A12: MCP server initialization failures - MCP servers unreachable or failed to start
+    r"(?i)mcp.*failed\s+to\s+initialize",
+    r"(?i)mcp.*initialization\s+failed",
+    r"(?i)mcp.*unreachable",
+    r"(?i)mcp.*connection\s+failed",
+    r"(?i)tools-server.*unreachable",
+    r"(?i)tools-server.*connection\s+refused",
+    r"(?i)tools-server.*unavailable",
+    r"(?i)failed\s+to\s+connect\s+to\s+mcp",
+    r"(?i)mcp\s+server.*not\s+responding",
 ];
 
 /// Patterns that indicate false positives (INFO-level messages with "error" keyword)
@@ -267,12 +293,28 @@ pub struct RemediationCandidate {
 pub fn is_actual_error(line: &str) -> bool {
     // Fast path: if the line doesn't contain any error-like keywords, skip regex
     let line_lower = line.to_lowercase();
-    if !line_lower.contains("error")
-        && !line_lower.contains("fatal")
-        && !line_lower.contains("panic")
-        && !line_lower.contains("exception")
-        && !line_lower.contains("traceback")
-    {
+    let has_error_keyword = line_lower.contains("error")
+        || line_lower.contains("fatal")
+        || line_lower.contains("panic")
+        || line_lower.contains("exception")
+        || line_lower.contains("traceback");
+
+    // A10-A12 keywords for tool/config/mcp issues
+    let has_config_keyword = line_lower.contains("tool inventory")
+        || line_lower.contains("missing from cli")
+        || line_lower.contains("tool not found")
+        || line_lower.contains("tool not available")
+        || line_lower.contains("unresolved tool")
+        || line_lower.contains("cto-config")
+        || line_lower.contains("cto config")
+        || line_lower.contains("mcp")
+        || line_lower.contains("tools-server");
+
+    // Check for klog-style error prefixes (E0104, E0105, etc.)
+    // These are Kubernetes-style errors that don't contain "error" keyword
+    let has_klog_error_prefix = line.starts_with("E") || line.starts_with("F E");
+
+    if !has_error_keyword && !has_config_keyword && !has_klog_error_prefix {
         return false;
     }
 
@@ -312,14 +354,28 @@ pub fn filter_actual_errors(entries: Vec<LogEntry>) -> Vec<LogEntry> {
                 return false;
             }
 
+            let line_lower = entry.line.to_lowercase();
+
             // Check if it contains actual error level indicators
             // If it doesn't match our error patterns but was caught by keyword search,
             // it's likely a false positive
-            let has_error_keyword = entry.line.to_lowercase().contains("error")
-                || entry.line.to_lowercase().contains("fatal")
-                || entry.line.to_lowercase().contains("panic");
+            let has_error_keyword = line_lower.contains("error")
+                || line_lower.contains("fatal")
+                || line_lower.contains("panic");
 
-            if has_error_keyword && !is_actual_error(&entry.line) {
+            // A10-A12 keywords for tool/config/mcp issues
+            let has_config_keyword = line_lower.contains("tool inventory")
+                || line_lower.contains("missing from cli")
+                || line_lower.contains("tool not found")
+                || line_lower.contains("tool not available")
+                || line_lower.contains("unresolved tool")
+                || line_lower.contains("cto-config")
+                || line_lower.contains("cto config")
+                || (line_lower.contains("mcp") && (line_lower.contains("failed") || line_lower.contains("unreachable")))
+                || (line_lower.contains("tools-server") && (line_lower.contains("unreachable") || line_lower.contains("refused")));
+
+            // If the line has relevant keywords, it must match an actual error pattern
+            if (has_error_keyword || has_config_keyword) && !is_actual_error(&entry.line) {
                 debug!(
                     "Filtering out keyword-only match: {}",
                     truncate_line(&entry.line, 100)
@@ -327,7 +383,9 @@ pub fn filter_actual_errors(entries: Vec<LogEntry>) -> Vec<LogEntry> {
                 return false;
             }
 
-            true
+            // Keep lines that match actual error patterns (e.g., E0104, level=error)
+            // even if they don't have error/fatal/panic keywords
+            is_actual_error(&entry.line)
         })
         .collect();
 
@@ -1551,5 +1609,86 @@ mod tests {
             .iter()
             .any(|e| e.line.contains("database connection failed")));
         assert!(!filtered.iter().any(|e| e.line.contains("Link not found")));
+    }
+
+    // ==================== A10-A12 Pattern Tests ====================
+
+    #[test]
+    fn test_is_actual_error_a10_tool_inventory_mismatch() {
+        // A10: Tool inventory mismatch patterns - must include error level prefix
+        assert!(is_actual_error("ERROR: Tool inventory MISMATCH - missing from CLI: [brave_search]"));
+        assert!(is_actual_error("[ERROR] tool inventory mismatch: declared tools not available"));
+        assert!(is_actual_error("level=error msg=\"Tool not found: brave_web_search\""));
+        assert!(is_actual_error("ERROR: Tool not available: memory_create_entities"));
+        assert!(is_actual_error("[ERROR] Unresolved tools: [github_issues, brave_search]"));
+        assert!(is_actual_error("ERROR: missing from cli: brave_web_search, github_file_operations"));
+    }
+
+    #[test]
+    fn test_is_actual_error_a11_cto_config_issues() {
+        // A11: CTO config missing or invalid - must include error level prefix
+        assert!(is_actual_error("ERROR: cto-config missing - cannot start agent"));
+        assert!(is_actual_error("[ERROR] cto-config invalid: expected JSON"));
+        assert!(is_actual_error("FATAL: cto-config not found at /workspace/cto-config.json"));
+        assert!(is_actual_error("level=error cto-config parse error: unexpected token"));
+        assert!(is_actual_error("ERROR: Failed to load cto-config: file not found"));
+        assert!(is_actual_error("[FATAL] Invalid CTO config structure"));
+        assert!(is_actual_error("level=fatal Config missing: cto-config.json"));
+    }
+
+    #[test]
+    fn test_is_actual_error_a12_mcp_init_failures() {
+        // A12: MCP server initialization failures - must include error level prefix
+        assert!(is_actual_error("ERROR: MCP failed to initialize - tools-server unreachable"));
+        assert!(is_actual_error("[ERROR] MCP initialization failed: connection refused"));
+        assert!(is_actual_error("level=error mcp unreachable at http://cto-tools:3000"));
+        assert!(is_actual_error("[ERR] MCP connection failed: timeout"));
+        assert!(is_actual_error("ERROR: tools-server unreachable: ECONNREFUSED"));
+        assert!(is_actual_error("level=error tools-server connection refused at localhost:3000"));
+        assert!(is_actual_error("ERROR: tools-server unavailable - retrying..."));
+        assert!(is_actual_error("[ERROR] Failed to connect to MCP server"));
+        assert!(is_actual_error("level=error MCP server not responding after 30s"));
+    }
+
+    #[test]
+    fn test_filter_a10_a12_patterns() {
+        use chrono::Utc;
+
+        let entries = vec![
+            // A10: Tool inventory mismatch - should be detected
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "ERROR: Tool inventory MISMATCH - missing from CLI: [brave_search, github_file_ops]".to_string(),
+                labels: HashMap::new(),
+            },
+            // A11: CTO config issue - should be detected
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "FATAL: cto-config not found - agent cannot start".to_string(),
+                labels: HashMap::new(),
+            },
+            // A12: MCP init failure - should be detected
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "ERROR: MCP failed to initialize - tools-server unreachable".to_string(),
+                labels: HashMap::new(),
+            },
+            // Normal info message - should be filtered
+            LogEntry {
+                timestamp: Utc::now(),
+                line: "INFO: Checking tool inventory...".to_string(),
+                labels: HashMap::new(),
+            },
+        ];
+
+        let filtered = filter_actual_errors(entries);
+
+        // Should have retained the 3 error entries
+        assert_eq!(filtered.len(), 3);
+
+        // Verify each A10-A12 error was detected
+        assert!(filtered.iter().any(|e| e.line.contains("Tool inventory MISMATCH")));
+        assert!(filtered.iter().any(|e| e.line.contains("cto-config not found")));
+        assert!(filtered.iter().any(|e| e.line.contains("MCP failed to initialize")));
     }
 }

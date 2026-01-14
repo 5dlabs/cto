@@ -5,6 +5,9 @@
 //! - Rendering alert-specific templates with context
 //! - Supporting both `.hbs` and legacy `.md` templates
 
+// Allow dead_code for library builds - these are used by the binary
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use handlebars::{Context as HbsContext, Handlebars, Helper, HelperResult, Output, RenderContext};
 use serde::Serialize;

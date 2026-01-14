@@ -65,7 +65,8 @@
       "securityMaxRetries": 2,
       "testingMaxRetries": 5,
       "autoMerge": false,
-      "parallelExecution": false
+      "parallelExecution": false,
+      "healerEndpoint": "http://localhost:8083"
     }
   },
   "_comment_agents": "Agent configurations with tool profiles",
@@ -315,6 +316,7 @@
     "defaults.play.testingMaxRetries": "Maximum retry attempts for testing agent (Tess)",
     "defaults.play.autoMerge": "Whether Tess should automatically merge PRs after approval (true/false)",
     "defaults.play.parallelExecution": "Whether to run independent tasks in parallel (true/false)",
+    "defaults.play.healerEndpoint": "Healer API endpoint for session notifications - enables real-time Play monitoring (e.g., 'http://localhost:8083' for local, 'http://cto-healer-play-api:8083' for cluster)",
     "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access",
     "agents.*.features.effectSolutions": "Enable Effect.ts integration - includes effect-solutions CLI instructions in agent prompts for idiomatic Effect TypeScript patterns",
     "agents.blaze.frontendStack": "Frontend stack selection: 'shadcn' (default) for Next.js + shadcn/ui, or 'tanstack' for TanStack Router + DB + Query ecosystem. Affects which patterns Blaze uses for routing, data fetching, and UI components",

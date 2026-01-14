@@ -295,25 +295,55 @@ impl BookmarkPoller {
             let before_count = all_bookmarks.len();
             let mut oldest_in_batch: Option<DateTime<Utc>> = None;
 
+            let batch_count = bookmarks.len();
+            let mut skipped_age = 0usize;
+            let mut added = 0usize;
+
             for bookmark in bookmarks {
                 // Track the oldest tweet in this batch
                 if oldest_in_batch.is_none() || bookmark.posted_at < oldest_in_batch.unwrap() {
                     oldest_in_batch = Some(bookmark.posted_at);
                 }
 
+                // Log bookmark details for debugging
+                let age_days = bookmark.age().num_days();
+                tracing::debug!(
+                    id = %bookmark.id,
+                    posted_at = %bookmark.posted_at,
+                    age_days,
+                    max_age_days = self.config.max_age_days,
+                    "Processing bookmark"
+                );
+
                 // Check if this bookmark is too old
                 if !bookmark.is_within_days(self.config.max_age_days) {
                     tracing::debug!(
                         id = %bookmark.id,
                         posted_at = %bookmark.posted_at,
-                        "Found bookmark older than {} days, stopping",
-                        self.config.max_age_days
+                        age_days,
+                        max_age_days = self.config.max_age_days,
+                        "Bookmark older than max_age_days, skipping"
                     );
+                    skipped_age += 1;
                     reached_time_boundary = true;
                     continue; // Don't add to collection
                 }
 
-                all_bookmarks.entry(bookmark.id.clone()).or_insert(bookmark);
+                if all_bookmarks.entry(bookmark.id.clone()).or_insert(bookmark).id.is_empty() {
+                    // Entry was just inserted
+                }
+                added += 1;
+            }
+
+            // Log batch summary at INFO level for better visibility
+            if skipped_age > 0 {
+                tracing::info!(
+                    batch_count,
+                    skipped_age,
+                    added,
+                    max_age_days = self.config.max_age_days,
+                    "Bookmarks filtered by age in batch"
+                );
             }
 
             let new_in_scroll = all_bookmarks.len() - before_count;

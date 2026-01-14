@@ -126,6 +126,15 @@ dev-healer:
 watch-healer:
     HEALER_TEMPLATES_DIR=./templates/healer CTO_CONFIG_PATH=./cto-config.json bacon run-healer
 
+# Run healer Play API server (for MCP integration)
+dev-healer-play-api:
+    @echo "Starting healer Play API server..."
+    cargo run --bin healer -- play-api --addr 0.0.0.0:8083
+
+# Run healer Play API with release build
+healer-play-api:
+    ./target/release/healer play-api --addr 0.0.0.0:8083
+
 # =============================================================================
 # CLI Commands (for testing CLIs locally)
 # =============================================================================
@@ -166,12 +175,13 @@ bacon-test:
 # mprocs (TUI for monitoring services) - RECOMMENDED
 # =============================================================================
 
-# Kill processes on dev ports (8080, 8081, 8082, 3000)
+# Kill processes on dev ports (8080, 8081, 8082, 8083, 3000)
 kill-ports:
     @echo "🧹 Cleaning up stale processes..."
     -lsof -ti :8080 | xargs kill -9 2>/dev/null || true
     -lsof -ti :8081 | xargs kill -9 2>/dev/null || true
     -lsof -ti :8082 | xargs kill -9 2>/dev/null || true
+    -lsof -ti :8083 | xargs kill -9 2>/dev/null || true
     -lsof -ti :3000 | xargs kill -9 2>/dev/null || true
     @sleep 1
     @echo "✅ Ports cleared"
@@ -317,10 +327,10 @@ preflight:
     
     echo "═══ 1. SERVICE STATUS ═══"
     printf "%-20s %-12s %-12s\n" "SERVICE" "K8S" "LOCAL"
-    for svc in pm controller healer tools; do
+    for svc in pm controller healer healer-play-api tools; do
       k8s=$(kubectl get deployment cto-$svc -n cto -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "?")
       case $svc in
-        pm) port=8081 ;; controller) port=8080 ;; healer) port=8082 ;; tools) port=3000 ;;
+        pm) port=8081 ;; controller) port=8080 ;; healer) port=8082 ;; healer-play-api) port=8083 ;; tools) port=3000 ;;
       esac
       local_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$port/health 2>/dev/null || echo "000")
       [ "$local_status" = "200" ] && local_status="✅ UP" || { local_status="❌ DOWN"; ERRORS=$((ERRORS+1)); }

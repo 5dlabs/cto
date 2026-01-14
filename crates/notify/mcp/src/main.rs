@@ -281,6 +281,9 @@ struct PlayDefaults {
     auto_merge: Option<bool>,
     #[serde(default, rename = "parallelExecution")]
     parallel_execution: Option<bool>,
+    /// Healer API endpoint for session notifications (e.g., `http://localhost:8081`)
+    #[serde(default, rename = "healerEndpoint")]
+    healer_endpoint: Option<String>,
 }
 
 /// Hardcoded agent suffixes - these are the canonical agent names
@@ -1557,6 +1560,126 @@ fn clear_play_progress(repo: &str) {
             "--ignore-not-found=true",
         ])
         .output();
+}
+
+/// Notify Healer that a Play session has started.
+///
+/// Sends the full CTO config and task information so Healer knows:
+/// - Expected tools per agent
+/// - Task dependencies
+/// - Repository and service details
+fn notify_healer(
+    healer_endpoint: &str,
+    play_id: &str,
+    repository: &str,
+    service: &str,
+    task_id: u32,
+    cto_config: &CtoConfig,
+) {
+    use std::io::Read;
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    eprintln!("📡 Notifying Healer at {healer_endpoint} of play session start...");
+
+    // Build the session start request
+    // Convert CtoConfig to the format Healer expects
+    let mut agents_map: BTreeMap<String, Value> = BTreeMap::new();
+    for (agent_key, agent_config) in &cto_config.agents {
+        let tools = agent_config.tools.as_ref().map(|t| {
+            json!({
+                "remote": t.remote,
+                "localServers": t.local_servers
+            })
+        }).unwrap_or_else(|| json!({"remote": [], "localServers": {}}));
+
+        agents_map.insert(agent_key.clone(), json!({
+            "githubApp": agent_config.github_app,
+            "cli": agent_config.cli,
+            "model": agent_config.model,
+            "tools": tools
+        }));
+    }
+
+    let request_body = json!({
+        "play_id": play_id,
+        "repository": repository,
+        "service": service,
+        "namespace": "cto",
+        "cto_config": {
+            "agents": agents_map
+        },
+        "tasks": [{
+            "id": task_id.to_string(),
+            "title": format!("Task {task_id}"),
+            "dependencies": []
+        }]
+    });
+
+    // Parse endpoint URL (simple implementation - just needs host:port)
+    let endpoint_clean = healer_endpoint
+        .trim_start_matches("http://")
+        .trim_start_matches("https://");
+
+    let (host_port, _path) = if let Some(idx) = endpoint_clean.find('/') {
+        endpoint_clean.split_at(idx)
+    } else {
+        (endpoint_clean, "/api/v1/session/start")
+    };
+
+    // Attempt HTTP POST using a simple TCP connection
+    // (We use raw TCP to avoid adding reqwest as a dependency in the MCP server)
+    let body = serde_json::to_string(&request_body).unwrap_or_default();
+    let http_request = format!(
+        "POST /api/v1/session/start HTTP/1.1\r\n\
+         Host: {host_port}\r\n\
+         Content-Type: application/json\r\n\
+         Content-Length: {}\r\n\
+         Connection: close\r\n\
+         \r\n\
+         {body}",
+        body.len()
+    );
+
+    // Try to parse as SocketAddr (host:port), or add :80 if no port specified
+    let socket_addr = match host_port.parse() {
+        Ok(addr) => addr,
+        Err(_) => {
+            // Try adding default port
+            match format!("{host_port}:80").parse() {
+                Ok(addr) => addr,
+                Err(e) => {
+                    eprintln!("⚠️  Invalid Healer endpoint '{healer_endpoint}': {e}");
+                    eprintln!("   (This is non-fatal - play workflow will continue)");
+                    return;
+                }
+            }
+        }
+    };
+
+    match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(5)) {
+        Ok(mut stream) => {
+            if let Err(e) = std::io::Write::write_all(&mut stream, http_request.as_bytes()) {
+                eprintln!("⚠️  Failed to send Healer notification: {e}");
+                return;
+            }
+
+            // Read response
+            let mut response = String::new();
+            if stream.read_to_string(&mut response).is_ok() && response.contains("200 OK") {
+                eprintln!("✅ Healer notified successfully");
+            } else if response.contains("409") {
+                eprintln!("⚠️  Healer session already exists (409 Conflict)");
+            } else {
+                eprintln!("⚠️  Healer notification got unexpected response");
+            }
+        }
+        Err(e) => {
+            // Non-fatal - Healer might not be running
+            eprintln!("⚠️  Could not connect to Healer at {healer_endpoint}: {e}");
+            eprintln!("   (This is non-fatal - play workflow will continue)");
+        }
+    }
 }
 
 /// Query active play workflows for a repository
@@ -3398,6 +3521,18 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 if let Err(e) = write_play_progress(&progress) {
                     eprintln!("⚠️  Failed to write progress ConfigMap: {e}");
                     eprintln!("   (This won't affect workflow execution)");
+                }
+
+                // Notify Healer if endpoint is configured
+                if let Some(healer_endpoint) = &config.defaults.play.healer_endpoint {
+                    notify_healer(
+                        healer_endpoint,
+                        wf_name,
+                        &repository,
+                        service,
+                        task_id,
+                        config,
+                    );
                 }
             }
 

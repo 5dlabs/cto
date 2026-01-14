@@ -397,6 +397,16 @@ enum Commands {
         #[arg(long)]
         config: Option<String>,
     },
+    /// [SERVER] Run Play API server for MCP integration
+    PlayApi {
+        /// Address to bind to
+        #[arg(long, default_value = "0.0.0.0:8081")]
+        addr: String,
+
+        /// Kubernetes namespace
+        #[arg(long, default_value = "cto")]
+        namespace: String,
+    },
     /// [SCANNER] Scan logs for errors and warnings across platform namespaces
     ScanLogs {
         /// Time window to scan (e.g., "1h", "30m", "2h")
@@ -2456,6 +2466,9 @@ async fn main() -> Result<()> {
             config: config_path,
         } => {
             run_server_command(&addr, &repository, &namespace, config_path.as_deref()).await?;
+        }
+        Commands::PlayApi { addr, namespace } => {
+            run_play_api_command(&addr, &namespace).await?;
         }
         Commands::ScanLogs {
             window,
@@ -8042,6 +8055,63 @@ async fn run_server_command(
     // Run the server
     println!("{}", format!("Starting server on {addr}...").cyan());
     ci::run_server(state, addr).await?;
+
+    Ok(())
+}
+
+/// Run the Play API server for MCP integration.
+async fn run_play_api_command(addr: &str, namespace: &str) -> Result<()> {
+    use play::{run_play_api_server, PlayApiState};
+    use std::sync::Arc;
+
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════════════════════════════════"
+            .bright_cyan()
+    );
+    println!(
+        "{}",
+        "                      HEALER PLAY API SERVER                                   "
+            .bright_cyan()
+            .bold()
+    );
+    println!(
+        "{}",
+        "═══════════════════════════════════════════════════════════════════════════════"
+            .bright_cyan()
+    );
+    println!();
+    println!("{}: {}", "Namespace".bright_white(), namespace.cyan());
+    println!("{}: {}", "Address".bright_white(), addr.cyan());
+    println!();
+    println!("{}", "Endpoints:".bright_white().bold());
+    println!(
+        "  {} - Health check",
+        format!("GET  http://{addr}/health").green()
+    );
+    println!(
+        "  {} - Start session (MCP calls this)",
+        format!("POST http://{addr}/api/v1/session/start").green()
+    );
+    println!(
+        "  {} - Get session by ID",
+        format!("GET  http://{addr}/api/v1/session/{{play_id}}").green()
+    );
+    println!(
+        "  {} - List active sessions",
+        format!("GET  http://{addr}/api/v1/sessions/active").green()
+    );
+    println!();
+
+    // Create server state
+    let state = Arc::new(PlayApiState::new(namespace));
+
+    // Run the server
+    println!(
+        "{}",
+        format!("Starting Play API server on {addr}...").cyan()
+    );
+    run_play_api_server(state, addr).await?;
 
     Ok(())
 }
