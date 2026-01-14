@@ -1,136 +1,25 @@
 ## Codebase Patterns
-- Intake workflow requires Morgan OAuth app to be installed in Linear workspace for auto-assign
-- `auto_assign_morgan` only works if Morgan user exists in Linear workspace users search
-- CLI mode JSON parsing: use `text.contains("```json")` not `text.find("```json")` to handle prefill
-- API mode for intake requires ANTHROPIC_API_KEY and may timeout on large PRDs (>20k chars)
-- Linear issues created: CTOPA-792, CTOPA-793, CTOPA-794 for alerthub-e2e-test
-- Empty tasks.json indicates intake didn't complete, not that there are no tasks
-- When AI wraps JSON in markdown code blocks, extract from code block BEFORE brace-matching
-- cto_play() requires `model` parameter explicitly when `defaults.play.model` not set in config
-- cto_play() requires `docs_project_directory` when tasks.json is not in default `docs/` folder
-- **Play workflow task files**: Must be on the branch workflow clones (main/develop by default)
-- **Play workflow docs-branch**: Available in Argo template but NOT in MCP cto_play() - use argo CLI
-- **CodeRun task file location**: `$REPO_ROOT/$DOCS_PROJECT_DIR/.tasks/docs/task-$TASK_ID`
-- **Agent configuration**: Required via workflow params or cto-config.json in docs repo
+- Intake CLI JSON parsing: Use `text.contains("```json")` not `text.find()` for code block detection
+- Task file structure: `.tasks/tasks/tasks.json` with `metadata` and `tasks` arrays
+- Agent hints: Task 1 should always be infrastructure (agentHint='bolt')
+- Provider.rs fix commit: 9ee45367d - handles prefill-generated output from Claude
 
 ---
 
-## 2026-01-14 08:08 - US-000 through US-002 (Completed)
-- Started all local services (PM, Healer, tunnel)
-- Verified pre-flight checks
-- Initiated intake via MCP tool (Morgan auto-assign failed, issue created)
-- See git history for details
+## 2026-01-14 13:44 - US-000
+- Verified provider.rs fix from commit 9ee45367d works correctly
+- Built intake locally with `cargo build -p intake`
+- Confirmed tasks.json generated with valid JSON (15 tasks, not mixed with text)
+- Task 1 has agentHint='bolt' (infrastructure) as required
+- All 155 unit tests pass + 44 integration tests pass
+- **Local intake test: PASS**
 
----
+**Files verified:**
+- crates/intake/src/ai/provider.rs (contains the fix)
+- alerthub-e2e-test/.tasks/tasks/tasks.json (valid JSON with 15 tasks)
 
-## 2026-01-14 09:35 - US-003 (COMPLETED ✓)
-- **Status**: COMPLETED - Fixed intake CLI JSON parsing bug, tasks generated successfully
-- **Root Cause Analysis** (now fixed):
-  - CLI mode prefill technique produced malformed JSON with explanatory text inside array
-  - Parser checked for `let Some(json_start) = text.find("```json")` which fails if text starts with `{`
-  - Changed to `text.contains("```json")` to find embedded code blocks even when prefill is present
-
-- **Fix Applied**:
-  - File: `crates/intake/src/ai/provider.rs` (lines 162-180)
-  - Changed `let json_text = if let Some(json_start) = text.find("```json")` to `if text.contains("```json")`
-  - This prioritizes extracting JSON from markdown code blocks over brace-matching fallback
-  - Rebuilt intake CLI: `cargo install --path crates/intake --bin intake --force`
-
-- **Verification**:
-  - Ran: `intake parse-prd prd.md --num-tasks 15 --use-cli --cli-type claude`
-  - Result: ✓ Generated 15 tasks from PRD
-  - Task 1: "Setup Infrastructure (Bolt - Kubernetes)" - infrastructure first as required
-  - All tasks have proper dependencies, priorities, decision points
-
-- **Generated Tasks Summary**:
-  | ID | Title | Priority | Dependencies |
-  |----|-------|----------|--------------|
-  | 1 | Setup Infrastructure (Bolt - Kubernetes) | high | - |
-  | 2 | Notification Router Service (Rex - Rust/Axum) | high | 1 |
-  | 3 | Admin API Service (Grizz - Go/gRPC) | high | 1 |
-  | 4 | Integration Service (Nova - Bun/Elysia) | high | 1 |
-  | 5 | Database Schema Migrations (Rex - Rust/Axum) | high | 1 |
-  | 6 | MongoDB Schema Setup (Nova - Bun/Elysia) | medium | 1 |
-  | 7 | Kafka Topics and Schemas (Bolt - Kubernetes) | medium | 1 |
-  | 8 | Web Console Dashboard (Blaze - React/Next.js) | high | 2, 3 |
-  | 9 | Web Console Integrations & Rules (Blaze - React/Next.js) | medium | 8 |
-  | 10 | Mobile App Core (Tap - Expo) | medium | 2, 3 |
-  | 11 | Mobile App Settings & Profile (Tap - Expo) | medium | 10 |
-  | 12 | Desktop Client Core (Spark - Electron) | medium | 2, 3 |
-  | 13 | Desktop Client Windows & Settings (Spark - Electron) | medium | 12 |
-  | 14 | Service Deployments (Bolt - Kubernetes) | high | 2, 3, 4, 8 |
-  | 15 | Observability Stack (Bolt - Kubernetes) | medium | 14 |
-
-- **Files Modified**:
-  - `crates/intake/src/ai/provider.rs` - JSON extraction fix
-
-- **Learnings for future iterations**:
-  - When extracting JSON from AI responses, ALWAYS check for markdown code blocks first
-  - `text.contains()` is better than `text.find().is_some()` when order of checks matters
-  - CLI mode prefill produces different output than API mode - parser must handle both
----
-
-## 2026-01-14 09:25 - US-004 (COMPLETED ✓)
-- **Status**: COMPLETED - Play workflow started successfully
-- **Workflow**: `play-workflow-template-krlpl` submitted for Task 1
-- **Task**: Task 1 - "Setup Infrastructure (Bolt - Kubernetes)" - infrastructure agent (5DLabs-Bolt)
-- **Model**: claude-opus-4-5-20251101
-- **Agents configured**: Rex, Blaze, Grizz, Nova, Tap, Spark, Bolt, Cleo, Cipher, Tess
-
-- **Services Verified Healthy**:
-  - PM Server: http://localhost:8081/health ✓
-  - Healer: http://localhost:8083/health ✓
-  - Tunnel: https://pm-dev.5dlabs.ai/health ✓
-  - Argo Workflows: http://localhost:2746/api/v1/info ✓
-
-- **Workflow Parameters**:
-  - task-id=1
-  - repository=5dlabs/cto
-  - docs-project-directory=alerthub-e2e-test
-  - auto-merge=true
-  - parallel-execution=false
-
-- **Learnings for future iterations**:
-  - Must explicitly pass `model` parameter to cto_play() - empty model validation fails
-  - Must specify `docs_project_directory` if tasks are not in default `docs` folder
-  - Workflow started at "initialize-stage" → "agent-sequence" → "check-resume-point"
----
-
-## 2026-01-14 09:45 - US-005 (PARTIAL - Configuration Blocker)
-- **Status**: PARTIAL - Play workflow monitoring attempted, hit E2E test setup issues
-- **Issue**: CodeRun pods failed because task files were not on the docs branch
-
-- **Root Cause Analysis**:
-  1. Task files were generated locally via `intake generate-docs` and committed to `ralph/e2e-alerthub-test` branch
-  2. Play workflow clones from `main`/`develop` branch by default, where task files don't exist
-  3. The `docs-branch` parameter is not exposed in the MCP `cto_play()` tool
-  4. Submitting via `argo submit` with `docs-branch=ralph/e2e-alerthub-test` hit another issue: missing agent configuration
-
-- **Workflow Attempts**:
-  - `play-workflow-template-krlpl` - Failed (prompt not found, main branch)
-  - `play-workflow-template-ttxtl` - Failed (same issue)
-  - `play-workflow-template-tcwzk` - Failed (same issue)
-  - `play-workflow-template-fzb4t` - Failed (agent configuration missing when using custom docs-branch)
-
-- **Actions Taken**:
-  1. Generated task docs: `intake generate-docs --project alerthub-e2e-test`
-  2. Copied task files to `docs/.tasks/` for compatibility
-  3. Committed and pushed to `ralph/e2e-alerthub-test`
-  4. Tried `argo submit` with `docs-branch` parameter
-
-- **Key Learnings (Added to Codebase Patterns)**:
-  - Task files MUST be on the branch that Play workflow clones (main/develop by default)
-  - The `docs-branch` parameter is available in the Argo template but NOT in MCP `cto_play()` tool
-  - For proper E2E testing, intake workflow should commit task files to the docs repository
-  - CodeRun pods look for task files at: `$REPO_ROOT/$DOCS_PROJECT_DIR/.tasks/docs/task-$TASK_ID`
-  - Agent configuration (infrastructure-agent, etc.) must be provided via workflow params or cto-config.json
-
-- **Files Changed**:
-  - Created: `docs/.tasks/` (copied from `alerthub-e2e-test/.tasks/`)
-  - Created: `alerthub-e2e-test/.tasks/docs/task-{1-15}/` (prompt.md, prompt.xml, acceptance.md, decisions.md)
-
-- **Recommendation**: For complete E2E testing, either:
-  1. Run intake in-cluster to auto-commit task files to docs repo main branch
-  2. OR manually merge task files to main/develop before starting Play
-  3. OR add `docs_branch` parameter to MCP `cto_play()` tool
+**Learnings for future iterations:**
+- The intake CLI requires project initialization before parse-prd works standalone
+- The `intake intake` command handles initialization automatically
+- Provider.rs uses `text.contains()` for code block detection to handle AI responses with mixed text/JSON
 ---

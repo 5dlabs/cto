@@ -1,10 +1,51 @@
 {
   "project": "CTO E2E Play Test - AlertHub",
   "branchName": "ralph/e2e-alerthub-test",
-  "description": "E2E test of CTO Play workflow using alerthub-e2e-test PRD. Tests full lifecycle from intake through deployment. All workflows run in-cluster. Includes Linear Agent API validation and two-way communication testing.",
+  "description": "E2E test of CTO Play workflow. ⚠️ CRITICAL RULES: (1) Use MCP tools ONLY (cto___intake, cto___play, cto___jobs). (2) NEVER run 'intake' CLI locally. (3) NEVER create or modify .tasks/ folders locally - only Morgan pod does this in-cluster. (4) NEVER run 'intake parse-prd', 'intake generate-docs', or any intake subcommand. (5) All task generation happens IN-CLUSTER via Argo pods. (6) Play workflow is triggered by merging Morgan's PR with tasks.json.",
+  "knownIssues": [
+    {
+      "id": "ISSUE-001",
+      "title": "Intake CLI JSON parsing bug in provider.rs",
+      "status": "FIXED_LOCALLY_NOT_DEPLOYED",
+      "description": "The intake CLI in CLI mode fails to parse JSON when Claude returns explanation text mixed with JSON. Fix: Change text.find() to text.contains() in provider.rs line ~162.",
+      "fixCommit": "9ee45367d",
+      "fixFile": "crates/intake/src/ai/provider.rs",
+      "action": "Test fix locally, then create PR to merge to develop, rebuild intake image"
+    },
+    {
+      "id": "ISSUE-002", 
+      "title": "Morgan auto-assign sometimes fails",
+      "status": "WORKAROUND_AVAILABLE",
+      "description": "Linear user search API can be flaky. Morgan gets set as delegate (sub-assignment) which still triggers webhook.",
+      "workaround": "If auto-assign fails, manually assign Morgan via Linear API. Morgan ID: 11f0c7e3-dbf5-45fe-b15e-2a235f4d0013"
+    }
+  ],
+  "prerequisites": [
+    "provider.rs fix must be merged to develop and intake image rebuilt before in-cluster intake will work",
+    "Test the fix locally first: cargo build -p intake && intake parse-prd alerthub-e2e-test/prd.md --use-cli",
+    "All local services must be running: controller, PM, healer, tunnel",
+    "Port forwards must be active: ArgoCD (8080), Argo Workflows (2746)"
+  ],
   "userStories": [
     {
       "id": "US-000",
+      "title": "Test intake fix locally before deployment",
+      "description": "As a tester, I need to verify the provider.rs fix works locally before deploying to cluster",
+      "acceptanceCriteria": [
+        "Checkout the branch with the fix: git checkout ralph/e2e-alerthub-test",
+        "Build intake locally: cargo build -p intake",
+        "Test the fix: ./target/debug/intake parse-prd alerthub-e2e-test/prd.md --num-tasks 15 --use-cli --cli-type claude",
+        "Verify tasks.json is generated with valid JSON (not mixed with text)",
+        "If test passes, create PR to merge provider.rs fix to develop",
+        "Wait for intake image to rebuild and deploy",
+        "Log to progress.txt: 'Local intake test: PASS/FAIL'"
+      ],
+      "priority": 0,
+      "passes": true,
+      "notes": "⚠️ BLOCKER: In-cluster intake will fail until this fix is deployed. Test locally first!"
+    },
+    {
+      "id": "US-001",
       "title": "Start all local services and webhook tunnel from scratch",
       "description": "As a tester, I need to start all services AND the Cloudflare tunnel from a stopped state before running E2E tests",
       "acceptanceCriteria": [
@@ -24,17 +65,18 @@
         "Delegate to @local-services: 'Report full status including PIDs, port forwards, and tunnel status'",
         "Log to progress.txt: 'Services started at [timestamp]: PM=OK, Healer=OK, Tunnel=OK, Ports=OK'"
       ],
-      "priority": 0,
-      "passes": true,
-      "notes": "FIRST STORY - Must complete before any other work. MUST source .env.local for env vars (LINEAR_WEBHOOK_URL, etc). Tunnel is REQUIRED for webhooks."
+      "priority": 1,
+      "passes": false,
+      "notes": "MUST source .env.local for env vars (LINEAR_WEBHOOK_URL, etc). Tunnel is REQUIRED for webhooks."
     },
     {
-      "id": "US-001",
-      "title": "Pre-flight checks before intake",
-      "description": "As a tester, I need to verify ALL systems are ready before attempting intake",
+      "id": "US-002",
+      "title": "Pre-flight checks and cleanup before intake",
+      "description": "As a tester, I need to verify ALL systems are ready and clean before attempting intake",
       "acceptanceCriteria": [
         "Delegate to @local-services: 'Run cleanup then full pre-flight checklist'",
-        "CLEANUP FIRST: Delete any stuck pods, jobs, PVCs from previous runs",
+        "CLEANUP FIRST: Delete any stuck CodeRuns, pods, jobs, PVCs from previous runs",
+        "CLEANUP: kubectl delete coderuns -n cto --all",
         "CLEANUP: kubectl delete pods -n cto -l component=code-runner --force --grace-period=0",
         "CLEANUP: kubectl delete jobs -n cto -l component=code-runner",
         "CLEANUP: Patch any Terminating PVCs to remove finalizers",
@@ -47,89 +89,93 @@
         "PRE-FLIGHT CHECK 7: No stuck resources: kubectl get pods -n cto | grep -E 'Error|Pending' should be empty",
         "CONFIG CHECK: Read cto-config.json, verify defaults.intake.local is FALSE",
         "CONFIG CHECK: Verify defaults.play.autoMerge is true",
-        "⚠️ ALL PRE-FLIGHT CHECKS MUST PASS before proceeding to US-002 (intake)",
+        "⚠️ ALL PRE-FLIGHT CHECKS MUST PASS before proceeding to US-003 (intake)",
         "Log to progress.txt: 'Pre-flight complete at [timestamp]: Cleanup done, all checks PASSED'"
       ],
-      "priority": 1,
-      "passes": true,
-      "notes": "GATE - Do NOT proceed to intake (US-002) until ALL pre-flight checks pass. Tunnel is required for webhooks."
-    },
-    {
-      "id": "US-002",
-      "title": "Initiate intake via CTO MCP tool (in-cluster)",
-      "description": "As a tester, I want to start intake using mcp_cto_intake which submits an Argo workflow. Handle Morgan auto-assign failures.",
-      "acceptanceCriteria": [
-        "Call MCP tool: mcp_cto_intake(project_name='alerthub-e2e-test')",
-        "Verify response indicates Linear project was created",
-        "Check response 'next_step' field - if it says 'Assign Morgan manually', auto-assign FAILED",
-        "IF MORGAN AUTO-ASSIGN FAILED: Execute fix (see notes below)",
-        "Verify PRD issue created with Morgan assigned as delegate (either auto or manual fix)",
-        "Morgan assignment triggers webhook to PM server → Argo Workflow created",
-        "Call mcp_cto_jobs() to see intake workflow running in Argo",
-        "Delegate to @linear-monitor: 'Verify Morgan agent session created in Linear, first thought activity within 10s'",
-        "Log intake workflow name to progress.txt"
-      ],
       "priority": 2,
-      "passes": true,
-      "notes": "FIX MORGAN AUTO-ASSIGN: If auto-assign fails, manually assign Morgan using Linear API. Morgan ID is '11f0c7e3-dbf5-45fe-b15e-2a235f4d0013'. Use this curl: curl -X POST https://api.linear.app/graphql -H 'Authorization: $LINEAR_API_KEY' -H 'Content-Type: application/json' -d '{\"query\": \"mutation { issueUpdate(id: \\\"<ISSUE_ID>\\\", input: {assigneeId: \\\"11f0c7e3-dbf5-45fe-b15e-2a235f4d0013\\\"}) { success issue { id title assignee { name } } } }\"}' | jq. Get the issue ID from the intake response. This triggers the webhook."
+      "passes": false,
+      "notes": "GATE - Do NOT proceed to intake (US-003) until ALL pre-flight checks pass. Cleanup CodeRuns FIRST - they are the source of pods/jobs."
     },
     {
       "id": "US-003",
-      "title": "Monitor intake and verify Linear agent dialogue",
-      "description": "As a tester, I want to verify intake completes AND Linear agent activities are populated. Handle failures properly.",
+      "title": "Initiate intake via CTO MCP tool (in-cluster) - NO LOCAL CLI",
+      "description": "⚠️ MUST use cto___intake() MCP tool. NEVER run 'intake' CLI locally. The MCP tool creates Linear issues and triggers Argo workflows.",
       "acceptanceCriteria": [
-        "Call MCP tool: mcp_cto_jobs(include=['intake']) - poll until 'Succeeded' or 'Failed'",
-        "IF FAILED: Delegate to @healer-monitor: 'IMMEDIATELY capture logs, check for remediation CRD'",
-        "IF FAILED: @healer-monitor must report: logs captured [YES/NO], remediation CRD exists [YES/NO]",
-        "IF FAILED + NO REMEDIATION: BLOCK - do not retry. Investigate why Healer didn't create remediation.",
-        "IF FAILED + REMEDIATION EXISTS: Wait for remediation, then @local-services cleanup before retry",
-        "IF SUCCEEDED: Verify tasks.json generated and committed to docs repository",
-        "Task 1 should have agentHint='bolt' (infrastructure always first)",
-        "Delegate to @linear-monitor: 'Check Morgan session activities: thought/action/response flow, plan checklist updates'",
-        "Delegate to @healer-monitor: 'Check for any errors in intake workflow logs'",
-        "Delegate to @local-services: 'Check in-cluster pod status for intake workflow'",
-        "Verify Linear PRD issue has agent dialogue populated (not empty)",
-        "Log task count and agent assignments to progress.txt"
+        "⚠️ PROHIBITED: 'intake parse-prd', 'intake generate-docs', creating .tasks/ folders locally",
+        "⚠️ ONLY the in-cluster Morgan pod creates task files - NOT you",
+        "Call MCP tool: cto___intake(project_name='alerthub-e2e-test')",
+        "Verify response contains 'linear_project_id' - if missing, STOP and debug",
+        "Verify response contains 'linear_issue_id' - this is the PRD issue ID",
+        "VERIFY Linear issue exists: curl Linear API to confirm issue was created",
+        "Morgan is auto-assigned as DELEGATE (sub-assignment), which triggers webhook",
+        "Webhook fires to PM server → Argo Workflow created",
+        "Call cto___jobs(include=['intake']) to see intake workflow running in Argo",
+        "⚠️ If no workflow appears after 30s, check PM server logs and webhook tunnel",
+        "Delegate to @linear-monitor: 'Verify Morgan agent session created, first thought within 10s'",
+        "Log to progress.txt: intake workflow name, Linear issue ID, Morgan assigned as delegate"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Morgan runs in pod, emits activities to Linear via sidecar. NOTE: Completed via LOCAL intake mode after fixing CLI JSON parsing bug in provider.rs."
+      "passes": false,
+      "notes": "Morgan is assigned as DELEGATE (sub-assignment), not primary assignee. This still triggers the webhook. ⚠️ BLOCKER: If in-cluster intake fails with JSON parse error, the provider.rs fix needs to be deployed first (see US-000)."
     },
     {
       "id": "US-004",
-      "title": "Start Play workflow and verify session notification",
-      "description": "As a tester, I want to start Play and verify both Healer and Linear are notified",
+      "title": "Monitor intake completion and verify Morgan creates PR",
+      "description": "As a tester, I want to verify intake completes AND Morgan commits tasks.json and creates PR",
       "acceptanceCriteria": [
-        "Call MCP tool: mcp_cto_play()",
-        "Verify Argo workflow submitted (check response)",
-        "Call mcp_cto_jobs(include=['play']) to confirm play workflow running",
-        "Delegate to @healer-monitor: 'Verify Healer received session with expected tools per agent'",
-        "Delegate to @linear-monitor: 'Verify Bolt assigned as delegate to Task 1 issue, session created'",
-        "Delegate to @local-services: 'Ensure all services still healthy, restart if needed'",
-        "Log play workflow name and starting task_id to progress.txt"
+        "Call MCP tool: cto___jobs(include=['intake']) - poll until 'Succeeded' or 'Failed'",
+        "IF FAILED: Delegate to @healer-monitor: 'IMMEDIATELY capture logs from intake pod before it terminates'",
+        "IF FAILED: Check if error is JSON parsing - if so, provider.rs fix needs deployment",
+        "IF FAILED: @healer-monitor must report: logs captured [YES/NO], remediation CRD exists [YES/NO]",
+        "IF FAILED + NO REMEDIATION: BLOCK - do not retry. Investigate why Healer didn't create remediation.",
+        "IF SUCCEEDED: Verify Morgan created a PR with tasks.json to the docs repository",
+        "Verify PR contains: tasks.json with tasks array, task-N/ folders with prompts",
+        "Task 1 should have agentHint='bolt' (infrastructure always first)",
+        "Delegate to @linear-monitor: 'Check Morgan session activities: thought/action/response flow, plan checklist updates'",
+        "Delegate to @healer-monitor: 'Check for any errors in intake workflow logs'",
+        "Verify Linear PRD issue has agent dialogue populated (not empty)",
+        "Log PR number, task count, and agent assignments to progress.txt"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Play orchestrates: Argo Workflow → Controller → CodeRuns (pods) per agent. Started workflow play-workflow-template-krlpl for Task 1 (Setup Infrastructure with Bolt)."
+      "passes": false,
+      "notes": "Morgan runs IN-CLUSTER, generates tasks, commits to repo, creates PR. The PR must be merged before Play can start."
     },
     {
       "id": "US-005",
+      "title": "Merge Morgan's PR to trigger Play workflow",
+      "description": "As a tester, I want to merge Morgan's tasks PR which triggers the Play workflow",
+      "acceptanceCriteria": [
+        "Find Morgan's PR: gh pr list --author '5DLabs-Morgan' --state open",
+        "Review PR contains valid tasks.json and task docs",
+        "Merge the PR: gh pr merge <PR_NUMBER> --merge",
+        "Merge triggers Play workflow automatically via webhook",
+        "Call cto___jobs(include=['play']) to see play workflow starting",
+        "Delegate to @healer-monitor: 'Verify Healer received session notification'",
+        "Delegate to @linear-monitor: 'Verify task issues created, Bolt assigned as delegate to Task 1'",
+        "Log to progress.txt: PR merged, play workflow started"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Play is triggered by merging Morgan's PR, not by manually calling cto___play(). The merge webhook starts the orchestration."
+    },
+    {
+      "id": "US-006",
       "title": "Monitor Play agent sequence with Linear dialogue verification",
       "description": "As a tester, I want to verify agents execute in order AND Linear activities stream correctly",
       "acceptanceCriteria": [
-        "Call MCP tool: mcp_cto_play_status() periodically to track progress",
+        "Call MCP tool: cto___play_status() periodically to track progress",
         "Verify stages: infrastructure (Bolt) → implementation (Rex/Blaze) → quality (Cleo) → security (Cipher) → testing (Tess) → integration (Atlas)",
         "Delegate to @linear-monitor: 'For each agent stage, verify: delegate assignment, first thought within 10s, activities streaming, final response'",
         "Delegate to @healer-monitor: 'Watch pod logs for tool inventory mismatch, MCP init failures (A10/A11/A12)'",
         "Delegate to @local-services: 'Monitor service health throughout, restart any crashed services'",
         "Log each stage transition to progress.txt with timestamps"
       ],
-      "priority": 5,
-      "passes": true,
-      "notes": "PARTIAL: Play workflow started but CodeRuns failed due to E2E test setup: (1) Task files must be on docs branch (main by default), (2) MCP cto_play() doesn't expose docs-branch param, (3) Agent config required. Generated task docs and committed. See progress.txt for full details."
+      "priority": 6,
+      "passes": false,
+      "notes": "Each agent runs as CodeRun pod with Linear sidecar emitting activities."
     },
     {
-      "id": "US-006",
+      "id": "US-007",
       "title": "Test two-way communication (user input)",
       "description": "As a tester, I want to verify users can send input to running agents via Linear",
       "acceptanceCriteria": [
@@ -140,12 +186,12 @@
         "Verify input is forwarded to agent via FIFO (if implemented)",
         "Log test result to progress.txt: 'User input test: PASS/FAIL'"
       ],
-      "priority": 6,
-      "passes": true,
-      "notes": "BLOCKED: Cannot test - requires active CodeRun with agent running. Play workflow blocked on E2E setup (task files branch, agent config). See US-005 notes."
+      "priority": 7,
+      "passes": false,
+      "notes": "Tests the input_poll_task in status-sync.rs. REQUIRES: Active CodeRun with agent running."
     },
     {
-      "id": "US-007",
+      "id": "US-008",
       "title": "Verify Healer and Linear monitoring integration",
       "description": "As a tester, I want to confirm both monitoring subagents detected all relevant events",
       "acceptanceCriteria": [
@@ -155,16 +201,16 @@
         "Cross-reference: Healer session tracking matches Linear session states",
         "Log combined monitoring summary to progress.txt"
       ],
-      "priority": 7,
-      "passes": true,
-      "notes": "BLOCKED: Cannot verify - requires completed Play workflow. Healer API verified healthy (http://localhost:8083/health). No sessions recorded as Play agents didn't execute successfully."
+      "priority": 8,
+      "passes": false,
+      "notes": "Validates both monitoring layers caught all events. REQUIRES: Play workflow must complete first."
     },
     {
-      "id": "US-008",
+      "id": "US-009",
       "title": "Complete full lifecycle verification",
       "description": "As a tester, I want to confirm entire in-cluster lifecycle completed successfully",
       "acceptanceCriteria": [
-        "Call MCP tool: mcp_cto_play_status() - verify workflow 'Succeeded'",
+        "Call MCP tool: cto___play_status() - verify workflow 'Succeeded'",
         "Verify PR was created by implementation agent's GitHub App",
         "Verify PR was merged by Atlas (autoMerge=true)",
         "All CodeRun pods should have completed successfully",
@@ -172,9 +218,9 @@
         "Delegate to @local-services: 'Cleanup: stop all background services if test complete'",
         "Log final summary to progress.txt: workflow names, duration, success/failure"
       ],
-      "priority": 8,
-      "passes": true,
-      "notes": "BLOCKED: Full E2E lifecycle incomplete. COMPLETED: intake → tasks.json, Play workflow submitted. BLOCKED: CodeRun prompt loading (task files not on docs branch). To complete: merge task files to main OR add docs_branch param to MCP cto_play()."
+      "priority": 9,
+      "passes": false,
+      "notes": "Full E2E: cto___intake() → Linear → Webhook → Morgan pod → tasks.json PR → Merge → Play workflow → CodeRuns → Merged implementation PR. This is the final verification."
     }
   ]
 }
