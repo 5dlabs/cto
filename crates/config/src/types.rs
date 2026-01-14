@@ -189,6 +189,13 @@ pub struct PlayDefaults {
     /// Working directory.
     #[serde(rename = "workingDirectory", default = "default_working_directory")]
     pub working_directory: String,
+
+    /// Healer API endpoint for session notifications.
+    /// When configured, the MCP server notifies Healer when a Play starts,
+    /// enabling real-time monitoring of the workflow lifecycle.
+    /// Example: `http://localhost:8083` (local) or `http://cto-healer-play-api:8083` (cluster)
+    #[serde(rename = "healerEndpoint", skip_serializing_if = "Option::is_none")]
+    pub healer_endpoint: Option<String>,
 }
 
 fn default_docs_project_directory() -> String {

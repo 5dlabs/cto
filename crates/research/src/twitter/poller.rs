@@ -195,12 +195,24 @@ impl BookmarkPoller {
         // Partition into new and already processed
         for bookmark in all_bookmarks {
             if state.is_processed(&bookmark.id) {
+                tracing::debug!(
+                    id = %bookmark.id,
+                    "Bookmark already processed, skipping"
+                );
                 result.already_processed += 1;
             } else {
                 result.new_bookmarks.push(bookmark.clone());
             }
             result.all_bookmarks.push(bookmark);
         }
+
+        // Log summary of partition
+        tracing::info!(
+            total = result.all_bookmarks.len(),
+            new = result.new_bookmarks.len(),
+            already_processed = result.already_processed,
+            "Partitioned bookmarks by processing status"
+        );
 
         Ok(result)
     }
@@ -295,26 +307,54 @@ impl BookmarkPoller {
             let before_count = all_bookmarks.len();
             let mut oldest_in_batch: Option<DateTime<Utc>> = None;
 
+            let batch_count = bookmarks.len();
+            let mut skipped_age = 0usize;
+            let mut added = 0usize;
+
             for bookmark in bookmarks {
                 // Track the oldest tweet in this batch
                 if oldest_in_batch.is_none() || bookmark.posted_at < oldest_in_batch.unwrap() {
                     oldest_in_batch = Some(bookmark.posted_at);
                 }
 
+                // Log bookmark details for debugging
+                let age_days = bookmark.age().num_days();
+                tracing::debug!(
+                    id = %bookmark.id,
+                    posted_at = %bookmark.posted_at,
+                    age_days,
+                    max_age_days = self.config.max_age_days,
+                    "Processing bookmark"
+                );
+
                 // Check if this bookmark is too old
                 if !bookmark.is_within_days(self.config.max_age_days) {
                     tracing::debug!(
                         id = %bookmark.id,
                         posted_at = %bookmark.posted_at,
-                        "Found bookmark older than {} days, stopping",
-                        self.config.max_age_days
+                        age_days,
+                        max_age_days = self.config.max_age_days,
+                        "Bookmark older than max_age_days, skipping"
                     );
+                    skipped_age += 1;
                     reached_time_boundary = true;
                     continue; // Don't add to collection
                 }
 
+                // Add to collection (HashMap ensures no duplicates)
                 all_bookmarks.entry(bookmark.id.clone()).or_insert(bookmark);
+                added += 1;
             }
+
+            // Log batch summary at INFO level for better visibility
+            tracing::info!(
+                batch_count,
+                skipped_age,
+                added,
+                total_collected = all_bookmarks.len(),
+                max_age_days = self.config.max_age_days,
+                "Batch processing complete"
+            );
 
             let new_in_scroll = all_bookmarks.len() - before_count;
             tracing::debug!(

@@ -36,7 +36,8 @@
       "service": "cto",
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
-      "workingDirectory": "."
+      "workingDirectory": ".",
+      "healerEndpoint": "http://localhost:8083"
     },
     "remediation": {
       "repository": "5dlabs/cto",

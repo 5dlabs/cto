@@ -18,7 +18,8 @@
       "service": "cto-parallel-test",
       "docsRepository": "5dlabs/cto-parallel-test",
       "docsProjectDirectory": "docs",
-      "workingDirectory": "."
+      "workingDirectory": ".",
+      "healerEndpoint": "http://cto-healer-play-api:8083"
     },
     "remediation": {
       "repository": "5dlabs/cto",

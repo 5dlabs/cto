@@ -55,10 +55,27 @@ impl BookmarkParser {
             };
 
             let href = link.value().attr("href").unwrap_or_default();
+            tracing::debug!(href, "Found tweet link href");
             let Some((username, tweet_id)) = Self::parse_tweet_url(href) else {
                 tracing::debug!(href, "Could not parse tweet URL");
                 continue;
             };
+
+            // Validate tweet ID is a valid snowflake (numeric, reasonable range)
+            if let Ok(id_num) = tweet_id.parse::<u64>() {
+                // Twitter IDs for tweets from 2020+ should be > 1200000000000000000
+                // IDs from 2025+ should be > 1850000000000000000
+                if id_num < 1_000_000_000_000_000_000 {
+                    tracing::warn!(
+                        tweet_id,
+                        id_num,
+                        href,
+                        "Tweet ID seems too small to be a recent tweet (possible parsing issue)"
+                    );
+                }
+            } else {
+                tracing::warn!(tweet_id, href, "Tweet ID is not a valid numeric value");
+            }
 
             // Extract the tweet text.
             // Prefer the tweetText testid; fall back to div[lang] which often holds the rendered text.
@@ -86,6 +103,14 @@ impl BookmarkParser {
                 text,
             );
 
+            // Log the derived timestamp for debugging
+            tracing::debug!(
+                id = %tweet_id,
+                posted_at = %bookmark.posted_at,
+                age_days = bookmark.age().num_days(),
+                "Created bookmark from snowflake ID"
+            );
+
             // Extract URLs from the tweet text
             bookmark.extract_urls();
             if !bookmark.urls.is_empty() {
@@ -96,7 +121,19 @@ impl BookmarkParser {
             bookmarks.push(bookmark);
         }
 
-        tracing::info!(count = bookmarks.len(), "Parsed bookmarks from HTML");
+        // Log summary with sample IDs and timestamps for debugging
+        if bookmarks.is_empty() {
+            tracing::info!(count = 0, "Parsed bookmarks from HTML");
+        } else {
+            let sample = &bookmarks[0];
+            tracing::info!(
+                count = bookmarks.len(),
+                sample_id = %sample.id,
+                sample_posted_at = %sample.posted_at,
+                sample_age_days = sample.age().num_days(),
+                "Parsed bookmarks from HTML"
+            );
+        }
         Ok(bookmarks)
     }
 

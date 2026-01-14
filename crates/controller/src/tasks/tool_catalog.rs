@@ -11,6 +11,13 @@ static TOOL_CATALOG: LazyLock<ToolCatalog> = LazyLock::new(ToolCatalog::load);
 /// Resolve a requested remote tool name to the canonical identifier advertised by Tools.
 /// Returns `None` when the name is invalid (not present in the catalog) and cannot be
 /// normalized via the legacy heuristics.
+///
+/// NOTE: This function falls back to returning the unchanged name when:
+/// - The catalog is not loaded (graceful degradation)
+/// - The tool is not found in the catalog (backward compatibility)
+///
+/// Use [`try_resolve_tool_strict`] if you need to distinguish between
+/// "tool found" vs "tool not found" for validation purposes.
 pub fn resolve_tool_name(name: &str) -> Option<String> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
@@ -38,6 +45,55 @@ pub fn resolve_tool_name(name: &str) -> Option<String> {
             Some(trimmed.to_string())
         }
     }
+}
+
+/// Result of strict tool resolution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ToolResolutionResult {
+    /// Tool was found in the catalog - canonical name returned
+    Resolved(String),
+    /// Tool was NOT found in the catalog (catalog is loaded)
+    NotFound,
+    /// Catalog is not loaded - cannot determine if tool exists
+    CatalogUnavailable,
+}
+
+/// Strictly resolve a tool name, distinguishing between "found", "not found", and "unknown".
+///
+/// Unlike [`resolve_tool_name`], this function does NOT fall back to returning the
+/// unchanged name. Instead, it returns a [`ToolResolutionResult`] that clearly indicates:
+/// - `Resolved(canonical)` - tool was found in catalog
+/// - `NotFound` - catalog is loaded but tool doesn't exist
+/// - `CatalogUnavailable` - catalog couldn't be loaded, resolution impossible
+///
+/// This is useful for tool inventory validation where you need to detect misconfigurations.
+pub fn try_resolve_tool_strict(name: &str) -> ToolResolutionResult {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return ToolResolutionResult::NotFound;
+    }
+
+    if !TOOL_CATALOG.is_loaded() {
+        return ToolResolutionResult::CatalogUnavailable;
+    }
+
+    // Try direct resolution
+    if let Some(canonical) = TOOL_CATALOG.resolve(trimmed) {
+        return ToolResolutionResult::Resolved(canonical);
+    }
+
+    // Try variant resolution (underscore/dash normalization)
+    let variants = vec![trimmed.replace('-', "_"), trimmed.replace('_', "-")];
+    for variant in variants {
+        if variant != trimmed {
+            if let Some(found) = TOOL_CATALOG.resolve(&variant) {
+                return ToolResolutionResult::Resolved(found);
+            }
+        }
+    }
+
+    // Tool not found in catalog
+    ToolResolutionResult::NotFound
 }
 
 struct ToolCatalog {

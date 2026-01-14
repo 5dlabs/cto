@@ -51,6 +51,13 @@ procs:
     cwd: "."
 
   # ===========================================================================
+  # Healer Play API - Session monitoring for MCP integration
+  # ===========================================================================
+  healer-play-api:
+    shell: "RUST_LOG=info,healer=debug cargo run --bin healer -- play-api --addr 0.0.0.0:8083"
+    cwd: "."
+
+  # ===========================================================================
   # Cloudflare Tunnel - Routes pm-dev.5dlabs.ai to localhost:8081
   # ===========================================================================
   tunnel:
