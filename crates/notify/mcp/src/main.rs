@@ -1656,6 +1656,19 @@ fn notify_healer(
         Ok(addrs) => addrs.collect(),
         Err(_) => {
             // Try adding default port if not specified
+            // Check if port is already present (last colon followed by digits only)
+            let has_port = host_port
+                .rfind(':')
+                .map(|idx| host_port[idx + 1..].chars().all(|c| c.is_ascii_digit()))
+                .unwrap_or(false);
+
+            if has_port {
+                // Port already present but resolution failed - give up
+                eprintln!("⚠️  Failed to resolve Healer endpoint '{healer_endpoint}'");
+                eprintln!("   (This is non-fatal - play workflow will continue)");
+                return;
+            }
+
             match format!("{host_port}:80").to_socket_addrs() {
                 Ok(addrs) => addrs.collect(),
                 Err(e) => {
