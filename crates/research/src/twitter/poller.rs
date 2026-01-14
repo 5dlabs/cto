@@ -195,12 +195,24 @@ impl BookmarkPoller {
         // Partition into new and already processed
         for bookmark in all_bookmarks {
             if state.is_processed(&bookmark.id) {
+                tracing::debug!(
+                    id = %bookmark.id,
+                    "Bookmark already processed, skipping"
+                );
                 result.already_processed += 1;
             } else {
                 result.new_bookmarks.push(bookmark.clone());
             }
             result.all_bookmarks.push(bookmark);
         }
+        
+        // Log summary of partition
+        tracing::info!(
+            total = result.all_bookmarks.len(),
+            new = result.new_bookmarks.len(),
+            already_processed = result.already_processed,
+            "Partitioned bookmarks by processing status"
+        );
 
         Ok(result)
     }
