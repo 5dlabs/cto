@@ -1670,7 +1670,8 @@ fn notify_healer(
             return;
         }
 
-        match format!("{host_port}:80").to_socket_addrs() {
+        // Default to port 8083 (Healer Play API default port)
+        match format!("{host_port}:8083").to_socket_addrs() {
             Ok(addrs) => addrs.collect(),
             Err(e) => {
                 eprintln!("⚠️  Failed to resolve Healer endpoint '{healer_endpoint}': {e}");
