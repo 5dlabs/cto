@@ -159,7 +159,13 @@ pub fn parse_ai_response<T: for<'de> Deserialize<'de>>(response: &AIResponse) ->
     // Handle cases where AI includes leading prose before JSON block
     // The JSON may contain embedded ``` markers (code examples), so we need to find
     // the LAST ``` which closes the JSON block, not the first one we encounter
-    let json_text = if let Some(json_start) = text.find("```json") {
+    //
+    // IMPORTANT: Check for ```json FIRST, even if text starts with { or [
+    // This handles cases where the prefill technique produces:
+    // {"tasks":[explanatory text...```json{actual json}```]}
+    let json_text = if text.contains("```json") {
+        // Find the ```json block and extract its contents
+        let json_start = text.find("```json").unwrap();
         let after_marker = &text[json_start + "```json".len()..];
         // Find the LAST ``` which closes the block (not embedded code examples)
         if let Some(end_idx) = after_marker.rfind("\n```") {
@@ -169,8 +175,9 @@ pub fn parse_ai_response<T: for<'de> Deserialize<'de>>(response: &AIResponse) ->
         } else {
             after_marker.trim()
         }
-    } else if let Some(code_start) = text.find("```\n{") {
+    } else if text.contains("```\n{") {
         // Handle ```\n{ pattern (code block without language tag)
+        let code_start = text.find("```\n{").unwrap();
         let after_marker = &text[code_start + "```\n".len()..];
         if let Some(end_idx) = after_marker.rfind("\n```") {
             after_marker[..end_idx].trim()
