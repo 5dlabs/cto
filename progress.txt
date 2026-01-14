@@ -23,3 +23,26 @@
 - The `intake intake` command handles initialization automatically
 - Provider.rs uses `text.contains()` for code block detection to handle AI responses with mixed text/JSON
 ---
+
+## 2026-01-14 16:25 - US-001
+- Verified all services were already running (started previously)
+- All health checks passed:
+  - PM Server (localhost:8081/health): OK
+  - Healer Play API (localhost:8083/health): OK  
+  - Cloudflare Tunnel (pm-dev.5dlabs.ai/health): OK
+  - Argo Workflows (localhost:2746): OK
+- Process PIDs verified:
+  - agent-controller: 11704
+  - pm-server: 72085
+  - healer: 72105
+  - cloudflared: 78094
+- **Services started at timestamp: PM=OK, Healer=OK, Tunnel=OK, Argo=OK**
+
+**Files verified:**
+- config/cloudflared-pm-dev.yaml (tunnel config)
+
+**Learnings for future iterations:**
+- Services may already be running from previous sessions - always check first
+- ArgoCD port forward isn't strictly required for intake/play workflows
+- Use `pgrep -la` to check running Rust services by binary name
+---

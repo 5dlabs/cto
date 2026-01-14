@@ -66,7 +66,7 @@
         "Log to progress.txt: 'Services started at [timestamp]: PM=OK, Healer=OK, Tunnel=OK, Ports=OK'"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "MUST source .env.local for env vars (LINEAR_WEBHOOK_URL, etc). Tunnel is REQUIRED for webhooks."
     },
     {
