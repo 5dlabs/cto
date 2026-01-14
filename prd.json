@@ -34,7 +34,7 @@
         "Log intake workflow name to progress.txt"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Intake: PRD → Linear → Webhook → Argo Workflow → Morgan pod"
     },
     {

@@ -31,3 +31,19 @@ Project: AlertHub E2E Test
   - PM server and Healer must be running locally to receive webhooks from in-cluster workflows
 ---
 
+## 2026-01-14 - US-002: Initiate intake via CTO MCP tool (in-cluster)
+- **Status**: PASSED
+- **Verification results**:
+  - Called MCP tool: `cto___intake(project_name='alerthub-e2e-test', repository='5dlabs/agent-sandbox')`
+  - Linear Project: ✅ Created - alerthub-e2e-test (URL: https://linear.app/jonathonfritz/project/alerthub-e2e-test-f8d41858e295)
+  - PRD Issue: ✅ Created - CTOPA-791 "[PRD] alerthub-e2e-test" (URL: https://linear.app/jonathonfritz/issue/CTOPA-791/prd-alerthub-e2e-test)
+  - Intake Status: ✅ ready - "Linear intake setup complete"
+  - Next Step: Assign Morgan to PRD issue to trigger intake workflow via webhook
+  - Initial jobs check: 0 intake workflows running (expected - waiting for Morgan assignment)
+- **Learnings for future iterations**:
+  - Intake MCP tool creates Linear project and PRD issue synchronously
+  - Morgan must be assigned as delegate to trigger the webhook → Argo workflow chain
+  - The `auto_assign_morgan` parameter should auto-assign, but actual assignment triggers workflow
+  - PRD content can be passed via prd_content parameter when not in standard location
+---
+
