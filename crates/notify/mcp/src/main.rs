@@ -1577,7 +1577,7 @@ fn notify_healer(
     cto_config: &CtoConfig,
 ) {
     use std::io::Read;
-    use std::net::TcpStream;
+    use std::net::{TcpStream, ToSocketAddrs};
     use std::time::Duration;
 
     eprintln!("📡 Notifying Healer at {healer_endpoint} of play session start...");
@@ -1650,15 +1650,16 @@ fn notify_healer(
     ]
     .concat();
 
-    // Try to parse as SocketAddr (host:port), or add :80 if no port specified
-    let socket_addr = match host_port.parse() {
-        Ok(addr) => addr,
+    // Resolve hostname to socket addresses using ToSocketAddrs (supports DNS resolution)
+    // This works with both IP addresses ("127.0.0.1:8083") and hostnames ("localhost:8083")
+    let socket_addrs: Vec<_> = match host_port.to_socket_addrs() {
+        Ok(addrs) => addrs.collect(),
         Err(_) => {
-            // Try adding default port
-            match format!("{host_port}:80").parse() {
-                Ok(addr) => addr,
+            // Try adding default port if not specified
+            match format!("{host_port}:80").to_socket_addrs() {
+                Ok(addrs) => addrs.collect(),
                 Err(e) => {
-                    eprintln!("⚠️  Invalid Healer endpoint '{healer_endpoint}': {e}");
+                    eprintln!("⚠️  Failed to resolve Healer endpoint '{healer_endpoint}': {e}");
                     eprintln!("   (This is non-fatal - play workflow will continue)");
                     return;
                 }
@@ -1666,6 +1667,14 @@ fn notify_healer(
         }
     };
 
+    if socket_addrs.is_empty() {
+        eprintln!("⚠️  No addresses found for Healer endpoint '{healer_endpoint}'");
+        eprintln!("   (This is non-fatal - play workflow will continue)");
+        return;
+    }
+
+    // Try connecting to the first resolved address
+    let socket_addr = socket_addrs[0];
     match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(5)) {
         Ok(mut stream) => {
             if let Err(e) = std::io::Write::write_all(&mut stream, http_request.as_bytes()) {
