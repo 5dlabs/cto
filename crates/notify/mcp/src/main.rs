@@ -1690,12 +1690,25 @@ fn notify_healer(
     let socket_addr = socket_addrs[0];
     match TcpStream::connect_timeout(&socket_addr, Duration::from_secs(5)) {
         Ok(mut stream) => {
+            // Set read/write timeouts to prevent indefinite blocking
+            // Without these, read_to_string could block forever if Healer accepts
+            // the connection but never responds, hanging the entire play workflow.
+            let io_timeout = Some(Duration::from_secs(5));
+            if let Err(e) = stream.set_read_timeout(io_timeout) {
+                eprintln!("⚠️  Failed to set read timeout: {e}");
+                return;
+            }
+            if let Err(e) = stream.set_write_timeout(io_timeout) {
+                eprintln!("⚠️  Failed to set write timeout: {e}");
+                return;
+            }
+
             if let Err(e) = std::io::Write::write_all(&mut stream, http_request.as_bytes()) {
                 eprintln!("⚠️  Failed to send Healer notification: {e}");
                 return;
             }
 
-            // Read response
+            // Read response (now protected by 5-second read timeout)
             let mut response = String::new();
             if stream.read_to_string(&mut response).is_ok() && response.contains("200 OK") {
                 eprintln!("✅ Healer notified successfully");
