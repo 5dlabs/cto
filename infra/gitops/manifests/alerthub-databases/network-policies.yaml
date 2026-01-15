@@ -1,0 +1,231 @@
+---
+# Network Policies for AlertHub infrastructure services
+# Implements zero-trust networking with explicit allow rules
+# Default deny all ingress, then whitelist specific connections
+
+# Default deny all ingress to namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-network-policy
+    app.kubernetes.io/part-of: alerthub
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# Allow PostgreSQL connections from alerthub namespace pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-ingress
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-network-policy
+    app.kubernetes.io/part-of: alerthub
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alerthub-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: alerthub
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow from cto namespace (main application)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cto
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow replication within the cluster
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alerthub-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# Allow Valkey/Redis connections
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-valkey-ingress
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-network-policy
+    app.kubernetes.io/part-of: alerthub
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alerthub-valkey
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: alerthub
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow from cto namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cto
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+# Allow Kafka connections
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-ingress
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-network-policy
+    app.kubernetes.io/part-of: alerthub
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/cluster: alerthub-kafka
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: alerthub
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9093
+    # Allow from cto namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cto
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9093
+    # Allow inter-broker communication
+    - from:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: alerthub-kafka
+      ports:
+        - protocol: TCP
+          port: 9091
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9093
+---
+# Allow MongoDB connections
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mongodb-ingress
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-network-policy
+    app.kubernetes.io/part-of: alerthub
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alerthub-mongodb
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: alerthub
+      ports:
+        - protocol: TCP
+          port: 27017
+    # Allow from cto namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cto
+      ports:
+        - protocol: TCP
+          port: 27017
+    # Allow replica set communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alerthub-mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+---
+# Allow RabbitMQ connections
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq-ingress
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-network-policy
+    app.kubernetes.io/part-of: alerthub
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alerthub-rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow AMQP from same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: alerthub
+      ports:
+        - protocol: TCP
+          port: 5672
+        - protocol: TCP
+          port: 15672
+        - protocol: TCP
+          port: 15692
+    # Allow from cto namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cto
+      ports:
+        - protocol: TCP
+          port: 5672
+        - protocol: TCP
+          port: 15672
+    # Allow cluster communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alerthub-rabbitmq
+      ports:
+        - protocol: TCP
+          port: 4369
+        - protocol: TCP
+          port: 25672

@@ -1,0 +1,170 @@
+---
+# AlertHub RabbitMQ cluster using RabbitMQ Cluster Operator
+# Used for task queues and asynchronous message processing
+# Source: https://github.com/rabbitmq/cluster-operator
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: alerthub-rabbitmq
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-rabbitmq
+    app.kubernetes.io/part-of: alerthub
+    app.kubernetes.io/component: messaging
+spec:
+  # Single replica for development
+  replicas: 1
+
+  # RabbitMQ image
+  image: rabbitmq:3.13-management
+
+  # Service configuration
+  service:
+    type: ClusterIP
+
+  # Persistence configuration
+  persistence:
+    storageClassName: mayastor
+    storage: 5Gi
+
+  # Resource allocation
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  # RabbitMQ configuration
+  rabbitmq:
+    additionalConfig: |
+      # Cluster formation
+      cluster_formation.peer_discovery_backend = rabbit_peer_discovery_k8s
+      cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+      cluster_formation.k8s.address_type = hostname
+      # Queue settings
+      queue_master_locator = min-masters
+      # Memory management
+      vm_memory_high_watermark.relative = 0.7
+      vm_memory_high_watermark_paging_ratio = 0.75
+      # Logging
+      log.console = true
+      log.console.level = info
+      # Management plugin
+      management.tcp.port = 15672
+    envConfig: |
+      RABBITMQ_LOGS=-
+  # Override settings
+  override:
+    statefulSet:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: rabbitmq
+                ports:
+                  - name: amqp
+                    containerPort: 5672
+                    protocol: TCP
+                  - name: management
+                    containerPort: 15672
+                    protocol: TCP
+                  - name: prometheus
+                    containerPort: 15692
+                    protocol: TCP
+---
+# Default vhost and permissions
+apiVersion: rabbitmq.com/v1beta1
+kind: Vhost
+metadata:
+  name: alerthub
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-rabbitmq
+    app.kubernetes.io/part-of: alerthub
+spec:
+  name: alerthub
+  rabbitmqClusterReference:
+    name: alerthub-rabbitmq
+---
+# Application user
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: alerthub-user
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-rabbitmq
+    app.kubernetes.io/part-of: alerthub
+spec:
+  rabbitmqClusterReference:
+    name: alerthub-rabbitmq
+  importCredentialsSecret:
+    name: alerthub-rabbitmq-user-credentials
+---
+# User credentials secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alerthub-rabbitmq-user-credentials
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-rabbitmq
+    app.kubernetes.io/part-of: alerthub
+type: Opaque
+stringData:
+  username: alerthub_user
+  password: alerthub_password123
+---
+# User permissions on vhost
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: alerthub-user-permission
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-rabbitmq
+    app.kubernetes.io/part-of: alerthub
+spec:
+  vhost: alerthub
+  userReference:
+    name: alerthub-user
+  permissions:
+    configure: ".*"
+    write: ".*"
+    read: ".*"
+  rabbitmqClusterReference:
+    name: alerthub-rabbitmq
+---
+# Default queue for tasks
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: alerthub-tasks
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-rabbitmq
+    app.kubernetes.io/part-of: alerthub
+spec:
+  name: tasks
+  vhost: alerthub
+  durable: true
+  rabbitmqClusterReference:
+    name: alerthub-rabbitmq
+---
+# Queue for notifications
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: alerthub-notifications
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-rabbitmq
+    app.kubernetes.io/part-of: alerthub
+spec:
+  name: notifications
+  vhost: alerthub
+  durable: true
+  rabbitmqClusterReference:
+    name: alerthub-rabbitmq

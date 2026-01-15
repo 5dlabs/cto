@@ -1,0 +1,10 @@
+---
+# Namespace for AlertHub infrastructure services
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub
+    app.kubernetes.io/part-of: alerthub
+    platform.5dlabs.io/tenant: alerthub

@@ -1,0 +1,48 @@
+---
+# AlertHub Valkey instance using OT-CONTAINER-KIT Redis Operator
+# Valkey is a BSD-3 licensed fork of Redis, fully protocol-compatible
+# Used for caching, session storage, and pub/sub messaging
+# Source: https://valkey.io/
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: Redis
+metadata:
+  name: alerthub-valkey
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-valkey
+    app.kubernetes.io/part-of: alerthub
+    app.kubernetes.io/component: cache
+spec:
+  # Security context
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
+
+  # Kubernetes configuration - Using Valkey instead of Redis
+  # Valkey 7.2 is a direct fork of Redis 7.2.4 and is fully protocol-compatible
+  kubernetesConfig:
+    image: valkey/valkey:7.2-alpine
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Redis exporter for metrics (works with Valkey)
+  redisExporter:
+    enabled: false
+    image: quay.io/opstree/redis-exporter:v1.44.0
+
+  # Storage configuration for persistence
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: mayastor
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi

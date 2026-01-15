@@ -1,0 +1,95 @@
+---
+# AlertHub PostgreSQL cluster using CloudNativePG
+# Primary database for AlertHub application data
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: alerthub-postgres
+  namespace: alerthub
+  labels:
+    app.kubernetes.io/name: alerthub-postgres
+    app.kubernetes.io/part-of: alerthub
+    app.kubernetes.io/component: database
+spec:
+  # Single instance for development/staging
+  # Increase to 3 for production HA
+  instances: 1
+
+  # PostgreSQL configuration
+  postgresql:
+    parameters:
+      # Connection settings
+      max_connections: "200"
+      # Memory settings
+      shared_buffers: "256MB"
+      effective_cache_size: "768MB"
+      maintenance_work_mem: "128MB"
+      work_mem: "8MB"
+      # Write-ahead log
+      wal_buffers: "8MB"
+      min_wal_size: "256MB"
+      max_wal_size: "1GB"
+      # Query tuning
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      # Logging
+      log_statement: "ddl"
+      log_min_duration_statement: "1000ms"
+      log_checkpoints: "on"
+      log_connections: "on"
+      log_disconnections: "on"
+      log_lock_waits: "on"
+      # Timezone
+      timezone: "UTC"
+
+  # Storage configuration
+  storage:
+    size: 10Gi
+    storageClass: mayastor
+
+  # Resource allocation
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 2Gi
+      cpu: "1"
+
+  # Bootstrap configuration - create alerthub database
+  bootstrap:
+    initdb:
+      database: alerthub
+      owner: alerthub_user
+      # Enable extensions commonly needed for applications
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+        - CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+        - CREATE EXTENSION IF NOT EXISTS "btree_gin";
+
+  # Enable superuser access for maintenance
+  enableSuperuserAccess: true
+
+  # Monitoring
+  monitoring:
+    enablePodMonitor: false
+
+  # Pod template customizations
+  # yamllint disable rule:line-length
+  managed:
+    services:
+      additional:
+        - selectorType: rw
+          serviceTemplate:
+            metadata:
+              name: alerthub-postgres-rw
+              labels:
+                app.kubernetes.io/name: alerthub-postgres
+                app.kubernetes.io/component: database
+            spec:
+              type: ClusterIP
+              ports:
+                - name: postgres
+                  port: 5432
+                  targetPort: 5432
+  # yamllint enable rule:line-length
