@@ -11,7 +11,7 @@ use crate::tasks::template_paths::{
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
 use crate::tasks::workflow::extract_workflow_name;
-use handlebars::{handlebars_helper, Handlebars};
+use handlebars::{handlebars_helper, Handlebars, HelperDef, ScopedJson};
 
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
@@ -49,6 +49,66 @@ struct CliRenderSettings {
     raw_additional_json: Option<String>,
     model_rotation: Vec<String>,
     list_tools_on_start: bool,
+}
+
+/// Helper for grouping array items by a field value.
+/// Usage: `{{#each (group_by subtasks "execution_level")}}...{{/each}}`
+/// Returns an object keyed by field values, where each value is an array of items.
+struct GroupByHelper;
+
+impl HelperDef for GroupByHelper {
+    fn call_inner<'reg: 'rc, 'rc>(
+        &self,
+        h: &handlebars::Helper<'rc>,
+        _: &'reg Handlebars<'reg>,
+        _: &'rc handlebars::Context,
+        _: &mut handlebars::RenderContext<'reg, 'rc>,
+    ) -> std::result::Result<ScopedJson<'rc>, handlebars::RenderError> {
+        // Get the array parameter
+        let array = h
+            .param(0)
+            .ok_or_else(|| handlebars::RenderErrorReason::ParamNotFoundForIndex("group_by", 0))?
+            .value();
+
+        // Get the field name parameter
+        let field = h
+            .param(1)
+            .ok_or_else(|| handlebars::RenderErrorReason::ParamNotFoundForIndex("group_by", 1))?
+            .value()
+            .as_str()
+            .ok_or_else(|| {
+                handlebars::RenderErrorReason::Other(
+                    "group_by field parameter must be a string".to_string(),
+                )
+            })?;
+
+        // Build grouped result using BTreeMap for sorted keys
+        let mut grouped: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+
+        if let Some(items) = array.as_array() {
+            for item in items {
+                let key = item
+                    .get(field)
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.clone()),
+                        Value::Number(n) => Some(n.to_string()),
+                        Value::Bool(b) => Some(b.to_string()),
+                        _ => None,
+                    })
+                    .unwrap_or_default();
+                grouped.entry(key).or_default().push(item.clone());
+            }
+        }
+
+        // Convert to JSON object
+        let result: Value = grouped
+            .into_iter()
+            .map(|(k, v)| (k, Value::Array(v)))
+            .collect::<serde_json::Map<String, Value>>()
+            .into();
+
+        Ok(ScopedJson::Derived(result))
+    }
 }
 
 pub struct CodeTemplateGenerator;
@@ -90,6 +150,10 @@ impl CodeTemplateGenerator {
                 },
             ),
         );
+
+        // Helper for grouping array items by a field: {{#each (group_by subtasks "execution_level")}}
+        // Returns an object keyed by field values, where each value is an array of items
+        handlebars.register_helper("group_by", Box::new(GroupByHelper));
     }
 
     /// Generate all template files for a code task
@@ -548,6 +612,7 @@ impl CodeTemplateGenerator {
             "default_retries": default_retries,
             "fresh_start_threshold": fresh_start_threshold,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -626,6 +691,7 @@ impl CodeTemplateGenerator {
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
             "cli_type": cli_type,
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -946,6 +1012,7 @@ impl CodeTemplateGenerator {
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             // Watch-specific context
             "iteration": iteration,
             "max_iterations": max_iterations,
@@ -1040,6 +1107,7 @@ impl CodeTemplateGenerator {
             "iteration": iteration,
             // Flag to conditionally skip inline partials (for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type_enum.to_string(),
                 "model": render_settings.model,
@@ -1246,6 +1314,7 @@ impl CodeTemplateGenerator {
             "skills": skills,
             // Flag to conditionally render partials (skip for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
         });
 
         handlebars
@@ -1386,6 +1455,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             // Flag to conditionally skip inline partials (for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": cli_model, // Use cli_model instead of code_run.spec.model
@@ -1627,6 +1697,7 @@ impl CodeTemplateGenerator {
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": cli_model,
@@ -1710,6 +1781,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             // Flag to conditionally skip inline partials (for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -1766,6 +1838,15 @@ impl CodeTemplateGenerator {
                 if enriched.get("frontendStack").is_none() {
                     enriched["frontendStack"] = json!(frontend_stack);
                 }
+            }
+
+            // If agent has subagent config, inject it into cli_config
+            // This allows coordinator templates to conditionally render dispatch instructions
+            if let Some(subagents) = &agent_config.subagents {
+                enriched["subagents"] = json!({
+                    "enabled": subagents.enabled,
+                    "maxConcurrent": subagents.max_concurrent
+                });
             }
         }
 
@@ -3013,6 +3094,7 @@ impl CodeTemplateGenerator {
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": render_settings.model,
@@ -3096,6 +3178,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             // Flag to conditionally skip inline partials (for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -3318,6 +3401,7 @@ impl CodeTemplateGenerator {
             "task_language": task_language,
             "default_retries": default_retries,
             "fresh_start_threshold": fresh_start_threshold,
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
         });
 
         handlebars
@@ -3459,6 +3543,7 @@ impl CodeTemplateGenerator {
             "requirements_env_vars": requirements_env_vars,
             "requirements_secret_sources": requirements_secret_sources,
             "cli_type": cli_type,
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": cli_model,
@@ -4729,6 +4814,151 @@ mod tests {
         // This is OK because get_agent_name() always provides a value in production
     }
 
+    #[test]
+    fn test_handlebars_group_by_groups_items_by_field() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        // Template iterates over grouped keys and lists item names in each group
+        hb.register_template_string(
+            "test",
+            "{{#each (group_by items \"level\")}}{{@key}}:[{{#each this}}{{name}}{{/each}}];{{/each}}",
+        )
+        .unwrap();
+
+        let data = json!({
+            "items": [
+                {"name": "a", "level": "1"},
+                {"name": "b", "level": "2"},
+                {"name": "c", "level": "1"},
+                {"name": "d", "level": "2"},
+                {"name": "e", "level": "1"}
+            ]
+        });
+        let result = hb.render("test", &data).unwrap();
+        // BTreeMap ensures sorted keys, so "1" comes before "2"
+        assert_eq!(
+            result, "1:[ace];2:[bd];",
+            "group_by should group items by field"
+        );
+    }
+
+    #[test]
+    fn test_handlebars_group_by_handles_numeric_field_values() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        hb.register_template_string(
+            "test",
+            "{{#each (group_by items \"level\")}}{{@key}}:[{{#each this}}{{name}}{{/each}}];{{/each}}",
+        )
+        .unwrap();
+
+        let data = json!({
+            "items": [
+                {"name": "a", "level": 1},
+                {"name": "b", "level": 2},
+                {"name": "c", "level": 1}
+            ]
+        });
+        let result = hb.render("test", &data).unwrap();
+        assert_eq!(
+            result, "1:[ac];2:[b];",
+            "group_by should handle numeric field values"
+        );
+    }
+
+    #[test]
+    fn test_handlebars_group_by_handles_empty_array() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        hb.register_template_string(
+            "test",
+            "{{#each (group_by items \"level\")}}{{@key}}:[{{#each this}}{{name}}{{/each}}];{{/each}}",
+        )
+        .unwrap();
+
+        let data = json!({"items": []});
+        let result = hb.render("test", &data).unwrap();
+        assert_eq!(result, "", "group_by should handle empty arrays");
+    }
+
+    #[test]
+    fn test_handlebars_group_by_handles_missing_field() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        hb.register_template_string(
+            "test",
+            "{{#each (group_by items \"level\")}}{{@key}}:[{{#each this}}{{name}}{{/each}}];{{/each}}",
+        )
+        .unwrap();
+
+        // Items without the "level" field should group under empty string key
+        let data = json!({
+            "items": [
+                {"name": "a", "level": "1"},
+                {"name": "b"},
+                {"name": "c", "level": "1"}
+            ]
+        });
+        let result = hb.render("test", &data).unwrap();
+        // Empty key comes first in BTreeMap ordering
+        assert_eq!(
+            result, ":[b];1:[ac];",
+            "group_by should group items with missing field under empty key"
+        );
+    }
+
+    #[test]
+    fn test_handlebars_group_by_preserves_item_data() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        // Template accesses nested data within grouped items
+        hb.register_template_string(
+            "test",
+            "{{#each (group_by items \"level\")}}[{{#each this}}{{name}}{{/each}}]{{/each}}",
+        )
+        .unwrap();
+
+        let data = json!({
+            "items": [
+                {"name": "a", "level": "x"},
+                {"name": "b", "level": "y"},
+                {"name": "c", "level": "x"}
+            ]
+        });
+        let result = hb.render("test", &data).unwrap();
+        assert_eq!(
+            result, "[ac][b]",
+            "group_by should preserve all item data within groups"
+        );
+    }
+
+    #[test]
+    fn test_handlebars_group_by_subtasks_by_execution_level() {
+        let mut hb = Handlebars::new();
+        CodeTemplateGenerator::register_template_helpers(&mut hb);
+        // Simulate the intended use case: grouping subtasks by execution_level
+        hb.register_template_string(
+            "test",
+            "{{#each (group_by subtasks \"execution_level\")}}Level {{@key}}: {{#each this}}{{task_id}}{{#unless @last}}, {{/unless}}{{/each}}\n{{/each}}",
+        )
+        .unwrap();
+
+        let data = json!({
+            "subtasks": [
+                {"task_id": "TASK-1", "execution_level": "1", "title": "Setup"},
+                {"task_id": "TASK-2", "execution_level": "2", "title": "Build"},
+                {"task_id": "TASK-3", "execution_level": "1", "title": "Config"},
+                {"task_id": "TASK-4", "execution_level": "2", "title": "Test"},
+                {"task_id": "TASK-5", "execution_level": "3", "title": "Deploy"}
+            ]
+        });
+        let result = hb.render("test", &data).unwrap();
+        assert_eq!(
+            result, "Level 1: TASK-1, TASK-3\nLevel 2: TASK-2, TASK-4\nLevel 3: TASK-5\n",
+            "group_by should work for subtasks grouped by execution_level"
+        );
+    }
+
     /// Verify that Atlas container.sh does NOT include Expo environment setup.
     /// This is a regression test for the issue where expo-env was being included
     /// for all agents instead of just Tap.
@@ -4978,6 +5208,7 @@ mod tests {
                 client_config: None,
                 model_rotation: None,
                 frontend_stack: None,
+                subagents: None,
             },
         );
 
@@ -5011,6 +5242,7 @@ mod tests {
                     }
                 })),
                 frontend_stack: None,
+                subagents: None,
             },
         );
 
@@ -5093,6 +5325,7 @@ mod tests {
                 client_config: None,
                 model_rotation: None,
                 frontend_stack: None,
+                subagents: None,
             },
         );
 
@@ -5177,6 +5410,56 @@ mod tests {
         assert!(
             tools.is_empty(),
             "Unknown agent should have no default tools"
+        );
+    }
+
+    #[test]
+    fn test_enrich_cli_config_passes_subagents_to_context() {
+        use crate::tasks::config::{AgentDefinition, ControllerConfig, SubagentConfig};
+
+        let mut config = ControllerConfig::default();
+        config.agents.insert(
+            "rex".to_string(),
+            AgentDefinition {
+                github_app: "5DLabs-Rex".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
+                reasoning_effort: None,
+                tools: None,
+                client_config: None,
+                model_rotation: None,
+                frontend_stack: None,
+                subagents: Some(SubagentConfig {
+                    enabled: true,
+                    max_concurrent: 8,
+                }),
+            },
+        );
+
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        let cli_config = json!({});
+
+        let enriched =
+            CodeTemplateGenerator::enrich_cli_config_from_agent(cli_config, &code_run, &config);
+
+        // Verify subagents config is passed through
+        assert!(
+            enriched.get("subagents").is_some(),
+            "subagents should be present in enriched config"
+        );
+
+        let subagents = enriched.get("subagents").unwrap();
+        assert_eq!(
+            subagents.get("enabled").and_then(Value::as_bool),
+            Some(true),
+            "subagents.enabled should be true"
+        );
+        assert_eq!(
+            subagents.get("maxConcurrent").and_then(Value::as_u64),
+            Some(8),
+            "subagents.maxConcurrent should be 8"
         );
     }
 }

@@ -401,6 +401,29 @@ pub struct AgentDefinition {
     /// Supported values: "shadcn" (default), "tanstack"
     #[serde(default, rename = "frontendStack")]
     pub frontend_stack: Option<String>,
+
+    /// Subagent configuration for parallel execution (Claude Code only).
+    /// When enabled, the agent operates as a coordinator that can spawn
+    /// multiple subagents to work on subtasks concurrently.
+    #[serde(default)]
+    pub subagents: Option<SubagentConfig>,
+}
+
+/// Subagent configuration for parallel execution
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SubagentConfig {
+    /// Whether subagent parallel execution is enabled
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Maximum concurrent subagents (1-10, default 5)
+    #[serde(default = "default_max_concurrent", rename = "maxConcurrent")]
+    pub max_concurrent: u8,
+}
+
+/// Default max concurrent subagents
+const fn default_max_concurrent() -> u8 {
+    5
 }
 
 /// Model rotation configuration for an agent
@@ -775,6 +798,7 @@ cleanup:
                 client_config: None,
                 model_rotation: None,
                 frontend_stack: None,
+                subagents: None,
             },
         );
         config.merge_agent_cli_defaults();

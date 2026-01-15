@@ -315,6 +315,29 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Sync a task from a Linear issue
+    SyncTask {
+        /// Linear issue ID (e.g., "TSK-123" or the UUID)
+        #[arg(long)]
+        issue_id: String,
+
+        /// Project name/identifier
+        #[arg(long, default_value = "")]
+        project_name: String,
+
+        /// Local task ID to update (defaults to Linear issue identifier)
+        #[arg(long)]
+        task_id: Option<String>,
+
+        /// Linear API token (reads from `LINEAR_API_KEY` env if not provided)
+        #[arg(long, env = "LINEAR_API_KEY")]
+        linear_token: Option<String>,
+
+        /// Tag context
+        #[arg(long)]
+        tag: Option<String>,
+    },
+
     /// Generate prompts for tasks using AI (Session 2)
     GeneratePrompts {
         /// Process specific task file only
@@ -1079,6 +1102,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 service,
                 docs_repository,
                 docs_project_directory,
+                auto_append_deploy_task: false,
             };
 
             ui::print_info("Starting intake workflow...");
@@ -1142,28 +1166,13 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
 
             // Apply agent hints with validation and override capability
             // ALWAYS re-validate AI hints - they may be wrong
-            // Task 1 MUST always be bolt (infrastructure)
+            // Route ALL tasks through content-based inference
             let mut hints_modified = 0;
             let tasks_snapshot = tasks.clone();
 
-            // Force Task 1 to bolt
-            if let Some(task1) = tasks.iter_mut().find(|t| t.id == "1") {
-                if task1.agent_hint.as_deref() != Some("bolt") {
-                    ui::print_warning(&format!(
-                        "Task 1 had incorrect hint '{}', forcing to 'bolt'",
-                        task1.agent_hint.as_deref().unwrap_or("none")
-                    ));
-                    task1.agent_hint = Some("bolt".to_string());
-                    hints_modified += 1;
-                }
-            }
-
-            // Apply routing to all other tasks - FAIL if any can't be routed
+            // Apply routing to all tasks - FAIL if any can't be routed
             let mut unroutable: Vec<String> = Vec::new();
             for task in &mut tasks {
-                if task.id == "1" {
-                    continue;
-                }
                 match infer_agent_hint_with_deps_str(task, &tasks_snapshot) {
                     Some(inferred) => {
                         if task.agent_hint.as_deref() != Some(inferred) {
@@ -1203,6 +1212,36 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 ));
                 // Save the updated tasks back
                 storage.save_tasks(&tasks, tag.as_deref()).await?;
+            }
+
+            // Check for auto-append deploy task from cto-config.json
+            let config_paths = [
+                project_path.join("cto-config.json"),
+                project_path.join(".tasks/cto-config.json"),
+            ];
+            let mut auto_append_deploy = false;
+            for config_path in &config_paths {
+                if config_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(config_path) {
+                        if let Ok(config) = CtoConfig::from_json(&content) {
+                            auto_append_deploy = config.defaults.intake.auto_append_deploy_task;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Auto-append deploy task if configured
+            if auto_append_deploy {
+                if intake::domain::has_deploy_task(&tasks) {
+                    ui::print_info("Deploy task already exists, skipping auto-append");
+                } else {
+                    ui::print_info("Auto-appending deploy task (depends on all other tasks)");
+                    let deploy_task = intake::domain::create_deploy_task(&tasks);
+                    tasks.push(deploy_task);
+                    // Save the updated tasks
+                    storage.save_tasks(&tasks, tag.as_deref()).await?;
+                }
             }
 
             let repository = repository.unwrap_or_else(|| "unknown/unknown".to_string());
@@ -1254,28 +1293,13 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
 
             // Apply agent hints with validation and override capability
             // ALWAYS re-validate AI hints - they may be wrong
-            // Task 1 MUST always be bolt (infrastructure)
+            // Route ALL tasks through content-based inference
             let mut hints_modified = 0;
             let tasks_snapshot = tasks.clone();
 
-            // Force Task 1 to bolt
-            if let Some(task1) = tasks.iter_mut().find(|t| t.id == "1") {
-                if task1.agent_hint.as_deref() != Some("bolt") {
-                    ui::print_warning(&format!(
-                        "Task 1 had incorrect hint '{}', forcing to 'bolt'",
-                        task1.agent_hint.as_deref().unwrap_or("none")
-                    ));
-                    task1.agent_hint = Some("bolt".to_string());
-                    hints_modified += 1;
-                }
-            }
-
-            // Apply routing to all other tasks - FAIL if any can't be routed
+            // Apply routing to all tasks - FAIL if any can't be routed
             let mut unroutable: Vec<String> = Vec::new();
             for task in &mut tasks {
-                if task.id == "1" {
-                    continue;
-                }
                 match infer_agent_hint_with_deps_str(task, &tasks_snapshot) {
                     Some(inferred) => {
                         if task.agent_hint.as_deref() != Some(inferred) {
@@ -1317,6 +1341,36 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 storage.save_tasks(&tasks, tag.as_deref()).await?;
             }
 
+            // Check for auto-append deploy task from cto-config.json
+            let config_paths = [
+                project_path.join("cto-config.json"),
+                project_path.join(".tasks/cto-config.json"),
+            ];
+            let mut auto_append_deploy = false;
+            for config_path in &config_paths {
+                if config_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(config_path) {
+                        if let Ok(config) = CtoConfig::from_json(&content) {
+                            auto_append_deploy = config.defaults.intake.auto_append_deploy_task;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Auto-append deploy task if configured
+            if auto_append_deploy {
+                if intake::domain::has_deploy_task(&tasks) {
+                    ui::print_info("Deploy task already exists, skipping auto-append");
+                } else {
+                    ui::print_info("Auto-appending deploy task (depends on all other tasks)");
+                    let deploy_task = intake::domain::create_deploy_task(&tasks);
+                    tasks.push(deploy_task);
+                    // Save the updated tasks
+                    storage.save_tasks(&tasks, tag.as_deref()).await?;
+                }
+            }
+
             let output_dir = output.unwrap_or_else(|| project_path.join(".tasks").join("docs"));
 
             ui::print_info(&format!(
@@ -1338,6 +1392,76 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 result.acceptance_files
             );
             ui::print_info(&format!("Output directory: {}", output_dir.display()));
+        }
+
+        Commands::SyncTask {
+            issue_id,
+            project_name,
+            task_id,
+            linear_token,
+            tag,
+        } => {
+            // Initialize if not already
+            if !tasks_domain.is_initialized().await? {
+                tasks_domain.init().await?;
+                ui::print_info("Initialized tasks structure");
+            }
+
+            let config = intake::commands::SyncTaskConfig {
+                issue_id: issue_id.clone(),
+                project_name,
+                task_id,
+                linear_token,
+                tag,
+            };
+
+            ui::print_info(&format!("Syncing task from Linear issue: {}", issue_id));
+
+            let result = intake::commands::sync_task(
+                Arc::clone(&storage) as Arc<dyn intake::storage::Storage>,
+                config,
+            )
+            .await?;
+
+            if result.created {
+                ui::print_success(&format!(
+                    "Created task {} from Linear issue",
+                    result.task.id
+                ));
+            } else {
+                ui::print_success(&format!(
+                    "Updated task {} from Linear issue",
+                    result.task.id
+                ));
+            }
+
+            println!();
+            println!("{}", "Task Details:".bold());
+            println!("  {} ID: {}", "•".cyan(), result.task.id);
+            println!("  {} Title: {}", "•".cyan(), result.task.title);
+            println!("  {} Priority: {}", "•".cyan(), result.task.priority);
+
+            if !result.parsed.acceptance_criteria.is_empty() {
+                println!(
+                    "  {} Acceptance criteria: {} items",
+                    "•".cyan(),
+                    result.parsed.acceptance_criteria.len()
+                );
+            }
+
+            if result.parsed.test_strategy.is_some() {
+                println!("  {} Test strategy: present", "•".cyan());
+            }
+
+            if let Some(ref hint) = result.task.agent_hint {
+                println!("  {} Agent hint: {}", "•".cyan(), hint);
+            }
+
+            println!();
+            ui::print_info("Changed files:");
+            for file in &result.changed_files {
+                println!("  {} {}", "•".cyan(), file.display());
+            }
         }
 
         // =========== Session 2: Prompt Generation Command Handlers ===========

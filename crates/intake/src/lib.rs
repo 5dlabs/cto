@@ -53,6 +53,9 @@ pub mod storage;
 // Domain facades
 pub mod domain;
 
+// Command implementations
+pub mod commands;
+
 // Terminal UI helpers
 pub mod ui;
 

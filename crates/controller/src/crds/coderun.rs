@@ -68,6 +68,36 @@ pub struct LinearIntegration {
     pub team_id: Option<String>,
 }
 
+/// Subtask specification for breaking down work into smaller units
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct SubtaskSpec {
+    /// Unique identifier for the subtask within the parent task
+    pub id: u32,
+
+    /// Human-readable title of the subtask
+    pub title: String,
+
+    /// Optional detailed description of the subtask
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// Optional subagent type to handle this subtask (e.g., "rex", "bolt", "tess")
+    #[serde(default, rename = "subagentType")]
+    pub subagent_type: Option<String>,
+
+    /// Optional execution level for ordering (lower levels execute first)
+    #[serde(default, rename = "executionLevel")]
+    pub execution_level: Option<u32>,
+
+    /// Whether this subtask can run in parallel with others at the same execution level
+    #[serde(default)]
+    pub parallelizable: bool,
+
+    /// List of subtask IDs that must complete before this subtask can start
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+}
+
 /// CLI-specific configuration
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct CLIConfig {
@@ -223,6 +253,10 @@ pub struct CodeRunSpec {
     /// Defaults to true for intake runs, false otherwise
     #[serde(default, rename = "freshWorkspace")]
     pub fresh_workspace: Option<bool>,
+
+    /// Optional list of subtasks that break down this CodeRun into smaller units of work
+    #[serde(default)]
+    pub subtasks: Option<Vec<SubtaskSpec>>,
 }
 
 impl Default for CodeRunSpec {
@@ -255,6 +289,7 @@ impl Default for CodeRunSpec {
             remote_tools: None,
             local_tools: None,
             fresh_workspace: None,
+            subtasks: None,
         }
     }
 }

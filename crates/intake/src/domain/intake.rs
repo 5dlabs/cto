@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::ai::schemas::ComplexityReport;
-use crate::entities::TaskStatus;
+use crate::entities::{Task, TaskStatus};
 use crate::errors::{TasksError, TasksResult};
 use crate::storage::Storage;
 
@@ -21,6 +21,64 @@ use super::cto_config::{generate_cto_config, save_cto_config};
 use super::docs::{generate_all_docs, DocsGenerationResult};
 use super::tasks::routing::infer_agent_hint_with_deps_str;
 use super::AIDomain;
+
+/// Check if a deploy task already exists in the task list.
+/// Looks for tasks with agent_hint="bolt" and title containing "deploy".
+#[must_use]
+pub fn has_deploy_task(tasks: &[Task]) -> bool {
+    tasks.iter().any(|t| {
+        let title_lower = t.title.to_lowercase();
+        let desc_lower = t.description.to_lowercase();
+        let is_bolt = t.agent_hint.as_deref() == Some("bolt");
+        let has_deploy_keyword = title_lower.contains("deploy")
+            || desc_lower.contains("deploy")
+            || title_lower.contains("deployment")
+            || desc_lower.contains("deployment");
+        is_bolt && has_deploy_keyword
+    })
+}
+
+/// Create a deploy task that depends on all other tasks.
+/// The task is assigned to Bolt and includes standard deployment instructions.
+#[must_use]
+pub fn create_deploy_task(tasks: &[Task]) -> Task {
+    // Get the next task ID (max ID + 1)
+    let max_id = tasks
+        .iter()
+        .filter_map(|t| t.id.parse::<u32>().ok())
+        .max()
+        .unwrap_or(0);
+    let new_id = (max_id + 1).to_string();
+
+    // Collect all task IDs as dependencies
+    let dependencies: Vec<String> = tasks.iter().map(|t| t.id.clone()).collect();
+
+    let mut task = Task::new(
+        new_id,
+        "Deploy application to production",
+        "Deploy the completed application to production environment. \
+         This task depends on all implementation tasks being complete.",
+    );
+    task.dependencies = dependencies;
+    task.agent_hint = Some("bolt".to_string());
+    task.details = "Deployment steps:\n\
+        1. Verify all dependent tasks are complete\n\
+        2. Run final integration tests\n\
+        3. Build production artifacts\n\
+        4. Deploy to staging environment\n\
+        5. Run smoke tests\n\
+        6. Deploy to production\n\
+        7. Verify production deployment\n\
+        8. Update deployment documentation"
+        .to_string();
+    task.test_strategy = "Verify deployment by:\n\
+        - Checking health endpoints\n\
+        - Running smoke tests against production\n\
+        - Verifying all services are operational"
+        .to_string();
+
+    task
+}
 
 /// Configuration for the intake process.
 #[derive(Debug, Clone)]
@@ -63,6 +121,10 @@ pub struct IntakeConfig {
 
     /// Project directory within docs repo.
     pub docs_project_directory: Option<String>,
+
+    /// Whether to auto-append a deploy task after all other tasks.
+    /// When enabled, a Bolt deploy task is added that depends on all other tasks.
+    pub auto_append_deploy_task: bool,
 }
 
 impl Default for IntakeConfig {
@@ -81,6 +143,7 @@ impl Default for IntakeConfig {
             service: None,
             docs_repository: None,
             docs_project_directory: None,
+            auto_append_deploy_task: false,
         }
     }
 }
@@ -296,29 +359,17 @@ impl IntakeDomain {
         // IMPORTANT: We ALWAYS re-validate and potentially override AI-generated hints
         // because the AI model may assign incorrect agents. Our routing logic is the
         // source of truth.
+        //
+        // NOTE: All tasks (including Task 1) are routed by content-based inference.
+        // The PRD prompt guides the AI to make Task 1 infrastructure only when needed
+        // (databases, caches, storage), but routing validates based on actual content.
         tracing::info!("Adding agent routing hints with dependency analysis...");
-
-        // CRITICAL: Task 1 MUST always be Bolt (infrastructure provisioning)
-        // This is a hard requirement from the platform architecture.
-        if let Some(task1) = tasks.iter_mut().find(|t| t.id == "1") {
-            if task1.agent_hint.as_deref() != Some("bolt") {
-                tracing::warn!(
-                    "Task 1 had incorrect agent hint '{}', forcing to 'bolt'",
-                    task1.agent_hint.as_deref().unwrap_or("none")
-                );
-                task1.agent_hint = Some("bolt".to_string());
-            }
-        }
 
         // First pass: assign hints to tasks without dependencies
         // This ensures dependency targets have hints before we check dependencies
         let mut unroutable_tasks: Vec<String> = Vec::new();
 
         for task in &mut tasks {
-            // Skip Task 1 (already handled above)
-            if task.id == "1" {
-                continue;
-            }
             if task.dependencies.is_empty() {
                 match infer_agent_hint_with_deps_str(task, &[]) {
                     Some(inferred) => {
@@ -348,10 +399,6 @@ impl IntakeDomain {
         // Clone tasks for reference since we need to mutate while iterating
         let tasks_snapshot = tasks.clone();
         for task in &mut tasks {
-            // Skip Task 1 (already handled above)
-            if task.id == "1" {
-                continue;
-            }
             if let Some(inferred) = infer_agent_hint_with_deps_str(task, &tasks_snapshot) {
                 if task.agent_hint.as_deref() != Some(inferred) {
                     if task.agent_hint.is_some() {
@@ -385,7 +432,20 @@ impl IntakeDomain {
             });
         }
 
-        tracing::info!("Agent hints assigned with dependency awareness (Task 1 forced to bolt)");
+        tracing::info!(
+            "Agent hints assigned via content-based inference with dependency awareness"
+        );
+
+        // 6.5: Auto-append deploy task if configured
+        if config.auto_append_deploy_task {
+            if has_deploy_task(&tasks) {
+                tracing::info!("Deploy task already exists, skipping auto-append");
+            } else {
+                tracing::info!("Auto-appending deploy task (depends on all other tasks)");
+                let deploy_task = create_deploy_task(&tasks);
+                tasks.push(deploy_task);
+            }
+        }
 
         // 7. Save tasks to storage
         let tasks_dir = config.output_dir.join("tasks");

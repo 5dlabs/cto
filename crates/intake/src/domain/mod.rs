@@ -13,7 +13,9 @@
 mod ai;
 mod config;
 pub mod cto_config;
+pub mod delta;
 pub mod intake;
+pub mod linear_parser;
 pub mod prompts;
 pub mod tasks;
 
@@ -37,4 +39,6 @@ pub mod docs {
 pub use ai::AIDomain;
 pub use config::ConfigDomain;
 pub use cto_config::{generate_cto_config, save_cto_config, CtoConfig};
-pub use intake::{IntakeConfig, IntakeDomain, IntakeResult};
+pub use delta::{compute_task_delta, get_task_changes, tasks_are_equal, TaskChanges, TaskDelta};
+pub use intake::{create_deploy_task, has_deploy_task, IntakeConfig, IntakeDomain, IntakeResult};
+pub use linear_parser::{parse_linear_issue, ParsedLinearTask};

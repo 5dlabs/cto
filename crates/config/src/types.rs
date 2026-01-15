@@ -75,7 +75,7 @@ impl SubagentConfig {
     /// Check if subagents should be used (enabled and valid CLI).
     #[must_use]
     pub fn should_use(&self, cli: &str) -> bool {
-        self.enabled && cli == "claude"
+        self.enabled && matches!(cli, "claude" | "opencode")
     }
 }
 
@@ -386,6 +386,13 @@ pub struct IntakeDefaults {
 
     /// Model configuration.
     pub models: IntakeModels,
+
+    /// Whether to auto-append a deploy task after all other tasks.
+    /// When enabled, a Bolt deploy task is added that depends on all other tasks.
+    /// Only applies to deployable projects (web apps, APIs), not libraries.
+    /// Default: false.
+    #[serde(rename = "autoAppendDeployTask", default)]
+    pub auto_append_deploy_task: bool,
 }
 
 fn default_source_branch() -> String {
@@ -405,6 +412,7 @@ impl Default for IntakeDefaults {
                 fallback: "claude-opus-4-5-20251101".to_string(),
                 cli_models: HashMap::new(), // Will be populated from config
             },
+            auto_append_deploy_task: false,
         }
     }
 }
@@ -652,6 +660,39 @@ mod tests {
         assert_eq!(defaults.github_app, "5DLabs-Morgan");
         assert_eq!(defaults.cli, "claude");
         assert_eq!(defaults.source_branch, "main");
+        assert!(!defaults.auto_append_deploy_task);
+    }
+
+    #[test]
+    fn test_intake_auto_append_deploy_task_from_json() {
+        // Test parsing autoAppendDeployTask from JSON (enabled)
+        let json = r#"{
+            "githubApp": "5DLabs-Morgan",
+            "cli": "claude",
+            "sourceBranch": "main",
+            "models": {
+                "primary": "claude-opus-4-5-20251101",
+                "research": "claude-opus-4-5-20251101",
+                "fallback": "claude-opus-4-5-20251101"
+            },
+            "autoAppendDeployTask": true
+        }"#;
+        let defaults: IntakeDefaults = serde_json::from_str(json).unwrap();
+        assert!(defaults.auto_append_deploy_task);
+
+        // Test default value when not specified (disabled)
+        let json_no_flag = r#"{
+            "githubApp": "5DLabs-Morgan",
+            "cli": "claude",
+            "sourceBranch": "main",
+            "models": {
+                "primary": "claude-opus-4-5-20251101",
+                "research": "claude-opus-4-5-20251101",
+                "fallback": "claude-opus-4-5-20251101"
+            }
+        }"#;
+        let defaults_default: IntakeDefaults = serde_json::from_str(json_no_flag).unwrap();
+        assert!(!defaults_default.auto_append_deploy_task);
     }
 
     #[test]
@@ -686,12 +727,16 @@ mod tests {
     #[test]
     fn test_subagent_config_should_use() {
         let config = SubagentConfig::enabled();
+        // Supported CLIs
         assert!(config.should_use("claude"));
+        assert!(config.should_use("opencode"));
+        // Unsupported CLIs
         assert!(!config.should_use("codex"));
         assert!(!config.should_use("gemini"));
 
         let disabled = SubagentConfig::default();
         assert!(!disabled.should_use("claude"));
+        assert!(!disabled.should_use("opencode"));
     }
 
     #[test]
