@@ -192,7 +192,7 @@ The platform is under active development.
 #### *The Rust Architect*
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/rex-avatar.png" width="180" height="180" alt="Rex Avatar">
+<img src="assets/rex-avatar-512.png" width="180" height="180" alt="Rex Avatar">
 </div>
 
 🦀 **Stack:** Rust, Tokio, Axum  
@@ -302,7 +302,7 @@ The platform is under active development.
 #### *The Quality Guardian*
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/cleo-avatar.png" width="180" height="180" alt="Cleo Avatar">
+<img src="assets/cleo-avatar-512.png" width="180" height="180" alt="Cleo Avatar">
 </div>
 
 🔍 **Personality:** Meticulous & wise  
@@ -318,7 +318,7 @@ The platform is under active development.
 #### *The Security Sentinel*
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/cipher-avatar.png" width="180" height="180" alt="Cipher Avatar">
+<img src="assets/cipher-avatar-512.png" width="180" height="180" alt="Cipher Avatar">
 </div>
 
 🛡️ **Personality:** Vigilant & protective  
@@ -334,7 +334,7 @@ The platform is under active development.
 #### *The Testing Genius*
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/tess-avatar.png" width="180" height="180" alt="Tess Avatar">
+<img src="assets/tess-avatar-512.png" width="180" height="180" alt="Tess Avatar">
 </div>
 
 🕵️ **Personality:** Curious & thorough  
@@ -373,7 +373,7 @@ The platform is under active development.
 #### *The Integration Master*
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/atlas-avatar.png" width="180" height="180" alt="Atlas Avatar">
+<img src="assets/atlas-avatar-512.png" width="180" height="180" alt="Atlas Avatar">
 </div>
 
 🔗 **Personality:** Systematic & reliable  
@@ -389,7 +389,7 @@ The platform is under active development.
 #### *The Deployment Specialist*
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/bolt-avatar.png" width="180" height="180" alt="Bolt Avatar">
+<img src="assets/bolt-avatar-512.png" width="180" height="180" alt="Bolt Avatar">
 </div>
 
 ⚡ **Personality:** Fast & action-oriented  
