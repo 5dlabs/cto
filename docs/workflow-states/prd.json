@@ -1,0 +1,305 @@
+{
+  "project": {
+    "name": "CTO Platform Improvements",
+    "description": "Multi-phase improvements to the CTO platform based on implementation plan analysis. Includes intake fixes, fresh start mechanism, subagent wiring, and linear task sync.",
+    "repository": "https://github.com/5dlabs/cto",
+    "docs_project_directory": "docs/workflow-states",
+    "target_branch": "develop"
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2026-01-15",
+    "source": "docs/workflow-states/implementation-plan.md",
+    "estimated_effort": "2-3 weeks",
+    "priority": "high"
+  },
+  "stories": [
+    {
+      "id": "STORY-001",
+      "title": "Remove local=true from MCP intake tool",
+      "phase": 0,
+      "complexity": "low",
+      "agent_hint": "rex",
+      "description": "Remove the `local=true` option from the MCP intake tool to prevent confusion during E2E tests. Intake should ALWAYS run in a container, never locally.",
+      "acceptance_criteria": [
+        "Delete `handle_intake_local()` function from `crates/notify/mcp/src/main.rs`",
+        "Remove local handling block from main intake handler",
+        "Remove `local` parameter from tool schema in `crates/notify/mcp/src/tools.rs`",
+        "Update AGENTS.md documentation to clarify intake never runs locally",
+        "All existing intake tests pass",
+        "MCP tool schema no longer includes local option"
+      ],
+      "files": [
+        "crates/notify/mcp/src/main.rs",
+        "crates/notify/mcp/src/tools.rs",
+        "AGENTS.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "STORY-002",
+      "title": "Remove hardcoded Task 1 = Bolt enforcement",
+      "phase": 0,
+      "complexity": "medium",
+      "agent_hint": "rex",
+      "description": "Remove the hardcoded assumption that Task 1 must always be Bolt (infrastructure). Simple projects may not need infrastructure setup. Task 1 should be routed based on content like all other tasks.",
+      "acceptance_criteria": [
+        "Delete the Task 1 = bolt forcing block in `crates/intake/src/bin/cli.rs` (lines ~1145-1160)",
+        "Task 1 now routes through `infer_agent_hint_with_deps_str()` like all other tasks",
+        "Existing routing tests pass",
+        "New test: Task 1 with implementation content routes to Rex/Blaze",
+        "New test: Task 1 with infrastructure content still routes to Bolt"
+      ],
+      "files": [
+        "crates/intake/src/bin/cli.rs",
+        "crates/intake/tests/intake_tests.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "STORY-003",
+      "title": "Add optional auto-append deploy task",
+      "phase": 0,
+      "complexity": "medium",
+      "agent_hint": "rex",
+      "description": "Optionally auto-append a final deployment task when configured. Should be controlled by `defaults.intake.autoAppendDeployTask` in cto-config.json. Only applies to deployable projects (web apps, APIs), not libraries.",
+      "acceptance_criteria": [
+        "Add `autoAppendDeployTask` field to IntakeDefaults in `crates/config/src/types.rs`",
+        "Implement auto-append logic in `crates/intake/src/bin/cli.rs`",
+        "Deploy task depends on all other tasks",
+        "Deploy task has agent_hint = bolt",
+        "Test: When enabled, deploy task is appended",
+        "Test: When disabled (default), no deploy task added",
+        "Test: If deploy task already exists in PRD, don't duplicate"
+      ],
+      "files": [
+        "crates/config/src/types.rs",
+        "crates/intake/src/bin/cli.rs",
+        "crates/intake/tests/intake_tests.rs",
+        "cto-config.template.json"
+      ],
+      "dependencies": ["STORY-002"]
+    },
+    {
+      "id": "STORY-004",
+      "title": "Wire up Fresh Start threshold config",
+      "phase": 1,
+      "complexity": "medium",
+      "agent_hint": "rex",
+      "description": "Wire up the `freshStartThreshold` config value from cto-config.json through to the retry-loop.sh.hbs template. The template code already exists but the variable is never populated.",
+      "acceptance_criteria": [
+        "Add `fresh_start_threshold` field to PlayDefaults in `crates/config/src/types.rs`",
+        "Pass `fresh_start_threshold` to template context in healer prompt generation",
+        "Template renders with actual threshold value (not hardcoded)",
+        "Test: Config with freshStartThreshold=5 renders correctly",
+        "Test: Default value (3) used when not specified",
+        "Fresh start triggers after configured number of retries"
+      ],
+      "files": [
+        "crates/config/src/types.rs",
+        "crates/healer/src/prompt/context.rs",
+        "templates/_shared/partials/retry-loop.sh.hbs"
+      ],
+      "dependencies": ["STORY-001", "STORY-002", "STORY-003"]
+    },
+    {
+      "id": "STORY-005",
+      "title": "Update SubagentConfig.should_use() for OpenCode",
+      "phase": 1.5,
+      "complexity": "low",
+      "agent_hint": "rex",
+      "description": "Update the `should_use()` method in SubagentConfig to also return true for OpenCode CLI, not just Claude. OpenCode has native subagent support via `mode: subagent` config.",
+      "acceptance_criteria": [
+        "Update `should_use()` in `crates/config/src/types.rs` to match claude OR opencode",
+        "Test: should_use('claude') returns true when enabled",
+        "Test: should_use('opencode') returns true when enabled",
+        "Test: should_use('codex') returns false (not supported)",
+        "Test: should_use returns false when disabled regardless of CLI"
+      ],
+      "files": [
+        "crates/config/src/types.rs"
+      ],
+      "dependencies": ["STORY-004"]
+    },
+    {
+      "id": "STORY-006",
+      "title": "Pass subagent config to template context",
+      "phase": 1.5,
+      "complexity": "medium",
+      "agent_hint": "rex",
+      "description": "Pass the `subagents` config from AgentConfig to the Handlebars template context so coordinator templates can conditionally render subagent dispatch instructions.",
+      "acceptance_criteria": [
+        "Add subagents to enriched CLI config in `enrich_cli_config_from_agent()`",
+        "Template context includes `subagents.enabled` and `subagents.maxConcurrent`",
+        "Test: Coordinator template renders dispatch instructions when enabled",
+        "Test: Coordinator template skips dispatch when disabled",
+        "Existing template tests pass"
+      ],
+      "files": [
+        "crates/controller/src/tasks/code/templates.rs"
+      ],
+      "dependencies": ["STORY-005"]
+    },
+    {
+      "id": "STORY-007",
+      "title": "Add subtasks field to CodeRunSpec",
+      "phase": 1.5,
+      "complexity": "medium",
+      "agent_hint": "rex",
+      "description": "Add a `subtasks` field to CodeRunSpec CRD so subtasks from intake can be passed through to the agent container and rendered in templates.",
+      "acceptance_criteria": [
+        "Add `SubtaskSpec` struct to `crates/controller/src/crds/coderun.rs`",
+        "Add `subtasks: Option<Vec<SubtaskSpec>>` to CodeRunSpec",
+        "SubtaskSpec includes: id, title, description, subagent_type, execution_level, parallelizable, dependencies",
+        "CRD schema validates correctly",
+        "Test: CodeRun with subtasks serializes/deserializes correctly"
+      ],
+      "files": [
+        "crates/controller/src/crds/coderun.rs"
+      ],
+      "dependencies": ["STORY-006"]
+    },
+    {
+      "id": "STORY-008",
+      "title": "Pass subtasks array to template context",
+      "phase": 1.5,
+      "complexity": "medium",
+      "agent_hint": "rex",
+      "description": "Pass the subtasks array from CodeRunSpec to the Handlebars template context. Templates can then iterate over subtasks to generate dispatch instructions.",
+      "acceptance_criteria": [
+        "Template context includes `subtasks` array from code_run.spec.subtasks",
+        "Each subtask has all fields accessible in templates",
+        "Test: Template with {{#each subtasks}} renders correctly",
+        "Test: Empty subtasks array doesn't break templates"
+      ],
+      "files": [
+        "crates/controller/src/tasks/code/templates.rs"
+      ],
+      "dependencies": ["STORY-007"]
+    },
+    {
+      "id": "STORY-009",
+      "title": "Register group_by Handlebars helper",
+      "phase": 1.5,
+      "complexity": "medium",
+      "agent_hint": "rex",
+      "description": "Register a `group_by` Handlebars helper that groups array items by a field. This is used by subagent-dispatch.md.hbs to group subtasks by execution_level for parallel dispatch.",
+      "acceptance_criteria": [
+        "Register `group_by` helper in `register_template_helpers()`",
+        "Helper accepts array and field name: {{#each (group_by subtasks 'execution_level')}}",
+        "Returns object keyed by field value with arrays of items",
+        "Test: group_by with execution_level groups correctly",
+        "Test: group_by with missing field handles gracefully",
+        "subagent-dispatch.md.hbs renders correctly with grouped subtasks"
+      ],
+      "files": [
+        "crates/controller/src/tasks/code/templates.rs"
+      ],
+      "dependencies": ["STORY-008"]
+    },
+    {
+      "id": "STORY-010",
+      "title": "Implement intake update command",
+      "phase": 2,
+      "complexity": "high",
+      "agent_hint": "rex",
+      "description": "Implement `intake update` command that re-parses PRD/architecture changes and generates a delta PR with updated task files. This allows mid-flight updates to the workflow.",
+      "acceptance_criteria": [
+        "New command: `intake update --project-name <name> [--prd-content <content>] [--architecture-content <content>]`",
+        "Loads existing tasks.json from docs repo",
+        "Re-runs task generation with updated inputs",
+        "Computes diff between old and new tasks",
+        "Generates delta PR with only changed task files",
+        "Preserves task IDs where possible (matching by title similarity)",
+        "Test: Update with new PRD generates correct delta",
+        "Test: Update preserves completed task status"
+      ],
+      "files": [
+        "crates/intake/src/commands/mod.rs",
+        "crates/intake/src/commands/update.rs",
+        "crates/intake/src/domain/delta.rs",
+        "crates/intake/src/bin/cli.rs"
+      ],
+      "dependencies": ["STORY-009"]
+    },
+    {
+      "id": "STORY-011",
+      "title": "Implement intake sync-task command",
+      "phase": 2,
+      "complexity": "high",
+      "agent_hint": "rex",
+      "description": "Implement `intake sync-task` command that pulls task changes from Linear issue edits and updates the corresponding task files in the docs repo.",
+      "acceptance_criteria": [
+        "New command: `intake sync-task --issue-id <id> --project-name <name> --task-id <id>`",
+        "Fetches issue details from Linear API",
+        "Parses description into prompt content and acceptance criteria",
+        "Updates task prompt.md and acceptance.md files",
+        "Creates PR with updated task files",
+        "Test: Sync from edited Linear issue updates task correctly",
+        "Test: Acceptance criteria checkboxes parsed correctly"
+      ],
+      "files": [
+        "crates/intake/src/commands/mod.rs",
+        "crates/intake/src/commands/sync.rs",
+        "crates/intake/src/domain/linear_parser.rs",
+        "crates/intake/src/bin/cli.rs"
+      ],
+      "dependencies": ["STORY-010"]
+    },
+    {
+      "id": "STORY-012",
+      "title": "Add MCP tools for intake update and sync",
+      "phase": 2,
+      "complexity": "medium",
+      "agent_hint": "rex",
+      "description": "Add MCP tools `intake_update` and `intake_sync_task` so these commands can be invoked from the CTO MCP server during play workflows.",
+      "acceptance_criteria": [
+        "Add `intake_update` tool to MCP tools schema",
+        "Add `intake_sync_task` tool to MCP tools schema",
+        "Implement handlers in `crates/notify/mcp/src/main.rs`",
+        "Tools call the intake binary with appropriate arguments",
+        "Test: MCP tool invocation works correctly",
+        "Documentation updated with new tool descriptions"
+      ],
+      "files": [
+        "crates/notify/mcp/src/tools.rs",
+        "crates/notify/mcp/src/main.rs",
+        "docs/mcp-tools.md"
+      ],
+      "dependencies": ["STORY-011"]
+    }
+  ],
+  "phases": {
+    "0": {
+      "name": "Intake Clarifications",
+      "description": "Critical fixes to remove confusion and ensure proper task routing",
+      "stories": ["STORY-001", "STORY-002", "STORY-003"],
+      "estimated_effort": "2-4 hours"
+    },
+    "1": {
+      "name": "Fresh Start Wiring",
+      "description": "Wire up the Fresh Start mechanism config to templates",
+      "stories": ["STORY-004"],
+      "estimated_effort": "1-2 hours"
+    },
+    "1.5": {
+      "name": "Subagent Wiring",
+      "description": "Wire up subagent config and subtasks to template context",
+      "stories": ["STORY-005", "STORY-006", "STORY-007", "STORY-008", "STORY-009"],
+      "estimated_effort": "4-6 hours"
+    },
+    "2": {
+      "name": "Linear Task Sync",
+      "description": "Enable mid-flight task updates from PRD changes or Linear edits",
+      "stories": ["STORY-010", "STORY-011", "STORY-012"],
+      "estimated_effort": "3-5 days"
+    }
+  },
+  "config_overrides": {
+    "implementation_agent": "rex",
+    "quality_agent": "cleo",
+    "testing_agent": "tess",
+    "parallel_execution": false,
+    "auto_merge": false
+  }
+}
