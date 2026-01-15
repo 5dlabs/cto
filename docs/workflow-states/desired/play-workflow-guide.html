@@ -469,6 +469,17 @@ Next agent run picks up updated task files automatically
             </p>
         </div>
 
+        <div class="phase">
+            <div class="phase-header">
+                <div class="phase-number">5</div>
+                <strong>Subagent Parallel Execution</strong>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                When <code>subagents.enabled=true</code>, pass subtasks to templates so coordinator dispatches to parallel workers.<br>
+                Default: <code>enabled=false</code> (single agent works sequentially)
+            </p>
+        </div>
+
         <h2>📁 Task Creation Enforcement</h2>
 
         <table>
@@ -514,11 +525,53 @@ Next agent run picks up updated task files automatically
   },
   "agents": {
     "morgan": { "model": "claude-opus-4-5-20251101" },
-    "rex": { "model": "claude-opus-4-5-20251101" },
-    "blaze": { "model": "claude-opus-4-5-20251101" },
-    "_note": "Per-agent models - no need for roleModels"
+    "rex": { 
+      "model": "claude-opus-4-5-20251101",
+      "subagents": {
+        "enabled": true,
+        "maxConcurrent": 5
+      },
+      "_note": "When enabled, Rex acts as coordinator for parallel subtasks"
+    },
+    "blaze": { 
+      "model": "claude-opus-4-5-20251101",
+      "subagents": { "enabled": false },
+      "_note": "Default: subagents disabled, single agent works sequentially"
+    }
   }
 }</pre>
+
+        <h2>🔀 Subagent Flow (When Enabled)</h2>
+
+        <pre style="font-size: 0.75rem;">
+┌─────────────────────────────────────────────────────────────────────┐
+│                    SUBTASK PARALLEL EXECUTION                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Task with Subtasks (subagents.enabled=true)                        │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  Level 0 (No Dependencies) - Run in Parallel                │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │    │
+│  │  │ @implementer │  │ @implementer │  │ @researcher  │      │    │
+│  │  │ Subtask 1    │  │ Subtask 2    │  │ Subtask 3    │      │    │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘      │    │
+│  └───────────────────────────┬─────────────────────────────────┘    │
+│                              ▼                                       │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  Level 1 (Depends on Level 0) - Run in Parallel             │    │
+│  │  ┌──────────────┐  ┌──────────────┐                         │    │
+│  │  │ @tester      │  │ @reviewer    │                         │    │
+│  │  │ Subtask 4    │  │ Subtask 5    │                         │    │
+│  │  └──────────────┘  └──────────────┘                         │    │
+│  └───────────────────────────┬─────────────────────────────────┘    │
+│                              ▼                                       │
+│                      Task Complete                                   │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+CLI Support: Claude Code (native), OpenCode (native), others TBD
+        </pre>
 
         <footer style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted);">
             <p>Desired State Specification - January 2026</p>

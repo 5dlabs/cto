@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-We have template code for Fresh Start, but the config value isn't parsed or passed through. Linear Task Sync is documented but not implemented at all.
+We have template code for Fresh Start and Subagent coordination, but the config values aren't parsed or passed through to templates. Linear Task Sync is documented but not implemented at all.
 
 **Simplified Scope:** After review, we removed `workerIsolation` and `roleModels` as dead code:
 - `workerIsolation` - Template existed but was never wired up; we don't have peer coordination anyway
@@ -10,16 +10,18 @@ We have template code for Fresh Start, but the config value isn't parsed or pass
 
 **Remaining Items:**
 1. **Wire up Fresh Start** - Pass `freshStartThreshold` from config to retry-loop template
-2. **Remove `local=true` from intake** - Causes confusion in E2E tests
-3. **Auto-append final deployment task** - Bolt's final task isn't guaranteed
-4. **Clarify 6 implementation agents** - Documentation needs updating
-5. **Linear Task Sync** - `intake update` and `intake sync-task` commands
+2. **Wire up Subagents** - Pass `subagents` config and `subtasks` array to templates
+3. **Remove `local=true` from intake** - Causes confusion in E2E tests
+4. **Auto-append final deployment task** - Bolt's final task isn't guaranteed
+5. **Clarify 6 implementation agents** - Documentation needs updating
+6. **Linear Task Sync** - `intake update` and `intake sync-task` commands
 
 ## Gap Analysis
 
 | Feature | Current State | Work Required |
 |---------|---------------|---------------|
 | **Fresh Start** | Template code exists, never triggers | Wire up config → template |
+| **Subagents** | Config & templates exist, not wired | Pass to template context |
 | **Linear Task Sync** | Design doc only | Full implementation |
 | **Intake local option** | Exists, causes confusion | Remove from MCP tool |
 | **Final Deploy Task** | PRD-dependent | Auto-append in intake |
@@ -152,6 +154,137 @@ cargo test -p cto-healer -- render_prompt
 ```
 
 **Estimated effort:** 1-2 hours
+
+---
+
+## Phase 1.5: Wire Up Subagents
+
+**Goal:** Enable parallel subtask execution via subagents when configured.
+
+### Background
+
+Subagents allow a single task to be broken into parallelizable subtasks that run concurrently:
+- **Intake** generates subtasks with `subagent_type`, `execution_level`, `parallelizable`
+- **Templates** exist (`coordinator.md.hbs`, `subagent-dispatch.md.hbs`) but never receive the data
+- **Config** exists (`agents.*.subagents.enabled`, `agents.*.subagents.maxConcurrent`)
+
+When `subagents.enabled = false` (default), agent works on task sequentially.
+When `subagents.enabled = true`, agent acts as coordinator, dispatching subtasks to parallel workers.
+
+### CLI Support Status
+
+| CLI | Subagents? | How |
+|-----|------------|-----|
+| **Claude Code** | ✅ Yes | Native `@agent_name` mentions |
+| **OpenCode** | ✅ Yes | Native `mode: subagent` config |
+| **Cursor** | ❓ TBD | Needs verification |
+| **Factory** | ❓ TBD | Needs verification |
+| **Codex** | ❓ TBD | Needs verification |
+| **Gemini** | ❓ TBD | Needs verification |
+
+### 1.5.1 Update `should_use()` for OpenCode
+
+**File:** `crates/config/src/types.rs`
+
+```rust
+impl SubagentConfig {
+    /// Check if subagents should be used (enabled and valid CLI).
+    #[must_use]
+    pub fn should_use(&self, cli: &str) -> bool {
+        // Currently only Claude and OpenCode support subagents
+        self.enabled && matches!(cli, "claude" | "opencode")
+    }
+}
+```
+
+### 1.5.2 Pass Subagent Config to Template Context
+
+**File:** `crates/controller/src/tasks/code/templates.rs`
+
+In `enrich_cli_config_from_agent()` around line 1744:
+
+```rust
+if let Some(agent_config) = config.agents.get(&agent_name) {
+    // Existing model_rotation and frontend_stack handling...
+    
+    // NEW: Inject subagent config if present
+    if let Some(subagents) = &agent_config.subagents {
+        enriched["subagents"] = json!({
+            "enabled": subagents.enabled,
+            "maxConcurrent": subagents.max_concurrent
+        });
+    }
+}
+```
+
+### 1.5.3 Pass Subtasks to Template Context
+
+The subtasks array needs to come from the task file. In each `generate_*_memory()` function:
+
+```rust
+let context = json!({
+    // ... existing fields ...
+    "subagents": cli_config.get("subagents").cloned().unwrap_or(json!({"enabled": false})),
+    "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
+});
+```
+
+**Note:** `CodeRunSpec` needs a `subtasks` field added:
+
+```rust
+// crates/controller/src/crds/coderun.rs
+pub struct CodeRunSpec {
+    // ... existing fields ...
+    
+    /// Subtasks for parallel execution (optional)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtasks: Option<Vec<SubtaskSpec>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SubtaskSpec {
+    pub id: u32,
+    pub title: String,
+    pub description: Option<String>,
+    #[serde(rename = "subagentType")]
+    pub subagent_type: Option<String>,
+    #[serde(rename = "executionLevel")]
+    pub execution_level: Option<u32>,
+    pub parallelizable: bool,
+    pub dependencies: Vec<String>,
+}
+```
+
+### 1.5.4 Register `group_by` Handlebars Helper
+
+The `subagent-dispatch.md.hbs` template uses `{{#each (group_by subtasks "execution_level")}}`.
+
+**File:** `crates/controller/src/tasks/code/templates.rs`
+
+In `register_template_helpers()`:
+
+```rust
+// Helper for grouping arrays by a field: {{#each (group_by array "field")}}
+handlebars.register_helper(
+    "group_by",
+    Box::new(|h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, out: &mut dyn Output| -> HelperResult {
+        // Implementation: group array items by specified field
+        // Returns object keyed by field value
+    })
+);
+```
+
+### 1.5.5 Test
+
+```bash
+# Verify config parsing
+cargo test -p cto-config -- subagent
+
+# Verify template rendering with subtasks
+cargo test -p cto-controller -- render_with_subtasks
+```
+
+**Estimated effort:** 4-6 hours
 
 ---
 
@@ -442,7 +575,8 @@ fn extract_checkboxes(text: &str) -> Vec<String> {
 |----------|-------|--------|-------|
 | 1 | **Phase 0**: Intake fixes (local removal, auto-deploy task) | 2-4 hours | Critical |
 | 2 | **Phase 1**: Fresh Start wiring | 1-2 hours | Medium |
-| 3 | **Phase 2**: Intake Update functionality | 3-5 days | **Highest** |
+| 3 | **Phase 1.5**: Subagent wiring | 4-6 hours | High |
+| 4 | **Phase 2**: Intake Update functionality | 3-5 days | **Highest** |
 
 ## Testing Strategy
 
@@ -462,6 +596,21 @@ cargo test -p cto-config -- fresh_start
 
 # Integration: Template rendering
 cargo test -p cto-healer -- render_with_fresh_start
+```
+
+### Phase 1.5 Tests
+```bash
+# Unit: Config parsing for subagents
+cargo test -p cto-config -- subagent
+
+# Unit: should_use() for claude and opencode
+cargo test -p cto-config -- subagent_should_use
+
+# Integration: Template rendering with subtasks
+cargo test -p cto-controller -- render_with_subtasks
+
+# Integration: group_by helper
+cargo test -p cto-controller -- group_by_helper
 ```
 
 ### Phase 2 Tests
@@ -488,6 +637,10 @@ cargo test -p cto-intake -- sync_task_integration
 | 0 | `crates/intake/src/bin/cli.rs` | Auto-append deploy task |
 | 1 | `crates/config/src/types.rs` | Add fresh_start_threshold |
 | 1 | `crates/healer/src/prompt/context.rs` | Pass value to templates |
+| 1.5 | `crates/config/src/types.rs` | Update `should_use()` for opencode |
+| 1.5 | `crates/controller/src/tasks/code/templates.rs` | Pass subagents + subtasks to context |
+| 1.5 | `crates/controller/src/crds/coderun.rs` | Add `subtasks` field to CodeRunSpec |
+| 1.5 | `crates/controller/src/tasks/code/templates.rs` | Register `group_by` helper |
 | 2 | `crates/intake/src/commands/update.rs` | NEW: update command |
 | 2 | `crates/intake/src/commands/sync.rs` | NEW: sync-task command |
 | 2 | `crates/intake/src/domain/linear_parser.rs` | NEW: Linear issue parsing |
@@ -499,6 +652,9 @@ cargo test -p cto-intake -- sync_task_integration
 - [ ] Phase 0: `local=true` removed from MCP intake
 - [ ] Phase 0: Deploy task auto-appended to all projects
 - [ ] Phase 1: Fresh Start triggers after configured threshold
+- [ ] Phase 1.5: Subagent config passed to templates when enabled
+- [ ] Phase 1.5: Subtasks array rendered in coordinator prompts
+- [ ] Phase 1.5: `group_by` helper works for execution level grouping
 - [ ] Phase 2: `intake update` re-parses PRD and creates delta PR
 - [ ] Phase 2: `intake sync-task` pulls Linear edits and creates PR
 - [ ] Phase 2: MCP tools available for both operations

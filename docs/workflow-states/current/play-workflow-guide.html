@@ -387,30 +387,33 @@
 
             <div class="feature-card partial">
                 <div class="feature-header">
-                    <span class="feature-name">🔒 Worker Isolation</span>
+                    <span class="feature-name">🔀 Subagent Parallel Execution</span>
                     <span class="feature-status partial">Partial</span>
                 </div>
-                <div class="feature-desc">Workers get focused context without peer info</div>
+                <div class="feature-desc">Subtasks run in parallel via CLI subagents</div>
                 <div class="feature-details">
-                    ✅ Template code exists (coordinator.md.hbs)<br>
-                    ✅ Conditional block for worker_isolation<br>
-                    ❌ Config not parsed (workerIsolation)<br>
-                    ❌ Template variable not set<br>
-                    ❌ All workers get full coordinator context
+                    ✅ Config exists (agents.*.subagents.enabled/maxConcurrent)<br>
+                    ✅ Intake generates subtasks with subagent_type, execution_level<br>
+                    ✅ Template exists (coordinator.md.hbs, subagent-dispatch.md.hbs)<br>
+                    ✅ Claude Code + OpenCode support subagents natively<br>
+                    ❌ Config not passed to template context<br>
+                    ❌ Subtasks array not passed to templates<br>
+                    ❌ group_by Handlebars helper not registered<br>
+                    ❌ CodeRunSpec missing subtasks field
                 </div>
             </div>
 
-            <div class="feature-card not-impl">
+            <div class="feature-card">
                 <div class="feature-header">
-                    <span class="feature-name">🎯 Role-Specific Models</span>
-                    <span class="feature-status not-impl">Not Impl</span>
+                    <span class="feature-name">🎯 Per-Agent Models</span>
+                    <span class="feature-status">Implemented</span>
                 </div>
-                <div class="feature-desc">Different models for planner/worker/reviewer</div>
+                <div class="feature-desc">Each agent can have its own model</div>
                 <div class="feature-details">
-                    ❌ roleModels config not parsed<br>
-                    ❌ No mapping from role to model<br>
-                    ❌ All agents use same model selection<br>
-                    ⚡ Uses per-agent model from config only
+                    ✅ agents.*.model in cto-config.json<br>
+                    ✅ Passed to CodeRun spec<br>
+                    ✅ Used by all CLIs<br>
+                    ⚡ roleModels was removed (redundant)
                 </div>
             </div>
 
@@ -474,17 +477,17 @@
             <tr>
                 <td><code>defaults.play.freshStartThreshold</code></td>
                 <td>—</td>
-                <td style="color: var(--not-impl);">❌ Not Parsed</td>
+                <td style="color: var(--not-impl);">❌ Not Parsed (template exists)</td>
             </tr>
             <tr>
-                <td><code>defaults.play.workerIsolation</code></td>
-                <td>—</td>
-                <td style="color: var(--not-impl);">❌ Not Parsed</td>
+                <td><code>agents.*.subagents.enabled</code></td>
+                <td>SubagentConfig</td>
+                <td style="color: var(--partial);">⚠️ Parsed but not passed to templates</td>
             </tr>
             <tr>
-                <td><code>defaults.play.roleModels</code></td>
-                <td>—</td>
-                <td style="color: var(--not-impl);">❌ Not Parsed</td>
+                <td><code>agents.*.subagents.maxConcurrent</code></td>
+                <td>SubagentConfig</td>
+                <td style="color: var(--partial);">⚠️ Parsed but not passed to templates</td>
             </tr>
         </table>
 
@@ -499,7 +502,7 @@
             <tr>
                 <td><code>crates/config/src/types.rs</code></td>
                 <td>Config parsing</td>
-                <td>PlayDefaults struct - missing new fields</td>
+                <td>SubagentConfig exists; freshStartThreshold needs adding</td>
             </tr>
             <tr>
                 <td><code>templates/_shared/partials/retry-loop.sh.hbs</code></td>
@@ -509,17 +512,22 @@
             <tr>
                 <td><code>templates/_shared/partials/coordinator.md.hbs</code></td>
                 <td>Agent prompt</td>
-                <td>Has Worker Isolation block, but not triggered</td>
+                <td>Coordinator mode (no longer has worker isolation)</td>
             </tr>
             <tr>
-                <td><code>infra/gitops/manifests/argo-workflows/play-workflow-template.yaml</code></td>
-                <td>Workflow def</td>
-                <td>No pre-stage sync step</td>
+                <td><code>templates/_shared/partials/subagent-dispatch.md.hbs</code></td>
+                <td>Subtask dispatch</td>
+                <td>Has group_by helper usage, but not registered</td>
             </tr>
             <tr>
-                <td><code>crates/pm/src/handlers/play.rs</code></td>
-                <td>Play handler</td>
-                <td>Submits workflows, no task sync</td>
+                <td><code>crates/controller/src/tasks/code/templates.rs</code></td>
+                <td>Template context</td>
+                <td>Does NOT pass subagents/subtasks to context</td>
+            </tr>
+            <tr>
+                <td><code>crates/intake/src/entities/subtask.rs</code></td>
+                <td>Subtask entity</td>
+                <td>Has subagent_type, execution_level, parallelizable</td>
             </tr>
         </table>
 
