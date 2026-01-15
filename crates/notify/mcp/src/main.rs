@@ -3903,6 +3903,182 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         ))
     }
 }
+
+/// Handle intake_update tool - re-parses PRD/architecture changes and generates a delta
+fn handle_intake_update(arguments: &HashMap<String, Value>) -> Result<Value> {
+    eprintln!("🔄 Processing intake update request");
+
+    // Get workspace directory
+    let workspace_dir = resolve_workspace_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    eprintln!("🔍 Using workspace directory: {}", workspace_dir.display());
+
+    // Get project name (required)
+    let project_name = arguments
+        .get("project_name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("project_name is required"))?;
+
+    let project_path = workspace_dir.join(project_name);
+
+    // Build intake binary command
+    let intake_cmd = find_command("intake");
+
+    let mut cmd = Command::new(&intake_cmd);
+    cmd.arg("intake") // The subcommand for running the intake workflow
+        .arg("--project")
+        .arg(&project_path);
+
+    // Handle optional PRD content - write to temp file if provided
+    let prd_temp_file: Option<tempfile::NamedTempFile>;
+    if let Some(prd_content) = arguments.get("prd_content").and_then(|v| v.as_str()) {
+        prd_temp_file = Some(tempfile::NamedTempFile::new()?);
+        if let Some(ref temp_file) = prd_temp_file {
+            std::fs::write(temp_file.path(), prd_content)?;
+            cmd.arg("--prd").arg(temp_file.path());
+        }
+    } else {
+        prd_temp_file = None;
+        // Use default PRD paths - intake binary will look for prd.md/prd.txt
+        let prd_paths = [
+            project_path.join("prd.md"),
+            project_path.join("prd.txt"),
+            project_path.join(".tasks/docs/prd.txt"),
+        ];
+        if let Some(prd_path) = prd_paths.iter().find(|p| p.exists()) {
+            cmd.arg("--prd").arg(prd_path);
+        }
+    }
+
+    // Handle optional architecture content - write to temp file if provided
+    let arch_temp_file: Option<tempfile::NamedTempFile>;
+    if let Some(arch_content) = arguments.get("architecture_content").and_then(|v| v.as_str()) {
+        arch_temp_file = Some(tempfile::NamedTempFile::new()?);
+        if let Some(ref temp_file) = arch_temp_file {
+            std::fs::write(temp_file.path(), arch_content)?;
+            cmd.arg("--architecture").arg(temp_file.path());
+        }
+    } else {
+        arch_temp_file = None;
+        // Use default architecture path
+        let arch_path = project_path.join("architecture.md");
+        if arch_path.exists() {
+            cmd.arg("--architecture").arg(&arch_path);
+        }
+    }
+
+    eprintln!("🚀 Running intake update: {:?}", cmd);
+
+    let output = cmd
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .context("Failed to execute intake binary")?;
+
+    // Keep temp files alive until command completes
+    drop(prd_temp_file);
+    drop(arch_temp_file);
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if !output.status.success() {
+        eprintln!("❌ Intake update failed");
+        eprintln!("stderr: {stderr}");
+        return Err(anyhow!(
+            "Intake update failed: {}\nstderr: {}",
+            stdout,
+            stderr
+        ));
+    }
+
+    eprintln!("✅ Intake update completed");
+    eprintln!("{stdout}");
+
+    Ok(json!({
+        "status": "success",
+        "message": format!("Intake update completed for project '{project_name}'"),
+        "project_name": project_name,
+        "output": stdout.to_string()
+    }))
+}
+
+/// Handle intake_sync_task tool - syncs task files from Linear issue edits
+fn handle_intake_sync_task(arguments: &HashMap<String, Value>) -> Result<Value> {
+    eprintln!("🔄 Processing intake sync-task request");
+
+    // Get workspace directory
+    let workspace_dir = resolve_workspace_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    eprintln!("🔍 Using workspace directory: {}", workspace_dir.display());
+
+    // Get required parameters
+    let issue_id = arguments
+        .get("issue_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("issue_id is required"))?;
+
+    let project_name = arguments
+        .get("project_name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("project_name is required"))?;
+
+    let task_id = arguments
+        .get("task_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("task_id is required"))?;
+
+    let project_path = workspace_dir.join(project_name);
+
+    // Build intake binary command
+    let intake_cmd = find_command("intake");
+
+    let mut cmd = Command::new(&intake_cmd);
+    cmd.arg("sync-task")
+        .arg("--issue-id")
+        .arg(issue_id)
+        .arg("--project-name")
+        .arg(project_name)
+        .arg("--task-id")
+        .arg(task_id)
+        .arg("--project")
+        .arg(&project_path);
+
+    eprintln!(
+        "🚀 Running intake sync-task: issue={}, project={}, task={}",
+        issue_id, project_name, task_id
+    );
+
+    let output = cmd
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .context("Failed to execute intake binary")?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if !output.status.success() {
+        eprintln!("❌ Intake sync-task failed");
+        eprintln!("stderr: {stderr}");
+        return Err(anyhow!(
+            "Intake sync-task failed: {}\nstderr: {}",
+            stdout,
+            stderr
+        ));
+    }
+
+    eprintln!("✅ Intake sync-task completed");
+    eprintln!("{stdout}");
+
+    Ok(json!({
+        "status": "success",
+        "message": format!("Task '{task_id}' synced from Linear issue '{issue_id}'"),
+        "issue_id": issue_id,
+        "project_name": project_name,
+        "task_id": task_id,
+        "output": stdout.to_string()
+    }))
+}
+
 fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Option<Result<Value>> {
     match method {
         "tools/call" => {
@@ -3920,6 +4096,20 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
             match name {
                 // Unified intake tool - combines PRD parsing and docs generation
                 Ok("intake") => Some(handle_intake_workflow(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                // Intake update - re-parses PRD/architecture changes
+                Ok("intake_update") => Some(handle_intake_update(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                // Intake sync task - syncs task files from Linear issue edits
+                Ok("intake_sync_task") => Some(handle_intake_sync_task(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())

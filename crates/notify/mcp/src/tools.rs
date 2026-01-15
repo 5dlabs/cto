@@ -6,6 +6,8 @@ pub fn get_tool_schemas() -> Value {
     json!({
         "tools": [
             get_intake_schema(),
+            get_intake_update_schema(),
+            get_intake_sync_task_schema(),
             get_play_schema(&HashMap::new()),
             get_play_status_schema(),
             get_jobs_schema(),
@@ -24,6 +26,8 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
     json!({
         "tools": [
             get_intake_schema(),
+            get_intake_update_schema(),
+            get_intake_sync_task_schema(),
             get_play_schema(agents),
             get_play_status_schema(),
             get_jobs_schema(),
@@ -106,6 +110,58 @@ fn get_intake_schema() -> Value {
                 }
             },
             "required": ["project_name"]
+        }
+    })
+}
+
+/// Intake update tool schema - re-parses PRD/architecture changes and generates a delta PR
+fn get_intake_update_schema() -> Value {
+    json!({
+        "name": "intake_update",
+        "description": "Update tasks from modified PRD/architecture. Creates PR with delta.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_name": {
+                    "type": "string",
+                    "description": "Name of the project subdirectory (required). Contains .tasks folder with existing tasks."
+                },
+                "prd_content": {
+                    "type": "string",
+                    "description": "Updated PRD content as a string (optional). If not provided, reads from {project_name}/prd.md or {project_name}/prd.txt"
+                },
+                "architecture_content": {
+                    "type": "string",
+                    "description": "Updated architecture document content (optional). If not provided, reads from {project_name}/architecture.md if it exists"
+                }
+            },
+            "required": ["project_name"]
+        }
+    })
+}
+
+/// Intake sync task tool schema - syncs task files from Linear issue edits
+fn get_intake_sync_task_schema() -> Value {
+    json!({
+        "name": "intake_sync_task",
+        "description": "Sync task files from Linear issue edits. Creates PR with updated task.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "issue_id": {
+                    "type": "string",
+                    "description": "Linear issue ID (e.g., 'TSK-123' or the UUID)"
+                },
+                "project_name": {
+                    "type": "string",
+                    "description": "Project name/identifier for the task"
+                },
+                "task_id": {
+                    "type": "string",
+                    "description": "Local task ID to update (e.g., '1' for task-1.json)"
+                }
+            },
+            "required": ["issue_id", "project_name", "task_id"]
         }
     })
 }
