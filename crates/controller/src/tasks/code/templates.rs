@@ -519,6 +519,7 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
+        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -545,6 +546,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "fresh_start_threshold": fresh_start_threshold,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
             "cli": {
                 "type": cli_type,
@@ -907,6 +909,7 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
+        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (Factory supports native skill loading)
         let skills = Self::get_agent_skills(code_run);
@@ -939,6 +942,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "fresh_start_threshold": fresh_start_threshold,
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
@@ -1210,6 +1214,7 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
+        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (used by Claude Code and Factory for native skill loading)
         let skills = Self::get_agent_skills(code_run);
@@ -1236,6 +1241,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "fresh_start_threshold": fresh_start_threshold,
             // Skills for native skill loading (Claude Code, Factory, OpenCode, Codex)
             "skills": skills,
             // Flag to conditionally render partials (skip for CLIs with native skills)
@@ -1589,6 +1595,7 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
+        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (Codex supports native skill loading)
         let skills = Self::get_agent_skills(code_run);
@@ -1616,6 +1623,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "fresh_start_threshold": fresh_start_threshold,
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
@@ -2973,6 +2981,7 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
+        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (OpenCode supports native skill loading)
         let skills = Self::get_agent_skills(code_run);
@@ -3000,6 +3009,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "fresh_start_threshold": fresh_start_threshold,
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
@@ -3283,6 +3293,7 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
+        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -3306,6 +3317,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "fresh_start_threshold": fresh_start_threshold,
         });
 
         handlebars
@@ -3723,6 +3735,19 @@ impl CodeTemplateGenerator {
             .or_else(|| code_run.spec.env.get("MAX_RETRIES"))
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(10) // Platform default
+    }
+
+    /// Get fresh start threshold from environment or use platform default.
+    /// After this many retries, context is cleared and agent starts fresh.
+    /// Based on Cursor's research: periodic fresh starts combat drift and tunnel vision.
+    #[allow(dead_code)]
+    fn get_fresh_start_threshold(code_run: &CodeRun) -> u32 {
+        code_run
+            .spec
+            .env
+            .get("FRESH_START_THRESHOLD")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(3) // Platform default - same as cto-config default
     }
 
     /// Get default MCP tools for an agent based on github_app and run_type.

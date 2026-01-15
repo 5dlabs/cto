@@ -84,21 +84,20 @@ git checkout -b feat/my-feature
 - **Vex** (Unity/C#) - XR Interaction Toolkit, OpenXR, Meta XR SDK
 
 **Support Agents:**
-- **Morgan** - Project management, PRD intake, **continuous planning**
+- **Morgan** - Project management, PRD intake
 - **Bolt** - Infrastructure setup (Task 1)
-- **Cleo** - Code quality review + **Judge** (iteration arbiter)
+- **Cleo** - Code quality review
 - **Cipher** - Security analysis
 - **Tess** - Testing
-- **Atlas** - Integration and merge (simplified: CI + merge only)
+- **Atlas** - Integration and merge (CI + merge only)
 
 ### Play Workflow Flow
 
 ```
 PRD → Intake (Morgan) → Infrastructure (Bolt) → Implementation (Rex/Blaze) 
-    → Quality + Judge (Cleo) → Security (Cipher) → Testing (Tess) → Merge (Atlas) → Done
-         ↑                           |
-         └── fresh_start ────────────┘
-         └── continue ───────────────┘
+    → Quality (Cleo) → Security (Cipher) → Testing (Tess) → Merge (Atlas) → Done
+         ↑                    |
+         └── retry with fresh start (after N attempts, clears context)
 ```
 
 ### Cursor-Inspired Improvements
@@ -107,47 +106,34 @@ Based on [Cursor's research](https://cursor.com/blog/scaling-autonomous-coding) 
 
 | Feature | Description | Config |
 |---------|-------------|--------|
-| **Cleo Judge Mode** | Evaluates iterations, decides: `continue`, `complete`, or `fresh_start` | `enableJudgeAgent: true` |
 | **Fresh Start** | After N retries, clears context to combat drift and tunnel vision | `freshStartThreshold: 3` |
-| **Role-Specific Models** | Different models optimized for planning vs coding vs evaluation | `roleModels: {...}` |
-| **Worker Isolation** | Workers focus only on their task, no peer coordination overhead | `workerIsolation: true` |
-| **Simplified Atlas** | Merge-only role - quality judgment moved to Cleo Judge | Default behavior |
-| **Continuous Planning** | Morgan can create follow-up tasks dynamically (experimental) | `continuousPlanning: false` |
+| **Simplified Atlas** | Merge-only role - workers handle their own conflicts | Default behavior |
 
-#### Judge Decisions
+#### Fresh Start Mechanism
 
-When Cleo runs in judge mode, it evaluates the work and outputs one of:
+When acceptance criteria aren't met after `freshStartThreshold` retries (default: 3):
+1. Context files are cleared (`.conversation_id`, `.session_state`, `.agent_context`)
+2. Agent restarts with only the task definition
+3. Model rotation continues to try different approaches
 
-- **`continue`** - More work needed, workers should iterate
-- **`complete`** - Acceptance criteria met, proceed to security/testing
-- **`fresh_start`** - Drift detected, restart with clean context (clears conversation state)
+This combats:
+- Tunnel vision from accumulated context
+- Risk-averse behavior patterns
+- Context saturation causing confusion
 
-#### Drift Detection
-
-The judge looks for signs of agent drift:
-- Avoiding complex implementation tasks (risk aversion)
-- Making cosmetic changes instead of core features
-- Repeated similar commits without meaningful progress
-- Context accumulation causing confusion
-
-#### Role-Specific Models
-
-Configure optimal models per role in `cto-config.json`:
+Configure in `cto-config.json`:
 
 ```json
 {
   "defaults": {
     "play": {
-      "roleModels": {
-        "planner": "claude-opus-4-5-20251101",
-        "worker": "gpt-5.2-codex",
-        "judge": "claude-opus-4-5-20251101",
-        "reviewer": "claude-sonnet-4-5-20250514"
-      }
+      "freshStartThreshold": 3
     }
   }
 }
 ```
+
+**Note:** Per-agent model configuration is done in the `agents` section of `cto-config.json`, not via `roleModels`.
 
 ### Key MCP Tools
 

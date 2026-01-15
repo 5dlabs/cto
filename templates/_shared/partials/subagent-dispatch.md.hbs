@@ -3,12 +3,8 @@
   
   Include this partial in agent prompts when subtasks have subagent metadata.
   Prerequisites: subtasks array with execution_level and subagent_type fields.
-  
-  US-005: Worker Isolation - When worker_isolation is true, subagents receive
-  only their specific subtask without any coordination context or peer awareness.
 --}}
 
-{{#unless worker_isolation}}
 ## Subagent Execution
 
 You have specialized subagents available for parallel task execution. Each subagent has focused context and capabilities for its role.
@@ -70,4 +66,3 @@ For example:
 - **Minimize context**: Each subagent works in isolation - keep subtasks self-contained
 - **Review integration points**: After parallel implementation, review how pieces fit together
 - **Use reviewers strategically**: Schedule review subtasks after implementation batches
-{{/unless}}

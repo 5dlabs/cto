@@ -67,17 +67,8 @@
       "autoMerge": false,
       "parallelExecution": false,
       "healerEndpoint": "http://localhost:8083",
-      "_comment_cursor_improvements": "Cursor-inspired multi-agent improvements (US-001 through US-006)",
-      "enableJudgeAgent": true,
-      "continuousPlanning": false,
-      "freshStartThreshold": 3,
-      "workerIsolation": true,
-      "roleModels": {
-        "planner": "claude-opus-4-5-20251101",
-        "worker": "claude-sonnet-4-5-20250514",
-        "judge": "claude-opus-4-5-20251101",
-        "reviewer": "claude-sonnet-4-5-20250514"
-      }
+      "_comment_cursor_improvements": "Cursor-inspired: fresh start clears context after N retries to combat drift",
+      "freshStartThreshold": 3
     }
   },
   "_comment_agents": "Agent configurations with tool profiles",
@@ -331,9 +322,9 @@
     "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access",
     "agents.*.features.effectSolutions": "Enable Effect.ts integration - includes effect-solutions CLI instructions in agent prompts for idiomatic Effect TypeScript patterns",
     "agents.blaze.frontendStack": "Frontend stack selection: 'shadcn' (default) for Next.js + shadcn/ui, or 'tanstack' for TanStack Router + DB + Query ecosystem. Affects which patterns Blaze uses for routing, data fetching, and UI components",
-    "agents.*.subagents": "Subagent configuration for Claude Code parallel execution (only works with cli: 'claude')",
-    "agents.*.subagents.enabled": "Enable subagent parallel execution - when true, the agent receives coordinator instructions and can dispatch work to parallel subagents",
-    "agents.*.subagents.maxConcurrent": "Maximum concurrent subagents (1-10, default 5) - Claude Code supports up to 10 concurrent subagents"
+    "agents.*.subagents": "Subagent configuration for parallel subtask execution (works with cli: 'claude' or 'opencode')",
+    "agents.*.subagents.enabled": "Enable subagent parallel execution - when true, agent acts as coordinator and dispatches subtasks to parallel workers. Default: false (single agent mode)",
+    "agents.*.subagents.maxConcurrent": "Maximum concurrent subagents (1-10, default 5) - Claude Code supports up to 10, OpenCode configurable per agent"
   },
   "_usage_examples": {
     "minimal_task_call": "task(task_id=1, repository='https://github.com/org/repo')",
