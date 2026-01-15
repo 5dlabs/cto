@@ -126,7 +126,7 @@
         "Changes appear as commit in target repo"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "PLAY-001",
