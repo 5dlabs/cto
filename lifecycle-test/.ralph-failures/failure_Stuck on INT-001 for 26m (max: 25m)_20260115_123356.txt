@@ -1,0 +1,28 @@
+=== Ralph Failure Context ===
+Story: Stuck on INT-001 for 26m (max: 25m)
+Reason: 
+Timestamp: 2026-01-15T12:33:56-08:00
+Health: ✗✓✗✗
+
+=== Last 100 lines from tmux ===
+(Could not capture tmux pane)
+
+=== Resource Status ===
+Disk: 91% used, 88GB free
+Memory: 3275MB free
+
+=== Git Status ===
+ M .ralph-events.json
+ M .ralph-monitor-state.json
+ M .ralph-monitor.pid
+?? ".ralph-failures/failure_Consecutive unhealthy: 3_20260115_122912.txt"
+?? ".ralph-failures/failure_Consecutive unhealthy: 3_20260115_123119.txt"
+?? ".ralph-failures/failure_Session died_20260115_122912.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 26m (max: 25m)_20260115_123356.txt"
+
+=== Last Progress Entry ===
+
+=== Process Info ===
+AI PID: 45732
+  PID  PPID  %CPU %MEM STAT      TIME COMMAND
+45732     1   0.0  1.2 Ss+    0:06.64 claude   
