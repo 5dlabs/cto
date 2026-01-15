@@ -206,6 +206,29 @@ pub fn extract_json_continuation(text: &str) -> String {
         return text.to_string();
     }
 
+    // Look for JSON inside markdown code blocks first (```json ... ```)
+    // This handles cases where the AI wraps the JSON in a code block
+    if let Some(json_block_start) = text.find("```json") {
+        let after_marker = &text[json_block_start + "```json".len()..];
+        if let Some(end_idx) = after_marker.rfind("```") {
+            let json_content = after_marker[..end_idx].trim();
+            if !json_content.is_empty() {
+                return json_content.to_string();
+            }
+        }
+    }
+
+    // Also check for plain code blocks (``` ... ```)
+    if let Some(code_block_start) = text.find("```\n") {
+        let after_marker = &text[code_block_start + "```\n".len()..];
+        if let Some(end_idx) = after_marker.rfind("```") {
+            let json_content = after_marker[..end_idx].trim();
+            if json_content.starts_with('{') || json_content.starts_with('[') {
+                return json_content.to_string();
+            }
+        }
+    }
+
     // Handle the case where the CLI echoes back the prefill with embedded text.
     // For example: {"tasks":[I'll continue...{"id":35,"title":"..."}]}
     // We need to find the FIRST actual JSON object ({"id":) and return from there.
