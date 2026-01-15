@@ -80,11 +80,66 @@ just webhook-status
 
 For each story:
 
-1. **Read the acceptance criteria** carefully
-2. **Execute verification commands** (curl, kubectl, gh, etc.)
-3. **Capture evidence** (command output, screenshots, logs)
-4. **Document findings** in progress.txt
-5. **Update passes** to `true` only if ALL criteria are met
+1. **Read ALL acceptance criteria** - understand what success looks like
+2. **Test EACH criterion individually** - do not batch or skip
+3. **Capture FULL output** - complete logs, not summaries
+4. **If ANY criterion fails:**
+   - Document the failure
+   - Diagnose root cause (read logs fully)
+   - Implement fix
+   - Clean up failed state (delete pods, reset resources)
+   - Rebuild if code changed
+   - Re-verify from step 1
+5. **Only when ALL criteria pass** → update PRD to `passes: true`
+
+## Kubernetes Debugging (MANDATORY for K8s errors)
+
+When you encounter Kubernetes errors, you MUST fully investigate:
+
+```bash
+# Get full logs (not just tail)
+kubectl logs -n cto <pod-name> --all-containers
+
+# Get previous crashed container logs
+kubectl logs -n cto <pod-name> --previous
+
+# Describe for events and conditions
+kubectl describe pod -n cto <pod-name>
+
+# Get events sorted by time
+kubectl get events -n cto --sort-by='.lastTimestamp' | tail -20
+
+# Check resource status
+kubectl get coderuns,pods,jobs -n cto -o wide
+```
+
+### Remediation Loop
+
+```
+KUBERNETES ERROR DETECTED:
+├── 1. Get FULL logs (not just last 10 lines)
+├── 2. Identify root cause
+├── 3. Fix the issue:
+│   ├── Code bug → Edit code → cargo build --release
+│   ├── Config error → Fix config → kubectl apply
+│   ├── Missing resource → Create it
+│   └── Stuck pod → kubectl delete pod <name>
+├── 4. Clean up failed resources:
+│   └── kubectl delete coderun <name> -n cto
+├── 5. Verify fix locally (if code change)
+│   └── cargo test -p <crate>
+└── 6. Re-run the verification from scratch
+```
+
+### Common Issues and Fixes
+
+| Issue | Diagnosis | Fix |
+|-------|-----------|-----|
+| Pod CrashLoopBackOff | `kubectl logs --previous` | Fix code, rebuild, redeploy |
+| ImagePullBackOff | `kubectl describe pod` | Check image tag, registry access |
+| Pending pod | `kubectl describe pod` | Check PVC, node resources |
+| Init container failed | `kubectl logs -c init-*` | Fix init script |
+| Webhook timeout | Check tunnel status | `just tunnel` or `just webhook-dev` |
 
 ### Verification Patterns
 
@@ -122,20 +177,115 @@ curl -s -H "Authorization: Bearer $LINEAR_OAUTH_TOKEN" https://api.linear.app/gr
 ## Progress Report Format
 
 APPEND to progress.txt (never replace, always append):
+
 ```
 ## [Date/Time] - [Story ID]
-- **Status**: PASSED / FAILED
-- **Commands Run:**
-  - `command` → output summary
-- **Evidence:**
-  - Relevant log snippets
-  - Screenshot references
-- **Issues Found:**
-  - Any blockers or observations
-- **Learnings for future iterations:**
-  - Patterns discovered
-  - Gotchas encountered
+
+### Acceptance Criteria Verification
+- [ ] Criterion 1: PASS/FAIL
+  - Command: `...`
+  - Output: `...`
+- [ ] Criterion 2: PASS/FAIL
+  - Command: `...`
+  - Output: `...`
+(repeat for ALL criteria)
+
+### Remediation Attempts (if any failures)
+**Attempt 1:**
+- Failure: [what failed]
+- Root cause: [diagnosis from logs]
+- Fix applied: [what you changed]
+- Clean up: [resources deleted/reset]
+- Rebuild: [cargo build output if applicable]
+- Re-verify result: PASS/FAIL
+
+**Attempt 2:** (if needed)
+...
+
+### Final Status: PASSED / FAILED
+- All criteria verified: YES/NO
+- Ready for next story: YES/NO
+
+### Learnings
+- [Patterns discovered]
+- [Gotchas encountered]
 ---
+```
+
+### Example Progress Entry
+
+```
+## 2026-01-15 14:30 - PRE-001
+
+### Acceptance Criteria Verification
+- [x] PM Server returns 200 at localhost:8081: PASS
+  - Command: `curl -s http://localhost:8081/health`
+  - Output: `{"status":"ok"}`
+- [ ] Controller logs show 'started': FAIL
+  - Command: `kubectl logs deploy/cto-controller -n cto --tail=50`
+  - Output: `Error: connection refused to postgres`
+
+### Remediation Attempts
+**Attempt 1:**
+- Failure: Controller can't connect to postgres
+- Root cause: postgres pod not running (kubectl get pods showed 0/1)
+- Fix applied: `kubectl rollout restart statefulset/postgres -n cto`
+- Clean up: Waited for postgres to be ready
+- Rebuild: N/A (no code change)
+- Re-verify result: PASS
+  - Command: `kubectl logs deploy/cto-controller -n cto --tail=50`
+  - Output: `INFO controller: started, version=0.2.9`
+
+### Final Status: PASSED
+- All criteria verified: YES
+- Ready for next story: YES
+
+### Learnings
+- Always check postgres status before controller
+- Use `kubectl wait` for readiness checks
+---
+```
+
+## Local Build & Verification
+
+When code changes are required to fix issues:
+
+```bash
+# 1. Make the code fix
+# 2. Run pre-push checks (MANDATORY)
+cargo fmt --all --check
+cargo clippy --all-targets -- -D warnings -W clippy::pedantic
+cargo test
+
+# 3. Build release binary
+cargo build --release
+
+# 4. For controller/PM changes, restart local services
+just mp-restart  # or manually restart the affected service
+
+# 5. For container images, rebuild
+docker build -t 5dlabs/cto-controller:dev -f infra/images/controller/Dockerfile .
+
+# 6. Verify the fix worked
+# (re-run the verification commands for the failing criterion)
+```
+
+### Local Service Management
+
+```bash
+# Start all services
+just mp
+
+# Restart services after code change
+just mp-restart
+
+# Check service status
+just status
+
+# View service logs
+just logs-pm
+just logs-controller
+just logs-healer
 ```
 
 ## Sub-Agent Delegation
@@ -148,12 +298,37 @@ Use specialized sub-agents for complex tasks:
 | Find code patterns | `explore` | Fast codebase search |
 | External docs lookup | `librarian` | Documentation retrieval |
 
-## Quality Requirements
+## Quality Requirements (STRICT)
 
-- Do NOT mark a story as `passes: true` unless ALL acceptance criteria are verified
-- Document ALL command outputs for traceability
-- If a test fails, document the failure mode clearly
-- Keep the progress log detailed but organized
+### NEVER FORGE AHEAD
+
+- **NEVER** mark `passes: true` if ANY criterion fails
+- **NEVER** skip a criterion because "it's probably fine"
+- **NEVER** move to the next story with unresolved failures
+- **ALWAYS** fix failures before continuing
+
+### Verification Standards
+
+- Run EVERY verification command, not just spot checks
+- Read FULL log output, not just summaries
+- Check EVERY acceptance criterion explicitly
+- Document BOTH successes and failures
+
+### Failure Handling
+
+1. **Document the failure** - exact error message, command output
+2. **Diagnose** - read logs, check events, understand root cause
+3. **Fix** - implement the actual fix, not a workaround
+4. **Clean up** - delete failed pods/resources, reset state
+5. **Rebuild** - if code changed: `cargo build --release`
+6. **Re-verify** - run ALL criteria again from scratch
+
+### Evidence Requirements
+
+- Include full command output for each criterion
+- Screenshot or log snippet for visual verification
+- Kubernetes resource status before/after
+- Clear PASS/FAIL status for each criterion
 
 ## Stop Condition
 
@@ -164,9 +339,31 @@ If ALL stories are complete and passing, reply with:
 
 If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
 
-## Important
+## Important Rules (MUST FOLLOW)
 
-- Work on ONE story per iteration
-- Verify thoroughly before marking complete
-- Read the Codebase Patterns section in progress.txt before starting
-- Reference `docs/workflow-lifecycle-checklist.md` for detailed conditions
+1. **ONE story per iteration** - do not try to complete multiple stories
+2. **VERIFY EVERY criterion** - do not skip any acceptance criteria
+3. **NEVER forge ahead** - if ANY criterion fails, stop and fix it
+4. **READ FULL LOGS** - use `kubectl logs` without `--tail` for full output
+5. **CLEAN UP failures** - delete failed resources before retrying
+6. **BUILD after code changes** - always run cargo build/test after edits
+7. **DOCUMENT everything** - include full command output in progress.txt
+8. **Reference the checklist** - `docs/workflow-lifecycle-checklist.md` has details
+
+### Failure Recovery Flow
+
+```
+CRITERION FAILED
+     │
+     ▼
+┌─────────────────────────────────────┐
+│ 1. STOP - Do not continue           │
+│ 2. READ full logs                   │
+│ 3. DIAGNOSE root cause              │
+│ 4. FIX the issue                    │
+│ 5. CLEAN UP failed resources        │
+│ 6. REBUILD if code changed          │
+│ 7. RE-VERIFY from scratch           │
+│ 8. REPEAT until ALL criteria pass   │
+└─────────────────────────────────────┘
+```
