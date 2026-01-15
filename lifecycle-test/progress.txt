@@ -30,6 +30,8 @@ Started: $(date)
 - `autoAppendDeployTask` defaults to false; enable via `"defaults": { "intake": { "autoAppendDeployTask": true } }` in cto-config.json
 - When testing new CLI commands, reinstall binary: `cargo install --path crates/<crate> --force`
 - Linear sync is pull-based via `intake_sync_task` MCP tool (not webhook-driven)
+- When CI workflows stuck in QUEUED, check `kubectl get nodes` - NotReady nodes cause runner pods to hang in Terminating state
+- GitHub runners live in `arc-runners` namespace; check health with `kubectl get pods -n arc-runners`
 ---
 
 ## 2026-01-15 - PRE-001
@@ -416,5 +418,49 @@ Started: $(date)
   - Even with local fix, CodeRuns use K8s image which pulls from release
   - Must wait for full release pipeline: tag → binary release → image rebuild → CodeRun
   - The intake CLI version shown as "0.0.1" in logs indicates runtime doesn't have updated binary
+---
+
+## 2026-01-16 - INT-001 (STILL BLOCKED - INFRASTRUCTURE ISSUE)
+- **Story**: Intake: Submit AlertHub PRD via MCP Tool
+- **Status**: BLOCKED - K8s cluster infrastructure issue
+- **Actions taken**:
+  1. Checked agent build workflow status: run #837 still QUEUED
+  2. Checked binaries release workflows: 4 workflows QUEUED (runs #60-63)
+  3. Checked runner status: 11 of 12 runners stuck in Terminating state
+  4. Identified root cause: Node `talos-tq1-f47` is NotReady
+- **Infrastructure issue details**:
+  - Node `talos-tq1-f47`: Status = NotReady
+  - All runner pods on that node stuck in `Terminating` state (5+ hours)
+  - Only 1 functional runner on `talos-irs-cis`
+  - EphemeralRunnerSet shows: desired=12, current=12, but most are unusable
+- **CI queue status**:
+  - Binaries Release runs #60, #61, #62, #63: QUEUED
+  - Agent Images run #837: QUEUED
+  - Single runner processing queue one job at a time
+- **Current intake CodeRun status**:
+  - CodeRun: `intake-ctopa-810-1768510899` (100+ minutes old)
+  - Pod: `intake-t0-morgan-claude-a853aab3-v1-lxlcf` - Error state
+  - Error: Same JSON parsing error (runtime still has v0.0.1 binary)
+- **What's needed to unblock**:
+  1. Fix node `talos-tq1-f47` (reboot or drain)
+  2. Allow runner pods to terminate properly
+  3. New runners will schedule on healthy nodes
+  4. CI queue will process faster
+  5. v0.2.11 release + agent image will build
+  6. New intake CodeRun will use fixed binary
+- **All remaining stories blocked**:
+  - PLAY-003 through DEPLOY-001 depend on INT-001 completing
+  - Lifecycle test cannot progress without working intake
+- **Next iteration should**:
+  1. Check if node `talos-tq1-f47` is fixed: `kubectl get nodes`
+  2. Check if runners unstuck: `kubectl get pods -n arc-runners`
+  3. Check if v0.2.11 release completed: `gh release view v0.2.11`
+  4. If release ready, check agent image build status
+  5. If all clear, retry intake submission
+- **Learnings for future iterations:**
+  - NotReady nodes cause runner pods to hang in Terminating state indefinitely
+  - EphemeralRunnerSet can show desired=current but pods may be unusable
+  - CI throughput directly depends on cluster health
+  - Check `kubectl get nodes` before investigating CI queue issues
 ---
 
