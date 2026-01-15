@@ -79,7 +79,7 @@
         "Argo Workflow 'intake-*' triggered (kubectl get workflows -n cto)"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "INT-002",

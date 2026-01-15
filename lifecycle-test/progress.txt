@@ -21,6 +21,8 @@ Started: $(date)
 - Subtasks enable parallel execution via subagent dispatch
 - Healer Play API health endpoint is on port 8083 (not 8082)
 - Linear webhook can be queried via GraphQL API: `webhooks { nodes { url enabled } }`
+- Intake MCP tool attaches docs as Linear documents (linked in description), not as file attachments
+- Intake CodeRuns use format: `intake-<issue-id>-<timestamp>` (e.g., intake-ctopa-807-1768504019)
 ---
 
 ## 2026-01-15 - PRE-001
@@ -70,5 +72,29 @@ Started: $(date)
   - All agent OAuth tokens are synced from K8s secrets via `just sync-agent-tokens`
   - The preflight command validates both the existence of secrets in K8s AND tokens in .env.local
   - Agents with OAuth tokens: morgan, rex, blaze, bolt, atlas, cleo, cipher, tess
+---
+
+## 2026-01-15 - INT-001
+- **Story**: Intake: Submit AlertHub PRD via MCP Tool
+- **What was implemented**: Successfully submitted AlertHub PRD via mcp__cto__intake MCP tool
+- **Verification performed**:
+  - Read PRD content from tests/intake/alerthub-e2e-test/prd.md
+  - Read architecture from tests/intake/alerthub-e2e-test/architecture.md
+  - Called mcp__cto__intake with project_name='alerthub-e2e-test', prd_content, architecture_content
+  - Tool returned success with Linear project URL: https://linear.app/jonathonfritz/project/alerthub-e2e-test-bc8bf067e70e
+  - Linear project created: alerthub-e2e-test
+  - PRD issue: CTOPA-807 at https://linear.app/jonathonfritz/issue/CTOPA-807/prd-alerthub-e2e-test
+  - PRD content visible in Linear issue description
+  - Architecture attached as Linear document: https://linear.app/jonathonfritz/document/architecture-fc706bf6d678
+  - cto-config.json attached as Linear document: https://linear.app/jonathonfritz/document/cto-configjson-9c684475e982
+  - Morgan agent session created (comment: "This thread is for an agent session with 5dlabs-morgan1")
+  - CodeRun 'intake-ctopa-807-1768504019' running (verified via kubectl get coderuns -n cto)
+- **Files changed**: prd.json (marked INT-001 passes: true), progress.txt
+- **Learnings for future iterations:**
+  - The intake MCP tool creates a Linear project, PRD issue, and attaches architecture + cto-config as Linear documents (not file attachments)
+  - Morgan agent session is created via comment thread in the issue, not via direct assignee
+  - Intake runs as a CodeRun CR (not Argo Workflow), check with `kubectl get coderuns -n cto | grep intake`
+  - auto_assign_morgan=true creates an agent session thread, enabling Morgan to respond
+  - The actual intake work is done by Morgan via CodeRun, not via traditional Argo Workflow
 ---
 
