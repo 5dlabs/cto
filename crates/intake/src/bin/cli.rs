@@ -315,6 +315,29 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Sync a task from a Linear issue
+    SyncTask {
+        /// Linear issue ID (e.g., "TSK-123" or the UUID)
+        #[arg(long)]
+        issue_id: String,
+
+        /// Project name/identifier
+        #[arg(long, default_value = "")]
+        project_name: String,
+
+        /// Local task ID to update (defaults to Linear issue identifier)
+        #[arg(long)]
+        task_id: Option<String>,
+
+        /// Linear API token (reads from LINEAR_API_KEY env if not provided)
+        #[arg(long, env = "LINEAR_API_KEY")]
+        linear_token: Option<String>,
+
+        /// Tag context
+        #[arg(long)]
+        tag: Option<String>,
+    },
+
     /// Generate prompts for tasks using AI (Session 2)
     GeneratePrompts {
         /// Process specific task file only
@@ -1369,6 +1392,76 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 result.acceptance_files
             );
             ui::print_info(&format!("Output directory: {}", output_dir.display()));
+        }
+
+        Commands::SyncTask {
+            issue_id,
+            project_name,
+            task_id,
+            linear_token,
+            tag,
+        } => {
+            // Initialize if not already
+            if !tasks_domain.is_initialized().await? {
+                tasks_domain.init().await?;
+                ui::print_info("Initialized tasks structure");
+            }
+
+            let config = intake::commands::SyncTaskConfig {
+                issue_id: issue_id.clone(),
+                project_name,
+                task_id,
+                linear_token,
+                tag,
+            };
+
+            ui::print_info(&format!("Syncing task from Linear issue: {}", issue_id));
+
+            let result = intake::commands::sync_task(
+                Arc::clone(&storage) as Arc<dyn intake::storage::Storage>,
+                config,
+            )
+            .await?;
+
+            if result.created {
+                ui::print_success(&format!(
+                    "Created task {} from Linear issue",
+                    result.task.id
+                ));
+            } else {
+                ui::print_success(&format!(
+                    "Updated task {} from Linear issue",
+                    result.task.id
+                ));
+            }
+
+            println!();
+            println!("{}", "Task Details:".bold());
+            println!("  {} ID: {}", "•".cyan(), result.task.id);
+            println!("  {} Title: {}", "•".cyan(), result.task.title);
+            println!("  {} Priority: {}", "•".cyan(), result.task.priority);
+
+            if !result.parsed.acceptance_criteria.is_empty() {
+                println!(
+                    "  {} Acceptance criteria: {} items",
+                    "•".cyan(),
+                    result.parsed.acceptance_criteria.len()
+                );
+            }
+
+            if result.parsed.test_strategy.is_some() {
+                println!("  {} Test strategy: present", "•".cyan());
+            }
+
+            if let Some(ref hint) = result.task.agent_hint {
+                println!("  {} Agent hint: {}", "•".cyan(), hint);
+            }
+
+            println!();
+            ui::print_info("Changed files:");
+            for file in &result.changed_files {
+                println!("  {} {}", "•".cyan(), file.display());
+            }
         }
 
         // =========== Session 2: Prompt Generation Command Handlers ===========

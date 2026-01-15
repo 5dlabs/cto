@@ -152,10 +152,7 @@ fn parse_description_sections(description: &str) -> (String, Vec<String>, Option
 
     // Combine test strategy lines
     if !test_strategy_lines.is_empty() {
-        let strategy = test_strategy_lines
-            .join("\n")
-            .trim()
-            .to_string();
+        let strategy = test_strategy_lines.join("\n").trim().to_string();
         if !strategy.is_empty() {
             test_strategy = Some(strategy);
         }
@@ -206,13 +203,7 @@ fn extract_bullet_item(line: &str) -> Option<String> {
 /// Returns the model part if found (e.g., `opus`, `sonnet`).
 fn extract_agent_hint_from_labels(labels: &[String]) -> Option<String> {
     // Known CLI prefixes
-    const CLI_PREFIXES: &[&str] = &[
-        "claude:",
-        "cursor:",
-        "codex:",
-        "opencode:",
-        "gemini:",
-    ];
+    const CLI_PREFIXES: &[&str] = &["claude:", "cursor:", "codex:", "opencode:", "gemini:"];
 
     for label in labels {
         let lower = label.to_lowercase();
@@ -316,11 +307,26 @@ Add unit tests for the auth module.
 
     #[test]
     fn test_extract_bullet_items() {
-        assert_eq!(extract_bullet_item("- simple item"), Some("simple item".to_string()));
-        assert_eq!(extract_bullet_item("* asterisk item"), Some("asterisk item".to_string()));
-        assert_eq!(extract_bullet_item("- [ ] checkbox"), Some("checkbox".to_string()));
-        assert_eq!(extract_bullet_item("- [x] checked"), Some("checked".to_string()));
-        assert_eq!(extract_bullet_item("1. numbered"), Some("numbered".to_string()));
+        assert_eq!(
+            extract_bullet_item("- simple item"),
+            Some("simple item".to_string())
+        );
+        assert_eq!(
+            extract_bullet_item("* asterisk item"),
+            Some("asterisk item".to_string())
+        );
+        assert_eq!(
+            extract_bullet_item("- [ ] checkbox"),
+            Some("checkbox".to_string())
+        );
+        assert_eq!(
+            extract_bullet_item("- [x] checked"),
+            Some("checked".to_string())
+        );
+        assert_eq!(
+            extract_bullet_item("1. numbered"),
+            Some("numbered".to_string())
+        );
         assert_eq!(extract_bullet_item("not a bullet"), None);
     }
 

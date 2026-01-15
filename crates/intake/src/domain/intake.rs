@@ -359,29 +359,17 @@ impl IntakeDomain {
         // IMPORTANT: We ALWAYS re-validate and potentially override AI-generated hints
         // because the AI model may assign incorrect agents. Our routing logic is the
         // source of truth.
+        //
+        // NOTE: All tasks (including Task 1) are routed by content-based inference.
+        // The PRD prompt guides the AI to make Task 1 infrastructure only when needed
+        // (databases, caches, storage), but routing validates based on actual content.
         tracing::info!("Adding agent routing hints with dependency analysis...");
-
-        // CRITICAL: Task 1 MUST always be Bolt (infrastructure provisioning)
-        // This is a hard requirement from the platform architecture.
-        if let Some(task1) = tasks.iter_mut().find(|t| t.id == "1") {
-            if task1.agent_hint.as_deref() != Some("bolt") {
-                tracing::warn!(
-                    "Task 1 had incorrect agent hint '{}', forcing to 'bolt'",
-                    task1.agent_hint.as_deref().unwrap_or("none")
-                );
-                task1.agent_hint = Some("bolt".to_string());
-            }
-        }
 
         // First pass: assign hints to tasks without dependencies
         // This ensures dependency targets have hints before we check dependencies
         let mut unroutable_tasks: Vec<String> = Vec::new();
 
         for task in &mut tasks {
-            // Skip Task 1 (already handled above)
-            if task.id == "1" {
-                continue;
-            }
             if task.dependencies.is_empty() {
                 match infer_agent_hint_with_deps_str(task, &[]) {
                     Some(inferred) => {
@@ -411,10 +399,6 @@ impl IntakeDomain {
         // Clone tasks for reference since we need to mutate while iterating
         let tasks_snapshot = tasks.clone();
         for task in &mut tasks {
-            // Skip Task 1 (already handled above)
-            if task.id == "1" {
-                continue;
-            }
             if let Some(inferred) = infer_agent_hint_with_deps_str(task, &tasks_snapshot) {
                 if task.agent_hint.as_deref() != Some(inferred) {
                     if task.agent_hint.is_some() {
@@ -448,7 +432,9 @@ impl IntakeDomain {
             });
         }
 
-        tracing::info!("Agent hints assigned with dependency awareness (Task 1 forced to bolt)");
+        tracing::info!(
+            "Agent hints assigned via content-based inference with dependency awareness"
+        );
 
         // 6.5: Auto-append deploy task if configured
         if config.auto_append_deploy_task {
