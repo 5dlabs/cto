@@ -211,3 +211,38 @@ Started: $(date)
   - Global intake binary must be reinstalled when CLI adds new commands
 ---
 
+## 2026-01-15 - PLAY-001
+- **Story**: Play: Verify CodeRun Creation
+- **What was implemented**: Verified CodeRun CR creation and configuration via code inspection
+- **Verification performed**:
+  1. ✅ CodeRun CR created in correct namespace (cto)
+     - Template at `infra/gitops/manifests/argo-workflows/play-workflow-template.yaml:1324-1398`
+     - `namespace: cto` hardcoded in CodeRun metadata
+  2. ✅ Agent correctly assigned from task agent_hint
+     - `determine-task-agent` template (lines 1915-2400) reads `agentHint` from tasks.json
+     - Line 2057: `AGENT_TYPE=$(echo "$TASK_ENTRY" | jq -r '.agentHint // .agentType // empty')`
+     - Agent routing: bolt→infrastructure, rex/blaze/grizz/nova/tap/spark→implementation
+  3. ✅ CLI configured as Claude
+     - Default CLI is "claude" (mcp/src/main.rs:153)
+     - `cliConfig.cliType` populated in CodeRun spec (line 1358)
+  4. ✅ Agent app assigned to Linear issue
+     - `githubApp` field in CodeRun spec (line 1351)
+     - Constructed as `{orgName}-{agentSuffix}` (e.g., "5DLabs-Rex")
+  5. ✅ Two-way communication enabled via Linear dialog
+     - LinearIntegration struct: `crates/controller/src/crds/coderun.rs:51-69`
+     - Linear sidecar added when enabled: `crates/controller/src/tasks/code/resources.rs:1159-1307`
+     - Sidecar handles: status sync, log streaming, 2-way comms, whip cracking
+     - Parameters passed: `linear-session-id`, `linear-issue-id`, `linear-team-id`
+  6. ✅ Subtasks included in CodeRun spec
+     - `SubtaskSpec` struct: `crates/controller/src/crds/coderun.rs:71-99`
+     - `subtasks` field in CodeRunSpec (line 259)
+     - Task.subtasks read from tasks.json: `crates/controller/src/tasks/play/tasks.rs:20`
+- **Files changed**: prd.json (marked PLAY-001 passes: true), progress.txt
+- **Learnings for future iterations:**
+  - CodeRun creation is in Argo Workflow template `create-coderun-resource`
+  - Agent routing cascade: agentHint → task file metadata → content-based detection
+  - Linear sidecar requires: session_id, issue_id, team_id for full functionality
+  - Subtasks enable parallel execution via subagent dispatch
+  - Model rotation is configured per-agent via `modelRotation` array
+---
+
