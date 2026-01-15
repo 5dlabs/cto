@@ -9,7 +9,7 @@
 use std::sync::Arc;
 
 use crate::ai::{
-    parse_ai_response,
+    extract_json_continuation, parse_ai_response,
     prompts::{AnalyzeComplexityContext, ExpandTaskContext, ParsePrdContext, TaskSummary},
     schemas::{
         AnalyzeComplexityResponse, ComplexityReport, ExpandTaskResponse, GeneratedDecisionPoint,
@@ -149,8 +149,12 @@ impl AIDomain {
             .generate_text(model_id, &messages, &options)
             .await?;
 
+        // Extract JSON from response, handling cases where AI includes explanatory text
+        // before the actual JSON content (common with extended thinking)
+        let json_content = extract_json_continuation(&response.text);
+
         // Reconstruct the full JSON by prepending the prefill
-        let full_json = format!(r#"{{"tasks":[{}"#, response.text);
+        let full_json = format!(r#"{{"tasks":[{json_content}"#);
         let reconstructed_response = crate::ai::AIResponse {
             text: full_json,
             usage: response.usage.clone(),
@@ -324,8 +328,11 @@ impl AIDomain {
             .generate_text(model_id, &messages, &options)
             .await?;
 
+        // Extract JSON from response, handling cases where AI includes explanatory text
+        let json_content = extract_json_continuation(&response.text);
+
         // Reconstruct the full JSON by prepending the prefill
-        let full_json = format!(r#"{{"subtasks":[{}"#, response.text);
+        let full_json = format!(r#"{{"subtasks":[{json_content}"#);
         let reconstructed_response = crate::ai::AIResponse {
             text: full_json,
             usage: response.usage.clone(),
@@ -395,8 +402,11 @@ impl AIDomain {
             .generate_text(model_id, &messages, &options)
             .await?;
 
+        // Extract JSON from response, handling cases where AI includes explanatory text
+        let json_content = extract_json_continuation(&response.text);
+
         // Reconstruct the full JSON by prepending the prefill
-        let full_json = format!(r#"{{"complexityAnalysis":[{}"#, response.text);
+        let full_json = format!(r#"{{"complexityAnalysis":[{json_content}"#);
         let reconstructed_response = crate::ai::AIResponse {
             text: full_json,
             usage: response.usage.clone(),

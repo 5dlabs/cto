@@ -19,7 +19,8 @@ pub mod openai;
 // Re-exports
 pub use prompts::{PromptManager, PromptTemplate};
 pub use provider::{
-    parse_ai_response, AIMessage, AIProvider, AIResponse, AIRole, GenerateOptions, TokenUsage,
+    extract_json_continuation, parse_ai_response, AIMessage, AIProvider, AIResponse, AIRole,
+    GenerateOptions, TokenUsage,
 };
 pub use registry::ProviderRegistry;
 pub use schemas::*;

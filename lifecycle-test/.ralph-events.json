@@ -1,0 +1,474 @@
+{
+  "started": "2026-01-15T12:16:07-08:00",
+  "project": "lifecycle-test",
+  "platform": "macos",
+  "events": [
+    {
+      "timestamp": "2026-01-15T10:58:57-08:00",
+      "type": "started",
+      "message": "Monitor started for lifecycle-test",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T10:59:00-08:00",
+      "type": "story_complete",
+      "message": "Completed: INT-001 in 5m",
+      "story": "INT-001"
+    },
+    {
+      "timestamp": "2026-01-15T10:59:00-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T10:59:01-08:00",
+      "type": "start",
+      "message": "Ralph started",
+      "story": "PRE-001"
+    },
+    {
+      "timestamp": "2026-01-15T10:59:01-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:04:00-08:00",
+      "type": "story_complete",
+      "message": "Completed: PRE-001 in 5m",
+      "story": "PRE-001"
+    },
+    {
+      "timestamp": "2026-01-15T11:04:01-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:04:01-08:00",
+      "type": "story_complete",
+      "message": "Completed: PRE-001 in 5m",
+      "story": "PRE-001"
+    },
+    {
+      "timestamp": "2026-01-15T11:04:02-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:09:01-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:09:02-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:14:01-08:00",
+      "type": "story_complete",
+      "message": "Completed: INT-001 in 10m",
+      "story": "INT-001"
+    },
+    {
+      "timestamp": "2026-01-15T11:14:02-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:14:02-08:00",
+      "type": "story_complete",
+      "message": "Completed: INT-001 in 10m",
+      "story": "INT-001"
+    },
+    {
+      "timestamp": "2026-01-15T11:14:03-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:19:02-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:19:03-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:24:02-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:24:03-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:29:03-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:29:04-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:34:03-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:34:04-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:39:03-08:00",
+      "type": "story_complete",
+      "message": "Completed: INT-002 in 25m",
+      "story": "INT-002"
+    },
+    {
+      "timestamp": "2026-01-15T11:39:04-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:39:04-08:00",
+      "type": "story_complete",
+      "message": "Completed: INT-002 in 25m",
+      "story": "INT-002"
+    },
+    {
+      "timestamp": "2026-01-15T11:39:05-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:44:04-08:00",
+      "type": "story_complete",
+      "message": "Completed: INT-003 in 5m",
+      "story": "INT-003"
+    },
+    {
+      "timestamp": "2026-01-15T11:44:05-08:00",
+      "type": "story_complete",
+      "message": "Completed: INT-003 in 5m",
+      "story": "INT-003"
+    },
+    {
+      "timestamp": "2026-01-15T11:44:05-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:44:05-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:49:05-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:49:06-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:54:05-08:00",
+      "type": "story_complete",
+      "message": "Completed: INT-004 in 10m",
+      "story": "INT-004"
+    },
+    {
+      "timestamp": "2026-01-15T11:54:06-08:00",
+      "type": "story_complete",
+      "message": "Completed: INT-004 in 10m",
+      "story": "INT-004"
+    },
+    {
+      "timestamp": "2026-01-15T11:54:06-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:54:06-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:59:06-08:00",
+      "type": "story_complete",
+      "message": "Completed: PLAY-001 in 5m",
+      "story": "PLAY-001"
+    },
+    {
+      "timestamp": "2026-01-15T11:59:06-08:00",
+      "type": "story_complete",
+      "message": "Completed: PLAY-001 in 5m",
+      "story": "PLAY-001"
+    },
+    {
+      "timestamp": "2026-01-15T11:59:07-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T11:59:07-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 91%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:04:07-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:04:07-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:08:48-08:00",
+      "type": "started",
+      "message": "Monitor started for lifecycle-test",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:08:51-08:00",
+      "type": "start",
+      "message": "Ralph started",
+      "story": "INT-001"
+    },
+    {
+      "timestamp": "2026-01-15T12:08:51-08:00",
+      "type": "story_complete",
+      "message": "Completed: PLAY-002 in 9m",
+      "story": "PLAY-002"
+    },
+    {
+      "timestamp": "2026-01-15T12:08:52-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:09:07-08:00",
+      "type": "story_complete",
+      "message": "Completed: PLAY-002 in 10m",
+      "story": "PLAY-002"
+    },
+    {
+      "timestamp": "2026-01-15T12:09:08-08:00",
+      "type": "story_complete",
+      "message": "Completed: PLAY-002 in 10m",
+      "story": "PLAY-002"
+    },
+    {
+      "timestamp": "2026-01-15T12:09:08-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:09:08-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:13:52-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:14:08-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:14:09-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:16:07-08:00",
+      "type": "started",
+      "message": "Monitor started for lifecycle-test",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:16:10-08:00",
+      "type": "start",
+      "message": "Ralph started",
+      "story": "INT-001"
+    },
+    {
+      "timestamp": "2026-01-15T12:16:11-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:18:52-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:19:09-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:19:09-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T12:21:11-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    }
+  ],
+  "stories_completed": [
+    {
+      "timestamp": "2026-01-15T10:59:00-08:00",
+      "story": "INT-001",
+      "duration": 5,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:04:00-08:00",
+      "story": "PRE-001",
+      "duration": 5,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:04:01-08:00",
+      "story": "PRE-001",
+      "duration": 5,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:14:01-08:00",
+      "story": "INT-001",
+      "duration": 10,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:14:02-08:00",
+      "story": "INT-001",
+      "duration": 10,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:39:03-08:00",
+      "story": "INT-002",
+      "duration": 25,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:39:04-08:00",
+      "story": "INT-002",
+      "duration": 25,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:44:04-08:00",
+      "story": "INT-003",
+      "duration": 5,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:44:05-08:00",
+      "story": "INT-003",
+      "duration": 5,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:54:05-08:00",
+      "story": "INT-004",
+      "duration": 10,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:54:06-08:00",
+      "story": "INT-004",
+      "duration": 10,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:59:06-08:00",
+      "story": "PLAY-001",
+      "duration": 5,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T11:59:06-08:00",
+      "story": "PLAY-001",
+      "duration": 5,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T12:08:51-08:00",
+      "story": "PLAY-002",
+      "duration": 9,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T12:09:07-08:00",
+      "story": "PLAY-002",
+      "duration": 10,
+      "estimate": 20
+    },
+    {
+      "timestamp": "2026-01-15T12:09:08-08:00",
+      "story": "PLAY-002",
+      "duration": 10,
+      "estimate": 20
+    }
+  ],
+  "restarts": [],
+  "total_restarts": 0,
+  "final_status": "running"
+}

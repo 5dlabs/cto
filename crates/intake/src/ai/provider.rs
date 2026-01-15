@@ -148,6 +148,48 @@ pub trait AIProvider: Send + Sync {
     ) -> TasksResult<AIResponse>;
 }
 
+/// Extract the JSON continuation from a prefill response.
+///
+/// When using the prefill technique (e.g., assistant message starts with `{"tasks":[`),
+/// the AI may include explanatory text before the actual JSON content. This function
+/// extracts just the JSON content suitable for reconstruction.
+///
+/// For example, if the AI returns:
+/// ```text
+/// I'll continue from where I was cut off...
+///
+/// {"id":35,"title":"..."},{"id":36,...}]}
+/// ```
+///
+/// This function returns:
+/// ```text
+/// {"id":35,"title":"..."},{"id":36,...}]}
+/// ```
+///
+/// If no JSON structure is found, returns the original text trimmed.
+pub fn extract_json_continuation(text: &str) -> String {
+    let text = text.trim();
+
+    // If the response starts with a JSON object or array element, it's already clean
+    if text.starts_with('{') || text.starts_with('[') {
+        return text.to_string();
+    }
+
+    // Look for the first JSON object in the response (typically starts with {"id":
+    // This handles cases like: "Some text...\n\n{"id":35,"title":"..."
+    if let Some(json_start) = text.find(r#"{"id":"#).or_else(|| text.find(r#"{"id"#)) {
+        return text[json_start..].to_string();
+    }
+
+    // Fallback: look for any JSON object start
+    if let Some(first_brace) = text.find('{') {
+        return text[first_brace..].to_string();
+    }
+
+    // No JSON found, return original
+    text.to_string()
+}
+
 /// Generate a structured object from an AI response.
 ///
 /// This is a standalone function rather than a trait method because
@@ -248,5 +290,67 @@ impl MessageBuilder {
     /// Build the message list.
     pub fn build(self) -> Vec<AIMessage> {
         self.messages
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_json_continuation_clean_json() {
+        // Already clean JSON should pass through unchanged
+        let input = r#"{"id":35,"title":"Test"}"#;
+        assert_eq!(extract_json_continuation(input), input);
+    }
+
+    #[test]
+    fn test_extract_json_continuation_with_leading_text() {
+        // Handles case where AI includes explanatory text before JSON
+        let input = r#"I'll continue from where I was cut off...
+
+{"id":35,"title":"Test"}"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"{"id":35,"title":"Test"}"#
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_with_extended_thinking_prefix() {
+        // Common case from extended thinking models
+        let input = r#"Based on the PRD requirements, I'll generate the following tasks:
+
+{"id":1,"title":"Setup project structure"}"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"{"id":1,"title":"Setup project structure"}"#
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_array_start() {
+        // Array continuation (for subtasks response)
+        let input = r#"[{"id":1,"title":"Subtask 1"},{"id":2,"title":"Subtask 2"}]"#;
+        assert_eq!(extract_json_continuation(input), input);
+    }
+
+    #[test]
+    fn test_extract_json_continuation_no_json() {
+        // No JSON found - returns original text
+        let input = "This is just plain text with no JSON";
+        assert_eq!(extract_json_continuation(input), input);
+    }
+
+    #[test]
+    fn test_extract_json_continuation_real_world_error() {
+        // The actual error case from the intake logs
+        let input = r#"I'll continue from where I was cut off, completing the gRPC service handlers and remaining tasks.
+
+{"id":35,"title":"Implement gRPC Service Handlers"}"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"{"id":35,"title":"Implement gRPC Service Handlers"}"#
+        );
     }
 }

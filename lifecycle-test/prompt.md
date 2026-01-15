@@ -1,6 +1,24 @@
-# CTO Platform Lifecycle Test Agent Instructions
+# CTO Platform Lifecycle Test Agent - AlertHub E2E
 
-You are an autonomous testing agent validating the CTO multi-agent orchestration platform.
+You are an autonomous testing agent validating the CTO multi-agent orchestration platform using the **AlertHub E2E Test Project**.
+
+## Test Project: AlertHub
+
+AlertHub is a comprehensive notification platform that exercises ALL implementation agents:
+
+| Agent | Technology | Component |
+|-------|------------|-----------|
+| **Rex** | Rust/Axum | Notification Router Service |
+| **Nova** | Bun/Elysia+Effect | Integration Service |
+| **Grizz** | Go/gRPC | Admin API |
+| **Blaze** | Next.js/React | Web Console |
+| **Tap** | Expo/React Native | Mobile App |
+| **Spark** | Electron | Desktop Client |
+
+**PRD Location**: `tests/intake/alerthub-e2e-test/prd.md`  
+**Architecture**: `tests/intake/alerthub-e2e-test/architecture.md`
+
+When you reach INT-001, read these files and use them for the MCP intake call.
 
 ## CRITICAL: Methodical Execution
 
@@ -60,59 +78,29 @@ just sync-secrets
 
 **Why OAuth?** OAuth tokens allow agent-specific Linear app assignment, enabling two-way communication in the Linear issue timeline.
 
-### 2. Start Local Services (Background Mode)
+### 2. Start Local Services
 
-Start services in detached/background mode so you can manage them:
-
-```bash
-# Option 1: Process-compose in detached mode (RECOMMENDED)
-just kill-ports  # Clean up any stale processes first
-just pc-detach   # Starts all services in background
-
-# Check status
-just pc-status
-
-# Stop when done
-just pc-down
-```
+Use `just mp` to start all services with the mprocs TUI:
 
 ```bash
-# Option 2: Start services individually in background
-source .env.local
-
-# PM Server (port 8081)
-cargo run --bin pm-server > /tmp/pm-server.log 2>&1 &
-echo $! > /tmp/pm-server.pid
-
-# Controller (port 8080)
-AGENT_TEMPLATES_PATH=./templates cargo run --bin agent-controller > /tmp/controller.log 2>&1 &
-echo $! > /tmp/controller.pid
-
-# Healer (port 8082)
-HEALER_TEMPLATES_DIR=./templates/healer CTO_CONFIG_PATH=./cto-config.json cargo run --bin healer -- server --addr 0.0.0.0:8082 > /tmp/healer.log 2>&1 &
-echo $! > /tmp/healer.pid
-
-# Cloudflare tunnel
-cloudflared tunnel --config config/cloudflared-pm-dev.yaml run > /tmp/tunnel.log 2>&1 &
-echo $! > /tmp/tunnel.pid
+# This kills stale ports, sources .env.local, and starts mprocs
+just mp
 ```
 
-**Services to verify:**
-| Service | Port | Health Check |
-|---------|------|--------------|
-| pm-server | 8081 | `curl http://localhost:8081/health` |
-| controller | 8080 | `curl http://localhost:8080/health` |
-| healer | 8082 | `curl http://localhost:8082/health` |
-| tunnel | - | `curl https://pm-dev.5dlabs.ai/health` |
+**Services started:**
+| Service | Port | Purpose |
+|---------|------|---------|
+| pm-server | 8081 | Linear webhooks, project management |
+| controller | 8080 | CodeRun CRD orchestration |
+| healer | 8082 | Self-healing monitor |
+| healer-play-api | 8083 | MCP session monitoring |
+| tunnel | - | Cloudflare tunnel (pm-dev.5dlabs.ai → localhost:8081) |
 
-**Restart a service after code changes:**
-```bash
-# Find and kill the process
-kill $(cat /tmp/pm-server.pid)
-# Rebuild and restart
-cargo build --bin pm-server && cargo run --bin pm-server > /tmp/pm-server.log 2>&1 &
-echo $! > /tmp/pm-server.pid
-```
+**mprocs TUI keybindings:**
+- `↑/↓` or `j/k` - Navigate processes
+- `Enter` - Focus process logs
+- `r` - Restart process
+- `q` - Quit all
 
 ### 3. Run Pre-Flight Check
 
@@ -317,6 +305,139 @@ KUBERNETES ERROR DETECTED:
 ├── 5. Verify fix locally (if code change)
 │   └── cargo test -p <crate>
 └── 6. Re-run the verification from scratch
+```
+
+## ⚠️ CRITICAL: Stringent Verification
+
+**DO NOT mark a story as `passes: true` unless the UNDERLYING ACTION SUCCEEDED.**
+
+### Examples of FALSE POSITIVES to avoid:
+
+| You observed... | But actually... | Correct action |
+|-----------------|-----------------|----------------|
+| "MCP intake tool returned success" | Intake CodeRun pod is in Error state | Story FAILS - investigate pod logs |
+| "Argo Workflow triggered" | Workflow completed but tasks.json empty | Story FAILS - verify output files |
+| "CodeRun created" | Pod crashed, no work done | Story FAILS - check logs |
+| "Linear issue created" | Morgan never responded | Story FAILS - check Morgan CodeRun |
+
+### Verification requires PROOF OF ACTUAL SUCCESS:
+
+For **INT-001** (Intake):
+```bash
+# NOT SUFFICIENT: "intake CodeRun exists"
+# REQUIRED: Verify tasks.json was created in the target repo
+gh api repos/5dlabs/<project>/.tasks/tasks/tasks.json | jq '.tasks | length'
+# Should return >0 tasks
+```
+
+For **INT-002** (Task Generation):
+```bash
+# NOT SUFFICIENT: "intake ran"  
+# REQUIRED: All fields populated correctly
+gh api repos/5dlabs/<project>/contents/.tasks/tasks/tasks.json | \
+  jq -r '.content' | base64 -d | jq '.tasks[] | select(.testStrategy == "")'
+# Should return nothing (all have testStrategy)
+```
+
+For **PLAY-xxx** stories:
+```bash
+# NOT SUFFICIENT: "CodeRun created"
+# REQUIRED: Pod completed successfully, work artifact exists
+kubectl get coderun -n cto <name> -o jsonpath='{.status.phase}'
+# Must be "Succeeded"
+```
+
+## 🔧 Root Cause Remediation (FIX THE CODE)
+
+**When you encounter platform bugs, FIX THEM. Don't just document and move on.**
+
+### Intake/CodeRun Failures - Release Cycle
+
+If the issue is in `crates/intake/**` or `crates/controller/**`:
+
+```
+ROOT CAUSE FIX FOR INTAKE:
+├── 1. Identify the bug in code
+│   └── Read full pod logs, find error message
+├── 2. Fix the code
+│   └── Edit files in crates/intake/src/...
+├── 3. Run local tests
+│   └── cargo test -p intake
+├── 4. Run Clippy pedantic
+│   └── cargo clippy --all-targets -- -D warnings -W clippy::pedantic
+├── 5. Commit and push to feature branch
+│   └── git add . && git commit -m "fix(intake): ..."
+├── 6. Create PR targeting develop
+│   └── gh pr create --base develop
+├── 7. Wait for CI to pass, then merge
+│   └── gh pr merge --squash
+├── 8. Tag a new release (from develop)
+│   └── git checkout develop && git pull
+│   └── git tag v0.2.X && git push origin v0.2.X
+├── 9. Wait for release workflow to publish binary
+│   └── gh run list --workflow release.yml --limit 1
+│   └── Wait until status is "completed"
+├── 10. Update runtime image to use new version
+│    └── Edit infra/images/runtime/Dockerfile
+│    └── ARG TASKS_VERSION=0.2.X  (new version)
+│    └── Commit: "chore: bump intake to v0.2.X"
+└── 11. Wait for agent image to rebuild
+     └── gh run list --workflow agent-images.yml --limit 1
+     └── Wait until claude/opencode images rebuilt
+```
+
+### Common Intake Issues and Code Fixes
+
+| Error | Root Cause | Code Fix Location |
+|-------|------------|-------------------|
+| "AI response parse error: expected value" | Claude includes text with JSON | `crates/intake/src/ai/cli_adapter.rs` - improve JSON extraction |
+| "task_id is required" | MCP schema mismatch | `crates/mcp/src/tools.rs` - make optional |
+| "testStrategy empty" | Prompt doesn't request it | `crates/intake/src/ai/prompts/parse_prd.rs` |
+| "deploy task not appended" | Config not loaded | `crates/intake/src/bin/cli.rs` |
+
+### JSON Parsing Error Fix
+
+If you see: `Failed to parse AI response as JSON: expected value at line 1 column X`
+
+The AI is returning: `{"tasks":[Some explanation text...`
+
+**Fix**: Update the JSON extraction in `crates/intake/src/ai/cli_adapter.rs` to strip non-JSON content:
+
+```rust
+// Find the JSON object/array boundaries and extract only that
+fn extract_json_from_response(response: &str) -> Result<&str> {
+    // Find first { or [ and last matching } or ]
+    let start = response.find(|c| c == '{' || c == '[');
+    // ... proper JSON extraction logic
+}
+```
+
+## When to Cut a Release
+
+Cut a new release when you've fixed bugs in:
+- `crates/intake/**` - Task generation logic
+- `crates/mcp/**` - MCP tool definitions  
+- `templates/**` - Agent prompts (via AGENTS.md release)
+- `crates/controller/**` - CodeRun handling
+
+**Do NOT wait for human approval** - you have agency to fix and release.
+
+### Release Commands
+
+```bash
+# After merging fix to develop:
+git checkout develop
+git pull origin develop
+
+# Tag new release (check current: git describe --tags)
+git tag v0.2.X
+git push origin v0.2.X
+
+# Monitor release workflow
+gh run watch $(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')
+
+# Update runtime image version
+# Edit infra/images/runtime/Dockerfile, update ARG TASKS_VERSION
 ```
 
 ### Common Issues and Fixes

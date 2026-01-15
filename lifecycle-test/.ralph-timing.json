@@ -1,0 +1,38 @@
+{
+  "stories": {
+    "INT-001": {
+      "actual": 10,
+      "estimate": 20
+    },
+    "PRE-001": {
+      "actual": 5,
+      "estimate": 20
+    },
+    "INT-002": {
+      "actual": 25,
+      "estimate": 20
+    },
+    "INT-003": {
+      "actual": 5,
+      "estimate": 20
+    },
+    "INT-004": {
+      "actual": 10,
+      "estimate": 20
+    },
+    "PLAY-001": {
+      "actual": 5,
+      "estimate": 20
+    },
+    "PLAY-002": {
+      "actual": 10,
+      "estimate": 20
+    }
+  },
+  "averages": {
+    "simple": 20,
+    "medium": 30,
+    "complex": 45,
+    "heavy": 60
+  }
+}

@@ -1,7 +1,12 @@
 {
-  "name": "CTO Platform Lifecycle Test",
-  "description": "End-to-end test of the CTO multi-agent orchestration platform from PRD to deployed code",
+  "name": "CTO Platform Lifecycle Test - AlertHub E2E",
+  "description": "End-to-end test using the AlertHub multi-platform notification system, which exercises all agents (Rex, Nova, Grizz, Blaze, Tap, Spark) and their respective tech stacks",
   "branchName": "ralph/lifecycle-test",
+  "testProject": {
+    "name": "alerthub-e2e-test",
+    "prdPath": "tests/intake/alerthub-e2e-test/prd.md",
+    "architecturePath": "tests/intake/alerthub-e2e-test/architecture.md"
+  },
   "userStories": [
     {
       "id": "PRE-001",
@@ -18,7 +23,7 @@
         "Run 'just preflight' and verify output shows '✅ PRE-FLIGHT PASSED'"
       ],
       "testStrategy": "smoke",
-      "passes": false
+      "passes": true
     },
     {
       "id": "PRE-002",
@@ -33,7 +38,7 @@
         "Linear webhook configured with correct URL"
       ],
       "testStrategy": "smoke",
-      "passes": false
+      "passes": true
     },
     {
       "id": "PRE-003",
@@ -53,25 +58,28 @@
         "'just preflight' section 5 (AGENT OAUTH) shows all agents with '✓ token'"
       ],
       "testStrategy": "smoke",
-      "passes": false
+      "passes": true
     },
     {
       "id": "INT-001",
-      "title": "Intake: Submit PRD via MCP Tool",
-      "description": "Use YOUR installed cto-mcp server to invoke intake. Do NOT run CLI directly or use local=true.",
+      "title": "Intake: Submit AlertHub PRD via MCP Tool (MUST COMPLETE)",
+      "description": "Use your cto-mcp server to intake the AlertHub E2E test project. The intake CodeRun MUST complete successfully with tasks.json created.",
       "priority": 2,
-      "complexity": "medium",
+      "complexity": "high",
       "acceptanceCriteria": [
-        "Use MCP tool: mcp_cto_intake(project_name='lifecycle-test-sample', prd_content='...')",
-        "Tool returns success with Linear issue URL",
-        "Linear issue created (verify via Linear UI or API)",
-        "PRD content visible in issue description",
-        "cto-config.json attached to issue",
-        "Morgan auto-assigned as delegate (uses Morgan OAuth token)",
-        "Argo Workflow triggered (check: kubectl get workflows -n cto)"
+        "Read PRD content from tests/intake/alerthub-e2e-test/prd.md",
+        "Read architecture from tests/intake/alerthub-e2e-test/architecture.md",
+        "Use MCP tool: mcp_cto_intake(project_name='alerthub-e2e-test', prd_content=<prd>, architecture_content=<arch>)",
+        "Tool returns success with Linear project URL",
+        "Linear project created with 'AlertHub' in name",
+        "Intake CodeRun pod completes WITHOUT ERROR (kubectl get pods -n cto | grep intake)",
+        "tasks.json EXISTS in target repo: gh api repos/5dlabs/prd-alerthub-e2e-test/contents/prd-alerthub-e2e-test/.tasks/tasks/tasks.json",
+        "tasks.json has >0 tasks with non-empty testStrategy",
+        "IF intake fails with JSON parsing error: FIX THE CODE in crates/intake/src/ai/cli_adapter.rs, cut release, update runtime image"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": false,
+      "knownIssue": "Intake CodeRun failing with JSON parsing error - AI includes explanatory text with JSON output"
     },
     {
       "id": "INT-002",
@@ -88,7 +96,7 @@
         "prompt.md contains ## Test Strategy section"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "INT-003",
@@ -103,7 +111,7 @@
         "Deploy task assigned to bolt agent"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "INT-004",
@@ -118,7 +126,7 @@
         "Changes appear as commit in target repo"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "PLAY-001",
@@ -135,7 +143,7 @@
         "Subtasks included in CodeRun spec"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "PLAY-002",
@@ -152,7 +160,7 @@
         "Log shows skills summary with loaded count"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "PLAY-003",
