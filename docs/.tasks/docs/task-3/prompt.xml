@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="3" priority="high" agent="grizz">
+    <meta>
+        <title>Admin API Service (Grizz - Go/gRPC)</title>
+        <priority>high</priority>
+        <dependencies>1</dependencies>
+        <agent_hint>grizz</agent_hint>
+    </meta>
+
+    <role>You are a Senior Go Engineer with expertise in concurrent systems and microservices. Implement Task 3 with production-quality code.</role>
+
+    <context>
+        <overview>Build Go gRPC service with grpc-gateway for tenant, user, rule management and analytics</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 1
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>Implement TenantService, UserService, RuleService, AnalyticsService with JWT auth, RBAC (owner/admin/member/viewer), notification rules engine, and audit logging.</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-3): Admin API Service (Grizz - Go/gRPC)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>Unit tests for rule engine, integration tests for gRPC, verify RBAC restrictions</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>go test ./...</command>
+        <command>golangci-lint run</command>
+        <command>go build ./...</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
+</task>

@@ -37,7 +37,12 @@
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
       "workingDirectory": ".",
-      "healerEndpoint": "http://localhost:8083"
+      "healerEndpoint": "http://localhost:8083",
+      "autoMerge": true,
+      "implementationMaxRetries": 10,
+      "qualityMaxRetries": 5,
+      "securityMaxRetries": 2,
+      "testingMaxRetries": 5
     },
     "remediation": {
       "repository": "5dlabs/cto",

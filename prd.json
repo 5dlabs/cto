@@ -41,7 +41,7 @@
         "Log to progress.txt: 'Local intake test: PASS/FAIL'"
       ],
       "priority": 0,
-      "passes": false,
+      "passes": true,
       "notes": "⚠️ BLOCKER: In-cluster intake will fail until this fix is deployed. Test locally first!"
     },
     {
@@ -66,7 +66,7 @@
         "Log to progress.txt: 'Services started at [timestamp]: PM=OK, Healer=OK, Tunnel=OK, Ports=OK'"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "MUST source .env.local for env vars (LINEAR_WEBHOOK_URL, etc). Tunnel is REQUIRED for webhooks."
     },
     {
@@ -93,7 +93,7 @@
         "Log to progress.txt: 'Pre-flight complete at [timestamp]: Cleanup done, all checks PASSED'"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "GATE - Do NOT proceed to intake (US-003) until ALL pre-flight checks pass. Cleanup CodeRuns FIRST - they are the source of pods/jobs."
     },
     {
@@ -115,7 +115,7 @@
         "Log to progress.txt: intake workflow name, Linear issue ID, Morgan assigned as delegate"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Morgan is assigned as DELEGATE (sub-assignment), not primary assignee. This still triggers the webhook. ⚠️ BLOCKER: If in-cluster intake fails with JSON parse error, the provider.rs fix needs to be deployed first (see US-000)."
     },
     {
@@ -138,7 +138,8 @@
       ],
       "priority": 4,
       "passes": false,
-      "notes": "Morgan runs IN-CLUSTER, generates tasks, commits to repo, creates PR. The PR must be merged before Play can start."
+      "notes": "BLOCKED: JSON parsing error - provider.rs fix needs deployment. Morgan runs IN-CLUSTER, generates tasks, commits to repo, creates PR. The PR must be merged before Play can start."
+      "notes": "BLOCKED: JSON parsing error - provider.rs fix needs deployment. Morgan runs IN-CLUSTER, generates tasks, commits to repo, creates PR. The PR must be merged before Play can start."
     },
     {
       "id": "US-005",
@@ -156,7 +157,8 @@
       ],
       "priority": 5,
       "passes": false,
-      "notes": "Play is triggered by merging Morgan's PR, not by manually calling cto___play(). The merge webhook starts the orchestration."
+      "notes": "BLOCKED: Depends on US-004. Play is triggered by merging Morgan's PR, not by manually calling cto___play(). The merge webhook starts the orchestration."
+      "notes": "BLOCKED: Depends on US-004. Play is triggered by merging Morgan's PR, not by manually calling cto___play(). The merge webhook starts the orchestration."
     },
     {
       "id": "US-006",
@@ -172,7 +174,8 @@
       ],
       "priority": 6,
       "passes": false,
-      "notes": "Each agent runs as CodeRun pod with Linear sidecar emitting activities."
+      "notes": "BLOCKED: Depends on US-005. Each agent runs as CodeRun pod with Linear sidecar emitting activities."
+      "notes": "BLOCKED: Depends on US-005. Each agent runs as CodeRun pod with Linear sidecar emitting activities."
     },
     {
       "id": "US-007",
@@ -188,7 +191,8 @@
       ],
       "priority": 7,
       "passes": false,
-      "notes": "Tests the input_poll_task in status-sync.rs. REQUIRES: Active CodeRun with agent running."
+      "notes": "BLOCKED: Depends on US-006. Tests the input_poll_task in status-sync.rs. REQUIRES: Active CodeRun with agent running."
+      "notes": "BLOCKED: Depends on US-006. Tests the input_poll_task in status-sync.rs. REQUIRES: Active CodeRun with agent running."
     },
     {
       "id": "US-008",
@@ -203,7 +207,8 @@
       ],
       "priority": 8,
       "passes": false,
-      "notes": "Validates both monitoring layers caught all events. REQUIRES: Play workflow must complete first."
+      "notes": "BLOCKED: Depends on US-006. Validates both monitoring layers caught all events. REQUIRES: Play workflow must complete first."
+      "notes": "BLOCKED: Depends on US-006. Validates both monitoring layers caught all events. REQUIRES: Play workflow must complete first."
     },
     {
       "id": "US-009",
@@ -220,7 +225,7 @@
       ],
       "priority": 9,
       "passes": false,
-      "notes": "Full E2E: cto___intake() → Linear → Webhook → Morgan pod → tasks.json PR → Merge → Play workflow → CodeRuns → Merged implementation PR. This is the final verification."
+      "notes": "BLOCKED: Depends on US-008. Full E2E: cto___intake() → Linear → Webhook → Morgan pod → tasks.json PR → Merge → Play workflow → CodeRuns → Merged implementation PR. This is the final verification."
     }
   ]
 }
