@@ -1,3 +1,8 @@
+## [0.2.9] - 2026-01-15
+
+### 🐛 Bug Fixes
+- Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
+
 ## [0.2.8] - 2026-01-15
 
 ### ✨ Features
