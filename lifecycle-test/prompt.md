@@ -432,6 +432,75 @@ this section MUST include actual tool invocation evidence from logs.
 ---
 ```
 
+## Release & Deployment (For Intake/Agent Changes)
+
+If you need to make changes to **intake** code or **AGENTS.md**, a full release cycle is required:
+
+### Release Process (using GitHub CLI)
+
+```bash
+# 1. Commit and push your changes
+git add .
+git commit -m "fix: description of change"
+git push origin main
+
+# 2. Tag a new release (increment version)
+# Check current version first
+git tag --list 'v*' | sort -V | tail -1
+# Create new tag
+git tag v0.2.10
+git push origin v0.2.10
+
+# 3. Monitor the release workflow
+gh run list --workflow=binaries-release.yaml --limit 5
+gh run watch  # Watch the latest run
+
+# 4. Wait for binary to publish (check releases)
+gh release view v0.2.10
+
+# 5. Update runtime image version
+# Edit infra/images/runtime/Dockerfile line ~399
+# Change: ARG TASKS_VERSION=0.2.9 → ARG TASKS_VERSION=0.2.10
+
+# 6. Commit runtime image update
+git add infra/images/runtime/Dockerfile
+git commit -m "chore: bump runtime TASKS_VERSION to v0.2.10"
+git push origin main
+
+# 7. Monitor agent image build
+gh run list --workflow=agent-image.yaml --limit 5
+gh run watch
+```
+
+### What Requires Release Cycle
+
+| Change | Requires Release? | Why |
+|--------|-------------------|-----|
+| `crates/intake/**` | ✅ Yes | Intake binary runs in container |
+| `AGENTS.md` | ✅ Yes | Baked into agent image |
+| `templates/**` | ❌ No | Mounted at runtime |
+| `crates/pm/**` | ❌ No | Running locally |
+| `crates/controller/**` | ❌ No | Running locally |
+| `lifecycle-test/**` | ❌ No | Local test files |
+
+### Waiting for CI/CD
+
+```bash
+# Check workflow status
+gh run list --limit 10
+
+# Watch a specific run
+gh run watch <run-id>
+
+# Check if release artifacts are ready
+gh release view v0.2.10 --json assets
+
+# Verify new image is available
+kubectl get pods -n cto -o jsonpath='{.items[*].spec.containers[*].image}' | tr ' ' '\n' | sort -u
+```
+
+---
+
 ## Local Build & Verification
 
 When code changes are required to fix issues:
