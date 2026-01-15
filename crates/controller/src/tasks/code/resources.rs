@@ -1690,11 +1690,13 @@ impl<'a> CodeResourceManager<'a> {
                 match self.jobs.delete(job_name, &delete_params).await {
                     Ok(_) => {
                         info!("Successfully deleted job: {}", job_name);
-                        // Continue to label-based cleanup for any orphaned jobs
+                        // Job deleted successfully - no need for label-based cleanup
+                        return Ok(());
                     }
                     Err(kube::Error::Api(ae)) if ae.code == 404 => {
                         info!("Job {} not found (may already be deleted)", job_name);
-                        // Continue to label-based cleanup for any orphaned jobs
+                        // Job not found - no need for label-based cleanup
+                        return Ok(());
                     }
                     Err(e) => {
                         warn!("Failed to delete job {}: {}", job_name, e);
@@ -1705,17 +1707,22 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         // Fallback: Clean up any remaining jobs by label selector
-        // This handles cases where job_name might not be set or there are orphaned jobs
+        // This handles cases where job_name might not be set in status
+        // IMPORTANT: Include LABEL_CLEANUP_RUN to only delete jobs belonging to this CodeRun
         let github_identifier = code_run
             .spec
             .github_app
             .as_deref()
             .or(code_run.spec.github_user.as_deref())
             .unwrap_or("unknown");
+
+        let code_run_name = code_run.metadata.name.as_deref().unwrap_or("unknown");
         let list_params = ListParams::default().labels(&format!(
-            "app=controller,component=code-runner,github-user={},service={}",
+            "app=controller,component=code-runner,github-user={},service={},{}={}",
             Self::sanitize_label_value(github_identifier),
-            Self::sanitize_label_value(&code_run.spec.service)
+            Self::sanitize_label_value(&code_run.spec.service),
+            LABEL_CLEANUP_RUN,
+            Self::sanitize_label_value(code_run_name)
         ));
 
         let jobs = self.jobs.list(&list_params).await?;
