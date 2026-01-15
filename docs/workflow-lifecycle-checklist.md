@@ -376,10 +376,14 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
 - Tess agent runs comprehensive test suite
 - **Conditions to verify:**
   - CodeRun created for Tess with `job: test`
-  - **Test strategy from intake used to guide testing:**
-    - `testStrategy` field from `tasks.json` passed to Tess prompt
-    - Strategy values: `unit`, `integration`, `e2e`, `smoke`, `manual`
-    - Tess adapts testing approach based on strategy
+  - **Test strategy from intake available to Tess:**
+    - `task/prompt.md` contains `## Test Strategy` section
+    - Tess template instructs agent to read test strategy from prompt.md
+    - Strategy values guide approach: `unit`, `integration`, `e2e`, `smoke`
+    - Verify in logs: Tess references the test strategy in its planning
+  - **Skills loaded for Tess:**
+    - Default: `testing-strategies`, `evaluation`, `webapp-testing`
+    - Optional triggered by task content
   - Test framework available for language
   
   **Unit Tests:**
