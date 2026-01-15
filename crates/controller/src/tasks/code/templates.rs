@@ -1767,6 +1767,15 @@ impl CodeTemplateGenerator {
                     enriched["frontendStack"] = json!(frontend_stack);
                 }
             }
+
+            // If agent has subagent config, inject it into cli_config
+            // This allows coordinator templates to conditionally render dispatch instructions
+            if let Some(subagents) = &agent_config.subagents {
+                enriched["subagents"] = json!({
+                    "enabled": subagents.enabled,
+                    "maxConcurrent": subagents.max_concurrent
+                });
+            }
         }
 
         enriched
@@ -4978,6 +4987,7 @@ mod tests {
                 client_config: None,
                 model_rotation: None,
                 frontend_stack: None,
+                subagents: None,
             },
         );
 
@@ -5011,6 +5021,7 @@ mod tests {
                     }
                 })),
                 frontend_stack: None,
+                subagents: None,
             },
         );
 
@@ -5093,6 +5104,7 @@ mod tests {
                 client_config: None,
                 model_rotation: None,
                 frontend_stack: None,
+                subagents: None,
             },
         );
 
@@ -5177,6 +5189,56 @@ mod tests {
         assert!(
             tools.is_empty(),
             "Unknown agent should have no default tools"
+        );
+    }
+
+    #[test]
+    fn test_enrich_cli_config_passes_subagents_to_context() {
+        use crate::tasks::config::{AgentDefinition, ControllerConfig, SubagentConfig};
+
+        let mut config = ControllerConfig::default();
+        config.agents.insert(
+            "rex".to_string(),
+            AgentDefinition {
+                github_app: "5DLabs-Rex".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
+                reasoning_effort: None,
+                tools: None,
+                client_config: None,
+                model_rotation: None,
+                frontend_stack: None,
+                subagents: Some(SubagentConfig {
+                    enabled: true,
+                    max_concurrent: 8,
+                }),
+            },
+        );
+
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        let cli_config = json!({});
+
+        let enriched =
+            CodeTemplateGenerator::enrich_cli_config_from_agent(cli_config, &code_run, &config);
+
+        // Verify subagents config is passed through
+        assert!(
+            enriched.get("subagents").is_some(),
+            "subagents should be present in enriched config"
+        );
+
+        let subagents = enriched.get("subagents").unwrap();
+        assert_eq!(
+            subagents.get("enabled").and_then(Value::as_bool),
+            Some(true),
+            "subagents.enabled should be true"
+        );
+        assert_eq!(
+            subagents.get("maxConcurrent").and_then(Value::as_u64),
+            Some(8),
+            "subagents.maxConcurrent should be 8"
         );
     }
 }
