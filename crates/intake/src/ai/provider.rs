@@ -151,7 +151,7 @@ pub trait AIProvider: Send + Sync {
 /// Extract the JSON continuation from a prefill response.
 ///
 /// When using the prefill technique (e.g., assistant message starts with `{"tasks":[`),
-/// the AI may include explanatory text before the actual JSON content. This function
+/// the AI may include explanatory text before OR within the JSON content. This function
 /// extracts just the JSON content suitable for reconstruction.
 ///
 /// For example, if the AI returns:
@@ -166,19 +166,66 @@ pub trait AIProvider: Send + Sync {
 /// {"id":35,"title":"..."},{"id":36,...}]}
 /// ```
 ///
+/// It also handles cases where the prefill is echoed back by the CLI:
+/// ```text
+/// {"tasks":[I'll continue from where I was cut off...{"id":35,"title":"..."}]}
+/// ```
+///
+/// In this case, it extracts just the JSON objects after the embedded text.
+///
 /// If no JSON structure is found, returns the original text trimmed.
 pub fn extract_json_continuation(text: &str) -> String {
     let text = text.trim();
 
-    // If the response starts with a JSON object or array element, it's already clean
-    if text.starts_with('{') || text.starts_with('[') {
+    // Look for JSON inside markdown code blocks first (```json ... ```)
+    // This handles cases where the AI wraps the JSON in a code block
+    if let Some(json_block_start) = text.find("```json") {
+        let after_marker = &text[json_block_start + "```json".len()..];
+        if let Some(end_idx) = after_marker.rfind("```") {
+            let json_content = after_marker[..end_idx].trim();
+            if !json_content.is_empty() {
+                return json_content.to_string();
+            }
+        }
+    }
+
+    // Also check for plain code blocks (``` ... ```)
+    if let Some(code_block_start) = text.find("```\n") {
+        let after_marker = &text[code_block_start + "```\n".len()..];
+        if let Some(end_idx) = after_marker.rfind("```") {
+            let json_content = after_marker[..end_idx].trim();
+            if json_content.starts_with('{') || json_content.starts_with('[') {
+                return json_content.to_string();
+            }
+        }
+    }
+
+    // If the response starts with a JSON array `[`, return as-is
+    // Arrays are used for subtasks and should be preserved complete
+    if text.starts_with('[') {
         return text.to_string();
     }
 
-    // Look for the first JSON object in the response (typically starts with {"id":
-    // This handles cases like: "Some text...\n\n{"id":35,"title":"..."
+    // Handle the case where the CLI echoes back the prefill with embedded text.
+    // For example: {"tasks":[I'll continue...{"id":35,"title":"..."}]}
+    // We need to find the FIRST actual JSON object ({"id":) and return from there.
+    //
+    // This check handles both:
+    // 1. Text that starts with { but has embedded prose (prefill echo case)
+    // 2. Text that starts with prose followed by JSON (normal case)
     if let Some(json_start) = text.find(r#"{"id":"#).or_else(|| text.find(r#"{"id"#)) {
-        return text[json_start..].to_string();
+        // Only use this extraction if:
+        // - Text doesn't start with { (prose before JSON)
+        // - OR text starts with { but json_start > 0 (embedded prose after { like {"tasks":[text{"id":...)
+        if !text.starts_with('{') || json_start > 0 {
+            return text[json_start..].to_string();
+        }
+    }
+
+    // If the response starts with a JSON object and we didn't find embedded prose
+    // (meaning it's likely clean JSON), return as-is
+    if text.starts_with('{') {
+        return text.to_string();
     }
 
     // Fallback: look for any JSON object start
@@ -352,5 +399,93 @@ mod tests {
             extract_json_continuation(input),
             r#"{"id":35,"title":"Implement gRPC Service Handlers"}"#
         );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_json_code_block() {
+        // AI wraps JSON in a markdown code block
+        let input = r#"Here is the continuation:
+
+```json
+{"id":1,"title":"Test task"}
+```"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"{"id":1,"title":"Test task"}"#
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_plain_code_block() {
+        // AI wraps JSON in a plain code block without language tag
+        let input = r#"Continuing the tasks:
+
+```
+{"id":1,"title":"Test task"}
+```"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"{"id":1,"title":"Test task"}"#
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_code_block_with_array() {
+        // AI wraps JSON array in code block (subtasks case)
+        let input = r#"Here are the subtasks:
+
+```json
+[{"id":1,"title":"Subtask 1"},{"id":2,"title":"Subtask 2"}]
+```"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"[{"id":1,"title":"Subtask 1"},{"id":2,"title":"Subtask 2"}]"#
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_prefill_echo_with_embedded_text() {
+        // Critical bug fix: handles case where CLI echoes back the prefill
+        // with explanatory text embedded INSIDE the JSON structure
+        // e.g., {"tasks":[I'll continue from where...{"id":35,...}]}
+        //
+        // The intake code does: full_json = format!(r#"{{"tasks":[{json_content}"#)
+        // So we need extract_json_continuation to return just the JSON objects
+        // when the input looks like: I'll continue...{"id":35,"title":"..."}]}
+        let input = r#"I'll continue from where I was cut off, completing the gRPC service handlers and remaining tasks.
+
+{"id":35,"title":"Implement gRPC Service Handlers"},{"id":36,"title":"Another task"}]}"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"{"id":35,"title":"Implement gRPC Service Handlers"},{"id":36,"title":"Another task"}]}"#
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_prefill_echo_starts_with_brace() {
+        // Edge case: CLI echoes prefill AND response starts with {
+        // This simulates: {"tasks":[Some text here{"id":35,...
+        // Where the whole thing starts with { but has embedded prose
+        //
+        // In this case, json_start would be > 0, so we extract from {"id":
+        let input = r#"{"tasks":[Some explanatory text{"id":35,"title":"Test task"}]}"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"{"id":35,"title":"Test task"}]}"#
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_clean_json_with_id_unchanged() {
+        // Clean JSON that starts with {"id": should pass through unchanged
+        let input = r#"{"id":35,"title":"Test task"}"#;
+        assert_eq!(extract_json_continuation(input), input);
+    }
+
+    #[test]
+    fn test_extract_json_continuation_clean_array_unchanged() {
+        // Clean JSON array should pass through unchanged
+        let input = r#"[{"id":1},{"id":2}]"#;
+        assert_eq!(extract_json_continuation(input), input);
     }
 }
