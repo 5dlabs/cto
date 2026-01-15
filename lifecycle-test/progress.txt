@@ -20,6 +20,7 @@ Started: $(date)
 - Test strategy is in `task/prompt.md` under `## Test Strategy` section
 - Subtasks enable parallel execution via subagent dispatch
 - Healer Play API health endpoint is on port 8083 (not 8082)
+- Linear webhook can be queried via GraphQL API: `webhooks { nodes { url enabled } }`
 ---
 
 ## 2026-01-15 - PRE-001
@@ -35,5 +36,20 @@ Started: $(date)
   - All services must be started with `just mp` before running preflight
   - Preflight command provides comprehensive status including K8s cluster access, tunnel status, and OAuth tokens
   - Services can be running locally while K8s versions are scaled down (as indicated by ⬇️ vs ✅)
+---
+
+## 2026-01-15 - PRE-002
+- **Story**: Pre-Flight: Verify Tunnels and Webhooks
+- **What was implemented**: Verified Cloudflare tunnels and webhook configurations
+- **Verification performed**:
+  - `cloudflared tunnel list` shows active tunnels (pm-local-dev, cto-main with connections)
+  - Cloudflared process running: `cloudflared tunnel --config config/cloudflared-pm-dev.yaml run`
+  - PM webhook URL: `curl https://pm-dev.5dlabs.ai/health` returns 200
+  - GitHub webhook: `just webhook-status` shows URL pointing to pm-dev.5dlabs.ai
+  - Linear webhook: GraphQL query shows `https://pm-dev.5dlabs.ai/webhooks/linear` enabled
+- **Learnings for future iterations:**
+  - There is no `just linear-webhook-status` command; use GraphQL API instead
+  - `just preflight` shows tunnel and webhook status in section 2
+  - Linear OAuth token is needed to query Linear API (from .env.local)
 ---
 
