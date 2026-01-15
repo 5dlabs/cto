@@ -1,0 +1,27 @@
+=== Ralph Failure Context ===
+Story: Consecutive unhealthy: 3
+Reason: 
+Timestamp: 2026-01-15T12:31:19-08:00
+Health: ✗✓✗✗
+
+=== Last 100 lines from tmux ===
+(Could not capture tmux pane)
+
+=== Resource Status ===
+Disk: 91% used, 88GB free
+Memory: 3081MB free
+
+=== Git Status ===
+ M .ralph-events.json
+ M .ralph-monitor-state.json
+ M .ralph-monitor.pid
+?? ".ralph-failures/failure_Consecutive unhealthy: 3_20260115_122912.txt"
+?? ".ralph-failures/failure_Consecutive unhealthy: 3_20260115_123119.txt"
+?? ".ralph-failures/failure_Session died_20260115_122912.txt"
+
+=== Last Progress Entry ===
+
+=== Process Info ===
+AI PID: 45732
+  PID  PPID  %CPU %MEM STAT      TIME COMMAND
+45732     1   2.3  1.1 Ss+    0:05.91 claude   
