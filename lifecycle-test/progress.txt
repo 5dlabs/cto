@@ -464,3 +464,44 @@ Started: $(date)
   - Check `kubectl get nodes` before investigating CI queue issues
 ---
 
+## 2026-01-16 - INT-001 (INFRASTRUCTURE HARD BLOCK)
+- **Story**: Intake: Submit AlertHub PRD via MCP Tool
+- **Status**: BLOCKED - K8s cluster capacity exhausted
+- **Actions taken**:
+  1. Checked node status: `talos-tq1-f47` still NotReady
+  2. Force-deleted 11 stuck Terminating pods on bad node
+  3. New pods created but stuck in Pending state
+  4. Root cause: Insufficient CPU on healthy node
+- **Infrastructure analysis**:
+  - **talos-tq1-f47**: NotReady, unreachable taint
+  - **talos-irs-cis**: 97% CPU allocated (15585m/16000m), cannot schedule more pods
+  - **talos-evr-4zu**: Control-plane, not schedulable for workloads
+  - Runner pod requests: 500m CPU, 2Gi memory
+  - Node capacity: Only 415m CPU available (97% used)
+- **CI Queue status**:
+  - Binaries Release (run #21046581807): QUEUED since 22:19 UTC
+  - Agent Images (run #21046790070): QUEUED since 21:22 UTC
+  - v0.2.11 release: NOT CREATED (binaries release blocked)
+- **Why this is a hard block**:
+  1. Runner pods cannot schedule (insufficient CPU)
+  2. CI workflows cannot run (no runners available)
+  3. v0.2.11 release cannot complete (CI blocked)
+  4. Agent image cannot rebuild (CI blocked)
+  5. Intake CodeRun uses old binary (fix not deployed)
+- **Resolution requires infrastructure intervention**:
+  - Option A: Fix/reboot node `talos-tq1-f47`
+  - Option B: Add more nodes to cluster
+  - Option C: Reduce workloads on `talos-irs-cis`
+  - Option D: Reduce runner resource requests
+- **All remaining stories blocked**:
+  - INT-001 through DEPLOY-001 blocked by CI infrastructure
+  - Lifecycle test CANNOT proceed without cluster capacity
+- **Learnings for future iterations:**
+  - Force-deleting stuck pods causes them to reschedule
+  - Rescheduling fails if no node has capacity
+  - CPU requests (not actual usage) determine schedulability
+  - Runner pods request 500m CPU each
+  - 12 runners × 500m = 6 CPU minimum needed
+  - Single-node operation is insufficient for this workload
+---
+
