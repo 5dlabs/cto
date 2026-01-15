@@ -24,13 +24,14 @@ We have template code for Fresh Start and Subagent coordination, but the config 
 | **Subagents** | Config & templates exist, not wired | Pass to template context |
 | **Linear Task Sync** | Design doc only | Full implementation |
 | **Intake local option** | Exists, causes confusion | Remove from MCP tool |
-| **Final Deploy Task** | PRD-dependent | Auto-append in intake |
+| **Task 1 = Bolt** | Hardcoded in cli.rs | Remove, route by content |
+| **Final Deploy Task** | PRD-dependent | Optional auto-append |
 
 ---
 
 ## Phase 0: Intake Clarifications (Critical)
 
-**Goal:** Remove confusion about intake and ensure deployment task is always created.
+**Goal:** Remove confusion about intake, fix hardcoded Task 1, and optionally auto-append deployment.
 
 ### 0.1 Remove `local=true` from MCP Tool
 
@@ -58,50 +59,92 @@ fn handle_intake_local(arguments: &HashMap<String, Value>) -> Result<Value> {
 // }
 ```
 
-### 0.2 Auto-Append Final Deployment Task
+### 0.2 Remove Hardcoded Task 1 = Bolt
+
+**Issue:** Currently `intake/src/bin/cli.rs` forces Task 1 to "bolt" regardless of content.
+This is wrong - simple projects may not need infrastructure setup.
+
+**File:** `crates/intake/src/bin/cli.rs` (around line 1145-1160)
+
+```rust
+// DELETE this entire block:
+// // Task 1 MUST always be bolt (infrastructure)
+// if let Some(task1) = tasks.iter_mut().find(|t| t.id == "1") {
+//     if task1.agent_hint.as_deref() != Some("bolt") {
+//         ui::print_warning(&format!(
+//             "Task 1 had incorrect hint '{}', forcing to 'bolt'",
+//             task1.agent_hint.as_deref().unwrap_or("none")
+//         ));
+//         task1.agent_hint = Some("bolt".to_string());
+//         hints_modified += 1;
+//     }
+// }
+
+// Instead, route Task 1 like any other task:
+for task in &mut tasks {
+    match infer_agent_hint_with_deps_str(task, &tasks_snapshot) {
+        Ok(Some(inferred)) => {
+            if task.agent_hint.as_deref() != Some(&inferred) {
+                task.agent_hint = Some(inferred);
+                hints_modified += 1;
+            }
+        }
+        Ok(None) => unroutable.push(task.id.clone()),
+        Err(e) => {
+            tracing::error!("Failed to infer agent for task {}: {}", task.id, e);
+            unroutable.push(task.id.clone());
+        }
+    }
+}
+```
+
+### 0.3 Optionally Auto-Append Final Deployment Task
+
+**Note:** This should only happen for deployable projects (web apps, APIs, etc.), not libraries.
 
 **File:** `crates/intake/src/bin/cli.rs`
 
-After the existing Task 1 enforcement (around line 1145):
-
 ```rust
-// Task 1 MUST always be bolt (infrastructure) - EXISTING CODE
-if let Some(task1) = tasks.iter_mut().find(|t| t.id == "1") {
-    if task1.agent_hint.as_deref() != Some("bolt") {
-        task1.agent_hint = Some("bolt".to_string());
+// NEW: Optionally append final deployment task
+// Only if project_type indicates it's deployable (not a library)
+let should_auto_deploy = cto_config
+    .defaults
+    .intake
+    .as_ref()
+    .and_then(|i| i.auto_append_deploy_task)
+    .unwrap_or(false);
+
+if should_auto_deploy {
+    let has_deploy_task = tasks.iter().any(|t| {
+        t.title.to_lowercase().contains("deploy") && 
+        t.agent_hint.as_deref() == Some("bolt")
+    });
+
+    if !has_deploy_task {
+        let max_id: u32 = tasks.iter()
+            .filter_map(|t| t.id.parse::<u32>().ok())
+            .max()
+            .unwrap_or(0);
+        
+        let deploy_task_id = (max_id + 1).to_string();
+        let all_task_ids: Vec<String> = tasks.iter().map(|t| t.id.clone()).collect();
+        
+        let deploy_task = Task {
+            id: deploy_task_id,
+            title: "Deploy to Production (Bolt - Deployment)".to_string(),
+            description: "Deploy application to production and verify public accessibility".to_string(),
+            status: TaskStatus::Pending,
+            dependencies: all_task_ids,
+            priority: "high".to_string(),
+            details: Some("Configure DNS, health probes, telemetry. Verify public access.".to_string()),
+            test_strategy: Some("Verify endpoints are accessible and healthy".to_string()),
+            agent_hint: Some("bolt".to_string()),
+            ..Default::default()
+        };
+        
+        tracing::info!("Auto-appended final deployment task: {}", deploy_task.id);
+        tasks.push(deploy_task);
     }
-}
-
-// NEW: Final task MUST always be bolt (deployment)
-let max_id: u32 = tasks.iter()
-    .filter_map(|t| t.id.parse::<u32>().ok())
-    .max()
-    .unwrap_or(0);
-
-let has_deploy_task = tasks.iter().any(|t| {
-    t.title.to_lowercase().contains("deploy") && 
-    t.agent_hint.as_deref() == Some("bolt")
-});
-
-if !has_deploy_task {
-    let deploy_task_id = (max_id + 1).to_string();
-    let all_task_ids: Vec<String> = tasks.iter().map(|t| t.id.clone()).collect();
-    
-    let deploy_task = Task {
-        id: deploy_task_id,
-        title: "Deploy to Production (Bolt - Deployment)".to_string(),
-        description: "Deploy application to production and verify public accessibility".to_string(),
-        status: TaskStatus::Pending,
-        dependencies: all_task_ids,
-        priority: "high".to_string(),
-        details: Some("Configure DNS, health probes, telemetry. Verify public access.".to_string()),
-        test_strategy: Some("Verify endpoints are accessible and healthy".to_string()),
-        agent_hint: Some("bolt".to_string()),
-        ..Default::default()
-    };
-    
-    tracing::info!("Auto-appended final deployment task: {}", deploy_task.id);
-    tasks.push(deploy_task);
 }
 ```
 
@@ -634,7 +677,8 @@ cargo test -p cto-intake -- sync_task_integration
 |-------|------|---------|
 | 0 | `crates/notify/mcp/src/main.rs` | Remove `handle_intake_local()` |
 | 0 | `crates/notify/mcp/src/tools.rs` | Remove `local` param from intake |
-| 0 | `crates/intake/src/bin/cli.rs` | Auto-append deploy task |
+| 0 | `crates/intake/src/bin/cli.rs` | Remove Task 1 = bolt enforcement |
+| 0 | `crates/intake/src/bin/cli.rs` | Optional auto-append deploy task |
 | 1 | `crates/config/src/types.rs` | Add fresh_start_threshold |
 | 1 | `crates/healer/src/prompt/context.rs` | Pass value to templates |
 | 1.5 | `crates/config/src/types.rs` | Update `should_use()` for opencode |
@@ -650,7 +694,8 @@ cargo test -p cto-intake -- sync_task_integration
 ## Definition of Done
 
 - [ ] Phase 0: `local=true` removed from MCP intake
-- [ ] Phase 0: Deploy task auto-appended to all projects
+- [ ] Phase 0: Task 1 routes by content (not hardcoded to Bolt)
+- [ ] Phase 0: Deploy task optionally auto-appended (config-based)
 - [ ] Phase 1: Fresh Start triggers after configured threshold
 - [ ] Phase 1.5: Subagent config passed to templates when enabled
 - [ ] Phase 1.5: Subtasks array rendered in coordinator prompts

@@ -238,6 +238,14 @@
         </div>
 
         <h2>📊 Current Workflow Flow</h2>
+
+        <div style="background: rgba(249, 115, 22, 0.1); border: 1px solid #f97316; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+            <strong>⚠️ Known Issue: Task 1 Hardcoded to Bolt</strong>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: var(--text-muted);">
+                <code>intake/src/bin/cli.rs</code> forces Task 1 to "bolt" regardless of content.
+                Simple projects may not need infrastructure setup. See implementation plan.
+            </p>
+        </div>
         
         <div class="flow-container">
             <div class="flow-diagram">
@@ -250,7 +258,7 @@
                 </div>
                 <div class="flow-arrow">→</div>
                 <div class="flow-step">
-                    <div class="flow-node" style="border-color: #f97316;">Task 1<div class="agent">Bolt (Infra)</div></div>
+                    <div class="flow-node" style="border-color: #f97316;" title="ISSUE: Hardcoded to Bolt">Task 1<div class="agent">Bolt (forced!)</div></div>
                 </div>
                 <div class="flow-arrow">→</div>
                 <div class="flow-step">
@@ -274,7 +282,7 @@
                 </div>
                 <div class="flow-arrow">→</div>
                 <div class="flow-step">
-                    <div class="flow-node" style="border-color: #f97316; border-style: dashed;">Deploy?<div class="agent">Bolt (maybe)</div></div>
+                    <div class="flow-node" style="border-color: #f97316; border-style: dashed;" title="Not auto-created">Deploy?<div class="agent">Bolt (maybe)</div></div>
                 </div>
                 <div class="flow-arrow">→</div>
                 <div class="flow-step">
@@ -528,6 +536,36 @@
                 <td><code>crates/intake/src/entities/subtask.rs</code></td>
                 <td>Subtask entity</td>
                 <td>Has subagent_type, execution_level, parallelizable</td>
+            </tr>
+            <tr>
+                <td><code>crates/intake/src/bin/cli.rs</code></td>
+                <td>Intake CLI</td>
+                <td style="color: var(--warning);">⚠️ Forces Task 1 = bolt (hardcoded)</td>
+            </tr>
+        </table>
+
+        <h2>🚨 Agent Routing Issues</h2>
+
+        <table>
+            <tr>
+                <th>Issue</th>
+                <th>Location</th>
+                <th>Problem</th>
+            </tr>
+            <tr>
+                <td>Task 1 hardcoded to Bolt</td>
+                <td><code>intake/src/bin/cli.rs:1145-1160</code></td>
+                <td style="color: var(--warning);">Simple projects don't need infrastructure setup</td>
+            </tr>
+            <tr>
+                <td>Final deploy task not auto-created</td>
+                <td>N/A</td>
+                <td style="color: var(--warning);">Relies on PRD to specify it</td>
+            </tr>
+            <tr>
+                <td>BoltStage logic in wrong place</td>
+                <td><code>pm/src/handlers/play_state.rs</code></td>
+                <td>Only affects Linear state, not agent routing</td>
             </tr>
         </table>
 

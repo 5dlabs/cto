@@ -480,7 +480,7 @@ Next agent run picks up updated task files automatically
             </p>
         </div>
 
-        <h2>📁 Task Creation Enforcement</h2>
+        <h2>📁 Agent Routing Rules</h2>
 
         <table>
             <tr>
@@ -489,19 +489,19 @@ Next agent run picks up updated task files automatically
                 <th>Desired</th>
             </tr>
             <tr>
-                <td>Task 1 = Bolt (Infra)</td>
-                <td style="color: var(--secondary);">✅ Enforced in code</td>
-                <td style="color: var(--secondary);">✅ Keep</td>
+                <td>Task 1 agent</td>
+                <td style="color: var(--warning);">⚠️ Hardcoded to Bolt</td>
+                <td style="color: var(--secondary);">✅ Route by content (like all tasks)</td>
             </tr>
             <tr>
                 <td>Final Task = Bolt (Deploy)</td>
                 <td style="color: var(--warning);">⚠️ PRD-dependent</td>
-                <td style="color: var(--secondary);">✅ Auto-append</td>
+                <td style="color: var(--secondary);">✅ Auto-append when deployable</td>
             </tr>
             <tr>
                 <td>Agent routing</td>
-                <td style="color: var(--secondary);">✅ Automatic</td>
-                <td style="color: var(--secondary);">✅ Keep</td>
+                <td style="color: var(--secondary);">✅ Content-based for Tasks 2-N</td>
+                <td style="color: var(--secondary);">✅ Content-based for ALL tasks</td>
             </tr>
             <tr>
                 <td>Intake location</td>
@@ -509,6 +509,15 @@ Next agent run picks up updated task files automatically
                 <td style="color: var(--secondary);">✅ Container only</td>
             </tr>
         </table>
+
+        <div style="background: rgba(249, 115, 22, 0.1); border: 1px solid #f97316; border-radius: 8px; padding: 1rem; margin: 1rem 0;">
+            <strong>⚠️ Issue: Hardcoded Task 1 = Bolt</strong>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: var(--text-muted);">
+                Currently <code>intake/src/bin/cli.rs</code> forces Task 1 to "bolt" regardless of content.
+                This is wrong - simple projects may not need infrastructure setup.
+                Task 1 should be routed like all other tasks based on its actual content.
+            </p>
+        </div>
 
         <h2>⚙️ Configuration</h2>
 
