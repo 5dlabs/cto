@@ -367,6 +367,14 @@ Started: $(date)
   - v0.2.11 Binaries Release: QUEUED (blocked by v0.2.10)
   - Agent build: QUEUED for 35+ minutes (blocked by binaries releases)
   - Only 1 runner available, causing significant queue delays
+- **CI Progress Update (as of 22:15 UTC)**:
+  - v0.2.11 Binaries Release (run #21046581807): 21/33 jobs complete
+  - intake-linux-x86_64: COMPLETE ✅
+  - intake-linux-aarch64: COMPLETE ✅
+  - Remaining builds: Darwin (macOS) targets
+  - Agent build (run #21046790070): still QUEUED (50+ minutes)
+  - v0.2.11 GitHub release: not yet created (waiting for all builds)
+  - Single ephemeral runner handling all workflows
 - **Next iteration should**:
   1. Check if binaries release completed: `gh run view 21045946043`
   2. Check if agent build completed: `gh run view 21046790070`
