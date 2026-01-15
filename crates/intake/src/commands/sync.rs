@@ -131,12 +131,11 @@ impl SyncTaskDomain {
             existing.title.clone_from(&parsed.title);
             existing.description.clone_from(&parsed.description);
 
-            // Update details with acceptance criteria
-            if !parsed.acceptance_criteria.is_empty() {
-                existing.details = parsed.acceptance_criteria.join("\n- ");
-                if !existing.details.is_empty() {
-                    existing.details = format!("- {}", existing.details);
-                }
+            // Update details with acceptance criteria (always update, even if empty)
+            if parsed.acceptance_criteria.is_empty() {
+                existing.details = String::new();
+            } else {
+                existing.details = format!("- {}", parsed.acceptance_criteria.join("\n- "));
             }
 
             // Update test strategy if present
