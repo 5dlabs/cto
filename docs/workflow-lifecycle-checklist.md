@@ -184,6 +184,70 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
   - Subagent config passed if `subagents.enabled: true`
   - Subtasks passed to template context
 
+### Step 2.6.1: Skills Loading (Claude CLI Test)
+- Skills copied to native skill directory based on agent + job type
+- **Conditions to verify:**
+  - `skill-mappings.yaml` loaded from `/templates/skills/`
+  - Agent's **default skills** loaded (always):
+    - Context engineering: `context-fundamentals`, `context-degradation`, `context-optimization`
+    - Tool skills: `openmemory`, `context7`, `llm-docs`, `github-mcp`
+    - Agent-specific skills based on `skill-mappings.yaml`
+  - Agent's **job-type skills** merged (based on `coder`, `healer`, `test`, etc.)
+  - **Optional skills triggered** by keywords in task description (if configured)
+  - Skills copied to `$CLAUDE_WORK_DIR/.claude/skills/` directory
+  - Each skill has `SKILL.md` file copied
+  - **Log output shows:**
+    ```
+    ═══════════════════════════════════════════════════════════════
+    ║               SKILLS SETUP                                   ║
+    ═══════════════════════════════════════════════════════════════
+    Setting up Claude Code skills...
+      ✓ Source: /templates/skills
+      ✓ Target: /workspace/.claude/skills
+      ✓ Loaded skill: context-fundamentals
+      ✓ Loaded skill: context-degradation
+      ...
+    📚 Skills summary
+      ✓ Loaded count: 12
+      ✓ Loaded list: context-fundamentals context-degradation ...
+    ```
+  - Verify specific skills for test agent (e.g., Rex):
+    - Default: `rust-patterns`, `mcp-development`
+    - Coder job: `tool-design`, `firecrawl`
+
+**Skills by Agent Reference (for verification):**
+
+| Agent | Default Skills | Job-Specific Skills |
+|-------|---------------|---------------------|
+| **blaze** | shadcn-stack, anime-js, effect-frontend-patterns, frontend-excellence | coder: tool-design, firecrawl |
+| **rex** | rust-patterns, mcp-development | coder: tool-design, firecrawl |
+| **grizz** | go-patterns | coder: tool-design, firecrawl |
+| **nova** | effect-patterns | coder: tool-design, better-auth, firecrawl |
+| **bolt** | kubernetes-operators, argocd-gitops, secrets-management, storage-operators | deploy: tool-design |
+| **cleo** | code-review, evaluation, advanced-evaluation, repomix, firecrawl | quality: tool-design |
+| **tess** | testing-strategies, evaluation, advanced-evaluation, webapp-testing | test: tool-design |
+| **cipher** | security-analysis | security: tool-design |
+| **morgan** | project-development, skill-authoring | intake: prd-analysis, multi-agent-patterns |
+| **atlas** | git-integration, repomix | integration: multi-agent-patterns |
+
+**Common skills loaded for ALL agents:**
+- `context-fundamentals`, `context-degradation`, `context-optimization`
+- `openmemory`, `context7`, `llm-docs`, `github-mcp`
+
+### Step 2.6.2: Skills Native vs Baked-In
+- Different CLIs handle skills differently
+- **CLIs with Native Skill Support (files copied to skill directory):**
+  - Claude Code: `.claude/skills/`
+  - Factory/Droid: `.factory/skills/`
+  - OpenCode: `.claude/skills/` (compatible)
+  - Codex: `.codex/skills/`
+- **CLIs without Native Skills (baked into AGENTS.md):**
+  - Cursor, Gemini, other CLIs
+- **Conditions to verify (for Claude test):**
+  - Skill files exist in `.claude/skills/{skill-name}/SKILL.md`
+  - Claude Code discovers and loads skills automatically
+  - Skills appear in Claude's context window
+
 ### Step 2.7: Subagent Dispatch (Claude with Subtasks)
 - Top-level agent spawns subagents for subtasks
 - **Conditions to verify:**
@@ -259,8 +323,16 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
 ### Step 3.2: Cleo Review (Quality)
 - Cleo agent reviews code quality based on implementation language
 - **Conditions to verify:**
-  - CodeRun created for Cleo with `job: review`
+  - CodeRun created for Cleo with `job: review` (triggers `quality` job-type skills)
   - Cleo has access to PR diff
+  - **Skills loaded for language/framework:**
+    - Default: `code-review`, `evaluation`, `advanced-evaluation`, `repomix`, `firecrawl`
+    - Optional (triggered by task content):
+      - `rust-patterns` for Rust projects
+      - `go-patterns` for Go projects
+      - `effect-patterns` for TypeScript/Effect projects
+      - `shadcn-stack` for React/Next.js frontend
+      - `better-auth` for auth-related code
   - **Quality checks conditional on implementation agent/language:**
     - Rust: `cargo fmt`, `cargo clippy --pedantic`, idioms
     - TypeScript/React: ESLint, Prettier, React best practices
@@ -276,6 +348,13 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
 - Cipher agent performs security analysis relative to implementation
 - **Conditions to verify:**
   - CodeRun created for Cipher with `job: security`
+  - **Skills loaded for security analysis:**
+    - Default: `security-analysis`, `observability`
+    - Optional (triggered by task content):
+      - `rust-patterns` for Rust-specific security
+      - `go-patterns` for Go-specific security
+      - `effect-patterns` for TypeScript security
+      - `better-auth` for auth/OAuth/token security
   - **Analysis relative to implementation agent nuances:**
     - Rust: unsafe blocks, memory safety
     - TypeScript: XSS, CSRF, injection
