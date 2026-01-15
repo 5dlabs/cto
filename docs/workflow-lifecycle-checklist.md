@@ -15,12 +15,18 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
   - All services connected to Kubernetes cluster
 
 ### Step 0.2: Cloudflare Tunnels
-- Webhook URLs must be accessible from Linear
+- Webhook URLs must be accessible from Linear and GitHub
 - **Conditions to verify:**
   - Cloudflare tunnel running (`cloudflared tunnel list`)
-  - PM Server webhook URL reachable from internet
-  - Linear webhook configured with correct URL
-  - Test webhook delivery in Linear settings
+  - **Linear tunnel up:**
+    - PM Server webhook URL reachable: `curl https://pm-dev.5dlabs.ai/health`
+    - Linear webhook configured with correct URL
+    - Test webhook delivery in Linear settings
+  - **GitHub webhook configured for dev:**
+    - Check with: `gh api repos/5dlabs/cto/hooks | jq '.[].config.url'`
+    - Should point to dev tunnel (e.g., `pm-dev.5dlabs.ai`)
+    - If not, run: `just webhook-dev`
+    - Verify with: `just webhook-status`
 
 ### Step 0.3: Credentials Verification
 - OAuth and API credentials configured correctly
@@ -554,6 +560,25 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
 }
 ```
 
+### Quick Justfile Commands for Setup
+
+```bash
+# Start all local services
+just mp
+
+# Start Cloudflare tunnel
+just tunnel
+
+# Point GitHub webhook to dev tunnel
+just webhook-dev
+
+# Check GitHub webhook status
+just webhook-status
+
+# Full dev environment status check
+just status
+```
+
 ### Key Environment Variables
 
 | Variable | Purpose | Required |
@@ -562,6 +587,7 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
 | `GITHUB_TOKEN` | Repository access | Yes |
 | `ANTHROPIC_API_KEY` | AI model access (Claude) | Yes |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Tunnel authentication | Yes |
+| `LINEAR_WEBHOOK_SECRET` | Linear webhook verification | Yes |
 
 ### Key Config Files
 
