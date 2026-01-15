@@ -1679,6 +1679,34 @@ impl<'a> CodeResourceManager<'a> {
 
     // Legacy cleanup method for backward compatibility
     async fn cleanup_old_jobs(&self, code_run: &CodeRun) -> Result<()> {
+        // First, try to delete the specific job from CodeRun status if available
+        if let Some(status) = &code_run.status {
+            if let Some(job_name) = &status.job_name {
+                info!("Deleting CodeRun job from status: {}", job_name);
+                let delete_params = DeleteParams {
+                    propagation_policy: Some(kube::api::PropagationPolicy::Background),
+                    ..Default::default()
+                };
+                match self.jobs.delete(job_name, &delete_params).await {
+                    Ok(_) => {
+                        info!("Successfully deleted job: {}", job_name);
+                        // Job deleted, return early
+                        return Ok(());
+                    }
+                    Err(kube::Error::Api(ae)) if ae.code == 404 => {
+                        info!("Job {} not found (may already be deleted)", job_name);
+                        // Continue to label-based cleanup for any orphaned jobs
+                    }
+                    Err(e) => {
+                        warn!("Failed to delete job {}: {}", job_name, e);
+                        // Continue to label-based cleanup as fallback
+                    }
+                }
+            }
+        }
+
+        // Fallback: Clean up any remaining jobs by label selector
+        // This handles cases where job_name might not be set or there are orphaned jobs
         let github_identifier = code_run
             .spec
             .github_app
