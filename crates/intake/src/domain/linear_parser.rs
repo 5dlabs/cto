@@ -79,19 +79,18 @@ pub fn parse_linear_issue(
 /// - Main description (everything before first recognized heading)
 /// - Acceptance criteria (bullet points under AC headings)
 /// - Test strategy (content under testing headings)
+#[derive(PartialEq, Eq)]
+enum Section {
+    Main,
+    AcceptanceCriteria,
+    TestStrategy,
+    Other,
+}
+
 fn parse_description_sections(description: &str) -> (String, Vec<String>, Option<String>) {
     let mut main_desc = String::new();
     let mut acceptance_criteria = Vec::new();
     let mut test_strategy = None;
-
-    #[derive(PartialEq, Eq)]
-    enum Section {
-        Main,
-        AcceptanceCriteria,
-        TestStrategy,
-        Other,
-    }
-
     let mut current_section = Section::Main;
     let mut test_strategy_lines = Vec::new();
 
@@ -117,11 +116,10 @@ fn parse_description_sections(description: &str) -> (String, Vec<String>, Option
             } else if lower.contains("description") {
                 current_section = Section::Main;
                 continue;
-            } else {
-                // Other heading - skip section
-                current_section = Section::Other;
-                continue;
             }
+            // Other heading - skip section
+            current_section = Section::Other;
+            continue;
         }
 
         match current_section {
@@ -189,7 +187,7 @@ fn extract_bullet_item(line: &str) -> Option<String> {
         Some(trimmed.strip_prefix("• ")?.to_string())
     } else if let Some(rest) = trimmed.strip_prefix(|c: char| c.is_ascii_digit()) {
         // Handle numbered lists like "1. item"
-        rest.strip_prefix(". ").map(|s| s.to_string())
+        rest.strip_prefix(". ").map(ToString::to_string)
     } else {
         None
     };

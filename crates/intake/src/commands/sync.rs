@@ -14,7 +14,7 @@ use crate::errors::{TasksError, TasksResult};
 use crate::storage::Storage;
 
 /// Configuration for the sync-task command.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SyncTaskConfig {
     /// Linear issue ID to sync from.
     pub issue_id: String,
@@ -30,18 +30,6 @@ pub struct SyncTaskConfig {
 
     /// Tag context for task storage.
     pub tag: Option<String>,
-}
-
-impl Default for SyncTaskConfig {
-    fn default() -> Self {
-        Self {
-            issue_id: String::new(),
-            project_name: String::new(),
-            task_id: None,
-            linear_token: None,
-            tag: None,
-        }
-    }
 }
 
 /// Result of the sync-task command.
@@ -140,8 +128,8 @@ impl SyncTaskDomain {
             // Update existing task
             tracing::info!(task_id = %task_id, "Updating existing task");
 
-            existing.title = parsed.title.clone();
-            existing.description = parsed.description.clone();
+            existing.title.clone_from(&parsed.title);
+            existing.description.clone_from(&parsed.description);
 
             // Update details with acceptance criteria
             if !parsed.acceptance_criteria.is_empty() {
@@ -153,7 +141,7 @@ impl SyncTaskDomain {
 
             // Update test strategy if present
             if let Some(ref strategy) = parsed.test_strategy {
-                existing.test_strategy = strategy.clone();
+                existing.test_strategy.clone_from(strategy);
             }
 
             // Update priority if present
@@ -169,7 +157,7 @@ impl SyncTaskDomain {
             existing.updated_at = Some(chrono::Utc::now());
 
             self.storage
-                .update_task(&existing, config.tag.as_deref())
+                .update_task(&task_id, &existing, config.tag.as_deref())
                 .await?;
             (existing, false)
         } else {
@@ -188,7 +176,7 @@ impl SyncTaskDomain {
 
             // Set test strategy if present
             if let Some(ref strategy) = parsed.test_strategy {
-                task.test_strategy = strategy.clone();
+                task.test_strategy.clone_from(strategy);
             }
 
             // Set priority if present
@@ -201,7 +189,9 @@ impl SyncTaskDomain {
                 task.agent_hint = Some(hint.clone());
             }
 
-            self.storage.add_task(&task, config.tag.as_deref()).await?;
+            self.storage
+                .add_task(task.clone(), config.tag.as_deref())
+                .await?;
             (task, true)
         };
 
@@ -231,7 +221,6 @@ fn map_linear_priority(linear_priority: i32) -> crate::entities::TaskPriority {
     match linear_priority {
         1 => TaskPriority::Critical,
         2 => TaskPriority::High,
-        3 => TaskPriority::Medium,
         4 => TaskPriority::Low,
         _ => TaskPriority::Medium,
     }

@@ -329,7 +329,7 @@ enum Commands {
         #[arg(long)]
         task_id: Option<String>,
 
-        /// Linear API token (reads from LINEAR_API_KEY env if not provided)
+        /// Linear API token (reads from `LINEAR_API_KEY` env if not provided)
         #[arg(long, env = "LINEAR_API_KEY")]
         linear_token: Option<String>,
 

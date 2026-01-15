@@ -71,6 +71,9 @@ cli = { path = "../cli" }
 # Shared CTO config types
 config = { path = "../config" }
 
+# PM client for Linear API
+pm = { path = "../pm" }
+
 # Temporary directories
 tempfile = "3.8"
 
