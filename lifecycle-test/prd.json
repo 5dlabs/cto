@@ -96,7 +96,7 @@
         "prompt.md contains ## Test Strategy section"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "INT-003",
