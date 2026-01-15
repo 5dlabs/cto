@@ -12,5 +12,22 @@ Started: Thu Jan 15 2026
 - Skills are loaded from `/templates/skills/` based on `skill-mappings.yaml`
 - Test strategy is in `task/prompt.md` under `## Test Strategy` section
 - Subtasks enable parallel execution via subagent dispatch
+- To start services without TUI (for headless environments), run each service directly in background with nohup
+- Tools server runs on port 3000 (not mentioned in mprocs.yaml but required by preflight)
+- Preflight passes with warnings as long as there are 0 errors
+---
+
+## 2026-01-15 10:45 - PRE-001
+- Verified all local services are healthy
+- Started services in background: PM (8081), Controller (8080), Healer (8082), Healer Play API (8083), Tools (3000)
+- Started Cloudflare tunnel for pm-dev.5dlabs.ai
+- All health endpoints return 200
+- Preflight shows "PRE-FLIGHT PASSED WITH 7 WARNING(S)" (warnings are OAuth-related, covered by PRE-003)
+- Files changed: prd.json (marked PRE-001 as passed), progress.txt
+- **Learnings for future iterations:**
+  - Services need 30-60 seconds to compile and start (Rust binaries)
+  - Tools server is required by preflight even though it's disabled in mprocs.yaml/process-compose.yaml
+  - Use `nohup cargo run --bin <service> > /tmp/<service>.log 2>&1 &` for headless service startup
+  - Preflight passes with warnings (0 errors) - warnings don't block the status
 ---
 
