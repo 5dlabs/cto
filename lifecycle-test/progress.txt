@@ -24,7 +24,8 @@ Started: $(date)
 - Intake MCP tool attaches docs as Linear documents (linked in description), not as file attachments
 - Intake CodeRuns use format: `intake-<issue-id>-<timestamp>` (e.g., intake-ctopa-807-1768504019)
 - Intake CLI generates `## Test Strategy` section in prompt.md when task.test_strategy is non-empty (crates/intake/src/bin/cli.rs:1020-1024)
-- AI JSON parsing errors occur when Claude includes explanatory text with JSON output - this is a known issue with LLM JSON generation
+- AI JSON parsing errors occur when Claude includes explanatory text with JSON output - fix in `extract_json_continuation` (provider.rs) handles this by extracting from `{"id":` pattern
+- Intake release pipeline: commit fix → PR to main → merge → tag (v*.*.*) → CI builds binaries → runtime image picks up new binary on rebuild
 - Successful intake example: 5dlabs/alerthub-multi-platform-notification-system has complete tasks.json with testStrategy, agentHint, subtasks
 - `autoAppendDeployTask` defaults to false; enable via `"defaults": { "intake": { "autoAppendDeployTask": true } }` in cto-config.json
 - When testing new CLI commands, reinstall binary: `cargo install --path crates/<crate> --force`
@@ -289,5 +290,74 @@ Started: $(date)
   - skills-setup partial searches all categories for each skill name
   - Claude, Factory, OpenCode, Codex have native skill support; Cursor, Gemini do not
   - For CLIs without native skills, skills are baked into AGENTS.md instead
+---
+
+## 2026-01-15 - INT-001 (FIX APPLIED)
+- **Story**: Intake: Submit AlertHub PRD via MCP Tool
+- **Status**: Blocked by JSON parsing error → FIX APPLIED → Awaiting release deployment
+- **Problem identified**:
+  - Intake CodeRun `intake-ctopa-809-1768508027` failing with AI response parse error
+  - Error: `expected value at line 1 column 11. Response: {"tasks":[I'll continue from where I was cut off...`
+  - Root cause: Claude includes explanatory text WITHIN the JSON structure after prefill
+  - The `extract_json_continuation` function returned text unchanged when it started with `{`
+- **Fix implemented**:
+  - Modified `crates/intake/src/ai/provider.rs` to handle prefill echo with embedded prose
+  - Function now: checks for `{"id":` pattern even when text starts with `{`
+  - Also handles JSON in markdown code blocks (` ```json ... ``` `)
+  - Preserves clean arrays starting with `[` unchanged
+  - Added 7 new tests covering all edge cases
+- **Release process**:
+  - PR #3837 created and merged to main
+  - Version bumped to v0.2.11 in Cargo.toml
+  - Release tag v0.2.11 pushed (triggers CI workflow)
+  - CI workflow `Binaries Release` queued (run #21045946043)
+- **Next steps for completion**:
+  1. Wait for release workflow to complete (builds intake-linux-x86_64)
+  2. Runtime image rebuild will pick up new binary
+  3. Restart intake CodeRun with new image
+  4. Verify intake completes successfully
+- **Files changed**:
+  - crates/intake/src/ai/provider.rs (fix + tests)
+  - Cargo.toml, Cargo.lock (version bump to 0.2.11)
+  - PR: https://github.com/5dlabs/cto/pull/3837
+- **Learnings for future iterations:**
+  - Prefill technique (`{"tasks":[`) can cause Claude CLI to echo prefill in response
+  - The `extract_json_continuation` function must check for `{"id":` pattern even when text starts with `{`
+  - Extended thinking with Opus model may produce verbose explanatory responses mixed with JSON
+  - Release pipeline: commit → PR → merge → tag → CI → runtime image rebuild → CodeRun restart
+---
+
+## 2026-01-15 - INT-001 (RETRY - STILL BLOCKED)
+- **Story**: Intake: Submit AlertHub PRD via MCP Tool
+- **Status**: BLOCKED - awaiting v0.2.11 release to complete
+- **Actions taken**:
+  1. Built intake CLI locally with fix (v0.2.11)
+  2. Merged latest main with fix (commit c3c6ab5cf)
+  3. Submitted new intake via MCP tool: `mcp__cto__intake(project_name='alerthub-e2e-test')`
+  4. Linear issue created: CTOPA-810 at https://linear.app/jonathonfritz/issue/CTOPA-810/prd-alerthub-e2e-test
+  5. CodeRun `intake-ctopa-810-1768510899` created and ran
+- **Result**: FAILED - same JSON parsing error
+  - Error: `AI response parse error: Failed to parse AI response as JSON: expected value at line 1 column 1. Response: {"tasks":[Based on the PRD provided...`
+  - Root cause: Runtime image still on v0.2.10, doesn't have the fix
+  - Pod status: Error after ~4 minutes
+- **Release workflow status**:
+  - v0.2.11 release workflow: QUEUED (run #21045946043) - waiting ~18 minutes
+  - v0.2.10 release workflow: QUEUED (run #21045546451) - waiting ~33 minutes
+  - Bottleneck: Only 1 GitHub runner available, multiple workflows queued
+- **What needs to happen**:
+  1. Release workflows must complete (v0.2.10 → v0.2.11)
+  2. Runtime image must be rebuilt with intake binary v0.2.11
+  3. New CodeRun will pick up updated image
+  4. Retry intake submission
+- **Next iteration should**:
+  1. Check if v0.2.11 release is complete: `gh release view v0.2.11`
+  2. Check runtime image version in deployed pods
+  3. Submit new intake via MCP tool
+  4. Verify tasks.json created in target repo
+- **Learnings for future iterations:**
+  - Runtime image is pinned to `TASKS_VERSION=0.2.10` in Dockerfile (infra/images/runtime/Dockerfile)
+  - Even with local fix, CodeRuns use K8s image which pulls from release
+  - Must wait for full release pipeline: tag → binary release → image rebuild → CodeRun
+  - The intake CLI version shown as "0.0.1" in logs indicates runtime doesn't have updated binary
 ---
 
