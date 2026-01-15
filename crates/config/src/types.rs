@@ -196,10 +196,23 @@ pub struct PlayDefaults {
     /// Example: `http://localhost:8083` (local) or `http://cto-healer-play-api:8083` (cluster)
     #[serde(rename = "healerEndpoint", skip_serializing_if = "Option::is_none")]
     pub healer_endpoint: Option<String>,
+
+    /// Retry count before triggering fresh start to combat drift (default: 3).
+    /// Based on Cursor's research: periodic fresh starts combat drift and tunnel vision.
+    /// When retry count exceeds this threshold, context is cleared and agent restarts fresh.
+    #[serde(
+        rename = "freshStartThreshold",
+        default = "default_fresh_start_threshold"
+    )]
+    pub fresh_start_threshold: u32,
 }
 
 fn default_docs_project_directory() -> String {
     "docs".to_string()
+}
+
+fn default_fresh_start_threshold() -> u32 {
+    3
 }
 
 fn default_working_directory() -> String {
@@ -570,6 +583,29 @@ mod tests {
         // Test with custom org name
         assert_eq!(defaults.get_implementation_agent("Acme"), "Acme-Rex");
         assert_eq!(defaults.get_frontend_agent("Acme"), "Acme-Blaze");
+
+        // Test fresh_start_threshold default
+        assert_eq!(defaults.fresh_start_threshold, 3);
+    }
+
+    #[test]
+    fn test_fresh_start_threshold_from_json() {
+        // Test parsing freshStartThreshold from JSON
+        let json = r#"{
+            "freshStartThreshold": 5,
+            "repository": "test-repo",
+            "service": "test-service"
+        }"#;
+        let defaults: PlayDefaults = serde_json::from_str(json).unwrap();
+        assert_eq!(defaults.fresh_start_threshold, 5);
+
+        // Test default value when not specified
+        let json_no_threshold = r#"{
+            "repository": "test-repo",
+            "service": "test-service"
+        }"#;
+        let defaults_default: PlayDefaults = serde_json::from_str(json_no_threshold).unwrap();
+        assert_eq!(defaults_default.fresh_start_threshold, 3);
     }
 
     #[test]
