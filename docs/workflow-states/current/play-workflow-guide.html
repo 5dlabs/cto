@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Play Workflow - CURRENT STATE</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-hover: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --not-impl: #ef4444;
+            --partial: #f59e0b;
+            --impl: #10b981;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: var(--warning);
+        }
+        
+        h2 { font-size: 1.4rem; margin: 2rem 0 1rem; color: var(--primary); }
+        h3 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; }
+        
+        .status-banner {
+            background: var(--bg-card);
+            border: 2px solid var(--warning);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 2rem;
+            margin: 1rem 0;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .dot.impl { background: var(--impl); }
+        .dot.partial { background: var(--partial); }
+        .dot.not-impl { background: var(--not-impl); }
+        
+        .flow-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+        }
+        
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0;
+            min-width: max-content;
+            padding: 1rem 0;
+        }
+        
+        .flow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 100px;
+        }
+        
+        .flow-node {
+            background: var(--bg);
+            border: 2px solid var(--impl);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            text-align: center;
+            font-size: 0.85rem;
+        }
+        
+        .flow-node.partial { border-color: var(--partial); }
+        .flow-node.not-impl { border-color: var(--not-impl); border-style: dashed; }
+        
+        .flow-node .agent {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        
+        .flow-arrow {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin: 0 0.3rem;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .feature-card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 1rem;
+            border-left: 4px solid var(--impl);
+        }
+        
+        .feature-card.partial { border-left-color: var(--partial); }
+        .feature-card.not-impl { border-left-color: var(--not-impl); }
+        
+        .feature-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-name { font-weight: 600; }
+        
+        .feature-status {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: var(--impl);
+        }
+        
+        .feature-status.partial { background: var(--partial); color: #000; }
+        .feature-status.not-impl { background: var(--not-impl); }
+        
+        .feature-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-details {
+            font-size: 0.8rem;
+            background: var(--bg);
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin: 1rem 0;
+        }
+        
+        th, td {
+            padding: 0.5rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        th { background: var(--bg-card); }
+        
+        code {
+            background: var(--bg);
+            padding: 0.1rem 0.3rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        
+        pre {
+            background: var(--bg);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.8rem;
+        }
+        
+        .info-box {
+            background: var(--bg-card);
+            border-left: 4px solid var(--primary);
+            padding: 1rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+        
+        .info-box.warning { border-color: var(--warning); }
+        .info-box.danger { border-color: var(--danger); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚠️ Play Workflow - CURRENT STATE</h1>
+            <p>What's actually implemented as of January 2026</p>
+        </header>
+
+        <div class="status-banner">
+            <strong>This document reflects the ACTUAL implementation</strong>, not aspirational features.
+            Use this to understand what works today.
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><div class="dot impl"></div> Fully Implemented</div>
+            <div class="legend-item"><div class="dot partial"></div> Partially Implemented</div>
+            <div class="legend-item"><div class="dot not-impl"></div> Not Implemented</div>
+        </div>
+
+        <h2>📊 Current Workflow Flow</h2>
+        
+        <div class="flow-container">
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div class="flow-node">PRD<div class="agent">Input</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Intake<div class="agent">Morgan (K8s)</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node" style="border-color: #f97316;">Task 1<div class="agent">Bolt (Infra)</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Tasks 2-N<div class="agent">6 Agents</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Quality<div class="agent">Cleo</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Security<div class="agent">Cipher</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Testing<div class="agent">Tess</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Merge<div class="agent">Atlas</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node" style="border-color: #f97316; border-style: dashed;">Deploy?<div class="agent">Bolt (maybe)</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Done<div class="agent">Complete</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box warning">
+            <strong>⚠️ Issues Identified:</strong>
+            <ul style="margin: 0.5rem 0 0 1rem;">
+                <li><strong>Intake:</strong> <code>local=true</code> option exists and causes confusion in E2E tests</li>
+                <li><strong>Deployment:</strong> Final Bolt deploy task only created if PRD specifies it</li>
+                <li><strong>Fresh Start:</strong> Template code exists but never triggers</li>
+            </ul>
+        </div>
+
+        <h2>🤖 6 Implementation Agents</h2>
+        
+        <p style="color: var(--text-muted); margin-bottom: 0.5rem; font-size: 0.9rem;">
+            Tasks are automatically routed to one of 6 implementation agents based on content:
+        </p>
+        
+        <table>
+            <tr><th>Agent</th><th>Stack</th><th>Routing Keywords</th></tr>
+            <tr><td>Rex</td><td>Rust/Axum</td><td>rust, axum, tokio</td></tr>
+            <tr><td>Grizz</td><td>Go/gRPC</td><td>go, grpc, chi</td></tr>
+            <tr><td>Nova</td><td>Node.js/Bun</td><td>node, bun, elysia</td></tr>
+            <tr><td>Blaze</td><td>React/Next.js</td><td>react, next.js, frontend</td></tr>
+            <tr><td>Tap</td><td>Expo/React Native</td><td>expo, react-native, mobile</td></tr>
+            <tr><td>Spark</td><td>Electron</td><td>electron, desktop</td></tr>
+        </table>
+
+        <h2>🔧 Bolt's Dual Role</h2>
+        
+        <table>
+            <tr><th>Stage</th><th>When</th><th>Status</th></tr>
+            <tr>
+                <td><strong>Infrastructure</strong></td>
+                <td>Task 1 (always first)</td>
+                <td style="color: var(--impl);">✅ Enforced in code</td>
+            </tr>
+            <tr>
+                <td><strong>Deployment</strong></td>
+                <td>Final task (after merge)</td>
+                <td style="color: var(--partial);">⚠️ PRD-dependent (not auto-created)</td>
+            </tr>
+        </table>
+
+        <h2>🔧 Feature Implementation Status</h2>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">🚀 Play Workflow Orchestration</span>
+                    <span class="feature-status">Implemented</span>
+                </div>
+                <div class="feature-desc">Argo Workflow orchestrates multiple agents through stages</div>
+                <div class="feature-details">
+                    ✅ Argo WorkflowTemplate defined<br>
+                    ✅ Agent selection via parameters<br>
+                    ✅ Sequential stage execution<br>
+                    ✅ Linear status updates
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">🔄 Model Rotation</span>
+                    <span class="feature-status">Implemented</span>
+                </div>
+                <div class="feature-desc">Rotates through models on retry</div>
+                <div class="feature-details">
+                    ✅ MODEL_ROTATION_ENABLED flag<br>
+                    ✅ MODEL_ROTATION_MODELS array<br>
+                    ✅ get_model_for_attempt() function<br>
+                    ✅ Configurable per-stage
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">✅ Acceptance Probe</span>
+                    <span class="feature-status">Implemented</span>
+                </div>
+                <div class="feature-desc">Checks markdown checkboxes for completion</div>
+                <div class="feature-details">
+                    ✅ probe_acceptance_criteria() function<br>
+                    ✅ Counts checked vs unchecked<br>
+                    ✅ Returns pass/fail<br>
+                    ✅ Used by retry loop
+                </div>
+            </div>
+
+            <div class="feature-card partial">
+                <div class="feature-header">
+                    <span class="feature-name">🔄 Fresh Start Mechanism</span>
+                    <span class="feature-status partial">Partial</span>
+                </div>
+                <div class="feature-desc">Clear context after N retries to combat drift</div>
+                <div class="feature-details">
+                    ✅ Template code exists (retry-loop.sh.hbs)<br>
+                    ✅ should_fresh_start() function<br>
+                    ✅ trigger_fresh_start() function<br>
+                    ❌ Config not parsed (freshStartThreshold)<br>
+                    ❌ Template variable not populated<br>
+                    ❌ Never actually triggers
+                </div>
+            </div>
+
+            <div class="feature-card partial">
+                <div class="feature-header">
+                    <span class="feature-name">🔒 Worker Isolation</span>
+                    <span class="feature-status partial">Partial</span>
+                </div>
+                <div class="feature-desc">Workers get focused context without peer info</div>
+                <div class="feature-details">
+                    ✅ Template code exists (coordinator.md.hbs)<br>
+                    ✅ Conditional block for worker_isolation<br>
+                    ❌ Config not parsed (workerIsolation)<br>
+                    ❌ Template variable not set<br>
+                    ❌ All workers get full coordinator context
+                </div>
+            </div>
+
+            <div class="feature-card not-impl">
+                <div class="feature-header">
+                    <span class="feature-name">🎯 Role-Specific Models</span>
+                    <span class="feature-status not-impl">Not Impl</span>
+                </div>
+                <div class="feature-desc">Different models for planner/worker/reviewer</div>
+                <div class="feature-details">
+                    ❌ roleModels config not parsed<br>
+                    ❌ No mapping from role to model<br>
+                    ❌ All agents use same model selection<br>
+                    ⚡ Uses per-agent model from config only
+                </div>
+            </div>
+
+            <div class="feature-card not-impl">
+                <div class="feature-header">
+                    <span class="feature-name">📋 Linear Task Sync</span>
+                    <span class="feature-status not-impl">Not Impl</span>
+                </div>
+                <div class="feature-desc">Sync task changes from Linear mid-workflow</div>
+                <div class="feature-details">
+                    ❌ No pm task sync command<br>
+                    ❌ No pre-stage sync step<br>
+                    ❌ Task files are static after intake<br>
+                    ⚡ Documented in docs/linear-task-sync.md
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header">
+                    <span class="feature-name">📊 Linear Integration</span>
+                    <span class="feature-status">Implemented</span>
+                </div>
+                <div class="feature-desc">Status updates to Linear during workflow</div>
+                <div class="feature-details">
+                    ✅ Issue state transitions<br>
+                    ✅ Comment updates on progress<br>
+                    ✅ Workflow state mapping<br>
+                    ✅ Healer webhook integration
+                </div>
+            </div>
+        </div>
+
+        <h2>⚙️ Configuration (What's Actually Parsed)</h2>
+
+        <table>
+            <tr>
+                <th>Config Field</th>
+                <th>Location</th>
+                <th>Status</th>
+            </tr>
+            <tr>
+                <td><code>defaults.play.implementationAgent</code></td>
+                <td>PlayDefaults</td>
+                <td style="color: var(--impl);">✅ Parsed</td>
+            </tr>
+            <tr>
+                <td><code>defaults.play.qualityAgent</code></td>
+                <td>PlayDefaults</td>
+                <td style="color: var(--impl);">✅ Parsed</td>
+            </tr>
+            <tr>
+                <td><code>defaults.play.repository</code></td>
+                <td>PlayDefaults</td>
+                <td style="color: var(--impl);">✅ Parsed</td>
+            </tr>
+            <tr>
+                <td><code>defaults.play.healerEndpoint</code></td>
+                <td>PlayDefaults</td>
+                <td style="color: var(--impl);">✅ Parsed</td>
+            </tr>
+            <tr>
+                <td><code>defaults.play.freshStartThreshold</code></td>
+                <td>—</td>
+                <td style="color: var(--not-impl);">❌ Not Parsed</td>
+            </tr>
+            <tr>
+                <td><code>defaults.play.workerIsolation</code></td>
+                <td>—</td>
+                <td style="color: var(--not-impl);">❌ Not Parsed</td>
+            </tr>
+            <tr>
+                <td><code>defaults.play.roleModels</code></td>
+                <td>—</td>
+                <td style="color: var(--not-impl);">❌ Not Parsed</td>
+            </tr>
+        </table>
+
+        <h2>📁 Key Files</h2>
+
+        <table>
+            <tr>
+                <th>File</th>
+                <th>Purpose</th>
+                <th>Notes</th>
+            </tr>
+            <tr>
+                <td><code>crates/config/src/types.rs</code></td>
+                <td>Config parsing</td>
+                <td>PlayDefaults struct - missing new fields</td>
+            </tr>
+            <tr>
+                <td><code>templates/_shared/partials/retry-loop.sh.hbs</code></td>
+                <td>Retry logic</td>
+                <td>Has Fresh Start code, but vars not populated</td>
+            </tr>
+            <tr>
+                <td><code>templates/_shared/partials/coordinator.md.hbs</code></td>
+                <td>Agent prompt</td>
+                <td>Has Worker Isolation block, but not triggered</td>
+            </tr>
+            <tr>
+                <td><code>infra/gitops/manifests/argo-workflows/play-workflow-template.yaml</code></td>
+                <td>Workflow def</td>
+                <td>No pre-stage sync step</td>
+            </tr>
+            <tr>
+                <td><code>crates/pm/src/handlers/play.rs</code></td>
+                <td>Play handler</td>
+                <td>Submits workflows, no task sync</td>
+            </tr>
+        </table>
+
+        <h2>🔄 Current Retry Flow</h2>
+
+        <pre>
+Attempt 1 (claude-opus)
+    ↓ [fails acceptance]
+Attempt 2 (gpt-5-codex)          ← Model rotation works
+    ↓ [fails acceptance]
+Attempt 3 (gemini-2.5-pro)       ← Context accumulates
+    ↓ [fails acceptance]
+Attempt 4 (claude-opus)          ← Same context, may be confused
+    ↓ [fails acceptance]
+MAX RETRIES EXHAUSTED            ← No fresh start ever triggered
+        </pre>
+
+        <div class="info-box warning">
+            <strong>Gap:</strong> Fresh start template code exists but never runs because <code>FRESH_START_THRESHOLD</code> is never set from config.
+        </div>
+
+        <h2>📋 What Works Today</h2>
+
+        <ul style="margin-left: 1.5rem; color: var(--text-muted);">
+            <li>✅ Full Play workflow orchestration via Argo</li>
+            <li>✅ Agent selection and routing</li>
+            <li>✅ Model rotation on retry</li>
+            <li>✅ Acceptance criteria checking</li>
+            <li>✅ Linear status updates</li>
+            <li>✅ Task file generation during intake</li>
+            <li>✅ PR creation and CI integration</li>
+        </ul>
+
+        <h2>❌ What Doesn't Work</h2>
+
+        <ul style="margin-left: 1.5rem; color: var(--text-muted);">
+            <li>❌ Fresh start after N retries (code exists, not wired up)</li>
+            <li>❌ Worker isolation mode (code exists, not wired up)</li>
+            <li>❌ Role-specific models (not implemented at all)</li>
+            <li>❌ Linear task sync mid-workflow (not implemented)</li>
+            <li>❌ Dynamic task creation (not implemented)</li>
+        </ul>
+
+        <footer style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted);">
+            <p>Current State Analysis - Generated January 2026</p>
+        </footer>
+    </div>
+</body>
+</html>

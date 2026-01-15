@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Play Workflow - DESIRED STATE</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-hover: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --new: #22c55e;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; color: var(--secondary); }
+        h2 { font-size: 1.4rem; margin: 2rem 0 1rem; color: var(--primary); }
+        h3 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; }
+        
+        .status-banner {
+            background: var(--bg-card);
+            border: 2px solid var(--secondary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .flow-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+        }
+        
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0;
+            min-width: max-content;
+            padding: 1rem 0;
+        }
+        
+        .flow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 90px;
+        }
+        
+        .flow-node {
+            background: var(--bg);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            padding: 0.4rem 0.6rem;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+        
+        .flow-node.new { border-color: var(--new); border-width: 3px; }
+        .flow-node.bolt { border-color: #f97316; }
+        
+        .flow-node .agent {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+        
+        .flow-arrow {
+            color: var(--primary);
+            font-size: 1rem;
+            margin: 0 0.2rem;
+        }
+        
+        .flow-note {
+            font-size: 0.6rem;
+            color: var(--new);
+            margin-top: 0.2rem;
+        }
+        
+        .critical-box {
+            background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%);
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.5rem 0;
+        }
+        
+        .critical-box h3 {
+            color: #ef4444;
+            margin-top: 0;
+        }
+        
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.75rem;
+            margin: 1rem 0;
+        }
+        
+        .agent-card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 0.75rem;
+            border-left: 3px solid var(--primary);
+        }
+        
+        .agent-card.bolt { border-left-color: #f97316; }
+        
+        .agent-name { font-weight: 600; font-size: 0.9rem; }
+        .agent-role { font-size: 0.75rem; color: var(--text-muted); }
+        .agent-stack { font-size: 0.7rem; color: var(--secondary); margin-top: 0.25rem; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin: 1rem 0;
+        }
+        
+        th, td {
+            padding: 0.5rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        th { background: var(--bg-card); }
+        
+        code {
+            background: var(--bg);
+            padding: 0.1rem 0.3rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        
+        pre {
+            background: var(--bg);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.8rem;
+        }
+        
+        .info-box {
+            background: var(--bg-card);
+            border-left: 4px solid var(--primary);
+            padding: 1rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+        
+        .info-box.new { border-color: var(--new); }
+        .info-box.warning { border-color: var(--warning); }
+        
+        .phase {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .phase-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .phase-number {
+            background: var(--primary);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>✅ Play Workflow - DESIRED STATE</h1>
+            <p>Complete specification including clarifications and improvements</p>
+        </header>
+
+        <div class="status-banner">
+            <strong>This document describes the target architecture.</strong>
+            It includes clarifications on intake, agents, and deployment flow.
+        </div>
+
+        <!-- CRITICAL: INTAKE RUNS IN CONTAINER -->
+        <div class="critical-box">
+            <h3>⚠️ CRITICAL: Intake NEVER Runs Locally</h3>
+            <p>The intake process ALWAYS runs in a Kubernetes container. Never locally.</p>
+            <pre style="margin-top: 0.5rem; background: rgba(0,0,0,0.3);">
+✅ CORRECT: mcp_cto_intake(project_name="my-project")
+   → Creates Linear issue
+   → Triggers Argo Workflow
+   → Morgan pod runs intake IN CLUSTER
+   → Tasks created in docs repo via PR
+
+❌ WRONG: intake parse-prd locally
+❌ WRONG: intake(local=true)
+❌ WRONG: Creating .tasks/ folders locally</pre>
+            <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                The <code>local=true</code> mode exists ONLY for debugging the intake binary itself.
+                It should be removed or hidden from normal usage to prevent confusion.
+            </p>
+        </div>
+
+        <h2>📊 Complete Workflow Flow</h2>
+        
+        <div class="flow-container">
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div class="flow-node">PRD<div class="agent">Input</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Intake<div class="agent">Morgan (K8s)</div></div>
+                    <div class="flow-note">in-cluster</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node bolt">Task 1<div class="agent">Bolt (Infra)</div></div>
+                    <div class="flow-note">always first</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Tasks 2-N<div class="agent">6 Agents</div></div>
+                    <div class="flow-note">isolated context</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Quality<div class="agent">Cleo</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Security<div class="agent">Cipher</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Testing<div class="agent">Tess</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Merge<div class="agent">Atlas</div></div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node bolt">Deploy<div class="agent">Bolt (Final)</div></div>
+                    <div class="flow-note">always last</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div class="flow-node">Done<div class="agent">Published</div></div>
+                </div>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 1.5rem;">Mid-Flight Updates (Separate from Play Flow)</h3>
+        <div class="flow-container" style="padding: 1rem;">
+            <pre style="background: transparent; margin: 0; font-size: 0.8rem;">
+User updates PRD/Architecture  ──┬──▶  intake update  ──┬──▶  PR with delta  ──▶  Morgan merges
+                                 │                      │
+User edits task in Linear     ──┴──▶  intake sync-task ─┘
+
+Next agent run picks up updated task files automatically
+(agents clone docs repo fresh on each run)</pre>
+        </div>
+
+        <h2>🤖 Implementation Agents (6 Total)</h2>
+        
+        <p style="color: var(--text-muted); margin-bottom: 1rem;">
+            There are <strong>6 implementation agents</strong> depending on the technology stack. Task routing is automatic based on task content.
+        </p>
+
+        <div class="agents-grid">
+            <div class="agent-card">
+                <div class="agent-name">Rex</div>
+                <div class="agent-role">Backend (Rust)</div>
+                <div class="agent-stack">Axum, Tokio, SQLx</div>
+            </div>
+            <div class="agent-card">
+                <div class="agent-name">Grizz</div>
+                <div class="agent-role">Backend (Go)</div>
+                <div class="agent-stack">Chi, gRPC, pgx</div>
+            </div>
+            <div class="agent-card">
+                <div class="agent-name">Nova</div>
+                <div class="agent-role">Backend (Node.js)</div>
+                <div class="agent-stack">Bun, Elysia, Drizzle</div>
+            </div>
+            <div class="agent-card">
+                <div class="agent-name">Blaze</div>
+                <div class="agent-role">Frontend (Web)</div>
+                <div class="agent-stack">Next.js, React, TailwindCSS</div>
+            </div>
+            <div class="agent-card">
+                <div class="agent-name">Tap</div>
+                <div class="agent-role">Frontend (Mobile)</div>
+                <div class="agent-stack">Expo, React Native</div>
+            </div>
+            <div class="agent-card">
+                <div class="agent-name">Spark</div>
+                <div class="agent-role">Frontend (Desktop)</div>
+                <div class="agent-stack">Electron, React</div>
+            </div>
+        </div>
+
+        <h2>🔧 Bolt's Dual Role</h2>
+        
+        <p style="color: var(--text-muted); margin-bottom: 1rem;">
+            Bolt handles <strong>two distinct phases</strong> of the workflow:
+        </p>
+
+        <div class="agents-grid">
+            <div class="agent-card bolt">
+                <div class="agent-name">Bolt - Infrastructure</div>
+                <div class="agent-role">Task 1 (ALWAYS First)</div>
+                <div class="agent-stack">K8s, PostgreSQL, Redis, Storage</div>
+            </div>
+            <div class="agent-card bolt">
+                <div class="agent-name">Bolt - Deployment</div>
+                <div class="agent-role">Final Task (After Merge)</div>
+                <div class="agent-stack">ArgoCD, DNS, Probes, Telemetry</div>
+            </div>
+        </div>
+
+        <div class="info-box warning">
+            <strong>Current State:</strong> Task 1 (Infrastructure) is enforced in code. 
+            The final deployment task is NOT automatically created - it relies on the PRD to specify it.
+            <br><br>
+            <strong>Desired State:</strong> Intake should ALWAYS create a final deployment task for Bolt, 
+            regardless of whether the PRD mentions it.
+        </div>
+
+        <h2>📋 Linear States</h2>
+
+        <table>
+            <tr>
+                <th>State</th>
+                <th>Agent</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td><code>Infrastructure</code></td>
+                <td>Bolt (Task 1)</td>
+                <td>Database, cache, storage setup</td>
+            </tr>
+            <tr>
+                <td><code>Implementation</code></td>
+                <td>Rex, Grizz, Nova, Blaze, Tap, Spark</td>
+                <td>Feature development</td>
+            </tr>
+            <tr>
+                <td><code>Quality</code></td>
+                <td>Cleo</td>
+                <td>Code review, style checks</td>
+            </tr>
+            <tr>
+                <td><code>Security</code></td>
+                <td>Cipher</td>
+                <td>Security analysis</td>
+            </tr>
+            <tr>
+                <td><code>Testing</code></td>
+                <td>Tess</td>
+                <td>Test execution</td>
+            </tr>
+            <tr>
+                <td><code>Integration</code></td>
+                <td>Atlas</td>
+                <td>PR merge</td>
+            </tr>
+            <tr>
+                <td><code>Deployment</code></td>
+                <td>Bolt (Final)</td>
+                <td>Production deployment</td>
+            </tr>
+        </table>
+
+        <h2>🚀 Desired Improvements</h2>
+
+        <div class="phase">
+            <div class="phase-header">
+                <div class="phase-number">1</div>
+                <strong>Auto-Create Final Deployment Task</strong>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Intake should ALWAYS append a final Bolt deployment task, ensuring:
+            </p>
+            <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                <li>Task N+1: "Deploy to Production (Bolt - Deployment)"</li>
+                <li>Dependencies: All other tasks</li>
+                <li>Agent hint: "bolt"</li>
+                <li>Responsibilities: DNS, health probes, telemetry, public access</li>
+            </ul>
+        </div>
+
+        <div class="phase">
+            <div class="phase-header">
+                <div class="phase-number">2</div>
+                <strong>Remove local=true from Intake</strong>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Remove or hide the <code>local=true</code> option from MCP tool to prevent confusion:
+            </p>
+            <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                <li>Delete <code>handle_intake_local()</code> from MCP server</li>
+                <li>Remove <code>local</code> parameter from tool schema</li>
+                <li>Keep binary for debugging but not exposed via MCP</li>
+            </ul>
+        </div>
+
+        <div class="phase">
+            <div class="phase-header">
+                <div class="phase-number">3</div>
+                <strong>Intake Update Functionality (NEW)</strong>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Add update capability to intake crate for mid-flight task changes:
+            </p>
+            <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                <li><code>intake update --project xyz</code> - Re-parse PRD/architecture, generate delta</li>
+                <li><code>intake sync-task --issue LIN-123</code> - Pull changes from Linear edits</li>
+                <li>Both create PR with updated task files</li>
+                <li>Morgan reviews/merges same as initial intake</li>
+                <li>Next agent run sees updated files (clones fresh)</li>
+            </ul>
+        </div>
+
+        <div class="phase">
+            <div class="phase-header">
+                <div class="phase-number">4</div>
+                <strong>Fresh Start & Worker Isolation</strong>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Wire up existing template code (see implementation-plan.md)
+            </p>
+        </div>
+
+        <h2>📁 Task Creation Enforcement</h2>
+
+        <table>
+            <tr>
+                <th>Rule</th>
+                <th>Current</th>
+                <th>Desired</th>
+            </tr>
+            <tr>
+                <td>Task 1 = Bolt (Infra)</td>
+                <td style="color: var(--secondary);">✅ Enforced in code</td>
+                <td style="color: var(--secondary);">✅ Keep</td>
+            </tr>
+            <tr>
+                <td>Final Task = Bolt (Deploy)</td>
+                <td style="color: var(--warning);">⚠️ PRD-dependent</td>
+                <td style="color: var(--secondary);">✅ Auto-append</td>
+            </tr>
+            <tr>
+                <td>Agent routing</td>
+                <td style="color: var(--secondary);">✅ Automatic</td>
+                <td style="color: var(--secondary);">✅ Keep</td>
+            </tr>
+            <tr>
+                <td>Intake location</td>
+                <td style="color: var(--warning);">⚠️ local option exists</td>
+                <td style="color: var(--secondary);">✅ Container only</td>
+            </tr>
+        </table>
+
+        <h2>⚙️ Configuration</h2>
+
+        <pre>{
+  "defaults": {
+    "play": {
+      "freshStartThreshold": 3,
+      "workerIsolation": true,
+      "enableTaskSync": true,
+      "roleModels": {
+        "planner": "claude-opus-4-5-20251101",
+        "worker": "claude-sonnet-4-5-20250514",
+        "reviewer": "claude-sonnet-4-5-20250514"
+      }
+    },
+    "intake": {
+      "autoAppendDeployTask": true,
+      "_note": "local option should be removed entirely"
+    }
+  }
+}</pre>
+
+        <footer style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted);">
+            <p>Desired State Specification - January 2026</p>
+        </footer>
+    </div>
+</body>
+</html>
