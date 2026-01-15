@@ -246,3 +246,48 @@ Started: $(date)
   - Model rotation is configured per-agent via `modelRotation` array
 ---
 
+## 2026-01-15 - PLAY-002
+- **Story**: Play: Verify Skills Loading
+- **What was implemented**: Verified skills loading mechanism via code inspection and file verification
+- **Verification performed**:
+  1. ✅ skill-mappings.yaml loaded from /templates/skills/
+     - File exists at: `templates/skills/skill-mappings.yaml`
+     - Loaded by `get_agent_skills()` at `crates/controller/src/tasks/code/templates.rs:3888-3967`
+     - Path constant: `SKILLS_MAPPINGS = "skills/skill-mappings.yaml"` in `template_paths.rs:54`
+  2. ✅ Default skills loaded (context-fundamentals, context7, etc.)
+     - Each agent in skill-mappings.yaml has a `default` key with skill list
+     - Example Rex default skills verified to exist:
+       - context-fundamentals (context/), context-degradation (context/), context-optimization (context/)
+       - openmemory (tools/), context7 (tools/), llm-docs (tools/), github-mcp (tools/)
+       - rust-patterns (languages/), mcp-development (tools/)
+  3. ✅ Agent-specific skills loaded based on mapping
+     - Blaze has frontend skills: shadcn-stack (stacks/), anime-js (animations/), effect-frontend-patterns (languages/)
+     - Rex has rust-patterns (languages/)
+     - Bolt has kubernetes-operators, argocd-gitops, secrets-management (platforms/)
+  4. ✅ Job-type skills merged
+     - `coder` job adds: tool-design (context/), firecrawl (tools/)
+     - `healer` job adds: incident-response (workflow/), observability (tools/), kubernetes-mcp (tools/)
+     - Merging logic at templates.rs:3935-3948 - only adds if not already present
+  5. ✅ Skills copied to .claude/skills/ directory
+     - Claude CLI template `templates/clis/claude.sh.hbs:26` invokes:
+       `{{> skills-setup skills_target="$CLAUDE_WORK_DIR/.claude/skills" skills_label="Claude Code" }}`
+     - skills-setup partial at `templates/_shared/partials/skills-setup.sh.hbs` copies SKILL.md files
+  6. ✅ Log shows skills summary with loaded count
+     - skills-setup.sh.hbs lines 54-66 output:
+       - "📚 Skills summary"
+       - "✓ Loaded count: N"
+       - "✓ Loaded list: space-separated-skills"
+- **Code paths verified**:
+  - `cli_supports_native_skills()` returns true for Claude, Factory, OpenCode, Codex (templates.rs:223-228)
+  - Skills passed to template context: `"skills": skills` at lines 1013, 1314, 1698, 3095
+  - All 16 E2E template tests pass: `cargo test -p controller --test e2e_template_tests`
+- **Files changed**: prd.json (marked PLAY-002 passes: true), progress.txt
+- **Learnings for future iterations:**
+  - Skills are organized in categories: stacks, auth, context, languages, platforms, quality, workflow, animations, tools
+  - Each skill is a directory with SKILL.md file: `templates/skills/{category}/{skill-name}/SKILL.md`
+  - `get_agent_skills()` reads skill-mappings.yaml, returns Vec<String> of skill names
+  - skills-setup partial searches all categories for each skill name
+  - Claude, Factory, OpenCode, Codex have native skill support; Cursor, Gemini do not
+  - For CLIs without native skills, skills are baked into AGENTS.md instead
+---
+

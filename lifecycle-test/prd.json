@@ -160,7 +160,7 @@
         "Log shows skills summary with loaded count"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "PLAY-003",
