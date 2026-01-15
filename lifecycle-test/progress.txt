@@ -362,6 +362,11 @@ Started: $(date)
   - intake-linux-x86_64 binary built: ✅
   - Release assets upload: pending (after all builds complete)
   - Agent image rebuild: queued (run #21046790070)
+- **CI Queue Bottleneck (as of 21:57 UTC)**:
+  - v0.2.10 Binaries Release still running (1h20m+)
+  - v0.2.11 Binaries Release: QUEUED (blocked by v0.2.10)
+  - Agent build: QUEUED for 35+ minutes (blocked by binaries releases)
+  - Only 1 runner available, causing significant queue delays
 - **Next iteration should**:
   1. Check if binaries release completed: `gh run view 21045946043`
   2. Check if agent build completed: `gh run view 21046790070`
