@@ -247,7 +247,7 @@ The platform is under active development.
 #### *The Web App Developer*
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/blaze-avatar.png" width="180" height="180" alt="Blaze Avatar">
+<img src="assets/blaze-avatar-512.png" width="180" height="180" alt="Blaze Avatar">
 </div>
 
 🎨 **Stack:** React, Next.js, shadcn/ui  
