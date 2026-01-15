@@ -75,7 +75,7 @@ impl SubagentConfig {
     /// Check if subagents should be used (enabled and valid CLI).
     #[must_use]
     pub fn should_use(&self, cli: &str) -> bool {
-        self.enabled && cli == "claude"
+        self.enabled && matches!(cli, "claude" | "opencode")
     }
 }
 
@@ -727,12 +727,16 @@ mod tests {
     #[test]
     fn test_subagent_config_should_use() {
         let config = SubagentConfig::enabled();
+        // Supported CLIs
         assert!(config.should_use("claude"));
+        assert!(config.should_use("opencode"));
+        // Unsupported CLIs
         assert!(!config.should_use("codex"));
         assert!(!config.should_use("gemini"));
 
         let disabled = SubagentConfig::default();
         assert!(!disabled.should_use("claude"));
+        assert!(!disabled.should_use("opencode"));
     }
 
     #[test]
