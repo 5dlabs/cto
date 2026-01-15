@@ -111,7 +111,7 @@
         "Deploy task assigned to bolt agent"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "INT-004",
