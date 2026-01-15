@@ -31,3 +31,15 @@ Started: Thu Jan 15 2026
   - Preflight passes with warnings (0 errors) - warnings don't block the status
 ---
 
+## 2026-01-15 10:52 - PRE-002
+- Verified Cloudflare tunnel is running (`pm-local-dev` with active connections)
+- PM webhook URL accessible: https://pm-dev.5dlabs.ai/health returns 200
+- GitHub webhook points to pm-dev.5dlabs.ai (verified via `just webhook-status`)
+- Linear webhook configured to https://pm-dev.5dlabs.ai/webhooks/linear (enabled)
+- Files changed: prd.json (marked PRE-002 as passed), progress.txt
+- **Learnings for future iterations:**
+  - Use `cloudflared tunnel list` to see all configured tunnels and their connection status
+  - `just webhook-status` shows GitHub webhook configuration
+  - Linear webhooks can be queried via GraphQL: `team(id: "CTOPA") { webhooks { nodes { url enabled } } }`
+---
+

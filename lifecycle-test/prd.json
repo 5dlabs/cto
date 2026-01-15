@@ -33,7 +33,7 @@
         "Linear webhook configured with correct URL"
       ],
       "testStrategy": "smoke",
-      "passes": false
+      "passes": true
     },
     {
       "id": "PRE-003",
