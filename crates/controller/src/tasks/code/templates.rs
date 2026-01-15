@@ -548,6 +548,7 @@ impl CodeTemplateGenerator {
             "default_retries": default_retries,
             "fresh_start_threshold": fresh_start_threshold,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -626,6 +627,7 @@ impl CodeTemplateGenerator {
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
             "cli_type": cli_type,
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -946,6 +948,7 @@ impl CodeTemplateGenerator {
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             // Watch-specific context
             "iteration": iteration,
             "max_iterations": max_iterations,
@@ -1040,6 +1043,7 @@ impl CodeTemplateGenerator {
             "iteration": iteration,
             // Flag to conditionally skip inline partials (for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type_enum.to_string(),
                 "model": render_settings.model,
@@ -1246,6 +1250,7 @@ impl CodeTemplateGenerator {
             "skills": skills,
             // Flag to conditionally render partials (skip for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
         });
 
         handlebars
@@ -1386,6 +1391,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             // Flag to conditionally skip inline partials (for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": cli_model, // Use cli_model instead of code_run.spec.model
@@ -1627,6 +1633,7 @@ impl CodeTemplateGenerator {
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": cli_model,
@@ -1710,6 +1717,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             // Flag to conditionally skip inline partials (for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -3022,6 +3030,7 @@ impl CodeTemplateGenerator {
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": render_settings.model,
@@ -3105,6 +3114,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             // Flag to conditionally skip inline partials (for CLIs with native skills)
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": model,
@@ -3327,6 +3337,7 @@ impl CodeTemplateGenerator {
             "task_language": task_language,
             "default_retries": default_retries,
             "fresh_start_threshold": fresh_start_threshold,
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
         });
 
         handlebars
@@ -3468,6 +3479,7 @@ impl CodeTemplateGenerator {
             "requirements_env_vars": requirements_env_vars,
             "requirements_secret_sources": requirements_secret_sources,
             "cli_type": cli_type,
+            "subtasks": code_run.spec.subtasks.clone().unwrap_or_default(),
             "cli": {
                 "type": cli_type,
                 "model": cli_model,
