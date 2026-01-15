@@ -67,15 +67,12 @@
       "autoMerge": false,
       "parallelExecution": false,
       "healerEndpoint": "http://localhost:8083",
-      "_comment_cursor_improvements": "Cursor-inspired multi-agent improvements (US-001 through US-006)",
-      "enableJudgeAgent": true,
-      "continuousPlanning": false,
+      "_comment_cursor_improvements": "Cursor-inspired improvements: fresh starts, worker isolation, role-specific models",
       "freshStartThreshold": 3,
       "workerIsolation": true,
       "roleModels": {
         "planner": "claude-opus-4-5-20251101",
         "worker": "claude-sonnet-4-5-20250514",
-        "judge": "claude-opus-4-5-20251101",
         "reviewer": "claude-sonnet-4-5-20250514"
       }
     }

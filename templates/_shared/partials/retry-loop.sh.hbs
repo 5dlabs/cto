@@ -29,28 +29,12 @@ echo ""
 # Based on Cursor's finding: periodic fresh starts combat drift and tunnel vision
 should_fresh_start() {
     local attempt=${1:-$CURRENT_ATTEMPT}
-    local judge_decision="${JUDGE_DECISION:-continue}"
     
-    # Trigger fresh start if:
-    # 1. Retry count exceeds threshold
-    # 2. Judge signals fresh_start
-    
+    # Trigger fresh start when retry count exceeds threshold
+    # Based on Cursor's research: periodic fresh starts combat drift and tunnel vision
     if [ "$attempt" -gt "$FRESH_START_THRESHOLD" ]; then
         echo "true"
         return 0
-    fi
-    
-    if [ "$judge_decision" = "fresh_start" ]; then
-        echo "true"
-        return 0
-    fi
-    
-    # Check judge decision file if function exists
-    if type judge_needs_fresh_start >/dev/null 2>&1; then
-        if judge_needs_fresh_start; then
-            echo "true"
-            return 0
-        fi
     fi
     
     echo "false"
@@ -154,21 +138,6 @@ run_with_retry() {
             else
                 echo "❌ Max retries exhausted"
                 return 1
-            fi
-        fi
-
-        # CLI succeeded - check judge decision if available (US-001)
-        if type log_judge_decision >/dev/null 2>&1; then
-            log_judge_decision
-        fi
-        
-        # If judge says complete, we're done
-        if type judge_says_complete >/dev/null 2>&1; then
-            if judge_says_complete; then
-                echo "✅ Judge approved - task complete"
-                echo "   Model used: $current_model"
-                echo "   Attempt: $attempt of $max_attempts"
-                return 0
             fi
         fi
 
