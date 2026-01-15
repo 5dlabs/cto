@@ -31,6 +31,101 @@ LOOP:
 6. If ANY criterion fails: diagnose, fix, clean up, retry
 7. Only after ALL criteria pass: update PRD and progress.txt
 
+## Pre-Flight Setup (BEFORE STARTING ANY TESTS)
+
+### 1. Ensure Secrets Are Available
+
+All secrets must be in `.env.local` at the project root. Run:
+
+```bash
+# Check if .env.local exists and has required secrets
+cat .env.local | grep -E "^(LINEAR|ANTHROPIC|GITHUB)" | wc -l
+# Should show 10+ lines
+
+# Or sync from 1Password if missing
+just sync-secrets
+```
+
+**Required secrets:**
+- `LINEAR_OAUTH_TOKEN` (NOT API key - must be OAuth)
+- `ANTHROPIC_API_KEY`
+- `GITHUB_TOKEN`
+- `LINEAR_WEBHOOK_SECRET`
+- Agent OAuth tokens: `LINEAR_APP_MORGAN_ACCESS_TOKEN`, `LINEAR_APP_REX_ACCESS_TOKEN`, etc.
+
+### 2. Start Local Services
+
+Use `just mp` to start all services with the mprocs TUI:
+
+```bash
+# This kills stale ports, sources .env.local, and starts mprocs
+just mp
+```
+
+**Services started:**
+| Service | Port | Purpose |
+|---------|------|---------|
+| pm-server | 8081 | Linear webhooks, project management |
+| controller | 8080 | CodeRun CRD orchestration |
+| healer | 8082 | Self-healing monitor |
+| healer-play-api | 8083 | MCP session monitoring |
+| tunnel | - | Cloudflare tunnel (pm-dev.5dlabs.ai → localhost:8081) |
+
+**mprocs TUI keybindings:**
+- `↑/↓` or `j/k` - Navigate processes
+- `Enter` - Focus process logs
+- `r` - Restart process
+- `q` - Quit all
+
+### 3. Run Pre-Flight Check
+
+```bash
+# Comprehensive check of all services, tunnels, and credentials
+just preflight
+```
+
+This verifies:
+- All local services are UP
+- Cloudflare tunnel is working
+- GitHub webhook points to dev
+- All API keys and OAuth tokens present
+- Cluster access and CRDs available
+
+**Only proceed with tests when preflight shows: "✅ PRE-FLIGHT PASSED"**
+
+### 4. Point GitHub Webhook to Dev (if needed)
+
+```bash
+# Check current webhook status
+just webhook-status
+
+# Point to dev tunnel
+just webhook-dev
+```
+
+## Using MCP Tools (Claude Code)
+
+**IMPORTANT:** You (Claude Code) have the `cto-mcp` server installed. Use your MCP tools directly:
+
+```
+# For intake - use your MCP tool
+mcp_cto_intake(project_name="...", prd_content="...", ...)
+
+# For play status
+mcp_cto_play_status()
+
+# For jobs
+mcp_cto_jobs()
+```
+
+Do NOT try to run the intake CLI directly or use `local=true`. The MCP tool handles everything:
+1. Creates Linear issue with PRD
+2. Attaches `cto-config.json`
+3. Auto-assigns Morgan
+4. Triggers the intake workflow in Kubernetes
+
+---
+
 ## CTO Platform Context
 
 You're testing the CTO platform which orchestrates AI agents through a structured workflow:

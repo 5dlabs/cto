@@ -6,14 +6,16 @@
     {
       "id": "PRE-001",
       "title": "Pre-Flight: Verify Local Services",
-      "description": "Ensure PM Server, Healer, and Controller are running locally and healthy",
+      "description": "Start local services with 'just mp' and verify they are healthy. Run 'just preflight' for comprehensive check.",
       "priority": 1,
       "complexity": "low",
       "acceptanceCriteria": [
-        "PM Server returns 200 at http://localhost:8081/health",
-        "Healer returns 200 at http://localhost:8082/health",
-        "Controller logs show 'started'",
-        "All services connected to Kubernetes cluster"
+        "Run 'just mp' to start all services (or verify mprocs already running)",
+        "PM Server returns 200: curl http://localhost:8081/health",
+        "Controller returns 200: curl http://localhost:8080/health",
+        "Healer returns 200: curl http://localhost:8082/health",
+        "Healer Play API returns 200: curl http://localhost:8083/health",
+        "Run 'just preflight' and verify output shows '✅ PRE-FLIGHT PASSED'"
       ],
       "testStrategy": "smoke",
       "passes": false
@@ -36,15 +38,18 @@
     {
       "id": "PRE-003",
       "title": "Pre-Flight: Verify Credentials",
-      "description": "Ensure all required OAuth and API credentials are configured",
+      "description": "Ensure all required OAuth and API credentials are configured in .env.local",
       "priority": 1,
       "complexity": "low",
       "acceptanceCriteria": [
-        "LINEAR_OAUTH_TOKEN is set (not API key)",
+        ".env.local exists at project root",
+        "LINEAR_OAUTH_TOKEN is set (verify with: source .env.local && echo $LINEAR_OAUTH_TOKEN | head -c 20)",
         "GITHUB_TOKEN is set",
         "ANTHROPIC_API_KEY is set",
         "LINEAR_WEBHOOK_SECRET is set",
-        "Agent OAuth tokens available for morgan, rex, blaze"
+        "Agent OAuth tokens: LINEAR_APP_MORGAN_ACCESS_TOKEN, LINEAR_APP_REX_ACCESS_TOKEN",
+        "'just preflight' section 4 (API KEYS) shows all ✅",
+        "'just preflight' section 5 (AGENT OAUTH) shows all ✅"
       ],
       "testStrategy": "smoke",
       "passes": false
@@ -52,15 +57,17 @@
     {
       "id": "INT-001",
       "title": "Intake: Submit PRD via MCP Tool",
-      "description": "Use MCP intake tool to create Linear issue and auto-assign Morgan",
+      "description": "Use YOUR installed cto-mcp server to invoke intake. Do NOT run CLI directly or use local=true.",
       "priority": 2,
       "complexity": "medium",
       "acceptanceCriteria": [
-        "MCP intake tool invoked successfully",
-        "PRD content submitted to Linear",
+        "Use MCP tool: mcp_cto_intake(project_name='lifecycle-test-sample', prd_content='...')",
+        "Tool returns success with Linear issue URL",
+        "Linear issue created (verify via Linear UI or API)",
+        "PRD content visible in issue description",
         "cto-config.json attached to issue",
         "Morgan auto-assigned as delegate",
-        "Linear issue created with full PRD in description"
+        "Argo Workflow triggered (check: kubectl get workflows -n cto)"
       ],
       "testStrategy": "integration",
       "passes": false
