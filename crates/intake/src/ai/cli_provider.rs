@@ -2,13 +2,17 @@
 //!
 //! Uses CLI adapters from the shared `cli` crate to interact with various
 //! AI coding assistants (Claude, Codex, Cursor, Factory, OpenCode, Gemini).
+//!
+//! For Claude CLI, uses `--output-format stream-json` to enable real-time
+//! activity streaming to Linear via the sidecar.
 
 use async_trait::async_trait;
 use cli::{AdapterFactory, CLIType, CliAdapter};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::fs::OpenOptions;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tracing::{debug, info, warn};
 
@@ -24,10 +28,16 @@ const DEFAULT_MODEL: &str = "claude-opus-4-5-20251101";
 /// Default model for extended thinking (same as default - Opus 4.5)
 pub const DEFAULT_THINKING_MODEL: &str = "claude-opus-4-5-20251101";
 
+/// Default stream file path for sidecar integration
+const DEFAULT_STREAM_FILE: &str = "/workspace/claude-stream.jsonl";
+
 /// CLI-based AI provider that uses CLI adapters for text generation.
 ///
 /// This provider executes AI CLI tools (claude, codex, cursor, etc.) as
 /// subprocesses and parses their output, rather than calling APIs directly.
+///
+/// For Claude CLI, uses `--output-format stream-json` and writes to a stream
+/// file that the Linear sidecar monitors for real-time activity updates.
 pub struct CLITextGenerator {
     /// The CLI type to use
     cli_type: CLIType,
@@ -41,6 +51,8 @@ pub struct CLITextGenerator {
     extended_thinking: bool,
     /// Default thinking budget
     thinking_budget: u32,
+    /// Stream file path for sidecar integration (Claude only)
+    stream_file: Option<PathBuf>,
 }
 
 impl CLITextGenerator {
@@ -55,6 +67,9 @@ impl CLITextGenerator {
         // Try to find default MCP config
         let mcp_config = Self::find_default_mcp_config();
 
+        // Get stream file from environment (for sidecar integration)
+        let stream_file = Self::get_stream_file_path();
+
         Ok(Self {
             cli_type,
             adapter,
@@ -62,6 +77,7 @@ impl CLITextGenerator {
             mcp_config,
             extended_thinking: false,
             thinking_budget: DEFAULT_THINKING_BUDGET,
+            stream_file,
         })
     }
 
@@ -76,10 +92,10 @@ impl CLITextGenerator {
         Ok(provider)
     }
 
-    /// Create for benchmarking/testing without MCP config.
+    /// Create for benchmarking/testing without MCP config or stream file.
     ///
     /// This avoids MCP tools that could cause the model to explain rather than
-    /// return structured JSON output.
+    /// return structured JSON output, and skips stream file writing.
     pub fn for_benchmark(cli_type: CLIType, extended_thinking: bool) -> TasksResult<Self> {
         let adapter = AdapterFactory::create(cli_type)
             .map_err(|e| TasksError::Ai(format!("Failed to create CLI adapter: {e}")))?;
@@ -93,6 +109,7 @@ impl CLITextGenerator {
             mcp_config: None, // Explicitly no MCP config
             extended_thinking,
             thinking_budget: DEFAULT_THINKING_BUDGET,
+            stream_file: None, // No stream file for benchmarks
         })
     }
 
@@ -164,6 +181,28 @@ impl CLITextGenerator {
 
         // NOTE: Do NOT use cto-config.json - it has a different schema
         // NOTE: Do NOT use tools-config.json - it has a different schema
+
+        None
+    }
+
+    /// Get stream file path for sidecar integration.
+    ///
+    /// When running in-cluster, the sidecar monitors this file to emit
+    /// structured activities to Linear. Returns None if not in-cluster
+    /// or if the environment variable is not set.
+    fn get_stream_file_path() -> Option<PathBuf> {
+        // Check for explicit environment variable
+        if let Ok(path) = std::env::var("CLAUDE_STREAM_FILE") {
+            if !path.is_empty() {
+                return Some(PathBuf::from(path));
+            }
+        }
+
+        // Check if default stream file location exists (indicates in-cluster)
+        let default_path = PathBuf::from(DEFAULT_STREAM_FILE);
+        if default_path.parent().is_some_and(std::path::Path::exists) {
+            return Some(default_path);
+        }
 
         None
     }
@@ -273,19 +312,15 @@ impl CLITextGenerator {
 
         match self.cli_type {
             CLIType::Claude => {
-                // Claude CLI: claude -p --model <model> --output-format json "prompt"
+                // Claude CLI: claude -p --model <model> --output-format stream-json "prompt"
                 args.push("-p".to_string()); // Print mode (non-interactive)
                 args.push("--model".to_string());
                 args.push(model.to_string());
 
-                // Add JSON output format for structured output
-                if options.json_mode {
-                    args.push("--output-format".to_string());
-                    args.push("json".to_string());
-                } else {
-                    args.push("--output-format".to_string());
-                    args.push("text".to_string());
-                }
+                // Use stream-json format for sidecar integration
+                // This outputs JSONL that the sidecar parses for Linear activities
+                args.push("--output-format".to_string());
+                args.push("stream-json".to_string());
 
                 // Add extended thinking settings via --settings JSON
                 let use_thinking = options.extended_thinking || self.extended_thinking;
@@ -419,6 +454,9 @@ impl CLITextGenerator {
     }
 
     /// Execute the CLI and capture output.
+    ///
+    /// For Claude CLI with stream-json format, also writes output to the stream
+    /// file in real-time for sidecar integration.
     async fn execute_cli(
         &self,
         model: &str,
@@ -464,7 +502,33 @@ impl CLITextGenerator {
             .take()
             .ok_or_else(|| TasksError::Ai("Failed to capture stderr".to_string()))?;
 
-        // Read stdout
+        // Open stream file for writing if available (for sidecar integration)
+        let mut stream_file = if matches!(self.cli_type, CLIType::Claude) {
+            if let Some(ref path) = self.stream_file {
+                match OpenOptions::new()
+                    .create(true)
+                    .truncate(true)
+                    .write(true)
+                    .open(path)
+                    .await
+                {
+                    Ok(file) => {
+                        info!(path = %path.display(), "Streaming output to file for sidecar");
+                        Some(file)
+                    }
+                    Err(e) => {
+                        warn!(path = %path.display(), error = %e, "Failed to open stream file, continuing without streaming");
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Read stdout line by line, writing to stream file in real-time
         let mut stdout_reader = BufReader::new(stdout).lines();
         let mut output = String::new();
 
@@ -473,6 +537,17 @@ impl CLITextGenerator {
             .await
             .map_err(|e| TasksError::Ai(format!("Failed to read stdout: {e}")))?
         {
+            // Write to stream file immediately for sidecar to parse
+            if let Some(ref mut file) = stream_file {
+                // Write line with newline, flush immediately for real-time streaming
+                if let Err(e) = file.write_all(format!("{line}\n").as_bytes()).await {
+                    warn!(error = %e, "Failed to write to stream file");
+                }
+                if let Err(e) = file.flush().await {
+                    warn!(error = %e, "Failed to flush stream file");
+                }
+            }
+
             output.push_str(&line);
             output.push('\n');
         }
@@ -532,91 +607,151 @@ impl CLITextGenerator {
             "Parsing CLI output"
         );
 
-        // Try to parse as JSONL (Codex/OpenCode CLI format: multiple JSON objects, one per line)
-        if matches!(self.cli_type, CLIType::Codex | CLIType::OpenCode) {
-            let mut agent_message = None;
+        // Parse JSONL format (Claude stream-json, Codex, OpenCode)
+        // Each line is a separate JSON object
+        if matches!(
+            self.cli_type,
+            CLIType::Claude | CLIType::Codex | CLIType::OpenCode
+        ) {
+            let mut result_text = None;
+            let mut assistant_text = String::new();
             let mut usage = TokenUsage::default();
 
             for line in output.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
-                    // Codex format: item.completed with agent_message
-                    if json.get("type").and_then(serde_json::Value::as_str)
-                        == Some("item.completed")
-                    {
-                        if let Some(item) = json.get("item") {
-                            if item.get("type").and_then(serde_json::Value::as_str)
-                                == Some("agent_message")
+                    let event_type = json.get("type").and_then(serde_json::Value::as_str);
+
+                    match event_type {
+                        // Claude stream-json: result event contains the final result
+                        Some("result") => {
+                            if let Some(result) =
+                                json.get("result").and_then(serde_json::Value::as_str)
                             {
-                                agent_message = item
-                                    .get("text")
-                                    .and_then(serde_json::Value::as_str)
-                                    .map(String::from);
+                                result_text = Some(result.to_string());
+                            }
+                            // Extract usage from result event
+                            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                            if let Some(total_cost) = json
+                                .get("total_cost_usd")
+                                .and_then(serde_json::Value::as_f64)
+                            {
+                                // Estimate tokens from cost (rough approximation)
+                                // Claude Opus: ~$15/1M input, ~$75/1M output
+                                // Cost is always positive, so sign loss is safe
+                                usage.total_tokens = (total_cost * 20000.0) as u32;
                             }
                         }
-                    }
-                    // Codex format: turn.completed with usage
-                    if json.get("type").and_then(serde_json::Value::as_str)
-                        == Some("turn.completed")
-                    {
-                        if let Some(usage_obj) = json.get("usage") {
-                            #[allow(clippy::cast_possible_truncation)]
-                            {
-                                usage.input_tokens = usage_obj
-                                    .get("input_tokens")
-                                    .and_then(serde_json::Value::as_u64)
-                                    .unwrap_or(0)
-                                    as u32;
-                                usage.output_tokens = usage_obj
-                                    .get("output_tokens")
-                                    .and_then(serde_json::Value::as_u64)
-                                    .unwrap_or(0)
-                                    as u32;
-                            }
-                        }
-                    }
-                    // OpenCode format: type "text" with part.text
-                    if json.get("type").and_then(serde_json::Value::as_str) == Some("text") {
-                        if let Some(part) = json.get("part") {
-                            if let Some(text) = part.get("text").and_then(serde_json::Value::as_str)
-                            {
-                                // Concatenate text parts (OpenCode streams in chunks)
-                                if let Some(ref mut msg) = agent_message {
-                                    msg.push_str(text);
-                                } else {
-                                    agent_message = Some(text.to_string());
+
+                        // Claude stream-json: assistant message contains text content
+                        Some("assistant") => {
+                            if let Some(message) = json.get("message") {
+                                if let Some(content) = message.get("content") {
+                                    if let Some(content_arr) = content.as_array() {
+                                        for block in content_arr {
+                                            if block.get("type").and_then(serde_json::Value::as_str)
+                                                == Some("text")
+                                            {
+                                                if let Some(text) = block
+                                                    .get("text")
+                                                    .and_then(serde_json::Value::as_str)
+                                                {
+                                                    if !assistant_text.is_empty() {
+                                                        assistant_text.push('\n');
+                                                    }
+                                                    assistant_text.push_str(text);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                    // OpenCode format: step_finish with tokens
-                    if json.get("type").and_then(serde_json::Value::as_str) == Some("step_finish") {
-                        if let Some(part) = json.get("part") {
-                            if let Some(tokens) = part.get("tokens") {
+
+                        // Codex format: item.completed with agent_message
+                        Some("item.completed") => {
+                            if let Some(item) = json.get("item") {
+                                if item.get("type").and_then(serde_json::Value::as_str)
+                                    == Some("agent_message")
+                                {
+                                    result_text = item
+                                        .get("text")
+                                        .and_then(serde_json::Value::as_str)
+                                        .map(String::from);
+                                }
+                            }
+                        }
+
+                        // Codex format: turn.completed with usage
+                        Some("turn.completed") => {
+                            if let Some(usage_obj) = json.get("usage") {
                                 #[allow(clippy::cast_possible_truncation)]
                                 {
-                                    usage.input_tokens = tokens
-                                        .get("input")
+                                    usage.input_tokens = usage_obj
+                                        .get("input_tokens")
                                         .and_then(serde_json::Value::as_u64)
                                         .unwrap_or(0)
                                         as u32;
-                                    usage.output_tokens = tokens
-                                        .get("output")
+                                    usage.output_tokens = usage_obj
+                                        .get("output_tokens")
                                         .and_then(serde_json::Value::as_u64)
                                         .unwrap_or(0)
                                         as u32;
                                 }
                             }
                         }
+
+                        // OpenCode format: type "text" with part.text
+                        Some("text") => {
+                            if let Some(part) = json.get("part") {
+                                if let Some(text) =
+                                    part.get("text").and_then(serde_json::Value::as_str)
+                                {
+                                    assistant_text.push_str(text);
+                                }
+                            }
+                        }
+
+                        // OpenCode format: step_finish with tokens
+                        Some("step_finish") => {
+                            if let Some(part) = json.get("part") {
+                                if let Some(tokens) = part.get("tokens") {
+                                    #[allow(clippy::cast_possible_truncation)]
+                                    {
+                                        usage.input_tokens = tokens
+                                            .get("input")
+                                            .and_then(serde_json::Value::as_u64)
+                                            .unwrap_or(0)
+                                            as u32;
+                                        usage.output_tokens = tokens
+                                            .get("output")
+                                            .and_then(serde_json::Value::as_u64)
+                                            .unwrap_or(0)
+                                            as u32;
+                                    }
+                                }
+                            }
+                        }
+
+                        _ => {}
                     }
                 }
             }
 
-            if let Some(msg) = agent_message {
-                return Ok((msg, usage));
+            // Prefer result_text (from result event), fall back to accumulated assistant text
+            if let Some(result) = result_text {
+                return Ok((result, usage));
+            }
+            if !assistant_text.is_empty() {
+                return Ok((assistant_text, usage));
             }
         }
 
-        // Try to parse as JSON (Claude/Cursor/Factory JSON output format)
+        // Try to parse as single JSON object (legacy format)
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(output) {
             // Claude/Cursor/Factory JSON format: {"type":"result","result":"...","duration_ms":...}
             if let Some(result) = json.get("result").and_then(serde_json::Value::as_str) {
@@ -876,6 +1011,7 @@ impl Default for CLITextGenerator {
             mcp_config: Self::find_default_mcp_config(),
             extended_thinking: false,
             thinking_budget: DEFAULT_THINKING_BUDGET,
+            stream_file: Self::get_stream_file_path(),
         })
     }
 }

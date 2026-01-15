@@ -23,6 +23,10 @@
     "PLAY-001": {
       "actual": 5,
       "estimate": 20
+    },
+    "PLAY-002": {
+      "actual": 10,
+      "estimate": 20
     }
   },
   "averages": {
