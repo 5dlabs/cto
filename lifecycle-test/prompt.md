@@ -116,6 +116,12 @@ mcp_cto_play_status()
 
 # For jobs
 mcp_cto_jobs()
+
+# Stop a running workflow
+mcp_cto_stop_job(job_type="play", name="...")
+
+# Check MCP setup
+mcp_cto_check_setup()
 ```
 
 Do NOT try to run the intake CLI directly or use `local=true`. The MCP tool handles everything:
@@ -123,6 +129,56 @@ Do NOT try to run the intake CLI directly or use `local=true`. The MCP tool hand
 2. Attaches `cto-config.json`
 3. Auto-assigns Morgan
 4. Triggers the intake workflow in Kubernetes
+
+## CLI Tools Available
+
+You have direct access to these CLI tools (already configured):
+
+### kubectl (Kubernetes)
+```bash
+# All CTO resources are in the 'cto' namespace
+kubectl get pods -n cto
+kubectl get coderuns -n cto
+kubectl get workflows -n cto
+kubectl logs -n cto <pod-name>
+kubectl describe pod -n cto <pod-name>
+kubectl delete coderun -n cto <name>
+```
+
+### Argo CLI (Workflows)
+```bash
+# List workflows
+argo list -n cto
+
+# Get workflow details
+argo get -n cto <workflow-name>
+
+# View workflow logs
+argo logs -n cto <workflow-name>
+
+# Watch workflow progress
+argo watch -n cto <workflow-name>
+```
+
+### GitHub CLI (gh)
+```bash
+# Check webhook status
+gh api repos/5dlabs/cto/hooks | jq '.[].config.url'
+
+# Create PR, check PR status, etc.
+gh pr list
+gh pr view <number>
+```
+
+### Key Namespace: `cto`
+
+**All CTO platform resources run in the `cto` namespace:**
+- CodeRuns (custom resource for agent executions)
+- Argo Workflows (intake, play orchestration)
+- Controller, PM, Healer deployments
+- PVCs for agent workspaces
+
+Always use `-n cto` with kubectl/argo commands.
 
 ---
 
