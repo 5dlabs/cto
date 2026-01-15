@@ -327,6 +327,43 @@ Started: $(date)
   - Release pipeline: commit → PR → merge → tag → CI → runtime image rebuild → CodeRun restart
 ---
 
+## 2026-01-15 - INT-001 (AGENT IMAGE REBUILD TRIGGERED)
+- **Story**: Intake: Submit AlertHub PRD via MCP Tool
+- **Status**: Code fix merged, agent image rebuild queued
+- **Actions taken**:
+  1. Verified fix is on main branch (c3c6ab5cf + cec775468)
+  2. Dockerfile updated to TASKS_VERSION=0.2.11 (commit cec775468)
+  3. Triggered agent build workflow manually: run #21046790070
+- **Agent build progress**:
+  - Jobs: build-sidecar, build-runtime
+  - Started: 2026-01-15T21:22:12Z
+  - Status: QUEUED - waiting for k8s-runner (blocked by CodeQL run #21045546163)
+  - Expected duration once started: 15-30 minutes
+- **Code fix verification**:
+  - All 13 tests for `extract_json_continuation` pass
+  - Test coverage includes: prefill echo with embedded text, markdown code blocks, clean JSON
+  - Fix location: `crates/intake/src/ai/provider.rs:177-261`
+- **Acceptance criteria status**:
+  1. ✅ Read PRD from tests/intake/alerthub-e2e-test/prd.md (done previously)
+  2. ✅ Read architecture from tests/intake/alerthub-e2e-test/architecture.md (done previously)
+  3. ✅ Use MCP tool mcp_cto_intake (done previously)
+  4. ✅ Linear project created: alerthub-e2e-test (CTOPA-810)
+  5. ⏳ Intake CodeRun completes WITHOUT ERROR (waiting for image rebuild)
+  6. ⏳ tasks.json EXISTS in target repo (waiting for intake to complete)
+  7. ⏳ tasks.json has >0 tasks with testStrategy (waiting for intake to complete)
+  8. ✅ FIX THE CODE if JSON parsing error (done: PR #3837 merged)
+- **Build queue status (as of 21:40 UTC)**:
+  - All workflows are queued - k8s-runner appears unavailable
+  - 10+ workflows waiting including agent build, release please, controller CI
+  - Last successful run: CodeQL at 20:36 UTC (over 1 hour ago)
+- **Next iteration should**:
+  1. Check if agent build completed: `gh run view 21046790070`
+  2. If still queued, check runner health: `kubectl get pods -n github-actions`
+  3. If complete, submit new intake via MCP tool
+  4. Verify tasks.json created in target repo
+  5. Mark INT-001 as passes: true
+---
+
 ## 2026-01-15 - INT-001 (RETRY - STILL BLOCKED)
 - **Story**: Intake: Submit AlertHub PRD via MCP Tool
 - **Status**: BLOCKED - awaiting v0.2.11 release to complete
