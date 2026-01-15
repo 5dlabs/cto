@@ -202,8 +202,26 @@ APPEND to progress.txt (never replace, always append):
 **Attempt 2:** (if needed)
 ...
 
+### Tool Usage Analysis (MANDATORY for agent stories)
+**Configured Tools:** (list from cto-config.json)
+
+**Tools Actually Used:**
+- tool1: X invocations ✅
+- tool2: Y invocations ✅
+- tool3: 0 invocations ❌ (investigate why!)
+
+**Tool Usage Evidence:**
+```
+[paste relevant log lines showing tool calls]
+```
+
+**If tools not used - remediation:**
+- [What was wrong]
+- [How it was fixed]
+
 ### Final Status: PASSED / FAILED
 - All criteria verified: YES/NO
+- Tools verified in use: YES/NO (or N/A if no agent run)
 - Ready for next story: YES/NO
 
 ### Learnings
@@ -236,8 +254,18 @@ APPEND to progress.txt (never replace, always append):
   - Command: `kubectl logs deploy/cto-controller -n cto --tail=50`
   - Output: `INFO controller: started, version=0.2.9`
 
+### Tool Usage Analysis
+**Configured Tools:** firecrawl, context7, github-mcp
+
+**Tools Actually Used:**
+- N/A (PRE-001 is pre-flight verification, no agent CodeRun)
+
+**Note:** For stories involving agent CodeRuns (PLAY-*, QUAL-*, etc.),
+this section MUST include actual tool invocation evidence from logs.
+
 ### Final Status: PASSED
 - All criteria verified: YES
+- Tools verified in use: N/A (no agent run in this story)
 - Ready for next story: YES
 
 ### Learnings
@@ -329,6 +357,46 @@ Use specialized sub-agents for complex tasks:
 - Screenshot or log snippet for visual verification
 - Kubernetes resource status before/after
 - Clear PASS/FAIL status for each criterion
+
+### Tool Usage Verification (MANDATORY AT END OF EACH STORY)
+
+After completing each story that involves an agent CodeRun, you MUST verify that assigned tools were actually used:
+
+```bash
+# Get the CodeRun logs and search for tool invocations
+kubectl logs -n cto -l app=coderun --all-containers | grep -E "(tool_call|mcp_|Tool:|Calling tool)"
+
+# Check for specific tool invocations in agent logs
+kubectl logs -n cto <coderun-pod> -c agent | grep -i "tool"
+
+# Verify MCP server was started (if local tools configured)
+kubectl logs -n cto <coderun-pod> -c mcp-server 2>/dev/null || echo "No MCP sidecar"
+```
+
+**What to look for in logs:**
+- `tool_call` or `mcp_*` function invocations
+- Tool names matching `cto-config.json` definitions
+- MCP server startup messages
+- Tool response handling
+
+**If tools NOT being used:**
+1. Check `cto-config.json` tool definitions
+2. Verify tools passed to agent context
+3. Check agent prompt includes tool instructions
+4. Look for tool permission errors in logs
+5. Document the gap and remediate before marking story complete
+
+**Example tool usage evidence:**
+```
+✅ Tools Verified in Logs:
+- mcp_firecrawl_scrape: 3 invocations
+- mcp_context7_query-docs: 2 invocations
+- grep: 15 invocations
+- read_file: 42 invocations
+
+❌ Tools NOT Used (configured but never called):
+- mcp_github_create_pr: 0 invocations (investigate why!)
+```
 
 ## Stop Condition
 
