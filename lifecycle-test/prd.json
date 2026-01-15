@@ -1,7 +1,12 @@
 {
-  "name": "CTO Platform Lifecycle Test",
-  "description": "End-to-end test of the CTO multi-agent orchestration platform from PRD to deployed code",
+  "name": "CTO Platform Lifecycle Test - AlertHub E2E",
+  "description": "End-to-end test using the AlertHub multi-platform notification system, which exercises all agents (Rex, Nova, Grizz, Blaze, Tap, Spark) and their respective tech stacks",
   "branchName": "ralph/lifecycle-test",
+  "testProject": {
+    "name": "alerthub-e2e-test",
+    "prdPath": "tests/intake/alerthub-e2e-test/prd.md",
+    "architecturePath": "tests/intake/alerthub-e2e-test/architecture.md"
+  },
   "userStories": [
     {
       "id": "PRE-001",
@@ -18,7 +23,7 @@
         "Run 'just preflight' and verify output shows '✅ PRE-FLIGHT PASSED'"
       ],
       "testStrategy": "smoke",
-      "passes": true
+      "passes": false
     },
     {
       "id": "PRE-002",
@@ -33,7 +38,7 @@
         "Linear webhook configured with correct URL"
       ],
       "testStrategy": "smoke",
-      "passes": true
+      "passes": false
     },
     {
       "id": "PRE-003",
@@ -53,25 +58,28 @@
         "'just preflight' section 5 (AGENT OAUTH) shows all agents with '✓ token'"
       ],
       "testStrategy": "smoke",
-      "passes": true
+      "passes": false
     },
     {
       "id": "INT-001",
-      "title": "Intake: Submit PRD via MCP Tool",
-      "description": "Use YOUR installed cto-mcp server to invoke intake. Do NOT run CLI directly or use local=true.",
+      "title": "Intake: Submit AlertHub PRD via MCP Tool",
+      "description": "Use your cto-mcp server to intake the AlertHub E2E test project. Read PRD from tests/intake/alerthub-e2e-test/prd.md",
       "priority": 2,
       "complexity": "medium",
       "acceptanceCriteria": [
-        "Use MCP tool: mcp_cto_intake(project_name='lifecycle-test-sample', prd_content='...')",
-        "Tool returns success with Linear issue URL",
-        "Linear issue created (verify via Linear UI or API)",
-        "PRD content visible in issue description",
+        "Read PRD content from tests/intake/alerthub-e2e-test/prd.md",
+        "Read architecture from tests/intake/alerthub-e2e-test/architecture.md",
+        "Use MCP tool: mcp_cto_intake(project_name='alerthub-e2e-test', prd_content=<prd>, architecture_content=<arch>)",
+        "Tool returns success with Linear project URL",
+        "Linear project created with 'AlertHub' in name",
+        "PRD content visible in Linear issue description",
+        "Architecture attached to Linear issue",
         "cto-config.json attached to issue",
-        "Morgan auto-assigned as delegate (uses Morgan OAuth token)",
-        "Argo Workflow triggered (check: kubectl get workflows -n cto)"
+        "Morgan auto-assigned as delegate",
+        "Argo Workflow 'intake-*' triggered (kubectl get workflows -n cto)"
       ],
       "testStrategy": "integration",
-      "passes": true
+      "passes": false
     },
     {
       "id": "INT-002",

@@ -1,6 +1,24 @@
-# CTO Platform Lifecycle Test Agent Instructions
+# CTO Platform Lifecycle Test Agent - AlertHub E2E
 
-You are an autonomous testing agent validating the CTO multi-agent orchestration platform.
+You are an autonomous testing agent validating the CTO multi-agent orchestration platform using the **AlertHub E2E Test Project**.
+
+## Test Project: AlertHub
+
+AlertHub is a comprehensive notification platform that exercises ALL implementation agents:
+
+| Agent | Technology | Component |
+|-------|------------|-----------|
+| **Rex** | Rust/Axum | Notification Router Service |
+| **Nova** | Bun/Elysia+Effect | Integration Service |
+| **Grizz** | Go/gRPC | Admin API |
+| **Blaze** | Next.js/React | Web Console |
+| **Tap** | Expo/React Native | Mobile App |
+| **Spark** | Electron | Desktop Client |
+
+**PRD Location**: `tests/intake/alerthub-e2e-test/prd.md`  
+**Architecture**: `tests/intake/alerthub-e2e-test/architecture.md`
+
+When you reach INT-001, read these files and use them for the MCP intake call.
 
 ## CRITICAL: Methodical Execution
 
@@ -60,59 +78,29 @@ just sync-secrets
 
 **Why OAuth?** OAuth tokens allow agent-specific Linear app assignment, enabling two-way communication in the Linear issue timeline.
 
-### 2. Start Local Services (Background Mode)
+### 2. Start Local Services
 
-Start services in detached/background mode so you can manage them:
-
-```bash
-# Option 1: Process-compose in detached mode (RECOMMENDED)
-just kill-ports  # Clean up any stale processes first
-just pc-detach   # Starts all services in background
-
-# Check status
-just pc-status
-
-# Stop when done
-just pc-down
-```
+Use `just mp` to start all services with the mprocs TUI:
 
 ```bash
-# Option 2: Start services individually in background
-source .env.local
-
-# PM Server (port 8081)
-cargo run --bin pm-server > /tmp/pm-server.log 2>&1 &
-echo $! > /tmp/pm-server.pid
-
-# Controller (port 8080)
-AGENT_TEMPLATES_PATH=./templates cargo run --bin agent-controller > /tmp/controller.log 2>&1 &
-echo $! > /tmp/controller.pid
-
-# Healer (port 8082)
-HEALER_TEMPLATES_DIR=./templates/healer CTO_CONFIG_PATH=./cto-config.json cargo run --bin healer -- server --addr 0.0.0.0:8082 > /tmp/healer.log 2>&1 &
-echo $! > /tmp/healer.pid
-
-# Cloudflare tunnel
-cloudflared tunnel --config config/cloudflared-pm-dev.yaml run > /tmp/tunnel.log 2>&1 &
-echo $! > /tmp/tunnel.pid
+# This kills stale ports, sources .env.local, and starts mprocs
+just mp
 ```
 
-**Services to verify:**
-| Service | Port | Health Check |
-|---------|------|--------------|
-| pm-server | 8081 | `curl http://localhost:8081/health` |
-| controller | 8080 | `curl http://localhost:8080/health` |
-| healer | 8082 | `curl http://localhost:8082/health` |
-| tunnel | - | `curl https://pm-dev.5dlabs.ai/health` |
+**Services started:**
+| Service | Port | Purpose |
+|---------|------|---------|
+| pm-server | 8081 | Linear webhooks, project management |
+| controller | 8080 | CodeRun CRD orchestration |
+| healer | 8082 | Self-healing monitor |
+| healer-play-api | 8083 | MCP session monitoring |
+| tunnel | - | Cloudflare tunnel (pm-dev.5dlabs.ai → localhost:8081) |
 
-**Restart a service after code changes:**
-```bash
-# Find and kill the process
-kill $(cat /tmp/pm-server.pid)
-# Rebuild and restart
-cargo build --bin pm-server && cargo run --bin pm-server > /tmp/pm-server.log 2>&1 &
-echo $! > /tmp/pm-server.pid
-```
+**mprocs TUI keybindings:**
+- `↑/↓` or `j/k` - Navigate processes
+- `Enter` - Focus process logs
+- `r` - Restart process
+- `q` - Quit all
 
 ### 3. Run Pre-Flight Check
 
