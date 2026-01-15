@@ -1,0 +1,16 @@
+# CTO Platform Lifecycle Test - Progress Log
+Started: Thu Jan 15 2026
+---
+
+## Codebase Patterns
+- Use `just mp` to start all local services (PM, Controller, Healer)
+- Use `just tunnel` to start Cloudflare tunnel
+- Use `just webhook-dev` to point GitHub webhook to dev tunnel
+- Use `just status` to check full dev environment status
+- Health endpoints: PM=8081, Controller=8080, Healer=8082
+- Linear uses OAuth credentials (not API key)
+- Skills are loaded from `/templates/skills/` based on `skill-mappings.yaml`
+- Test strategy is in `task/prompt.md` under `## Test Strategy` section
+- Subtasks enable parallel execution via subagent dispatch
+---
+

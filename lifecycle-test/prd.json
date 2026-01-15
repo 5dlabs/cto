@@ -1,0 +1,300 @@
+{
+  "name": "CTO Platform Lifecycle Test",
+  "description": "End-to-end test of the CTO multi-agent orchestration platform from PRD to deployed code",
+  "branchName": "ralph/lifecycle-test",
+  "userStories": [
+    {
+      "id": "PRE-001",
+      "title": "Pre-Flight: Verify Local Services",
+      "description": "Ensure PM Server, Healer, and Controller are running locally and healthy",
+      "priority": 1,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "PM Server returns 200 at http://localhost:8081/health",
+        "Healer returns 200 at http://localhost:8082/health",
+        "Controller logs show 'started'",
+        "All services connected to Kubernetes cluster"
+      ],
+      "testStrategy": "smoke",
+      "passes": false
+    },
+    {
+      "id": "PRE-002",
+      "title": "Pre-Flight: Verify Tunnels and Webhooks",
+      "description": "Ensure Cloudflare tunnels are up and GitHub webhooks point to dev",
+      "priority": 1,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "Cloudflare tunnel running (cloudflared tunnel list)",
+        "PM webhook URL accessible: curl https://pm-dev.5dlabs.ai/health returns 200",
+        "GitHub webhook points to pm-dev.5dlabs.ai (just webhook-status)",
+        "Linear webhook configured with correct URL"
+      ],
+      "testStrategy": "smoke",
+      "passes": false
+    },
+    {
+      "id": "PRE-003",
+      "title": "Pre-Flight: Verify Credentials",
+      "description": "Ensure all required OAuth and API credentials are configured",
+      "priority": 1,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "LINEAR_OAUTH_TOKEN is set (not API key)",
+        "GITHUB_TOKEN is set",
+        "ANTHROPIC_API_KEY is set",
+        "LINEAR_WEBHOOK_SECRET is set",
+        "Agent OAuth tokens available for morgan, rex, blaze"
+      ],
+      "testStrategy": "smoke",
+      "passes": false
+    },
+    {
+      "id": "INT-001",
+      "title": "Intake: Submit PRD via MCP Tool",
+      "description": "Use MCP intake tool to create Linear issue and auto-assign Morgan",
+      "priority": 2,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "MCP intake tool invoked successfully",
+        "PRD content submitted to Linear",
+        "cto-config.json attached to issue",
+        "Morgan auto-assigned as delegate",
+        "Linear issue created with full PRD in description"
+      ],
+      "testStrategy": "integration",
+      "passes": false
+    },
+    {
+      "id": "INT-002",
+      "title": "Intake: Verify Task Generation",
+      "description": "Verify AI generates tasks with correct structure including testStrategy",
+      "priority": 2,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Intake runs in CLI mode (not API mode)",
+        "tasks.json created with all required fields",
+        "testStrategy field non-empty for each task",
+        "Agent hints assigned via content-based routing",
+        "Subtasks generated with execution levels",
+        "prompt.md contains ## Test Strategy section"
+      ],
+      "testStrategy": "integration",
+      "passes": false
+    },
+    {
+      "id": "INT-003",
+      "title": "Intake: Verify Auto-Append Deploy Task",
+      "description": "Verify final Bolt deploy task is auto-appended when config enabled",
+      "priority": 2,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "autoAppendDeployTask: true in cto-config.json",
+        "Final deploy task exists in tasks.json",
+        "Deploy task has all other tasks as dependencies",
+        "Deploy task assigned to bolt agent"
+      ],
+      "testStrategy": "integration",
+      "passes": false
+    },
+    {
+      "id": "INT-004",
+      "title": "Intake: Verify Linear Sync",
+      "description": "Edit Linear issue and verify task files update in GitHub",
+      "priority": 2,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Edit issue title in Linear → task title updated",
+        "Edit acceptance criteria in Linear → acceptance.md updated",
+        "Local customizations preserved (test_strategy, agent_hint)",
+        "Changes appear as commit in target repo"
+      ],
+      "testStrategy": "integration",
+      "passes": false
+    },
+    {
+      "id": "PLAY-001",
+      "title": "Play: Verify CodeRun Creation",
+      "description": "Verify CodeRun CR created with correct configuration",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "CodeRun CR created in correct namespace",
+        "Agent correctly assigned from task agent_hint",
+        "CLI configured as Claude",
+        "Agent app assigned to Linear issue",
+        "Two-way communication enabled via Linear dialog",
+        "Subtasks included in CodeRun spec"
+      ],
+      "testStrategy": "integration",
+      "passes": false
+    },
+    {
+      "id": "PLAY-002",
+      "title": "Play: Verify Skills Loading",
+      "description": "Verify skills copied to native skill directory for Claude",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "skill-mappings.yaml loaded from /templates/skills/",
+        "Default skills loaded (context-fundamentals, context7, etc.)",
+        "Agent-specific skills loaded based on mapping",
+        "Job-type skills merged",
+        "Skills copied to .claude/skills/ directory",
+        "Log shows skills summary with loaded count"
+      ],
+      "testStrategy": "integration",
+      "passes": false
+    },
+    {
+      "id": "PLAY-003",
+      "title": "Play: Verify Two-Way Communication",
+      "description": "Test bidirectional communication through Linear agent dialog",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Agent activities appear in Linear issue timeline",
+        "User can send message via Linear input",
+        "Agent receives and processes Linear input",
+        "Agent signals (errors, completions) logged in Linear"
+      ],
+      "testStrategy": "e2e",
+      "passes": false
+    },
+    {
+      "id": "PLAY-004",
+      "title": "Play: Verify Subagent Dispatch",
+      "description": "Verify coordinator spawns subagents for subtasks",
+      "priority": 3,
+      "complexity": "high",
+      "acceptanceCriteria": [
+        "subagents.enabled: true in agent config",
+        "Subtasks grouped by execution_level",
+        "Subagents spawned for parallel execution",
+        "Coordinator manages subtask completion",
+        "Each subagent has focused context"
+      ],
+      "testStrategy": "e2e",
+      "passes": false
+    },
+    {
+      "id": "PLAY-005",
+      "title": "Play: Verify Tool Usage",
+      "description": "Verify configured tools are being used and logged",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Tools defined in cto-config.json appear in agent context",
+        "Tools showing up in logs as being invoked",
+        "MCP servers started for local tools",
+        "Tool filtering working correctly per agent"
+      ],
+      "testStrategy": "integration",
+      "passes": false
+    },
+    {
+      "id": "PLAY-006",
+      "title": "Play: Verify Model Rotation",
+      "description": "Test retry with model rotation between Opus and Sonnet",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "First attempt uses configured model (Sonnet)",
+        "On retry, model rotates to Opus",
+        "Model name appears correctly in logs",
+        "Both models can complete the task"
+      ],
+      "testStrategy": "e2e",
+      "passes": false
+    },
+    {
+      "id": "QUAL-001",
+      "title": "Quality: Verify Cleo Review",
+      "description": "Verify Cleo performs language-specific quality checks",
+      "priority": 4,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "CodeRun created for Cleo with job: review",
+        "Skills loaded for language/framework (rust-patterns, etc.)",
+        "Context7 access configured for documentation lookup",
+        "Quality checks run (clippy, fmt, etc.)",
+        "Review comments posted to PR if issues found"
+      ],
+      "testStrategy": "integration",
+      "passes": false
+    },
+    {
+      "id": "QUAL-002",
+      "title": "Quality: Verify Tess Testing",
+      "description": "Verify Tess reads test strategy and runs appropriate tests",
+      "priority": 4,
+      "complexity": "high",
+      "acceptanceCriteria": [
+        "CodeRun created for Tess with job: test",
+        "task/prompt.md contains ## Test Strategy section",
+        "Tess references test strategy in planning",
+        "Unit tests written/run for new code",
+        "Integration tests run against services",
+        "Coverage meets threshold"
+      ],
+      "testStrategy": "e2e",
+      "passes": false
+    },
+    {
+      "id": "MERGE-001",
+      "title": "Merge: Verify Atlas Integration",
+      "description": "Verify Atlas merges PR after all checks pass",
+      "priority": 5,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "All CI checks passed",
+        "All required reviews approved (Cleo, Cipher)",
+        "No merge conflicts",
+        "PR merged successfully",
+        "Linear status updated to Done"
+      ],
+      "testStrategy": "e2e",
+      "passes": false
+    },
+    {
+      "id": "DEPLOY-001",
+      "title": "Deploy: Verify Bolt Final Deployment",
+      "description": "Verify Bolt deploys application to production",
+      "priority": 6,
+      "complexity": "high",
+      "acceptanceCriteria": [
+        "All implementation tasks completed",
+        "Deploy task dependencies satisfied",
+        "Helm chart created and valid",
+        "Application deployed to Kubernetes",
+        "Health endpoints returning 200"
+      ],
+      "testStrategy": "e2e",
+      "passes": false
+    },
+    {
+      "id": "TEL-001",
+      "title": "Telemetry: Verify Logs and Metrics",
+      "description": "Verify all expected telemetry was captured",
+      "priority": 7,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Agent invocation logs captured in Loki",
+        "Tool usage logs present",
+        "Task duration metrics in Prometheus",
+        "All agents logged activities to Linear timeline"
+      ],
+      "testStrategy": "smoke",
+      "passes": false
+    }
+  ],
+  "config": {
+    "autoAppendDeployTask": true,
+    "freshStartThreshold": 3,
+    "cli": "claude",
+    "subagents": {
+      "enabled": true,
+      "maxConcurrent": 5
+    }
+  }
+}
