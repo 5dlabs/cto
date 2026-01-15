@@ -1595,6 +1595,7 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
+        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (Codex supports native skill loading)
         let skills = Self::get_agent_skills(code_run);
@@ -1622,6 +1623,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "fresh_start_threshold": fresh_start_threshold,
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
@@ -2979,6 +2981,7 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
+        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (OpenCode supports native skill loading)
         let skills = Self::get_agent_skills(code_run);
@@ -3006,6 +3009,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "fresh_start_threshold": fresh_start_threshold,
             // Skills for native skill loading
             "skills": skills,
             "skills_native": Self::cli_supports_native_skills(cli_type_enum),
@@ -3289,6 +3293,7 @@ impl CodeTemplateGenerator {
         let agent_name = Self::get_agent_name(code_run);
         let task_language = Self::get_task_language(code_run);
         let default_retries = Self::get_default_retries(code_run);
+        let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -3312,6 +3317,7 @@ impl CodeTemplateGenerator {
             "agent_name": agent_name,
             "task_language": task_language,
             "default_retries": default_retries,
+            "fresh_start_threshold": fresh_start_threshold,
         });
 
         handlebars
