@@ -71,7 +71,7 @@
         "Argo Workflow triggered (check: kubectl get workflows -n cto)"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "INT-002",

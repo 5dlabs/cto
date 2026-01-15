@@ -172,3 +172,21 @@ Started: Thu Jan 15 2026
   - Platform is now fully ready for intake/play workflows with full Linear activity features
 ---
 
+
+## 2026-01-15 18:55 - INT-001
+- Successfully submitted PRD via MCP intake tool
+- Linear issue created: CTOPA-806 (https://linear.app/jonathonfritz/issue/CTOPA-806/prd-lifecycle-test-sample)
+- Linear project created: lifecycle-test-sample (https://linear.app/jonathonfritz/project/lifecycle-test-sample-4e41140cf931)
+- PRD content stored in ConfigMap `intake-linear-ctopa-806-1768503266`
+- cto-config.json attached with full configuration including Linear session details
+- Morgan auto-assigned with GitHub app `5DLabs-Morgan` and Linear session
+- CodeRun `intake-ctopa-806-1768503266` created and running with phase `Running`
+- Job name: `intake-t0-morgan-claude-e8085e4f-v1`
+- Files changed: prd.json (marked INT-001 as passed), progress.txt
+- **Learnings for future iterations:**
+  - MCP intake tool creates Linear issue, project, and CodeRun in one operation
+  - ConfigMap contains prd.txt, config.json, and architecture.md fields
+  - CodeRun has labels for linear-issue, github-app, project-name, workflow-type
+  - Linear integration config includes issueId, sessionId, teamId for two-way communication
+  - auto_assign_morgan=true parameter triggers immediate workflow start
+---
