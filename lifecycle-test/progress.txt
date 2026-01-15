@@ -352,16 +352,23 @@ Started: $(date)
   6. ⏳ tasks.json EXISTS in target repo (waiting for intake to complete)
   7. ⏳ tasks.json has >0 tasks with testStrategy (waiting for intake to complete)
   8. ✅ FIX THE CODE if JSON parsing error (done: PR #3837 merged)
-- **Build queue status (as of 21:40 UTC)**:
-  - All workflows are queued - k8s-runner appears unavailable
-  - 10+ workflows waiting including agent build, release please, controller CI
-  - Last successful run: CodeQL at 20:36 UTC (over 1 hour ago)
+- **Build queue status (as of 21:55 UTC)**:
+  - Binaries release (run #21045946043) progressing: 21/33 jobs complete
+  - intake-linux-x86_64 build: COMPLETE ✅
+  - intake-linux-aarch64 build: COMPLETE ✅
+  - Agent build (run #21046790070) still queued, waiting for runners
+- **Release pipeline status**:
+  - v0.2.11 tag created: ✅
+  - intake-linux-x86_64 binary built: ✅
+  - Release assets upload: pending (after all builds complete)
+  - Agent image rebuild: queued (run #21046790070)
 - **Next iteration should**:
-  1. Check if agent build completed: `gh run view 21046790070`
-  2. If still queued, check runner health: `kubectl get pods -n github-actions`
-  3. If complete, submit new intake via MCP tool
-  4. Verify tasks.json created in target repo
-  5. Mark INT-001 as passes: true
+  1. Check if binaries release completed: `gh run view 21045946043`
+  2. Check if agent build completed: `gh run view 21046790070`
+  3. If agent build complete, verify new image: `kubectl get pods -n arc-runners`
+  4. Submit new intake via MCP tool
+  5. Verify tasks.json created in target repo
+  6. Mark INT-001 as passes: true
 ---
 
 ## 2026-01-15 - INT-001 (RETRY - STILL BLOCKED)
