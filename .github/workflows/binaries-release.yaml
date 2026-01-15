@@ -105,7 +105,7 @@ jobs:
         package:
           - name: cto-mcp
             binary: cto-mcp
-            dir: crates/notify/mcp
+            dir: crates/mcp
             standalone: true  # Has own [workspace], build from dir
           - name: tools
             binary: tools-server

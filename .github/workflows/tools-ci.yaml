@@ -6,7 +6,7 @@ on:
     branches: [main, develop]
     paths:
       - 'crates/tools/**'
-      - 'crates/notify/mcp/**'
+      - 'crates/mcp/**'
       - 'infra/images/tools/**'
       - 'infra/charts/tools/**'
       - '.github/workflows/tools-ci.yaml'
@@ -14,7 +14,7 @@ on:
     branches: [main, develop]
     paths:
       - 'crates/tools/**'
-      - 'crates/notify/mcp/**'
+      - 'crates/mcp/**'
       - 'infra/images/tools/**'
       - 'infra/charts/tools/**'
       - '.github/workflows/tools-ci.yaml'
@@ -43,8 +43,8 @@ jobs:
               - 'crates/tools/**'
               - '!crates/tools/**/*.md'
             mcp:
-              - 'crates/notify/mcp/**'
-              - '!crates/notify/mcp/**/*.md'
+              - 'crates/mcp/**'
+              - '!crates/mcp/**/*.md'
             helm:
               - 'infra/charts/tools/**'
             docker:
@@ -78,7 +78,7 @@ jobs:
         uses: ./.github/actions/rust-lint
         with:
           package: cto-mcp
-          working-directory: crates/notify/mcp
+          working-directory: crates/mcp
           use-sccache: 'true'
 
   # Run tests using composite action
@@ -104,7 +104,7 @@ jobs:
         uses: ./.github/actions/rust-test
         with:
           package: cto-mcp
-          working-directory: crates/notify/mcp
+          working-directory: crates/mcp
           use-sccache: 'true'
 
   # Build check using composite action
@@ -139,7 +139,7 @@ jobs:
         with:
           package: cto-mcp
           binary: cto-mcp
-          working-directory: crates/notify/mcp
+          working-directory: crates/mcp
           use-sccache: 'true'
 
   # Helm chart validation
@@ -228,8 +228,8 @@ jobs:
         with:
           package: cto-mcp
           binary: cto-mcp
-          working-directory: crates/notify/mcp
-          output-path: ../../../infra/images/tools/cto-mcp
+          working-directory: crates/mcp
+          output-path: ../../infra/images/tools/cto-mcp
           use-sccache: 'true'
 
       - name: Get version info

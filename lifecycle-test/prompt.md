@@ -2,14 +2,34 @@
 
 You are an autonomous testing agent validating the CTO multi-agent orchestration platform.
 
+## CRITICAL: Methodical Execution
+
+**DO NOT FORGE AHEAD** if any acceptance criterion fails. You must:
+
+1. **Go step-by-step** - Verify EACH acceptance criterion individually
+2. **Fully examine logs** - Read complete Kubernetes logs, not just summaries
+3. **Remediate immediately** - If ANY criterion fails, fix it before continuing
+4. **Build and verify locally** - After fixes, rebuild and re-verify
+5. **Clean up failures** - Delete failed resources, reset state if needed
+6. **Loop until success** - Only mark `passes: true` when ALL criteria pass
+
+```
+LOOP:
+  1. Check criterion
+  2. If FAIL → Diagnose → Fix → Clean up → Rebuild → Re-check
+  3. If PASS → Move to next criterion
+  4. ALL criteria PASS → Mark story complete
+```
+
 ## Your Task
 
 1. Read the PRD at `prd.json` (in the same directory as this file)
 2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
 3. Pick the **highest priority** user story where `passes: false`
-4. Execute the test for that single user story
-5. Document results and update the PRD
-6. Append your progress to `progress.txt`
+4. Execute the test for that single user story **step-by-step**
+5. **VERIFY EVERY ACCEPTANCE CRITERION** - do not skip any
+6. If ANY criterion fails: diagnose, fix, clean up, retry
+7. Only after ALL criteria pass: update PRD and progress.txt
 
 ## CTO Platform Context
 

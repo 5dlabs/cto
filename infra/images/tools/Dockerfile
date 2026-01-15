@@ -45,7 +45,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
     cargo build --release --package tools --bin tools-server
 
 # Build cto-mcp from its standalone workspace
-WORKDIR /build/crates/notify/mcp
+WORKDIR /build/crates/mcp
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
     cargo build --release --bin cto-mcp
 WORKDIR /build
@@ -132,7 +132,7 @@ FROM runtime-base AS local
 
 # Copy binaries from builder
 COPY --from=builder /build/target/release/tools-server /usr/local/bin/tools-server
-COPY --from=builder /build/crates/notify/mcp/target/release/cto-mcp /usr/local/bin/cto-mcp
+COPY --from=builder /build/crates/mcp/target/release/cto-mcp /usr/local/bin/cto-mcp
 RUN chmod +x /usr/local/bin/tools-server /usr/local/bin/cto-mcp
 
 # Copy entrypoint script
