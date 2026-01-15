@@ -19,5 +19,21 @@ Started: $(date)
 - Skills are loaded from `/templates/skills/` based on `skill-mappings.yaml`
 - Test strategy is in `task/prompt.md` under `## Test Strategy` section
 - Subtasks enable parallel execution via subagent dispatch
+- Healer Play API health endpoint is on port 8083 (not 8082)
+---
+
+## 2026-01-15 - PRE-001
+- **Story**: Pre-Flight: Verify Local Services
+- **What was implemented**: Verified all local services are healthy and running
+- **Verification performed**:
+  - Ran `just preflight` - shows '✅ PRE-FLIGHT PASSED'
+  - PM Server health (8081): 200 OK
+  - Controller health (8080): 200 OK
+  - Healer health (8082): 200 OK
+  - Healer Play API health (8083): 200 OK
+- **Learnings for future iterations:**
+  - All services must be started with `just mp` before running preflight
+  - Preflight command provides comprehensive status including K8s cluster access, tunnel status, and OAuth tokens
+  - Services can be running locally while K8s versions are scaled down (as indicated by ⬇️ vs ✅)
 ---
 
