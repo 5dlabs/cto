@@ -3904,7 +3904,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     }
 }
 
-/// Handle intake_update tool - re-parses PRD/architecture changes and generates a delta
+/// Handle `intake_update` tool - re-parses PRD/architecture changes and generates a delta
 fn handle_intake_update(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🔄 Processing intake update request");
 
@@ -3951,7 +3951,10 @@ fn handle_intake_update(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Handle optional architecture content - write to temp file if provided
     let arch_temp_file: Option<tempfile::NamedTempFile>;
-    if let Some(arch_content) = arguments.get("architecture_content").and_then(|v| v.as_str()) {
+    if let Some(arch_content) = arguments
+        .get("architecture_content")
+        .and_then(|v| v.as_str())
+    {
         arch_temp_file = Some(tempfile::NamedTempFile::new()?);
         if let Some(ref temp_file) = arch_temp_file {
             std::fs::write(temp_file.path(), arch_content)?;
@@ -3966,7 +3969,7 @@ fn handle_intake_update(arguments: &HashMap<String, Value>) -> Result<Value> {
         }
     }
 
-    eprintln!("🚀 Running intake update: {:?}", cmd);
+    eprintln!("🚀 Running intake update: {cmd:?}");
 
     let output = cmd
         .stdout(std::process::Stdio::piped())
@@ -4002,7 +4005,7 @@ fn handle_intake_update(arguments: &HashMap<String, Value>) -> Result<Value> {
     }))
 }
 
-/// Handle intake_sync_task tool - syncs task files from Linear issue edits
+/// Handle `intake_sync_task` tool - syncs task files from Linear issue edits
 fn handle_intake_sync_task(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🔄 Processing intake sync-task request");
 
@@ -4044,10 +4047,7 @@ fn handle_intake_sync_task(arguments: &HashMap<String, Value>) -> Result<Value> 
     }
 
     let display_task_id = task_id.unwrap_or(issue_id);
-    eprintln!(
-        "🚀 Running intake sync-task: issue={}, project={}, task={}",
-        issue_id, project_name, display_task_id
-    );
+    eprintln!("🚀 Running intake sync-task: issue={issue_id}, project={project_name}, task={display_task_id}");
 
     let output = cmd
         .stdout(std::process::Stdio::piped())
