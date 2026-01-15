@@ -138,16 +138,20 @@ impl SyncTaskDomain {
                 existing.details = format!("- {}", parsed.acceptance_criteria.join("\n- "));
             }
 
-            // Update test strategy (always update - clear if missing from Linear)
-            existing.test_strategy = parsed.test_strategy.clone().unwrap_or_default();
+            // Update test strategy if present (preserve existing if not specified in Linear)
+            if let Some(ref strategy) = parsed.test_strategy {
+                existing.test_strategy.clone_from(strategy);
+            }
 
-            // Update priority if present (keep existing if not specified in Linear)
+            // Update priority if present (preserve existing if not specified in Linear)
             if let Some(linear_priority) = parsed.priority {
                 existing.priority = map_linear_priority(linear_priority);
             }
 
-            // Update agent hint (always update - clear if missing from Linear)
-            existing.agent_hint.clone_from(&parsed.agent_hint);
+            // Update agent hint if present (preserve existing if not specified in Linear)
+            if let Some(ref hint) = parsed.agent_hint {
+                existing.agent_hint = Some(hint.clone());
+            }
 
             existing.updated_at = Some(chrono::Utc::now());
 
