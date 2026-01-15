@@ -545,6 +545,7 @@ mod config_tests {
             service: Some("test-service".to_string()),
             docs_repository: Some("5dlabs/test".to_string()),
             docs_project_directory: Some("test-service".to_string()),
+            auto_append_deploy_task: true,
         };
 
         assert_eq!(config.num_tasks, 20);
@@ -552,6 +553,7 @@ mod config_tests {
         assert!(config.analyze);
         assert_eq!(config.complexity_threshold, 7);
         assert_eq!(config.model, Some("claude-sonnet".to_string()));
+        assert!(config.auto_append_deploy_task);
     }
 }
 
@@ -1280,6 +1282,144 @@ mod cto_config_tests {
         assert!(
             !platform_config_path.exists(),
             "platform-config.json should not exist (merged into cto-config.json)"
+        );
+    }
+}
+
+// ===========================================================================
+// STORY-003: Auto-append deploy task tests
+// ===========================================================================
+// These tests verify the autoAppendDeployTask feature works correctly.
+
+#[allow(clippy::similar_names)]
+mod auto_append_deploy_tests {
+    use super::*;
+    use intake::domain::{create_deploy_task, has_deploy_task};
+
+    #[test]
+    fn test_has_deploy_task_detects_existing_deploy() {
+        // Task with "deploy" in title and bolt agent should be detected
+        let mut deploy_task = Task::new("10", "Deploy to production", "Deploy the application");
+        deploy_task.agent_hint = Some("bolt".to_string());
+
+        let tasks = vec![deploy_task];
+        assert!(
+            has_deploy_task(&tasks),
+            "Should detect existing deploy task with bolt agent"
+        );
+    }
+
+    #[test]
+    fn test_has_deploy_task_detects_deployment_keyword() {
+        // Task with "deployment" in description and bolt agent should be detected
+        let mut deploy_task = Task::new("10", "Final infrastructure", "Handle deployment to AWS");
+        deploy_task.agent_hint = Some("bolt".to_string());
+
+        let tasks = vec![deploy_task];
+        assert!(
+            has_deploy_task(&tasks),
+            "Should detect task with 'deployment' keyword"
+        );
+    }
+
+    #[test]
+    fn test_has_deploy_task_requires_bolt_agent() {
+        // Task with "deploy" but non-bolt agent should NOT be detected
+        let mut deploy_task = Task::new("10", "Deploy to production", "Deploy the application");
+        deploy_task.agent_hint = Some("rex".to_string());
+
+        let tasks = vec![deploy_task];
+        assert!(
+            !has_deploy_task(&tasks),
+            "Should not detect deploy task without bolt agent"
+        );
+    }
+
+    #[test]
+    fn test_has_deploy_task_no_deploy_task() {
+        // Regular tasks without deploy should not be detected
+        let mut task1 = Task::new("1", "Build API", "Create REST endpoints");
+        task1.agent_hint = Some("rex".to_string());
+
+        let mut task2 = Task::new("2", "Build UI", "Create dashboard");
+        task2.agent_hint = Some("blaze".to_string());
+
+        let tasks = vec![task1, task2];
+        assert!(
+            !has_deploy_task(&tasks),
+            "Should not detect deploy task when none exists"
+        );
+    }
+
+    #[test]
+    fn test_create_deploy_task_depends_on_all_tasks() {
+        let mut task1 = Task::new("1", "Build API", "Create REST endpoints");
+        task1.agent_hint = Some("rex".to_string());
+
+        let mut task2 = Task::new("2", "Build UI", "Create dashboard");
+        task2.agent_hint = Some("blaze".to_string());
+
+        let mut task3 = Task::new("3", "Setup K8s", "Create manifests");
+        task3.agent_hint = Some("bolt".to_string());
+
+        let tasks = vec![task1, task2, task3];
+        let deploy_task = create_deploy_task(&tasks);
+
+        // Deploy task should have all task IDs as dependencies
+        assert_eq!(deploy_task.dependencies.len(), 3);
+        assert!(deploy_task.dependencies.contains(&"1".to_string()));
+        assert!(deploy_task.dependencies.contains(&"2".to_string()));
+        assert!(deploy_task.dependencies.contains(&"3".to_string()));
+    }
+
+    #[test]
+    fn test_create_deploy_task_has_correct_id() {
+        let mut task1 = Task::new("1", "Build API", "Create REST endpoints");
+        task1.agent_hint = Some("rex".to_string());
+
+        let mut task2 = Task::new("5", "Build UI", "Create dashboard");
+        task2.agent_hint = Some("blaze".to_string());
+
+        let tasks = vec![task1, task2];
+        let deploy_task = create_deploy_task(&tasks);
+
+        // Deploy task should have ID = max(existing IDs) + 1
+        assert_eq!(deploy_task.id, "6", "Deploy task ID should be max + 1");
+    }
+
+    #[test]
+    fn test_create_deploy_task_assigned_to_bolt() {
+        let mut task1 = Task::new("1", "Build API", "Create REST endpoints");
+        task1.agent_hint = Some("rex".to_string());
+
+        let tasks = vec![task1];
+        let deploy_task = create_deploy_task(&tasks);
+
+        assert_eq!(
+            deploy_task.agent_hint,
+            Some("bolt".to_string()),
+            "Deploy task should be assigned to bolt"
+        );
+    }
+
+    #[test]
+    fn test_create_deploy_task_has_deploy_in_title() {
+        let tasks = vec![Task::new("1", "Build API", "Create endpoints")];
+        let deploy_task = create_deploy_task(&tasks);
+
+        assert!(
+            deploy_task.title.to_lowercase().contains("deploy"),
+            "Deploy task title should contain 'deploy'"
+        );
+    }
+
+    #[test]
+    fn test_auto_append_disabled_by_default() {
+        // Verify IntakeConfig defaults to auto_append_deploy_task = false
+        let config = IntakeConfig::default();
+        assert!(
+            !config.auto_append_deploy_task,
+            "auto_append_deploy_task should be false by default"
         );
     }
 }

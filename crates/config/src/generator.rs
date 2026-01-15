@@ -94,6 +94,7 @@ pub fn generate_project_config(input: &ProjectConfigInput) -> CtoConfig {
                     fallback: "claude-opus-4-5-20251101".to_string(),
                     cli_models: HashMap::new(),
                 },
+                auto_append_deploy_task: false,
             },
             linear: LinearDefaults {
                 team_id: input.team_id.clone(),
@@ -226,6 +227,7 @@ pub fn generate_config_with_tasks<T: ToolAnalyzable>(
                     fallback: "claude-opus-4-5-20251101".to_string(),
                     cli_models: HashMap::new(),
                 },
+                auto_append_deploy_task: false,
             },
             linear: LinearDefaults {
                 team_id: input.team_id.clone(),

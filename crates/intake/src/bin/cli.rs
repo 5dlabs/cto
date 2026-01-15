@@ -1079,6 +1079,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 service,
                 docs_repository,
                 docs_project_directory,
+                auto_append_deploy_task: false,
             };
 
             ui::print_info("Starting intake workflow...");
@@ -1190,6 +1191,36 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 storage.save_tasks(&tasks, tag.as_deref()).await?;
             }
 
+            // Check for auto-append deploy task from cto-config.json
+            let config_paths = [
+                project_path.join("cto-config.json"),
+                project_path.join(".tasks/cto-config.json"),
+            ];
+            let mut auto_append_deploy = false;
+            for config_path in &config_paths {
+                if config_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(config_path) {
+                        if let Ok(config) = CtoConfig::from_json(&content) {
+                            auto_append_deploy = config.defaults.intake.auto_append_deploy_task;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Auto-append deploy task if configured
+            if auto_append_deploy {
+                if intake::domain::has_deploy_task(&tasks) {
+                    ui::print_info("Deploy task already exists, skipping auto-append");
+                } else {
+                    ui::print_info("Auto-appending deploy task (depends on all other tasks)");
+                    let deploy_task = intake::domain::create_deploy_task(&tasks);
+                    tasks.push(deploy_task);
+                    // Save the updated tasks
+                    storage.save_tasks(&tasks, tag.as_deref()).await?;
+                }
+            }
+
             let repository = repository.unwrap_or_else(|| "unknown/unknown".to_string());
             let service = service.unwrap_or_else(|| "unknown".to_string());
             let docs_repository = docs_repository.unwrap_or_else(|| repository.clone());
@@ -1285,6 +1316,36 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 ));
                 // Save the updated tasks back
                 storage.save_tasks(&tasks, tag.as_deref()).await?;
+            }
+
+            // Check for auto-append deploy task from cto-config.json
+            let config_paths = [
+                project_path.join("cto-config.json"),
+                project_path.join(".tasks/cto-config.json"),
+            ];
+            let mut auto_append_deploy = false;
+            for config_path in &config_paths {
+                if config_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(config_path) {
+                        if let Ok(config) = CtoConfig::from_json(&content) {
+                            auto_append_deploy = config.defaults.intake.auto_append_deploy_task;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Auto-append deploy task if configured
+            if auto_append_deploy {
+                if intake::domain::has_deploy_task(&tasks) {
+                    ui::print_info("Deploy task already exists, skipping auto-append");
+                } else {
+                    ui::print_info("Auto-appending deploy task (depends on all other tasks)");
+                    let deploy_task = intake::domain::create_deploy_task(&tasks);
+                    tasks.push(deploy_task);
+                    // Save the updated tasks
+                    storage.save_tasks(&tasks, tag.as_deref()).await?;
+                }
             }
 
             let output_dir = output.unwrap_or_else(|| project_path.join(".tasks").join("docs"));

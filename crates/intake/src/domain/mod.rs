@@ -37,4 +37,4 @@ pub mod docs {
 pub use ai::AIDomain;
 pub use config::ConfigDomain;
 pub use cto_config::{generate_cto_config, save_cto_config, CtoConfig};
-pub use intake::{IntakeConfig, IntakeDomain, IntakeResult};
+pub use intake::{create_deploy_task, has_deploy_task, IntakeConfig, IntakeDomain, IntakeResult};
