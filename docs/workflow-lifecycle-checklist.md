@@ -76,7 +76,10 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
   - Agent hints assigned via content-based routing (NOT hardcoded Task 1 = Bolt)
   - Subtasks generated with execution levels (if complexity warrants)
   - Complexity analysis completed (if enabled)
-  - **Test strategy defined for each task** (important for downstream testing)
+  - **Test strategy defined for each task** (AI generates `testStrategy` field)
+    - Verify `testStrategy` is non-empty in `tasks.json`
+    - Strategy should guide Tess on verification approach
+    - AI applies research findings to test strategy if research mode enabled
 
 ### Step 1.5: Auto-Append Deploy Task
 - If `autoAppendDeployTask: true` in config, final Bolt deploy task is added
@@ -89,8 +92,12 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
 ### Step 1.6: Documentation Generation
 - Agent prompts (MD + XML) and acceptance criteria files created
 - **Conditions to verify:**
-  - `.tasks/tasks/tasks.json` created
+  - `.tasks/tasks/tasks.json` created with all fields:
+    - `id`, `title`, `description`, `details`
+    - `testStrategy` (non-empty - guides Tess)
+    - `dependencies`, `priority`, `agent_hint`
   - `.tasks/docs/{task_id}/prompt.md` for each task
+    - Contains `## Test Strategy` section from AI
   - `.tasks/docs/{task_id}/prompt.xml` for each task
   - `.tasks/docs/{task_id}/acceptance.md` for each task
   - `cto-config.json` generated with agent tool configurations
@@ -369,7 +376,10 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
 - Tess agent runs comprehensive test suite
 - **Conditions to verify:**
   - CodeRun created for Tess with `job: test`
-  - **Test strategy from intake** used to guide testing
+  - **Test strategy from intake used to guide testing:**
+    - `testStrategy` field from `tasks.json` passed to Tess prompt
+    - Strategy values: `unit`, `integration`, `e2e`, `smoke`, `manual`
+    - Tess adapts testing approach based on strategy
   - Test framework available for language
   
   **Unit Tests:**
