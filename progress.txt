@@ -7,6 +7,11 @@
 - Manual trigger: POST /trigger/intake with {"issueId": "CTOPA-XXX"} bypasses webhook dependency
 - CodeRuns vs Argo: cto___jobs shows Argo workflows, use `kubectl get coderuns -n cto` for CodeRuns
 - In-cluster vs local: Always verify in-cluster image matches local fix before E2E testing
+- PM server requires KUBECONFIG environment variable when running locally (default uses ~/.kube/config which may not exist)
+- For local dev, set LINEAR_SKIP_SIGNATURE_VERIFICATION=true to bypass webhook signature checks
+- PM logs are written to /private/tmp/cto-pm.log when started via nohup
+- Once an agent session comment exists on a Linear issue, reassigning delegate won't trigger a new session
+- Intake workflow creates ConfigMap in cto namespace before creating CodeRun
 
 ---
 
@@ -129,4 +134,42 @@
 - Runtime image downloads binaries from GitHub releases (not built from source in CI)
 - Agent Images workflow must complete AFTER release to include fixes
 - Can check release timing vs workflow timing to verify fix inclusion
+---
+
+## 2026-01-15 01:25 - US-004 Investigation (Continued)
+
+**Status: BLOCKED - Infrastructure Issues with Second Attempt**
+
+**Investigation Summary:**
+- Called cto___intake() which created new Linear issue CTOPA-801 (id: d733deb6-8f49-49e8-83fd-3b8f9db72b6c)
+- Intake failed with "Failed to create intake ConfigMap" error
+
+**Root Causes Identified:**
+
+1. **KUBECONFIG not propagated to PM server**
+   - PM server uses `kube::Client::try_default()` which requires KUBECONFIG env var
+   - When started via process-compose or mprocs, the env var wasn't set
+   - Fix: Start PM server with explicit `KUBECONFIG=/Users/jonathonfritz/talos/kubeconfig`
+
+2. **Webhook signature verification failing**
+   - Linear webhooks were rejected with "Invalid webhook signature - no matching agent or legacy secret"
+   - Multiple agent app secrets are configured but none matched
+   - Fix: Set `LINEAR_SKIP_SIGNATURE_VERIFICATION=true` for local dev
+
+3. **Agent session already exists**
+   - Previous failed intake created an agent session comment on the issue
+   - Webhook handler detects existing session and doesn't trigger new intake
+   - The issue already has: "This thread is for an agent session with 5dlabs-morgan1."
+
+**Actions Taken:**
+- Restarted PM server with KUBECONFIG and LINEAR_SKIP_SIGNATURE_VERIFICATION=true
+- Triggered webhooks by reassigning Morgan delegate
+- Verified services are healthy (PM, Healer, Tunnel all OK)
+- Webhooks now received but no new intake triggered due to existing session
+
+**Next Steps:**
+- Need to create a fresh Linear issue without existing agent session to test intake
+- Or manually delete the existing agent session comment and retry
+- Update PRD to note this blocker requires clean Linear issue
+
 ---
