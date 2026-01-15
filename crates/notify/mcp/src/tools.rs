@@ -41,7 +41,7 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
 fn get_intake_schema() -> Value {
     json!({
         "name": "intake",
-        "description": "Process a PRD to generate tasks and documentation. Parses PRD, generates task breakdowns with complexity analysis, creates agent prompts (XML + Markdown), and optionally submits a PR. Use local=true for immediate local execution without Argo.",
+        "description": "Process a PRD to generate tasks and documentation. Parses PRD, generates task breakdowns with complexity analysis, creates agent prompts (XML + Markdown), and optionally submits a PR.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -64,11 +64,6 @@ fn get_intake_schema() -> Value {
                 "architecture_content": {
                     "type": "string",
                     "description": "Architecture document content (optional). If not provided, reads from {project_name}/architecture.md if it exists"
-                },
-                "local": {
-                    "type": "boolean",
-                    "description": "Run intake locally using tasks CLI instead of submitting Argo workflow (optional, defaults to false)",
-                    "default": false
                 },
                 "num_tasks": {
                     "type": "integer",
