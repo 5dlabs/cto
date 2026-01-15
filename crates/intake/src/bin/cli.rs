@@ -1088,6 +1088,23 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
 
             let output_dir = output.unwrap_or_else(|| project_path.join(".tasks"));
 
+            // Check for auto-append deploy task from cto-config.json
+            let config_paths = [
+                project_path.join("cto-config.json"),
+                project_path.join(".tasks/cto-config.json"),
+            ];
+            let mut auto_append_deploy = false;
+            for config_path in &config_paths {
+                if config_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(config_path) {
+                        if let Ok(cto_config) = CtoConfig::from_json(&content) {
+                            auto_append_deploy = cto_config.defaults.intake.auto_append_deploy_task;
+                            break;
+                        }
+                    }
+                }
+            }
+
             let config = IntakeConfig {
                 prd_path: prd,
                 architecture_path: architecture,
@@ -1102,7 +1119,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 service,
                 docs_repository,
                 docs_project_directory,
-                auto_append_deploy_task: false,
+                auto_append_deploy_task: auto_append_deploy,
             };
 
             ui::print_info("Starting intake workflow...");
