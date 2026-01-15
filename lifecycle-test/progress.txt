@@ -23,6 +23,9 @@ Started: $(date)
 - Linear webhook can be queried via GraphQL API: `webhooks { nodes { url enabled } }`
 - Intake MCP tool attaches docs as Linear documents (linked in description), not as file attachments
 - Intake CodeRuns use format: `intake-<issue-id>-<timestamp>` (e.g., intake-ctopa-807-1768504019)
+- Intake CLI generates `## Test Strategy` section in prompt.md when task.test_strategy is non-empty (crates/intake/src/bin/cli.rs:1020-1024)
+- AI JSON parsing errors occur when Claude includes explanatory text with JSON output - this is a known issue with LLM JSON generation
+- Successful intake example: 5dlabs/alerthub-multi-platform-notification-system has complete tasks.json with testStrategy, agentHint, subtasks
 ---
 
 ## 2026-01-15 - PRE-001
@@ -96,5 +99,30 @@ Started: $(date)
   - Intake runs as a CodeRun CR (not Argo Workflow), check with `kubectl get coderuns -n cto | grep intake`
   - auto_assign_morgan=true creates an agent session thread, enabling Morgan to respond
   - The actual intake work is done by Morgan via CodeRun, not via traditional Argo Workflow
+---
+
+## 2026-01-15 - INT-002 (BLOCKED)
+- **Story**: Intake: Verify Task Generation
+- **Status**: BLOCKED - Intake CodeRun failing due to AI response parsing errors
+- **Verification attempted**:
+  - Multiple intake runs attempted (CTOPA-807, CTOPA-808)
+  - All failed with "AI response parse error: Failed to parse AI response as JSON"
+  - Claude (Opus) is returning JSON mixed with explanatory text instead of pure JSON
+  - Example error: `{"tasks":[The tasks have been generated...` (text mixed in JSON)
+- **Partial verification from existing successful intake (alerthub-multi-platform-notification-system)**:
+  - ✅ Intake runs in CLI mode - confirmed from logs: "Using CLI provider for AI operations"
+  - ✅ tasks.json structure verified - has `tasks` array with proper fields
+  - ✅ testStrategy field present - each task has non-empty testStrategy
+  - ✅ Agent hints assigned - `agentHint` field present (bolt, rex, nova, etc.)
+  - ✅ Subtasks generated - each task has subtasks with id, dependencies, priority, testStrategy
+  - ⚠️ prompt.md Test Strategy section - older intakes don't have it, but code shows it's generated when task.test_strategy is non-empty
+- **Root cause**: Claude CLI is returning mixed text/JSON responses instead of pure JSON
+- **Impact**: Cannot complete end-to-end verification for this lifecycle test
+- **Learnings for future iterations:**
+  - The intake CLI uses extended thinking (`extended_thinking=true, thinking_budget=10000`)
+  - Large PRDs (~50+ tasks) with Opus model may trigger verbose explanatory responses
+  - The JSON parsing in intake CLI expects pure JSON, not JSON with embedded text
+  - Previous successful intakes exist (alerthub-multi-platform-notification-system) proving the system works
+  - Consider using JSON mode/structured output enforcement in future
 ---
 
