@@ -110,3 +110,24 @@
 
 **US-004 Status: BLOCKED** - Cannot proceed until provider.rs fix is deployed to cluster
 ---
+
+## 2026-01-15 00:57 - US-004 BLOCKER RESOLUTION IN PROGRESS
+- Previous blocker: provider.rs fix needed to be deployed to cluster
+- Fix status:
+  - Commit f86f528a9 merged to main at 2026-01-14T22:03:28 UTC
+  - Release v0.2.7 published at 2026-01-14T22:43:06 UTC with fixed intake binary
+  - Agent Images workflow 21012519735 started at 2026-01-15T00:51:09 UTC
+  - Workflow status: IN PROGRESS (runtime image completed, agent images building)
+- The claude:latest image will be rebuilt with intake v0.2.7 binary containing the fix
+- Once Agent Images workflow completes:
+  - New images pushed to ghcr.io/5dlabs/*:latest
+  - Next intake CodeRun will pull updated image with fixed intake CLI
+- Waiting for workflow to complete before retrying intake
+
+**Current workflow URL:** https://github.com/5dlabs/cto/actions/runs/21012519735
+
+**Learnings for future iterations:**
+- Runtime image downloads binaries from GitHub releases (not built from source in CI)
+- Agent Images workflow must complete AFTER release to include fixes
+- Can check release timing vs workflow timing to verify fix inclusion
+---
