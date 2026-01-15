@@ -1,0 +1,28 @@
+{
+  "worker_isolation": false,
+  "context": {
+    "task": {
+      "id": 3,
+      "title": "Implement API endpoint for user profile",
+      "description": "Create GET/PUT /api/users/:id endpoint"
+    },
+    "relevant_files": [
+      "src/handlers/user.rs",
+      "src/models/user.rs"
+    ],
+    "acceptance_criteria": [
+      "GET endpoint returns user data",
+      "PUT endpoint updates user data",
+      "Proper error handling"
+    ],
+    "other_workers": [
+      { "id": "worker-1", "task": "Database migrations", "status": "completed" },
+      { "id": "worker-2", "task": "Auth middleware", "status": "in_progress" }
+    ],
+    "coordination_info": {
+      "depends_on": ["worker-2"],
+      "blocks": ["worker-4"],
+      "shared_resources": ["database", "redis"]
+    }
+  }
+}

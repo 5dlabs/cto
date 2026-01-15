@@ -1,0 +1,8 @@
+{
+  "roleModels": {
+    "planner": "claude-opus-4-5-20251101",
+    "worker": "gpt-5.2-codex",
+    "judge": "claude-opus-4-5-20251101",
+    "reviewer": "claude-sonnet-4-5-20250514"
+  }
+}

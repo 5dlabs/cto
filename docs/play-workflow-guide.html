@@ -152,6 +152,10 @@
         .flow-node[data-stage="quality"]:hover,
         .flow-node[data-stage="quality"].active { background: #06b6d4; }
         
+        .flow-node[data-stage="judge"] { border-color: #f97316; }
+        .flow-node[data-stage="judge"]:hover,
+        .flow-node[data-stage="judge"].active { background: #f97316; }
+        
         .flow-node[data-stage="security"] { border-color: #ef4444; }
         .flow-node[data-stage="security"]:hover,
         .flow-node[data-stage="security"].active { background: #ef4444; }
@@ -167,6 +171,14 @@
         .flow-node[data-stage="merged"] { border-color: #22c55e; }
         .flow-node[data-stage="merged"]:hover,
         .flow-node[data-stage="merged"].active { background: #22c55e; }
+        
+        /* Loop indicator */
+        .flow-loop-indicator {
+            font-size: 0.7rem;
+            color: var(--warning);
+            text-align: center;
+            margin-top: 0.25rem;
+        }
         
         /* Stage Details Panel */
         .stage-details {
@@ -516,6 +528,7 @@
             <li><a href="#stages">Stages</a></li>
             <li><a href="#tools">MCP Tools</a></li>
             <li><a href="#criteria">Acceptance Criteria</a></li>
+            <li><a href="#cursor" style="color: var(--secondary);">🚀 Cursor Improvements</a></li>
         </ul>
     </nav>
 
@@ -523,12 +536,13 @@
         <header>
             <h1>🎭 Play Workflow Guide</h1>
             <p class="subtitle">Multi-agent orchestration from PRD to shipped feature</p>
+            <p style="color: var(--secondary); font-size: 0.9rem; margin-top: 0.5rem;">Now with Cursor-inspired improvements: Judge mode, Fresh starts, Worker isolation</p>
         </header>
 
         <!-- Workflow Flow Diagram -->
         <section id="workflow">
             <h2>📊 Workflow Flow</h2>
-            <p style="color: var(--text-muted); margin-bottom: 1rem;">Click on any stage to see details and acceptance criteria.</p>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">Click on any stage to see details and acceptance criteria. The new <strong style="color: var(--secondary);">Judge stage</strong> creates an iteration loop that can continue, complete, or fresh-start based on progress.</p>
             
             <div class="flow-container">
                 <div class="flow-diagram">
@@ -565,6 +579,14 @@
                             Quality
                             <div class="agent">Cleo</div>
                         </div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-node" data-stage="judge" onclick="showStageDetails('judge')">
+                            Judge
+                            <div class="agent">Cleo</div>
+                        </div>
+                        <div class="flow-loop-indicator">↩️ can loop back</div>
                     </div>
                     <div class="flow-arrow">→</div>
                     <div class="flow-step">
@@ -702,6 +724,36 @@
                 </ul>
             </div>
             
+            <div id="stage-judge" class="stage-details">
+                <div class="stage-header">
+                    <div class="stage-icon" style="background: #f97316;">⚖️</div>
+                    <div>
+                        <div class="stage-title">Judge Stage</div>
+                        <div class="stage-agent">Agent: Cleo (Judge Mode) • Timeout: 10 min</div>
+                    </div>
+                </div>
+                <p>Cleo evaluates the iteration and decides the next action. Based on <a href="https://cursor.com/blog/scaling-autonomous-coding" style="color: var(--primary);">Cursor's research</a> on scaling autonomous coding.</p>
+                <h3>Decisions</h3>
+                <div class="table-container">
+                    <table>
+                        <tr><th>Decision</th><th>Action</th><th>When</th></tr>
+                        <tr><td><code>continue</code></td><td>Workers iterate again</td><td>More work needed, acceptance &lt; threshold</td></tr>
+                        <tr><td><code>complete</code></td><td>Proceed to security</td><td>Acceptance criteria met, quality sufficient</td></tr>
+                        <tr><td><code>fresh_start</code></td><td>Clear context, restart</td><td>Drift detected, tunnel vision, risk aversion</td></tr>
+                    </table>
+                </div>
+                <h3>Drift Indicators</h3>
+                <ul class="criteria-list">
+                    <li>Avoiding complex implementation tasks (risk aversion)</li>
+                    <li>Making cosmetic changes instead of core features</li>
+                    <li>Repeated similar commits without meaningful progress</li>
+                    <li>Context accumulation causing confusion</li>
+                </ul>
+                <div class="info-box warning">
+                    <strong>Fresh Start:</strong> Clears <code>.conversation_id</code> and <code>.session_state</code> to combat drift. Triggered after <code>freshStartThreshold</code> retries (default: 3).
+                </div>
+            </div>
+            
             <div id="stage-security" class="stage-details">
                 <div class="stage-header">
                     <div class="stage-icon" style="background: #ef4444;">🔒</div>
@@ -764,19 +816,28 @@
                 <div class="stage-header">
                     <div class="stage-icon" style="background: #3b82f6;">🔀</div>
                     <div>
-                        <div class="stage-title">Integration Stage</div>
-                        <div class="stage-agent">Agent: Atlas (Integration) • Timeout: 30 min</div>
+                        <div class="stage-title">Integration Stage (Simplified)</div>
+                        <div class="stage-agent">Agent: Atlas (Merge Only) • Timeout: 15 min</div>
                     </div>
                 </div>
-                <p>Atlas resolves conflicts and merges the PR to the main branch.</p>
-                <h3>Acceptance Criteria</h3>
+                <p>Atlas verifies CI passes and merges the PR. Quality judgment has been moved to Cleo Judge.</p>
+                <h3>Simplified Responsibilities</h3>
                 <ul class="criteria-list">
-                    <li>Branch is rebased on latest main</li>
-                    <li>Merge conflicts (if any) are resolved correctly</li>
-                    <li>All CI checks pass after rebase</li>
-                    <li>PR is approved (or auto-merge enabled)</li>
-                    <li>PR is merged to main branch</li>
+                    <li>Verify all CI checks pass</li>
+                    <li>Merge PR to target branch</li>
                 </ul>
+                <div class="info-box">
+                    <strong>Why Simplified?</strong> Based on Cursor's research, they removed their "integrator" role because workers were already capable of handling conflicts themselves. Quality judgment is now handled by Cleo Judge, reducing Atlas to a simple merge gate.
+                </div>
+                <h3>Removed Responsibilities</h3>
+                <div class="table-container">
+                    <table>
+                        <tr><th>Responsibility</th><th>Now Handled By</th></tr>
+                        <tr><td>Quality judgment</td><td>Cleo Judge</td></tr>
+                        <tr><td>Conflict resolution</td><td>Workers themselves</td></tr>
+                        <tr><td>Code review</td><td>Cleo Quality</td></tr>
+                    </table>
+                </div>
             </div>
             
             <div id="stage-merged" class="stage-details">
@@ -950,10 +1011,10 @@
                             <div class="agent-avatar category-support">Cleo</div>
                             <div>
                                 <div class="agent-name">Cleo</div>
-                                <div class="agent-role">Quality Assurance</div>
+                                <div class="agent-role">Quality + Judge</div>
                             </div>
                         </div>
-                        <div class="agent-details">Code review, style enforcement, quality checks</div>
+                        <div class="agent-details">Code review, style enforcement, <strong style="color: var(--secondary);">+ iteration arbiter (judge mode)</strong></div>
                     </div>
                     
                     <div class="agent-card">
@@ -983,10 +1044,10 @@
                             <div class="agent-avatar category-support">Atlas</div>
                             <div>
                                 <div class="agent-name">Atlas</div>
-                                <div class="agent-role">Integration</div>
+                                <div class="agent-role">Integration (Simplified)</div>
                             </div>
                         </div>
-                        <div class="agent-details">Conflict resolution, PR merging, CI management</div>
+                        <div class="agent-details">CI verification, PR merging <em style="color: var(--text-muted);">(quality judgment moved to Cleo Judge)</em></div>
                     </div>
                 </div>
             </div>
@@ -1064,6 +1125,10 @@
                         <td>Style consistent, no code smells, documented</td>
                     </tr>
                     <tr>
+                        <td><strong>Judge</strong></td>
+                        <td>Iteration decision: continue, complete, or fresh_start</td>
+                    </tr>
+                    <tr>
                         <td><strong>Security</strong></td>
                         <td>No vulnerabilities, input validated, auth correct</td>
                     </tr>
@@ -1125,6 +1190,203 @@
             <div class="info-box warning">
                 <strong>Model Rotation:</strong> When acceptance criteria not met:<br>
                 <code>claude → code → gemini → code (/solve) → gemini (flash)</code>
+            </div>
+        </section>
+
+        <!-- Cursor-Inspired Improvements -->
+        <section id="cursor">
+            <h2>🚀 Cursor-Inspired Improvements</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                Based on <a href="https://cursor.com/blog/scaling-autonomous-coding" style="color: var(--primary);">Cursor's research</a> on scaling long-running autonomous coding agents (January 2026).
+            </p>
+
+            <h3>The Problem Cursor Solved</h3>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                When Cursor ran hundreds of concurrent agents, they found that flat coordination (agents with equal status) failed. Agents became risk-averse, avoided hard tasks, and work churned without progress. Their solution: separate planning and execution with a judge to evaluate progress.
+            </p>
+
+            <h3>New Workflow Loop</h3>
+            <div class="flow-container">
+                <pre style="background: transparent; border: none; color: var(--text); font-size: 0.9rem;">
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        CURSOR-INSPIRED LOOP                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   ┌──────────┐     ┌────────────┐     ┌─────────────┐                   │
+│   │  Morgan  │────▶│   Bolt     │────▶│   Workers   │                   │
+│   │ (Planner)│     │ (Infra)    │     │ (Isolated)  │                   │
+│   └──────────┘     └────────────┘     └──────┬──────┘                   │
+│        │                                      │                          │
+│        │ continuous                           ▼                          │
+│        │ planning                      ┌─────────────┐                   │
+│        │                               │ Cleo Judge  │                   │
+│        │                               │             │                   │
+│        │                               │ ┌─────────┐ │                   │
+│        │                               │ │continue │─┼──▶ Back to Workers│
+│        │                               │ ├─────────┤ │                   │
+│        │                               │ │complete │─┼──▶ Security → Merge│
+│        │                               │ ├─────────┤ │                   │
+│        │                               │ │fresh    │─┼──▶ Clear Context  │
+│        │◀──────────────────────────────│ │start    │ │   → Back to Workers│
+│        │    creates follow-up tasks    │ └─────────┘ │                   │
+│        │                               └─────────────┘                   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+                </pre>
+            </div>
+
+            <h3>Key Improvements</h3>
+            <div class="agents-grid">
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <div class="agent-avatar" style="background: #f97316;">⚖️</div>
+                        <div>
+                            <div class="agent-name">Cleo Judge Mode</div>
+                            <div class="agent-role">Iteration Arbiter</div>
+                        </div>
+                    </div>
+                    <div class="agent-details">
+                        After each implementation cycle, Cleo evaluates and decides: <code>continue</code> (iterate), <code>complete</code> (proceed), or <code>fresh_start</code> (reset context).
+                    </div>
+                </div>
+
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <div class="agent-avatar" style="background: #22c55e;">🔄</div>
+                        <div>
+                            <div class="agent-name">Fresh Start</div>
+                            <div class="agent-role">Drift Recovery</div>
+                        </div>
+                    </div>
+                    <div class="agent-details">
+                        After N retries (default: 3), clears conversation context to combat tunnel vision and accumulated mistakes.
+                    </div>
+                </div>
+
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <div class="agent-avatar" style="background: #8b5cf6;">🎯</div>
+                        <div>
+                            <div class="agent-name">Role-Specific Models</div>
+                            <div class="agent-role">Optimized Selection</div>
+                        </div>
+                    </div>
+                    <div class="agent-details">
+                        Different models for different roles: Opus for planning/judging, Codex for implementation, Sonnet for review.
+                    </div>
+                </div>
+
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <div class="agent-avatar" style="background: #06b6d4;">🔒</div>
+                        <div>
+                            <div class="agent-name">Worker Isolation</div>
+                            <div class="agent-role">No Peer Coordination</div>
+                        </div>
+                    </div>
+                    <div class="agent-details">
+                        Workers focus only on their task with no knowledge of other workers. Reduces coordination overhead and prevents risk aversion.
+                    </div>
+                </div>
+
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <div class="agent-avatar" style="background: #3b82f6;">📋</div>
+                        <div>
+                            <div class="agent-name">Continuous Planning</div>
+                            <div class="agent-role">Dynamic Task Creation</div>
+                        </div>
+                    </div>
+                    <div class="agent-details">
+                        Morgan can create follow-up tasks dynamically based on implementation progress (experimental feature).
+                    </div>
+                </div>
+
+                <div class="agent-card">
+                    <div class="agent-header">
+                        <div class="agent-avatar" style="background: #ef4444;">⚡</div>
+                        <div>
+                            <div class="agent-name">Simplified Atlas</div>
+                            <div class="agent-role">Merge Only</div>
+                        </div>
+                    </div>
+                    <div class="agent-details">
+                        Atlas reduced to merge-only role. Quality judgment moved to Cleo Judge, conflicts handled by workers.
+                    </div>
+                </div>
+            </div>
+
+            <h3>Configuration</h3>
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">Add to <code>cto-config.json</code> under <code>defaults.play</code>:</p>
+            <pre>{
+  "defaults": {
+    "play": {
+      "enableJudgeAgent": true,
+      "freshStartThreshold": 3,
+      "workerIsolation": true,
+      "continuousPlanning": false,
+      "roleModels": {
+        "planner": "claude-opus-4-5-20251101",
+        "worker": "gpt-5.2-codex",
+        "judge": "claude-opus-4-5-20251101",
+        "reviewer": "claude-sonnet-4-5-20250514"
+      }
+    }
+  }
+}</pre>
+
+            <div class="table-container">
+                <table>
+                    <tr>
+                        <th>Config</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>enableJudgeAgent</code></td>
+                        <td><code>true</code></td>
+                        <td>Enable Cleo judge mode for iteration decisions</td>
+                    </tr>
+                    <tr>
+                        <td><code>freshStartThreshold</code></td>
+                        <td><code>3</code></td>
+                        <td>Number of retries before triggering fresh start</td>
+                    </tr>
+                    <tr>
+                        <td><code>workerIsolation</code></td>
+                        <td><code>true</code></td>
+                        <td>Remove peer coordination from worker context</td>
+                    </tr>
+                    <tr>
+                        <td><code>continuousPlanning</code></td>
+                        <td><code>false</code></td>
+                        <td>Enable Morgan to create follow-up tasks dynamically</td>
+                    </tr>
+                    <tr>
+                        <td><code>roleModels.planner</code></td>
+                        <td><code>opus</code></td>
+                        <td>Model for planning (extended thinking)</td>
+                    </tr>
+                    <tr>
+                        <td><code>roleModels.worker</code></td>
+                        <td><code>codex</code></td>
+                        <td>Model for implementation (fast execution)</td>
+                    </tr>
+                    <tr>
+                        <td><code>roleModels.judge</code></td>
+                        <td><code>opus</code></td>
+                        <td>Model for judge evaluation (reasoning)</td>
+                    </tr>
+                    <tr>
+                        <td><code>roleModels.reviewer</code></td>
+                        <td><code>sonnet</code></td>
+                        <td>Model for code review (balance)</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="info-box success">
+                <strong>Why This Works:</strong> Cursor found that agents running for weeks need: (1) a judge to prevent drift, (2) fresh starts to clear accumulated mistakes, (3) isolated workers to prevent risk aversion, and (4) role-specific models because planning and coding require different strengths.
             </div>
         </section>
 

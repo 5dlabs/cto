@@ -1,0 +1,8 @@
+{
+  "decision": "continue",
+  "reasoning": "Acceptance criteria only 60% complete. Core authentication handler not yet implemented.",
+  "acceptance_completion": 0.60,
+  "quality_score": 0.75,
+  "drift_indicators": [],
+  "risk_aversion_detected": false
+}

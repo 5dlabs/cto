@@ -4,6 +4,7 @@
 
 ACCEPTANCE_FILE="${CLI_WORK_DIR}/task/acceptance-criteria.md"
 PROBE_RESULT_FILE="/workspace/.acceptance_result"
+JUDGE_DECISION_FILE="${JUDGE_DECISION_FILE:-/workspace/.judge_decision}"
 
 # Initialize probe result
 echo "pending" > "$PROBE_RESULT_FILE"
@@ -66,6 +67,79 @@ probe_acceptance_criteria() {
     fi
 }
 
-# Export for use in completion partial
+# =========================================================================
+# Judge Decision Integration (US-001)
+# =========================================================================
+
+# Read the judge decision file if it exists
+read_judge_decision() {
+    if [ -f "$JUDGE_DECISION_FILE" ]; then
+        cat "$JUDGE_DECISION_FILE"
+    else
+        echo '{"decision": "continue"}'
+    fi
+}
+
+# Get the decision type from judge decision
+get_judge_decision_type() {
+    local decision_json
+    decision_json=$(read_judge_decision)
+    echo "$decision_json" | jq -r '.decision // "continue"' 2>/dev/null || echo "continue"
+}
+
+# Check if judge says fresh start is needed
+judge_needs_fresh_start() {
+    local decision
+    decision=$(get_judge_decision_type)
+    [ "$decision" = "fresh_start" ]
+}
+
+# Check if judge says task is complete
+judge_says_complete() {
+    local decision
+    decision=$(get_judge_decision_type)
+    [ "$decision" = "complete" ]
+}
+
+# Log judge decision for observability
+log_judge_decision() {
+    local decision_json
+    decision_json=$(read_judge_decision)
+    
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ Judge Decision"
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    
+    local decision reasoning
+    decision=$(echo "$decision_json" | jq -r '.decision // "unknown"' 2>/dev/null)
+    reasoning=$(echo "$decision_json" | jq -r '.reasoning // "No reasoning provided"' 2>/dev/null)
+    
+    case "$decision" in
+        "complete")
+            echo "✅ Judge Decision: COMPLETE"
+            ;;
+        "fresh_start")
+            echo "🔄 Judge Decision: FRESH START"
+            ;;
+        "continue")
+            echo "🔁 Judge Decision: CONTINUE"
+            ;;
+        *)
+            echo "❓ Judge Decision: UNKNOWN ($decision)"
+            ;;
+    esac
+    
+    echo "   Reasoning: $reasoning"
+    echo ""
+}
+
+# Export for use in other partials
 export -f probe_acceptance_criteria 2>/dev/null || true
+export -f read_judge_decision 2>/dev/null || true
+export -f get_judge_decision_type 2>/dev/null || true
+export -f judge_needs_fresh_start 2>/dev/null || true
+export -f judge_says_complete 2>/dev/null || true
+export -f log_judge_decision 2>/dev/null || true
 

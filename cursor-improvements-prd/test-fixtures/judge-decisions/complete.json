@@ -1,0 +1,8 @@
+{
+  "decision": "complete",
+  "reasoning": "All acceptance criteria met. Code quality is sufficient. Ready to proceed to security review.",
+  "acceptance_completion": 0.95,
+  "quality_score": 0.90,
+  "drift_indicators": [],
+  "risk_aversion_detected": false
+}

@@ -1,22 +1,98 @@
 # =========================================================================
-# Retry Loop with Model Rotation and Acceptance Verification
+# Retry Loop with Model Rotation, Acceptance Verification & Fresh Start (US-003)
 # =========================================================================
 
 # Retry configuration from environment or template defaults
 MAX_RETRIES="${EXECUTION_MAX_RETRIES:-{{default_retries}}}"
 CURRENT_ATTEMPT="${CURRENT_ATTEMPT:-1}"
 
+# Fresh Start configuration (US-003)
+# After this many retries, trigger a fresh start to combat drift
+FRESH_START_THRESHOLD="${FRESH_START_THRESHOLD:-{{fresh_start_threshold}}}"
+
 echo ""
 echo "🔄 Retry Configuration:"
 echo "   Max Retries: $MAX_RETRIES"
 echo "   Current Attempt: $CURRENT_ATTEMPT"
+echo "   Fresh Start Threshold: $FRESH_START_THRESHOLD"
 if [ "${MODEL_ROTATION_ENABLED:-false}" = "true" ]; then
     echo "   Model Rotation: ENABLED"
     echo "   Models: $(echo "$MODEL_ROTATION_MODELS" | jq -r 'join(" → ")' 2>/dev/null || echo "$MODEL_ROTATION_MODELS")"
 fi
 echo ""
 
-# Run CLI with retry awareness and model rotation
+# =========================================================================
+# Fresh Start Mechanism (US-003)
+# =========================================================================
+
+# Check if fresh start should be triggered
+# Based on Cursor's finding: periodic fresh starts combat drift and tunnel vision
+should_fresh_start() {
+    local attempt=${1:-$CURRENT_ATTEMPT}
+    local judge_decision="${JUDGE_DECISION:-continue}"
+    
+    # Trigger fresh start if:
+    # 1. Retry count exceeds threshold
+    # 2. Judge signals fresh_start
+    
+    if [ "$attempt" -gt "$FRESH_START_THRESHOLD" ]; then
+        echo "true"
+        return 0
+    fi
+    
+    if [ "$judge_decision" = "fresh_start" ]; then
+        echo "true"
+        return 0
+    fi
+    
+    # Check judge decision file if function exists
+    if type judge_needs_fresh_start >/dev/null 2>&1; then
+        if judge_needs_fresh_start; then
+            echo "true"
+            return 0
+        fi
+    fi
+    
+    echo "false"
+    return 1
+}
+
+# Trigger a fresh start - clear accumulated context
+trigger_fresh_start() {
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║ 🔄 FRESH START TRIGGERED"
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "Reason: Retry threshold exceeded or drift detected"
+    echo "Action: Clearing accumulated context, restarting with task only"
+    echo ""
+    
+    # Export fresh start flags
+    export CONTINUE_SESSION="false"
+    export FRESH_START="true"
+    
+    # Clear context markers to prevent context accumulation
+    rm -f /workspace/.conversation_id 2>/dev/null
+    rm -f /workspace/.session_state 2>/dev/null
+    rm -f /workspace/.agent_context 2>/dev/null
+    
+    # Log fresh start event for observability
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) FRESH_START attempt=$CURRENT_ATTEMPT threshold=$FRESH_START_THRESHOLD" >> /workspace/.fresh_start_log 2>/dev/null || true
+    
+    echo "✅ Context cleared - agent will start fresh with task definition only"
+    echo ""
+}
+
+# Export fresh start functions
+export -f should_fresh_start 2>/dev/null || true
+export -f trigger_fresh_start 2>/dev/null || true
+
+# =========================================================================
+# Main Retry Loop
+# =========================================================================
+
+# Run CLI with retry awareness, model rotation, and fresh start support
 run_with_retry() {
     local attempt=1
     local max_attempts=$((MAX_RETRIES + 1))  # +1 for initial attempt
@@ -24,6 +100,11 @@ run_with_retry() {
     while [ "$attempt" -le "$max_attempts" ]; do
         echo ""
         echo "════════════════════════════════════════════════════════════════"
+        
+        # Check if fresh start is needed (US-003)
+        if [ "$(should_fresh_start "$attempt")" = "true" ]; then
+            trigger_fresh_start
+        fi
         
         # Get model for this attempt (handles rotation if enabled)
         local current_model
@@ -39,6 +120,9 @@ run_with_retry() {
         else
             echo "║ Model: $current_model"
         fi
+        if [ "${FRESH_START:-false}" = "true" ]; then
+            echo "║ Mode: FRESH START (context cleared)"
+        fi
         echo "════════════════════════════════════════════════════════════════"
         echo ""
 
@@ -49,6 +133,9 @@ run_with_retry() {
         # Execute the CLI (adapter should read ACTIVE_MODEL)
         {{cli_execute}}
         CLI_EXIT_CODE=$?
+        
+        # Reset fresh start flag after execution
+        export FRESH_START="false"
 
         if [ $CLI_EXIT_CODE -ne 0 ]; then
             echo "❌ CLI execution failed with exit code: $CLI_EXIT_CODE"
@@ -70,7 +157,22 @@ run_with_retry() {
             fi
         fi
 
-        # CLI succeeded - now verify acceptance criteria
+        # CLI succeeded - check judge decision if available (US-001)
+        if type log_judge_decision >/dev/null 2>&1; then
+            log_judge_decision
+        fi
+        
+        # If judge says complete, we're done
+        if type judge_says_complete >/dev/null 2>&1; then
+            if judge_says_complete; then
+                echo "✅ Judge approved - task complete"
+                echo "   Model used: $current_model"
+                echo "   Attempt: $attempt of $max_attempts"
+                return 0
+            fi
+        fi
+
+        # Verify acceptance criteria
         if type probe_acceptance_criteria >/dev/null 2>&1; then
             if probe_acceptance_criteria; then
                 echo "✅ Task complete - acceptance criteria verified"
@@ -79,7 +181,13 @@ run_with_retry() {
                 return 0
             else
                 if [ "$attempt" -lt "$max_attempts" ]; then
-                    if [ "${MODEL_ROTATION_ENABLED:-false}" = "true" ]; then
+                    # Check if we should fresh start on next attempt
+                    local should_fs
+                    should_fs=$(should_fresh_start "$((attempt + 1))")
+                    
+                    if [ "$should_fs" = "true" ]; then
+                        echo "🔄 Acceptance criteria not met - will fresh start on next attempt"
+                    elif [ "${MODEL_ROTATION_ENABLED:-false}" = "true" ]; then
                         local next_model
                         next_model=$(get_model_for_attempt "$((attempt + 1))")
                         echo "🔄 Acceptance criteria not met - retrying with model: $next_model"
@@ -87,8 +195,10 @@ run_with_retry() {
                         echo "🔄 Acceptance criteria not met - retrying..."
                     fi
                     attempt=$((attempt + 1))
-                    # Continue session flag for retry
-                    export CONTINUE_SESSION="true"
+                    # Continue session flag for retry (unless fresh start)
+                    if [ "$should_fs" != "true" ]; then
+                        export CONTINUE_SESSION="true"
+                    fi
                     continue
                 else
                     echo "❌ Max retries exhausted - acceptance criteria not fully met"
