@@ -60,3 +60,115 @@ Started: Thu Jan 15 2026
   - URL pattern: http://localhost:8081/oauth/start?agent={agent_name}
 ---
 
+## 2026-01-15 11:00 - PRE-003 (RE-CHECKED, STILL BLOCKED)
+- Re-verified credentials status via `just preflight`
+- Section 4 (API KEYS & SECRETS): All 4 core credentials showing ✅
+  - LINEAR_OAUTH_TOKEN (OAuth - preferred) ✅
+  - ANTHROPIC_API_KEY ✅
+  - GITHUB_TOKEN ✅
+  - LINEAR_WEBHOOK_SECRET ✅
+- Section 5 (AGENT OAUTH TOKENS): Only morgan passing
+  - morgan: ✓ secret, ✓ token ✅
+  - rex, blaze, bolt, atlas, cleo, cipher, tess: ✓ secret, ✗ token ❌
+- Preflight result: "PRE-FLIGHT PASSED WITH 7 WARNING(S)"
+- **STILL BLOCKED**: Cannot complete acceptance criteria requiring ALL agents with tokens
+- Note: Platform CAN run workflows with warnings - limited Linear activity features only
+- **To unblock**: User must run OAuth flow in browser for each agent:
+  - http://localhost:8081/oauth/start?agent=rex
+  - http://localhost:8081/oauth/start?agent=blaze
+  - http://localhost:8081/oauth/start?agent=bolt
+  - http://localhost:8081/oauth/start?agent=atlas
+  - http://localhost:8081/oauth/start?agent=cleo
+  - http://localhost:8081/oauth/start?agent=cipher
+  - http://localhost:8081/oauth/start?agent=tess
+---
+
+## 2026-01-15 11:15 - PRE-003 (ITERATION RE-CHECK)
+- Confirmed PRE-003 still blocked on manual OAuth tokens
+- `just preflight` shows same status: 7 warnings for missing agent OAuth tokens
+- All core credentials verified (LINEAR_OAUTH_TOKEN, GITHUB_TOKEN, ANTHROPIC_API_KEY, LINEAR_WEBHOOK_SECRET)
+- Morgan OAuth verified: LINEAR_APP_MORGAN_ACCESS_TOKEN is set
+- **Remaining blockers**: rex, blaze, bolt, atlas, cleo, cipher, tess need OAuth tokens
+- These require interactive browser OAuth flow - cannot be automated
+- **Recommendation**: Consider proceeding to INT-001 if full agent OAuth is not strictly required for initial testing, as platform runs with warnings
+---
+
+## 2026-01-15 11:30 - PRE-003 (ITERATION 4 - STILL BLOCKED)
+- Re-checked via `just preflight` - no change in status
+- Section 4 (API KEYS & SECRETS): All 4 core credentials ✅
+- Section 5 (AGENT OAUTH TOKENS): Only morgan has token (✓ token)
+  - Missing tokens: rex, blaze, bolt, atlas, cleo, cipher, tess
+- Result: "PRE-FLIGHT PASSED WITH 7 WARNING(S)"
+- **BLOCKED**: Acceptance criteria require ALL agents to show '✓ token' in preflight section 5
+- **Action needed from user**: Complete OAuth flow in browser for each agent
+- Files changed: progress.txt (documenting continued blocker)
+---
+
+## 2026-01-15 11:45 - PRE-003 (ITERATION 5 - STILL BLOCKED)
+- Re-verified via `just preflight` - no change since last iteration
+- Section 4 (API KEYS & SECRETS): All 4 core credentials ✅
+- Section 5 (AGENT OAUTH TOKENS): Only morgan has token
+  - morgan: ✓ secret, ✓ token ✅
+  - rex, blaze, bolt, atlas, cleo, cipher, tess: ✓ secret, ✗ token ❌
+- Result: "PRE-FLIGHT PASSED WITH 7 WARNING(S)"
+- **STILL BLOCKED**: This story requires manual human intervention (browser OAuth flow)
+- **User action required**: Visit these URLs in browser to complete OAuth for each agent:
+  1. http://localhost:8081/oauth/start?agent=rex
+  2. http://localhost:8081/oauth/start?agent=blaze
+  3. http://localhost:8081/oauth/start?agent=bolt
+  4. http://localhost:8081/oauth/start?agent=atlas
+  5. http://localhost:8081/oauth/start?agent=cleo
+  6. http://localhost:8081/oauth/start?agent=cipher
+  7. http://localhost:8081/oauth/start?agent=tess
+- After OAuth completion, tokens will be stored in .env.local and preflight will show ✓ token for all agents
+- Files changed: progress.txt
+---
+
+## 2026-01-15 12:00 - PRE-003 (ITERATION 6 - STILL BLOCKED)
+- Re-verified via `just preflight` - status unchanged
+- Section 4 (API KEYS & SECRETS): All 4 core credentials ✅
+- Section 5 (AGENT OAUTH TOKENS): Only morgan has token
+  - morgan: ✓ secret, ✓ token ✅
+  - rex, blaze, bolt, atlas, cleo, cipher, tess: ✓ secret, ✗ token ❌
+- Result: "PRE-FLIGHT PASSED WITH 7 WARNING(S)"
+- **STILL BLOCKED**: This story CANNOT be completed by an automated agent
+- **Reason**: OAuth flow requires interactive browser session - cannot be automated
+- **User action required**: Visit these URLs in browser:
+  1. http://localhost:8081/oauth/start?agent=rex
+  2. http://localhost:8081/oauth/start?agent=blaze
+  3. http://localhost:8081/oauth/start?agent=bolt
+  4. http://localhost:8081/oauth/start?agent=atlas
+  5. http://localhost:8081/oauth/start?agent=cleo
+  6. http://localhost:8081/oauth/start?agent=cipher
+  7. http://localhost:8081/oauth/start?agent=tess
+- **Learnings for future iterations:**
+  - PRE-003 is a manual story that cannot be automated
+  - Platform can run workflows with warnings (limited Linear activity features)
+  - Consider skipping to INT-001 if user confirms OAuth warnings are acceptable
+---
+
+## 2026-01-15 12:30 - PRE-003 (COMPLETED)
+- User completed OAuth flow for all agents (manual browser interaction)
+- Verified via `just preflight` - all acceptance criteria now met:
+  - Section 4 (API KEYS & SECRETS): All 4 core credentials ✅
+    - LINEAR_OAUTH_TOKEN (OAuth - preferred) ✅
+    - ANTHROPIC_API_KEY ✅
+    - GITHUB_TOKEN ✅
+    - LINEAR_WEBHOOK_SECRET ✅
+  - Section 5 (AGENT OAUTH TOKENS): All 8 agents now have tokens
+    - morgan: ✓ secret, ✓ token ✅
+    - rex: ✓ secret, ✓ token ✅
+    - blaze: ✓ secret, ✓ token ✅
+    - bolt: ✓ secret, ✓ token ✅
+    - atlas: ✓ secret, ✓ token ✅
+    - cleo: ✓ secret, ✓ token ✅
+    - cipher: ✓ secret, ✓ token ✅
+    - tess: ✓ secret, ✓ token ✅
+- Result: "PRE-FLIGHT PASSED - Ready for intake/play workflows!" (0 warnings)
+- Files changed: prd.json (marked PRE-003 as passed), progress.txt
+- **Learnings for future iterations:**
+  - OAuth tokens persist in .env.local after browser flow completion
+  - Once all agent tokens are configured, preflight shows 0 warnings
+  - Platform is now fully ready for intake/play workflows with full Linear activity features
+---
+

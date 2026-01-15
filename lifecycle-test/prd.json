@@ -53,7 +53,7 @@
         "'just preflight' section 5 (AGENT OAUTH) shows all agents with '✓ token'"
       ],
       "testStrategy": "smoke",
-      "passes": false
+      "passes": true
     },
     {
       "id": "INT-001",
