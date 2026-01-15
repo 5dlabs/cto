@@ -132,26 +132,25 @@ echo "🚀 Claude Command: $CLAUDE_CMD \"<prompt>\""
 echo ""
 echo "✓ Prompt loaded ($(echo "$USER_PROMPT" | wc -c) bytes)"
 
-# Execute Claude with pseudo-terminal to force line buffering
-# The script command emulates a TTY which forces stdout line buffering
-# This ensures the sidecar receives stream events in real-time
-if command -v script >/dev/null 2>&1; then
-    echo "✓ Using script for unbuffered output"
-    # macOS: script -q /dev/null
-    # Linux: script -q -c "command" /dev/null
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "$USER_PROMPT" | script -q /dev/null $CLAUDE_CMD | tee "$STREAM_OUTPUT" "$AGENT_LOG"
-    else
-        echo "$USER_PROMPT" | script -q -c "$CLAUDE_CMD" /dev/null | tee "$STREAM_OUTPUT" "$AGENT_LOG"
-    fi
-elif command -v stdbuf >/dev/null 2>&1; then
-    echo "⚠️ Falling back to stdbuf (may have buffering issues)"
-    echo "$USER_PROMPT" | stdbuf -oL $CLAUDE_CMD | tee "$STREAM_OUTPUT" "$AGENT_LOG"
+# Execute Claude with prompt via stdin
+# Note: The `script` command doesn't properly forward stdin when using -c on Linux,
+# so we use stdbuf for line buffering instead, or fall back to direct piping.
+# Save prompt to temp file for reliable delivery (stdin piping can be finicky)
+PROMPT_FILE="/tmp/claude-prompt-$$.txt"
+echo "$USER_PROMPT" > "$PROMPT_FILE"
+
+if command -v stdbuf >/dev/null 2>&1; then
+    echo "✓ Using stdbuf for unbuffered output"
+    cat "$PROMPT_FILE" | stdbuf -oL $CLAUDE_CMD 2>&1 | tee "$STREAM_OUTPUT" "$AGENT_LOG"
+    CLAUDE_EXIT_CODE=${PIPESTATUS[1]}
 else
     echo "⚠️ No buffering control available"
-    echo "$USER_PROMPT" | $CLAUDE_CMD | tee "$STREAM_OUTPUT" "$AGENT_LOG"
+    cat "$PROMPT_FILE" | $CLAUDE_CMD 2>&1 | tee "$STREAM_OUTPUT" "$AGENT_LOG"
+    CLAUDE_EXIT_CODE=${PIPESTATUS[1]}
 fi
-CLAUDE_EXIT_CODE=$?
+
+# Cleanup temp file
+rm -f "$PROMPT_FILE" 2>/dev/null || true
 
 # Request sidecar shutdown
 if [ "${SKIP_MCP_SHUTDOWN:-0}" != "1" ]; then
