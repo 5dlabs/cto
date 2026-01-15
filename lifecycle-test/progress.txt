@@ -43,3 +43,20 @@ Started: Thu Jan 15 2026
   - Linear webhooks can be queried via GraphQL: `team(id: "CTOPA") { webhooks { nodes { url enabled } } }`
 ---
 
+## 2026-01-15 10:56 - PRE-003 (BLOCKED)
+- Verified .env.local exists with core secrets
+- Core credentials verified: LINEAR_OAUTH_TOKEN, GITHUB_TOKEN, ANTHROPIC_API_KEY, LINEAR_WEBHOOK_SECRET
+- Morgan OAuth token verified: LINEAR_APP_MORGAN_ACCESS_TOKEN is set
+- **BLOCKED**: Agent OAuth tokens missing for: rex, blaze, bolt, atlas, cleo, cipher, tess
+  - These require manual OAuth flow via browser: http://localhost:8081/oauth/start?agent=rex
+  - Cannot be automated - requires human interaction
+- Preflight section 4 shows all core credentials with ✅
+- Preflight section 5 shows morgan with ✓ token, others with ✗ token
+- **Action Required**: User must complete OAuth flow for each agent before this story can pass
+- Files changed: progress.txt (documented blocker)
+- **Learnings for future iterations:**
+  - Agent OAuth tokens require manual browser-based OAuth flow
+  - Only Morgan has OAuth token pre-configured in .env.local
+  - URL pattern: http://localhost:8081/oauth/start?agent={agent_name}
+---
+
