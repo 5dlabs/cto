@@ -4021,10 +4021,8 @@ fn handle_intake_sync_task(arguments: &HashMap<String, Value>) -> Result<Value> 
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("project_name is required"))?;
 
-    let task_id = arguments
-        .get("task_id")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("task_id is required"))?;
+    // task_id is optional - defaults to issue_id if not provided
+    let task_id = arguments.get("task_id").and_then(|v| v.as_str());
 
     let project_path = workspace_dir.join(project_name);
 
@@ -4037,14 +4035,18 @@ fn handle_intake_sync_task(arguments: &HashMap<String, Value>) -> Result<Value> 
         .arg(issue_id)
         .arg("--project-name")
         .arg(project_name)
-        .arg("--task-id")
-        .arg(task_id)
         .arg("--project")
         .arg(&project_path);
 
+    // Add task_id if provided (otherwise CLI defaults to issue identifier)
+    if let Some(tid) = task_id {
+        cmd.arg("--task-id").arg(tid);
+    }
+
+    let display_task_id = task_id.unwrap_or(issue_id);
     eprintln!(
         "🚀 Running intake sync-task: issue={}, project={}, task={}",
-        issue_id, project_name, task_id
+        issue_id, project_name, display_task_id
     );
 
     let output = cmd
@@ -4071,10 +4073,10 @@ fn handle_intake_sync_task(arguments: &HashMap<String, Value>) -> Result<Value> 
 
     Ok(json!({
         "status": "success",
-        "message": format!("Task '{task_id}' synced from Linear issue '{issue_id}'"),
+        "message": format!("Task '{}' synced from Linear issue '{}'", display_task_id, issue_id),
         "issue_id": issue_id,
         "project_name": project_name,
-        "task_id": task_id,
+        "task_id": display_task_id,
         "output": stdout.to_string()
     }))
 }

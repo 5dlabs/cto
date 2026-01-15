@@ -158,10 +158,10 @@ fn get_intake_sync_task_schema() -> Value {
                 },
                 "task_id": {
                     "type": "string",
-                    "description": "Local task ID to update (e.g., '1' for task-1.json)"
+                    "description": "Local task ID to update (e.g., '1' for task-1.json). Optional - defaults to the Linear issue identifier."
                 }
             },
-            "required": ["issue_id", "project_name", "task_id"]
+            "required": ["issue_id", "project_name"]
         }
     })
 }
