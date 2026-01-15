@@ -62,24 +62,24 @@
     },
     {
       "id": "INT-001",
-      "title": "Intake: Submit AlertHub PRD via MCP Tool",
-      "description": "Use your cto-mcp server to intake the AlertHub E2E test project. Read PRD from tests/intake/alerthub-e2e-test/prd.md",
+      "title": "Intake: Submit AlertHub PRD via MCP Tool (MUST COMPLETE)",
+      "description": "Use your cto-mcp server to intake the AlertHub E2E test project. The intake CodeRun MUST complete successfully with tasks.json created.",
       "priority": 2,
-      "complexity": "medium",
+      "complexity": "high",
       "acceptanceCriteria": [
         "Read PRD content from tests/intake/alerthub-e2e-test/prd.md",
         "Read architecture from tests/intake/alerthub-e2e-test/architecture.md",
         "Use MCP tool: mcp_cto_intake(project_name='alerthub-e2e-test', prd_content=<prd>, architecture_content=<arch>)",
         "Tool returns success with Linear project URL",
         "Linear project created with 'AlertHub' in name",
-        "PRD content visible in Linear issue description",
-        "Architecture attached to Linear issue",
-        "cto-config.json attached to issue",
-        "Morgan auto-assigned as delegate",
-        "Argo Workflow 'intake-*' triggered (kubectl get workflows -n cto)"
+        "Intake CodeRun pod completes WITHOUT ERROR (kubectl get pods -n cto | grep intake)",
+        "tasks.json EXISTS in target repo: gh api repos/5dlabs/prd-alerthub-e2e-test/contents/prd-alerthub-e2e-test/.tasks/tasks/tasks.json",
+        "tasks.json has >0 tasks with non-empty testStrategy",
+        "IF intake fails with JSON parsing error: FIX THE CODE in crates/intake/src/ai/cli_adapter.rs, cut release, update runtime image"
       ],
       "testStrategy": "integration",
-      "passes": true
+      "passes": false,
+      "knownIssue": "Intake CodeRun failing with JSON parsing error - AI includes explanatory text with JSON output"
     },
     {
       "id": "INT-002",
