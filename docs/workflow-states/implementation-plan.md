@@ -2,20 +2,24 @@
 
 ## Executive Summary
 
-We have template code for Fresh Start and Worker Isolation, but the config values aren't parsed or passed through. Linear Task Sync is documented but not implemented at all.
+We have template code for Fresh Start, but the config value isn't parsed or passed through. Linear Task Sync is documented but not implemented at all.
 
-Additionally, we need to:
-1. **Remove `local=true` option from intake** - causes confusion in E2E tests
-2. **Auto-append final deployment task** - Bolt's final task isn't guaranteed
-3. **Clarify 6 implementation agents** - documentation needs updating
+**Simplified Scope:** After review, we removed `workerIsolation` and `roleModels` as dead code:
+- `workerIsolation` - Template existed but was never wired up; we don't have peer coordination anyway
+- `roleModels` - Redundant with per-agent model config in `agents.*` section
+
+**Remaining Items:**
+1. **Wire up Fresh Start** - Pass `freshStartThreshold` from config to retry-loop template
+2. **Remove `local=true` from intake** - Causes confusion in E2E tests
+3. **Auto-append final deployment task** - Bolt's final task isn't guaranteed
+4. **Clarify 6 implementation agents** - Documentation needs updating
+5. **Linear Task Sync** - `intake update` and `intake sync-task` commands
 
 ## Gap Analysis
 
 | Feature | Current State | Work Required |
 |---------|---------------|---------------|
 | **Fresh Start** | Template code exists, never triggers | Wire up config → template |
-| **Worker Isolation** | Template code exists, never activates | Wire up config → template |
-| **Role Models** | Not implemented | New config struct + routing |
 | **Linear Task Sync** | Design doc only | Full implementation |
 | **Intake local option** | Exists, causes confusion | Remove from MCP tool |
 | **Final Deploy Task** | PRD-dependent | Auto-append in intake |
@@ -101,11 +105,11 @@ if !has_deploy_task {
 
 **Estimated effort:** 2-4 hours
 
-## Phase 1: Wire Up Existing Code (Easiest)
+## Phase 1: Wire Up Fresh Start (Easiest)
 
-**Goal:** Make Fresh Start and Worker Isolation actually work.
+**Goal:** Make Fresh Start actually trigger from config.
 
-### 1.1 Add Config Fields
+### 1.1 Add Config Field
 
 **File:** `crates/config/src/types.rs`
 
@@ -117,29 +121,25 @@ pub struct PlayDefaults {
     /// Retry count before triggering fresh start (default: 3)
     #[serde(rename = "freshStartThreshold", default = "default_fresh_start_threshold")]
     pub fresh_start_threshold: u32,
-
-    /// Enable worker isolation mode (default: true)
-    #[serde(rename = "workerIsolation", default = "default_worker_isolation")]
-    pub worker_isolation: bool,
 }
 
 fn default_fresh_start_threshold() -> u32 { 3 }
-fn default_worker_isolation() -> bool { true }
 ```
 
 ### 1.2 Pass to Templates
 
 **File:** `crates/healer/src/prompt/context.rs` (or wherever PromptContext is defined)
 
-Add fields to the context struct that gets passed to Handlebars:
+Add field to the context struct that gets passed to Handlebars:
 
 ```rust
 pub struct PromptContext {
     // ... existing fields ...
     pub fresh_start_threshold: u32,
-    pub worker_isolation: bool,
 }
 ```
+
+This will make the `{{fresh_start_threshold}}` variable in `retry-loop.sh.hbs` actually get populated.
 
 ### 1.3 Test
 
@@ -151,84 +151,34 @@ cargo test -p cto-config -- fresh_start
 cargo test -p cto-healer -- render_prompt
 ```
 
-**Estimated effort:** 2-4 hours
+**Estimated effort:** 1-2 hours
 
 ---
 
-## Phase 2: Role-Specific Models (Medium)
+## ~~Phase 2: Role-Specific Models~~ REMOVED
 
-**Goal:** Different models for planner/worker/reviewer roles.
+**Reason:** Redundant with per-agent model config in `agents.*` section of `cto-config.json`.
 
-### 2.1 Add RoleModels Struct
-
-**File:** `crates/config/src/types.rs`
-
-```rust
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct RoleModels {
-    /// Model for Morgan (planning)
-    #[serde(default)]
-    pub planner: Option<String>,
-    
-    /// Model for implementation agents (Rex, Blaze, etc.)
-    #[serde(default)]
-    pub worker: Option<String>,
-    
-    /// Model for Cleo (quality review)
-    #[serde(default)]
-    pub reviewer: Option<String>,
-}
-
-// Add to PlayDefaults:
-#[serde(rename = "roleModels", default)]
-pub role_models: RoleModels,
-```
-
-### 2.2 Add Role Detection
-
-**File:** `crates/healer/src/workflow/agent.rs`
-
-```rust
-pub enum AgentRole {
-    Planner,   // Morgan
-    Worker,    // Rex, Blaze, Grizz, Nova, Tap, Spark, Bolt
-    Reviewer,  // Cleo, Cipher, Tess
-    Integrator, // Atlas
-}
-
-impl AgentRole {
-    pub fn from_agent_name(name: &str) -> Self {
-        match name.to_lowercase().as_str() {
-            n if n.contains("morgan") => Self::Planner,
-            n if n.contains("cleo") || n.contains("cipher") || n.contains("tess") => Self::Reviewer,
-            n if n.contains("atlas") => Self::Integrator,
-            _ => Self::Worker,
-        }
-    }
+Each agent already has its own `model` field:
+```json
+"agents": {
+  "morgan": { "model": "claude-opus-4-5-20251101" },
+  "rex": { "model": "claude-opus-4-5-20251101" },
+  ...
 }
 ```
 
-### 2.3 Override Model Selection
-
-When starting an agent, check role and override model:
-
-```rust
-fn get_model_for_agent(agent: &str, config: &PlayDefaults) -> String {
-    let role = AgentRole::from_agent_name(agent);
-    match role {
-        AgentRole::Planner => config.role_models.planner.clone(),
-        AgentRole::Worker => config.role_models.worker.clone(),
-        AgentRole::Reviewer => config.role_models.reviewer.clone(),
-        AgentRole::Integrator => None, // Use default
-    }.unwrap_or_else(|| config.get_default_model())
-}
-```
-
-**Estimated effort:** 4-6 hours
+No need for an additional `roleModels` abstraction.
 
 ---
 
-## Phase 3: Intake Update Functionality (Most Important)
+## ~~Worker Isolation~~ REMOVED
+
+**Reason:** Dead code. We don't have peer coordination - each task runs in its own CodeRun pod independently. The template code existed but was never wired up, and would have had no effect anyway.
+
+---
+
+## Phase 2: Intake Update Functionality (Most Important)
 
 **Goal:** Allow mid-flight task updates from PRD/Architecture changes OR Linear edits.
 
@@ -246,7 +196,7 @@ We just need to UPDATE the task files, and the next agent run automatically pick
 
 Both produce the same output: **PR with updated task files**.
 
-### 3.1 Command: `intake update`
+### 2.1 Command: `intake update`
 
 Re-parse PRD/architecture and generate delta.
 
@@ -298,7 +248,7 @@ pub async fn update_project(args: UpdateArgs) -> Result<()> {
 }
 ```
 
-### 3.2 Command: `intake sync-task`
+### 2.2 Command: `intake sync-task`
 
 Pull task changes from Linear manual edits.
 
@@ -353,7 +303,7 @@ pub async fn sync_task(args: SyncTaskArgs) -> Result<()> {
 }
 ```
 
-### 3.3 Linear Issue Parsing
+### 2.3 Linear Issue Parsing
 
 **File:** `crates/intake/src/domain/linear_parser.rs` (NEW)
 
@@ -401,7 +351,7 @@ fn extract_checkboxes(text: &str) -> Vec<String> {
 }
 ```
 
-### 3.4 MCP Tool for Update
+### 2.4 MCP Tool for Update
 
 **File:** `crates/notify/mcp/src/tools.rs`
 
@@ -429,7 +379,7 @@ fn extract_checkboxes(text: &str) -> Vec<String> {
 }
 ```
 
-### 3.5 Flow Diagram
+### 2.5 Flow Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -491,11 +441,8 @@ fn extract_checkboxes(text: &str) -> Vec<String> {
 | Priority | Phase | Effort | Value |
 |----------|-------|--------|-------|
 | 1 | **Phase 0**: Intake fixes (local removal, auto-deploy task) | 2-4 hours | Critical |
-| 2 | **Phase 1**: Fresh Start + Worker Isolation | 2-4 hours | High |
-| 3 | **Phase 3**: Intake Update functionality | 3-5 days | **Highest** |
-| 4 | **Phase 2**: Role Models | 4-6 hours | Medium |
-
-Note: Phase 3 is reordered before Phase 2 because mid-flight updates is the most valuable feature.
+| 2 | **Phase 1**: Fresh Start wiring | 1-2 hours | Medium |
+| 3 | **Phase 2**: Intake Update functionality | 3-5 days | **Highest** |
 
 ## Testing Strategy
 
@@ -511,22 +458,13 @@ cargo test -p cto-intake -- auto_deploy_task
 ### Phase 1 Tests
 ```bash
 # Unit: Config parsing
-cargo test -p cto-config -- fresh_start worker_isolation
+cargo test -p cto-config -- fresh_start
 
 # Integration: Template rendering
 cargo test -p cto-healer -- render_with_fresh_start
 ```
 
 ### Phase 2 Tests
-```bash
-# Unit: Role detection
-cargo test -p cto-healer -- agent_role
-
-# Unit: Model routing
-cargo test -p cto-healer -- role_model_routing
-```
-
-### Phase 3 Tests
 ```bash
 # Unit: Linear issue parsing
 cargo test -p cto-intake -- parse_linear_issue
@@ -548,25 +486,21 @@ cargo test -p cto-intake -- sync_task_integration
 | 0 | `crates/notify/mcp/src/main.rs` | Remove `handle_intake_local()` |
 | 0 | `crates/notify/mcp/src/tools.rs` | Remove `local` param from intake |
 | 0 | `crates/intake/src/bin/cli.rs` | Auto-append deploy task |
-| 1 | `crates/config/src/types.rs` | Add fresh_start_threshold, worker_isolation |
-| 1 | `crates/healer/src/prompt/context.rs` | Pass values to templates |
-| 2 | `crates/config/src/types.rs` | Add RoleModels struct |
-| 2 | `crates/healer/src/workflow/agent.rs` | Add role detection + routing |
-| 3 | `crates/intake/src/commands/update.rs` | NEW: update command |
-| 3 | `crates/intake/src/commands/sync.rs` | NEW: sync-task command |
-| 3 | `crates/intake/src/domain/linear_parser.rs` | NEW: Linear issue parsing |
-| 3 | `crates/intake/src/domain/delta.rs` | NEW: task diff logic |
-| 3 | `crates/notify/mcp/src/tools.rs` | Add intake_update, intake_sync_task |
+| 1 | `crates/config/src/types.rs` | Add fresh_start_threshold |
+| 1 | `crates/healer/src/prompt/context.rs` | Pass value to templates |
+| 2 | `crates/intake/src/commands/update.rs` | NEW: update command |
+| 2 | `crates/intake/src/commands/sync.rs` | NEW: sync-task command |
+| 2 | `crates/intake/src/domain/linear_parser.rs` | NEW: Linear issue parsing |
+| 2 | `crates/intake/src/domain/delta.rs` | NEW: task diff logic |
+| 2 | `crates/notify/mcp/src/tools.rs` | Add intake_update, intake_sync_task |
 
 ## Definition of Done
 
 - [ ] Phase 0: `local=true` removed from MCP intake
 - [ ] Phase 0: Deploy task auto-appended to all projects
 - [ ] Phase 1: Fresh Start triggers after configured threshold
-- [ ] Phase 1: Worker Isolation shows focused prompts
-- [ ] Phase 2: Morgan uses planner model, Rex uses worker model  
-- [ ] Phase 3: `intake update` re-parses PRD and creates delta PR
-- [ ] Phase 3: `intake sync-task` pulls Linear edits and creates PR
-- [ ] Phase 3: MCP tools available for both operations
+- [ ] Phase 2: `intake update` re-parses PRD and creates delta PR
+- [ ] Phase 2: `intake sync-task` pulls Linear edits and creates PR
+- [ ] Phase 2: MCP tools available for both operations
 - [ ] All tests pass
 - [ ] Documentation updated

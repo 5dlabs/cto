@@ -67,14 +67,8 @@
       "autoMerge": false,
       "parallelExecution": false,
       "healerEndpoint": "http://localhost:8083",
-      "_comment_cursor_improvements": "Cursor-inspired improvements: fresh starts, worker isolation, role-specific models",
-      "freshStartThreshold": 3,
-      "workerIsolation": true,
-      "roleModels": {
-        "planner": "claude-opus-4-5-20251101",
-        "worker": "claude-sonnet-4-5-20250514",
-        "reviewer": "claude-sonnet-4-5-20250514"
-      }
+      "_comment_cursor_improvements": "Cursor-inspired: fresh start clears context after N retries to combat drift",
+      "freshStartThreshold": 3
     }
   },
   "_comment_agents": "Agent configurations with tool profiles",

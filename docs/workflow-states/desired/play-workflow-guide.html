@@ -462,10 +462,10 @@ Next agent run picks up updated task files automatically
         <div class="phase">
             <div class="phase-header">
                 <div class="phase-number">4</div>
-                <strong>Fresh Start & Worker Isolation</strong>
+                <strong>Fresh Start Mechanism</strong>
             </div>
             <p style="color: var(--text-muted); font-size: 0.9rem;">
-                Wire up existing template code (see implementation-plan.md)
+                Wire up config → template so <code>freshStartThreshold</code> triggers context clearing after N retries
             </p>
         </div>
 
@@ -505,18 +505,18 @@ Next agent run picks up updated task files automatically
   "defaults": {
     "play": {
       "freshStartThreshold": 3,
-      "workerIsolation": true,
-      "enableTaskSync": true,
-      "roleModels": {
-        "planner": "claude-opus-4-5-20251101",
-        "worker": "claude-sonnet-4-5-20250514",
-        "reviewer": "claude-sonnet-4-5-20250514"
-      }
+      "_comment": "After 3 retries, clear context and start fresh"
     },
     "intake": {
       "autoAppendDeployTask": true,
       "_note": "local option should be removed entirely"
     }
+  },
+  "agents": {
+    "morgan": { "model": "claude-opus-4-5-20251101" },
+    "rex": { "model": "claude-opus-4-5-20251101" },
+    "blaze": { "model": "claude-opus-4-5-20251101" },
+    "_note": "Per-agent models - no need for roleModels"
   }
 }</pre>
 

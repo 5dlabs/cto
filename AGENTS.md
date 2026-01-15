@@ -107,8 +107,6 @@ Based on [Cursor's research](https://cursor.com/blog/scaling-autonomous-coding) 
 | Feature | Description | Config |
 |---------|-------------|--------|
 | **Fresh Start** | After N retries, clears context to combat drift and tunnel vision | `freshStartThreshold: 3` |
-| **Worker Isolation** | Workers focus only on their task, no peer coordination overhead | `workerIsolation: true` |
-| **Role-Specific Models** | Different models optimized for planning vs coding vs review | `roleModels: {...}` |
 | **Simplified Atlas** | Merge-only role - workers handle their own conflicts | Default behavior |
 
 #### Fresh Start Mechanism
@@ -123,25 +121,19 @@ This combats:
 - Risk-averse behavior patterns
 - Context saturation causing confusion
 
-#### Role-Specific Models
-
-Configure optimal models per role in `cto-config.json`:
+Configure in `cto-config.json`:
 
 ```json
 {
   "defaults": {
     "play": {
-      "freshStartThreshold": 3,
-      "workerIsolation": true,
-      "roleModels": {
-        "planner": "claude-opus-4-5-20251101",
-        "worker": "claude-sonnet-4-5-20250514",
-        "reviewer": "claude-sonnet-4-5-20250514"
-      }
+      "freshStartThreshold": 3
     }
   }
 }
 ```
+
+**Note:** Per-agent model configuration is done in the `agents` section of `cto-config.json`, not via `roleModels`.
 
 ### Key MCP Tools
 
