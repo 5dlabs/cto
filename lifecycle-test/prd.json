@@ -37,19 +37,20 @@
     },
     {
       "id": "PRE-003",
-      "title": "Pre-Flight: Verify Credentials",
-      "description": "Ensure all required OAuth and API credentials are configured in .env.local",
+      "title": "Pre-Flight: Verify Credentials (OAuth)",
+      "description": "Ensure all required OAuth credentials are in .env.local. We use OAuth tokens (not API key) for Linear.",
       "priority": 1,
       "complexity": "low",
       "acceptanceCriteria": [
-        ".env.local exists at project root",
-        "LINEAR_OAUTH_TOKEN is set (verify with: source .env.local && echo $LINEAR_OAUTH_TOKEN | head -c 20)",
+        ".env.local exists at project root with secrets",
+        "LINEAR_OAUTH_TOKEN is set (NOT LINEAR_API_KEY - OAuth is required)",
         "GITHUB_TOKEN is set",
         "ANTHROPIC_API_KEY is set",
         "LINEAR_WEBHOOK_SECRET is set",
-        "Agent OAuth tokens: LINEAR_APP_MORGAN_ACCESS_TOKEN, LINEAR_APP_REX_ACCESS_TOKEN",
-        "'just preflight' section 4 (API KEYS) shows all ✅",
-        "'just preflight' section 5 (AGENT OAUTH) shows all ✅"
+        "Morgan OAuth: LINEAR_APP_MORGAN_ACCESS_TOKEN is set",
+        "Agent OAuth tokens: LINEAR_APP_REX_ACCESS_TOKEN, LINEAR_APP_BLAZE_ACCESS_TOKEN",
+        "'just preflight' section 4 shows '✅ LINEAR_OAUTH_TOKEN (OAuth - preferred)'",
+        "'just preflight' section 5 (AGENT OAUTH) shows all agents with '✓ token'"
       ],
       "testStrategy": "smoke",
       "passes": false
@@ -66,7 +67,7 @@
         "Linear issue created (verify via Linear UI or API)",
         "PRD content visible in issue description",
         "cto-config.json attached to issue",
-        "Morgan auto-assigned as delegate",
+        "Morgan auto-assigned as delegate (uses Morgan OAuth token)",
         "Argo Workflow triggered (check: kubectl get workflows -n cto)"
       ],
       "testStrategy": "integration",

@@ -33,9 +33,9 @@ LOOP:
 
 ## Pre-Flight Setup (BEFORE STARTING ANY TESTS)
 
-### 1. Ensure Secrets Are Available
+### 1. Ensure Secrets Are Available (OAuth Required)
 
-All secrets must be in `.env.local` at the project root. Run:
+All secrets must be in `.env.local` at the project root. **We use OAuth tokens, NOT API keys.**
 
 ```bash
 # Check if .env.local exists and has required secrets
@@ -46,12 +46,19 @@ cat .env.local | grep -E "^(LINEAR|ANTHROPIC|GITHUB)" | wc -l
 just sync-secrets
 ```
 
-**Required secrets:**
-- `LINEAR_OAUTH_TOKEN` (NOT API key - must be OAuth)
-- `ANTHROPIC_API_KEY`
-- `GITHUB_TOKEN`
-- `LINEAR_WEBHOOK_SECRET`
-- Agent OAuth tokens: `LINEAR_APP_MORGAN_ACCESS_TOKEN`, `LINEAR_APP_REX_ACCESS_TOKEN`, etc.
+**Required secrets (OAuth flow):**
+- `LINEAR_OAUTH_TOKEN` - **Required** (NOT `LINEAR_API_KEY` - we use OAuth)
+- `ANTHROPIC_API_KEY` - For AI model access
+- `GITHUB_TOKEN` - For repository operations
+- `LINEAR_WEBHOOK_SECRET` - For webhook verification
+
+**Agent OAuth tokens (each agent has its own):**
+- `LINEAR_APP_MORGAN_ACCESS_TOKEN` - Morgan uses this for intake
+- `LINEAR_APP_REX_ACCESS_TOKEN` - Rex OAuth token
+- `LINEAR_APP_BLAZE_ACCESS_TOKEN` - Blaze OAuth token
+- (and similar for other agents: bolt, atlas, cleo, cipher, tess)
+
+**Why OAuth?** OAuth tokens allow agent-specific Linear app assignment, enabling two-way communication in the Linear issue timeline.
 
 ### 2. Start Local Services
 

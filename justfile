@@ -359,7 +359,16 @@ preflight:
     
     echo ""
     echo "═══ 4. API KEYS & SECRETS ═══"
-    [ -n "${LINEAR_API_KEY:-}" ] && echo "✅ LINEAR_API_KEY" || { echo "❌ LINEAR_API_KEY"; ERRORS=$((ERRORS+1)); }
+    # Check for LINEAR_OAUTH_TOKEN (preferred) - OAuth flow is required for local dev
+    if [ -n "${LINEAR_OAUTH_TOKEN:-}" ]; then
+      echo "✅ LINEAR_OAUTH_TOKEN (OAuth - preferred)"
+    elif [ -n "${LINEAR_API_KEY:-}" ]; then
+      echo "⚠️  LINEAR_API_KEY (legacy - OAuth preferred)"
+      WARNINGS=$((WARNINGS+1))
+    else
+      echo "❌ LINEAR_OAUTH_TOKEN (required for OAuth flow)"
+      ERRORS=$((ERRORS+1))
+    fi
     [ -n "${ANTHROPIC_API_KEY:-}" ] && echo "✅ ANTHROPIC_API_KEY" || { echo "❌ ANTHROPIC_API_KEY"; ERRORS=$((ERRORS+1)); }
     [ -n "${GITHUB_TOKEN:-}" ] && echo "✅ GITHUB_TOKEN" || { echo "❌ GITHUB_TOKEN"; ERRORS=$((ERRORS+1)); }
     [ -n "${LINEAR_WEBHOOK_SECRET:-}" ] && echo "✅ LINEAR_WEBHOOK_SECRET" || { echo "❌ LINEAR_WEBHOOK_SECRET"; ERRORS=$((ERRORS+1)); }
