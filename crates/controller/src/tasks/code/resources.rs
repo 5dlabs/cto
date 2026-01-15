@@ -1690,8 +1690,7 @@ impl<'a> CodeResourceManager<'a> {
                 match self.jobs.delete(job_name, &delete_params).await {
                     Ok(_) => {
                         info!("Successfully deleted job: {}", job_name);
-                        // Job deleted, return early
-                        return Ok(());
+                        // Continue to label-based cleanup for any orphaned jobs
                     }
                     Err(kube::Error::Api(ae)) if ae.code == 404 => {
                         info!("Job {} not found (may already be deleted)", job_name);
