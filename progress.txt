@@ -50,7 +50,6 @@
 - ArgoCD port forward isn't strictly required for intake/play workflows
 - Use `pgrep -la` to check running Rust services by binary name
 ---
-
 ## 2026-01-14 16:28 - US-002
 - Cleanup completed (no stuck resources found):
   - kubectl delete coderuns -n cto --all: No resources found
