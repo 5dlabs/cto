@@ -10142,3 +10142,13 @@ target/debug/deps/cto-194166ecea56f79c.d
 
 # Build logs
 .build-*.log
+
+# Ralph monitor runtime files (local state, debugging output)
+.ralph-last-branch
+**/.ralph-last-branch
+**/.ralph-monitor-state.json
+**/.ralph-monitor.pid
+**/.ralph-events.json
+**/.ralph-timing.json
+**/ralph-report.html
+**/.ralph-failures/
