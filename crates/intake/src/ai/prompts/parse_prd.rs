@@ -125,8 +125,13 @@ Each task must follow this JSON structure:
 	"status": "pending",
 	"dependencies": number[] (IDs of prerequisite tasks),
 	"priority": "high" | "medium" | "low",
-	"details": string (how to implement, with pseudo-code),
+	"details": string (how to implement, with pseudo-code - MUST be a properly escaped JSON string),
 	"testStrategy": string (how to validate),
+
+IMPORTANT: All string fields (details, description, testStrategy) are JSON strings. Any code examples, JSON configs, or multi-line content MUST be properly escaped:
+- Use \\n for newlines
+- Use \\" for quotes inside the string
+- Do NOT output raw JSON objects as field values - escape them as strings
 	"decisionPoints": [  // Optional: areas requiring agent judgment
 		{
 			"id": string (e.g., "d1", "d2"),
@@ -139,6 +144,11 @@ Each task must follow this JSON structure:
 	]
 }
 
+IMPORTANT: All string fields (details, description, testStrategy) are JSON strings. Any code examples, JSON configs, or multi-line content MUST be properly escaped:
+- Use \\n for newlines
+- Use \\" for quotes inside the string
+- Do NOT output raw JSON objects as field values - escape them as strings
+
 ## Guidelines
 1. Create {{#if (gt num_tasks 0)}}exactly {{num_tasks}}{{else}}an appropriate number of{{/if}} tasks, numbered from {{next_id}}
 2. Each task: atomic, single responsibility, following current best practices
@@ -150,11 +160,12 @@ Each task must follow this JSON structure:
 4. Dependencies can only reference lower IDs (including existing tasks < {{next_id}})
 5. Priority based on criticality and dependency chain position
 6. Details field: include implementation guidance{{#if research}}, specific library versions{{/if}}
-7. STRICTLY ADHERE to PRD-specified libraries, schemas, frameworks, tech stacks
-8. Fill gaps in PRD while preserving all explicit requirements
-9. Avoid over-engineering; prefer direct implementation paths{{#if research}}
-10. Include actionable guidance based on researched best practices{{/if}}
-11. Include agent hint in task title using format: "Title (AgentName - Stack)"
+7. **CRITICAL - JSON String Escaping**: When including code examples (JSON configs, TypeScript, YAML, etc.) in the details field, you MUST escape them as JSON strings. Do NOT output raw JSON structures - the details field value must be a valid JSON string, not a JSON object. Example: `"details":"Create config:\\n{\\\"key\\\": \\\"value\\\"}"` NOT `"details":{"key":"value"}`
+8. STRICTLY ADHERE to PRD-specified libraries, schemas, frameworks, tech stacks
+9. Fill gaps in PRD while preserving all explicit requirements
+10. Avoid over-engineering; prefer direct implementation paths{{#if research}}
+11. Include actionable guidance based on researched best practices{{/if}}
+12. Include agent hint in task title using format: "Title (AgentName - Stack)"
     - Infrastructure: (Bolt - Kubernetes)
     - Rust backend: (Rex - Rust/Axum)
     - Go backend: (Grizz - Go/gRPC)
@@ -162,7 +173,7 @@ Each task must follow this JSON structure:
     - React frontend: (Blaze - React/Next.js)
     - Mobile app: (Tap - Expo)
     - Desktop app: (Spark - Electron)
-12. **Decision Points (Captured Discovery)**: For each task, identify areas where judgment is needed:
+13. **Decision Points (Captured Discovery)**: For each task, identify areas where judgment is needed:
     - Include decision points for ambiguous requirements, error handling strategies, UX behaviors
     - Use "escalation" constraint type for decisions with significant user impact
     - Prefer "open" constraint type for technical choices with clear tradeoffs
@@ -200,6 +211,6 @@ Include decisionPoints for tasks with ambiguous areas or choices to be made duri
 I have already started the JSON structure with `{"tasks":[` - you must CONTINUE by outputting the task objects directly, starting with the first task object. Do NOT repeat the opening structure.
 
 Example of what you should output (just the array contents, comma-separated task objects):
-{"id":{{next_id}},"title":"Setup Infrastructure (Bolt - Kubernetes)","description":"Provision databases, caches, and storage","status":"pending","dependencies":[],"priority":"high","details":"Deploy PostgreSQL, Redis, etc.","testStrategy":"Verify resources are running"},{"id":2,"title":"Backend API (Rex - Rust/Axum)","description":"Core API service","status":"pending","dependencies":[{{next_id}}],"priority":"high","details":"Create Axum router","testStrategy":"Unit and integration tests","decisionPoints":[{"id":"d1","category":"error-handling","description":"Database failure handling","options":["Retry","Fail fast","Circuit breaker"],"requiresApproval":false,"constraintType":"open"}]}]}
+{"id":{{next_id}},"title":"Setup Infrastructure (Bolt - Kubernetes)","description":"Provision databases, caches, and storage","status":"pending","dependencies":[],"priority":"high","details":"1. Create PostgreSQL cluster:\\n```yaml\\napiVersion: postgresql.cnpg.io/v1\\nkind: Cluster\\n```\\n2. Deploy Redis for caching","testStrategy":"Verify resources are running with kubectl get pods"},{"id":2,"title":"Mobile App Setup (Tap - Expo)","description":"Initialize Expo mobile app","status":"pending","dependencies":[{{next_id}}],"priority":"high","details":"1. Create app.json config:\\n```json\\n{\\\"expo\\\": {\\\"name\\\": \\\"AppName\\\", \\\"slug\\\": \\\"appname\\\"}}\\n```\\n2. Run: npx create-expo-app","testStrategy":"App builds and runs on simulator","decisionPoints":[{"id":"d1","category":"architecture","description":"Navigation library choice","options":["expo-router","react-navigation"],"requiresApproval":false,"constraintType":"open"}]}]}
 
 FINAL INSTRUCTION: Continue the JSON array by outputting task objects directly. Start with the first task's opening brace { - do NOT output {"tasks":[ again as that is already provided."#;

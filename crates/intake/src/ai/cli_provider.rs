@@ -312,7 +312,7 @@ impl CLITextGenerator {
 
         match self.cli_type {
             CLIType::Claude => {
-                // Claude CLI: claude -p --model <model> --output-format stream-json "prompt"
+                // Claude CLI: claude -p --model <model> --output-format stream-json --verbose "prompt"
                 args.push("-p".to_string()); // Print mode (non-interactive)
                 args.push("--model".to_string());
                 args.push(model.to_string());
@@ -321,6 +321,9 @@ impl CLITextGenerator {
                 // This outputs JSONL that the sidecar parses for Linear activities
                 args.push("--output-format".to_string());
                 args.push("stream-json".to_string());
+
+                // --verbose is required when using --print with --output-format=stream-json
+                args.push("--verbose".to_string());
 
                 // Add extended thinking settings via --settings JSON
                 let use_thinking = options.extended_thinking || self.extended_thinking;

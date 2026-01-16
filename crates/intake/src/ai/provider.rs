@@ -175,7 +175,22 @@ pub trait AIProvider: Send + Sync {
 ///
 /// If no JSON structure is found, returns the original text trimmed.
 pub fn extract_json_continuation(text: &str) -> String {
+    // Prefill constant used to detect echoed prefill from CLI
+    const PREFILL: &str = r#"{"tasks":["#;
+
     let text = text.trim();
+
+    // CRITICAL: Handle echoed prefill first.
+    // When the CLI echoes back the prefill, the response looks like:
+    // {"tasks":[\n{\n  "expo": ...}]} or {"tasks":[{"id":1,...}]}
+    // We need to strip the {"tasks":[ part so it's not doubled when reconstructed.
+    let text = if let Some(stripped) = text.strip_prefix(PREFILL) {
+        // Strip the prefill and continue processing the remainder
+        // The remainder may still have embedded prose before {"id":
+        stripped.trim_start()
+    } else {
+        text
+    };
 
     // Look for JSON inside markdown code blocks first (```json ... ```)
     // This handles cases where the AI wraps the JSON in a code block
@@ -206,6 +221,29 @@ pub fn extract_json_continuation(text: &str) -> String {
         return text.to_string();
     }
 
+    // Look for JSON inside markdown code blocks first (```json ... ```)
+    // This handles cases where the AI wraps the JSON in a code block
+    if let Some(json_block_start) = text.find("```json") {
+        let after_marker = &text[json_block_start + "```json".len()..];
+        if let Some(end_idx) = after_marker.rfind("```") {
+            let json_content = after_marker[..end_idx].trim();
+            if !json_content.is_empty() {
+                return json_content.to_string();
+            }
+        }
+    }
+
+    // Also check for plain code blocks (``` ... ```)
+    if let Some(code_block_start) = text.find("```\n") {
+        let after_marker = &text[code_block_start + "```\n".len()..];
+        if let Some(end_idx) = after_marker.rfind("```") {
+            let json_content = after_marker[..end_idx].trim();
+            if json_content.starts_with('{') || json_content.starts_with('[') {
+                return json_content.to_string();
+            }
+        }
+    }
+
     // Handle the case where the CLI echoes back the prefill with embedded text.
     // For example: {"tasks":[I'll continue...{"id":35,"title":"..."}]}
     // We need to find the FIRST actual JSON object ({"id":) and return from there.
@@ -213,6 +251,7 @@ pub fn extract_json_continuation(text: &str) -> String {
     // This check handles both:
     // 1. Text that starts with { but has embedded prose (prefill echo case)
     // 2. Text that starts with prose followed by JSON (normal case)
+    // 3. Text that starts with { but is WRONG structure (e.g., {"expo":... instead of {"id":...)
     if let Some(json_start) = text.find(r#"{"id":"#).or_else(|| text.find(r#"{"id"#)) {
         // Only use this extraction if:
         // - Text doesn't start with { (prose before JSON)
@@ -222,9 +261,22 @@ pub fn extract_json_continuation(text: &str) -> String {
         }
     }
 
-    // If the response starts with a JSON object and we didn't find embedded prose
-    // (meaning it's likely clean JSON), return as-is
+    // If text starts with { but doesn't have "id" key, it might be hallucinated content
+    // (e.g., AI outputting {"expo":...} instead of task objects)
+    // In this case, we MUST find {"id": or the content is invalid
     if text.starts_with('{') {
+        // Check if first key is "id" - if so, it's valid task content
+        // Patterns: {"id": or {\n  "id": or { "id":
+        let trimmed = text.trim_start_matches('{').trim_start();
+        if trimmed.starts_with("\"id\"") {
+            return text.to_string();
+        }
+        // First key is NOT "id" - this is hallucinated content (e.g., {"expo":...})
+        // Look for the first {"id": in the entire text
+        if let Some(json_start) = text.find(r#"{"id":"#).or_else(|| text.find(r#"{"id"#)) {
+            return text[json_start..].to_string();
+        }
+        // No valid task objects found - return original and let caller handle the error
         return text.to_string();
     }
 
@@ -487,5 +539,53 @@ mod tests {
         // Clean JSON array should pass through unchanged
         let input = r#"[{"id":1},{"id":2}]"#;
         assert_eq!(extract_json_continuation(input), input);
+    }
+
+    #[test]
+    fn test_extract_json_continuation_echoed_prefill_with_valid_tasks() {
+        // Critical bug fix: when CLI echoes back the prefill {"tasks":[
+        // we need to strip it so it doesn't get doubled in reconstruction
+        let input = r#"{"tasks":[{"id":1,"title":"Task 1"},{"id":2,"title":"Task 2"}]}"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"{"id":1,"title":"Task 1"},{"id":2,"title":"Task 2"}]}"#
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_echoed_prefill_with_hallucinated_content() {
+        // Bug: AI echoes prefill but hallucinates wrong content (expo config instead of tasks)
+        // The response starts with {"tasks":[ (prefill) then wrong JSON follows
+        // We strip the prefill so caller can try to parse what remains
+        let input = r#"{"tasks":[
+{
+  "expo": {
+    "name": "AlertHub"
+  }
+}]}"#;
+        // After stripping {"tasks":[, we get the expo content (which will fail parsing as Task)
+        // But at least it won't have double {"tasks":[ prefix
+        let result = extract_json_continuation(input);
+        assert!(
+            !result.starts_with(r#"{"tasks":["#),
+            "Should strip echoed prefill"
+        );
+        assert!(
+            result.contains("expo"),
+            "Should preserve the content after prefill"
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_echoed_prefill_with_newlines() {
+        // CLI may echo prefill with newlines in the continuation
+        let input = r#"{"tasks":[
+{"id":1,"title":"Task 1"}
+]}"#;
+        let result = extract_json_continuation(input);
+        assert!(
+            result.starts_with(r#"{"id":1"#),
+            "Should strip prefill and return task JSON"
+        );
     }
 }

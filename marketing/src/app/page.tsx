@@ -5,6 +5,7 @@ import { RainEffect } from "@/components/rain-effect";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { AgentGrid, type AgentSquad } from "@/components/agent-card";
 import { Header } from "@/components/header";
+import { featureFlags } from "@/config/feature-flags";
 
 const squads: AgentSquad[] = [
   {
@@ -207,12 +208,14 @@ export default function Home() {
               transition={{ delay: 0.7, duration: 0.8 }}
               className="flex flex-col sm:flex-row justify-center gap-4 mb-16"
             >
-              <a
-                href="https://app.5dlabs.ai"
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
-              >
-                Start Now
-              </a>
+              {featureFlags.showStartNowButton && (
+                <a
+                  href="https://app.5dlabs.ai"
+                  className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
+                >
+                  Start Now
+                </a>
+              )}
               <WaitlistForm />
             </motion.div>
 
@@ -831,12 +834,14 @@ export default function Home() {
               Your engineering team is ready. No hiring, no onboarding—just results.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <a
-                href="https://app.5dlabs.ai"
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
-              >
-                Start Now
-              </a>
+              {featureFlags.showStartNowButton && (
+                <a
+                  href="https://app.5dlabs.ai"
+                  className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
+                >
+                  Start Now
+                </a>
+              )}
               <WaitlistForm />
             </div>
           </motion.div>
