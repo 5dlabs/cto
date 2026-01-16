@@ -496,7 +496,10 @@ impl CLITextGenerator {
         if matches!(self.cli_type, CLIType::Claude) {
             let max_tokens = options.max_tokens.unwrap_or(64_000);
             cmd.env("CLAUDE_CODE_MAX_OUTPUT_TOKENS", max_tokens.to_string());
-            debug!(max_tokens, "Setting CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable");
+            debug!(
+                max_tokens,
+                "Setting CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable"
+            );
         }
 
         let mut child = cmd.spawn().map_err(|e| {
