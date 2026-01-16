@@ -23,12 +23,62 @@ Parse the PRD at `.tasks/docs/prd.txt` and generate `tasks.json` with comprehens
 Before generating tasks, think step-by-step:
 
 1. **Analyze PRD Structure** - Identify features, tech requirements, implicit dependencies
-2. **Identify Research Needs** - Scan for competitive references, unfamiliar patterns
-3. **Map Dependencies** - What depends on what? Shared infrastructure needs?
-4. **Define Task Boundaries** - Atomic, single responsibility, independently testable
-5. **Generate Implementation Details** - Pseudo-code, file structures, library versions
-6. **Define Test Strategies** - Acceptance criteria, unit/integration/E2E guidance
-7. **Self-Verify** - All requirements covered? No circular deps? Valid ordering?
+2. **Clarify Ambiguities** - Use lettered options for quick resolution (see below)
+3. **Identify Research Needs** - Scan for competitive references, unfamiliar patterns
+4. **Map Dependencies** - What depends on what? Shared infrastructure needs?
+5. **Define Task Boundaries** - Atomic, single responsibility, independently testable
+6. **Generate Implementation Details** - Pseudo-code, file structures, library versions
+7. **Define Test Strategies** - Acceptance criteria, unit/integration/E2E guidance
+8. **Self-Verify** - All requirements covered? No circular deps? Valid ordering?
+
+---
+
+## PRD Clarification (When Needed)
+
+If the PRD has ambiguities, present **lettered options** for quick resolution.
+
+### Format Questions Like This
+
+```markdown
+Before I generate tasks, I need clarification on a few points:
+
+1. What is the primary deployment target?
+   A. Kubernetes (production cluster)
+   B. Docker Compose (dev/staging)
+   C. Both with different configs
+   D. Other: [please specify]
+
+2. What authentication approach?
+   A. Better Auth (recommended for new projects)
+   B. Auth0/Clerk (existing integration)
+   C. Custom JWT implementation
+   D. SSO/SAML enterprise
+
+3. What database preference?
+   A. PostgreSQL (CloudNative-PG operator)
+   B. MySQL/MariaDB
+   C. MongoDB (Percona operator)
+   D. Use existing database
+
+Please respond with format: "1A, 2A, 3A" for quick answers.
+```
+
+### When to Ask
+
+| PRD Content | Clarification Needed? |
+|-------------|----------------------|
+| "Build a notification system" | Yes - scope unclear |
+| "Add user authentication" | Yes - which provider? |
+| "Integrate with Slack" | No - specific enough |
+| "Make it scalable" | Yes - what scale? |
+| "Use our standard stack" | Maybe - if not defined |
+
+### Keep Clarifications Minimal
+
+- Only ask 3-5 essential questions
+- Focus on architecture-impacting decisions
+- Skip questions the PRD already answers
+- Default to best practices when reasonable
 
 ---
 
@@ -310,6 +360,47 @@ You **MUST** use these **EXACT** field names (case-sensitive):
 {{#unless skills_native}}
 {{> frontend-toolkits }}
 {{/unless}}
+
+---
+
+## Task Sizing Guidelines (CRITICAL)
+
+**Each task MUST be completable in ONE agent iteration (~one context window).**
+
+Agents run with fresh context per iteration. If a task is too big, the agent runs out of context before finishing.
+
+### Right-Sized Tasks (GOOD)
+
+| Example | Why It Works |
+|---------|--------------|
+| "Add user_id column + migration" | Single database change |
+| "Create NotificationCard component" | Single UI component |
+| "Implement POST /api/notifications" | Single endpoint |
+| "Add filter to notifications list" | Single feature increment |
+| "Write tests for auth middleware" | Scoped test coverage |
+
+### Too Big (SPLIT THESE)
+
+| Bad Task | Split Into |
+|----------|------------|
+| "Build entire dashboard" | Schema → API → Components → Filters |
+| "Add authentication" | Schema → Middleware → Login UI → Session handling |
+| "Refactor the API" | One task per endpoint or module |
+| "Implement notification system" | Create → Read → Update → Delete as separate tasks |
+
+### Rule of Thumb
+
+> **If you can't describe the implementation in 2-3 sentences, the task is too big.**
+
+### Task Size Checklist
+
+Before finalizing each task:
+
+- [ ] Can be described in 2-3 sentences?
+- [ ] Touches only 1-3 files?
+- [ ] Has ONE primary change (not "and also...")
+- [ ] Acceptance criteria are verifiable in one PR?
+- [ ] Does NOT require multiple iteration cycles?
 
 ---
 

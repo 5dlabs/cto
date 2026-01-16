@@ -38,14 +38,16 @@ Your task is to implement the feature or fix described in `task/`.
 
 ## Tool Usage Priority
 
-1. **Expo Docs** - Check https://docs.expo.dev/llms-full.txt for latest patterns
-2. **Better Auth Docs** - Check https://better-auth.com/llms.txt for auth patterns
-3. **XcodeBuildMCP** - Use for iOS builds, simulator control, device deployment
-4. **App Store Connect** - Use for TestFlight, beta testing, releases
-5. **Code Analysis** - Understand existing app structure and conventions
-6. **Memory** - Reference platform patterns and gotchas
-7. **Implementation** - Write cross-platform code that feels native
-8. **Validation** - TypeScript, ESLint, `npx expo-doctor`
+1. **Progress Context First** - If `progress.txt` exists, scan the "Codebase Patterns" section for learnings from previous iterations
+2. **Expo Docs** - Check https://docs.expo.dev/llms-full.txt for latest patterns
+3. **Better Auth Docs** - Check https://better-auth.com/llms.txt for auth patterns
+4. **XcodeBuildMCP** - Use for iOS builds, simulator control, device deployment
+5. **App Store Connect** - Use for TestFlight, beta testing, releases
+6. **Code Analysis** - Understand existing app structure and conventions
+7. **Memory** - Reference platform patterns and gotchas
+8. **Implementation** - Write cross-platform code that feels native
+9. **Validation** - TypeScript, ESLint, `npx expo-doctor`
+10. **Compound Learnings** - Document patterns discovered in progress.txt or AGENTS.md
 
 ## Context7 Library IDs
 
@@ -227,6 +229,17 @@ SplashScreen.hideAsync();
 - **Accessibility** - use `accessibilityLabel`, `accessibilityRole`
 - **Deep linking** - automatic with Expo Router
 - **OTA updates** - use EAS Update for instant bug fixes
+
+## Skill References
+
+Consult these skills for detailed best practices:
+
+| Skill | Focus | When to Use |
+|-------|-------|-------------|
+| **react-best-practices** | Performance optimization | Component memoization, state management, async patterns |
+| **web-design-guidelines** | UI/UX quality | Accessibility, forms, animation (mobile-relevant rules) |
+
+**Note:** Some web-design-guidelines rules (like CSS-specific ones) don't apply to React Native. Focus on: accessibility, forms, animation, typography, and touch interaction rules.
 
 ## XcodeBuildMCP - Native iOS Development Tools
 

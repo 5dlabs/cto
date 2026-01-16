@@ -32,9 +32,11 @@ blaze:
     - anime-js
     - effect-frontend-patterns
     - frontend-excellence
+    - frontend-design
   coder:
     - tool-design
     - firecrawl
+    - compound-engineering
   healer:
     - incident-response
     - observability
@@ -67,15 +69,23 @@ tap:
     - llm-docs
     - github-mcp
     - expo-patterns
+    - frontend-design
   coder:
     - tool-design
     - better-auth-expo
     - firecrawl
+    - compound-engineering
   healer:
     - incident-response
     - observability
     - kubernetes-mcp
-  optional: {}
+  optional:
+    expo-deployment:
+      triggers: [deploy, eas, testflight, app store, play store, submit, release]
+      description: "EAS deployment to app stores and web hosting"
+    expo-upgrading:
+      triggers: [upgrade, sdk, version, deprecated, breaking changes, migrate]
+      description: "Upgrading Expo SDK versions and fixing dependency issues"
 
 spark:
   description: "Electron desktop application development"
@@ -88,10 +98,12 @@ spark:
     - llm-docs
     - github-mcp
     - electron-patterns
+    - frontend-design
   coder:
     - tool-design
     - better-auth-electron
     - firecrawl
+    - compound-engineering
   healer:
     - incident-response
     - observability
@@ -117,6 +129,7 @@ rex:
   coder:
     - tool-design
     - firecrawl
+    - compound-engineering
   healer:
     - incident-response
     - observability
@@ -149,6 +162,7 @@ grizz:
   coder:
     - tool-design
     - firecrawl
+    - compound-engineering
   healer:
     - incident-response
     - observability
@@ -180,6 +194,7 @@ nova:
     - tool-design
     - better-auth
     - firecrawl
+    - compound-engineering
   healer:
     - incident-response
     - observability
@@ -223,6 +238,7 @@ bolt:
     - mcp-development
   deploy:
     - tool-design
+    - compound-engineering
   healer:
     - incident-response
   optional:
@@ -412,6 +428,7 @@ vex:
   coder:
     - tool-design
     - firecrawl
+    - compound-engineering
   healer:
     - incident-response
     - observability

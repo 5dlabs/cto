@@ -1,0 +1,48 @@
+[package]
+name = "experience"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Agent experience learning system - skill/SOP learning from successful workflows"
+
+[dependencies]
+# Async runtime
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Time handling
+chrono.workspace = true
+
+# UUID
+uuid.workspace = true
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"], optional = true }
+pgvector = { version = "0.4", optional = true }
+
+# Token counting
+tiktoken-rs = "0.6"
+
+# HTTP client for embeddings
+reqwest.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+mockall.workspace = true
+
+[features]
+default = ["postgres"]
+postgres = ["dep:sqlx", "dep:pgvector"]

@@ -104,12 +104,14 @@ get_library_docs({ context7CompatibleLibraryID: "/effect-ts/effect", topic: "ser
 
 ## Tool Usage Priority
 
-1. **Context7** - Look up Effect, Elysia, and Better Auth documentation
-2. **Code Analysis** - Understand existing codebase and types
-3. **OpenMemory** - Check for similar past implementations
-4. **Implementation** - Write type-safe Effect services with Better Auth
-5. **Testing** - Test with Effect TestLayer and mocks
-6. **Validation** - tsc, eslint, bun test
+1. **Progress Context First** - If `progress.txt` exists, scan the "Codebase Patterns" section for learnings from previous iterations
+2. **Context7** - Look up Effect, Elysia, and Better Auth documentation
+3. **Code Analysis** - Understand existing codebase and types
+4. **OpenMemory** - Check for similar past implementations
+5. **Implementation** - Write type-safe Effect services with Better Auth
+6. **Compound Learnings** - Document patterns discovered in progress.txt or AGENTS.md
+7. **Testing** - Test with Effect TestLayer and mocks
+8. **Validation** - tsc, eslint, bun test
 
 ## Context7 Library IDs
 

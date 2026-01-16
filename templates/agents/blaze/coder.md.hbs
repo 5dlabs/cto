@@ -25,11 +25,13 @@ Your task is to implement frontend changes based on the task specification in `t
 
 ## Tool Usage Priority
 
-1. **Documentation First** - Query Context7 for library docs before coding
-2. **Memory Search** - Check OpenMemory for similar past implementations
-3. **Code Search** - Look for existing patterns in the codebase
-4. **Implementation** - Build components following discovered patterns
-5. **Visual Validation** - Capture screenshots, verify responsive design
+1. **Progress Context First** - If `progress.txt` exists, scan the "Codebase Patterns" section for learnings from previous iterations
+2. **Documentation** - Query Context7 for library docs before coding
+3. **Memory Search** - Check OpenMemory for similar past implementations
+4. **Code Search** - Look for existing patterns in the codebase
+5. **Implementation** - Build components following discovered patterns
+6. **Visual Validation** - Capture screenshots, verify responsive design
+7. **Compound Learnings** - Document patterns discovered in progress.txt or AGENTS.md
 
 ## Context7 Library IDs
 
@@ -105,6 +107,16 @@ Install components with: `npx shadcn@latest add [component-name]`
 - **Update your Linear issue** with progress and status
 - Document components with JSDoc and usage examples
 
+## Skill References
+
+Consult these skills for detailed best practices:
+
+| Skill | Focus | When to Use |
+|-------|-------|-------------|
+| **react-best-practices** | Performance optimization | Waterfalls, bundle size, memoization, server components |
+| **web-design-guidelines** | UI/UX quality | Accessibility, forms, animation, typography, i18n |
+| **vercel-deploy** | Preview deployments | Quick stakeholder reviews before K8s deployment |
+
 ## Local Validation Commands
 
 Run these before creating a PR:
@@ -115,6 +127,26 @@ pnpm lint
 pnpm typecheck || npx tsc --noEmit
 pnpm test || echo "No tests"
 pnpm build
+```
+
+## Browser Testing: Functional vs Visual
+
+**CRITICAL:** Use the right approach based on what you're verifying.
+
+| Testing Type | Method | Use For |
+|--------------|--------|---------|
+| **Functional** | `take_snapshot` / DOM inspection | Button exists, text appears, form works |
+| **Visual** | `take_screenshot` | Layout, colors, styling, animations |
+
+**Common mistake:** Taking screenshots to verify behavior. Screenshots are images—you cannot parse them to check if a button exists. Use snapshot/DOM for functional checks.
+
+```typescript
+// GOOD: Functional check (parseable)
+const submitButton = page.locator('text=Submit');
+expect(submitButton).toBeVisible();
+
+// GOOD: Visual check (screenshot)
+await page.screenshot({ path: 'dashboard.png', fullPage: true });
 ```
 
 ## Visual Verification (MANDATORY)
