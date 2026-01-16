@@ -232,12 +232,22 @@ impl Default for TaskExtractor {
     }
 }
 
-/// Truncate a result string to a maximum length.
+/// Truncate a result string to a maximum length (UTF-8 safe).
+///
+/// This function ensures truncation occurs at a valid UTF-8 character boundary
+/// to avoid panics when the string contains multi-byte characters (emoji, CJK, etc.).
 fn truncate_result(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len - 3])
+        // Reserve 3 bytes for "..."
+        let truncate_at = max_len.saturating_sub(3);
+        // Find a valid UTF-8 boundary at or before truncate_at
+        let mut boundary = truncate_at.min(s.len());
+        while boundary > 0 && !s.is_char_boundary(boundary) {
+            boundary -= 1;
+        }
+        format!("{}...", &s[..boundary])
     }
 }
 
@@ -331,6 +341,39 @@ mod tests {
         let truncated = truncate_result(&long, 50);
         assert!(truncated.len() <= 50);
         assert!(truncated.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_result_utf8_safe() {
+        // Test with emoji (4-byte UTF-8 characters)
+        // Each emoji like 🎉 is 4 bytes
+        let emoji_string = "🎉🎊🎈🎁🎂"; // 5 emojis = 20 bytes
+                                         // Truncating at 10 bytes would fall in the middle of an emoji without proper handling
+        let truncated = truncate_result(emoji_string, 10);
+        assert!(truncated.ends_with("..."));
+        // Should be valid UTF-8 (this would panic if truncation was invalid)
+        assert!(truncated.chars().count() > 0);
+
+        // Test with CJK characters (3-byte UTF-8 characters)
+        let cjk_string = "你好世界测试"; // 6 chars = 18 bytes
+        let truncated_cjk = truncate_result(cjk_string, 10);
+        assert!(truncated_cjk.ends_with("..."));
+        // Verify it's valid UTF-8
+        assert!(truncated_cjk.chars().count() > 0);
+
+        // Test mixed ASCII and multi-byte
+        let mixed = "Hello 世界! 🌍";
+        let truncated_mixed = truncate_result(mixed, 12);
+        assert!(truncated_mixed.ends_with("..."));
+        assert!(truncated_mixed.chars().count() > 0);
+
+        // Test edge case: max_len smaller than "..."
+        let tiny_truncate = truncate_result("hello", 2);
+        assert_eq!(tiny_truncate, "...");
+
+        // Test edge case: max_len exactly 3
+        let exactly_three = truncate_result("hello", 3);
+        assert_eq!(exactly_three, "...");
     }
 
     #[test]
