@@ -25,6 +25,7 @@ blaze:
     # Tool skills
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     # Frontend specific
@@ -66,6 +67,7 @@ tap:
     - context-optimization
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     - expo-patterns
@@ -95,6 +97,7 @@ spark:
     - context-optimization
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     - electron-patterns
@@ -122,6 +125,7 @@ rex:
     - context-optimization
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     - rust-patterns
@@ -156,6 +160,7 @@ grizz:
     - context-optimization
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     - go-patterns
@@ -187,6 +192,7 @@ nova:
     - context-optimization
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     - effect-patterns
@@ -226,6 +232,7 @@ bolt:
     # Tool skills
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     - kubernetes-mcp
@@ -296,6 +303,7 @@ cleo:
     - context-optimization
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     - code-review
@@ -363,6 +371,7 @@ cipher:
     - context-optimization
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     - security-analysis
@@ -391,6 +400,7 @@ morgan:
     - context-optimization
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - firecrawl
     - repomix
@@ -421,6 +431,7 @@ vex:
     - context-optimization
     - openmemory
     - context7
+    - octocode
     - llm-docs
     - github-mcp
     - unity-vr
