@@ -145,6 +145,32 @@ Configure in `cto-config.json`:
 | `jobs` | List running workflows |
 | `stop_job` | Cancel running workflow |
 
+### Research & Code Quality Tools
+
+| Tool | Purpose |
+|------|---------|
+| **Context7** | Library documentation lookup (prevents hallucinated APIs) |
+| **OctoCode** | Semantic code search across GitHub for real implementations |
+| **Firecrawl** | Web research and competitive analysis |
+
+#### OctoCode Usage
+
+OctoCode provides semantic code search and specialized review commands:
+
+| Tool/Command | Purpose | Best For |
+|--------------|---------|----------|
+| `octocode_githubSearchCode` | Search code across repos | Finding implementation patterns |
+| `octocode_githubSearchRepositories` | Discover repos by topic/stars | Finding reference projects |
+| `octocode_githubSearchPullRequests` | Search PRs with diffs | Learning how issues were fixed |
+| `/research` command | Deep code discovery | Morgan intake research |
+| `/review_pull_request` command | Defects-first PR analysis | Cleo code quality reviews |
+| `/review_security` command | Security audit with evidence | Cipher security analysis |
+
+**When to use which tool:**
+- **Context7** → "What's the API for Effect Schema?" (documentation)
+- **OctoCode** → "How does React implement useState?" (source code)
+- **Firecrawl** → "How do competitors handle this?" (web research)
+
 ### MCP Tool Usage Guidelines
 
 #### `intake` Tool - Production Flow Only

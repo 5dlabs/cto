@@ -43,9 +43,11 @@ Before generating tasks, scan the PRD for:
 | Research Type | Tool | Why |
 |---------------|------|-----|
 | **Competitive analysis** | `firecrawl_agent` | Multi-site autonomous research |
-| **Implementation patterns** | `firecrawl_agent` | Finds real-world examples |
+| **Implementation patterns** | `octocode_githubSearchCode` | Searches actual production code across GitHub |
 | **Library documentation** | `context7` | Official, structured docs |
-| **Code examples** | GitHub MCP | Real production code |
+| **Code examples from GitHub** | `octocode_githubSearchCode` | Real production code with semantic search |
+| **How major projects solve X** | `octocode_githubSearchRepositories` | Find reference implementations |
+| **PR discussions/fixes** | `octocode_githubSearchPullRequests` | Learn how issues were resolved |
 | **Specific page content** | `firecrawl_scrape` | Known URL, faster |
 
 ### Step 3: Execute Research
@@ -222,7 +224,27 @@ Firecrawl Agent pricing is dynamic. Optimize costs:
 - **Library docs exist in Context7** - Use `context7` instead
 - **You know the exact URL** - Use `firecrawl_scrape`
 - **Simple factual lookup** - Use `firecrawl_search`
-- **Code examples from repos** - Use GitHub MCP
+- **Code examples from GitHub repos** - Use `octocode_githubSearchCode` (semantic search across repos)
+- **How React/major OSS projects do X** - Use OctoCode to search their source
+
+## OctoCode Integration
+
+For implementation pattern research, combine Firecrawl (web) with OctoCode (code):
+
+```
+# 1. Research how competitors approach the problem (web)
+firecrawl_agent({ prompt: "How does Auth0 implement refresh token rotation?" })
+
+# 2. Find actual implementations in open source (code)
+octocode_githubSearchCode({
+  query: "refresh token rotation",
+  language: "typescript",
+  stars: ">500"
+})
+
+# 3. Get library docs for the chosen approach
+context7_get_library_docs({ libraryId: "/better-auth/better-auth", topic: "refresh tokens" })
+```
 
 ## Research Checklist
 
