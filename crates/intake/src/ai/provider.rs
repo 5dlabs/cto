@@ -175,7 +175,22 @@ pub trait AIProvider: Send + Sync {
 ///
 /// If no JSON structure is found, returns the original text trimmed.
 pub fn extract_json_continuation(text: &str) -> String {
+    // Prefill constant used to detect echoed prefill from CLI
+    const PREFILL: &str = r#"{"tasks":["#;
+
     let text = text.trim();
+
+    // CRITICAL: Handle echoed prefill first.
+    // When the CLI echoes back the prefill, the response looks like:
+    // {"tasks":[\n{\n  "expo": ...}]} or {"tasks":[{"id":1,...}]}
+    // We need to strip the {"tasks":[ part so it's not doubled when reconstructed.
+    let text = if let Some(stripped) = text.strip_prefix(PREFILL) {
+        // Strip the prefill and continue processing the remainder
+        // The remainder may still have embedded prose before {"id":
+        stripped.trim_start()
+    } else {
+        text
+    };
 
     // Look for JSON inside markdown code blocks first (```json ... ```)
     // This handles cases where the AI wraps the JSON in a code block
@@ -510,5 +525,53 @@ mod tests {
         // Clean JSON array should pass through unchanged
         let input = r#"[{"id":1},{"id":2}]"#;
         assert_eq!(extract_json_continuation(input), input);
+    }
+
+    #[test]
+    fn test_extract_json_continuation_echoed_prefill_with_valid_tasks() {
+        // Critical bug fix: when CLI echoes back the prefill {"tasks":[
+        // we need to strip it so it doesn't get doubled in reconstruction
+        let input = r#"{"tasks":[{"id":1,"title":"Task 1"},{"id":2,"title":"Task 2"}]}"#;
+        assert_eq!(
+            extract_json_continuation(input),
+            r#"{"id":1,"title":"Task 1"},{"id":2,"title":"Task 2"}]}"#
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_echoed_prefill_with_hallucinated_content() {
+        // Bug: AI echoes prefill but hallucinates wrong content (expo config instead of tasks)
+        // The response starts with {"tasks":[ (prefill) then wrong JSON follows
+        // We strip the prefill so caller can try to parse what remains
+        let input = r#"{"tasks":[
+{
+  "expo": {
+    "name": "AlertHub"
+  }
+}]}"#;
+        // After stripping {"tasks":[, we get the expo content (which will fail parsing as Task)
+        // But at least it won't have double {"tasks":[ prefix
+        let result = extract_json_continuation(input);
+        assert!(
+            !result.starts_with(r#"{"tasks":["#),
+            "Should strip echoed prefill"
+        );
+        assert!(
+            result.contains("expo"),
+            "Should preserve the content after prefill"
+        );
+    }
+
+    #[test]
+    fn test_extract_json_continuation_echoed_prefill_with_newlines() {
+        // CLI may echo prefill with newlines in the continuation
+        let input = r#"{"tasks":[
+{"id":1,"title":"Task 1"}
+]}"#;
+        let result = extract_json_continuation(input);
+        assert!(
+            result.starts_with(r#"{"id":1"#),
+            "Should strip prefill and return task JSON"
+        );
     }
 }
