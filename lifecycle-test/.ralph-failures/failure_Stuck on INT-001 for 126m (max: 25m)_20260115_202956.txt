@@ -1,0 +1,25 @@
+=== Ralph Failure Context ===
+Story: Stuck on INT-001 for 126m (max: 25m)
+Reason: 
+Timestamp: 2026-01-15T20:29:56-08:00
+Health: ✗✓✗✗
+
+=== Last 100 lines from tmux ===
+(Could not capture tmux pane)
+
+=== Resource Status ===
+Disk: 94% used, 58GB free
+Memory: 3097MB free
+
+=== Git Status ===
+ M ../Cargo.lock
+ M .ralph-events.json
+ M .ralph-monitor-state.json
+?? ".ralph-failures/failure_Stuck on INT-001 for 126m (max: 25m)_20260115_202956.txt"
+
+=== Last Progress Entry ===
+
+=== Process Info ===
+AI PID: 36648
+  PID  PPID  %CPU %MEM STAT      TIME COMMAND
+36648 36647   0.0  0.8 S      0:02.60 claude     

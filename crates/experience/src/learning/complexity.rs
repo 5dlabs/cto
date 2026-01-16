@@ -33,11 +33,7 @@ impl Default for ComplexityFilter {
 impl ComplexityFilter {
     /// Create a new complexity filter with custom settings.
     #[must_use]
-    pub fn new(
-        min_tool_calls: usize,
-        min_duration_secs: u64,
-        complexity_threshold: f32,
-    ) -> Self {
+    pub fn new(min_tool_calls: usize, min_duration_secs: u64, complexity_threshold: f32) -> Self {
         Self {
             min_tool_calls,
             min_duration_secs,
@@ -92,6 +88,7 @@ impl ComplexityFilter {
 
     /// Calculate complexity score for a task (0.0 - 1.0).
     #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn calculate_complexity(&self, task: &TaskRecord) -> f32 {
         let mut score = 0.0f32;
 
@@ -125,6 +122,7 @@ impl ComplexityFilter {
 
     /// Get detailed complexity breakdown for debugging.
     #[must_use]
+    #[allow(clippy::cast_sign_loss)]
     pub fn complexity_breakdown(&self, task: &TaskRecord) -> ComplexityBreakdown {
         let unique_tools = task.unique_tools();
         let duration_secs = task

@@ -11,7 +11,8 @@ pub use space::Space;
 pub use task::{TaskRecord, TaskStatus, ToolCallRecord};
 
 /// Search mode for skill retrieval.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SearchMode {
     /// Fast embedding-based similarity search.
     #[default]

@@ -1,4 +1,4 @@
-//! Session collector - receives events from Healer's SessionStore.
+//! Session collector - receives events from Healer's `SessionStore`.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -133,6 +133,7 @@ pub struct LearningQueueHandler {
 impl LearningQueueHandler {
     /// Create a new learning queue handler.
     #[must_use]
+    #[allow(dead_code)]
     pub fn new(queue: mpsc::Sender<SessionRecord>) -> Self {
         Self { queue }
     }

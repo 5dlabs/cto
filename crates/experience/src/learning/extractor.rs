@@ -40,29 +40,26 @@ impl TaskExtractor {
 
     /// Enhance existing tasks with tool call information from messages.
     fn enhance_existing_tasks(&self, session: &SessionRecord) -> Vec<TaskRecord> {
-        let tool_calls = self.extract_tool_calls(&session.messages);
-        let preferences = self.extract_preferences(&session.messages);
-        let progress = self.extract_progress(&session.messages);
-
         session
             .tasks
             .iter()
             .map(|task| {
                 let mut enhanced = task.clone();
+                let scoped_messages = messages_for_task(&session.messages, task, session);
 
                 // Add tool calls (simple assignment - in production would correlate by time/context)
                 if enhanced.tool_calls.is_empty() {
-                    enhanced.tool_calls = tool_calls.clone();
+                    enhanced.tool_calls = self.extract_tool_calls(&scoped_messages);
                 }
 
                 // Add preferences if not already present
                 if enhanced.user_preferences.is_empty() {
-                    enhanced.user_preferences = preferences.clone();
+                    enhanced.user_preferences = self.extract_preferences(&scoped_messages);
                 }
 
                 // Add progress if not already present
                 if enhanced.progresses.is_empty() {
-                    enhanced.progresses = progress.clone();
+                    enhanced.progresses = self.extract_progress(&scoped_messages);
                 }
 
                 enhanced
@@ -112,11 +109,16 @@ impl TaskExtractor {
     /// Extract tool calls from messages.
     fn extract_tool_calls(&self, messages: &[MessageRecord]) -> Vec<ToolCallRecord> {
         let mut tool_calls = Vec::new();
+        let mut missing_id_counter = 0usize;
 
         for msg in messages {
             if let Some(ref tool_name) = msg.tool_name {
+                let tool_call_id = normalize_tool_call_id(&msg.tool_call_id).unwrap_or_else(|| {
+                    missing_id_counter += 1;
+                    format!("missing-{missing_id_counter}")
+                });
                 let tool_call = ToolCallRecord::new(
-                    msg.tool_call_id.clone().unwrap_or_default(),
+                    tool_call_id,
                     tool_name.clone(),
                     "{}", // Arguments would need to be extracted from content
                 );
@@ -125,10 +127,10 @@ impl TaskExtractor {
 
             // Also look for tool results
             if msg.role == "tool" {
-                if let Some(ref call_id) = msg.tool_call_id {
+                if let Some(call_id) = normalize_tool_call_id(&msg.tool_call_id) {
                     // Find and update the corresponding tool call
                     for tc in &mut tool_calls {
-                        if tc.id == *call_id && tc.result.is_none() {
+                        if tc.id == call_id && tc.result.is_none() {
                             tc.result = Some(truncate_result(&msg.content, 500));
                             tc.success = !msg.content.to_lowercase().contains("error");
                             break;
@@ -238,6 +240,42 @@ fn truncate_result(s: &str, max_len: usize) -> String {
     }
 }
 
+fn normalize_tool_call_id(id: &Option<String>) -> Option<String> {
+    id.as_ref()
+        .map(String::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn messages_for_task(
+    messages: &[MessageRecord],
+    task: &TaskRecord,
+    session: &SessionRecord,
+) -> Vec<MessageRecord> {
+    let start = task.started_at;
+    let mut end = task
+        .completed_at
+        .or(session.completed_at)
+        .unwrap_or_else(|| {
+            messages
+                .iter()
+                .map(|message| message.timestamp)
+                .max()
+                .unwrap_or(start)
+        });
+
+    if end < start {
+        end = start;
+    }
+
+    messages
+        .iter()
+        .filter(|message| message.timestamp >= start && message.timestamp <= end)
+        .cloned()
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,5 +334,153 @@ mod tests {
         let truncated = truncate_result(&long, 50);
         assert!(truncated.len() <= 50);
         assert!(truncated.ends_with("..."));
+    }
+
+    #[test]
+    fn test_tool_results_without_ids_do_not_attach_to_missing_call_ids() {
+        let extractor = TaskExtractor::new();
+
+        let messages = vec![
+            MessageRecord {
+                role: "assistant".to_string(),
+                content: "Call tool A".to_string(),
+                tool_call_id: None,
+                tool_name: Some("tool_a".to_string()),
+                token_count: 0,
+                timestamp: chrono::Utc::now(),
+            },
+            MessageRecord {
+                role: "assistant".to_string(),
+                content: "Call tool B".to_string(),
+                tool_call_id: None,
+                tool_name: Some("tool_b".to_string()),
+                token_count: 0,
+                timestamp: chrono::Utc::now(),
+            },
+            MessageRecord::tool("", "result one"),
+            MessageRecord::tool("", "result two"),
+        ];
+
+        let tool_calls = extractor.extract_tool_calls(&messages);
+        assert_eq!(tool_calls.len(), 2);
+        assert!(tool_calls.iter().all(|tc| tc.result.is_none()));
+    }
+
+    #[test]
+    fn test_enhance_existing_tasks_scopes_messages_by_task_time() {
+        let extractor = TaskExtractor::new();
+
+        let base_time = chrono::Utc::now();
+        let task1_start = base_time - chrono::Duration::seconds(10);
+        let task1_end = base_time - chrono::Duration::seconds(5);
+        let task2_start = base_time - chrono::Duration::seconds(4);
+        let task2_end = base_time - chrono::Duration::seconds(1);
+
+        let mut task1 = TaskRecord::new("task-1", "First task");
+        task1.started_at = task1_start;
+        task1.completed_at = Some(task1_end);
+
+        let mut task2 = TaskRecord::new("task-2", "Second task");
+        task2.started_at = task2_start;
+        task2.completed_at = Some(task2_end);
+
+        let messages = vec![
+            MessageRecord {
+                role: "assistant".to_string(),
+                content: "Calling tool for task 1".to_string(),
+                tool_call_id: Some("call-1".to_string()),
+                tool_name: Some("tool_one".to_string()),
+                token_count: 0,
+                timestamp: task1_start + chrono::Duration::seconds(1),
+            },
+            MessageRecord {
+                role: "tool".to_string(),
+                content: "result 1".to_string(),
+                tool_call_id: Some("call-1".to_string()),
+                tool_name: None,
+                token_count: 0,
+                timestamp: task1_start + chrono::Duration::seconds(2),
+            },
+            MessageRecord {
+                role: "user".to_string(),
+                content: "Please use serde for task 1.".to_string(),
+                tool_call_id: None,
+                tool_name: None,
+                token_count: 0,
+                timestamp: task1_start + chrono::Duration::seconds(3),
+            },
+            MessageRecord {
+                role: "assistant".to_string(),
+                content: "Completed task 1 setup.".to_string(),
+                tool_call_id: None,
+                tool_name: None,
+                token_count: 0,
+                timestamp: task1_start + chrono::Duration::seconds(4),
+            },
+            MessageRecord {
+                role: "assistant".to_string(),
+                content: "Calling tool for task 2".to_string(),
+                tool_call_id: Some("call-2".to_string()),
+                tool_name: Some("tool_two".to_string()),
+                token_count: 0,
+                timestamp: task2_start + chrono::Duration::seconds(1),
+            },
+            MessageRecord {
+                role: "tool".to_string(),
+                content: "result 2".to_string(),
+                tool_call_id: Some("call-2".to_string()),
+                tool_name: None,
+                token_count: 0,
+                timestamp: task2_start + chrono::Duration::seconds(2),
+            },
+            MessageRecord {
+                role: "user".to_string(),
+                content: "I prefer using tokio in task 2.".to_string(),
+                tool_call_id: None,
+                tool_name: None,
+                token_count: 0,
+                timestamp: task2_start + chrono::Duration::seconds(3),
+            },
+            MessageRecord {
+                role: "assistant".to_string(),
+                content: "Completed task 2 implementation.".to_string(),
+                tool_call_id: None,
+                tool_name: None,
+                token_count: 0,
+                timestamp: task2_end,
+            },
+        ];
+
+        let mut session = SessionRecord::new("play-1", uuid::Uuid::new_v4());
+        session.tasks = vec![task1, task2];
+        session.messages = messages;
+
+        let tasks = extractor.extract_tasks(&session).expect("tasks extracted");
+        assert_eq!(tasks.len(), 2);
+
+        let task1 = tasks.iter().find(|task| task.id == "task-1").unwrap();
+        let task2 = tasks.iter().find(|task| task.id == "task-2").unwrap();
+
+        assert_eq!(task1.tool_calls.len(), 1);
+        assert_eq!(task1.tool_calls[0].tool_name, "tool_one");
+        assert!(task1
+            .user_preferences
+            .iter()
+            .any(|pref| pref.contains("serde")));
+        assert!(task1
+            .progresses
+            .iter()
+            .any(|progress| progress.contains("Completed task 1")));
+
+        assert_eq!(task2.tool_calls.len(), 1);
+        assert_eq!(task2.tool_calls[0].tool_name, "tool_two");
+        assert!(task2
+            .user_preferences
+            .iter()
+            .any(|pref| pref.contains("tokio")));
+        assert!(task2
+            .progresses
+            .iter()
+            .any(|progress| progress.contains("Completed task 2")));
     }
 }

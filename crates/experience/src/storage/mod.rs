@@ -1,4 +1,4 @@
-//! PostgreSQL storage layer for experience data.
+//! `PostgreSQL` storage layer for experience data.
 
 mod postgres;
 

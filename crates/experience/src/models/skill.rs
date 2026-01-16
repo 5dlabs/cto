@@ -210,18 +210,17 @@ impl Skill {
     /// Generate a summary of this skill for inclusion in prompts.
     #[must_use]
     pub fn to_prompt_summary(&self) -> String {
+        use std::fmt::Write;
+
         let mut summary = format!("### {}\n", self.use_when);
 
         if !self.preferences.is_empty() {
-            summary.push_str(&format!(
-                "**Preferences**: {}\n",
-                self.preferences.join(", ")
-            ));
+            let _ = writeln!(summary, "**Preferences**: {}", self.preferences.join(", "));
         }
 
         summary.push_str("**Approach**:\n");
         for step in &self.tool_sops {
-            summary.push_str(&format!("{}. `{}`: {}\n", step.order, step.tool_name, step.action));
+            let _ = writeln!(summary, "{}. `{}`: {}", step.order, step.tool_name, step.action);
         }
 
         summary

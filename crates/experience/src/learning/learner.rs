@@ -1,6 +1,6 @@
 //! Skill learner - extracts SOPs from successful task executions.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use tracing::{debug, info, warn};
 
@@ -12,7 +12,11 @@ use super::complexity::ComplexityFilter;
 #[async_trait]
 pub trait LlmClient: Send + Sync {
     /// Generate a description of when this skill should be used.
-    async fn generate_use_when(&self, task: &TaskRecord, tool_sequence: &[ToolStep]) -> Result<String>;
+    async fn generate_use_when(
+        &self,
+        task: &TaskRecord,
+        tool_sequence: &[ToolStep],
+    ) -> Result<String>;
 
     /// Generate an embedding vector for a skill.
     async fn generate_embedding(&self, text: &str) -> Result<Vec<f32>>;
@@ -145,13 +149,10 @@ impl SkillLearner {
             seen_patterns.insert(pattern_key);
 
             // Generate action description
-            let action = self.generate_action_description(&tool_call.tool_name, &tool_call.arguments);
+            let action =
+                self.generate_action_description(&tool_call.tool_name, &tool_call.arguments);
 
-            let step = ToolStep::new(
-                (steps.len() + 1) as u32,
-                &tool_call.tool_name,
-                action,
-            );
+            let step = ToolStep::new((steps.len() + 1) as u32, &tool_call.tool_name, action);
 
             steps.push(step);
         }
@@ -172,7 +173,9 @@ impl SkillLearner {
             "git_diff" => "View diff of changes".to_string(),
             "git_log" => "Review commit history".to_string(),
             "git_show" => "Examine specific commit details".to_string(),
-            "brave_search" | "brave_web_search" => "Search web for documentation or examples".to_string(),
+            "brave_search" | "brave_web_search" => {
+                "Search web for documentation or examples".to_string()
+            }
             _ => format!("Execute {tool_name}"),
         }
     }
@@ -184,7 +187,10 @@ impl SkillLearner {
         } else {
             // Try to infer from tool usage
             let tools = task.unique_tools();
-            if tools.iter().any(|t| t.contains("react") || t.contains("component")) {
+            if tools
+                .iter()
+                .any(|t| t.contains("react") || t.contains("component"))
+            {
                 AgentType::Blaze
             } else {
                 AgentType::Rex // Default to Rex
@@ -198,14 +204,14 @@ impl SkillLearner {
         let tool_summary = if tools.len() <= 3 {
             tools.join(", ")
         } else {
-            format!("{} and {} more tools", tools[..3].join(", "), tools.len() - 3)
+            format!(
+                "{} and {} more tools",
+                tools[..3].join(", "),
+                tools.len() - 3
+            )
         };
 
-        format!(
-            "{} (using {})",
-            task.description,
-            tool_summary
-        )
+        format!("{} (using {})", task.description, tool_summary)
     }
 }
 
@@ -222,7 +228,11 @@ pub struct MockLlmClient;
 #[cfg(test)]
 #[async_trait]
 impl LlmClient for MockLlmClient {
-    async fn generate_use_when(&self, task: &TaskRecord, _tool_sequence: &[ToolStep]) -> Result<String> {
+    async fn generate_use_when(
+        &self,
+        task: &TaskRecord,
+        _tool_sequence: &[ToolStep],
+    ) -> Result<String> {
         Ok(format!("Implementing: {}", task.description))
     }
 
@@ -243,11 +253,27 @@ mod tests {
         task.start();
 
         // Add tool calls
-        task.add_tool_call(ToolCallRecord::new("1", "read_file", r#"{"path": "src/main.rs"}"#));
-        task.add_tool_call(ToolCallRecord::new("2", "search_files", r#"{"query": "handler"}"#));
-        task.add_tool_call(ToolCallRecord::new("3", "write_file", r#"{"path": "src/handler.rs"}"#));
+        task.add_tool_call(ToolCallRecord::new(
+            "1",
+            "read_file",
+            r#"{"path": "src/main.rs"}"#,
+        ));
+        task.add_tool_call(ToolCallRecord::new(
+            "2",
+            "search_files",
+            r#"{"query": "handler"}"#,
+        ));
+        task.add_tool_call(ToolCallRecord::new(
+            "3",
+            "write_file",
+            r#"{"path": "src/handler.rs"}"#,
+        ));
         task.add_tool_call(ToolCallRecord::new("4", "git_status", "{}"));
-        task.add_tool_call(ToolCallRecord::new("5", "read_file", r#"{"path": "Cargo.toml"}"#));
+        task.add_tool_call(ToolCallRecord::new(
+            "5",
+            "read_file",
+            r#"{"path": "Cargo.toml"}"#,
+        ));
 
         task.add_preference("Use async/await");
         task.add_progress("Implemented the handler");
@@ -295,7 +321,7 @@ mod tests {
         let mock_client = MockLlmClient;
 
         let skill = learner
-            .extract_skill(&task, space_id, Some(&mock_client))
+            .extract_skill(&task, space_id, Some(&mock_client as &dyn LlmClient))
             .await
             .unwrap();
 

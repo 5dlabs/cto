@@ -79,7 +79,11 @@ pub struct ToolCallRecord {
 impl ToolCallRecord {
     /// Create a new tool call record.
     #[must_use]
-    pub fn new(id: impl Into<String>, tool_name: impl Into<String>, arguments: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        tool_name: impl Into<String>,
+        arguments: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             tool_name: tool_name.into(),
@@ -222,7 +226,9 @@ impl TaskRecord {
 
         if let Some(duration) = self.duration() {
             let duration_secs = duration.num_seconds();
-            if duration_secs < 0 || (duration_secs as u64) < min_duration_secs {
+            let min_duration_secs_i64 =
+                i64::try_from(min_duration_secs).unwrap_or(i64::MAX);
+            if duration_secs < min_duration_secs_i64 {
                 return false;
             }
         } else {
@@ -252,7 +258,10 @@ mod tests {
 
     #[test]
     fn test_task_status_parsing() {
-        assert_eq!("pending".parse::<TaskStatus>().unwrap(), TaskStatus::Pending);
+        assert_eq!(
+            "pending".parse::<TaskStatus>().unwrap(),
+            TaskStatus::Pending
+        );
         assert_eq!("done".parse::<TaskStatus>().unwrap(), TaskStatus::Success);
         assert_eq!(
             "in_progress".parse::<TaskStatus>().unwrap(),
