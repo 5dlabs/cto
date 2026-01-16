@@ -1,0 +1,62 @@
+=== Ralph Failure Context ===
+Story: Stuck on INT-001 for 89m (max: 25m)
+Reason: 
+Timestamp: 2026-01-15T16:15:23-08:00
+Health: ✗✓✗✗
+
+=== Last 100 lines from tmux ===
+(Could not capture tmux pane)
+
+=== Resource Status ===
+Disk: 91% used, 83GB free
+Memory: 3063MB free
+
+=== Git Status ===
+ M ../.secrets.baseline
+ M .ralph-events.json
+ M .ralph-monitor-state.json
+ M ../templates/agents/blaze/coder.md.hbs
+ M ../templates/agents/grizz/coder.md.hbs
+ M ../templates/agents/morgan/intake.md.hbs
+ M ../templates/agents/nova/coder.md.hbs
+ M ../templates/agents/rex/coder.md.hbs
+ M ../templates/agents/spark/coder.md.hbs
+ M ../templates/agents/tap/coder.md.hbs
+ M ../templates/agents/vex/coder.md.hbs
+ M ../templates/skills/quality/webapp-testing/SKILL.md
+ M ../templates/skills/skill-mappings.yaml
+?? ".ralph-failures/failure_Stuck on INT-001 for 52m (max: 25m)_20260115_153908.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 55m (max: 25m)_20260115_154145.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 55m (max: 25m)_20260115_154156.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 57m (max: 25m)_20260115_154329.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 58m (max: 25m)_20260115_154414.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 60m (max: 25m)_20260115_154650.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 60m (max: 25m)_20260115_154702.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 62m (max: 25m)_20260115_154835.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 63m (max: 25m)_20260115_154919.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 65m (max: 25m)_20260115_155156.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 65m (max: 25m)_20260115_155208.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 67m (max: 25m)_20260115_155340.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 68m (max: 25m)_20260115_155425.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 70m (max: 25m)_20260115_155702.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 71m (max: 25m)_20260115_155714.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 72m (max: 25m)_20260115_155846.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 73m (max: 25m)_20260115_155931.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 75m (max: 25m)_20260115_160208.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 77m (max: 25m)_20260115_160352.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 81m (max: 25m)_20260115_160714.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 81m (max: 25m)_20260115_160720.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 82m (max: 25m)_20260115_160858.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 83m (max: 25m)_20260115_160938.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 86m (max: 25m)_20260115_161223.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 86m (max: 25m)_20260115_161229.txt"
+?? ".ralph-failures/failure_Stuck on INT-001 for 89m (max: 25m)_20260115_161523.txt"
+?? ../templates/skills/design/
+?? ../templates/skills/workflow/compound-engineering/
+
+=== Last Progress Entry ===
+
+=== Process Info ===
+AI PID: 45732
+  PID  PPID  %CPU %MEM STAT      TIME COMMAND
+45732     1   0.0  0.5 Ss+    0:16.69 claude   

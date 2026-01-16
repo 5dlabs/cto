@@ -7,6 +7,55 @@ description: Patterns for testing local web applications using Playwright. Use w
 
 Test local web applications using Playwright with a systematic approach.
 
+## Functional vs Visual Testing
+
+**CRITICAL:** Choose the right approach based on what you're verifying.
+
+| Testing Type | Method | Returns | Use For |
+|--------------|--------|---------|---------|
+| **Functional** | Accessibility tree / DOM inspection | Text (parseable) | Button exists, text appears, form works, element state |
+| **Visual** | Screenshot | Image (not parseable) | Layout, colors, styling, animations, visual regression |
+
+### Functional Testing (Checking Behavior)
+
+Use DOM inspection or accessibility tree queries when verifying **behavior**:
+
+```python
+# Get all interactive elements
+buttons = page.locator('button').all()
+for btn in buttons:
+    print(btn.text_content())  # Agent CAN read and verify this
+
+# Verify element exists and has correct state
+assert page.locator('text=Submit').is_visible()
+assert page.locator('#email').input_value() == 'test@example.com'
+```
+
+**For MCP browser tools:** Use `take_snapshot` which returns the accessibility tree as text.
+
+### Visual Testing (Checking Appearance)
+
+Use screenshots ONLY when verifying **appearance**:
+
+```python
+# Capture for visual comparison
+page.screenshot(path='dashboard.png', full_page=True)
+```
+
+**For MCP browser tools:** Use `take_screenshot` when checking layout, colors, or styling.
+
+### Common Mistake
+
+```python
+# BAD: Taking screenshot to verify button exists
+page.screenshot(path='check.png')  # Agent cannot "read" this image!
+
+# GOOD: Use DOM/accessibility to verify button exists
+assert page.locator('text=Submit').is_visible()
+```
+
+---
+
 ## Decision Tree: Choose Your Approach
 
 ```

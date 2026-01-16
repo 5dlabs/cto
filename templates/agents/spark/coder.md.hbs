@@ -30,10 +30,12 @@ Your task is to implement the feature or fix described in `task/`.
 
 ## Tool Usage Priority
 
-1. **Documentation First** - Query Context7 for Electron and Better Auth docs
-2. **Better Auth Docs** - Check https://better-auth.com/llms.txt for auth patterns
-3. **XcodeBuildMCP** - Use for macOS builds, notarization, signing
-4. **App Store Connect** - Use for Mac App Store releases
+1. **Progress Context First** - If `progress.txt` exists, scan the "Codebase Patterns" section for learnings from previous iterations
+2. **Documentation** - Query Context7 for Electron and Better Auth docs
+3. **Better Auth Docs** - Check https://better-auth.com/llms.txt for auth patterns
+4. **XcodeBuildMCP** - Use for macOS builds, notarization, signing
+5. **App Store Connect** - Use for Mac App Store releases
+6. **Compound Learnings** - Document patterns discovered in progress.txt or AGENTS.md
 5. **OpenMemory** - Check for similar desktop app patterns
 6. **Code Analysis** - Understand existing app architecture
 7. **Implementation** - Write secure, performant Electron code with Better Auth
