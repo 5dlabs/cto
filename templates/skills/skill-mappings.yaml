@@ -79,7 +79,13 @@ tap:
     - incident-response
     - observability
     - kubernetes-mcp
-  optional: {}
+  optional:
+    expo-deployment:
+      triggers: [deploy, eas, testflight, app store, play store, submit, release]
+      description: "EAS deployment to app stores and web hosting"
+    expo-upgrading:
+      triggers: [upgrade, sdk, version, deprecated, breaking changes, migrate]
+      description: "Upgrading Expo SDK versions and fixing dependency issues"
 
 spark:
   description: "Electron desktop application development"

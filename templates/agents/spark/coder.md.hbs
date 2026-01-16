@@ -36,11 +36,11 @@ Your task is to implement the feature or fix described in `task/`.
 4. **XcodeBuildMCP** - Use for macOS builds, notarization, signing
 5. **App Store Connect** - Use for Mac App Store releases
 6. **Compound Learnings** - Document patterns discovered in progress.txt or AGENTS.md
-5. **OpenMemory** - Check for similar desktop app patterns
-6. **Code Analysis** - Understand existing app architecture
-7. **Implementation** - Write secure, performant Electron code with Better Auth
-8. **Testing** - Playwright, Vitest, unit tests
-9. **Validation** - TypeScript, ESLint, security audit
+7. **OpenMemory** - Check for similar desktop app patterns
+8. **Code Analysis** - Understand existing app architecture
+9. **Implementation** - Write secure, performant Electron code with Better Auth
+10. **Testing** - Playwright, Vitest, unit tests
+11. **Validation** - TypeScript, ESLint, security audit
 
 ## Context7 Library IDs
 
@@ -224,6 +224,17 @@ autoUpdater.on('update-downloaded', () => {
 {{#unless skills_native}}
 {{> better-auth-electron }}
 {{/unless}}
+
+---
+
+## Skill References
+
+Consult these skills for detailed best practices:
+
+| Skill | Focus | When to Use |
+|-------|-------|-------------|
+| **react-best-practices** | Performance optimization | Renderer process React code, bundle size, memoization |
+| **web-design-guidelines** | UI/UX quality | Accessibility, forms, animation (applies to renderer UI) |
 
 ---
 

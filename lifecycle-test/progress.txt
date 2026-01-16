@@ -505,3 +505,34 @@ Started: $(date)
   - Single-node operation is insufficient for this workload
 ---
 
+## 2026-01-16 - INT-001 (STILL BLOCKED - INFRASTRUCTURE STALE)
+- **Story**: Intake: Submit AlertHub PRD via MCP Tool
+- **Status**: BLOCKED - K8s node `talos-tq1-f47` still NotReady, Agent Images workflow queued
+- **Actions taken**:
+  1. Verified v0.2.11 release is COMPLETE (published 2026-01-15T23:23:07Z)
+  2. Verified intake-linux-x86_64 binary with fix is available in release
+  3. Verified Dockerfile has TASKS_VERSION=0.2.11
+  4. Checked Agent Images workflow: run #21051891103 - QUEUED (started 2026-01-16T01:01:34Z)
+  5. Checked tasks.json in target repo: NOT FOUND (intake hasn't completed)
+- **Infrastructure status**:
+  - `talos-tq1-f47`: NotReady since Jan 15 10:17 AM (kubelet stopped posting status)
+  - `talos-irs-cis`: Only healthy worker node, at 97% CPU capacity
+  - Runner pods: 9 Pending, 1 Running on `talos-irs-cis`
+  - Agent Images workflow: QUEUED, cannot run without available runners
+- **What's needed**:
+  - Node `talos-tq1-f47` needs reboot or repair (requires infrastructure access)
+  - OR: Reduce runner resource requests to fit more on single node
+  - OR: Add temporary worker node capacity
+- **Remaining acceptance criteria for INT-001**:
+  - ⏳ Intake CodeRun completes WITHOUT ERROR (waiting for agent image with v0.2.11)
+  - ⏳ tasks.json EXISTS in target repo (waiting for intake to complete)
+  - ⏳ tasks.json has >0 tasks with testStrategy (waiting for intake to complete)
+  - ✅ FIX THE CODE if JSON parsing error (done: PR #3837 merged, v0.2.11 released)
+- **All downstream stories blocked**: PLAY-003, PLAY-004, PLAY-005, PLAY-006, QUAL-001, QUAL-002, MERGE-001, DEPLOY-001, TEL-001
+- **Next iteration should**:
+  1. Check node status: `kubectl get nodes`
+  2. Check if Agent Images workflow completed: `gh run view 21051891103`
+  3. If agent image available, submit new intake via MCP tool
+  4. Verify tasks.json created in target repo
+---
+
