@@ -127,6 +127,11 @@ Each task must follow this JSON structure:
 	"priority": "high" | "medium" | "low",
 	"details": string (how to implement, with pseudo-code - MUST be a properly escaped JSON string),
 	"testStrategy": string (how to validate),
+
+IMPORTANT: All string fields (details, description, testStrategy) are JSON strings. Any code examples, JSON configs, or multi-line content MUST be properly escaped:
+- Use \\n for newlines
+- Use \\" for quotes inside the string
+- Do NOT output raw JSON objects as field values - escape them as strings
 	"decisionPoints": [  // Optional: areas requiring agent judgment
 		{
 			"id": string (e.g., "d1", "d2"),
