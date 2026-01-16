@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { featureFlags } from "@/config/feature-flags";
 
 export function Header() {
   return (
@@ -43,12 +44,14 @@ export function Header() {
           >
             Platform
           </a>
-          <a
-            href="/pricing"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Pricing
-          </a>
+          {featureFlags.showPricingLink && (
+            <a
+              href="/pricing"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Pricing
+            </a>
+          )}
           <a
             href="https://github.com/5dlabs"
             target="_blank"
@@ -57,12 +60,14 @@ export function Header() {
           >
             GitHub
           </a>
-          <a
-            href="https://app.5dlabs.ai"
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium text-sm hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40"
-          >
-            Start Now
-          </a>
+          {featureFlags.showStartNowButton && (
+            <a
+              href="https://app.5dlabs.ai"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium text-sm hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40"
+            >
+              Start Now
+            </a>
+          )}
         </nav>
       </div>
     </motion.header>
