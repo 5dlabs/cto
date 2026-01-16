@@ -42,6 +42,12 @@ kubeconfig-*
 # Don't ignore kubeconfig.rs source files
 !**/kubeconfig.rs
 
+# Talos cluster configuration (contains secrets)
+infra/talos/config/simple/controlplane.yaml
+infra/talos/config/simple/worker.yaml
+infra/talos/config/simple/worker-*.yaml
+infra/talos/config/simple/talosconfig
+
 
 # Test and Debug Files
 test-*.yaml
