@@ -1388,6 +1388,12 @@
       "type": "resource_alert",
       "message": "Disk usage critical: 92%",
       "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T21:06:54-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
     }
   ],
   "stories_completed": [
