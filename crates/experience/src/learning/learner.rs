@@ -334,10 +334,10 @@ mod tests {
 
     #[test]
     fn test_tool_step_extraction() {
-        let learner = SkillLearner::with_defaults();
+        let _learner = SkillLearner::with_defaults();
         let task = create_learnable_task();
 
-        let steps = learner.extract_tool_steps(&task);
+        let steps = SkillLearner::extract_tool_steps(&task);
 
         // Should have deduplicated steps
         assert!(!steps.is_empty());

@@ -93,11 +93,14 @@ impl SessionCollector {
         Ok(())
     }
 
-    /// Process events from the receiver channel.
-    pub async fn process_events(
-        handlers: Vec<Arc<dyn SessionEventHandler>>,
-        mut receiver: mpsc::Receiver<SessionEvent>,
-    ) {
+    /// Get the registered handlers.
+    #[must_use]
+    pub fn handlers(&self) -> &[Arc<dyn SessionEventHandler>] {
+        &self.handlers
+    }
+
+    /// Process events from the receiver channel using the registered handlers.
+    pub async fn process_events(&self, mut receiver: mpsc::Receiver<SessionEvent>) {
         info!("Starting session event processor");
 
         while let Some(event) = receiver.recv().await {
@@ -109,7 +112,7 @@ impl SessionCollector {
 
             debug!(event_type, "Processing session event");
 
-            for handler in &handlers {
+            for handler in &self.handlers {
                 if let Err(e) = handler.handle(event.clone()).await {
                     warn!(
                         error = %e,
