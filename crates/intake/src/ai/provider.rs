@@ -251,6 +251,7 @@ pub fn extract_json_continuation(text: &str) -> String {
     // This check handles both:
     // 1. Text that starts with { but has embedded prose (prefill echo case)
     // 2. Text that starts with prose followed by JSON (normal case)
+    // 3. Text that starts with { but is WRONG structure (e.g., {"expo":... instead of {"id":...)
     if let Some(json_start) = text.find(r#"{"id":"#).or_else(|| text.find(r#"{"id"#)) {
         // Only use this extraction if:
         // - Text doesn't start with { (prose before JSON)
@@ -260,9 +261,22 @@ pub fn extract_json_continuation(text: &str) -> String {
         }
     }
 
-    // If the response starts with a JSON object and we didn't find embedded prose
-    // (meaning it's likely clean JSON), return as-is
+    // If text starts with { but doesn't have "id" key, it might be hallucinated content
+    // (e.g., AI outputting {"expo":...} instead of task objects)
+    // In this case, we MUST find {"id": or the content is invalid
     if text.starts_with('{') {
+        // Check if first key is "id" - if so, it's valid task content
+        // Patterns: {"id": or {\n  "id": or { "id":
+        let trimmed = text.trim_start_matches('{').trim_start();
+        if trimmed.starts_with("\"id\"") {
+            return text.to_string();
+        }
+        // First key is NOT "id" - this is hallucinated content (e.g., {"expo":...})
+        // Look for the first {"id": in the entire text
+        if let Some(json_start) = text.find(r#"{"id":"#).or_else(|| text.find(r#"{"id"#)) {
+            return text[json_start..].to_string();
+        }
+        // No valid task objects found - return original and let caller handle the error
         return text.to_string();
     }
 
