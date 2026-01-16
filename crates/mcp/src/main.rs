@@ -4713,6 +4713,19 @@ fn create_mcp_server_coderun(
 ) -> Result<String> {
     let kubectl_cmd = find_command("kubectl");
 
+    // Get Rex agent config from cto-config.json
+    let config = CTO_CONFIG
+        .get()
+        .ok_or_else(|| anyhow!("CTO config not loaded"))?;
+    let rex_config = config
+        .agents
+        .get("rex")
+        .ok_or_else(|| anyhow!("Rex agent not found in config"))?;
+
+    let model = &rex_config.model;
+    let cli_type = &rex_config.cli;
+    let github_app = &rex_config.github_app;
+
     // Build the prompt for Rex based on task type
     let prompt = build_mcp_server_prompt(
         task_type,
@@ -4732,7 +4745,7 @@ fn create_mcp_server_coderun(
         env_map.insert("MCP_SERVER_GITHUB_URL".to_string(), json!(url));
     }
 
-    // Build the CodeRun manifest
+    // Build the CodeRun manifest using Rex's config from cto-config.json
     let coderun = json!({
         "apiVersion": "agents.platform/v1",
         "kind": "CodeRun",
@@ -4751,14 +4764,14 @@ fn create_mcp_server_coderun(
             "repositoryUrl": "https://github.com/5dlabs/cto",
             "docsRepositoryUrl": "https://github.com/5dlabs/cto",
             "workingDirectory": ".",
-            "model": "claude-sonnet-4-5-20250514",
-            "githubApp": "5DLabs-Rex",
+            "model": model,
+            "githubApp": github_app,
             "continueSession": false,
             "overwriteMemory": true,
             "promptModification": prompt,
             "cliConfig": {
-                "cliType": "claude",
-                "model": "claude-sonnet-4-5-20250514"
+                "cliType": cli_type,
+                "model": model
             },
             "remoteTools": "mcp_tools_github_*,mcp_tools_argocd_*,mcp_tools_kubernetes_*",
             "env": env_map

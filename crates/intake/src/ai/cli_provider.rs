@@ -919,7 +919,7 @@ impl CLITextGenerator {
                 // Claude models
                 "claude-opus-4-5-20251101",
                 "claude-sonnet-4-5-20250929",
-                "claude-sonnet-4-5-20250514",
+                "claude-sonnet-4-20250514",
                 // GPT models
                 "gpt-5.1",
                 "gpt-4-turbo",

@@ -258,7 +258,7 @@ impl Default for RemediationTarget {
             branch: "develop".to_string(),
             agent: "bolt".to_string(),
             cli: "claude".to_string(),
-            model: "claude-sonnet-4-5-20250514".to_string(),
+            model: "claude-sonnet-4-20250514".to_string(),
         }
     }
 }

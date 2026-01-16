@@ -35,7 +35,7 @@ impl Default for EvaluationSpawnerConfig {
         Self {
             namespace: "cto".to_string(),
             github_app: "5DLabs-Healer".to_string(),
-            model: "claude-sonnet-4-5-20250514".to_string(),
+            model: "claude-sonnet-4-20250514".to_string(),
             cli: "claude".to_string(),
             repository: "5dlabs/cto".to_string(),
         }
@@ -315,7 +315,7 @@ mod tests {
             AgentConfig {
                 github_app: Some("5DLabs-Rex".to_string()),
                 cli: Some("claude".to_string()),
-                model: Some("claude-sonnet-4-5-20250514".to_string()),
+                model: Some("claude-sonnet-4-20250514".to_string()),
                 tools: AgentTools {
                     remote: vec!["brave_search".to_string(), "github_create_pr".to_string()],
                     local_servers: HashMap::new(),
@@ -375,6 +375,6 @@ mod tests {
             spec["metadata"]["labels"]["healer.agents.platform/type"],
             "evaluation"
         );
-        assert_eq!(spec["spec"]["model"], "claude-sonnet-4-5-20250514");
+        assert_eq!(spec["spec"]["model"], "claude-sonnet-4-20250514");
     }
 }

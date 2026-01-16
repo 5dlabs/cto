@@ -52,7 +52,7 @@ async fn test_play_session_lifecycle_http() {
                 "rex": {
                     "github_app": "5DLabs-Rex",
                     "cli": "claude",
-                    "model": "claude-sonnet-4-5-20250514",
+                    "model": "claude-sonnet-4-20250514",
                     "tools": {
                         "remote": ["brave_search", "github_create_pr"],
                         "local_servers": {
@@ -66,7 +66,7 @@ async fn test_play_session_lifecycle_http() {
                 "bolt": {
                     "github_app": "5DLabs-Bolt",
                     "cli": "claude",
-                    "model": "claude-sonnet-4-5-20250514",
+                    "model": "claude-sonnet-4-20250514",
                     "tools": {
                         "remote": ["kubernetes_apply"],
                         "local_servers": {}
@@ -222,7 +222,7 @@ async fn test_play_session_payload_validation() {
                 "rex": {
                     "github_app": "5DLabs-Rex",
                     "cli": "claude",
-                    "model": "claude-sonnet-4-5-20250514",
+                    "model": "claude-sonnet-4-20250514",
                     "tools": {
                         "remote": ["brave_search", "github_create_pr"],
                         "local_servers": {
@@ -323,7 +323,7 @@ async fn test_healer_notification_format() {
                 "rex": {
                     "githubApp": "5DLabs-Rex",
                     "cli": "claude",
-                    "model": "claude-sonnet-4-5-20250514",
+                    "model": "claude-sonnet-4-20250514",
                     "tools": {
                         "remote": ["brave_search"],
                         "localServers": {}
@@ -580,7 +580,7 @@ async fn test_mcp_to_healer_json_format() {
                 "rex": {
                     "githubApp": "5DLabs-Rex",  // camelCase!
                     "cli": "claude",
-                    "model": "claude-sonnet-4-5-20250514",
+                    "model": "claude-sonnet-4-20250514",
                     "tools": {
                         "remote": ["context7_resolve_library_id", "firecrawl_scrape"],
                         "localServers": {}  // camelCase!
@@ -589,7 +589,7 @@ async fn test_mcp_to_healer_json_format() {
                 "bolt": {
                     "githubApp": "5DLabs-Bolt",
                     "cli": "claude",
-                    "model": "claude-sonnet-4-5-20250514",
+                    "model": "claude-sonnet-4-20250514",
                     "tools": {
                         "remote": ["kubernetes_listResources", "argocd_list_applications"],
                         "localServers": {

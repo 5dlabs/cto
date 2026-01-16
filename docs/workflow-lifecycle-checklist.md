@@ -524,7 +524,7 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
   "agents": {
     "rex": {
       "cli": "claude",
-      "model": "claude-sonnet-4-5-20250514",
+      "model": "claude-sonnet-4-20250514",
       "subagents": {
         "enabled": true,
         "maxConcurrent": 5
@@ -532,7 +532,7 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
     },
     "blaze": {
       "cli": "claude",
-      "model": "claude-sonnet-4-5-20250514",
+      "model": "claude-sonnet-4-20250514",
       "subagents": {
         "enabled": true,
         "maxConcurrent": 5
@@ -552,7 +552,7 @@ This document outlines the complete lifecycle from PRD to deployed code, with ve
   "agents": {
     "rex": {
       "models": [
-        "claude-sonnet-4-5-20250514",
+        "claude-sonnet-4-20250514",
         "claude-opus-4-5-20250514"
       ]
     }

@@ -31,7 +31,7 @@ impl Default for EvaluatorConfig {
     fn default() -> Self {
         Self {
             llm_endpoint: "http://tools-server:8080/v1/chat/completions".to_string(),
-            model: "claude-sonnet-4-5-20250514".to_string(),
+            model: "claude-sonnet-4-20250514".to_string(),
             timeout: Duration::from_secs(30),
             pass_threshold: 0.7,
         }
