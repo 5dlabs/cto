@@ -66,7 +66,7 @@ pub use search::SkillSearcher;
 /// Experience client configuration.
 #[derive(Debug, Clone)]
 pub struct ExperienceConfig {
-    /// Database URL for PostgreSQL storage.
+    /// Database URL for `PostgreSQL` storage.
     #[cfg(feature = "postgres")]
     pub database_url: String,
 

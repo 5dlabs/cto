@@ -86,7 +86,7 @@ pub struct ToolStep {
     /// Order in the sequence (1-based).
     pub order: u32,
 
-    /// Name of the tool (e.g., "git_status", "write_file").
+    /// Name of the tool (e.g., `git_status`, `write_file`).
     pub tool_name: String,
 
     /// Description of what this step accomplishes.
@@ -220,7 +220,11 @@ impl Skill {
 
         summary.push_str("**Approach**:\n");
         for step in &self.tool_sops {
-            let _ = writeln!(summary, "{}. `{}`: {}", step.order, step.tool_name, step.action);
+            let _ = writeln!(
+                summary,
+                "{}. `{}`: {}",
+                step.order, step.tool_name, step.action
+            );
         }
 
         summary

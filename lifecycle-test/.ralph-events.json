@@ -1394,6 +1394,30 @@
       "type": "resource_alert",
       "message": "Disk usage critical: 92%",
       "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T21:07:45-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T21:10:35-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T21:12:00-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
+    },
+    {
+      "timestamp": "2026-01-15T21:12:51-08:00",
+      "type": "resource_alert",
+      "message": "Disk usage critical: 92%",
+      "story": ""
     }
   ],
   "stories_completed": [

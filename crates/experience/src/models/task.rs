@@ -226,8 +226,7 @@ impl TaskRecord {
 
         if let Some(duration) = self.duration() {
             let duration_secs = duration.num_seconds();
-            let min_duration_secs_i64 =
-                i64::try_from(min_duration_secs).unwrap_or(i64::MAX);
+            let min_duration_secs_i64 = i64::try_from(min_duration_secs).unwrap_or(i64::MAX);
             if duration_secs < min_duration_secs_i64 {
                 return false;
             }

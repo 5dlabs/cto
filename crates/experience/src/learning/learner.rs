@@ -67,7 +67,7 @@ impl SkillLearner {
         );
 
         // Extract tool sequence as steps
-        let tool_sops = self.extract_tool_steps(task);
+        let tool_sops = Self::extract_tool_steps(task);
 
         if tool_sops.is_empty() {
             warn!(task_id = %task.id, "No tool steps extracted, skipping");
@@ -75,7 +75,7 @@ impl SkillLearner {
         }
 
         // Determine agent type
-        let agent = self.determine_agent(task);
+        let agent = Self::determine_agent(task);
 
         // Generate use_when description
         let use_when = if let Some(client) = llm_client {
@@ -84,10 +84,10 @@ impl SkillLearner {
                 .await
                 .unwrap_or_else(|e| {
                     warn!(error = %e, "Failed to generate use_when, using fallback");
-                    self.fallback_use_when(task)
+                    Self::fallback_use_when(task)
                 })
         } else {
-            self.fallback_use_when(task)
+            Self::fallback_use_when(task)
         };
 
         // Create skill
@@ -126,7 +126,7 @@ impl SkillLearner {
     }
 
     /// Extract tool steps from task's tool calls.
-    fn extract_tool_steps(&self, task: &TaskRecord) -> Vec<ToolStep> {
+    fn extract_tool_steps(task: &TaskRecord) -> Vec<ToolStep> {
         let mut steps = Vec::new();
         let mut seen_patterns: std::collections::HashSet<String> = std::collections::HashSet::new();
 
@@ -150,8 +150,9 @@ impl SkillLearner {
 
             // Generate action description
             let action =
-                self.generate_action_description(&tool_call.tool_name, &tool_call.arguments);
+                Self::generate_action_description(&tool_call.tool_name, &tool_call.arguments);
 
+            #[allow(clippy::cast_possible_truncation)]
             let step = ToolStep::new((steps.len() + 1) as u32, &tool_call.tool_name, action);
 
             steps.push(step);
@@ -161,7 +162,7 @@ impl SkillLearner {
     }
 
     /// Generate an action description for a tool call.
-    fn generate_action_description(&self, tool_name: &str, _arguments: &str) -> String {
+    fn generate_action_description(tool_name: &str, _arguments: &str) -> String {
         // Map common tools to descriptions
         match tool_name {
             "read_file" => "Read file contents to understand existing code".to_string(),
@@ -181,7 +182,7 @@ impl SkillLearner {
     }
 
     /// Determine the agent type from task metadata.
-    fn determine_agent(&self, task: &TaskRecord) -> AgentType {
+    fn determine_agent(task: &TaskRecord) -> AgentType {
         if let Some(ref agent) = task.agent {
             agent.parse().unwrap_or(AgentType::Rex)
         } else {
@@ -198,8 +199,8 @@ impl SkillLearner {
         }
     }
 
-    /// Generate a fallback use_when description without LLM.
-    fn fallback_use_when(&self, task: &TaskRecord) -> String {
+    /// Generate a fallback `use_when` description without LLM.
+    fn fallback_use_when(task: &TaskRecord) -> String {
         let tools = task.unique_tools();
         let tool_summary = if tools.len() <= 3 {
             tools.join(", ")
@@ -346,12 +347,10 @@ mod tests {
 
     #[test]
     fn test_action_descriptions() {
-        let learner = SkillLearner::with_defaults();
-
-        let desc = learner.generate_action_description("read_file", "{}");
+        let desc = SkillLearner::generate_action_description("read_file", "{}");
         assert!(desc.contains("Read file"));
 
-        let desc = learner.generate_action_description("unknown_tool", "{}");
+        let desc = SkillLearner::generate_action_description("unknown_tool", "{}");
         assert!(desc.contains("unknown_tool"));
     }
 }

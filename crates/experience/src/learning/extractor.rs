@@ -31,15 +31,15 @@ impl TaskExtractor {
 
         // If session already has tasks, enhance them with tool call data
         if !session.tasks.is_empty() {
-            return Ok(self.enhance_existing_tasks(session));
+            return Ok(Self::enhance_existing_tasks(session));
         }
 
         // Otherwise, try to extract tasks from messages
-        self.extract_tasks_from_messages(session)
+        Ok(Self::extract_tasks_from_messages(session))
     }
 
     /// Enhance existing tasks with tool call information from messages.
-    fn enhance_existing_tasks(&self, session: &SessionRecord) -> Vec<TaskRecord> {
+    fn enhance_existing_tasks(session: &SessionRecord) -> Vec<TaskRecord> {
         session
             .tasks
             .iter()
@@ -49,17 +49,17 @@ impl TaskExtractor {
 
                 // Add tool calls (simple assignment - in production would correlate by time/context)
                 if enhanced.tool_calls.is_empty() {
-                    enhanced.tool_calls = self.extract_tool_calls(&scoped_messages);
+                    enhanced.tool_calls = Self::extract_tool_calls(&scoped_messages);
                 }
 
                 // Add preferences if not already present
                 if enhanced.user_preferences.is_empty() {
-                    enhanced.user_preferences = self.extract_preferences(&scoped_messages);
+                    enhanced.user_preferences = Self::extract_preferences(&scoped_messages);
                 }
 
                 // Add progress if not already present
                 if enhanced.progresses.is_empty() {
-                    enhanced.progresses = self.extract_progress(&scoped_messages);
+                    enhanced.progresses = Self::extract_progress(&scoped_messages);
                 }
 
                 enhanced
@@ -68,13 +68,15 @@ impl TaskExtractor {
     }
 
     /// Extract tasks from message history when no structured tasks exist.
-    fn extract_tasks_from_messages(&self, session: &SessionRecord) -> Result<Vec<TaskRecord>> {
-        let tool_calls = self.extract_tool_calls(&session.messages);
-        let preferences = self.extract_preferences(&session.messages);
-        let progress = self.extract_progress(&session.messages);
+    fn extract_tasks_from_messages(session: &SessionRecord) -> Vec<TaskRecord> {
+        let tool_calls = Self::extract_tool_calls(&session.messages);
+        let preferences = Self::extract_preferences(&session.messages);
+        let progress = Self::extract_progress(&session.messages);
 
         // If we have tool calls, create a synthetic task
-        if !tool_calls.is_empty() {
+        if tool_calls.is_empty() {
+            Vec::new()
+        } else {
             let mut task = TaskRecord::new(
                 format!("session-{}", session.play_id),
                 format!("Work performed in session {}", session.play_id),
@@ -100,23 +102,22 @@ impl TaskExtractor {
                 "Created synthetic task from session"
             );
 
-            Ok(vec![task])
-        } else {
-            Ok(Vec::new())
+            vec![task]
         }
     }
 
     /// Extract tool calls from messages.
-    fn extract_tool_calls(&self, messages: &[MessageRecord]) -> Vec<ToolCallRecord> {
+    fn extract_tool_calls(messages: &[MessageRecord]) -> Vec<ToolCallRecord> {
         let mut tool_calls = Vec::new();
         let mut missing_id_counter = 0usize;
 
         for msg in messages {
             if let Some(ref tool_name) = msg.tool_name {
-                let tool_call_id = normalize_tool_call_id(&msg.tool_call_id).unwrap_or_else(|| {
-                    missing_id_counter += 1;
-                    format!("missing-{missing_id_counter}")
-                });
+                let tool_call_id = normalize_tool_call_id(msg.tool_call_id.as_ref())
+                    .unwrap_or_else(|| {
+                        missing_id_counter += 1;
+                        format!("missing-{missing_id_counter}")
+                    });
                 let tool_call = ToolCallRecord::new(
                     tool_call_id,
                     tool_name.clone(),
@@ -127,7 +128,7 @@ impl TaskExtractor {
 
             // Also look for tool results
             if msg.role == "tool" {
-                if let Some(call_id) = normalize_tool_call_id(&msg.tool_call_id) {
+                if let Some(call_id) = normalize_tool_call_id(msg.tool_call_id.as_ref()) {
                     // Find and update the corresponding tool call
                     for tc in &mut tool_calls {
                         if tc.id == call_id && tc.result.is_none() {
@@ -144,7 +145,7 @@ impl TaskExtractor {
     }
 
     /// Extract user preferences from messages.
-    fn extract_preferences(&self, messages: &[MessageRecord]) -> Vec<String> {
+    fn extract_preferences(messages: &[MessageRecord]) -> Vec<String> {
         let mut preferences = Vec::new();
 
         // Look for preference indicators in user messages
@@ -186,7 +187,7 @@ impl TaskExtractor {
     }
 
     /// Extract progress updates from assistant messages.
-    fn extract_progress(&self, messages: &[MessageRecord]) -> Vec<String> {
+    fn extract_progress(messages: &[MessageRecord]) -> Vec<String> {
         let mut progress = Vec::new();
 
         let progress_indicators = [
@@ -240,9 +241,8 @@ fn truncate_result(s: &str, max_len: usize) -> String {
     }
 }
 
-fn normalize_tool_call_id(id: &Option<String>) -> Option<String> {
-    id.as_ref()
-        .map(String::as_str)
+fn normalize_tool_call_id(id: Option<&String>) -> Option<String> {
+    id.map(String::as_str)
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_string)
@@ -284,7 +284,8 @@ mod tests {
     #[test]
     fn test_extractor_creation() {
         let extractor = TaskExtractor::new();
-        assert!(std::mem::size_of_val(&extractor) > 0);
+        // TaskExtractor is a unit struct (ZST), just verify it can be created
+        let _ = extractor;
     }
 
     #[test]
@@ -298,30 +299,26 @@ mod tests {
 
     #[test]
     fn test_extract_preferences() {
-        let extractor = TaskExtractor::new();
-
         let messages = vec![
             MessageRecord::user("Please use async/await for all IO operations."),
             MessageRecord::user("I prefer using the Result type for error handling."),
             MessageRecord::assistant("I'll implement it with async/await."),
         ];
 
-        let preferences = extractor.extract_preferences(&messages);
+        let preferences = TaskExtractor::extract_preferences(&messages);
         assert!(!preferences.is_empty());
         assert!(preferences.iter().any(|p| p.contains("async/await")));
     }
 
     #[test]
     fn test_extract_progress() {
-        let extractor = TaskExtractor::new();
-
         let messages = vec![
             MessageRecord::assistant("I have completed the initial setup."),
             MessageRecord::assistant("Successfully implemented the handler."),
             MessageRecord::user("Great, continue."),
         ];
 
-        let progress = extractor.extract_progress(&messages);
+        let progress = TaskExtractor::extract_progress(&messages);
         assert!(!progress.is_empty());
     }
 
@@ -338,8 +335,6 @@ mod tests {
 
     #[test]
     fn test_tool_results_without_ids_do_not_attach_to_missing_call_ids() {
-        let extractor = TaskExtractor::new();
-
         let messages = vec![
             MessageRecord {
                 role: "assistant".to_string(),
@@ -361,12 +356,13 @@ mod tests {
             MessageRecord::tool("", "result two"),
         ];
 
-        let tool_calls = extractor.extract_tool_calls(&messages);
+        let tool_calls = TaskExtractor::extract_tool_calls(&messages);
         assert_eq!(tool_calls.len(), 2);
         assert!(tool_calls.iter().all(|tc| tc.result.is_none()));
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_enhance_existing_tasks_scopes_messages_by_task_time() {
         let extractor = TaskExtractor::new();
 
@@ -455,30 +451,30 @@ mod tests {
         session.tasks = vec![task1, task2];
         session.messages = messages;
 
-        let tasks = extractor.extract_tasks(&session).expect("tasks extracted");
-        assert_eq!(tasks.len(), 2);
+        let extracted = extractor.extract_tasks(&session).expect("tasks extracted");
+        assert_eq!(extracted.len(), 2);
 
-        let task1 = tasks.iter().find(|task| task.id == "task-1").unwrap();
-        let task2 = tasks.iter().find(|task| task.id == "task-2").unwrap();
+        let first_task = extracted.iter().find(|t| t.id == "task-1").unwrap();
+        let second_task = extracted.iter().find(|t| t.id == "task-2").unwrap();
 
-        assert_eq!(task1.tool_calls.len(), 1);
-        assert_eq!(task1.tool_calls[0].tool_name, "tool_one");
-        assert!(task1
+        assert_eq!(first_task.tool_calls.len(), 1);
+        assert_eq!(first_task.tool_calls[0].tool_name, "tool_one");
+        assert!(first_task
             .user_preferences
             .iter()
             .any(|pref| pref.contains("serde")));
-        assert!(task1
+        assert!(first_task
             .progresses
             .iter()
             .any(|progress| progress.contains("Completed task 1")));
 
-        assert_eq!(task2.tool_calls.len(), 1);
-        assert_eq!(task2.tool_calls[0].tool_name, "tool_two");
-        assert!(task2
+        assert_eq!(second_task.tool_calls.len(), 1);
+        assert_eq!(second_task.tool_calls[0].tool_name, "tool_two");
+        assert!(second_task
             .user_preferences
             .iter()
             .any(|pref| pref.contains("tokio")));
-        assert!(task2
+        assert!(second_task
             .progresses
             .iter()
             .any(|progress| progress.contains("Completed task 2")));

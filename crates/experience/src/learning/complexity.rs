@@ -125,10 +125,7 @@ impl ComplexityFilter {
     #[allow(clippy::cast_sign_loss)]
     pub fn complexity_breakdown(&self, task: &TaskRecord) -> ComplexityBreakdown {
         let unique_tools = task.unique_tools();
-        let duration_secs = task
-            .duration()
-            .map(|d| d.num_seconds().max(0) as u64)
-            .unwrap_or(0);
+        let duration_secs = task.duration().map_or(0, |d| d.num_seconds().max(0) as u64);
 
         ComplexityBreakdown {
             tool_calls: task.tool_calls.len(),
