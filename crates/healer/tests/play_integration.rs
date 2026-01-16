@@ -369,7 +369,7 @@ async fn test_session_status_transitions() {
         assert!(session.get("status").is_some());
     }
 
-    println!("✅ Session status values validated: {:?}", statuses);
+    println!("✅ Session status values validated: {statuses:?}");
 }
 
 /// Test issue detection types.
@@ -416,7 +416,7 @@ async fn test_agent_language_mapping() {
     ];
 
     for (agent, language, tools) in &mappings {
-        println!("  Agent {agent} -> {language}: {:?}", tools);
+        println!("  Agent {agent} -> {language}: {tools:?}");
     }
 
     println!(
@@ -472,10 +472,9 @@ async fn test_remediation_strategy_selection() {
         let strategy_name = format!("{strategy:?}");
         assert_eq!(
             strategy_name, expected_strategy,
-            "Issue {} should map to {}",
-            issue_type_debug, expected_strategy
+            "Issue {issue_type_debug} should map to {expected_strategy}"
         );
-        println!("  {} -> {}", issue_type_debug, strategy_name);
+        println!("  {issue_type_debug} -> {strategy_name}");
     }
 
     println!("✅ Remediation strategy selection validated");
@@ -509,12 +508,12 @@ async fn test_language_matching_verification() {
     let rust_quality = ImplementationLanguage::Rust.quality_tools();
     assert!(rust_quality.contains(&"cargo clippy"));
     assert!(rust_quality.contains(&"cargo fmt"));
-    println!("✅ Rust quality tools: {:?}", rust_quality);
+    println!("✅ Rust quality tools: {rust_quality:?}");
 
     // Test security tools for Go
     let go_security = ImplementationLanguage::Go.security_tools();
     assert!(go_security.contains(&"gosec"));
-    println!("✅ Go security tools: {:?}", go_security);
+    println!("✅ Go security tools: {go_security:?}");
 
     // Test language match verification
     let result = verify_language_match(
@@ -668,7 +667,7 @@ async fn test_mcp_to_healer_json_format() {
         bolt_local_servers.get("filesystem").is_some(),
         "Bolt's filesystem local server should be stored"
     );
-    println!("✅ Bolt localServers stored: {:?}", bolt_local_servers);
+    println!("✅ Bolt localServers stored: {bolt_local_servers:?}");
 
     println!("\n🎉 MCP → Healer JSON format test PASSED!");
 }
