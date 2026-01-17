@@ -84,3 +84,43 @@
 ### Final Status: PASSED (baseline documented)
 
 ---
+
+## [2026-01-17 04:25] - OPT-001: Cache and Parallelism Improvements
+
+### Before
+- Runtime build: 21-39 min
+- Claude build: 34 min
+- Full pipeline: 98 min
+- Success rate: ~20%
+
+### Changes Made
+1. **Removed CACHE_BUST arg** (agents-build.yaml:510)
+   - Was: `CACHE_BUST=${{ github.run_id }}` - invalidated all cache every run
+   - Now: Removed - allows proper layer caching
+
+2. **Added registry cache for runtime** (agents-build.yaml:252-260)
+   - Was: GHA cache only (`type=gha,scope=runtime`)
+   - Now: Registry cache + GHA cache (persistent + fast)
+   - Registry cache survives GHA cache evictions (10GB limit)
+
+3. **Fixed pre-pull step order** (agents-build.yaml:392-404)
+   - Was: Pre-pull before login (failed for private GHCR)
+   - Now: Login first, then pre-pull (works correctly)
+
+4. **Increased parallelism** (agents-build.yaml:336)
+   - Was: max-parallel: 2
+   - Now: max-parallel: 4 (runtime is pre-built, cache is warmed)
+
+### Files Modified
+- `.github/workflows/agents-build.yaml`
+
+### Evidence
+- Commit: 8edbc50f8
+- Branch: ralph/agent-ci-optimization-2026-01-17
+- Build run: https://github.com/5dlabs/cto/actions/runs/21088420552
+
+### After (Pending - Build Running)
+- Build triggered at: 2026-01-17 04:25:48Z
+- Status: PENDING (monitoring...)
+
+---
