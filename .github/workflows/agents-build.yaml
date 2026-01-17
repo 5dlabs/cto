@@ -219,10 +219,14 @@ jobs:
       - name: Check if base image exists
         id: check
         run: |
-          if docker manifest inspect "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ steps.tag.outputs.tag }}" > /dev/null 2>&1; then
+          # Use timeout to prevent hanging on Docker socket issues
+          # If manifest check times out or fails, assume image doesn't exist and rebuild
+          if timeout 30 docker manifest inspect "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ steps.tag.outputs.tag }}" > /dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Base image exists: v${{ steps.tag.outputs.tag }}"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "📦 Base image not found or check timed out, will rebuild"
           fi
 
       - name: Set up Docker Buildx
@@ -399,9 +403,10 @@ jobs:
       - name: Pre-pull runtime base image
         run: |
           echo "📥 Pre-pulling runtime base image to warm up cache..."
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }} || \
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:latest || \
-            echo "⚠️ Pre-pull failed, build will pull during build step"
+          # Use timeout to prevent hanging on Docker socket issues
+          timeout 120 docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }} || \
+            timeout 120 docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:latest || \
+            echo "⚠️ Pre-pull failed or timed out, build will pull during build step"
 
       - name: Setup Node.js (ensure npm available in runner)
         uses: actions/setup-node@v4
