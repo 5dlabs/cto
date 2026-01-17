@@ -13,10 +13,11 @@ RUN apk add --no-cache libc6-compat git
 WORKDIR /app
 
 # Clone tweakcn repository with retry logic for resilience against transient network failures
-# Clean up partial clones before retrying to avoid "destination path already exists" errors
+# Clean up all directory contents before retrying to avoid "destination path already exists" errors
+# (partial clones can leave files like README.md or package.json, not just .git)
 # Use git rev-parse HEAD to verify clone completed (not just that .git exists)
 RUN for i in 1 2 3 4 5; do \
-      rm -rf .git 2>/dev/null || true; \
+      rm -rf .git .[!.]* ..?* * 2>/dev/null || true; \
       git clone --depth 1 https://github.com/jnsahaj/tweakcn.git . && break || \
       echo "Git clone attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
     done && \
