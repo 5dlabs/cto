@@ -2,45 +2,35 @@
 # Based on official Dockerfile from https://github.com/caviraoss/openmemory
 # Server now lives in packages/openmemory-js/
 
+# ===== DOWNLOAD STAGE =====
+# Download the repository archive using ADD instruction
+# ADD with URLs uses the buildkit daemon's DNS config (from buildkitd.toml)
+# which is properly configured, unlike RUN instruction containers
+FROM alpine:3.21 AS downloader
+
+WORKDIR /src
+
+# Install unzip for extracting the archive
+RUN apk add --no-cache unzip
+
+# Download and extract the OpenMemory repository from GitHub archive
+# Using ADD with URL instead of git clone avoids DNS issues in RUN containers
+ADD https://github.com/caviraoss/openmemory/archive/refs/heads/main.zip /tmp/repo.zip
+RUN unzip /tmp/repo.zip -d /tmp && \
+    mv /tmp/openmemory-main/* /src/ && \
+    rm -rf /tmp/repo.zip /tmp/openmemory-main
+
 # ===== BUILD STAGE =====
-FROM node:20-alpine AS builder
+# Use official Bun image which has Bun pre-installed (avoids DNS issues from curl install)
+FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
 
-# Install system dependencies required for native module compilation,
-# plus curl and bash (needed to run the Bun installation script)
-RUN apk add --no-cache python3 make g++ curl bash git
+# Install system dependencies required for native module compilation
+RUN apk add --no-cache python3 make g++ nodejs npm
 
-# Install Bun globally and relocate it to a shared, persistent location
-# Use retry logic with exponential backoff for resilience against transient DNS failures
-# Clean up partial installations before retrying to avoid installer conflicts
-# Note: SHELL with pipefail ensures curl failures in the pipeline are detected
-# (without pipefail, only bash's exit code is checked, which is 0 for empty input)
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN for i in 1 2 3 4 5; do \
-      rm -rf /root/.bun 2>/dev/null || true; \
-      curl -fsSL https://bun.sh/install | bash && break || \
-      echo "Attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
-    done && \
-    [ -d /root/.bun ] || { echo "ERROR: Bun installation failed after all retries"; exit 1; } && \
-    mv /root/.bun /opt/bun && \
-    ln -s /opt/bun/bin/bun /usr/local/bin/bun
-SHELL ["/bin/sh", "-c"]
-
-# Ensure Bun is available in PATH for subsequent commands
-ENV PATH="/opt/bun/bin:${PATH}"
-
-# Clone OpenMemory repository and navigate to the JS server package
-# Clean up partial clones before retrying to avoid "destination path already exists" errors
-# Use git rev-parse HEAD to verify clone completed (not just that .git exists)
-RUN for i in 1 2 3 4 5; do \
-      rm -rf /src 2>/dev/null || true; \
-      git clone --depth 1 https://github.com/caviraoss/openmemory.git /src && break || \
-      echo "Git clone attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
-    done && \
-    git -C /src rev-parse HEAD > /dev/null 2>&1 || { echo "ERROR: Git clone failed or incomplete after all retries"; exit 1; }
-
-WORKDIR /src/packages/openmemory-js
+# Copy the downloaded repository from the downloader stage
+COPY --from=downloader /src/packages/openmemory-js ./
 
 # Install all dependencies (including devDependencies) using Bun
 RUN bun install --concurrent-scripts=10 --network-concurrency=96
@@ -65,9 +55,9 @@ RUN addgroup -g 1001 -S openmemory \
  && adduser -u 1001 -S openmemory -G openmemory
 
 # Copy only production artifacts from the builder stage
-COPY --from=builder /src/packages/openmemory-js/node_modules ./node_modules/
-COPY --from=builder /src/packages/openmemory-js/dist ./dist/
-COPY --from=builder /src/packages/openmemory-js/package.json ./
+COPY --from=builder /app/node_modules ./node_modules/
+COPY --from=builder /app/dist ./dist/
+COPY --from=builder /app/package.json ./
 
 # Create a directory for persistent data and secure file permissions
 RUN mkdir -p /data \
