@@ -327,8 +327,64 @@ jobs:
             echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:${{ steps.version.outputs.version }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  build-agents:
+  # Phase 1: Build a simple agent first to warm the registry buildcache
+  # This ensures base image layers are in the cache before other agents start
+  warm-cache:
     needs: build-runtime
+    runs-on: [k8s-runner]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Determine cursor version
+        id: version
+        run: |
+          VERSION=$(git log -1 --format="%h" -- "./infra/images/cursor/")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 cursor version (dir hash): $VERSION"
+
+      - name: Build cursor (cache warmup)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./infra/images/cursor
+          file: ./infra/images/cursor/Dockerfile
+          platforms: linux/amd64
+          pull: true
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:v${{ steps.version.outputs.version }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
+          no-cache: ${{ inputs.no_cache == true }}
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:buildcache
+            ${{ inputs.no_cache != true && 'type=gha,scope=cursor' || '' }}
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:buildcache,mode=max
+            ${{ inputs.no_cache != true && 'type=gha,scope=cursor,mode=max' || '' }}
+
+  # Phase 2: Build remaining agents in parallel (cache is now warm)
+  build-agents:
+    needs: [build-runtime, warm-cache]
     runs-on: [k8s-runner]
     timeout-minutes: 45
     permissions:
@@ -337,7 +393,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      max-parallel: 4  # Increased parallelism since runtime is pre-built and cached
+      max-parallel: 6  # Higher parallelism now that cache is warm
       matrix:
         include:
           - id: claude
@@ -347,11 +403,7 @@ jobs:
             version_type: npm
             version_pkg: "@anthropic-ai/claude-code"
             version_arg: CLAUDE_CODE_VERSION
-          - id: cursor
-            image: cursor
-            context: ./infra/images/cursor
-            file: ./infra/images/cursor/Dockerfile
-            version_type: dir_hash
+          # cursor is built in warm-cache phase
           - id: opencode
             image: opencode
             context: ./infra/images/opencode
@@ -536,7 +588,7 @@ jobs:
 
   # Summary job
   summary:
-    needs: [build-agents, build-sidecar]
+    needs: [warm-cache, build-agents, build-sidecar]
     if: always()
     runs-on: [k8s-runner]
     steps:

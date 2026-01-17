@@ -119,8 +119,170 @@
 - Branch: ralph/agent-ci-optimization-2026-01-17
 - Build run: https://github.com/5dlabs/cto/actions/runs/21088420552
 
-### After (Pending - Build Running)
-- Build triggered at: 2026-01-17 04:25:48Z
-- Status: PENDING (monitoring...)
+### After - Build 21088420552 FAILED
+- Build failed due to runtime timeout (31 min)
+- Root cause: cargo-outdated compilation (requires full cargo crate - 500+ deps)
+- Status: FAILED - Need OPT-005
+
+---
+
+## [2026-01-17 05:00] - OPT-005: Remove Slow Rust Crates
+
+### Before
+- Runtime build: 31+ min (timeout at cargo-outdated compilation)
+- cargo-outdated requires compiling entire cargo crate (~500 dependencies)
+- Also included: cargo-geiger, cargo-expand, cargo-udeps (rarely used)
+
+### Changes Made
+1. **Removed slow cargo crates** (runtime/Dockerfile:560-568)
+   - Removed: cargo-outdated, cargo-geiger, cargo-expand, cargo-udeps
+   - Kept: sccache, cargo-edit, cargo-nextest, cargo-deny, cargo-watch, cargo-audit
+   - Estimated savings: 10+ minutes compile time
+
+2. **Removed redundant apt-get** (opencode/Dockerfile)
+   - Removed unnecessary curl, bash, unzip, wget install (already in runtime)
+
+### Files Modified
+- `infra/images/runtime/Dockerfile`
+- `infra/images/opencode/Dockerfile`
+
+### Evidence
+- Commits: 50e4bab22, 06e7e1249
+- Branch: ralph/agent-ci-optimization-2026-01-17
+- Build run: https://github.com/5dlabs/cto/actions/runs/21088941371
+
+### After - Previous Builds
+- Build 21088941371: FAILED (runtime timeout at cargo-deny)
+- Build 21089059857: FAILED (runtime timeout)
+- Build 21089070781: CANCELLED (runner shutdown)
+- Build 21089420415: FAILED - runtime succeeded but agent builds still slow
+  - Runtime build: ~3 min (skipped - image existed)
+  - Claude agent: 34 min (FAILED - runner shutdown at 16min image pull)
+  - Analysis: BuildKit docker-container driver re-pulls runtime image
+
+### Root Cause Identified
+The docker-container driver (default) has isolated image storage.
+Even with pre-pull step, BuildKit ignores Docker daemon's cache and
+re-fetches the 500MB+ runtime image from registry (16+ minutes).
+
+### Next Optimization
+See OPT-006 below
+
+---
+
+## [2026-01-17 07:07] - OPT-006: Use Docker Driver to Share Image Cache
+
+### Problem
+BuildKit docker-container driver has isolated image storage:
+- Pre-pull to Docker daemon cache: works (runtime image pulled in 3min)
+- BuildKit build: ignores daemon cache, re-pulls from registry (16+ min)
+- Total: 19+ min per agent just for base image handling
+
+### Solution
+Switch from docker-container to docker driver for agent builds:
+- docker driver uses daemon's image store directly
+- Pre-pulled runtime image is immediately available to BuildKit
+- Trade-off: No registry cache support, but acceptable since:
+  - Agent Dockerfiles are tiny (just npm install)
+  - Major savings come from not re-pulling 500MB+ base image
+
+### Changes Made
+1. **Enhanced pre-pull step** (agents-build.yaml)
+   - Extract digest after pull for stable reference
+   - Increased timeout from 120s to 180s
+   - Output digest and ref for use in build step
+
+2. **Switch to docker driver** (agents-build.yaml)
+   - Added `driver: docker` to setup-buildx-action
+   - This shares daemon's image store with pre-pulled runtime
+
+3. **Removed registry/GHA cache** (agents-build.yaml)
+   - docker driver doesn't support these backends
+   - Keep inline cache via BUILDKIT_INLINE_CACHE=1
+
+4. **Use digest-based base image ref** (agents-build.yaml)
+   - BASE_IMAGE=${{ steps.runtime.outputs.ref }}
+   - More stable than tag-based references
+
+### Files Modified
+- `.github/workflows/agents-build.yaml`
+
+### Evidence
+- Commit: d444d29bd
+- Branch: ralph/agent-ci-optimization-2026-01-17
+- Build run: https://github.com/5dlabs/cto/actions/runs/21090466182
+
+### Expected Results
+- Agent build time: 34 min → ~5 min
+- Image pull time: 16 min → 0 min (already in cache)
+- npm install: ~7 sec (unchanged)
+
+### After (OPT-006 Reverted)
+- Build 21090466182: CANCELLED - docker driver with push hung indefinitely
+- Reverted to docker-container driver with registry cache in commit 5b28c88e1
+
+### Final Status: FAILED - docker driver approach doesn't work with push:true
+
+---
+
+## [2026-01-17 08:26] - ANALYSIS: Build 21090969591 Results
+
+### Build Completed Successfully
+Total pipeline time: ~34 minutes
+
+### Job Timing Breakdown
+| Agent    | Time    | Cache Status | Notes |
+|----------|---------|--------------|-------|
+| runtime  | 2m32s   | Built fresh  | Skipped (image existed) |
+| sidecar  | 5m44s   | Built        | Rust compile |
+| cursor   | 1m3s    | CACHED       | No syntax directive, started first |
+| opencode | 2m29s   | CACHED       | syntax=1 (simpler) |
+| code     | 2m23s   | CACHED       | Started 1.5min late, got cache |
+| factory  | 2m42s   | CACHED       | Started 3.5min late, got cache |
+| gemini   | 19m14s  | PARTIAL      | Started 5min late but still slow |
+| codex    | 23m23s  | NO CACHE     | Started early with syntax=1.7-labs |
+| claude   | 31m36s  | NO CACHE     | Started early with syntax=1.7-labs |
+
+### Root Cause Analysis
+1. **Parallel start with cache contention**: Claude/Codex/Gemini all start at ~07:52
+   and compete for the same registry cache. First one to request populates,
+   others have to wait or download fresh.
+
+2. **syntax=docker/dockerfile:1.7-labs overhead**: This directive requires
+   BuildKit to download a separate Dockerfile frontend image (~12MB) before
+   even starting the build. Cursor (no directive) starts 20 seconds faster.
+
+3. **Cache warming takes time**: Builds that start 2+ minutes later (code, factory)
+   benefit from cache populated by earlier builds (cursor).
+
+4. **Large runtime base image**: The runtime image has 401MB + 408MB layers
+   that must be downloaded if cache miss. This takes 15-20 minutes.
+
+### Observations from Logs
+
+**Cursor (fast - 1m3s)**:
+```
+#6 [1/4] FROM ghcr.io/5dlabs/runtime:... - resolve 0.1s
+#10 CACHED
+#11 CACHED
+#12 CACHED
+#13 exporting to image - immediately
+Total push: ~2.3s
+```
+
+**Claude (slow - 31m36s)**:
+```
+#2 resolve dockerfile:1.7-labs - 2 seconds overhead
+#7 [stage-0 1/5] FROM ghcr.io/5dlabs/runtime:...
+#7 sha256:... 14.68MB / 401.04MB - downloading 401MB layer
+#7 sha256:... 0B / 408.95MB - downloading 408MB layer
+```
+
+### Key Finding
+Builds that start later benefit from cache populated by earlier builds.
+The solution is to stagger builds or have a dedicated cache-warming job.
+
+### Next Optimization: OPT-007 - Cache Warming Job
+Create a dedicated job that warms the registry cache before agent builds start.
 
 ---
