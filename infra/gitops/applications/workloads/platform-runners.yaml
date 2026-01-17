@@ -81,7 +81,9 @@ spec:
               logs.platform.5dlabs.io/service: github-runner
           spec:
             restartPolicy: OnFailure
-            activeDeadlineSeconds: 3600
+            # Increased from 3600 to 7200 (2 hours) to support long-running builds
+            # Agent builds can take 45-90 minutes, and pods need time before starting jobs
+            activeDeadlineSeconds: 7200
             # Explicit DNS configuration to avoid transient CoreDNS/host DNS issues
             # Uses public DNS servers directly for reliable external domain resolution
             dnsPolicy: "None"

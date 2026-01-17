@@ -142,10 +142,15 @@ impl AIDomain {
         // Use maximum output tokens to ensure complete response
         // Claude 4.5 models support up to 64k output tokens (128k with extended thinking)
         // We set to 64k to allow complete task generation without truncation
+        //
+        // IMPORTANT: Explicitly disable MCP tools for PRD parsing to force pure JSON output.
+        // When Claude has access to tools (Read, Write, Glob, etc.), it tends to use them
+        // instead of outputting JSON directly, which breaks the prefill technique.
         let options = GenerateOptions {
             temperature: Some(0.7),
             max_tokens: Some(64_000),
             json_mode: true,
+            mcp_config: None, // Disable MCP to force JSON output
             ..Default::default()
         };
 

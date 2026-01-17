@@ -219,10 +219,14 @@ jobs:
       - name: Check if base image exists
         id: check
         run: |
-          if docker manifest inspect "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ steps.tag.outputs.tag }}" > /dev/null 2>&1; then
+          # Use timeout to prevent hanging on Docker socket issues
+          # If manifest check times out or fails, assume image doesn't exist and rebuild
+          if timeout 30 docker manifest inspect "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ steps.tag.outputs.tag }}" > /dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Base image exists: v${{ steps.tag.outputs.tag }}"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "📦 Base image not found or check timed out, will rebuild"
           fi
 
       - name: Set up Docker Buildx
@@ -249,10 +253,15 @@ jobs:
             PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
             TASKS_VERSION=${{ steps.binaries-version.outputs.tasks_version }}
             TASKMASTER_VERSION=${{ steps.taskmaster-version.outputs.version }}
-          # Cache can be disabled via no_cache input when builds hang due to corruption
+          # Cache strategy: GHA cache (fast) + registry cache (persistent fallback)
+          # Registry cache survives even when no_cache=true (only disables GHA cache)
           no-cache: ${{ inputs.no_cache == true }}
-          cache-from: ${{ inputs.no_cache != true && 'type=gha,scope=runtime' || '' }}
-          cache-to: ${{ inputs.no_cache != true && 'type=gha,scope=runtime,mode=max' || '' }}
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
+            ${{ inputs.no_cache != true && 'type=gha,scope=runtime' || '' }}
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache,mode=max
+            ${{ inputs.no_cache != true && 'type=gha,scope=runtime,mode=max' || '' }}
 
       - name: Set build output
         id: set-built
@@ -318,8 +327,64 @@ jobs:
             echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:${{ steps.version.outputs.version }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  build-agents:
+  # Phase 1: Build a simple agent first to warm the registry buildcache
+  # This ensures base image layers are in the cache before other agents start
+  warm-cache:
     needs: build-runtime
+    runs-on: [k8s-runner]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: Determine cursor version
+        id: version
+        run: |
+          VERSION=$(git log -1 --format="%h" -- "./infra/images/cursor/")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 cursor version (dir hash): $VERSION"
+
+      - name: Build cursor (cache warmup)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./infra/images/cursor
+          file: ./infra/images/cursor/Dockerfile
+          platforms: linux/amd64
+          pull: true
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:v${{ steps.version.outputs.version }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
+          no-cache: ${{ inputs.no_cache == true }}
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:buildcache
+            ${{ inputs.no_cache != true && 'type=gha,scope=cursor' || '' }}
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:buildcache,mode=max
+            ${{ inputs.no_cache != true && 'type=gha,scope=cursor,mode=max' || '' }}
+
+  # Phase 2: Build remaining agents in parallel (cache is now warm)
+  build-agents:
+    needs: [build-runtime, warm-cache]
     runs-on: [k8s-runner]
     timeout-minutes: 45
     permissions:
@@ -328,7 +393,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      max-parallel: 2  # Limit parallelism to reduce resource contention on k8s-runner
+      max-parallel: 6  # Higher parallelism now that cache is warm
       matrix:
         include:
           - id: claude
@@ -338,11 +403,7 @@ jobs:
             version_type: npm
             version_pkg: "@anthropic-ai/claude-code"
             version_arg: CLAUDE_CODE_VERSION
-          - id: cursor
-            image: cursor
-            context: ./infra/images/cursor
-            file: ./infra/images/cursor/Dockerfile
-            version_type: dir_hash
+          # cursor is built in warm-cache phase
           - id: opencode
             image: opencode
             context: ./infra/images/opencode
@@ -384,12 +445,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Pre-pull runtime base image
-        run: |
-          echo "📥 Pre-pulling runtime base image to warm up cache..."
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }} || \
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:latest || \
-            echo "⚠️ Pre-pull failed, build will pull during build step"
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Pre-pull removed: docker-container driver has isolated cache
+      # Instead, we rely on registry buildcache to provide base image layers
 
       - name: Setup Node.js (ensure npm available in runner)
         uses: actions/setup-node@v4
@@ -400,13 +464,6 @@ jobs:
         run: |
           node -v
           npm -v
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Determine version (npm for npm agents, PyPI for pypi/pip agents, script-hash for remote installers, dir-hash otherwise)
         id: version
@@ -488,6 +545,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        # Using default docker-container driver for full push support
+        # Registry cache will help with base image layers
 
       - name: Build and push image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
@@ -495,10 +554,10 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           platforms: linux/amd64
+          # Allow pull but use registry cache for base image layers
           pull: true
           push: true
           # Disable attestations - avoids GHCR permission issues for new packages
-          # and reduces complexity (attestations require id-token: write permission)
           provenance: false
           sbom: false
           tags: |
@@ -508,11 +567,10 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
             BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
             VERSION=${{ steps.version.outputs.version }}
-            CACHE_BUST=${{ github.run_id }}
-          # Cache strategy: GHA cache (fast) + registry cache (persistent fallback)
-          # Registry cache survives even when no_cache=true (only disables GHA cache)
+          # Use registry cache heavily - runtime buildcache contains all base layers
           no-cache: ${{ inputs.no_cache == true }}
           cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache
             ${{ inputs.no_cache != true && format('type=gha,scope={0}', matrix.id) || '' }}
           cache-to: |
@@ -530,7 +588,7 @@ jobs:
 
   # Summary job
   summary:
-    needs: [build-agents, build-sidecar]
+    needs: [warm-cache, build-agents, build-sidecar]
     if: always()
     runs-on: [k8s-runner]
     steps:

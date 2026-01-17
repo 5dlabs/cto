@@ -40,6 +40,12 @@ build-release:
 build-bin BIN:
     cargo build --bin {{BIN}}
 
+# Build core services (controller, pm-server, healer) in release mode with verbose progress
+# Use this for faster local dev builds - shows compile progress and uses sccache
+build-release-fast:
+    @echo "Building release binaries with verbose progress (using sccache)..."
+    cargo build --release --bin agent-controller --bin pm-server --bin healer -vv
+
 # =============================================================================
 # Check & Lint Commands
 # =============================================================================
@@ -198,6 +204,78 @@ mp: kill-ports
         echo "⚠️  .env.local not found - some services may not work"; \
     fi
     mprocs
+
+# =============================================================================
+# launchd Services (background daemon mode - no terminal required)
+# =============================================================================
+
+# Install and start launchd services (runs in background, auto-restarts on rebuild)
+launchd-install:
+    @echo "Installing CTO services as launchd daemons..."
+    @echo "Prerequisites: fswatch (brew install fswatch), release binaries (cargo build --release)"
+    ./scripts/launchd-setup.sh install
+
+# Uninstall launchd services
+launchd-uninstall:
+    ./scripts/launchd-setup.sh uninstall
+
+# Show launchd service status
+launchd-status:
+    ./scripts/launchd-setup.sh status
+
+# Tail launchd service logs
+launchd-logs:
+    ./scripts/launchd-setup.sh logs
+
+# Restart all launchd services
+launchd-restart:
+    ./scripts/launchd-setup.sh restart
+
+# Start launchd services (if stopped)
+launchd-start:
+    ./scripts/launchd-setup.sh start
+
+# Stop launchd services (without unloading)
+launchd-stop:
+    ./scripts/launchd-setup.sh stop
+
+# Build release binaries and let launchd auto-restart (main development workflow)
+build-and-restart: build-release
+    @echo "✅ Release binaries built - launchd watcher will auto-restart services"
+
+# Monitor launchd services with lnav (status + logs in one TUI)
+launchd-monitor:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    # Check if lnav is installed
+    if ! command -v lnav &> /dev/null; then
+        echo "lnav not found. Installing via Homebrew..."
+        brew install lnav
+    fi
+    
+    # Show current status first
+    ./scripts/launchd-setup.sh status
+    echo ""
+    echo "Press Enter to open log viewer (lnav)..."
+    read -r
+    
+    # Open lnav with all log files
+    lnav /tmp/cto-launchd/*.log
+
+# Monitor launchd services with multitail (split pane view)
+launchd-multitail:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    # Check if multitail is installed
+    if ! command -v multitail &> /dev/null; then
+        echo "multitail not found. Installing via Homebrew..."
+        brew install multitail
+    fi
+    
+    # Open multitail with all log files
+    multitail -s 2 /tmp/cto-launchd/controller.log /tmp/cto-launchd/pm-server.log /tmp/cto-launchd/healer.log /tmp/cto-launchd/healer-sensor.log /tmp/cto-launchd/tunnel.log /tmp/cto-launchd/watcher.log
 
 # =============================================================================
 # Process Compose (legacy - use mprocs instead)
@@ -457,6 +535,38 @@ preflight:
     echo "  just tunnel          # Start Cloudflare tunnel"
     echo "  just webhook-dev     # Point GitHub webhook to dev"
     echo "  just cluster-down    # Scale down in-cluster services"
+
+# =============================================================================
+# Fast Dev Image Builds (bypass GitHub Actions)
+# =============================================================================
+
+# Build and push dev runtime image with local intake binary
+dev-runtime-image:
+    @echo "Building dev runtime image with local intake..."
+    ./scripts/build-dev-image.sh --binary intake --image runtime --push
+
+# Build and push dev Claude image with local intake binary
+dev-claude-image:
+    @echo "Building dev Claude image with local intake..."
+    ./scripts/build-dev-image.sh --binary intake --image claude --push
+
+# Build dev image locally without pushing (for testing)
+dev-image-local:
+    ./scripts/build-dev-image.sh --binary intake --image runtime
+
+# Build and push all binaries to dev runtime
+dev-runtime-all:
+    ./scripts/build-dev-image.sh --binary all --image runtime --push
+
+# Install cross-compilation tools for dev builds
+install-cross-tools:
+    @echo "Installing cross-compilation tools..."
+    cargo install cargo-zigbuild
+    @echo ""
+    @echo "✅ cargo-zigbuild installed"
+    @echo ""
+    @echo "For GHCR authentication, run:"
+    @echo '  echo $$GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin'
 
 # =============================================================================
 # Utility Commands
