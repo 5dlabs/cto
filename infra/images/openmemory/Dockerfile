@@ -42,7 +42,9 @@ FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
 # Install system dependencies required for native module compilation
-RUN apk add --no-cache python3 make g++ nodejs npm
+# py3-setuptools provides distutils module which was removed in Python 3.12+
+# but is still required by node-gyp for building native modules like sqlite3
+RUN apk add --no-cache python3 py3-setuptools make g++ nodejs npm
 
 # Copy pre-downloaded Node.js headers for native module compilation
 # This avoids DNS issues when node-gyp tries to download headers during bun install
