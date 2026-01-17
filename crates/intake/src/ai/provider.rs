@@ -354,7 +354,7 @@ pub fn validate_json_continuation(content: &str) -> TasksResult<()> {
             if trimmed != "]}" {
                 return Err(crate::errors::TasksError::Ai(format!(
                     "AI returned incomplete JSON structure. \
-                     Expected '}}]' to close the tasks array, but got: {}...",
+                     Expected ']}}' to close the tasks array, but got: {}...",
                     &content.chars().take(50).collect::<String>()
                 )));
             }
