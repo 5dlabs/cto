@@ -331,8 +331,8 @@ pub fn validate_json_continuation(content: &str) -> TasksResult<()> {
 
     if first_char == '{' || first_char == ']' {
         // Looks like JSON - do a quick sanity check
-        // The content after `{` should start with `"id"` for valid task objects
         if first_char == '{' {
+            // The content after `{` should start with `"id"` for valid task objects
             let after_brace = content.trim_start_matches('{').trim_start();
             if !after_brace.starts_with("\"id\"") {
                 // Content starts with { but first key is not "id" - this is invalid
@@ -344,6 +344,18 @@ pub fn validate_json_continuation(content: &str) -> TasksResult<()> {
                      Expected JSON array of tasks with 'id' as the first field, but got different structure. \
                      First 200 chars: {}...",
                     &content.chars().take(200).collect::<String>()
+                )));
+            }
+        } else {
+            // Content starts with `]` - this should be `]}` to close both the array and object
+            // When reconstructed as `{"tasks":[` + content, we need `]}` to produce valid JSON
+            // Accepting just `]` would produce `{"tasks":[]` which is invalid (missing `}`)
+            let trimmed = content.trim();
+            if trimmed != "]}" {
+                return Err(crate::errors::TasksError::Ai(format!(
+                    "AI returned incomplete JSON structure. \
+                     Expected '}}]' to close the tasks array, but got: {}...",
+                    &content.chars().take(50).collect::<String>()
                 )));
             }
         }
@@ -678,8 +690,38 @@ mod tests {
     #[test]
     fn test_validate_json_continuation_empty_array() {
         // Empty array (closing bracket from prefill)
+        // Must be exactly `]}` to close both the array and object when reconstructed
         let content = "]}";
         assert!(validate_json_continuation(content).is_ok());
+    }
+
+    #[test]
+    fn test_validate_json_continuation_incomplete_closing() {
+        // Just `]` without the closing `}` would produce invalid JSON when reconstructed
+        // `{"tasks":[` + `]` = `{"tasks":[]` (missing closing brace)
+        let content = "]";
+        let result = validate_json_continuation(content);
+        assert!(
+            result.is_err(),
+            "Should reject incomplete closing bracket without }}"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("incomplete"),
+            "Error should mention incomplete: {err}"
+        );
+    }
+
+    #[test]
+    fn test_validate_json_continuation_extra_closing() {
+        // Extra brackets would produce invalid JSON
+        // `{"tasks":[` + `]}]` = `{"tasks":[]}]` (extra bracket)
+        let content = "]}]";
+        let result = validate_json_continuation(content);
+        assert!(
+            result.is_err(),
+            "Should reject content with extra closing brackets"
+        );
     }
 
     #[test]
