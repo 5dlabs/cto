@@ -2,6 +2,26 @@
 # Built from upstream: https://github.com/jnsahaj/tweakcn
 # Build trigger: HEAL-2485 - Initial GHCR image push for deployment
 
+# ===== DOWNLOAD STAGE =====
+# Download the repository archive using ADD instruction
+# ADD with URLs uses the buildkit daemon's DNS config (from buildkitd.toml)
+# which is properly configured, unlike RUN instruction containers
+FROM alpine:3.21 AS downloader
+
+WORKDIR /src
+
+# Install unzip for extracting the archive
+RUN apk add --no-cache unzip
+
+# Download and extract the tweakcn repository from GitHub archive
+# Using ADD with URL instead of git clone avoids DNS issues in RUN containers
+# Note: Using cp -a with trailing dot to include hidden dotfiles (e.g., .npmrc, .nvmrc)
+# The shell glob * does not match dotfiles by default, so we use cp -a instead of mv
+ADD https://github.com/jnsahaj/tweakcn/archive/refs/heads/main.zip /tmp/repo.zip
+RUN unzip /tmp/repo.zip -d /tmp && \
+    cp -a /tmp/tweakcn-main/. /src/ && \
+    rm -rf /tmp/repo.zip /tmp/tweakcn-main
+
 FROM node:20-alpine AS base
 
 # Install pnpm globally
@@ -9,19 +29,11 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat git
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Clone tweakcn repository with retry logic for resilience against transient network failures
-# Clean up all directory contents before retrying to avoid "destination path already exists" errors
-# (partial clones can leave files like README.md or package.json, not just .git)
-# Use git rev-parse HEAD to verify clone completed (not just that .git exists)
-RUN for i in 1 2 3 4 5; do \
-      rm -rf .git .[!.]* ..?* * 2>/dev/null || true; \
-      git clone --depth 1 https://github.com/jnsahaj/tweakcn.git . && break || \
-      echo "Git clone attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
-    done && \
-    git rev-parse HEAD > /dev/null 2>&1 || { echo "ERROR: Git clone failed or incomplete after all retries"; exit 1; }
+# Copy the downloaded repository from the downloader stage
+COPY --from=downloader /src ./
 
 # Install dependencies with pnpm (matches upstream package manager)
 RUN pnpm install --frozen-lockfile || pnpm install
