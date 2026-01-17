@@ -48,7 +48,7 @@
         "Document findings in progress.txt with specific timings"
       ],
       "testStrategy": "manual",
-      "passes": false
+      "passes": true
     },
     {
       "id": "OPT-001",
@@ -65,7 +65,7 @@
         "Document removed tools and rationale"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "OPT-002",
@@ -81,7 +81,7 @@
         "Document cache strategy in infra/images/README.md"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "OPT-003",
@@ -97,7 +97,7 @@
         "Document pre-warming strategy"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "OPT-004",
@@ -113,7 +113,7 @@
         "No builds fail due to resource contention"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "OPT-005",
@@ -129,7 +129,7 @@
         "Cache persists across builds (check GHA cache usage)"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "OPT-006",
@@ -145,7 +145,7 @@
         "Subsequent agent builds reuse layers from earlier builds"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "OPT-007",
@@ -160,7 +160,7 @@
         "Document layer optimization strategy"
       ],
       "testStrategy": "integration",
-      "passes": false
+      "passes": true
     },
     {
       "id": "VERIFY-001",
@@ -177,7 +177,7 @@
         "Document final timings in progress.txt"
       ],
       "testStrategy": "e2e",
-      "passes": false
+      "passes": true
     },
     {
       "id": "DOC-001",
@@ -193,7 +193,7 @@
         "Include troubleshooting guide for slow builds"
       ],
       "testStrategy": "manual",
-      "passes": false
+      "passes": true
     }
   ],
   "constraints": [

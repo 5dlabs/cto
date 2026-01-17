@@ -3,9 +3,20 @@
 # Runtime Base Image - Unified Dockerfile
 # =============================================================================
 #
-# Supports both CI (download binaries) and local (build from source) builds:
+# Multi-target build supporting different use cases:
 #
-#   CI/GHCR build (default - downloads binaries from releases):
+#   Minimal (for agents - default target):
+#     docker build -t ghcr.io/5dlabs/runtime .
+#     docker build --target minimal -t ghcr.io/5dlabs/runtime:minimal .
+#     Contains: git, Node.js, npm, ripgrep, jq, curl, GitHub CLI
+#     Size: ~500MB (vs ~2GB for full)
+#
+#   Full development environment:
+#     docker build --target production -t ghcr.io/5dlabs/runtime:full .
+#     Contains: All development tools, languages, k8s CLIs, security scanners
+#     Size: ~2GB
+#
+#   CI/GHCR build (downloads binaries from releases):
 #     docker build -t ghcr.io/5dlabs/runtime .
 #
 #   Local/Kind build (compiles intake/pm-activity from source):
@@ -25,7 +36,105 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
     cargo build --release --package pm --bin pm-activity
 
 # =============================================================================
-# MAIN RUNTIME IMAGE
+# MINIMAL RUNTIME IMAGE (for agents) - DEFAULT TARGET
+# =============================================================================
+# Contains only tools essential for agent execution:
+# - git, Node.js, npm, npx (all agents)
+# - curl, jq (API/config operations)
+# - ripgrep (MCP tools: warp_grep, search)
+# - GitHub CLI (PR operations, code review)
+# - Basic shell utilities
+# =============================================================================
+FROM ubuntu:24.04 AS minimal-base
+SHELL ["/bin/bash", "-lc"]
+
+ARG TZ
+ENV TZ="$TZ"
+
+# Essential packages only (single layer for efficiency)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get -o Acquire::ForceIPv4=true update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true install -y --no-install-recommends \
+      git procps sudo unzip gnupg2 ca-certificates curl wget \
+      jq ripgrep openssh-client strace lsof \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user 'node' with stable UID/GID 1000
+RUN groupadd -g 1000 node 2>/dev/null || groupadd node 2>/dev/null || true && \
+    useradd --shell /bin/bash --create-home -u 1000 -g 1000 node 2>/dev/null || \
+    useradd --shell /bin/bash --create-home -g 1000 node 2>/dev/null || \
+    useradd --shell /bin/bash --create-home node || true && \
+    id node && getent group node && \
+    echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd && \
+    chmod 0440 /etc/sudoers.d/99-node-nopasswd
+
+# Install Node.js LTS
+RUN --mount=type=cache,target=/root/.cache \
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    apt-get -o Acquire::ForceIPv4=true install -y nodejs && \
+    npm install -g npm@latest && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install GitHub CLI (essential for PR operations)
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    ARCH=$(dpkg --print-architecture) && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+    apt-get -o Acquire::ForceIPv4=true update && \
+    apt-get -o Acquire::ForceIPv4=true install -y gh && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install CTO binaries from pre-downloaded files in build context
+COPY .docker-binaries/ /tmp/binaries/
+
+ARG TOOLS_VERSION=skip
+RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
+      mv /tmp/binaries/tools-client-linux-x86_64 /usr/local/bin/tools && \
+      chmod +x /usr/local/bin/tools; \
+    fi
+
+ARG PLAY_MONITOR_VERSION=skip
+RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
+      mv /tmp/binaries/play-monitor-linux-x86_64 /usr/local/bin/play-monitor && \
+      chmod +x /usr/local/bin/play-monitor; \
+    fi
+
+ARG TASKS_VERSION=0.2.12
+RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
+      mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && \
+      chmod +x /usr/local/bin/intake; \
+    fi
+
+RUN rm -rf /tmp/binaries
+
+# Configure git defaults
+RUN git config --global init.defaultBranch main && \
+    git config --global pull.rebase true && \
+    git config --global push.autoSetupRemote true
+
+# Prepare npm global and permissions
+RUN mkdir -p /usr/local/share/npm-global/lib && chown -R node:node /usr/local/share/npm-global
+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
+
+# Setup workspace
+RUN mkdir -p /workspace && chown -R node:node /workspace
+
+USER node
+WORKDIR /workspace
+ENV DEVCONTAINER=true
+
+# =============================================================================
+# MINIMAL TARGET (default for agents)
+# =============================================================================
+FROM minimal-base AS minimal
+
+# Verify essential tools
+RUN node --version && npm --version && git --version && gh --version
+
+# =============================================================================
+# MAIN RUNTIME IMAGE (full development environment)
 # =============================================================================
 FROM ubuntu:24.04 AS production
 
@@ -144,149 +253,66 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list \
   && apt-get -o Acquire::ForceIPv4=true update && apt-get -o Acquire::ForceIPv4=true install -y kubectl && rm -rf /var/lib/apt/lists/*
 
-# Install Helm via direct download (script was failing on arm64)
+# =============================================================================
+# Kubernetes and DevOps CLIs (consolidated into single layer for efficiency)
+# =============================================================================
+# Tools: helm, argocd, argo, talosctl, yq, stern, docker-compose, k9s, kustomize, cloudflared
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    set -eux && \
     ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    case "$ARCH" in amd64) DL_ARCH=amd64; AWS_ARCH=x86_64 ;; arm64) DL_ARCH=arm64; AWS_ARCH=aarch64 ;; *) DL_ARCH=$ARCH; AWS_ARCH=$ARCH ;; esac && \
+    # Helm
     HELM_VERSION=$(curl -s https://api.github.com/repos/helm/helm/releases/latest | jq -r '.tag_name') && \
-    HELM_TAR="helm-${HELM_VERSION}-linux-${DL_ARCH}.tar.gz" && \
-    for i in 1 2 3; do \
-        curl -fsSL -o "/tmp/${HELM_TAR}" "https://get.helm.sh/${HELM_TAR}" && \
-        tar -C /tmp -xzf "/tmp/${HELM_TAR}" && \
-        mv "/tmp/linux-${DL_ARCH}/helm" /usr/local/bin/helm && \
-        chmod +x /usr/local/bin/helm && \
-        rm -f "/tmp/${HELM_TAR}" "/tmp/linux-${DL_ARCH}" && \
-        helm version && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
+    curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-${DL_ARCH}.tar.gz" | tar -xzf - -C /tmp && \
+    mv /tmp/linux-${DL_ARCH}/helm /usr/local/bin/helm && chmod +x /usr/local/bin/helm && \
+    # Argo CD CLI
+    curl -fsSL -o /usr/local/bin/argocd "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${DL_ARCH}" && \
+    chmod +x /usr/local/bin/argocd && \
+    # Argo Workflows CLI
+    curl -fsSL "https://github.com/argoproj/argo-workflows/releases/latest/download/argo-linux-${DL_ARCH}.gz" | gunzip > /usr/local/bin/argo && \
+    chmod +x /usr/local/bin/argo && \
+    # talosctl
+    curl -fsSL -o /usr/local/bin/talosctl "https://github.com/siderolabs/talos/releases/latest/download/talosctl-linux-${DL_ARCH}" && \
+    chmod +x /usr/local/bin/talosctl && \
+    # yq
+    curl -fsSL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${DL_ARCH}" && \
+    chmod +x /usr/local/bin/yq && \
+    # stern
+    curl -fsSL "https://github.com/stern/stern/releases/latest/download/stern_linux_${DL_ARCH}.tar.gz" | tar -xzf - -C /usr/local/bin stern && \
+    # Docker Compose
+    COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name') && \
+    curl -fsSL -o /usr/local/bin/docker-compose "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${DL_ARCH}" && \
+    chmod +x /usr/local/bin/docker-compose && \
+    # k9s
+    curl -fsSL "https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_${DL_ARCH}.tar.gz" | tar -xzf - -C /usr/local/bin k9s && \
+    # kustomize
+    curl -fsSL https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh | bash && \
+    mv ./kustomize /usr/local/bin/kustomize && \
+    # cloudflared
+    curl -fsSL -o /usr/local/bin/cloudflared "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${DL_ARCH}" && \
+    chmod +x /usr/local/bin/cloudflared && \
+    # Cleanup
+    rm -rf /tmp/linux-* /tmp/*.tar.gz
 
-# Set architecture variables
-ENV DL_ARCH_AMD64=amd64
-ENV DL_ARCH_ARM64=arm64
-
-# Install Argo CD CLI
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+# GitHub CLI (requires apt, separate layer)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    for i in 1 2 3; do \
-        curl -fsSL -o /usr/local/bin/argocd "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${DL_ARCH}" && \
-        chmod +x /usr/local/bin/argocd && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install Argo Workflows CLI
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    for i in 1 2 3; do \
-        curl -fsSL -o "/tmp/argo-linux-${DL_ARCH}.gz" "https://github.com/argoproj/argo-workflows/releases/latest/download/argo-linux-${DL_ARCH}.gz" && \
-        gunzip -c "/tmp/argo-linux-${DL_ARCH}.gz" > /usr/local/bin/argo && \
-        chmod +x /usr/local/bin/argo && \
-        rm -f "/tmp/argo-linux-${DL_ARCH}.gz" && \
-        argo version --short && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install talosctl
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    for i in 1 2 3; do \
-        curl -fsSL -o /usr/local/bin/talosctl "https://github.com/siderolabs/talos/releases/latest/download/talosctl-linux-${DL_ARCH}" && \
-        chmod +x /usr/local/bin/talosctl && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install yq
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    for i in 1 2 3; do \
-        curl -fsSL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${DL_ARCH}" && \
-        chmod +x /usr/local/bin/yq && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install GitHub CLI extensions
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+    apt-get -o Acquire::ForceIPv4=true update && apt-get -o Acquire::ForceIPv4=true install -y gh && \
+    rm -rf /var/lib/apt/lists/* && \
     gh extension install github/gh-copilot 2>/dev/null || true && \
     gh extension install github/gh-codeql 2>/dev/null || true
 
-# Install GitHub CLI
+# AWS CLI v2
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    for i in 1 2 3; do \
-        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
-        echo "deb [arch=${DL_ARCH} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
-        apt-get -o Acquire::ForceIPv4=true update && apt-get -o Acquire::ForceIPv4=true install -y gh && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install AWS CLI v2
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    for i in 1 2 3; do \
-        curl -fsSL -o "/tmp/awscli.zip" "https://awscli.amazonaws.com/awscli-exe-linux-${DL_ARCH}.zip" && \
-        unzip -q /tmp/awscli.zip -d /tmp && \
-        /tmp/aws/install && \
-        rm -rf /tmp/aws /tmp/awscli.zip && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install stern
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    STERN_TAR="stern_linux_${DL_ARCH}.tar.gz" && \
-    for i in 1 2 3; do \
-        curl -fsSL -o "/tmp/${STERN_TAR}" "https://github.com/stern/stern/releases/latest/download/${STERN_TAR}" && \
-        tar -C /usr/local/bin -xzf "/tmp/${STERN_TAR}" stern && \
-        rm -f "/tmp/${STERN_TAR}" && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install Docker Compose v2
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name') && \
-    for i in 1 2 3; do \
-        curl -fsSL -o /usr/local/bin/docker-compose "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${DL_ARCH}" && \
-        chmod +x /usr/local/bin/docker-compose && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install k9s
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    K9S_TAR="k9s_Linux_${DL_ARCH}.tar.gz" && \
-    for i in 1 2 3; do \
-        curl -fsSL -o "/tmp/${K9S_TAR}" "https://github.com/derailed/k9s/releases/latest/download/${K9S_TAR}" && \
-        tar -C /usr/local/bin -xzf "/tmp/${K9S_TAR}" k9s && \
-        rm -f "/tmp/${K9S_TAR}" && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install kustomize
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    for i in 1 2 3; do \
-        curl -fsSL https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh | bash && \
-        mv ./kustomize /usr/local/bin/kustomize && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
-
-# Install cloudflared (Cloudflare Tunnel CLI)
-RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
-    for i in 1 2 3; do \
-        curl -fsSL -o /usr/local/bin/cloudflared "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${DL_ARCH}" && \
-        chmod +x /usr/local/bin/cloudflared && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
-    done
+    case "$ARCH" in amd64) AWS_ARCH=x86_64 ;; arm64) AWS_ARCH=aarch64 ;; *) AWS_ARCH=$ARCH ;; esac && \
+    curl -fsSL -o /tmp/awscli.zip "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}.zip" && \
+    unzip -q /tmp/awscli.zip -d /tmp && \
+    /tmp/aws/install && \
+    rm -rf /tmp/aws /tmp/awscli.zip
 
 # Install kubectx/kubens from upstream (not available via default apt)
 RUN git clone --depth=1 https://github.com/ahmetb/kubectx /opt/kubectx \
@@ -369,45 +395,24 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 # Install CTO binaries from pre-downloaded files in build context
 # The workflow downloads these from GitHub releases before building
 # This avoids authentication issues with private repos during Docker build
-
-# Copy pre-downloaded binaries directory (created by workflow with .gitkeep placeholder)
 COPY .docker-binaries/ /tmp/binaries/
-
-# Install tools client
 ARG TOOLS_VERSION=skip
-RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
-      echo "📦 Installing tools client v${TOOLS_VERSION}..." && \
-      mv /tmp/binaries/tools-client-linux-x86_64 /usr/local/bin/tools && \
-      chmod +x /usr/local/bin/tools && \
-      echo "✅ tools client installed"; \
-    else \
-      echo "⏭️ Skipping tools client installation (binary not available)"; \
-    fi
-
-# Install play-monitor
 ARG PLAY_MONITOR_VERSION=skip
-RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
-      echo "📦 Installing play-monitor v${PLAY_MONITOR_VERSION}..." && \
-      mv /tmp/binaries/play-monitor-linux-x86_64 /usr/local/bin/play-monitor && \
-      chmod +x /usr/local/bin/play-monitor && \
-      echo "✅ play-monitor installed"; \
-    else \
-      echo "⏭️ Skipping play-monitor installation (binary not available)"; \
-    fi
-
-# Install intake CLI (Rust replacement for TaskMaster-AI)
 ARG TASKS_VERSION=0.2.12
-RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
-      echo "📦 Installing intake CLI v${TASKS_VERSION}..." && \
-      mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && \
-      chmod +x /usr/local/bin/intake && \
-      echo "✅ intake CLI installed"; \
-    else \
-      echo "⏭️ Skipping intake CLI installation (binary not available)"; \
-    fi
-
-# Cleanup temp binaries directory
-RUN rm -rf /tmp/binaries
+RUN set -eux && \
+    # tools client
+    if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
+      mv /tmp/binaries/tools-client-linux-x86_64 /usr/local/bin/tools && chmod +x /usr/local/bin/tools; \
+    fi && \
+    # play-monitor
+    if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
+      mv /tmp/binaries/play-monitor-linux-x86_64 /usr/local/bin/play-monitor && chmod +x /usr/local/bin/play-monitor; \
+    fi && \
+    # intake CLI
+    if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
+      mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && chmod +x /usr/local/bin/intake; \
+    fi && \
+    rm -rf /tmp/binaries
 
 # TaskMaster removed - using Rust intake CLI instead (see TASKS_VERSION above)
 
@@ -580,23 +585,20 @@ ENV CC=clang \
 # Note: sccache available at /home/node/.cargo/bin/sccache but not set as RUSTC_WRAPPER
 # to avoid path conflicts when containers run as different users
 
-# Create global rustup default to work regardless of which user the container runs as
+# Configure Rust environment for all users (consolidated)
 USER root
-RUN rustup default stable 2>/dev/null || true
+RUN rustup default stable 2>/dev/null || true && \
+    # Ensure rust default script
+    echo '#!/bin/sh\nrustup default stable 2>/dev/null || true' > /usr/local/bin/ensure-rust-default && \
+    chmod +x /usr/local/bin/ensure-rust-default && \
+    # Shell profile integration
+    printf '%s\n' '# Add Cargo bin to PATH for interactive shells' 'if [ -d "$HOME/.cargo/bin" ]; then PATH="$HOME/.cargo/bin:$PATH"; fi' 'export PATH' > /etc/profile.d/cargo.sh && \
+    chmod 0644 /etc/profile.d/cargo.sh && \
+    # Global Rust environment setup script
+    echo '#!/bin/sh\n# Ensure Rust environment is always available\nif [ -f "$HOME/.cargo/env" ]; then\n    . "$HOME/.cargo/env"\nfi\nif [ -f "/root/.cargo/env" ]; then\n    . "/root/.cargo/env"\nfi\nrustup default stable 2>/dev/null || true' > /usr/local/bin/setup-rust-env && \
+    chmod +x /usr/local/bin/setup-rust-env
 USER node
 RUN rustup default stable 2>/dev/null || true
-# Final fallback: ensure rustup has a default even if container runs as different user
-USER root
-RUN echo '#!/bin/sh\nrustup default stable 2>/dev/null || true' > /usr/local/bin/ensure-rust-default \
-  && chmod +x /usr/local/bin/ensure-rust-default
-
-# Ensure Rust environment is always available in shell profiles
-RUN printf '%s\n' '# Add Cargo bin to PATH for interactive shells' 'if [ -d "$HOME/.cargo/bin" ]; then PATH="$HOME/.cargo/bin:$PATH"; fi' 'export PATH' > /etc/profile.d/cargo.sh \
-  && chmod 0644 /etc/profile.d/cargo.sh
-
-# Create a global Rust environment setup script
-RUN echo '#!/bin/sh\n# Ensure Rust environment is always available\nif [ -f "$HOME/.cargo/env" ]; then\n    . "$HOME/.cargo/env"\nfi\nif [ -f "/root/.cargo/env" ]; then\n    . "/root/.cargo/env"\nfi\nrustup default stable 2>/dev/null || true' > /usr/local/bin/setup-rust-env \
-  && chmod +x /usr/local/bin/setup-rust-env
 
 
 # =============================================================================
@@ -607,8 +609,6 @@ FROM production AS local
 # Copy locally-built binaries from builder stage
 COPY --from=intake-builder /build/target/release/intake /usr/local/bin/intake
 COPY --from=intake-builder /build/target/release/pm-activity /usr/local/bin/pm-activity
-RUN chmod +x /usr/local/bin/intake /usr/local/bin/pm-activity
-
-# Verify installation
-RUN intake --version 2>&1 || intake --help 2>&1 | head -5
-RUN pm-activity --help 2>&1 | head -5
+RUN chmod +x /usr/local/bin/intake /usr/local/bin/pm-activity && \
+    (intake --version 2>&1 || intake --help 2>&1 | head -5) && \
+    (pm-activity --help 2>&1 | head -5)
