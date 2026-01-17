@@ -13,12 +13,17 @@ RUN apk add --no-cache python3 make g++ curl bash git
 
 # Install Bun globally and relocate it to a shared, persistent location
 # Use retry logic with exponential backoff for resilience against transient DNS failures
+# Note: SHELL with pipefail ensures curl failures in the pipeline are detected
+# (without pipefail, only bash's exit code is checked, which is 0 for empty input)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN for i in 1 2 3 4 5; do \
       curl -fsSL https://bun.sh/install | bash && break || \
       echo "Attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
-    done \
- && mv /root/.bun /opt/bun \
- && ln -s /opt/bun/bin/bun /usr/local/bin/bun
+    done && \
+    [ -d /root/.bun ] || { echo "ERROR: Bun installation failed after all retries"; exit 1; } && \
+    mv /root/.bun /opt/bun && \
+    ln -s /opt/bun/bin/bun /usr/local/bin/bun
+SHELL ["/bin/sh", "-c"]
 
 # Ensure Bun is available in PATH for subsequent commands
 ENV PATH="/opt/bun/bin:${PATH}"
