@@ -212,6 +212,68 @@ make -C infra/gitops validate
 pre-commit run --all-files
 ```
 
+### Fast Dev Image Builds (Bypass GitHub Actions)
+
+For rapid iteration on intake/runtime changes without waiting for full CI:
+
+#### Prerequisites
+
+```bash
+# Install cross-compilation tools (one-time)
+just install-cross-tools
+
+# Authenticate with GHCR
+echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+```
+
+#### Quick Commands
+
+| Command | Description |
+|---------|-------------|
+| `just dev-runtime-image` | Build runtime with local intake → push to `ghcr.io/5dlabs/runtime:dev` |
+| `just dev-claude-image` | Build Claude image with local intake → push to `ghcr.io/5dlabs/claude:dev` |
+| `just dev-image-local` | Build locally without pushing (for testing) |
+| `just dev-runtime-all` | Build with all binaries (intake + pm-activity) |
+
+#### How It Works
+
+1. **Cross-compiles** intake binary for linux-x86_64 using `cargo-zigbuild` (~1-2 min on Mac)
+2. **Creates overlay image** that replaces just the binary in existing runtime/claude image
+3. **Pushes to GHCR** with `dev` tag
+
+#### Using the Dev Image
+
+```bash
+# Option A: Test with a CodeRun
+kubectl apply -f - <<EOF
+apiVersion: agents.platform/v1
+kind: CodeRun
+metadata:
+  name: test-dev-intake
+  namespace: cto
+spec:
+  cli: claude
+  prompt: "Run intake --version and report the output"
+  image: ghcr.io/5dlabs/claude:dev
+EOF
+
+# Option B: Patch existing deployment
+kubectl set image deployment/claude-agent claude=ghcr.io/5dlabs/claude:dev -n cto
+
+# Option C: Set in cto-config.json for play workflows
+# "agentImage": "ghcr.io/5dlabs/claude:dev"
+```
+
+#### Full Script Options
+
+```bash
+./scripts/build-dev-image.sh --help
+
+# Examples:
+./scripts/build-dev-image.sh --binary intake --image runtime --push
+./scripts/build-dev-image.sh --binary all --image claude --tag my-feature --push
+```
+
 ### Port Forwards (for MCP tools)
 
 ```bash
@@ -220,6 +282,167 @@ kubectl port-forward svc/loki-gateway -n observability 3100:80
 kubectl port-forward svc/grafana -n observability 3000:80
 kubectl port-forward svc/argocd-server -n argocd 8080:80
 kubectl port-forward svc/argo-workflows-server -n automation 2746:2746
+```
+
+### Local Development with launchd (Background Services)
+
+For running CTO services in the background without a terminal window, use the launchd integration. Services auto-restart when you rebuild binaries.
+
+#### Prerequisites
+
+```bash
+# Install fswatch (required for binary watching)
+brew install fswatch
+
+# Install cloudflared (for tunnel to receive webhooks)
+brew install cloudflared
+
+# Build release binaries
+cargo build --release
+```
+
+#### Quick Start
+
+```bash
+# 1. Install and start all services (one-time setup)
+just launchd-install
+
+# 2. Verify everything is running
+just launchd-status
+
+# 3. Monitor logs in a TUI
+just launchd-monitor
+```
+
+#### Management Commands
+
+| Command | Description |
+|---------|-------------|
+| `just launchd-install` | Generate plist files and start all services |
+| `just launchd-uninstall` | Stop and remove all services |
+| `just launchd-status` | Show service status and health |
+| `just launchd-logs` | Tail all service logs (raw) |
+| `just launchd-monitor` | **Open lnav TUI** for log viewing with search/filter |
+| `just launchd-multitail` | Split pane view of all logs |
+| `just launchd-restart` | Restart all services manually |
+| `just launchd-start` | Start services (if stopped) |
+| `just launchd-stop` | Stop services (without unloading) |
+
+#### Development Workflow
+
+Once installed, the watcher monitors `target/release/` and auto-restarts services when binaries change:
+
+```bash
+# Normal development - just rebuild, services restart automatically
+cargo build --release --bin agent-controller
+# → watcher detects change → controller restarts automatically
+
+# Rebuild healer - both healer AND healer-sensor restart
+cargo build --release --bin healer
+# → watcher restarts ai.5dlabs.cto.healer
+# → watcher restarts ai.5dlabs.cto.healer-sensor
+
+# Or use the convenience command to build all
+just build-and-restart
+```
+
+#### Services Managed
+
+| Service | Binary | Port | Health Endpoint | Description |
+|---------|--------|------|-----------------|-------------|
+| `ai.5dlabs.cto.controller` | `agent-controller` | 8080 | `/health` | CodeRun CRD orchestrator |
+| `ai.5dlabs.cto.pm-server` | `pm-server` | 8081 | `/health` | Linear webhooks & PM |
+| `ai.5dlabs.cto.healer` | `healer` | 8082 | `/health` | Self-healing monitor |
+| `ai.5dlabs.cto.healer-sensor` | `healer` | - | - | GitHub Actions failure sensor |
+| `ai.5dlabs.cto.tunnel` | `cloudflared` | - | pm-dev.5dlabs.ai | Cloudflare tunnel for webhooks |
+| `ai.5dlabs.cto.watcher` | - | - | - | Binary change watcher |
+
+#### Log Locations
+
+| Path | Description |
+|------|-------------|
+| `/tmp/cto-launchd/controller.log` | Controller stdout |
+| `/tmp/cto-launchd/pm-server.log` | PM Server stdout |
+| `/tmp/cto-launchd/healer.log` | Healer stdout |
+| `/tmp/cto-launchd/healer-sensor.log` | Healer Sensor stdout |
+| `/tmp/cto-launchd/tunnel.log` | Cloudflare tunnel logs |
+| `/tmp/cto-launchd/watcher.log` | Watcher events (shows restarts) |
+| `/tmp/cto-launchd/*.err` | stderr for each service |
+
+#### Monitoring with lnav (Recommended)
+
+```bash
+just launchd-monitor
+```
+
+**lnav keybindings:**
+- `/` - search for text
+- `n`/`N` - next/prev search result
+- `e`/`E` - jump to next/prev error
+- `:filter-in <pattern>` - show only matching lines
+- `:filter-out <pattern>` - hide matching lines
+- `Tab` - cycle through files
+- `q` - quit
+
+#### For AI Agents
+
+When working on CTO platform code:
+
+1. **Before starting work**, verify services are running:
+   ```bash
+   just launchd-status
+   ```
+
+2. **After making code changes**, rebuild the affected binary:
+   ```bash
+   cargo build --release --bin <binary-name>
+   ```
+   The watcher will automatically restart the service.
+
+3. **To view logs** for debugging:
+   ```bash
+   # Quick tail
+   tail -f /tmp/cto-launchd/controller.log
+   
+   # Or use the TUI
+   just launchd-monitor
+   ```
+
+4. **If services aren't running** after a system restart:
+   ```bash
+   just launchd-start
+   ```
+
+5. **If things are broken**, full reinstall:
+   ```bash
+   just launchd-uninstall && just launchd-install
+   ```
+
+#### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Services not running after reboot | Run `just launchd-start` (services don't auto-start on login) |
+| Service shows "loaded" but no PID | Check error log: `cat /tmp/cto-launchd/<service>.err` |
+| Watcher not detecting changes | Reinstall: `just launchd-uninstall && just launchd-install` |
+| Binary not found errors | Run `cargo build --release` first |
+| Port already in use | Run `just kill-ports` then `just launchd-restart` |
+| Need to update env vars | Reinstall to regenerate plists with new `.env.local` values |
+
+#### Manual launchctl Commands (Advanced)
+
+```bash
+# List all CTO services
+launchctl list | grep 5dlabs
+
+# View a specific service's info
+launchctl print gui/$(id -u)/ai.5dlabs.cto.controller
+
+# Manually kick (restart) a service
+launchctl kickstart -k gui/$(id -u)/ai.5dlabs.cto.controller
+
+# View plist files
+ls ~/Library/LaunchAgents/ai.5dlabs.cto.*.plist
 ```
 
 ---

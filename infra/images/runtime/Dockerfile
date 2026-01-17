@@ -552,6 +552,16 @@ ENV DEVCONTAINER=true
 
 # Rust dev tooling for node user (install via cargo)
 # Only cache the registry for faster rebuilds - bin directory is written to image
+# MINIMAL SET: Only essential tools to reduce build time
+# - sccache: compilation cache
+# - cargo-nextest: fast test runner
+# - cargo-watch: file watcher for development
+# Removed slow-to-compile tools that can be installed on-demand:
+# - cargo-outdated (requires full cargo crate)
+# - cargo-deny (heavy deps: gix, rustls)
+# - cargo-audit (can use cargo-deny instead)
+# - cargo-edit (use `cargo add` in recent Rust)
+# - cargo-geiger, cargo-expand, cargo-udeps (rarely used)
 USER node
 RUN --mount=type=cache,target=/home/node/.cargo/registry,id=node-cargo-registry-v3,uid=1000,gid=1000,mode=0777 \
   . $HOME/.cargo/env && \
@@ -559,15 +569,8 @@ RUN --mount=type=cache,target=/home/node/.cargo/registry,id=node-cargo-registry-
   cargo --version && \
   cargo install \
     sccache \
-    cargo-edit \
     cargo-nextest \
-    cargo-deny \
-    cargo-outdated \
-    cargo-watch \
-    cargo-expand \
-    cargo-udeps \
-    cargo-audit \
-    cargo-geiger || true
+    cargo-watch || true
 
 # Configure Rust build environment (without problematic sccache wrapper)
 ENV CC=clang \

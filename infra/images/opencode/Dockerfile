@@ -28,16 +28,8 @@ RUN mkdir -p /workspace /home/node/.opencode /home/node/.cache/opencode && \
 
 WORKDIR /workspace
 
-# Install base dependencies (only needed if using node:slim base)
-# These are already present in the runtime image
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    bash \
-    unzip \
-    wget \
-    && rm -rf /var/lib/apt/lists/* || true
-
 # Install Open Code CLI with retries
+# Note: curl, bash, unzip, wget are already in runtime base image
 RUN set -eux; \
     for i in 1 2 3; do \
         if curl -fsSL https://opencode.ai/install | bash; then \
