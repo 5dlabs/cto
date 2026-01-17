@@ -53,7 +53,7 @@ pub enum Commands {
         batch_size: usize,
 
         /// AI model to use
-        #[arg(long, default_value = "claude-sonnet-4-5-20250514")]
+        #[arg(long, default_value = "claude-sonnet-4-20250514")]
         model: String,
 
         /// Create a PR with new research entries
@@ -158,7 +158,7 @@ pub enum Commands {
         hours_between: u64,
 
         /// AI model to use for analysis
-        #[arg(long, default_value = "claude-sonnet-4-5-20250514")]
+        #[arg(long, default_value = "claude-sonnet-4-20250514")]
         model: String,
 
         /// Skip AI analysis (just list entries)

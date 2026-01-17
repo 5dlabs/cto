@@ -337,7 +337,7 @@ impl Default for IntakeConfig {
                 .unwrap_or_else(|_| "anthropic".to_string()),
             // Fallback to Sonnet 4 (faster, cheaper) if Opus fails
             fallback_model: env::var("FALLBACK_MODEL")
-                .unwrap_or_else(|_| "claude-sonnet-4-5-20250514".to_string()),
+                .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string()),
             fallback_provider: env::var("FALLBACK_PROVIDER")
                 .unwrap_or_else(|_| "anthropic".to_string()),
             docs_model: env::var("DOCS_MODEL")
@@ -443,7 +443,7 @@ pub struct CtoConfig {
     /// CLI to use (claude, cursor, codex, dexter, opencode).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cli: Option<String>,
-    /// Model to use (e.g., claude-sonnet-4-5-20250514, claude-opus-4-20250514).
+    /// Model to use (e.g., claude-sonnet-4-20250514, claude-opus-4-20250514).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// Prompt style variant (e.g., "minimal" for Ralph-style prompts).

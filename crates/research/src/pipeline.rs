@@ -42,7 +42,7 @@ impl Default for PipelineConfig {
             index_path: PathBuf::from("/data/research/index.json"),
             min_relevance: 0.5,
             batch_size: 10,
-            model: "claude-sonnet-4-5-20250514".to_string(),
+            model: "claude-sonnet-4-20250514".to_string(),
             digest_state_path: Some(PathBuf::from("/data/digest-state.json")),
             max_age_days: 60,
         }

@@ -37,7 +37,7 @@ impl Default for RemediationSpawnerConfig {
         Self {
             namespace: "cto".to_string(),
             github_app: "5DLabs-Healer".to_string(),
-            model: "claude-sonnet-4-5-20250514".to_string(),
+            model: "claude-sonnet-4-20250514".to_string(),
             cli: "claude".to_string(),
             repository: "5dlabs/cto".to_string(),
             max_retries: 3,
