@@ -979,7 +979,7 @@ async fn test_full_monitoring_roundtrip() {
         "FixConfig",
         "ToolMismatch + Critical should map to FixConfig"
     );
-    println!("✅ Step 3: Remediation strategy determined: {:?}", strategy);
+    println!("✅ Step 3: Remediation strategy determined: {strategy:?}");
 
     // Step 4: Verify the session has the issue
     let response = app
