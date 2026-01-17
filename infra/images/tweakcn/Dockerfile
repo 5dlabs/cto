@@ -12,8 +12,11 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat git
 WORKDIR /app
 
-# Clone tweakcn repository
-RUN git clone --depth 1 https://github.com/jnsahaj/tweakcn.git .
+# Clone tweakcn repository with retry logic for resilience against transient network failures
+RUN for i in 1 2 3 4 5; do \
+      git clone --depth 1 https://github.com/jnsahaj/tweakcn.git . && break || \
+      echo "Git clone attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
+    done
 
 # Install dependencies with pnpm (matches upstream package manager)
 RUN pnpm install --frozen-lockfile || pnpm install

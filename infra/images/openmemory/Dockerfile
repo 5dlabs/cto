@@ -12,7 +12,11 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ curl bash git
 
 # Install Bun globally and relocate it to a shared, persistent location
-RUN curl -fsSL https://bun.sh/install | bash \
+# Use retry logic with exponential backoff for resilience against transient DNS failures
+RUN for i in 1 2 3 4 5; do \
+      curl -fsSL https://bun.sh/install | bash && break || \
+      echo "Attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
+    done \
  && mv /root/.bun /opt/bun \
  && ln -s /opt/bun/bin/bun /usr/local/bin/bun
 
@@ -20,7 +24,11 @@ RUN curl -fsSL https://bun.sh/install | bash \
 ENV PATH="/opt/bun/bin:${PATH}"
 
 # Clone OpenMemory repository and navigate to the JS server package
-RUN git clone --depth 1 https://github.com/caviraoss/openmemory.git /src
+# Use retry logic for resilience against transient network failures
+RUN for i in 1 2 3 4 5; do \
+      git clone --depth 1 https://github.com/caviraoss/openmemory.git /src && break || \
+      echo "Git clone attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
+    done
 
 WORKDIR /src/packages/openmemory-js
 
