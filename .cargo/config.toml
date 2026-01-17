@@ -1,0 +1,15 @@
+# Local Cargo configuration for faster builds
+# ===========================================
+# Note: sccache and incremental compilation are mutually exclusive.
+# If sccache causes issues, comment out rustc-wrapper and use incremental instead.
+
+[build]
+# Enable incremental compilation for faster rebuilds (use this OR sccache, not both)
+incremental = true
+
+# Uncomment to use sccache (requires: brew install sccache && sccache --start-server)
+# rustc-wrapper = "sccache"
+
+[term]
+# Show verbose output by default
+verbose = true

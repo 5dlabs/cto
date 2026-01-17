@@ -101,6 +101,10 @@ pub struct GenerateOptions {
     pub thinking_budget: Option<u32>,
     /// Path to MCP config file
     pub mcp_config: Option<String>,
+    /// Explicitly disable MCP tools even if provider has them configured.
+    /// When true, the provider will not pass --mcp-config to the CLI.
+    /// This forces the model to output pure text/JSON without using tools.
+    pub disable_mcp: bool,
 }
 
 /// Configuration for an AI provider.

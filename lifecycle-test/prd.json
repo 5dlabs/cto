@@ -1,11 +1,26 @@
 {
   "name": "CTO Platform Lifecycle Test - AlertHub E2E",
   "description": "End-to-end test using the AlertHub multi-platform notification system, which exercises all agents (Rex, Nova, Grizz, Blaze, Tap, Spark) and their respective tech stacks",
-  "branchName": "ralph/lifecycle-test",
+  "branchName": "ralph/lifecycle-test-2026-01-16",
   "testProject": {
     "name": "alerthub-e2e-test",
     "prdPath": "tests/intake/alerthub-e2e-test/prd.md",
     "architecturePath": "tests/intake/alerthub-e2e-test/architecture.md"
+  },
+  "cleanupProcedure": {
+    "description": "MANDATORY cleanup after ANY failure - run ALL steps before retrying",
+    "steps": [
+      "1. Delete ALL CodeRuns: kubectl delete coderuns -n cto --all --wait=false",
+      "2. Delete stuck pods: kubectl delete pods -n cto --field-selector=status.phase!=Running --wait=false",
+      "3. Delete test PVCs: kubectl delete pvc -n cto -l app=alerthub --wait=false",
+      "4. Wait for cleanup: sleep 10 && kubectl get coderuns,pods -n cto | grep -E '(intake|alerthub)'",
+      "5. Verify empty: The above should return NO results before proceeding"
+    ],
+    "linearCleanup": [
+      "Close stale Linear issues if test will create new ones",
+      "Archive old Linear projects from previous test runs if needed"
+    ],
+    "rule": "NEVER retry a story without running full cleanup first. Duplicate CodeRuns cause confusion and resource conflicts."
   },
   "userStories": [
     {
@@ -67,12 +82,16 @@
       "priority": 2,
       "complexity": "high",
       "acceptanceCriteria": [
+        "BEFORE starting: Clean up any existing intake CodeRuns: kubectl delete coderun -n cto -l type=intake,service=prd-alerthub-e2e-test",
+        "BEFORE starting: Clean up any stuck PVCs: kubectl delete pvc -n cto workspace-prd-alerthub-e2e-test-morgan --wait=false",
+        "Verify NO duplicate intake CodeRuns exist: kubectl get coderuns -n cto -l type=intake should show 0 or 1 AFTER cleanup",
         "Read PRD content from tests/intake/alerthub-e2e-test/prd.md",
         "Read architecture from tests/intake/alerthub-e2e-test/architecture.md",
         "Use MCP tool: mcp_cto_intake(project_name='alerthub-e2e-test', prd_content=<prd>, architecture_content=<arch>)",
         "Tool returns success with Linear project URL",
         "Linear project created with 'AlertHub' in name",
         "Intake CodeRun pod completes WITHOUT ERROR (kubectl get pods -n cto | grep intake)",
+        "Verify Linear issue has agent dialog with verbose logging (check Linear UI for Morgan's activities)",
         "tasks.json EXISTS in target repo: gh api repos/5dlabs/prd-alerthub-e2e-test/contents/prd-alerthub-e2e-test/.tasks/tasks/tasks.json",
         "tasks.json has >0 tasks with non-empty testStrategy",
         "IF intake fails with JSON parsing error: FIX THE CODE in crates/intake/src/ai/cli_adapter.rs, cut release, update runtime image"

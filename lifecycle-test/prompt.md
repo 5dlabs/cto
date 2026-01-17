@@ -2,6 +2,44 @@
 
 You are an autonomous testing agent validating the CTO multi-agent orchestration platform using the **AlertHub E2E Test Project**.
 
+## 🔧 Working Directory & Git Setup
+
+**CRITICAL: You MUST work from the PROJECT ROOT, not lifecycle-test/**
+
+```bash
+# Verify you're in the right place
+pwd  # Should be: /Users/jonathonfritz/code/work-projects/5dlabs/cto
+
+# If you're in lifecycle-test/, go up
+cd /Users/jonathonfritz/code/work-projects/5dlabs/cto
+```
+
+**Why this matters:** You need to edit code in `crates/controller/`, `crates/pm/`, `crates/intake/`, etc. These are NOT accessible from `lifecycle-test/`.
+
+### Branch Management
+
+```bash
+# Check current branch
+git branch --show-current
+
+# Expected branch: ralph/lifecycle-test-2026-01-16 (or similar)
+# If on main/develop, create your working branch:
+git checkout -b ralph/lifecycle-test-2026-01-16 origin/develop
+
+# After making code changes, commit to YOUR branch (not main/develop)
+git add -A
+git commit -m "fix(component): description of fix"
+
+# Push your branch for CI
+git push -u origin HEAD
+```
+
+**Branch Rules:**
+- NEVER push directly to `main` or `develop`
+- Create feature branches from `develop`
+- All code changes go on your working branch
+- PRs target `develop` (not `main`)
+
 ## Test Project: AlertHub
 
 AlertHub is a comprehensive notification platform that exercises ALL implementation agents:
@@ -39,6 +77,149 @@ LOOP:
   4. ALL criteria PASS → Mark story complete
 ```
 
+## 🧹 MANDATORY: Full Cleanup After ANY Failure
+
+**BEFORE retrying ANY story, run this COMPLETE cleanup sequence:**
+
+```bash
+# 1. Delete ALL CodeRuns in cto namespace
+kubectl delete coderuns -n cto --all --wait=false
+
+# 2. Delete any non-running pods (stuck/failed)
+kubectl delete pods -n cto --field-selector=status.phase!=Running --wait=false 2>/dev/null || true
+
+# 3. Delete test-related PVCs that might be stuck
+kubectl delete pvc -n cto -l app=alerthub --wait=false 2>/dev/null || true
+kubectl delete pvc -n cto workspace-prd-alerthub-e2e-test-morgan --wait=false 2>/dev/null || true
+
+# 4. Wait for cleanup to complete
+sleep 10
+
+# 5. VERIFY cleanup - this should return EMPTY
+kubectl get coderuns,pods -n cto | grep -E "(intake|alerthub|morgan)" || echo "✅ Cleanup complete"
+```
+
+**WHY THIS MATTERS:**
+- Duplicate CodeRuns cause resource conflicts and PVC contention
+- Failed pods leave behind state that confuses subsequent runs
+- Stuck PVCs prevent new pods from scheduling
+- Clean state makes debugging much easier
+
+**RULE: If step 5 shows ANY resources, go back to step 1 and repeat.**
+
+## 📋 MANDATORY: Check Logs After EVERY Operation
+
+**After ANY MCP tool call, kubectl command, or service interaction, CHECK THE LOGS.**
+
+Don't wait for visible failures — errors like "invalid signature" or "unauthorized" appear in logs BEFORE they cause visible problems.
+
+### Local Service Logs (launchd)
+
+```bash
+# Controller logs (CodeRun orchestration)
+tail -100 /tmp/cto-launchd/controller.log
+
+# PM Server logs (Linear webhooks, intake triggers)
+tail -100 /tmp/cto-launchd/pm-server.log
+
+# Check for errors in any service
+grep -i "error\|fail\|invalid\|unauthorized" /tmp/cto-launchd/*.log | tail -20
+
+# Watch logs in real-time while testing
+tail -f /tmp/cto-launchd/controller.log /tmp/cto-launchd/pm-server.log
+```
+
+### Kubernetes Pod Logs
+
+```bash
+# List pods in cto namespace
+kubectl get pods -n cto
+
+# Get logs from a specific pod (replace <pod-name>)
+kubectl logs -n cto <pod-name>
+
+# Get logs from intake pod
+kubectl logs -n cto -l type=intake --tail=100
+
+# Get logs from most recent pod
+kubectl logs -n cto $(kubectl get pods -n cto --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}') --tail=100
+```
+
+### Common Errors to Watch For
+
+| Error | Meaning | Fix |
+|-------|---------|-----|
+| `invalid signature` | Webhook signature verification failed | Check LINEAR_WEBHOOK_SECRET matches Linear settings |
+| `unauthorized` / `401` | API token invalid or expired | Refresh OAuth tokens in .env.local |
+| `connection refused` | Service not running | Check `just launchd-status` or restart services |
+| `PVC already exists` | Previous run left resources | Run full cleanup procedure |
+| `pod pending` | Scheduling issue | Check `kubectl describe pod -n cto <pod>` |
+
+### After Each Story Attempt
+
+```bash
+# Quick health check - run this after EVERY attempt
+echo "=== Recent Errors ===" && grep -i "error\|fail" /tmp/cto-launchd/*.log | tail -10
+echo "=== CodeRuns ===" && kubectl get coderuns -n cto
+echo "=== Pods ===" && kubectl get pods -n cto | grep -v Completed
+```
+
+**RULE: If you see ANY error in logs, diagnose it BEFORE continuing. Don't assume the operation succeeded just because no error was returned to you.**
+
+## 🔨 Making Code Changes
+
+When you need to fix bugs in the platform code:
+
+### 1. Locate the Code
+
+```bash
+# Controller code (CodeRun orchestration)
+crates/controller/src/
+
+# PM Server code (Linear webhooks)
+crates/pm/src/
+
+# Intake code (PRD processing)
+crates/intake/src/
+
+# Healer code (monitoring)
+crates/healer/src/
+```
+
+### 2. Edit, Build, Test
+
+```bash
+# After editing code, run checks
+cargo fmt --all --check
+cargo clippy -p <crate> -- -D warnings -W clippy::pedantic
+cargo test -p <crate>
+
+# Build release binaries
+cargo build --release --bin agent-controller --bin pm-server --bin healer
+```
+
+### 3. Restart Services (launchd auto-restarts on binary change)
+
+```bash
+# If launchd watcher is running, it auto-restarts when binaries change
+# Otherwise manually restart:
+just launchd-restart
+
+# Verify services are healthy
+curl http://localhost:8080/health  # Controller
+curl http://localhost:8081/health  # PM Server
+curl http://localhost:8082/health  # Healer
+```
+
+### 4. Commit Your Changes
+
+```bash
+# Commit to your working branch
+git add -A
+git commit -m "fix(controller): description of fix"
+git push -u origin HEAD
+```
+
 ## Your Task
 
 1. Read the PRD at `prd.json` (in the same directory as this file)
@@ -46,8 +227,10 @@ LOOP:
 3. Pick the **highest priority** user story where `passes: false`
 4. Execute the test for that single user story **step-by-step**
 5. **VERIFY EVERY ACCEPTANCE CRITERION** - do not skip any
-6. If ANY criterion fails: diagnose, fix, clean up, retry
+6. If ANY criterion fails: diagnose, fix, **RUN FULL CLEANUP**, retry
 7. Only after ALL criteria pass: update PRD and progress.txt
+
+**NOTE:** Healer functionality is OUT OF SCOPE for this test. Focus only on the lifecycle stories in prd.json.
 
 ## Pre-Flight Setup (BEFORE STARTING ANY TESTS)
 
@@ -78,29 +261,53 @@ just sync-secrets
 
 **Why OAuth?** OAuth tokens allow agent-specific Linear app assignment, enabling two-way communication in the Linear issue timeline.
 
-### 2. Start Local Services
+### 2. Start Local Services (launchd - RECOMMENDED)
 
-Use `just mp` to start all services with the mprocs TUI:
+Use launchd for background services that auto-restart when binaries are rebuilt:
 
 ```bash
-# This kills stale ports, sources .env.local, and starts mprocs
-just mp
+# One-time setup (installs services)
+just launchd-install
+
+# Check status
+just launchd-status
+
+# Monitor logs with TUI
+just launchd-monitor
 ```
 
-**Services started:**
-| Service | Port | Purpose |
-|---------|------|---------|
-| pm-server | 8081 | Linear webhooks, project management |
-| controller | 8080 | CodeRun CRD orchestration |
-| healer | 8082 | Self-healing monitor |
-| healer-play-api | 8083 | MCP session monitoring |
-| tunnel | - | Cloudflare tunnel (pm-dev.5dlabs.ai → localhost:8081) |
+**Services managed by launchd:**
+| Service | Port | Health Endpoint | Description |
+|---------|------|-----------------|-------------|
+| controller | 8080 | `/health` | CodeRun CRD orchestrator |
+| pm-server | 8081 | `/health` | Linear webhooks & PM |
+| healer | 8082 | `/health` | Self-healing monitor |
+| healer-sensor | - | - | GitHub Actions failure sensor |
+| tunnel | - | - | Cloudflare tunnel (pm-dev.5dlabs.ai → localhost:8081) |
+| watcher | - | - | Auto-restarts services on binary rebuild |
 
-**mprocs TUI keybindings:**
-- `↑/↓` or `j/k` - Navigate processes
-- `Enter` - Focus process logs
-- `r` - Restart process
-- `q` - Quit all
+**Key launchd commands:**
+| Command | Description |
+|---------|-------------|
+| `just launchd-install` | Install and start all services |
+| `just launchd-uninstall` | Stop and remove all services |
+| `just launchd-status` | Show service status and health |
+| `just launchd-logs` | Tail all service logs |
+| `just launchd-monitor` | TUI with lnav (search, filter, color) |
+| `just launchd-restart` | Restart all services |
+
+**Auto-restart on rebuild:** When you run `cargo build --release`, the watcher automatically restarts affected services.
+
+**Log locations:**
+- `/tmp/cto-launchd/controller.log`
+- `/tmp/cto-launchd/pm-server.log`
+- `/tmp/cto-launchd/healer.log`
+- `/tmp/cto-launchd/watcher.log`
+
+**Alternative: mprocs TUI (interactive)**
+```bash
+just mp  # Interactive TUI with all services
+```
 
 ### 3. Run Pre-Flight Check
 
@@ -257,16 +464,22 @@ just webhook-status
 For each story:
 
 1. **Read ALL acceptance criteria** - understand what success looks like
-2. **Test EACH criterion individually** - do not batch or skip
-3. **Capture FULL output** - complete logs, not summaries
-4. **If ANY criterion fails:**
+2. **CLEAN UP FIRST** - Before retrying ANY story:
+   - Delete existing CodeRuns for that story: `kubectl delete coderun -n cto -l type=<type>,service=<service>`
+   - Delete stuck PVCs: `kubectl delete pvc -n cto <pvc-name> --wait=false`
+   - Verify cleanup: `kubectl get coderuns,pods,pvc -n cto | grep <service>`
+   - **NEVER create duplicate CodeRuns** - always clean up failed attempts first
+3. **Test EACH criterion individually** - do not batch or skip
+4. **Capture FULL output** - complete logs, not summaries
+5. **Verify verbose logging** - Check Linear issue timeline for agent activities and dialog
+6. **If ANY criterion fails:**
    - Document the failure
    - Diagnose root cause (read logs fully)
+   - **CLEAN UP failed resources** (CodeRuns, pods, PVCs)
    - Implement fix
-   - Clean up failed state (delete pods, reset resources)
    - Rebuild if code changed
    - Re-verify from step 1
-5. **Only when ALL criteria pass** → update PRD to `passes: true`
+7. **Only when ALL criteria pass** → update PRD to `passes: true`
 
 ## Kubernetes Debugging (MANDATORY for K8s errors)
 
@@ -300,12 +513,26 @@ KUBERNETES ERROR DETECTED:
 │   ├── Config error → Fix config → kubectl apply
 │   ├── Missing resource → Create it
 │   └── Stuck pod → kubectl delete pod <name>
-├── 4. Clean up failed resources:
-│   └── kubectl delete coderun <name> -n cto
-├── 5. Verify fix locally (if code change)
+├── 4. Clean up ALL failed resources (MANDATORY):
+│   ├── kubectl delete coderun <name> -n cto
+│   ├── kubectl delete pod <name> -n cto (if stuck)
+│   └── kubectl delete pvc <name> -n cto --wait=false (if Terminating)
+├── 5. Verify cleanup complete:
+│   └── kubectl get coderuns,pods,pvc -n cto | grep <service> (should be empty)
+├── 6. Verify fix locally (if code change)
 │   └── cargo test -p <crate>
-└── 6. Re-run the verification from scratch
+└── 7. Re-run the verification from scratch (with clean state)
 ```
+
+### CRITICAL: No Duplicate CodeRuns
+
+**BEFORE creating any CodeRun, ALWAYS:**
+1. Check for existing CodeRuns: `kubectl get coderuns -n cto -l type=<type>,service=<service>`
+2. If any exist, DELETE them first: `kubectl delete coderun -n cto <name>`
+3. Wait for cleanup: `kubectl get pods -n cto | grep <service>` (should be empty)
+4. Only then proceed with the new attempt
+
+**Why this matters:** Duplicate CodeRuns cause confusion, resource contention, and make debugging impossible.
 
 ## ⚠️ CRITICAL: Stringent Verification
 
@@ -582,6 +809,78 @@ this section MUST include actual tool invocation evidence from logs.
 - Use `kubectl wait` for readiness checks
 ---
 ```
+
+## ⚡ FAST Dev Image Builds (PREFERRED for Intake Fixes)
+
+**Use this for rapid iteration - takes ~2-3 minutes instead of 15+ minutes for full CI.**
+
+When you need to fix intake bugs, DON'T wait for GitHub Actions. Build and push a dev image directly:
+
+### Quick Fix Workflow
+
+```bash
+# 1. Fix the code
+vim crates/intake/src/ai/cli_adapter.rs  # or wherever the bug is
+
+# 2. Test locally
+cargo test -p intake
+cargo clippy -p intake -- -D warnings -W clippy::pedantic
+
+# 3. Build and push dev image (ONE COMMAND - ~2-3 min total)
+just dev-claude-image
+
+# 4. Verify the image
+docker run --rm ghcr.io/5dlabs/claude:dev intake --version
+
+# 5. Update cto-config.json to use dev image
+# Edit cto-config.json:
+#   "defaults": { "play": { "agentImage": "ghcr.io/5dlabs/claude:dev" } }
+
+# 6. Restart local controller to pick up new config
+just launchd-restart   # or: cargo build --release --bin agent-controller
+
+# 7. Retry the failed operation
+```
+
+### How It Works
+
+1. **Cross-compile** with `cargo-zigbuild` (fast on Mac, produces Linux binary)
+2. **Overlay image** - adds your binary on top of existing claude:latest
+3. **Push to GHCR** - only uploads the new layer (~30 seconds)
+
+### Available Commands
+
+| Command | Description | Time |
+|---------|-------------|------|
+| `just dev-claude-image` | Build intake + push to ghcr.io/5dlabs/claude:dev | ~2-3 min |
+| `just dev-runtime-image` | Build runtime with local intake | ~2-3 min |
+| `just dev-image-local` | Build locally without pushing (testing) | ~2 min |
+| `just install-cross-tools` | One-time setup for cargo-zigbuild | ~1 min |
+
+### When to Use Dev Images vs Full Release
+
+| Situation | Use Dev Image | Use Full Release |
+|-----------|---------------|------------------|
+| Debugging intake bug | ✅ Yes | ❌ No |
+| Iterating on fix | ✅ Yes | ❌ No |
+| Testing in cluster | ✅ Yes | ❌ No |
+| Production deployment | ❌ No | ✅ Yes |
+| Final validated fix | ❌ No | ✅ Yes |
+
+### Reverting to Production Image
+
+```bash
+# Remove the agentImage override from cto-config.json
+# Or set it back to latest:
+#   "agentImage": "ghcr.io/5dlabs/claude:latest"
+
+# Restart controller
+just launchd-restart
+```
+
+**YOU HAVE AGENCY TO USE THIS.** If intake is failing, fix it and push a dev image immediately. Don't wait for approval or full CI.
+
+---
 
 ## Release & Deployment (For Intake/Agent Changes)
 
