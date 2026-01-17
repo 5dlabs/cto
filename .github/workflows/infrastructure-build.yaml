@@ -106,11 +106,12 @@ jobs:
         if: steps.should-build.outputs.build == 'true'
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
         with:
-          # Use host network for BuildKit to inherit DNS configuration from k8s-runner
-          # This fixes DNS resolution failures (e.g., "Could not resolve host: bun.sh")
-          # that occur because the default bridge network uses Google DNS (8.8.8.8)
-          # which may not work in all network environments
+          # Use host network for BuildKit to inherit network configuration from k8s-runner
+          # The buildkitd.toml file provides explicit DNS configuration (Cloudflare/Google DNS)
+          # to fix DNS resolution failures that occur when the default bridge network
+          # doesn't properly inherit DNS from the k8s-runner pod
           driver-opts: network=host
+          buildkitd-config: ./infra/buildkitd.toml
 
       - name: Build and push ${{ matrix.name }} image
         if: steps.should-build.outputs.build == 'true'
@@ -121,6 +122,11 @@ jobs:
           platforms: linux/amd64
           pull: true
           push: true
+          # Use host network for RUN instructions to inherit DNS configuration
+          # This fixes DNS resolution failures (e.g., "Could not resolve host: github.com")
+          # that occur during git clone and curl operations in Dockerfiles
+          network: host
+          allow: network.host
           # Disable attestations - avoids GHCR permission issues for new packages
           provenance: false
           sbom: false

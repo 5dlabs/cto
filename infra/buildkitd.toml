@@ -1,0 +1,11 @@
+# BuildKit daemon configuration for CI/CD builds
+# This configuration ensures proper DNS resolution in the buildkit sandbox
+# even when the k8s-runner's DNS isn't properly inherited
+
+# Configure DNS for the buildkit worker
+# Uses Cloudflare (1.1.1.1) and Google (8.8.8.8) public DNS servers
+# This fixes DNS resolution failures like "Could not resolve host: github.com"
+# that occur during git clone and curl operations in Dockerfiles
+
+[dns]
+nameservers = ["1.1.1.1", "8.8.8.8", "1.0.0.1"]
