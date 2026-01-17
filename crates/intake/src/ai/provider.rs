@@ -335,16 +335,16 @@ pub fn validate_json_continuation(content: &str) -> TasksResult<()> {
         if first_char == '{' {
             let after_brace = content.trim_start_matches('{').trim_start();
             if !after_brace.starts_with("\"id\"") {
-                // Content starts with { but first key is not "id" - this is prose or invalid
-                // Check if there's any {"id": later in the content
-                if !content.contains(r#"{"id":"#) && !content.contains(r#"{"id"#) {
-                    return Err(crate::errors::TasksError::Ai(format!(
-                        "AI response does not contain valid task objects. \
-                         Expected JSON array of tasks with 'id' field, but got prose or invalid content. \
-                         First 200 chars: {}...",
-                        &content.chars().take(200).collect::<String>()
-                    )));
-                }
+                // Content starts with { but first key is not "id" - this is invalid
+                // Note: We do NOT accept nested {"id": fields (e.g., {"wrapper":{"id":1,...}})
+                // because they cannot deserialize to GeneratedTask which requires "id" as a
+                // direct top-level field
+                return Err(crate::errors::TasksError::Ai(format!(
+                    "AI response does not contain valid task objects. \
+                     Expected JSON array of tasks with 'id' as the first field, but got different structure. \
+                     First 200 chars: {}...",
+                    &content.chars().take(200).collect::<String>()
+                )));
             }
         }
         Ok(())
@@ -737,13 +737,19 @@ mod tests {
     fn test_validate_json_continuation_has_nested_id() {
         // Content that has {"id": somewhere inside (nested task)
         // This simulates cases like: {"wrapper":{"id":1,"title":"Task"}}
-        // which is invalid for our use case but contains {"id":
+        // which is INVALID because when reconstructed as {"tasks":[{"wrapper":...}]},
+        // it cannot deserialize to ParsePrdResponse (wrapper is not a valid field)
         let content = r#"{"wrapper":{"id":1,"title":"Task"}}"#;
-        // This should pass because content.contains(r#"{"id":"#) is true
+        // This should FAIL because "id" must be a direct top-level field, not nested
         let result = validate_json_continuation(content);
         assert!(
-            result.is_ok(),
-            "Should pass because content contains nested {{\"id\":"
+            result.is_err(),
+            "Should fail because nested {{\"id\":\" is not valid - id must be top-level"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("first field"),
+            "Error should mention 'id' must be the first field: {err}"
         );
     }
 
