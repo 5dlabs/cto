@@ -5,7 +5,6 @@
 set -euo pipefail
 
 NAMESPACE="${1:-cto}"
-LOG_DIR="/tmp/cto-launchd"
 POLL_INTERVAL=5  # Check every 5 seconds
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
@@ -21,7 +20,6 @@ cleanup_failed_coderuns() {
 check_for_failures() {
     # Check for Error pods
     local error_pods=$(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[?(@.status.phase=="Failed")].metadata.name}' 2>/dev/null || echo "")
-    local error_pods2=$(kubectl get pods -n "$NAMESPACE" --field-selector=status.phase!=Running,status.phase!=Succeeded,status.phase!=Pending -o name 2>/dev/null | grep -v "Completed" || echo "")
     
     # Check for Failed CodeRuns
     local failed_coderuns=$(kubectl get coderuns -n "$NAMESPACE" -o jsonpath='{.items[?(@.status.phase=="Failed")].metadata.name}' 2>/dev/null || echo "")

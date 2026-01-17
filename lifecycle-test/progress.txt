@@ -1,49 +1,72 @@
 # CTO Platform Lifecycle Test - Progress Log
-# Started: 2026-01-16 (Level Set Restart)
+# Started: 2026-01-17 (Fresh Reset)
 # PRD: prd.json (AlertHub E2E Test)
-# Branch: ralph/lifecycle-test-2026-01-16
+# Branch: ralph/lifecycle-test-2026-01-17
 
 ## Codebase Patterns
 - ALWAYS run full cleanup before retrying any story
 - Healer is OUT OF SCOPE for this test
 - kubectl delete coderuns -n cto --all --wait=false before each retry
 - Verify cleanup complete before proceeding
-- CHECK LOGS after every operation (see prompt for commands)
+- CHECK LOGS after every operation (see pin.md for commands)
 - Working directory MUST be project root (not lifecycle-test/)
 - Code changes go in crates/controller/, crates/pm/, crates/intake/
 
-## Session Start - 2026-01-16 19:20
-- Level set restart with comprehensive cleanup instructions
-- All CodeRuns deleted from cto namespace
-- PRD updated with cleanupProcedure section
-- Prompt updated with:
-  - Mandatory cleanup steps
-  - Log checking after every operation
-  - Working directory instructions (project root)
-  - Branch management rules
-  - Code change workflow
-- Healer removed from scope (separate test)
-- Symlinks created at root: prompt.md, prd.json, progress.txt → lifecycle-test/
+---
+
+## Session Start - 2026-01-17
+- Fresh reset from previous attempts
+- All state files reset to clean slate
+- Infrastructure verified healthy (all nodes Ready, services running)
+- JSON parsing fix deployed in runtime (TASKS_VERSION >= 0.2.12)
 
 ---
 
-## INT-001 Attempt 1 - 2026-01-16 19:17
-- Intake CodeRun created: intake-ctopa-829-1768619830
-- **FAILED**: JSON parsing error - Claude returned prose instead of JSON
-- Error: `AI response parse error: Failed to parse AI response as JSON: expected value at line 1 column 11`
-- Root cause: Claude's extended thinking returned `{"tasks":[I have generated...` (prose inside JSON)
-- Linear dialog: Only 1 turn recorded before failure - NOT showing verbose output
-- **ACTION NEEDED**: Fix JSON extraction in crates/intake/src/ai/provider.rs or domain/ai.rs
-- Cleanup performed: kubectl delete coderuns -n cto --all
+## INT-001 Attempt 1 - 2026-01-17 21:14 UTC
+- **FAILED**: AI response parse error - prose summary instead of JSON
 
-## INT-001 Attempt 2 - 2026-01-16 19:28
-- **BLOCKED**: "Credit balance is too low" - Claude credits depleted
-- Ralph cannot proceed until credits are added
-- All test infrastructure is ready:
-  - PM Server running with skip_signature_verification enabled
-  - Working directory set to project root (can edit crates/)
-  - Cleanup procedures in place
-  - Event watcher script created: scripts/coderun-watcher.sh
+## INT-002 Attempt 2 - 2026-01-17 (CTOPA-836)
+- Deployed fix for `force_disable_thinking` on retry
+- Using `ghcr.io/5dlabs/claude:dev` image with intake 0.2.13
+- **FAILED**: Extended thinking still enabled on retry (code bug - OR logic)
+
+## INT-003 Attempt 3 - 2026-01-17 (CTOPA-838)
+- Fixed `force_disable_thinking` to properly override provider defaults
+- 3 retry attempts all failed with extended thinking (same behavior)
+- After ~65 minutes, pod still running but Claude not responding
+- **FAILED**: Output truncation - EOF at line 65 column 843
+- Root cause: Generated 65 tasks but output exceeded token limit before completing JSON array
+
+### Analysis of Attempt 3
+The intake actually SUCCEEDED in generating all 65 tasks, but the output was truncated:
+```
+✗ AI response parse error: Failed to parse AI response as JSON: EOF while parsing a list at line 65 column 843
+```
+This is an output token limit issue, not a thinking/JSON format issue.
+
+### Fix: Reduce task count
+- Original request: 50 tasks
+- Claude generated 65 tasks (with expanded details)
+- Solution: Request ~30 tasks to stay within output limits
 
 ---
 
+## Pod Monitoring Enhancement - 2026-01-17
+Added automatic pod monitoring to Ralph loop:
+- Monitors every 30 seconds during agent execution
+- Detects pod Error/Failed states and container exit codes
+- Reports failures immediately instead of waiting for gates
+- Configured in `ralph-cto.json` under `monitoring` section
+
+---
+
+## Overnight Run Setup - 2026-01-17 08:30 UTC
+- All CodeRuns and pods cleaned up
+- Controller config updated to use `claude:dev` image
+- Objective updated to request 30 tasks instead of 50
+- Ralph loop ready for overnight execution
+
+### Next Phase: Intake with reduced task count
+Target: Submit intake with num_tasks=30, verify tasks.json created, then start play.
+
+---

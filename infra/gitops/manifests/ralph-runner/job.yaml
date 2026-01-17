@@ -1,0 +1,147 @@
+---
+# Ralph Runner Job
+#
+# Kubernetes Job that runs the Ralph lifecycle loop until completion.
+# Posts to Linear when the play lifecycle completes or fails.
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ralph-runner
+  namespace: cto
+  labels:
+    app: ralph-runner
+spec:
+  # Don't retry the Job itself - the entrypoint handles retries
+  backoffLimit: 0
+  # Keep completed pods for inspection
+  ttlSecondsAfterFinished: 86400  # 24 hours
+  template:
+    metadata:
+      labels:
+        app: ralph-runner
+    spec:
+      serviceAccountName: ralph-runner
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-secret
+
+      # Init container to clone the repo (use ubuntu for better chown support)
+      initContainers:
+        - name: git-clone
+          image: ubuntu:24.04
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              apt-get update && apt-get install -y git
+              echo "Cloning repository..."
+              if [ -n "$GITHUB_TOKEN" ]; then
+                git clone --depth=1 https://x-access-token:${GITHUB_TOKEN}@github.com/5dlabs/cto.git /workspace
+              else
+                echo "WARNING: No GITHUB_TOKEN, trying unauthenticated clone..."
+                git clone --depth=1 https://github.com/5dlabs/cto.git /workspace
+              fi
+              # Make workspace writable by node user (UID 1000)
+              echo "Setting permissions for UID 1000..."
+              chown -R 1000:1000 /workspace
+              chmod -R 755 /workspace
+              ls -la /workspace/lifecycle-test/ | head -10
+              echo "Clone complete"
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          env:
+            - name: GIT_TERMINAL_PROMPT
+              value: "0"
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tools-github-secrets
+                  key: GITHUB_PERSONAL_ACCESS_TOKEN
+                  optional: false
+
+      containers:
+        - name: ralph-runner
+          image: ghcr.io/5dlabs/ralph-runner:latest
+          imagePullPolicy: Always
+
+          # Environment configuration
+          env:
+            # Ralph paths (use writable state volume, not git checkout)
+            - name: RALPH_CONFIG
+              value: /ralph/config/ralph-cto.json
+            - name: RALPH_STATE
+              value: /ralph/state/ralph-cto.state.json
+            - name: RALPH_PROGRESS
+              value: /ralph/state/progress.txt
+            - name: RALPH_REPORT
+              value: /ralph/state/report.json
+            - name: WORKSPACE
+              value: /workspace
+
+            # Runner behavior
+            - name: SLEEP_INTERVAL
+              value: "60"
+            - name: MAX_FAILURES
+              value: "10"
+            - name: NOTIFY_ON_SUCCESS
+              value: "true"
+            - name: NOTIFY_ON_FAILURE
+              value: "true"
+
+            # Linear notification
+            - name: LINEAR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: linear-credentials
+                  key: api-key
+                  optional: true
+            - name: LINEAR_ISSUE_ID
+              value: ""  # Set this when creating the Job
+
+            # GitHub auth for gh CLI
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tools-github-secrets
+                  key: GITHUB_PERSONAL_ACCESS_TOKEN
+                  optional: false
+
+            # Anthropic API key for Claude
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: anthropic-api-key
+                  key: api-key
+                  optional: true
+
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: config
+              mountPath: /ralph/config
+              readOnly: true
+            - name: state
+              mountPath: /ralph/state
+
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: ralph-runner-config
+        - name: state
+          emptyDir: {}
+
+      # Allow enough time for lifecycle to complete
+      activeDeadlineSeconds: 86400  # 24 hours

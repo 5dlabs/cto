@@ -97,6 +97,10 @@ pub struct GenerateOptions {
     pub schema_name: Option<String>,
     /// Enable extended thinking for more complex reasoning
     pub extended_thinking: bool,
+    /// Force disable extended thinking, overriding provider defaults.
+    /// When true, thinking is disabled regardless of provider settings.
+    /// Useful for retry logic when verbose thinking causes issues.
+    pub force_disable_thinking: bool,
     /// Budget in tokens for extended thinking
     pub thinking_budget: Option<u32>,
     /// Path to MCP config file

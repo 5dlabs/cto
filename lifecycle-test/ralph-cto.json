@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "project": {
+    "name": "alerthub-e2e-test",
+    "namespace": "cto",
+    "service": "prd-alerthub-e2e-test",
+    "prdPath": "tests/intake/alerthub-e2e-test/prd.md",
+    "architecturePath": "tests/intake/alerthub-e2e-test/architecture.md",
+    "numTasks": 30
+  },
+  "paths": {
+    "pinPath": "lifecycle-test/pin.md",
+    "pinLookupPath": "lifecycle-test/pin.lookup.md",
+    "execPromptPath": "lifecycle-test/prompt.md",
+    "objectivePath": "lifecycle-test/current-objective.md",
+    "progressPath": "lifecycle-test/progress.txt",
+    "reportPath": "lifecycle-test/report.json",
+    "statePath": "lifecycle-test/ralph-cto.state.json",
+    "planPath": "lifecycle-test/implementation-plan.md"
+  },
+  "runner": {
+    "cli": "claude",
+    "command": "claude --dangerously-skip-permissions -p"
+  },
+  "attended": {
+    "enabled": true,
+    "requiredRuns": 2
+  },
+  "redaction": {
+    "enabled": true,
+    "replacement": "[REDACTED]",
+    "patterns": [
+      "(?i)api[_-]?key\\s*[:=]\\s*\\S+",
+      "(?i)authorization:\\s*\\S+",
+      "(?i)token\\s*[:=]\\s*\\S+",
+      "(?i)cookie:\\s*\\S+",
+      "\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b"
+    ]
+  },
+  "monitoring": {
+    "enabled": true,
+    "intervalSeconds": 30,
+    "namespace": "cto",
+    "failOnPodError": true,
+    "podSelectors": [
+      "type=intake",
+      "type=implementation"
+    ]
+  },
+  "preflight": {
+    "requiredCommands": [
+      "jq",
+      "kubectl",
+      "gh",
+      "curl",
+      "git",
+      "claude"
+    ],
+    "checks": [
+      {
+        "name": "controller-health",
+        "command": "curl -sf http://localhost:8080/health"
+      },
+      {
+        "name": "pm-server-health",
+        "command": "curl -sf http://localhost:8081/health"
+      },
+      {
+        "name": "healer-health",
+        "command": "curl -sf http://localhost:8082/health",
+        "optional": true
+      },
+      {
+        "name": "healer-play-api-health",
+        "command": "curl -sf http://localhost:8083/health",
+        "optional": true
+      },
+      {
+        "name": "kubectl-context",
+        "command": "kubectl cluster-info >/dev/null"
+      },
+      {
+        "name": "anthropic-key",
+        "command": "test -n \"$ANTHROPIC_API_KEY\""
+      },
+      {
+        "name": "linear-oauth-token",
+        "command": "test -n \"$LINEAR_OAUTH_TOKEN\"",
+        "optional": true
+      },
+      {
+        "name": "github-token",
+        "command": "test -n \"$GITHUB_TOKEN\"",
+        "optional": true
+      }
+    ]
+  },
+  "cleanup": {
+    "global": [
+      "kubectl delete coderuns -n cto --all --wait=false",
+      "kubectl delete pods -n cto --field-selector=status.phase!=Running --wait=false 2>/dev/null || true",
+      "kubectl delete pvc -n cto -l app=alerthub --wait=false 2>/dev/null || true",
+      "kubectl delete pvc -n cto workspace-prd-alerthub-e2e-test-morgan --wait=false 2>/dev/null || true",
+      "sleep 10"
+    ]
+  },
+  "phases": [
+    {
+      "id": "intake",
+      "objective": "Submit intake for AlertHub and verify tasks.json is generated with testStrategy for each task.",
+      "timeoutMinutes": 45,
+      "maxRetries": 3,
+      "gates": [
+        {
+          "name": "intake-succeeded",
+          "command": "kubectl get coderuns -n cto -l type=intake -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
+          "description": "Intake CodeRun must complete successfully (implies coderun exists)"
+        },
+        {
+          "name": "tasks-json-exists",
+          "command": "gh api repos/5dlabs/prd-alerthub-e2e-test/contents/prd-alerthub-e2e-test/.tasks/tasks/tasks.json >/dev/null",
+          "description": "tasks.json must exist in target repo after intake"
+        }
+      ],
+      "cleanup": [
+        "kubectl delete coderun -n cto -l type=intake,service=prd-alerthub-e2e-test --wait=false",
+        "kubectl delete pvc -n cto workspace-prd-alerthub-e2e-test-morgan --wait=false"
+      ]
+    },
+    {
+      "id": "play",
+      "objective": "Start Play and verify at least one task CodeRun is created with tools configured and Linear dialog active.",
+      "timeoutMinutes": 60,
+      "maxRetries": 3,
+      "gates": [
+        {
+          "name": "coderuns-exist",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '.items | length > 0'"
+        }
+      ]
+    },
+    {
+      "id": "quality",
+      "objective": "Verify Cleo review completes with language-appropriate checks.",
+      "timeoutMinutes": 30,
+      "maxRetries": 2,
+      "gates": [
+        {
+          "name": "open-pr-exists",
+          "command": "gh pr list --state open --json number >/dev/null"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "objective": "Verify Cipher security scan runs and reports no critical issues.",
+      "timeoutMinutes": 30,
+      "maxRetries": 2,
+      "gates": [
+        {
+          "name": "open-pr-exists",
+          "command": "gh pr list --state open --json number >/dev/null"
+        }
+      ]
+    },
+    {
+      "id": "testing",
+      "objective": "Verify Tess runs tests per testStrategy and records results.",
+      "timeoutMinutes": 45,
+      "maxRetries": 3,
+      "gates": [
+        {
+          "name": "open-pr-exists",
+          "command": "gh pr list --state open --json number >/dev/null"
+        }
+      ]
+    },
+    {
+      "id": "integration",
+      "objective": "Verify Atlas merges after checks pass and updates Linear.",
+      "timeoutMinutes": 45,
+      "maxRetries": 2,
+      "gates": [
+        {
+          "name": "merged-pr-exists",
+          "command": "gh pr list --state merged --json number >/dev/null"
+        }
+      ]
+    },
+    {
+      "id": "deploy",
+      "objective": "Verify Bolt deploy task runs, applies manifests, and health checks pass.",
+      "timeoutMinutes": 60,
+      "maxRetries": 2,
+      "gates": [
+        {
+          "name": "deploy-task-present",
+          "command": "gh pr list --state merged --json number >/dev/null"
+        }
+      ]
+    },
+    {
+      "id": "postflight",
+      "objective": "Verify telemetry and Linear timeline completeness after deploy.",
+      "timeoutMinutes": 30,
+      "maxRetries": 1,
+      "gates": [
+        {
+          "name": "k8s-clean",
+          "command": "kubectl get pods -n cto -o json | jq -e '.items | length >= 0'"
+        }
+      ]
+    }
+  ]
+}

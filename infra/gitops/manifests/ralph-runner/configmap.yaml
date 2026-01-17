@@ -1,0 +1,90 @@
+---
+# Ralph Runner ConfigMap
+#
+# Configuration files for the Ralph Runner.
+# These are mounted into the Job container.
+#
+# NOTE: The actual config content should be populated by the deployment process
+# or by a separate ConfigMap generator script.
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ralph-runner-config
+  namespace: cto
+  labels:
+    app: ralph-runner
+data:
+  # Ralph configuration - customize for your project
+  ralph-cto.json: |
+    {
+      "version": 1,
+      "project": {
+        "name": "alerthub-e2e-test",
+        "namespace": "cto",
+        "service": "prd-alerthub-e2e-test",
+        "prdPath": "tests/intake/alerthub-e2e-test/prd.md",
+        "architecturePath": "tests/intake/alerthub-e2e-test/architecture.md",
+        "numTasks": 30
+      },
+      "paths": {
+        "pinPath": "lifecycle-test/pin.md",
+        "execPromptPath": "lifecycle-test/prompt.md",
+        "objectivePath": "lifecycle-test/current-objective.md",
+        "progressPath": "lifecycle-test/progress.txt",
+        "reportPath": "lifecycle-test/report.json",
+        "statePath": "lifecycle-test/ralph-cto.state.json"
+      },
+      "runner": {
+        "cli": "claude",
+        "command": "claude --dangerously-skip-permissions -p"
+      },
+      "attended": {
+        "enabled": false,
+        "requiredRuns": 0
+      },
+      "monitoring": {
+        "enabled": true,
+        "intervalSeconds": 30,
+        "namespace": "cto",
+        "failOnPodError": true,
+        "podSelectors": [
+          "type=intake",
+          "type=implementation"
+        ]
+      },
+      "phases": [
+        {
+          "name": "intake",
+          "gates": [
+            {
+              "name": "intake-succeeded",
+              "command": "kubectl get coderuns -n cto -l type=intake -o json | jq -e '.items[0].status.phase == \"Succeeded\"'"
+            }
+          ]
+        },
+        {
+          "name": "play",
+          "gates": [
+            {
+              "name": "play-started",
+              "command": "kubectl get coderuns -n cto -l type=implementation -o json | jq -e '.items | length > 0'"
+            }
+          ]
+        },
+        {
+          "name": "done",
+          "gates": []
+        }
+      ]
+    }
+
+  # Initial state
+  ralph-cto.state.json: |
+    {
+      "phase": "intake",
+      "attempts": {},
+      "completedObjectives": [],
+      "attendedCompleted": 2,
+      "last_success": null
+    }

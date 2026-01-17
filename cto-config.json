@@ -39,6 +39,7 @@
       "workingDirectory": ".",
       "healerEndpoint": "http://localhost:8083",
       "autoMerge": true,
+      "agentImage": "ghcr.io/5dlabs/claude:dev",
       "implementationMaxRetries": 10,
       "qualityMaxRetries": 5,
       "securityMaxRetries": 2,

@@ -326,7 +326,9 @@ impl CLITextGenerator {
                 args.push("--verbose".to_string());
 
                 // Add extended thinking settings via --settings JSON
-                let use_thinking = options.extended_thinking || self.extended_thinking;
+                // force_disable_thinking overrides provider defaults (useful for retry logic)
+                let use_thinking = !options.force_disable_thinking
+                    && (options.extended_thinking || self.extended_thinking);
                 if use_thinking {
                     let thinking_budget = options.thinking_budget.unwrap_or(self.thinking_budget);
                     let settings_json = serde_json::json!({
@@ -337,11 +339,13 @@ impl CLITextGenerator {
                     args.push(settings_json.to_string());
                 }
 
-                // Add MCP config if available
-                let mcp_config = options.mcp_config.as_ref().or(self.mcp_config.as_ref());
-                if let Some(config) = mcp_config {
-                    args.push("--mcp-config".to_string());
-                    args.push(config.clone());
+                // Add MCP config if available (unless explicitly disabled)
+                if !options.disable_mcp {
+                    let mcp_config = options.mcp_config.as_ref().or(self.mcp_config.as_ref());
+                    if let Some(config) = mcp_config {
+                        args.push("--mcp-config".to_string());
+                        args.push(config.clone());
+                    }
                 }
 
                 // Use -- to separate options from the prompt (prevents prompt being
@@ -988,7 +992,9 @@ impl AIProvider for CLITextGenerator {
         }
 
         let prompt = self.messages_to_prompt(messages);
-        let use_thinking = options.extended_thinking || self.extended_thinking;
+        // force_disable_thinking overrides provider defaults (useful for retry logic)
+        let use_thinking = !options.force_disable_thinking
+            && (options.extended_thinking || self.extended_thinking);
         let thinking_budget = options.thinking_budget.unwrap_or(self.thinking_budget);
 
         info!(
@@ -996,6 +1002,7 @@ impl AIProvider for CLITextGenerator {
             model = %model,
             prompt_len = prompt.len(),
             extended_thinking = use_thinking,
+            force_disable_thinking = options.force_disable_thinking,
             thinking_budget = if use_thinking { Some(thinking_budget) } else { None },
             mcp_config = ?options.mcp_config.as_ref().or(self.mcp_config.as_ref()),
             "Generating text via CLI"
