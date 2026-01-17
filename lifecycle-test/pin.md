@@ -47,6 +47,37 @@ Do not proceed to the next phase without evidence for all gates.
 Use `lifecycle-test/pin.lookup.md` to resolve aliases and pointer paths before
 searching. This reduces missed context and keeps the loop deterministic.
 
+## Infrastructure Health Check (RUN FIRST)
+
+**Before attempting ANY objective, verify infrastructure is healthy:**
+
+```bash
+# Check controller is running (MUST have 1+ pods)
+kubectl get pods -n cto -l app.kubernetes.io/name=agent-controller
+# If "No resources found", FIX IT immediately
+
+# Check PM server is running (MUST have 1+ pods)
+kubectl get pods -n cto -l app=pm-server
+# If "No resources found", FIX IT immediately
+```
+
+**If controller or PM server not running, FIX IT:**
+
+```bash
+# Option 1: Scale via ArgoCD (permanent)
+kubectl patch application cto -n argocd --type merge -p '{"spec":{"source":{"helm":{"valuesObject":{"controller":{"replicaCount":1},"pm-server":{"replicaCount":1}}}}}}'
+
+# Option 2: Scale deployments directly (temporary, survives until next ArgoCD sync)
+kubectl scale deployment agent-controller -n cto --replicas=1
+kubectl scale deployment pm-server -n cto --replicas=1
+
+# Wait for pods to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=agent-controller -n cto --timeout=60s
+kubectl wait --for=condition=ready pod -l app=pm-server -n cto --timeout=60s
+```
+
+**DO NOT proceed with any objective until both controller and PM server are running.**
+
 ## Cleanup Rules (No Duplicate CodeRuns)
 
 Before retrying any phase:

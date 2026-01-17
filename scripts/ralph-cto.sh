@@ -250,7 +250,8 @@ select_plan_objective() {
   [[ -f "$plan_path" ]] || return 1
 
   while IFS= read -r line; do
-    line="${line#- [ ] }"
+    # Quote the pattern to prevent [ ] from being interpreted as glob
+    line="${line#"- [ ] "}"
     IFS='|' read -r id objective <<< "$line"
     id="$(echo "$id" | xargs)"
     objective="$(echo "${objective:-}" | xargs)"
@@ -415,7 +416,8 @@ run_command() {
   local name="$1"
   local command="$2"
   local log_dir="$3"
-  local log_path="${log_dir}/${name}_$(date -u '+%Y%m%d_%H%M%S').log"
+  local log_path
+  log_path="${log_dir}/${name}_$(date -u '+%Y%m%d_%H%M%S').log"
   mkdir -p "$log_dir"
   log "Running: $name"
   set +e
@@ -525,12 +527,13 @@ run_agent() {
     cat "$objective"
   } > "$run_prompt"
 
-  local prompt_json
-  prompt_json="$(jq -Rs '.' < "$run_prompt")"
-  rm -f "$run_prompt"
-
   log "Invoking CLI runner"
-  bash -c "${runner_command} ${prompt_json}"
+  # Use the prompt file directly to avoid shell interpretation of backticks
+  # Claude CLI accepts -p with a file path or reads from stdin with -p -
+  cat "$run_prompt" | $runner_command -
+  local exit_code=$?
+  rm -f "$run_prompt"
+  return $exit_code
 }
 
 main() {

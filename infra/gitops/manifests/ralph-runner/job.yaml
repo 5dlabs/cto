@@ -36,17 +36,31 @@ spec:
             - |
               set -e
               apt-get update && apt-get install -y git
-              echo "Cloning repository..."
+              echo "Cloning repository (branch: ralph/agent-ci-optimization-2026-01-17)..."
               if [ -n "$GITHUB_TOKEN" ]; then
-                git clone --depth=1 https://x-access-token:${GITHUB_TOKEN}@github.com/5dlabs/cto.git /workspace
+                git clone --depth=1 --branch ralph/agent-ci-optimization-2026-01-17 https://x-access-token:${GITHUB_TOKEN}@github.com/5dlabs/cto.git /workspace
               else
                 echo "WARNING: No GITHUB_TOKEN, trying unauthenticated clone..."
-                git clone --depth=1 https://github.com/5dlabs/cto.git /workspace
+                git clone --depth=1 --branch ralph/agent-ci-optimization-2026-01-17 https://github.com/5dlabs/cto.git /workspace
               fi
-              # Make workspace writable by node user (UID 1000)
-              echo "Setting permissions for UID 1000..."
-              chown -R 1000:1000 /workspace
+              # Make workspace writable by node user (UID 1001 in claude image)
+              echo "Setting permissions for UID 1001..."
+              chown -R 1001:1000 /workspace
               chmod -R 755 /workspace
+
+              # Patch config for K8s environment:
+              # - Disable attended runs (running unattended in K8s)
+              # - Remove localhost preflight checks (not applicable in container)
+              # - Remove kubectl-context check (already in cluster)
+              echo "Patching config for K8s environment..."
+              apt-get install -y jq >/dev/null 2>&1 || true
+              CONFIG=/workspace/lifecycle-test/ralph-cto.json
+              if [ -f "$CONFIG" ]; then
+                jq '.attended.enabled = false | .attended.requiredRuns = 0 | .preflight.checks = [.preflight.checks[] | select((.command | test("localhost") | not) and (.name != "kubectl-context"))]' "$CONFIG" > /tmp/config.json && mv /tmp/config.json "$CONFIG"
+                chown 1001:1000 "$CONFIG"
+                echo "Config patched - removed localhost checks and kubectl-context"
+              fi
+
               ls -la /workspace/lifecycle-test/ | head -10
               echo "Clone complete"
           volumeMounts:
@@ -69,9 +83,9 @@ spec:
 
           # Environment configuration
           env:
-            # Ralph paths (use writable state volume, not git checkout)
+            # Ralph paths (use config from cloned workspace, state in writable volume)
             - name: RALPH_CONFIG
-              value: /ralph/config/ralph-cto.json
+              value: /workspace/lifecycle-test/ralph-cto.json
             - name: RALPH_STATE
               value: /ralph/state/ralph-cto.state.json
             - name: RALPH_PROGRESS
@@ -95,9 +109,9 @@ spec:
             - name: LINEAR_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: linear-credentials
-                  key: api-key
-                  optional: true
+                  name: linear-secrets
+                  key: LINEAR_API_KEY
+                  optional: false
             - name: LINEAR_ISSUE_ID
               value: ""  # Set this when creating the Job
 
@@ -113,9 +127,9 @@ spec:
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: anthropic-api-key
-                  key: api-key
-                  optional: true
+                  name: cto-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: false
 
           volumeMounts:
             - name: workspace
