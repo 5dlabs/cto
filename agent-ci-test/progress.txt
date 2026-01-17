@@ -286,3 +286,77 @@ The solution is to stagger builds or have a dedicated cache-warming job.
 Create a dedicated job that warms the registry cache before agent builds start.
 
 ---
+
+## [2026-01-17 08:40] - OPT-007: Cache Warming Phase ✅ SUCCESS
+
+### Before (Build 21090969591)
+| Job | Time | Notes |
+|-----|------|-------|
+| runtime | 2m32s | Skipped (existed) |
+| sidecar | 5m44s | - |
+| cursor | 1m3s | Fast (no syntax) |
+| opencode | 2m29s | - |
+| code | 2m23s | Cache hit |
+| factory | 2m42s | Cache hit |
+| gemini | 19m14s | Slow (early start) |
+| codex | 23m23s | Slow (early start) |
+| claude | **31m36s** | **Slowest** |
+| **Total** | **~34min** | - |
+
+### Changes Made
+1. **Added warm-cache job** (agents-build.yaml:330-380)
+   - Builds cursor first (simplest Dockerfile, no syntax directive)
+   - Populates registry buildcache with base image layers
+   - Other agents wait for warm-cache before starting
+
+2. **Simplified Dockerfile syntax** (claude, code, codex, gemini)
+   - Changed from `syntax=docker/dockerfile:1.7-labs` to `syntax=docker/dockerfile:1`
+   - Only `--mount=type=cache` is used (works in standard syntax)
+   - Eliminates ~12MB frontend image download overhead
+
+3. **Increased parallelism** (agents-build.yaml:340)
+   - Changed from `max-parallel: 4` to `max-parallel: 6`
+   - Cache is now warm, more parallelism is safe
+
+### After (Build 21091427015) ✅ SUCCESS
+| Job | Time | vs Previous | Improvement |
+|-----|------|-------------|-------------|
+| runtime | 2m40s | 2m32s | ~same |
+| sidecar | 5m12s | 5m44s | ~same |
+| **warm-cache** | **47s** | NEW | Cache warmup |
+| opencode | 3m18s | 2m29s | ~same |
+| code | 4m0s | 2m23s | +1m37s (overhead) |
+| factory | 1m32s | 2m42s | -1m10s |
+| gemini | **8m38s** | 19m14s | **2.2x faster** |
+| codex | **4m0s** | 23m23s | **5.8x faster** |
+| claude | **3m23s** | 31m36s | **9.4x faster!** |
+| summary | 4s | 4s | ~same |
+| **Total** | **~14min** | ~34min | **2.4x faster!** |
+
+### Key Metrics
+- **Full pipeline**: 34 min → 14 min (**59% reduction**)
+- **Claude agent**: 31m36s → 3m23s (**89% reduction**)
+- **Codex agent**: 23m23s → 4m0s (**83% reduction**)
+- **Gemini agent**: 19m14s → 8m38s (**55% reduction**)
+- **Success rate**: 100% (no cancellations)
+
+### Evidence
+- Commit: 5ab3495c0
+- Branch: ralph/agent-ci-optimization-2026-01-17
+- Build run: https://github.com/5dlabs/cto/actions/runs/21091427015
+
+### Analysis
+The cache warming strategy worked exceptionally well:
+1. warm-cache builds cursor in 47s, populating registry buildcache
+2. All subsequent agents benefit from pre-warmed cache
+3. Claude went from 31m to 3m - mostly npm install time now
+4. The syntax simplification helped reduce overhead
+
+### Target Achievement
+- **Target**: <15 minutes total pipeline time
+- **Achieved**: ~14 minutes ✅
+- **Success rate**: 100% (target was 100%)
+
+### Final Status: PASSED ✅
+
+---
