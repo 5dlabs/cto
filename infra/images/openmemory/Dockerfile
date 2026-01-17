@@ -15,9 +15,11 @@ RUN apk add --no-cache unzip
 
 # Download and extract the OpenMemory repository from GitHub archive
 # Using ADD with URL instead of git clone avoids DNS issues in RUN containers
+# Note: Using cp -a with trailing dot to include hidden dotfiles (e.g., .npmrc, .nvmrc)
+# The shell glob * does not match dotfiles by default, so we use cp -a instead of mv
 ADD https://github.com/caviraoss/openmemory/archive/refs/heads/main.zip /tmp/repo.zip
 RUN unzip /tmp/repo.zip -d /tmp && \
-    mv /tmp/openmemory-main/* /src/ && \
+    cp -a /tmp/openmemory-main/. /src/ && \
     rm -rf /tmp/repo.zip /tmp/openmemory-main
 
 # ===== BUILD STAGE =====

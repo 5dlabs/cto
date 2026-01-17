@@ -15,9 +15,11 @@ RUN apk add --no-cache unzip
 
 # Download and extract the tweakcn repository from GitHub archive
 # Using ADD with URL instead of git clone avoids DNS issues in RUN containers
+# Note: Using cp -a with trailing dot to include hidden dotfiles (e.g., .npmrc, .nvmrc)
+# The shell glob * does not match dotfiles by default, so we use cp -a instead of mv
 ADD https://github.com/jnsahaj/tweakcn/archive/refs/heads/main.zip /tmp/repo.zip
 RUN unzip /tmp/repo.zip -d /tmp && \
-    mv /tmp/tweakcn-main/* /src/ && \
+    cp -a /tmp/tweakcn-main/. /src/ && \
     rm -rf /tmp/repo.zip /tmp/tweakcn-main
 
 FROM node:20-alpine AS base
