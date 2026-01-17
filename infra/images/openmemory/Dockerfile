@@ -29,13 +29,14 @@ SHELL ["/bin/sh", "-c"]
 ENV PATH="/opt/bun/bin:${PATH}"
 
 # Clone OpenMemory repository and navigate to the JS server package
-# Use retry logic for resilience against transient network failures
-# Note: Verify clone succeeded after loop - sleep always returns 0, masking failures
+# Clean up partial clones before retrying to avoid "destination path already exists" errors
+# Use git rev-parse HEAD to verify clone completed (not just that .git exists)
 RUN for i in 1 2 3 4 5; do \
+      rm -rf /src 2>/dev/null || true; \
       git clone --depth 1 https://github.com/caviraoss/openmemory.git /src && break || \
       echo "Git clone attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
     done && \
-    [ -d /src/.git ] || { echo "ERROR: Git clone failed after all retries"; exit 1; }
+    git -C /src rev-parse HEAD > /dev/null 2>&1 || { echo "ERROR: Git clone failed or incomplete after all retries"; exit 1; }
 
 WORKDIR /src/packages/openmemory-js
 
