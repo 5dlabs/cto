@@ -8,14 +8,15 @@ ENV TZ="$TZ"
 ARG USERNAME=node
 ENV DEVCONTAINER=true
 
+# Switch to root for all setup (base image ends as USER node)
+USER root
+
 # Setup workspace and user environment
 RUN mkdir -p /workspace /home/node/.gemini /home/node/.config /home/node/.cache && \
-    chown -R 1000:1000 /home/node/.gemini /home/node/.config /home/node/.cache
+    chown -R node:node /home/node/.gemini /home/node/.config /home/node/.cache && \
+    chown -R node:node /workspace
 
 WORKDIR /workspace
-
-# Install Gemini CLI as root, then drop to node
-USER root
 
 # Install Google Gemini CLI
 # Note: Gemini CLI installation method - using npm global install
