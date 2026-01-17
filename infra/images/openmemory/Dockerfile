@@ -28,8 +28,9 @@ RUN unzip /tmp/repo.zip -d /tmp && \
 FROM alpine:3.21 AS headers
 
 # Get Node version to download matching headers
-# We use Node 22.x to match the oven/bun:1-alpine image's node version
-ARG NODE_VERSION=22.16.0
+# IMPORTANT: Must match the production stage Node version (node:20-alpine) for ABI compatibility
+# Native modules compiled with these headers must run in the production Node runtime
+ARG NODE_VERSION=20.20.0
 ADD https://nodejs.org/download/release/v${NODE_VERSION}/node-v${NODE_VERSION}-headers.tar.gz /tmp/node-headers.tar.gz
 RUN mkdir -p /node-headers && \
     tar -xzf /tmp/node-headers.tar.gz -C /node-headers --strip-components=1 && \
