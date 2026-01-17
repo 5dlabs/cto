@@ -249,10 +249,15 @@ jobs:
             PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
             TASKS_VERSION=${{ steps.binaries-version.outputs.tasks_version }}
             TASKMASTER_VERSION=${{ steps.taskmaster-version.outputs.version }}
-          # Cache can be disabled via no_cache input when builds hang due to corruption
+          # Cache strategy: GHA cache (fast) + registry cache (persistent fallback)
+          # Registry cache survives even when no_cache=true (only disables GHA cache)
           no-cache: ${{ inputs.no_cache == true }}
-          cache-from: ${{ inputs.no_cache != true && 'type=gha,scope=runtime' || '' }}
-          cache-to: ${{ inputs.no_cache != true && 'type=gha,scope=runtime,mode=max' || '' }}
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
+            ${{ inputs.no_cache != true && 'type=gha,scope=runtime' || '' }}
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache,mode=max
+            ${{ inputs.no_cache != true && 'type=gha,scope=runtime,mode=max' || '' }}
 
       - name: Set build output
         id: set-built
@@ -328,7 +333,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      max-parallel: 2  # Limit parallelism to reduce resource contention on k8s-runner
+      max-parallel: 4  # Increased parallelism since runtime is pre-built and cached
       matrix:
         include:
           - id: claude
@@ -384,6 +389,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Pre-pull runtime base image
         run: |
           echo "📥 Pre-pulling runtime base image to warm up cache..."
@@ -400,13 +412,6 @@ jobs:
         run: |
           node -v
           npm -v
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Determine version (npm for npm agents, PyPI for pypi/pip agents, script-hash for remote installers, dir-hash otherwise)
         id: version
@@ -508,7 +513,6 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
             BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
             VERSION=${{ steps.version.outputs.version }}
-            CACHE_BUST=${{ github.run_id }}
           # Cache strategy: GHA cache (fast) + registry cache (persistent fallback)
           # Registry cache survives even when no_cache=true (only disables GHA cache)
           no-cache: ${{ inputs.no_cache == true }}

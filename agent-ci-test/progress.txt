@@ -1,0 +1,86 @@
+# Agent CI Build Optimization Progress Log
+
+## Session Started: 2026-01-17
+
+### Codebase Patterns
+- Build workflow: .github/workflows/agents-build.yaml
+- Runtime Dockerfile: infra/images/runtime/Dockerfile (600+ lines, massive)
+- Agent Dockerfiles: infra/images/{claude,codex,cursor,...}/Dockerfile
+- Runner config: infra/gitops/applications/workloads/platform-runners.yaml
+- activeDeadlineSeconds already increased to 7200 (was 3600)
+
+### Known Issues from Recent Builds
+1. Claude build cancelled at 22 min (runner shutdown signal)
+2. Codex build cancelled at 3 min (runner shutdown signal)
+3. Runtime image is ~531MB with 60+ layers
+4. No effective pre-warming of base images
+5. GHA cache frequently not hit
+
+### Initial Observations
+- Runtime Dockerfile includes: Go, Rust, Node, Python, kubectl, Helm, ArgoCD, 
+  Argo Workflows, talosctl, yq, gh CLI, AWS CLI, stern, Docker Compose, k9s,
+  kustomize, cloudflared, kubectx/kubens, Python dev tools, Node.js dev tools,
+  Expo/React Native, Playwright+Chromium, security scanners (trivy, gitleaks,
+  semgrep, hadolint), mermaid-cli, and more.
+- Most agents (Claude, Codex, Cursor) only need: git, node, basic shell tools
+- Playwright+Chromium alone adds ~400MB (only Blaze needs this)
+
+### Priority Order
+1. DIAG-001 - Profile and understand current bottlenecks
+2. OPT-001 - Slim the runtime image (biggest impact)
+3. OPT-002 - Fix BuildKit caching
+4. OPT-003 - Pre-warm images on runners
+5. Others as needed
+
+---
+
+## Progress Entries
+
+---
+
+## [2026-01-17 00:00] - DIAG-001: Baseline Metrics
+
+### Before (Baseline Measurements)
+- Runtime build: 21-39 min
+- Claude build: 34 min (often cancelled before completion)
+- Full pipeline: 98 min (successful) / 45-90 min (cancelled)
+- Success rate: ~20% (many cancelled/failed runs)
+
+### Analysis Performed
+1. Examined recent 15 builds:
+   - 21087277467: in_progress (74min+)
+   - 21069563331: success (98min)
+   - 21058443913: success (318min - severe cache issues)
+   - Multiple cancelled builds (48min, 30min, 31min, etc.)
+
+2. Job breakdown from successful run 21069563331:
+   - build-runtime: 21min
+   - build-sidecar: 5min
+   - build-agents (claude): 34min (slowest)
+   - build-agents (code): 24min
+   - build-agents (factory): 23min
+   - build-agents (codex): 21min
+   - build-agents (opencode): 19min
+   - build-agents (gemini): 18min
+   - build-agents (cursor): 9min
+
+3. Runtime image analysis:
+   - 61 layers total
+   - Largest layer: 531MB (apt packages)
+   - Key bloat: Playwright+Chromium (~400MB), security scanners, PHP/Ruby/Perl
+
+4. Cache analysis:
+   - GHA cache configured with per-agent scopes
+   - Registry cache configured but may not be pulling effectively
+   - CACHE_BUST arg defeats caching on every run
+
+### Key Findings
+1. **CACHE_BUST arg is counterproductive**: `CACHE_BUST=${{ github.run_id }}` invalidates cache every run
+2. **Runtime image too large**: 531MB apt layer + many downloads = slow pulls
+3. **Duplicate Rust installations**: Both root and node user have full Rust toolchain
+4. **Serial agent builds**: max-parallel: 2 but agents wait on runtime
+5. **No pre-warming**: Each agent job pulls runtime from scratch
+
+### Final Status: PASSED (baseline documented)
+
+---
