@@ -49,34 +49,46 @@ searching. This reduces missed context and keeps the loop deterministic.
 
 ## Infrastructure Health Check (RUN FIRST)
 
-**Before attempting ANY objective, verify infrastructure is healthy:**
+**Local services are running via launchd (NOT in-cluster):**
 
 ```bash
-# Check controller is running (MUST have 1+ pods)
-kubectl get pods -n cto -l app.kubernetes.io/name=agent-controller
-# If "No resources found", FIX IT immediately
-
-# Check PM server is running (MUST have 1+ pods)
-kubectl get pods -n cto -l app=pm-server
-# If "No resources found", FIX IT immediately
+# Check local services are healthy
+curl -sf http://localhost:8080/health && echo "Controller OK"
+curl -sf http://localhost:8081/health && echo "PM Server OK"
+curl -sf http://localhost:8082/health && echo "Healer OK"
 ```
 
-**If controller or PM server not running, FIX IT:**
+**If local services not running:**
 
 ```bash
-# Option 1: Scale via ArgoCD (permanent)
-kubectl patch application cto -n argocd --type merge -p '{"spec":{"source":{"helm":{"valuesObject":{"controller":{"replicaCount":1},"pm-server":{"replicaCount":1}}}}}}'
+# Check launchd status
+just launchd-status
 
-# Option 2: Scale deployments directly (temporary, survives until next ArgoCD sync)
-kubectl scale deployment agent-controller -n cto --replicas=1
-kubectl scale deployment pm-server -n cto --replicas=1
+# Restart all services
+just launchd-restart
 
-# Wait for pods to be ready
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=agent-controller -n cto --timeout=60s
-kubectl wait --for=condition=ready pod -l app=pm-server -n cto --timeout=60s
+# Or reinstall if needed
+just launchd-uninstall && just launchd-install
 ```
 
-**DO NOT proceed with any objective until both controller and PM server are running.**
+**DO NOT proceed until all local services are healthy.**
+
+## Image Configuration
+
+Agent images are selected by CLI type, NOT from cto-config.json:
+
+- **Local**: `config/controller-config.yaml` → `agent.cliImages.{cli}.tag`
+- **Cluster**: `infra/charts/cto/values.yaml` → same path
+
+Each CLI (claude, cursor, codex, etc.) has its own image config.
+
+To switch between dev/latest for local development:
+```bash
+# Edit config/controller-config.yaml
+# Change agent.cliImages.claude.tag from "dev" to "latest" or vice versa
+# Then restart controller
+just launchd-restart
+```
 
 ## Cleanup Rules (No Duplicate CodeRuns)
 

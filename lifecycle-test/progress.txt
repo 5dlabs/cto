@@ -70,3 +70,75 @@ Added automatic pod monitoring to Ralph loop:
 Target: Submit intake with num_tasks=30, verify tasks.json created, then start play.
 
 ---
+
+---
+
+## Level Set - 2026-01-17 18:30 UTC
+
+### Critical Requirements Identified
+
+1. **Linear Integration for Play Workflow**
+   - Each task MUST have a Linear issue created with subtasks
+   - Working agent MUST be assigned to the issue
+   - CLI output MUST stream to agent dialog via Linear sync sidecar
+   - Same behavior as Morgan's intake workflow
+   - **STATUS**: NOT WORKING - need to verify/fix
+
+2. **Pod Lifecycle Bug**
+   - Primary container terminates while sidecar remains up
+   - Example: `play-coderun-t1-rex-claude-328f86d3-v1-86r6k`
+   - Prevents cleanup and workflow progression
+   - **STATUS**: KNOWN BUG - needs fix
+
+3. **Failure Protocol**
+   - When ANY step fails: STOP, CLEANUP, INVESTIGATE, FIX, RESTART
+   - NEVER forge forward with failures
+   - Always backtrack and start from beginning of phase
+   - **STATUS**: Documented in prompt.md
+
+4. **PR Changes Before Merge**
+   - Quality agents can request changes
+   - Implementation agent makes fixes
+   - Re-review loop until acceptance
+   - **STATUS**: Need to verify this is working
+
+### Action Items Before Next Run
+
+1. Verify Linear sidecar is configured for Play CodeRuns
+2. Check controller code for Linear issue creation during Play workflow
+3. Fix sidecar termination logic (shareProcessNamespace or signal handling)
+4. Verify agent assignment to Linear issues
+
+
+### Analysis Complete - Issues Identified
+
+#### 1. Morgan's Play Template - Missing Linear Parameters ✅ FIXED
+- **Issue**: Morgan's template mentioned Linear params but didn't include them in `mcp_cto_play` call
+- **Fix**: Updated `templates/agents/morgan/play.md.hbs` to explicitly include Linear params
+- **Status**: Template updated
+
+#### 2. Linear Issues for Tasks
+- **Expected**: Intake should create Linear issues for each task via `create_task_issues_with_project()`
+- **Called in**: `crates/pm/src/handlers/callbacks.rs` line 292 (intake callback)
+- **Verification needed**: Check if intake callback is being processed correctly
+
+#### 3. Linear Sidecar Enablement
+- **How it works**: 
+  - CodeRun spec has `linearIntegration.enabled` field
+  - If `LINEAR_SESSION_ID` is passed to Argo workflow, it adds linearIntegration to CodeRun
+  - Controller adds linear-sidecar container if linearIntegration.enabled=true
+- **Issue**: If Morgan doesn't pass Linear params, session ID is empty, sidecar not added
+- **Fix applied**: Morgan template now explicitly includes Linear params
+
+#### 4. Sidecar Termination Issue
+- **Known bug**: Primary container exits but sidecar keeps running
+- **Root cause**: Need `shareProcessNamespace: true` or proper signal handling
+- **Location**: `crates/controller/src/tasks/code/resources.rs` sidecar spec construction
+- **Status**: NOT FIXED YET - requires code change
+
+### Next Steps
+1. Verify Morgan template fix by running intake again
+2. Check intake callback processing in PM server logs
+3. Fix sidecar termination if observed again
+4. Test full flow: intake → tasks created → play workflow → Linear dialog active
+

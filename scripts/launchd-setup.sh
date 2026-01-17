@@ -77,7 +77,7 @@ EOF
             key="${key#export }"
             # Only include specific keys we need
             case "$key" in
-                LINEAR_OAUTH_TOKEN|LINEAR_API_KEY|LINEAR_WEBHOOK_SECRET|LINEAR_ENABLED|ANTHROPIC_API_KEY|GITHUB_TOKEN|OPENAI_API_KEY|KUBECONFIG)
+                LINEAR_OAUTH_TOKEN|LINEAR_API_KEY|LINEAR_WEBHOOK_SECRET|LINEAR_ENABLED|LINEAR_WEBHOOK_URL|WEBHOOK_CALLBACK_URL|ANTHROPIC_API_KEY|GITHUB_TOKEN|OPENAI_API_KEY|KUBECONFIG)
                     # Remove quotes from value
                     value="${value%\"}"
                     value="${value#\"}"

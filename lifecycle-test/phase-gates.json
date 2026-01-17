@@ -1,0 +1,236 @@
+{
+  "$schema": "./phase-gates.schema.json",
+  "description": "Phase gate conditions for CTO lifecycle test. Each phase must pass ALL conditions before proceeding. If ANY condition fails, cleanup and restart from the beginning of that phase.",
+  "cleanupOnFailure": true,
+  "maxRetriesPerAgent": 10,
+  "acceptanceThreshold": 90,
+  "cleanupCommands": [
+    "kubectl delete coderuns -n cto -l service=prd-prd-alerthub-e2e-test --wait=false 2>/dev/null || true",
+    "kubectl delete pods -n cto --field-selector=status.phase!=Running --wait=false 2>/dev/null || true",
+    "kubectl delete pvc -n cto -l service=prd-prd-alerthub-e2e-test --wait=false 2>/dev/null || true",
+    "sleep 10"
+  ],
+  "phases": {
+    "intake": {
+      "description": "PRD → Tasks generation via Morgan agent",
+      "agent": "morgan",
+      "gates": [
+        {
+          "id": "intake-coderun-created",
+          "description": "Intake CodeRun exists and is processing",
+          "command": "kubectl get coderuns -n cto -l type=intake,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items | length > 0'",
+          "timeout": 60
+        },
+        {
+          "id": "intake-succeeded",
+          "description": "Intake CodeRun completed successfully",
+          "command": "kubectl get coderuns -n cto -l type=intake,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
+          "timeout": 1800
+        },
+        {
+          "id": "tasks-json-exists",
+          "description": "tasks.json created in repository",
+          "command": "gh api repos/5dlabs/prd-alerthub-e2e-test/contents/.tasks/tasks/tasks.json --silent",
+          "timeout": 30
+        },
+        {
+          "id": "tasks-have-test-strategy",
+          "description": "All tasks have testStrategy field",
+          "command": "gh api repos/5dlabs/prd-alerthub-e2e-test/contents/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -e '.tasks | all(.testStrategy != null and .testStrategy != \"\")'",
+          "timeout": 30
+        },
+        {
+          "id": "task-docs-created",
+          "description": "Task documentation files exist",
+          "command": "gh api repos/5dlabs/prd-alerthub-e2e-test/contents/.tasks/docs/task-1 --silent",
+          "timeout": 30
+        }
+      ]
+    },
+    "play-implementation": {
+      "description": "Task implementation by assigned agent",
+      "dynamicAgent": true,
+      "agentSource": "task.agent_hint",
+      "gates": [
+        {
+          "id": "play-coderun-created",
+          "description": "Play CodeRun exists for task",
+          "command": "kubectl get coderuns -n cto -l type=implementation,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items | length > 0'",
+          "timeout": 60
+        },
+        {
+          "id": "correct-agent-assigned",
+          "description": "CodeRun assigned to correct agent based on task agent_hint",
+          "verification": "dynamic",
+          "verifyCommand": "EXPECTED_AGENT=$(gh api repos/5dlabs/prd-alerthub-e2e-test/contents/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -r '.tasks[0].agent_hint'); ACTUAL_AGENT=$(kubectl get coderun -n cto -l type=implementation -o json | jq -r '.items[0].metadata.labels[\"cto.5dlabs.io/agent-type\"]'); [ \"$EXPECTED_AGENT\" = \"$ACTUAL_AGENT\" ]",
+          "errorMessage": "Agent mismatch: Expected {expected} but got {actual}",
+          "timeout": 30
+        },
+        {
+          "id": "implementation-succeeded",
+          "description": "Implementation CodeRun completed successfully",
+          "command": "kubectl get coderuns -n cto -l type=implementation,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
+          "timeout": 3600
+        },
+        {
+          "id": "pr-created",
+          "description": "PR created in repository",
+          "command": "gh pr list --repo 5dlabs/prd-alerthub-e2e-test --state open --json number --jq 'length > 0'",
+          "timeout": 30
+        },
+        {
+          "id": "pr-author-correct",
+          "description": "PR created by correct agent's GitHub App",
+          "verification": "dynamic",
+          "verifyCommand": "EXPECTED_AGENT=$(gh api repos/5dlabs/prd-alerthub-e2e-test/contents/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -r '.tasks[0].agent_hint'); PR_AUTHOR=$(gh pr list --repo 5dlabs/prd-alerthub-e2e-test --state all --json author --jq '.[0].author.login'); echo \"Expected agent: $EXPECTED_AGENT, PR author: $PR_AUTHOR\"; [[ \"$PR_AUTHOR\" == *\"$EXPECTED_AGENT\"* ]] || [[ \"$PR_AUTHOR\" == \"app/${EXPECTED_AGENT}-5dlabs\" ]]",
+          "errorMessage": "PR author mismatch: Expected agent '{expected}' but PR created by '{actual}'",
+          "timeout": 30
+        }
+      ]
+    },
+    "quality-cleo": {
+      "description": "Code quality review by Cleo",
+      "agent": "cleo",
+      "dependsOn": ["play-implementation"],
+      "gates": [
+        {
+          "id": "cleo-coderun-created",
+          "description": "Cleo CodeRun exists for quality review",
+          "command": "kubectl get coderuns -n cto -l type=quality,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items | length > 0'",
+          "timeout": 120
+        },
+        {
+          "id": "cleo-succeeded",
+          "description": "Cleo review completed",
+          "command": "kubectl get coderuns -n cto -l type=quality,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
+          "timeout": 1800
+        },
+        {
+          "id": "cleo-review-submitted",
+          "description": "Cleo submitted PR review",
+          "command": "gh pr view --repo 5dlabs/prd-alerthub-e2e-test $(gh pr list --repo 5dlabs/prd-alerthub-e2e-test --state all --json number --jq '.[0].number') --json reviews --jq '.reviews | map(select(.author.login | contains(\"cleo\"))) | length > 0'",
+          "timeout": 30
+        }
+      ]
+    },
+    "security-cipher": {
+      "description": "Security analysis by Cipher",
+      "agent": "cipher",
+      "dependsOn": ["quality-cleo"],
+      "gates": [
+        {
+          "id": "cipher-coderun-created",
+          "description": "Cipher CodeRun exists for security review",
+          "command": "kubectl get coderuns -n cto -l type=security,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items | length > 0'",
+          "timeout": 120
+        },
+        {
+          "id": "cipher-succeeded",
+          "description": "Cipher security analysis completed",
+          "command": "kubectl get coderuns -n cto -l type=security,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
+          "timeout": 1800
+        }
+      ]
+    },
+    "testing-tess": {
+      "description": "Testing by Tess",
+      "agent": "tess",
+      "dependsOn": ["security-cipher"],
+      "gates": [
+        {
+          "id": "tess-coderun-created",
+          "description": "Tess CodeRun exists for testing",
+          "command": "kubectl get coderuns -n cto -l type=test,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items | length > 0'",
+          "timeout": 120
+        },
+        {
+          "id": "tess-succeeded",
+          "description": "Tess testing completed",
+          "command": "kubectl get coderuns -n cto -l type=test,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
+          "timeout": 3600
+        }
+      ]
+    },
+    "merge-atlas": {
+      "description": "PR merge by Atlas",
+      "agent": "atlas",
+      "dependsOn": ["testing-tess"],
+      "gates": [
+        {
+          "id": "atlas-coderun-created",
+          "description": "Atlas CodeRun exists for merge",
+          "command": "kubectl get coderuns -n cto -l type=merge,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items | length > 0'",
+          "timeout": 120
+        },
+        {
+          "id": "atlas-succeeded",
+          "description": "Atlas merge completed",
+          "command": "kubectl get coderuns -n cto -l type=merge,service=prd-prd-alerthub-e2e-test -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
+          "timeout": 600
+        },
+        {
+          "id": "pr-merged",
+          "description": "PR was merged",
+          "command": "gh pr list --repo 5dlabs/prd-alerthub-e2e-test --state merged --json number --jq 'length > 0'",
+          "timeout": 30
+        }
+      ]
+    },
+    "deploy-bolt": {
+      "description": "Deploy to Kubernetes via ArgoCD GitOps (Bolt)",
+      "agent": "bolt",
+      "dependsOn": ["merge-atlas"],
+      "gitopsRepo": "5dlabs/cto-apps",
+      "notes": "Bolt creates ArgoCD Application YAML in cto-apps repo, ArgoCD auto-syncs",
+      "gates": [
+        {
+          "id": "argocd-app-created",
+          "description": "ArgoCD Application YAML created in cto-apps repo",
+          "command": "gh api repos/5dlabs/cto-apps/contents/preview --jq '.[].name' | grep -q 'alerthub'",
+          "timeout": 60
+        },
+        {
+          "id": "argocd-app-synced",
+          "description": "ArgoCD Application synced successfully",
+          "command": "kubectl get application -n argocd -l task-id=1 -o json | jq -e '.items[0].status.sync.status == \"Synced\"'",
+          "timeout": 300
+        },
+        {
+          "id": "deployment-healthy",
+          "description": "Deployed pods are running",
+          "command": "kubectl get pods -n alerthub -o json | jq -e '.items | length > 0 and all(.status.phase == \"Running\")'",
+          "timeout": 300
+        },
+        {
+          "id": "health-endpoint-ok",
+          "description": "Health endpoint returns 200",
+          "command": "kubectl run curl-test --rm -i --restart=Never --image=curlimages/curl -- curl -sf http://notification-router.alerthub.svc.cluster.local/health",
+          "timeout": 60
+        }
+      ]
+    }
+  },
+  "fullSequence": [
+    "intake",
+    "play-implementation", 
+    "quality-cleo",
+    "security-cipher",
+    "testing-tess",
+    "merge-atlas",
+    "deploy-bolt"
+  ],
+  "agentMapping": {
+    "bolt": "app/bolt-5dlabs",
+    "rex": "app/rex-5dlabs",
+    "nova": "app/nova-5dlabs",
+    "grizz": "app/grizz-5dlabs",
+    "blaze": "app/blaze-5dlabs",
+    "tap": "app/tap-5dlabs",
+    "spark": "app/spark-5dlabs",
+    "cleo": "app/cleo-5dlabs",
+    "cipher": "app/cipher-5dlabs",
+    "tess": "app/tess-5dlabs",
+    "atlas": "app/atlas-5dlabs",
+    "morgan": "app/morgan-5dlabs"
+  }
+}

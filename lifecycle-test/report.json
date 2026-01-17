@@ -1,1 +1,318 @@
-[]
+[
+  {
+    "timestamp": "2026-01-17T14:06:38Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "controller-health",
+    "status": "passed",
+    "command": "curl -sf http://localhost:8080/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_controller-health_20260117_140638.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:06:39Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "pm-server-health",
+    "status": "passed",
+    "command": "curl -sf http://localhost:8081/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_pm-server-health_20260117_140639.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:06:39Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "healer-health",
+    "status": "passed",
+    "command": "curl -sf http://localhost:8082/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_healer-health_20260117_140639.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:06:39Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "healer-play-api-health",
+    "status": "skipped",
+    "command": "curl -sf http://localhost:8083/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_healer-play-api-health_20260117_140639.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:06:39Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "kubectl-context",
+    "status": "passed",
+    "command": "kubectl cluster-info >/dev/null",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_kubectl-context_20260117_140639.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:06:39Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "anthropic-key",
+    "status": "passed",
+    "command": "test -n \"$ANTHROPIC_API_KEY\"",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_anthropic-key_20260117_140639.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:06:39Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "linear-oauth-token",
+    "status": "skipped",
+    "command": "test -n \"$LINEAR_OAUTH_TOKEN\"",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_linear-oauth-token_20260117_140639.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:06:39Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "github-token",
+    "status": "skipped",
+    "command": "test -n \"$GITHUB_TOKEN\"",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_github-token_20260117_140639.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:19:40Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "controller-health",
+    "status": "passed",
+    "command": "curl -sf http://localhost:8080/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_controller-health_20260117_141940.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:19:41Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "pm-server-health",
+    "status": "passed",
+    "command": "curl -sf http://localhost:8081/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_pm-server-health_20260117_141940.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:19:41Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "healer-health",
+    "status": "passed",
+    "command": "curl -sf http://localhost:8082/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_healer-health_20260117_141941.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:19:41Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "healer-play-api-health",
+    "status": "skipped",
+    "command": "curl -sf http://localhost:8083/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_healer-play-api-health_20260117_141941.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:19:41Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "kubectl-context",
+    "status": "passed",
+    "command": "kubectl cluster-info >/dev/null",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_kubectl-context_20260117_141941.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:19:41Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "anthropic-key",
+    "status": "passed",
+    "command": "test -n \"$ANTHROPIC_API_KEY\"",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_anthropic-key_20260117_141941.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:19:41Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "linear-oauth-token",
+    "status": "skipped",
+    "command": "test -n \"$LINEAR_OAUTH_TOKEN\"",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_linear-oauth-token_20260117_141941.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:19:41Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "github-token",
+    "status": "skipped",
+    "command": "test -n \"$GITHUB_TOKEN\"",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_github-token_20260117_141941.log"
+  },
+  {
+    "timestamp": "2026-01-17T14:21:00Z",
+    "phase": "intake",
+    "step": "infrastructure-fix",
+    "gate": "dns-check-fix",
+    "status": "passed",
+    "description": "Fixed DNS check in templates to use curl instead of nslookup",
+    "files_changed": [
+      "templates/_shared/partials/git-setup.sh.hbs",
+      "templates/_shared/partials/github-auth.sh.hbs"
+    ]
+  },
+  {
+    "timestamp": "2026-01-17T14:30:00Z",
+    "phase": "intake",
+    "step": "infrastructure-fix",
+    "gate": "controller-rebuild",
+    "status": "passed",
+    "description": "Built and pushed controller:dev with DNS fix for amd64",
+    "image": "ghcr.io/5dlabs/controller:dev@sha256:8bb3dcdca265f58591d483231836c91886b41f54e27aac177b85b2b3fa06938f"
+  },
+  {
+    "timestamp": "2026-01-17T14:35:00Z",
+    "phase": "intake",
+    "step": "submit",
+    "gate": "intake-submitted",
+    "status": "passed",
+    "description": "Intake submitted via MCP tool",
+    "linear_issue": "CTOPA-848",
+    "repository": "5dlabs/prd-prd-alerthub-e2e-test"
+  },
+  {
+    "timestamp": "2026-01-17T14:48:00Z",
+    "phase": "intake",
+    "step": "run",
+    "gate": "intake-succeeded",
+    "status": "failed",
+    "description": "AI returned prose/summary instead of JSON after 3 retries",
+    "error": "AI returned a summary or explanation instead of JSON task data",
+    "root_cause": "Extended thinking mode causes verbose explanatory responses"
+  },
+  {
+    "timestamp": "2026-01-17T15:13:55Z",
+    "phase": "intake",
+    "step": "gate",
+    "gate": "intake-succeeded",
+    "status": "failed",
+    "command": "kubectl get coderuns -n cto -l type=intake -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/intake_intake-succeeded_20260117_151355.log"
+  },
+  {
+    "timestamp": "2026-01-17T15:16:20Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "controller-health",
+    "status": "passed",
+    "command": "curl -sf http://localhost:8080/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_controller-health_20260117_151620.log"
+  },
+  {
+    "timestamp": "2026-01-17T15:16:20Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "pm-server-health",
+    "status": "passed",
+    "command": "curl -sf http://localhost:8081/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_pm-server-health_20260117_151620.log"
+  },
+  {
+    "timestamp": "2026-01-17T15:16:20Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "healer-health",
+    "status": "passed",
+    "command": "curl -sf http://localhost:8082/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_healer-health_20260117_151620.log"
+  },
+  {
+    "timestamp": "2026-01-17T15:16:20Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "healer-play-api-health",
+    "status": "skipped",
+    "command": "curl -sf http://localhost:8083/health",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_healer-play-api-health_20260117_151620.log"
+  },
+  {
+    "timestamp": "2026-01-17T15:16:21Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "kubectl-context",
+    "status": "passed",
+    "command": "kubectl cluster-info >/dev/null",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_kubectl-context_20260117_151620.log"
+  },
+  {
+    "timestamp": "2026-01-17T15:16:21Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "anthropic-key",
+    "status": "passed",
+    "command": "test -n \"$ANTHROPIC_API_KEY\"",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_anthropic-key_20260117_151621.log"
+  },
+  {
+    "timestamp": "2026-01-17T15:16:21Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "linear-oauth-token",
+    "status": "skipped",
+    "command": "test -n \"$LINEAR_OAUTH_TOKEN\"",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_linear-oauth-token_20260117_151621.log"
+  },
+  {
+    "timestamp": "2026-01-17T15:16:21Z",
+    "phase": "preflight",
+    "step": "preflight",
+    "gate": "github-token",
+    "status": "skipped",
+    "command": "test -n \"$GITHUB_TOKEN\"",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/preflight_github-token_20260117_151621.log"
+  },
+  {
+    "timestamp": "2026-01-17T16:00:00Z",
+    "phase": "intake",
+    "step": "fix",
+    "gate": "extended-thinking-fix",
+    "status": "passed",
+    "description": "Changed extended_thinking default from true to false in PM config",
+    "files_changed": [
+      "crates/pm/src/config.rs"
+    ]
+  },
+  {
+    "timestamp": "2026-01-17T16:05:00Z",
+    "phase": "intake",
+    "step": "fix",
+    "gate": "prompt-template-fix",
+    "status": "passed",
+    "description": "Removed confusing expo app.json example from parse-prd prompt template",
+    "files_changed": [
+      "crates/intake/src/ai/prompts/parse_prd.rs"
+    ]
+  },
+  {
+    "timestamp": "2026-01-17T16:06:00Z",
+    "phase": "intake",
+    "step": "run",
+    "gate": "local-intake-run",
+    "status": "passed",
+    "description": "Ran intake CLI locally with fixed prompt - generated 10 tasks with 61 subtasks",
+    "tasks_generated": 10,
+    "subtasks_generated": 61
+  },
+  {
+    "timestamp": "2026-01-17T16:08:00Z",
+    "phase": "intake",
+    "step": "gate",
+    "gate": "tasks-json-exists",
+    "status": "passed",
+    "command": "gh api repos/5dlabs/prd-alerthub-e2e-test/contents/prd-alerthub-e2e-test/.tasks/tasks/tasks.json",
+    "description": "tasks.json pushed to prd-alerthub-e2e-test repository"
+  },
+  {
+    "timestamp": "2026-01-17T16:54:01Z",
+    "phase": "intake",
+    "step": "gate",
+    "gate": "intake-succeeded",
+    "status": "failed",
+    "command": "kubectl get coderuns -n cto -l type=intake -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
+    "logFile": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/ralph-logs/intake_intake-succeeded_20260117_165401.log"
+  }
+]
