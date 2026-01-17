@@ -105,6 +105,12 @@ jobs:
       - name: Set up Docker Buildx
         if: steps.should-build.outputs.build == 'true'
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        with:
+          # Use host network for BuildKit to inherit DNS configuration from k8s-runner
+          # This fixes DNS resolution failures (e.g., "Could not resolve host: bun.sh")
+          # that occur because the default bridge network uses Google DNS (8.8.8.8)
+          # which may not work in all network environments
+          driver-opts: network=host
 
       - name: Build and push ${{ matrix.name }} image
         if: steps.should-build.outputs.build == 'true'
