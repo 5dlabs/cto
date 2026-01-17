@@ -12,15 +12,33 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ curl bash git
 
 # Install Bun globally and relocate it to a shared, persistent location
-RUN curl -fsSL https://bun.sh/install | bash \
- && mv /root/.bun /opt/bun \
- && ln -s /opt/bun/bin/bun /usr/local/bin/bun
+# Use retry logic with exponential backoff for resilience against transient DNS failures
+# Clean up partial installations before retrying to avoid installer conflicts
+# Note: SHELL with pipefail ensures curl failures in the pipeline are detected
+# (without pipefail, only bash's exit code is checked, which is 0 for empty input)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN for i in 1 2 3 4 5; do \
+      rm -rf /root/.bun 2>/dev/null || true; \
+      curl -fsSL https://bun.sh/install | bash && break || \
+      echo "Attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
+    done && \
+    [ -d /root/.bun ] || { echo "ERROR: Bun installation failed after all retries"; exit 1; } && \
+    mv /root/.bun /opt/bun && \
+    ln -s /opt/bun/bin/bun /usr/local/bin/bun
+SHELL ["/bin/sh", "-c"]
 
 # Ensure Bun is available in PATH for subsequent commands
 ENV PATH="/opt/bun/bin:${PATH}"
 
 # Clone OpenMemory repository and navigate to the JS server package
-RUN git clone --depth 1 https://github.com/caviraoss/openmemory.git /src
+# Clean up partial clones before retrying to avoid "destination path already exists" errors
+# Use git rev-parse HEAD to verify clone completed (not just that .git exists)
+RUN for i in 1 2 3 4 5; do \
+      rm -rf /src 2>/dev/null || true; \
+      git clone --depth 1 https://github.com/caviraoss/openmemory.git /src && break || \
+      echo "Git clone attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
+    done && \
+    git -C /src rev-parse HEAD > /dev/null 2>&1 || { echo "ERROR: Git clone failed or incomplete after all retries"; exit 1; }
 
 WORKDIR /src/packages/openmemory-js
 
