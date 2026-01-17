@@ -174,6 +174,10 @@ pub trait AIProvider: Send + Sync {
 /// In this case, it extracts just the JSON objects after the embedded text.
 ///
 /// If no JSON structure is found, returns the original text trimmed.
+///
+/// # Note
+/// Use `validate_json_continuation` to check if the result is valid JSON content
+/// before reconstructing the full JSON structure.
 pub fn extract_json_continuation(text: &str) -> String {
     // Prefill constant used to detect echoed prefill from CLI
     const PREFILL: &str = r#"{"tasks":["#;
@@ -287,6 +291,84 @@ pub fn extract_json_continuation(text: &str) -> String {
 
     // No JSON found, return original
     text.to_string()
+}
+
+/// Validates that extracted JSON continuation contains valid task objects.
+///
+/// This function checks if the result from `extract_json_continuation` is valid
+/// JSON content that can be used to reconstruct a tasks array. It returns an
+/// error if the content is pure prose (common when AI outputs a summary instead
+/// of actual JSON).
+///
+/// # Arguments
+/// * `content` - The string returned from `extract_json_continuation`
+///
+/// # Returns
+/// * `Ok(())` if the content appears to be valid JSON array content
+/// * `Err(...)` if the content is invalid (prose, summary, etc.)
+///
+/// # Example
+/// ```ignore
+/// let json_content = extract_json_continuation(&response.text);
+/// validate_json_continuation(&json_content)?;
+/// let full_json = format!(r#"{{"tasks":[{json_content}"#);
+/// ```
+pub fn validate_json_continuation(content: &str) -> TasksResult<()> {
+    let content = content.trim();
+
+    // Empty content is invalid
+    if content.is_empty() {
+        return Err(crate::errors::TasksError::Ai(
+            "AI returned empty response - no task JSON generated".to_string(),
+        ));
+    }
+
+    // Valid JSON array content should start with:
+    // 1. `{` for a JSON object (task)
+    // 2. `]` for an empty array (closing bracket from prefill)
+    // 3. `]}` for an empty response
+    let first_char = content.chars().next().unwrap_or(' ');
+
+    if first_char == '{' || first_char == ']' {
+        // Looks like JSON - do a quick sanity check
+        if first_char == '{' {
+            // The content after `{` should start with `"id"` for valid task objects
+            let after_brace = content.trim_start_matches('{').trim_start();
+            if !after_brace.starts_with("\"id\"") {
+                // Content starts with { but first key is not "id" - this is invalid
+                // Note: We do NOT accept nested {"id": fields (e.g., {"wrapper":{"id":1,...}})
+                // because they cannot deserialize to GeneratedTask which requires "id" as a
+                // direct top-level field
+                return Err(crate::errors::TasksError::Ai(format!(
+                    "AI response does not contain valid task objects. \
+                     Expected JSON array of tasks with 'id' as the first field, but got different structure. \
+                     First 200 chars: {}...",
+                    &content.chars().take(200).collect::<String>()
+                )));
+            }
+        } else {
+            // Content starts with `]` - this should be `]}` to close both the array and object
+            // When reconstructed as `{"tasks":[` + content, we need `]}` to produce valid JSON
+            // Accepting just `]` would produce `{"tasks":[]` which is invalid (missing `}`)
+            let trimmed = content.trim();
+            if trimmed != "]}" {
+                return Err(crate::errors::TasksError::Ai(format!(
+                    "AI returned incomplete JSON structure. \
+                     Expected ']}}' to close the tasks array, but got: {}...",
+                    &content.chars().take(50).collect::<String>()
+                )));
+            }
+        }
+        Ok(())
+    } else {
+        // Content starts with something else - likely prose
+        Err(crate::errors::TasksError::Ai(format!(
+            "AI returned a summary or explanation instead of JSON task data. \
+             The model should output only JSON array contents. \
+             First 200 chars: {}...",
+            &content.chars().take(200).collect::<String>()
+        )))
+    }
 }
 
 /// Generate a structured object from an AI response.
@@ -587,5 +669,137 @@ mod tests {
             result.starts_with(r#"{"id":1"#),
             "Should strip prefill and return task JSON"
         );
+    }
+
+    // Tests for validate_json_continuation
+
+    #[test]
+    fn test_validate_json_continuation_valid_task_object() {
+        // Valid task object starting with {"id":
+        let content = r#"{"id":1,"title":"Setup project"}"#;
+        assert!(validate_json_continuation(content).is_ok());
+    }
+
+    #[test]
+    fn test_validate_json_continuation_valid_task_array() {
+        // Multiple tasks
+        let content = r#"{"id":1,"title":"Task 1"},{"id":2,"title":"Task 2"}]}"#;
+        assert!(validate_json_continuation(content).is_ok());
+    }
+
+    #[test]
+    fn test_validate_json_continuation_empty_array() {
+        // Empty array (closing bracket from prefill)
+        // Must be exactly `]}` to close both the array and object when reconstructed
+        let content = "]}";
+        assert!(validate_json_continuation(content).is_ok());
+    }
+
+    #[test]
+    fn test_validate_json_continuation_incomplete_closing() {
+        // Just `]` without the closing `}` would produce invalid JSON when reconstructed
+        // `{"tasks":[` + `]` = `{"tasks":[]` (missing closing brace)
+        let content = "]";
+        let result = validate_json_continuation(content);
+        assert!(
+            result.is_err(),
+            "Should reject incomplete closing bracket without }}"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("incomplete"),
+            "Error should mention incomplete: {err}"
+        );
+    }
+
+    #[test]
+    fn test_validate_json_continuation_extra_closing() {
+        // Extra brackets would produce invalid JSON
+        // `{"tasks":[` + `]}]` = `{"tasks":[]}]` (extra bracket)
+        let content = "]}]";
+        let result = validate_json_continuation(content);
+        assert!(
+            result.is_err(),
+            "Should reject content with extra closing brackets"
+        );
+    }
+
+    #[test]
+    fn test_validate_json_continuation_prose_only() {
+        // Pure prose - AI returned a summary instead of JSON
+        let content = "I've generated the complete task breakdown for the AlertHub PRD. The JSON output contains 50 tasks organized as follows:";
+        let result = validate_json_continuation(content);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("summary or explanation"),
+            "Error should mention summary/explanation: {err}"
+        );
+    }
+
+    #[test]
+    fn test_validate_json_continuation_prose_with_bullets() {
+        // Prose with bullet points - common failure mode
+        let content = "**Infrastructure (Tasks 1-9):**\n- PostgreSQL, Redis/Valkey, Kafka, MongoDB setup\n- Database schema creation";
+        let result = validate_json_continuation(content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_json_continuation_empty() {
+        // Empty content
+        let content = "";
+        let result = validate_json_continuation(content);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("empty"));
+    }
+
+    #[test]
+    fn test_validate_json_continuation_whitespace_only() {
+        // Whitespace only
+        let content = "   \n\t  ";
+        let result = validate_json_continuation(content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_json_continuation_wrong_json_structure() {
+        // JSON but not task objects (starts with { but no "id" key)
+        let content = r#"{"expo":{"name":"app","slug":"app"}}"#;
+        let result = validate_json_continuation(content);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("valid task objects"),
+            "Error should mention valid task objects: {err}"
+        );
+    }
+
+    #[test]
+    fn test_validate_json_continuation_has_nested_id() {
+        // Content that has {"id": somewhere inside (nested task)
+        // This simulates cases like: {"wrapper":{"id":1,"title":"Task"}}
+        // which is INVALID because when reconstructed as {"tasks":[{"wrapper":...}]},
+        // it cannot deserialize to ParsePrdResponse (wrapper is not a valid field)
+        let content = r#"{"wrapper":{"id":1,"title":"Task"}}"#;
+        // This should FAIL because "id" must be a direct top-level field, not nested
+        let result = validate_json_continuation(content);
+        assert!(
+            result.is_err(),
+            "Should fail because nested {{\"id\":\" is not valid - id must be top-level"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("first field"),
+            "Error should mention 'id' must be the first field: {err}"
+        );
+    }
+
+    #[test]
+    fn test_validate_json_continuation_no_nested_id() {
+        // Content that doesn't have {"id": anywhere
+        let content = r#"{"metadata":{"key":"value"},"name":"test"}"#;
+        let result = validate_json_continuation(content);
+        assert!(result.is_err(), "Should fail because no {{\"id\": found");
     }
 }

@@ -15,11 +15,15 @@ use crate::ai::{
         AnalyzeComplexityResponse, ComplexityReport, ExpandTaskResponse, GeneratedDecisionPoint,
         GeneratedSubtask, GeneratedTask, ParsePrdResponse,
     },
-    AIMessage, AIProvider, GenerateOptions, PromptManager, ProviderRegistry, TokenUsage,
+    validate_json_continuation, AIMessage, AIProvider, GenerateOptions, PromptManager,
+    ProviderRegistry, TokenUsage,
 };
 use crate::entities::{DecisionPoint, Subtask, Task, TaskPriority, TaskStatus};
 use crate::errors::{TasksError, TasksResult};
 use crate::storage::Storage;
+
+/// Maximum retry attempts for PRD parsing when AI returns invalid responses
+const MAX_PRD_PARSE_RETRIES: u32 = 3;
 
 /// AI Domain for AI-powered task operations.
 pub struct AIDomain {
@@ -145,32 +149,79 @@ impl AIDomain {
             ..Default::default()
         };
 
-        let response = provider
-            .generate_text(model_id, &messages, &options)
-            .await?;
+        // Retry loop for handling AI responses that return prose instead of JSON
+        // This is common with Opus + extended thinking on large PRDs
+        let mut last_error: Option<TasksError> = None;
+        let mut total_usage = TokenUsage::default();
 
-        // Extract JSON from response, handling cases where AI includes explanatory text
-        // before the actual JSON content (common with extended thinking)
-        let json_content = extract_json_continuation(&response.text);
+        for attempt in 0..MAX_PRD_PARSE_RETRIES {
+            if attempt > 0 {
+                tracing::warn!(
+                    attempt = attempt + 1,
+                    max_retries = MAX_PRD_PARSE_RETRIES,
+                    "Retrying PRD parsing after AI returned invalid response"
+                );
+            }
 
-        // Reconstruct the full JSON by prepending the prefill
-        let full_json = format!(r#"{{"tasks":[{json_content}"#);
-        let reconstructed_response = crate::ai::AIResponse {
-            text: full_json,
-            usage: response.usage.clone(),
-            model: response.model.clone(),
-            provider: response.provider.clone(),
-        };
-        let parsed: ParsePrdResponse = parse_ai_response(&reconstructed_response)?;
+            let response = provider
+                .generate_text(model_id, &messages, &options)
+                .await?;
 
-        // Convert generated tasks to Task entities
-        let tasks: Vec<Task> = parsed
-            .tasks
-            .into_iter()
-            .map(Self::generated_task_to_task)
-            .collect();
+            // Accumulate token usage across retries
+            total_usage.input_tokens += response.usage.input_tokens;
+            total_usage.output_tokens += response.usage.output_tokens;
+            total_usage.total_tokens += response.usage.total_tokens;
 
-        Ok((tasks, response.usage))
+            // Extract JSON from response, handling cases where AI includes explanatory text
+            // before the actual JSON content (common with extended thinking)
+            let json_content = extract_json_continuation(&response.text);
+
+            // Validate that the extracted content is actual JSON, not prose
+            if let Err(e) = validate_json_continuation(&json_content) {
+                tracing::warn!(
+                    attempt = attempt + 1,
+                    error = %e,
+                    "AI returned invalid content, will retry if attempts remaining"
+                );
+                last_error = Some(e);
+                continue;
+            }
+
+            // Reconstruct the full JSON by prepending the prefill
+            let full_json = format!(r#"{{"tasks":[{json_content}"#);
+            let reconstructed_response = crate::ai::AIResponse {
+                text: full_json,
+                usage: total_usage.clone(),
+                model: response.model.clone(),
+                provider: response.provider.clone(),
+            };
+
+            match parse_ai_response::<ParsePrdResponse>(&reconstructed_response) {
+                Ok(parsed) => {
+                    // Convert generated tasks to Task entities
+                    let tasks: Vec<Task> = parsed
+                        .tasks
+                        .into_iter()
+                        .map(Self::generated_task_to_task)
+                        .collect();
+
+                    return Ok((tasks, total_usage));
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        attempt = attempt + 1,
+                        error = %e,
+                        "Failed to parse AI response as JSON, will retry if attempts remaining"
+                    );
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        // All retries exhausted
+        Err(last_error.unwrap_or_else(|| {
+            TasksError::Ai("Failed to generate tasks after multiple attempts".to_string())
+        }))
     }
 
     /// Expand a task into subtasks.
