@@ -400,13 +400,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pre-pull runtime base image
+      - name: Pre-pull runtime base image and extract digest
+        id: runtime
         run: |
           echo "📥 Pre-pulling runtime base image to warm up cache..."
-          # Use timeout to prevent hanging on Docker socket issues
-          timeout 120 docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }} || \
-            timeout 120 docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:latest || \
-            echo "⚠️ Pre-pull failed or timed out, build will pull during build step"
+          RUNTIME_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}"
+          RUNTIME_LATEST="${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:latest"
+
+          # Pull with timeout (use versioned tag, fallback to latest)
+          if timeout 180 docker pull "$RUNTIME_TAG" 2>/dev/null; then
+            RUNTIME_REF="$RUNTIME_TAG"
+          elif timeout 180 docker pull "$RUNTIME_LATEST" 2>/dev/null; then
+            RUNTIME_REF="$RUNTIME_LATEST"
+          else
+            echo "⚠️ Pre-pull failed, BuildKit will pull during build"
+            RUNTIME_REF="$RUNTIME_TAG"
+          fi
+
+          # Extract digest if available (helps BuildKit skip re-pulling)
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$RUNTIME_REF" 2>/dev/null | cut -d'@' -f2 || true)
+          if [ -n "$DIGEST" ]; then
+            echo "✅ Runtime digest: $DIGEST"
+            echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+            # Use digest reference for more reliable caching
+            echo "ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime@$DIGEST" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=$RUNTIME_REF" >> "$GITHUB_OUTPUT"
+          fi
+          echo "pulled=true" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js (ensure npm available in runner)
         uses: actions/setup-node@v4
@@ -498,6 +519,12 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        with:
+          # CRITICAL: Use docker driver to share image cache with pre-pulled runtime image
+          # The default docker-container driver has isolated cache and would re-pull the 500MB+ base image
+          # With docker driver, buildkit uses the local daemon's image store directly
+          # Trade-off: No registry cache support, but pre-pull saves 16+ minutes per agent build
+          driver: docker
 
       - name: Build and push image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
@@ -505,10 +532,10 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           platforms: linux/amd64
-          pull: true
+          # Don't re-pull - runtime image already in daemon cache from pre-pull step
+          pull: false
           push: true
           # Disable attestations - avoids GHCR permission issues for new packages
-          # and reduces complexity (attestations require id-token: write permission)
           provenance: false
           sbom: false
           tags: |
@@ -516,17 +543,12 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:v${{ steps.version.outputs.version }}
           build-args: |
             BUILDKIT_INLINE_CACHE=1
-            BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
+            BASE_IMAGE=${{ steps.runtime.outputs.ref }}
             VERSION=${{ steps.version.outputs.version }}
-          # Cache strategy: GHA cache (fast) + registry cache (persistent fallback)
-          # Registry cache survives even when no_cache=true (only disables GHA cache)
+          # docker driver doesn't support external cache backends (registry, gha)
+          # That's acceptable: the major win is avoiding re-pull of 500MB+ runtime base image
+          # Agent Dockerfiles are small (few RUN steps), so layer caching provides minimal benefit
           no-cache: ${{ inputs.no_cache == true }}
-          cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache
-            ${{ inputs.no_cache != true && format('type=gha,scope={0}', matrix.id) || '' }}
-          cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache,mode=max
-            ${{ inputs.no_cache != true && format('type=gha,scope={0},mode=max', matrix.id) || '' }}
 
       - name: Append summary
         run: |
