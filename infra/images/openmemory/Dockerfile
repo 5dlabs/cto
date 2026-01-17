@@ -22,6 +22,19 @@ RUN unzip /tmp/repo.zip -d /tmp && \
     cp -a /tmp/OpenMemory-main/. /src/ && \
     rm -rf /tmp/repo.zip /tmp/OpenMemory-main
 
+# ===== HEADERS STAGE =====
+# Download Node.js headers using ADD (uses buildkit daemon's DNS config)
+# This is needed because node-gyp (used by native modules like sqlite3) requires headers
+FROM alpine:3.21 AS headers
+
+# Get Node version to download matching headers
+# We use Node 22.x to match the oven/bun:1-alpine image's node version
+ARG NODE_VERSION=22.16.0
+ADD https://nodejs.org/download/release/v${NODE_VERSION}/node-v${NODE_VERSION}-headers.tar.gz /tmp/node-headers.tar.gz
+RUN mkdir -p /node-headers && \
+    tar -xzf /tmp/node-headers.tar.gz -C /node-headers --strip-components=1 && \
+    rm /tmp/node-headers.tar.gz
+
 # ===== BUILD STAGE =====
 # Use official Bun image which has Bun pre-installed (avoids DNS issues from curl install)
 FROM oven/bun:1-alpine AS builder
@@ -30,6 +43,14 @@ WORKDIR /app
 
 # Install system dependencies required for native module compilation
 RUN apk add --no-cache python3 make g++ nodejs npm
+
+# Copy pre-downloaded Node.js headers for native module compilation
+# This avoids DNS issues when node-gyp tries to download headers during bun install
+COPY --from=headers /node-headers /usr/local/node-headers
+
+# Set environment variables to tell node-gyp where to find headers
+# This prevents it from trying to download them from nodejs.org
+ENV npm_config_nodedir=/usr/local/node-headers
 
 # Copy the downloaded repository from the downloader stage
 COPY --from=downloader /src/packages/openmemory-js ./
