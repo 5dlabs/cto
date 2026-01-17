@@ -13,10 +13,12 @@ RUN apk add --no-cache libc6-compat git
 WORKDIR /app
 
 # Clone tweakcn repository with retry logic for resilience against transient network failures
+# Note: Verify clone succeeded after loop - sleep always returns 0, masking failures
 RUN for i in 1 2 3 4 5; do \
       git clone --depth 1 https://github.com/jnsahaj/tweakcn.git . && break || \
       echo "Git clone attempt $i failed, retrying in $((i * 5)) seconds..." && sleep $((i * 5)); \
-    done
+    done && \
+    [ -d .git ] || { echo "ERROR: Git clone failed after all retries"; exit 1; }
 
 # Install dependencies with pnpm (matches upstream package manager)
 RUN pnpm install --frozen-lockfile || pnpm install
