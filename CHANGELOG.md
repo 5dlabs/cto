@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.15](https://github.com/5dlabs/cto/compare/v0.2.14...v0.2.15) (2026-01-18)
+
+
+### ✨ Features
+
+* **tools:** add octocode MCP server for GitHub code search ([#3872](https://github.com/5dlabs/cto/issues/3872)) ([60d2a5c](https://github.com/5dlabs/cto/commit/60d2a5c334a45919895edaacec9f5efb0afa922d))
+
 ## [0.2.14](https://github.com/5dlabs/cto/compare/v0.2.13...v0.2.14) (2026-01-17)
 
 
