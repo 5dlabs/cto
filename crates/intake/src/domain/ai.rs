@@ -150,7 +150,8 @@ impl AIDomain {
             temperature: Some(0.7),
             max_tokens: Some(64_000),
             json_mode: true,
-            mcp_config: None, // Disable MCP to force JSON output
+            mcp_config: None,
+            disable_mcp: true, // Disable MCP to force pure JSON output
             ..Default::default()
         };
 

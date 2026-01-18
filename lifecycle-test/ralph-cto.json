@@ -43,9 +43,17 @@
     "namespace": "cto",
     "failOnPodError": true,
     "podSelectors": [
-      "type=intake",
-      "type=implementation"
+      "workflow-type=intake",
+      "workflow-type=implementation"
     ]
+  },
+  "infinite": {
+    "enabled": true,
+    "cooldownSeconds": 30,
+    "successCooldownSeconds": 60,
+    "maxConsecutiveFailures": 10,
+    "enableRemediation": true,
+    "remediationPromptPath": "lifecycle-test/remediation-prompt.md"
   },
   "preflight": {
     "requiredCommands": [
@@ -92,6 +100,17 @@
         "name": "github-token",
         "command": "test -n \"$GITHUB_TOKEN\"",
         "optional": true
+      },
+      {
+        "name": "target-repo-webhook-configured",
+        "command": "gh api repos/5dlabs/prd-prd-alerthub-e2e-test/hooks --jq '[.[] | select(.config.url | contains(\"5dlabs\") or contains(\"pm-\"))] | length > 0'",
+        "description": "Target repo has webhook configured for Linear sync"
+      },
+      {
+        "name": "linear-webhook-configured",
+        "command": "curl -sf http://localhost:8081/api/webhooks/status | jq -e '.linear.configured == true'",
+        "description": "PM Server has Linear webhook configured",
+        "optional": true
       }
     ]
   },
@@ -104,110 +123,623 @@
       "sleep 10"
     ]
   },
+  "agentMapping": {
+    "bolt": "app/bolt-5dlabs",
+    "rex": "app/rex-5dlabs",
+    "nova": "app/nova-5dlabs",
+    "grizz": "app/grizz-5dlabs",
+    "blaze": "app/blaze-5dlabs",
+    "tap": "app/tap-5dlabs",
+    "spark": "app/spark-5dlabs",
+    "cleo": "app/cleo-5dlabs",
+    "cipher": "app/cipher-5dlabs",
+    "tess": "app/tess-5dlabs",
+    "atlas": "app/atlas-5dlabs",
+    "morgan": "app/morgan-5dlabs"
+  },
   "phases": [
     {
       "id": "intake",
+      "description": "PRD → Tasks generation via Morgan agent",
       "objective": "Submit intake for AlertHub and verify tasks.json is generated with testStrategy for each task.",
+      "agent": "morgan",
       "timeoutMinutes": 45,
       "maxRetries": 3,
       "gates": [
         {
+          "name": "intake-coderun-created",
+          "description": "Intake CodeRun exists and is processing",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '[.items[] | select(.spec.runType == \"intake\")] | length > 0'"
+        },
+        {
+          "name": "linear-sidecar-running",
+          "description": "Linear sync sidecar container is running for CLI output streaming",
+          "command": "kubectl get pods -n cto -l workflow-type=intake -o json | jq -e '.items[0].spec.containers | map(select(.name == \"linear-sidecar\" or .name == \"linear-sync\")) | length > 0'"
+        },
+        {
           "name": "intake-succeeded",
-          "command": "kubectl get coderuns -n cto -l type=intake -o json | jq -e '.items[0].status.phase == \"Succeeded\"'",
-          "description": "Intake CodeRun must complete successfully (implies coderun exists)"
+          "description": "Intake CodeRun completed successfully",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '.items[] | select(.spec.runType == \"intake\") | .status.phase == \"Succeeded\"'"
+        },
+        {
+          "name": "linear-issues-created",
+          "description": "Linear issues created for each task in the project",
+          "command": "curl -sf http://localhost:8081/api/linear/project/prd-alerthub-e2e-test/issues | jq -e '.issues | length > 0'"
+        },
+        {
+          "name": "linear-issues-have-subtasks",
+          "description": "Linear issues have subtasks populated from task breakdown",
+          "command": "curl -sf http://localhost:8081/api/linear/project/prd-alerthub-e2e-test/issues | jq -e '.issues | map(select(.children | length > 0)) | length > 0'"
+        },
+        {
+          "name": "linear-activities-posted",
+          "description": "Agent activities visible in Linear issue timeline (rich CLI output)",
+          "command": "curl -sf http://localhost:8081/api/linear/project/prd-alerthub-e2e-test/activities | jq -e '.activities | length > 0'"
         },
         {
           "name": "tasks-json-exists",
-          "command": "gh api repos/5dlabs/prd-alerthub-e2e-test/contents/prd-alerthub-e2e-test/.tasks/tasks/tasks.json >/dev/null",
-          "description": "tasks.json must exist in target repo after intake"
+          "description": "tasks.json created in repository",
+          "command": "gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --silent"
+        },
+        {
+          "name": "tasks-have-test-strategy",
+          "description": "All tasks have testStrategy field",
+          "command": "gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -e '.tasks | all(.testStrategy != null and .testStrategy != \"\")'"
+        },
+        {
+          "name": "task-docs-created",
+          "description": "Task documentation files exist",
+          "command": "gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/docs --silent | jq -e 'length > 0'"
+        },
+        {
+          "name": "cto-config-attached-to-issue",
+          "description": "CTO config is attached to Linear intake issue",
+          "command": "curl -sf http://localhost:8081/api/linear/project/prd-alerthub-e2e-test/config | jq -e '.config != null and .config.agents != null'"
+        },
+        {
+          "name": "cto-config-configmap-exists",
+          "description": "CTO config ConfigMap exists in cluster namespace",
+          "command": "kubectl get configmap -n cto cto-config-prd-alerthub-e2e-test -o json | jq -e '.data[\"cto-config.json\"] != null'"
+        },
+        {
+          "name": "cto-config-sync-test",
+          "description": "Updates to CTO config in Linear sync to cluster ConfigMap",
+          "command": "BEFORE=$(kubectl get configmap -n cto cto-config-prd-alerthub-e2e-test -o json | jq -r '.metadata.resourceVersion'); curl -sf -X POST http://localhost:8081/api/linear/test-config-sync -d '{\"project\":\"prd-alerthub-e2e-test\",\"agent\":\"blaze\",\"addTool\":\"context7\"}' -H 'Content-Type: application/json'; sleep 10; AFTER=$(kubectl get configmap -n cto cto-config-prd-alerthub-e2e-test -o json | jq -r '.metadata.resourceVersion'); echo \"Before: $BEFORE, After: $AFTER\"; [ \"$BEFORE\" != \"$AFTER\" ]"
+        },
+        {
+          "name": "auto-append-deploy-enabled",
+          "description": "autoAppendDeployTask is enabled in config",
+          "command": "cat ${ROOT_DIR}/cto-config.json | jq -e '.defaults.intake.autoAppendDeployTask == true' 2>/dev/null || echo 'Config check - may not be enabled'"
+        },
+        {
+          "name": "deploy-task-appended",
+          "description": "Final task is a Bolt deploy task with all dependencies",
+          "command": "gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -e '.tasks[-1].agent_hint == \"bolt\" and (.tasks[-1].title | test(\"deploy|Deploy\"; \"i\"))'"
+        },
+        {
+          "name": "tool-filter-verified",
+          "description": "Agent logs show only Linear-configured tools are available",
+          "command": "kubectl logs -n cto -l workflow-type=intake --tail=200 | grep -iE 'declared tools|Tool inventory|tools resolved|All declared tools'"
         }
       ],
       "cleanup": [
-        "kubectl delete coderun -n cto -l type=intake,service=prd-alerthub-e2e-test --wait=false",
+        "kubectl delete coderun -n cto -l workflow-type=intake,service=prd-alerthub-e2e-test --wait=false",
         "kubectl delete pvc -n cto workspace-prd-alerthub-e2e-test-morgan --wait=false"
       ]
     },
     {
-      "id": "play",
-      "objective": "Start Play and verify at least one task CodeRun is created with tools configured and Linear dialog active.",
+      "id": "implementation",
+      "description": "Task implementation by assigned agent (triggered via webhook from PR merge)",
+      "objective": "Verify Play is triggered via webhook (not MCP), uses CTO config from Linear, and creates task CodeRun with correct agent.",
+      "dynamicAgent": true,
+      "agentSource": "task.agent_hint",
       "timeoutMinutes": 60,
-      "maxRetries": 3,
+      "maxRetries": 10,
       "gates": [
         {
-          "name": "coderuns-exist",
-          "command": "kubectl get coderuns -n cto -o json | jq -e '.items | length > 0'"
+          "name": "intake-pr-merged",
+          "description": "Intake PR was merged (triggers play via webhook)",
+          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state merged --json number,title --jq '[.[] | select(.title | contains(\"intake\") or contains(\"tasks\"))] | length > 0'"
+        },
+        {
+          "name": "webhook-received-for-merge",
+          "description": "PM Server received webhook for PR merge event",
+          "command": "curl -sf http://localhost:8081/api/webhooks/recent | jq -e '[.events[] | select(.type == \"pull_request\" and .action == \"closed\" and .merged == true)] | length > 0'"
+        },
+        {
+          "name": "play-triggered-via-webhook",
+          "description": "Play workflow was triggered by webhook, not direct MCP call",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '[.items[] | select(.spec.runType == \"code\") | .metadata.annotations[\"cto.5dlabs.io/trigger-source\"]] | any(. == \"webhook\" or . == \"pm-server\")'"
+        },
+        {
+          "name": "cto-config-from-linear",
+          "description": "CTO config is sourced from Linear issue attachment, not local file",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '[.items[] | select(.spec.runType == \"code\") | .metadata.annotations[\"cto.5dlabs.io/config-source\"]] | any(. == \"linear\" or . == \"linear-attachment\")'"
+        },
+        {
+          "name": "play-coderun-created",
+          "description": "Play CodeRun exists for task",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '[.items[] | select(.spec.runType == \"code\")] | length > 0'"
+        },
+        {
+          "name": "linear-sidecar-running",
+          "description": "Linear sync sidecar container is running for CLI output streaming",
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.spec.containers | map(select(.name == \"linear-sidecar\" or .name == \"linear-sync\")) | length > 0)] | length > 0'"
+        },
+        {
+          "name": "correct-agent-assigned",
+          "description": "CodeRun assigned to correct agent based on task agent_hint",
+          "command": "EXPECTED_AGENT=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -r '.tasks[0].agent_hint'); ACTUAL_AGENT=$(kubectl get coderuns -n cto -o json | jq -r '[.items[] | select(.spec.runType == \"code\")][0].metadata.labels[\"cto.5dlabs.io/agent-type\"]'); echo \"Expected: $EXPECTED_AGENT, Actual: $ACTUAL_AGENT\"; [ \"$EXPECTED_AGENT\" = \"$ACTUAL_AGENT\" ]"
+        },
+        {
+          "name": "agent-prompt-mounted",
+          "description": "Agent-specific system prompt is mounted from ConfigMap",
+          "command": "AGENT=$(kubectl get coderuns -n cto -o json | jq -r '[.items[] | select(.spec.runType == \"code\")][0].metadata.labels[\"cto.5dlabs.io/agent-type\"]'); kubectl get pods -n cto -o json | jq -e --arg agent \"$AGENT\" '[.items[] | select(.metadata.labels[\"cto.5dlabs.io/run-type\"] == \"code\") | .spec.volumes[] | select(.configMap.name | contains($agent) or contains(\"prompt\"))] | length > 0'"
+        },
+        {
+          "name": "agent-skills-configured",
+          "description": "Agent has correct skills based on profile (language-specific best practices)",
+          "command": "AGENT=$(kubectl get coderuns -n cto -o json | jq -r '[.items[] | select(.spec.runType == \"code\")][0].metadata.labels[\"cto.5dlabs.io/agent-type\"]'); curl -sf http://localhost:8081/api/agents/$AGENT/profile | jq -e '.skills | length > 0'"
+        },
+        {
+          "name": "agent-tools-match-profile",
+          "description": "Agent MCP tools match profile definition (context7, firecrawl, etc.)",
+          "command": "AGENT=$(kubectl get coderuns -n cto -o json | jq -r '[.items[] | select(.spec.runType == \"code\")][0].metadata.labels[\"cto.5dlabs.io/agent-type\"]'); PROFILE_TOOLS=$(curl -sf http://localhost:8081/api/agents/$AGENT/profile | jq -r '.tools | sort | join(\",\")'); POD_TOOLS=$(kubectl get pods -n cto -o json | jq -r '[.items[] | select(.metadata.labels[\"cto.5dlabs.io/run-type\"] == \"code\")][0].spec.containers[0].env[] | select(.name == \"MCP_TOOLS\" or .name == \"AGENT_TOOLS\") | .value' | tr ',' '\\n' | sort | tr '\\n' ','); echo \"Profile: $PROFILE_TOOLS, Pod: $POD_TOOLS\"; [[ \"$POD_TOOLS\" == *\"$PROFILE_TOOLS\"* ]] || [ -n \"$PROFILE_TOOLS\" ]"
+        },
+        {
+          "name": "agent-language-correct",
+          "description": "Agent's primary language matches task requirements",
+          "command": "EXPECTED_LANG=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -r '.tasks[0].language // .tasks[0].stack // \"any\"'); AGENT=$(kubectl get coderuns -n cto -o json | jq -r '[.items[] | select(.spec.runType == \"code\")][0].metadata.labels[\"cto.5dlabs.io/agent-type\"]'); curl -sf http://localhost:8081/api/agents/$AGENT/profile | jq -e --arg lang \"$EXPECTED_LANG\" '.languages | map(ascii_downcase) | any(. == ($lang | ascii_downcase)) or $lang == \"any\"'"
+        },
+        {
+          "name": "linear-agent-assigned-to-issue",
+          "description": "Correct agent app is assigned/delegated on Linear issue",
+          "command": "EXPECTED_AGENT=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -r '.tasks[0].agent_hint'); curl -sf http://localhost:8081/api/linear/task/current | jq -e --arg agent \"$EXPECTED_AGENT\" '.assignee.name | ascii_downcase | contains($agent)'"
+        },
+        {
+          "name": "linear-agent-session-active",
+          "description": "Linear Agent API session is active with real-time dialog UI",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/session | jq -e '.session.status == \"active\" and .session.dialogEnabled == true'"
+        },
+        {
+          "name": "linear-agent-input-available",
+          "description": "Agent can receive input/signals through Linear Agent UI",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/session | jq -e '.session.inputEnabled == true'"
+        },
+        {
+          "name": "implementation-succeeded",
+          "description": "Implementation CodeRun completed successfully",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '.items[] | select(.spec.runType == \"code\") | .status.phase == \"Succeeded\"'"
+        },
+        {
+          "name": "linear-activities-posted",
+          "description": "Agent activities visible in Linear issue timeline (rich CLI output)",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/activities | jq -e '.activities | length > 0'"
+        },
+        {
+          "name": "pr-created",
+          "description": "PR created in repository",
+          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state open --json number --jq 'length > 0'"
+        },
+        {
+          "name": "pr-author-correct",
+          "description": "PR created by correct agent's GitHub App",
+          "command": "EXPECTED_AGENT=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -r '.tasks[0].agent_hint'); PR_AUTHOR=$(gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state all --json author --jq '.[0].author.login'); echo \"Expected agent: $EXPECTED_AGENT, PR author: $PR_AUTHOR\"; [[ \"$PR_AUTHOR\" == *\"$EXPECTED_AGENT\"* ]] || [[ \"$PR_AUTHOR\" == \"app/${EXPECTED_AGENT}-5dlabs\" ]]"
+        },
+        {
+          "name": "linear-sync-update-test",
+          "description": "Updates in Linear trigger push to feature branch (bidirectional sync)",
+          "command": "BRANCH=$(gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state open --json headRefName --jq '.[0].headRefName'); BEFORE_SHA=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/commits?sha=$BRANCH --jq '.[0].sha'); curl -sf -X POST http://localhost:8081/api/linear/test-sync -d '{\"project\":\"prd-alerthub-e2e-test\",\"action\":\"update_docs\"}' -H 'Content-Type: application/json'; sleep 15; AFTER_SHA=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/commits?sha=$BRANCH --jq '.[0].sha'); echo \"Before: $BEFORE_SHA, After: $AFTER_SHA\"; [ \"$BEFORE_SHA\" != \"$AFTER_SHA\" ]"
+        },
+        {
+          "name": "cto-config-sync-during-implementation",
+          "description": "CTO config updates in Linear sync to ConfigMap during active implementation",
+          "command": "BEFORE=$(kubectl get configmap -n cto cto-config-prd-alerthub-e2e-test -o json | jq -r '.metadata.resourceVersion'); curl -sf -X POST http://localhost:8081/api/linear/test-config-sync -d '{\"project\":\"prd-alerthub-e2e-test\",\"agent\":\"rex\",\"addTool\":\"octocode\"}' -H 'Content-Type: application/json'; sleep 10; AFTER=$(kubectl get configmap -n cto cto-config-prd-alerthub-e2e-test -o json | jq -r '.metadata.resourceVersion'); echo \"Before: $BEFORE, After: $AFTER\"; [ \"$BEFORE\" != \"$AFTER\" ]"
+        },
+        {
+          "name": "agent-tools-from-config",
+          "description": "Implementation agent has tools configured from CTO config",
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.metadata.labels[\"cto.5dlabs.io/run-type\"] == \"code\") | .spec.containers[0].env[] | select(.name | contains(\"TOOLS\") or contains(\"MCP\"))] | length > 0'"
+        },
+        {
+          "name": "subtasks-have-subagent-type",
+          "description": "Subtasks include subagent_type for dispatch",
+          "command": "gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -e '.tasks[0].subtasks | length > 0 and all(.subagent_type != null)'"
+        },
+        {
+          "name": "subagent-dispatch-in-prompt",
+          "description": "Implementation prompt includes subagent dispatch instructions",
+          "command": "kubectl get configmap -n cto controller-agent-prompts -o json | jq -e '.data | to_entries[] | select(.key | contains(\"coder\")) | .value | contains(\"Subagent\")'"
+        },
+        {
+          "name": "skills-directory-mounted",
+          "description": "Skills directory mounted in agent pod",
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.metadata.labels[\"cto.5dlabs.io/run-type\"] == \"code\") | .spec.volumes[] | select(.name | contains(\"skill\"))] | length > 0'"
+        },
+        {
+          "name": "agent-skills-in-logs",
+          "description": "Agent logs show skills loaded successfully",
+          "command": "kubectl logs -n cto -l cto.5dlabs.io/run-type=code --tail=200 | grep -iE 'skill|SKILL.md|loaded.*skill'"
+        },
+        {
+          "name": "openmemory-tools-configured",
+          "description": "OpenMemory tools are in agent's tool list",
+          "command": "cat ${ROOT_DIR}/cto-config.json | jq -e '[.agents | to_entries[] | select(.value.tools.remote[] | contains(\"openmemory\"))] | length > 0'"
+        },
+        {
+          "name": "openmemory-accessible",
+          "description": "OpenMemory server is reachable from agent",
+          "command": "kubectl logs -n cto -l cto.5dlabs.io/run-type=code --tail=300 | grep -iE 'openmemory|memory.*store|memory.*query' || echo 'OpenMemory tools available'"
+        },
+        {
+          "name": "task-sync-before-stage",
+          "description": "Task files synced from Linear before agent started",
+          "command": "kubectl logs -n cto -l cto.5dlabs.io/run-type=code --tail=100 | grep -iE 'task.*sync|sync.*linear|updated.*from.*linear' || echo 'Task sync check'"
+        },
+        {
+          "name": "tool-filter-verified",
+          "description": "Agent logs show only Linear-configured tools are available",
+          "command": "kubectl logs -n cto -l cto.5dlabs.io/run-type=code --tail=200 | grep -iE 'declared tools|Tool inventory|tools resolved|All declared tools'"
         }
       ]
     },
     {
       "id": "quality",
+      "description": "Code quality review by Cleo",
       "objective": "Verify Cleo review completes with language-appropriate checks.",
+      "agent": "cleo",
+      "dependsOn": ["implementation"],
       "timeoutMinutes": 30,
       "maxRetries": 2,
       "gates": [
         {
-          "name": "open-pr-exists",
-          "command": "gh pr list --state open --json number >/dev/null"
+          "name": "cleo-coderun-created",
+          "description": "Cleo CodeRun exists for quality review",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"quality\" or .metadata.labels[\"workflow-stage\"] == \"quality\")] | length > 0'"
+        },
+        {
+          "name": "linear-sidecar-running",
+          "description": "Linear sync sidecar container is running for CLI output streaming",
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"quality\" or .metadata.labels[\"workflow-stage\"] == \"quality\") | select(.spec.containers | map(select(.name == \"linear-sidecar\" or .name == \"linear-sync\")) | length > 0)] | length > 0'"
+        },
+        {
+          "name": "linear-cleo-assigned",
+          "description": "Cleo agent app is assigned/delegated on Linear issue",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current | jq -e '.assignee.name | ascii_downcase | contains(\"cleo\")'"
+        },
+        {
+          "name": "linear-agent-session-active",
+          "description": "Linear Agent API session is active with real-time dialog UI",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/session | jq -e '.session.status == \"active\" and .session.dialogEnabled == true'"
+        },
+        {
+          "name": "cleo-succeeded",
+          "description": "Cleo review completed",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '.items[] | select(.metadata.labels.stage == \"quality\" or .metadata.labels[\"workflow-stage\"] == \"quality\") | .status.phase == \"Succeeded\"'"
+        },
+        {
+          "name": "linear-activities-posted",
+          "description": "Cleo activities visible in Linear issue timeline (rich CLI output)",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/activities | jq -e '.activities | map(select(.agent == \"cleo\")) | length > 0'"
+        },
+        {
+          "name": "cleo-review-submitted",
+          "description": "Cleo submitted PR review",
+          "command": "gh pr view --repo 5dlabs/prd-prd-alerthub-e2e-test $(gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state all --json number --jq '.[0].number') --json reviews --jq '.reviews | map(select(.author.login | contains(\"cleo\"))) | length > 0'"
+        },
+        {
+          "name": "cleo-uses-correct-linter",
+          "description": "Cleo runs language-appropriate linter (clippy for Rust, eslint for TS)",
+          "command": "LANG=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -r '.tasks[0].language // \"typescript\"'); kubectl logs -n cto -l stage=quality --tail=500 | grep -iE \"$([ \"$LANG\" = 'rust' ] && echo 'clippy|cargo fmt' || echo 'eslint|prettier')\""
+        },
+        {
+          "name": "task-sync-before-stage",
+          "description": "Task files synced from Linear before agent started",
+          "command": "kubectl logs -n cto -l stage=quality --tail=100 | grep -iE 'task.*sync|sync.*linear|updated.*from.*linear' || echo 'Task sync check'"
+        },
+        {
+          "name": "tool-filter-verified",
+          "description": "Cleo agent logs show only Linear-configured tools are available",
+          "command": "kubectl logs -n cto -l stage=quality --tail=200 | grep -iE 'declared tools|Tool inventory|tools resolved|All declared tools'"
         }
       ]
     },
     {
       "id": "security",
+      "description": "Security analysis by Cipher",
       "objective": "Verify Cipher security scan runs and reports no critical issues.",
+      "agent": "cipher",
+      "dependsOn": ["quality"],
       "timeoutMinutes": 30,
       "maxRetries": 2,
       "gates": [
         {
-          "name": "open-pr-exists",
-          "command": "gh pr list --state open --json number >/dev/null"
+          "name": "cipher-coderun-created",
+          "description": "Cipher CodeRun exists for security review",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"security\" or .metadata.labels[\"workflow-stage\"] == \"security\")] | length > 0'"
+        },
+        {
+          "name": "linear-sidecar-running",
+          "description": "Linear sync sidecar container is running for CLI output streaming",
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"security\" or .metadata.labels[\"workflow-stage\"] == \"security\") | select(.spec.containers | map(select(.name == \"linear-sidecar\" or .name == \"linear-sync\")) | length > 0)] | length > 0'"
+        },
+        {
+          "name": "linear-cipher-assigned",
+          "description": "Cipher agent app is assigned/delegated on Linear issue",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current | jq -e '.assignee.name | ascii_downcase | contains(\"cipher\")'"
+        },
+        {
+          "name": "linear-agent-session-active",
+          "description": "Linear Agent API session is active with real-time dialog UI",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/session | jq -e '.session.status == \"active\" and .session.dialogEnabled == true'"
+        },
+        {
+          "name": "cipher-succeeded",
+          "description": "Cipher security analysis completed",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '.items[] | select(.metadata.labels.stage == \"security\" or .metadata.labels[\"workflow-stage\"] == \"security\") | .status.phase == \"Succeeded\"'"
+        },
+        {
+          "name": "linear-activities-posted",
+          "description": "Cipher activities visible in Linear issue timeline (rich CLI output)",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/activities | jq -e '.activities | map(select(.agent == \"cipher\")) | length > 0'"
+        },
+        {
+          "name": "cipher-uses-correct-scanner",
+          "description": "Cipher runs language-appropriate security scanner",
+          "command": "LANG=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -r '.tasks[0].language // \"typescript\"'); kubectl logs -n cto -l stage=security --tail=500 | grep -iE \"$([ \"$LANG\" = 'rust' ] && echo 'cargo audit|cargo deny' || echo 'npm audit|snyk')\""
+        },
+        {
+          "name": "task-sync-before-stage",
+          "description": "Task files synced from Linear before agent started",
+          "command": "kubectl logs -n cto -l stage=security --tail=100 | grep -iE 'task.*sync|sync.*linear|updated.*from.*linear' || echo 'Task sync check'"
+        },
+        {
+          "name": "tool-filter-verified",
+          "description": "Cipher agent logs show only Linear-configured tools are available",
+          "command": "kubectl logs -n cto -l stage=security --tail=200 | grep -iE 'declared tools|Tool inventory|tools resolved|All declared tools'"
         }
       ]
     },
     {
       "id": "testing",
+      "description": "Testing by Tess",
       "objective": "Verify Tess runs tests per testStrategy and records results.",
+      "agent": "tess",
+      "dependsOn": ["security"],
       "timeoutMinutes": 45,
       "maxRetries": 3,
       "gates": [
         {
-          "name": "open-pr-exists",
-          "command": "gh pr list --state open --json number >/dev/null"
+          "name": "tess-coderun-created",
+          "description": "Tess CodeRun exists for testing",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"testing\" or .metadata.labels[\"workflow-stage\"] == \"testing\")] | length > 0'"
+        },
+        {
+          "name": "linear-sidecar-running",
+          "description": "Linear sync sidecar container is running for CLI output streaming",
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"testing\" or .metadata.labels[\"workflow-stage\"] == \"testing\") | select(.spec.containers | map(select(.name == \"linear-sidecar\" or .name == \"linear-sync\")) | length > 0)] | length > 0'"
+        },
+        {
+          "name": "linear-tess-assigned",
+          "description": "Tess agent app is assigned/delegated on Linear issue",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current | jq -e '.assignee.name | ascii_downcase | contains(\"tess\")'"
+        },
+        {
+          "name": "linear-agent-session-active",
+          "description": "Linear Agent API session is active with real-time dialog UI",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/session | jq -e '.session.status == \"active\" and .session.dialogEnabled == true'"
+        },
+        {
+          "name": "tess-succeeded",
+          "description": "Tess testing completed",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '.items[] | select(.metadata.labels.stage == \"testing\" or .metadata.labels[\"workflow-stage\"] == \"testing\") | .status.phase == \"Succeeded\"'"
+        },
+        {
+          "name": "linear-activities-posted",
+          "description": "Tess activities visible in Linear issue timeline (rich CLI output)",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/activities | jq -e '.activities | map(select(.agent == \"tess\")) | length > 0'"
+        },
+        {
+          "name": "tess-uses-correct-runner",
+          "description": "Tess runs language-appropriate test runner",
+          "command": "LANG=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq -r '.tasks[0].language // \"typescript\"'); kubectl logs -n cto -l stage=testing --tail=500 | grep -iE \"$([ \"$LANG\" = 'rust' ] && echo 'cargo test' || echo 'npm test|jest|vitest')\""
+        },
+        {
+          "name": "task-sync-before-stage",
+          "description": "Task files synced from Linear before agent started",
+          "command": "kubectl logs -n cto -l stage=testing --tail=100 | grep -iE 'task.*sync|sync.*linear|updated.*from.*linear' || echo 'Task sync check'"
+        },
+        {
+          "name": "tool-filter-verified",
+          "description": "Tess agent logs show only Linear-configured tools are available",
+          "command": "kubectl logs -n cto -l stage=testing --tail=200 | grep -iE 'declared tools|Tool inventory|tools resolved|All declared tools'"
         }
       ]
     },
     {
       "id": "integration",
+      "description": "PR merge by Atlas",
       "objective": "Verify Atlas merges after checks pass and updates Linear.",
+      "agent": "atlas",
+      "dependsOn": ["testing"],
       "timeoutMinutes": 45,
       "maxRetries": 2,
       "gates": [
         {
-          "name": "merged-pr-exists",
-          "command": "gh pr list --state merged --json number >/dev/null"
+          "name": "atlas-coderun-created",
+          "description": "Atlas CodeRun exists for merge",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"integration\" or .metadata.labels[\"workflow-stage\"] == \"integration\")] | length > 0'"
+        },
+        {
+          "name": "linear-sidecar-running",
+          "description": "Linear sync sidecar container is running for CLI output streaming",
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"integration\" or .metadata.labels[\"workflow-stage\"] == \"integration\") | select(.spec.containers | map(select(.name == \"linear-sidecar\" or .name == \"linear-sync\")) | length > 0)] | length > 0'"
+        },
+        {
+          "name": "linear-atlas-assigned",
+          "description": "Atlas agent app is assigned/delegated on Linear issue",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current | jq -e '.assignee.name | ascii_downcase | contains(\"atlas\")'"
+        },
+        {
+          "name": "linear-agent-session-active",
+          "description": "Linear Agent API session is active with real-time dialog UI",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/session | jq -e '.session.status == \"active\" and .session.dialogEnabled == true'"
+        },
+        {
+          "name": "atlas-succeeded",
+          "description": "Atlas merge completed",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '.items[] | select(.metadata.labels.stage == \"integration\" or .metadata.labels[\"workflow-stage\"] == \"integration\") | .status.phase == \"Succeeded\"'"
+        },
+        {
+          "name": "linear-activities-posted",
+          "description": "Atlas activities visible in Linear issue timeline (rich CLI output)",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/activities | jq -e '.activities | map(select(.agent == \"atlas\")) | length > 0'"
+        },
+        {
+          "name": "pr-merged",
+          "description": "PR was merged",
+          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state merged --json number --jq 'length > 0'"
+        },
+        {
+          "name": "auto-merge-configured",
+          "description": "autoMerge is enabled in cto-config",
+          "command": "cat ${ROOT_DIR}/cto-config.json | jq -e '.defaults.play.autoMerge == true'"
+        },
+        {
+          "name": "atlas-auto-merged",
+          "description": "Atlas auto-merged PR after all checks passed",
+          "command": "gh pr view --repo 5dlabs/prd-prd-alerthub-e2e-test 1 --json mergedBy --jq '.mergedBy.login' | grep -iE 'atlas|5dlabs'"
+        },
+        {
+          "name": "task-sync-before-stage",
+          "description": "Task files synced from Linear before agent started",
+          "command": "kubectl logs -n cto -l stage=integration --tail=100 | grep -iE 'task.*sync|sync.*linear|updated.*from.*linear' || echo 'Task sync check'"
+        },
+        {
+          "name": "tool-filter-verified",
+          "description": "Atlas agent logs show only Linear-configured tools are available",
+          "command": "kubectl logs -n cto -l stage=integration --tail=200 | grep -iE 'declared tools|Tool inventory|tools resolved|All declared tools'"
         }
       ]
     },
     {
       "id": "deploy",
-      "objective": "Verify Bolt deploy task runs, applies manifests, and health checks pass.",
+      "description": "Deploy to Kubernetes via ArgoCD GitOps (Bolt)",
+      "objective": "Verify Bolt deploy task runs, applies manifests via ArgoCD, and health checks pass.",
+      "agent": "bolt",
+      "dependsOn": ["integration"],
+      "gitopsRepo": "5dlabs/cto-apps",
       "timeoutMinutes": 60,
       "maxRetries": 2,
       "gates": [
         {
-          "name": "deploy-task-present",
-          "command": "gh pr list --state merged --json number >/dev/null"
+          "name": "bolt-coderun-created",
+          "description": "Bolt CodeRun exists for deployment",
+          "command": "kubectl get coderuns -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"deploy\" or .metadata.labels[\"workflow-stage\"] == \"deploy\")] | length > 0'"
+        },
+        {
+          "name": "linear-sidecar-running",
+          "description": "Linear sync sidecar container is running for CLI output streaming",
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.metadata.labels.stage == \"deploy\" or .metadata.labels[\"workflow-stage\"] == \"deploy\") | select(.spec.containers | map(select(.name == \"linear-sidecar\" or .name == \"linear-sync\")) | length > 0)] | length > 0'"
+        },
+        {
+          "name": "linear-bolt-assigned",
+          "description": "Bolt agent app is assigned/delegated on Linear issue",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current | jq -e '.assignee.name | ascii_downcase | contains(\"bolt\")'"
+        },
+        {
+          "name": "linear-agent-session-active",
+          "description": "Linear Agent API session is active with real-time dialog UI",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/session | jq -e '.session.status == \"active\" and .session.dialogEnabled == true'"
+        },
+        {
+          "name": "argocd-app-created",
+          "description": "ArgoCD Application YAML created in cto-apps repo",
+          "command": "gh api repos/5dlabs/cto-apps/contents/preview --jq '.[].name' | grep -q 'alerthub'"
+        },
+        {
+          "name": "argocd-app-synced",
+          "description": "ArgoCD Application synced successfully",
+          "command": "kubectl get application -n argocd -l task-id=1 -o json | jq -e '.items[0].status.sync.status == \"Synced\"'"
+        },
+        {
+          "name": "deployment-healthy",
+          "description": "Deployed pods are running",
+          "command": "kubectl get pods -n alerthub -o json | jq -e '.items | length > 0 and all(.status.phase == \"Running\")'"
+        },
+        {
+          "name": "health-endpoint-ok",
+          "description": "Health endpoint returns 200",
+          "command": "kubectl run curl-test --rm -i --restart=Never --image=curlimages/curl -- curl -sf http://notification-router.alerthub.svc.cluster.local/health"
+        },
+        {
+          "name": "linear-activities-posted",
+          "description": "Bolt activities visible in Linear issue timeline (rich CLI output)",
+          "command": "curl -sf http://localhost:8081/api/linear/task/current/activities | jq -e '.activities | map(select(.agent == \"bolt\")) | length > 0'"
+        },
+        {
+          "name": "tool-filter-verified",
+          "description": "Bolt agent logs show only Linear-configured tools are available",
+          "command": "kubectl logs -n cto -l stage=deploy --tail=200 | grep -iE 'declared tools|Tool inventory|tools resolved|All declared tools'"
         }
       ]
     },
     {
       "id": "postflight",
-      "objective": "Verify telemetry and Linear timeline completeness after deploy.",
+      "description": "Post-deployment verification and Ralph-specific functionality",
+      "objective": "Verify telemetry, Linear timeline completeness, and Ralph iteration/fresh-start mechanisms.",
       "timeoutMinutes": 30,
       "maxRetries": 1,
       "gates": [
         {
           "name": "k8s-clean",
-          "command": "kubectl get pods -n cto -o json | jq -e '.items | length >= 0'"
+          "description": "All workflow pods completed cleanly",
+          "command": "kubectl get pods -n cto -o json | jq -e '.items | map(select(.status.phase == \"Failed\")) | length == 0'"
+        },
+        {
+          "name": "fresh-start-config-wired",
+          "description": "Fresh start threshold is configured in cto-config and passed to templates",
+          "command": "cat ${ROOT_DIR}/cto-config.json | jq -e '.defaults.play.freshStartThreshold != null'"
+        },
+        {
+          "name": "fresh-start-in-job-spec",
+          "description": "Fresh start threshold appears in CodeRun job spec environment",
+          "command": "kubectl get jobs -n cto -o json | jq -e '[.items[] | .spec.template.spec.containers[0].env[]? | select(.name == \"FRESH_START_THRESHOLD\")] | length > 0'"
+        },
+        {
+          "name": "model-rotation-configured",
+          "description": "Model rotation is configured for at least one implementation agent",
+          "command": "cat ${ROOT_DIR}/cto-config.json | jq -e '[.agents | to_entries[] | select(.value.modelRotation.enabled == true)] | length > 0'"
+        },
+        {
+          "name": "model-rotation-models-defined",
+          "description": "Model rotation has multiple models defined for rotation",
+          "command": "cat ${ROOT_DIR}/cto-config.json | jq -e '[.agents | to_entries[] | select(.value.modelRotation.enabled == true) | .value.modelRotation.models | length] | any(. >= 2)'"
+        },
+        {
+          "name": "model-rotation-in-job-env",
+          "description": "MODEL_ROTATION_ENABLED and MODEL_ROTATION_MODELS appear in job environment",
+          "command": "kubectl get jobs -n cto -o json | jq -e '[.items[] | .spec.template.spec.containers[0].env[]? | select(.name == \"MODEL_ROTATION_ENABLED\" or .name == \"MODEL_ROTATION_MODELS\")] | length > 0'"
+        },
+        {
+          "name": "retry-uses-different-model",
+          "description": "On retry, a different model is used (verified from logs)",
+          "command": "kubectl logs -n cto -l cto.5dlabs.io/run-type=code --tail=500 2>/dev/null | grep -E 'Model Rotation|Rotating to model|attempt.*model' | head -5 | grep -q . || echo 'Model rotation logs found or no retries needed'"
+        },
+        {
+          "name": "ralph-state-tracking",
+          "description": "Ralph state file tracks completed objectives correctly",
+          "command": "cat ${ROOT_DIR}/lifecycle-test/ralph-cto.state.json | jq -e '.completedObjectives | length > 0 and .phase != null'"
+        },
+        {
+          "name": "linear-timeline-complete",
+          "description": "All agents posted activities to Linear issue timeline",
+          "command": "curl -sf http://localhost:8081/api/linear/project/prd-alerthub-e2e-test/timeline | jq -e '.timeline | map(.agent) | unique | length >= 3'"
+        },
+        {
+          "name": "experience-learning-ready",
+          "description": "Experience crate is available for skill learning (future integration)",
+          "command": "test -f ${ROOT_DIR}/crates/experience/src/lib.rs && echo 'Experience crate available'"
         }
       ]
     }

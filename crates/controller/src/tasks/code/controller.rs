@@ -162,6 +162,46 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
     let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
     let configmaps: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
     let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+
+    // CRITICAL: If the cached CodeRun shows "Running" but has no job_name, the cache is stale.
+    // The status subresource update with job_name may not have propagated to the informer cache.
+    // Fetch the latest CodeRun from the API to get the correct job_name.
+    let code_run = if code_run
+        .status
+        .as_ref()
+        .is_some_and(|s| s.phase == "Running" && s.job_name.is_none())
+    {
+        debug!(
+            "Cached CodeRun {} has Running phase but no job_name - fetching fresh copy from API",
+            code_run.name_any()
+        );
+        let coderuns_api: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+        match coderuns_api.get(&code_run.name_any()).await {
+            Ok(fresh) => {
+                if fresh.status.as_ref().and_then(|s| s.job_name.as_ref()).is_some() {
+                    debug!(
+                        "Fresh CodeRun has job_name: {:?}",
+                        fresh.status.as_ref().and_then(|s| s.job_name.as_ref())
+                    );
+                    Arc::new(fresh)
+                } else {
+                    debug!("Fresh CodeRun still has no job_name, using cached");
+                    code_run.clone()
+                }
+            }
+            Err(err) => {
+                warn!(
+                    "Failed to fetch fresh CodeRun {}: {}. Using cached object.",
+                    code_run.name_any(),
+                    err
+                );
+                code_run.clone()
+            }
+        }
+    } else {
+        code_run.clone()
+    };
+
     let job_name = get_job_name(&code_run);
     debug!("Generated job name: {}", job_name);
 
@@ -504,6 +544,8 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
             // CRITICAL: Implementation agents MUST create a PR
             // Validate PR URL exists for implementation stages
+            // BUT: Intake CodeRuns don't create PRs (they push directly or merge intake PR)
+            let run_type = latest_code_run.spec.run_type.as_str();
             let stage = latest_code_run
                 .metadata
                 .labels
@@ -511,10 +553,12 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 .and_then(|labels| labels.get("stage"))
                 .map(std::string::String::as_str);
 
-            let is_implementation_stage = matches!(
-                stage,
-                Some("implementation" | "frontend") | None // None = legacy/default implementation
-            );
+            // Intake, docs, research, etc. don't need PR validation
+            let is_implementation_stage = run_type == "code"
+                && matches!(
+                    stage,
+                    Some("implementation" | "frontend") | None // None = legacy/default implementation
+                );
 
             let pr_url = latest_code_run
                 .status
