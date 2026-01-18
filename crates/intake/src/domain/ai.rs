@@ -150,7 +150,8 @@ impl AIDomain {
             temperature: Some(0.7),
             max_tokens: Some(64_000),
             json_mode: true,
-            mcp_config: None, // Disable MCP to force JSON output
+            mcp_config: None,
+            disable_mcp: true, // Disable MCP to force pure JSON output
             ..Default::default()
         };
 
@@ -160,16 +161,25 @@ impl AIDomain {
         let mut total_usage = TokenUsage::default();
 
         for attempt in 0..MAX_PRD_PARSE_RETRIES {
-            if attempt > 0 {
+            // On retry, force-disable extended thinking and increase temperature slightly
+            // This helps when the model returns prose summaries instead of JSON
+            let retry_options = if attempt > 0 {
                 tracing::warn!(
                     attempt = attempt + 1,
                     max_retries = MAX_PRD_PARSE_RETRIES,
-                    "Retrying PRD parsing after AI returned invalid response"
+                    "Retrying PRD parsing with extended thinking force-disabled"
                 );
-            }
+                GenerateOptions {
+                    force_disable_thinking: true, // Force disable thinking on retry
+                    temperature: Some(0.8),       // Slightly higher temp for variety
+                    ..options.clone()
+                }
+            } else {
+                options.clone()
+            };
 
             let response = provider
-                .generate_text(model_id, &messages, &options)
+                .generate_text(model_id, &messages, &retry_options)
                 .await?;
 
             // Accumulate token usage across retries

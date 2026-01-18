@@ -1041,9 +1041,17 @@ impl<'a> CodeResourceManager<'a> {
         final_env_vars = final_deduplicated_env_vars;
 
         // Build the job spec with environment configuration
+        // Use Always pull policy for :latest and :dev tags to ensure fresh images
+        let image_pull_policy = if image.ends_with(":latest") || image.ends_with(":dev") {
+            "Always"
+        } else {
+            "IfNotPresent"
+        };
+
         let mut container_spec = json!({
             "name": container_name,
             "image": image,
+            "imagePullPolicy": image_pull_policy,
             "env": final_env_vars,
             "command": ["/bin/bash"],
             "args": ["/task-files/container.sh"],

@@ -1,0 +1,54 @@
+---
+# Ralph Runner RBAC
+#
+# ServiceAccount, Role, and RoleBinding for the Ralph Runner Job.
+# Provides access to CodeRuns, pods, and secrets in the cto namespace.
+#
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ralph-runner
+  namespace: cto
+  labels:
+    app: ralph-runner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ralph-runner
+  namespace: cto
+rules:
+  # CodeRun management
+  - apiGroups: ["agents.platform"]
+    resources: ["coderuns"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+  # Pod monitoring
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # ConfigMap access (for config files)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Secrets access (for API tokens)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  # PVC management (cleanup)
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ralph-runner
+  namespace: cto
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ralph-runner
+subjects:
+  - kind: ServiceAccount
+    name: ralph-runner
+    namespace: cto

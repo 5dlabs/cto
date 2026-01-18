@@ -136,20 +136,20 @@ kubectl rollout restart deployment cto-controller -n cto
 
 #### For Local Controller (launchd)
 
-Update your local `cto-config.json` or controller config file to use the dev image.
+Update `config/controller-config.yaml` to use the dev image:
 
-### Option C: cto-config.json Override
+```yaml
+agent:
+  cliImages:
+    claude:
+      repository: ghcr.io/5dlabs/claude
+      tag: dev  # Change to 'latest' for production
+```
 
-For specific Play workflows, you can override the agent image in your `cto-config.json`:
+Then restart the controller:
 
-```json
-{
-  "defaults": {
-    "play": {
-      "agentImage": "ghcr.io/5dlabs/claude:dev"
-    }
-  }
-}
+```bash
+just launchd-restart
 ```
 
 ## Workflow Example

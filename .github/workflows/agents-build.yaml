@@ -239,6 +239,9 @@ jobs:
         with:
           context: .
           file: ./infra/images/runtime/Dockerfile
+          # Use minimal target by default (agents only need essential tools)
+          # For full image with all dev tools: docker build --target production
+          target: minimal
           platforms: linux/amd64
           pull: true
           push: true

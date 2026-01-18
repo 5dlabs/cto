@@ -1438,8 +1438,12 @@ impl CodeTemplateGenerator {
             .unwrap_or("shadcn");
         let is_tanstack_stack = frontend_stack == "tanstack";
 
+        // Get task language for support agents (Cleo, Cipher, Tess)
+        let task_language = Self::get_task_language(code_run);
+
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
+            "task_language": task_language,
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
