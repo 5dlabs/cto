@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.16](https://github.com/5dlabs/cto/compare/v0.2.15...v0.2.16) (2026-01-18)
+
+
+### 🐛 Bug Fixes
+
+* extend pod GC retention to 2 hours for debugging ([#3875](https://github.com/5dlabs/cto/issues/3875)) ([4c73d00](https://github.com/5dlabs/cto/commit/4c73d00cd6124830f4c0e9778a2ee6d14bd8bc54))
+
 ## [0.2.15](https://github.com/5dlabs/cto/compare/v0.2.14...v0.2.15) (2026-01-18)
 
 
