@@ -589,6 +589,8 @@ spec:
               parameters:
                 - name: task-id
                   value: "{{workflow.parameters.task-id}}"
+                - name: repository
+                  value: "{{workflow.parameters.repository}}"
                 - name: docs-repository
                   value: "{{workflow.parameters.docs-repository}}"
                 - name: docs-project-directory
@@ -1916,6 +1918,7 @@ spec:
       inputs:
         parameters:
           - name: task-id
+          - name: repository
           - name: docs-repository
           - name: docs-project-directory
           - name: docs-branch
@@ -1962,11 +1965,13 @@ spec:
           set -e
 
           TASK_ID="{{inputs.parameters.task-id}}"
+          REPOSITORY="{{inputs.parameters.repository}}"
           DOCS_REPO="{{inputs.parameters.docs-repository}}"
           DOCS_PROJECT_DIR="{{inputs.parameters.docs-project-directory}}"
           DOCS_BRANCH="{{inputs.parameters.docs-branch}}"
 
           echo "🔍 Determining agent for task ${TASK_ID}"
+          echo "   Target repository: ${REPOSITORY}"
           echo "   Docs repository: ${DOCS_REPO}"
           echo "   Project directory: ${DOCS_PROJECT_DIR}"
           echo "   Docs branch: ${DOCS_BRANCH}"
@@ -1989,20 +1994,20 @@ spec:
           SIG=$(echo -n "$SIG" | tr '+/' '-_' | tr -d '=')
           JWT="$HDR.$PAY.$SIG"
 
-          OWNER=$(echo "$DOCS_REPO" | cut -d'/' -f1)
-          REPO_NAME=$(echo "$DOCS_REPO" | cut -d'/' -f2)
-
-          # Get installation token
+          # Get installation token using org-level access (more reliable across repos)
+          OWNER=$(echo "$REPOSITORY" | cut -d'/' -f1)
           INSTALLATION_ID=$(curl -s -L \
             -H "Authorization: Bearer $JWT" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
+            "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
 
           if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
+            # Try repo-level installation
+            REPO_NAME=$(echo "$REPOSITORY" | cut -d'/' -f2)
             INSTALLATION_ID=$(curl -s -L \
               -H "Authorization: Bearer $JWT" \
               -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
+              "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
           fi
 
           TOKEN=$(curl -s -X POST \
@@ -2012,14 +2017,48 @@ spec:
 
           rm -f "$TEMP_KEY"
 
-          # Clone docs repository to read task file
-          CLONE_DIR="/tmp/docs-repo"
+          # Clone target repository first (preferred - where tasks.json is usually created)
+          CLONE_DIR="/tmp/task-repo"
           rm -rf "$CLONE_DIR"
+          TASKS_JSON=""
+          TASK_BASE_DIR=""
 
-          echo "📥 Cloning docs repository (branch: ${DOCS_BRANCH})..."
-          git clone --depth 1 --branch "${DOCS_BRANCH}" "https://x-access-token:${TOKEN}@github.com/${DOCS_REPO}.git" "$CLONE_DIR" 2>&1 || {
-            echo "❌ Failed to clone repository"
-            # Fallback to implementation agent
+          echo "📥 Trying target repository first: ${REPOSITORY}..."
+          if git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${REPOSITORY}.git" "$CLONE_DIR" 2>&1; then
+            TASKS_JSON="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.tasks/tasks/tasks.json"
+            TASK_BASE_DIR="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.tasks/tasks"
+            if [ ! -f "$TASKS_JSON" ]; then
+              echo "⚠️ tasks.json not found in target repo at ${TASKS_JSON}"
+              TASKS_JSON=""
+              TASK_BASE_DIR=""
+            else
+              echo "✅ Found tasks.json in target repository"
+            fi
+          else
+            echo "⚠️ Failed to clone target repository, trying docs repository..."
+          fi
+
+          # Fall back to docs repository if tasks.json not found in target repo
+          if [ -z "$TASKS_JSON" ] && [ "$REPOSITORY" != "$DOCS_REPO" ]; then
+            rm -rf "$CLONE_DIR"
+            echo "📥 Trying docs repository: ${DOCS_REPO} (branch: ${DOCS_BRANCH})..."
+            if git clone --depth 1 --branch "${DOCS_BRANCH}" "https://x-access-token:${TOKEN}@github.com/${DOCS_REPO}.git" "$CLONE_DIR" 2>&1; then
+              TASKS_JSON="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.tasks/tasks/tasks.json"
+              TASK_BASE_DIR="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.tasks/tasks"
+              if [ ! -f "$TASKS_JSON" ]; then
+                echo "⚠️ tasks.json not found in docs repo at ${TASKS_JSON}"
+                TASKS_JSON=""
+                TASK_BASE_DIR=""
+              else
+                echo "✅ Found tasks.json in docs repository"
+              fi
+            fi
+          fi
+
+          # If no tasks.json found anywhere, fall back to implementation agent
+          if [ -z "$TASKS_JSON" ]; then
+            echo "❌ tasks.json not found in either repository"
+            echo "   Falling back to implementation agent"
             echo "{{workflow.parameters.implementation-agent}}" > /tmp/github-app.txt
             echo "{{workflow.parameters.implementation-cli}}" > /tmp/cli-type.txt
             echo "{{workflow.parameters.implementation-model}}" > /tmp/model.txt
@@ -2028,10 +2067,9 @@ spec:
             echo "rust" > /tmp/task-language.txt
             echo "" > /tmp/task-framework.txt
             exit 0
-          }
+          fi
 
-          # Load task metadata from tasks.json when available
-          TASKS_JSON="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.tasks/tasks/tasks.json"
+          # Load task metadata from tasks.json
           TASK_ENTRY=""
           if [ -f "$TASKS_JSON" ]; then
             TASK_ENTRY=$(jq -c --arg tid "$TASK_ID" '
@@ -2062,9 +2100,8 @@ spec:
             FRAMEWORK=$(echo "$TASK_ENTRY" | jq -r '.framework // .taskFramework // empty')
           fi
 
-          # Attempt to locate task file for supplemental metadata
+          # Attempt to locate task file for supplemental metadata (TASK_BASE_DIR set above)
           TASK_FILE=""
-          TASK_BASE_DIR="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.tasks/tasks"
           if [ -d "$TASK_BASE_DIR" ]; then
             PADDED_ID=""
             case "$TASK_ID" in
@@ -3236,8 +3273,9 @@ spec:
     secondsAfterSuccess: 86400       # Keep successful workflows for 24 hours
 
   # Pod garbage collection
-  # Delete delay increased from 60s to 300s to allow heal system to capture logs
-  # before pods are cleaned up (fixes issue #2576 - A2 alerts with missing logs)
+  # Delete delay extended to 2 hours for debugging
+  # Previous: 300s (5 min) - allows heal system to capture logs
+  # Current: 7200s (2 hours) - extended for debugging, can revert after stabilization
   podGC:
     strategy: OnPodCompletion
-    deleteDelayDuration: 300s
+    deleteDelayDuration: 7200s

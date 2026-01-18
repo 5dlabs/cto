@@ -66,15 +66,16 @@ spec:
             spec:
               parallelism: 10
               # Global TTL for automatic cleanup of completed workflows
-              # More aggressive than before to prevent accumulation
+              # Extended retention for debugging - can revert after stabilization
               ttlStrategy:
-                secondsAfterCompletion: 1800   # Clean up after 30 minutes
-                secondsAfterSuccess: 1800      # Clean up successful after 30 minutes
-                secondsAfterFailure: 7200      # Keep failed workflows for 2 hours
-              # Pod garbage collection - give heal time to capture logs before cleanup
+                secondsAfterCompletion: 7200   # Clean up after 2 hours
+                secondsAfterSuccess: 7200      # Clean up successful after 2 hours
+                secondsAfterFailure: 14400     # Keep failed workflows for 4 hours
+              # Pod garbage collection - extended for debugging
+              # Previous: 300s (5 min) - now 2 hours to allow log capture and debugging
               podGC:
                 strategy: OnPodCompletion
-                deleteDelayDuration: 300s      # 5 minutes - allows heal to capture logs
+                deleteDelayDuration: 7200s     # 2 hours - extended for debugging
         server:
           image:
             tag: v3.7.1
