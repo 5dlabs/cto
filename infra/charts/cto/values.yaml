@@ -520,6 +520,16 @@ tools:
         args: ["-y", "repomix", "--mcp"]
         workingDirectory: "/tmp"
 
+      octocode:
+        name: "Octocode"
+        description: "GitHub code search and analysis - search repositories, extract context, analyze PRs with token optimization"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "octocode-mcp@latest"]
+        workingDirectory: "/tmp"
+        env:
+          GITHUB_TOKEN: "${GITHUB_TOKEN}"
+
       # --- Project Management ---
       linear:
         name: "Linear"
