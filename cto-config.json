@@ -61,6 +61,17 @@
       "model": "glm-4-plus",
       "template": "watch/factory",
       "maxIterations": 3
+    },
+    "stitch": {
+      "enabled": true,
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "repos": [
+        "5dlabs/cto",
+        "5dlabs/web"
+      ],
+      "excludeLabels": ["skip-review", "bot"],
+      "excludeAuthors": ["dependabot[bot]", "renovate[bot]"]
     }
   },
   "agents": {
@@ -486,6 +497,35 @@
           "github_merge_pull_request",
           "github_update_pull_request_branch",
           "github_get_pull_request_status",
+          "github_create_pull_request_review",
+          "github_get_file_contents"
+        ],
+        "localServers": {}
+      }
+    },
+    "stitch": {
+      "githubApp": "5DLabs-Stitch",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "octocode_githubSearchCode",
+          "octocode_githubSearchRepositories",
+          "octocode_githubViewRepoStructure",
+          "octocode_githubGetFileContent",
+          "octocode_githubSearchPullRequests",
+          "octocode_packageSearch",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "github_get_pull_request",
+          "github_get_pull_request_files",
+          "github_get_pull_request_comments",
+          "github_add_pull_request_review_comment",
           "github_create_pull_request_review",
           "github_get_file_contents"
         ],

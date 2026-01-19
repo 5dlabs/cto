@@ -1,0 +1,161 @@
+---
+# =============================================================================
+# Stitch PR Review Sensor
+# =============================================================================
+# Triggers Stitch code review agent when PRs are opened or updated.
+# Completely independent of the Play workflow - reviews ANY PR on monitored repos.
+#
+# Monitored repos are configured in cto-config.json under defaults.stitch.repos
+# Currently hardcoded here for simplicity; can be made dynamic via ConfigMap.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: stitch-pr-review
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: stitch-pr-review
+    app.kubernetes.io/component: sensor
+spec:
+  dependencies:
+    - eventName: org
+      eventSourceName: github
+      filters:
+        data:
+          # Only pull_request events
+          - path: body.X-GitHub-Event
+            type: string
+            value:
+              - pull_request
+          # Trigger on opened, synchronize (new commits), and reopened
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - synchronize
+              - reopened
+          # Only User PRs (excludes Bot type like dependabot, renovate)
+          - path: body.pull_request.user.type
+            type: string
+            value:
+              - User
+        # Expression filter for repo allowlist
+        # Repos: 5dlabs/cto, 5dlabs/web
+        exprs:
+          - expr: repository in ["5dlabs/cto", "5dlabs/web"]
+            fields:
+              - name: repository
+                path: body.repository.full_name
+      name: github-pr-opened
+  deploymentStrategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  replicas: 1
+  template:
+    serviceAccountName: argo-events-sa
+  triggers:
+    - retryStrategy:
+        duration: 10s
+        factor: 2
+        steps: 3
+      template:
+        name: create-stitch-review
+        conditions: github-pr-opened
+        k8s:
+          operation: create
+          parameters:
+            # Generate unique name with PR number
+            - dest: metadata.generateName
+              operation: append
+              src:
+                dataTemplate: "{{ .Input.body.pull_request.number }}-"
+                dependencyName: github-pr-opened
+            # Labels for tracking
+            - dest: metadata.labels.pr-number
+              src:
+                dataKey: body.pull_request.number
+                dependencyName: github-pr-opened
+            - dest: metadata.labels.repository
+              src:
+                dataTemplate: "{{ .Input.body.repository.full_name | replace \"/\" \"-\" }}"
+                dependencyName: github-pr-opened
+            # Spec fields from webhook payload
+            - dest: spec.service
+              src:
+                dataTemplate: "{{ .Input.body.repository.name }}"
+                dependencyName: github-pr-opened
+            - dest: spec.repositoryUrl
+              src:
+                dataTemplate: "https://github.com/{{ .Input.body.repository.full_name }}.git"
+                dependencyName: github-pr-opened
+            - dest: spec.docsRepositoryUrl
+              src:
+                dataTemplate: "https://github.com/{{ .Input.body.repository.full_name }}.git"
+                dependencyName: github-pr-opened
+            - dest: spec.workingDirectory
+              src:
+                dataTemplate: "."
+                dependencyName: github-pr-opened
+            # Environment variables for the review
+            - dest: spec.env.PR_NUMBER
+              src:
+                dataKey: body.pull_request.number
+                dependencyName: github-pr-opened
+            - dest: spec.env.PR_URL
+              src:
+                dataKey: body.pull_request.html_url
+                dependencyName: github-pr-opened
+            - dest: spec.env.PR_TITLE
+              src:
+                dataKey: body.pull_request.title
+                dependencyName: github-pr-opened
+            - dest: spec.env.PR_BRANCH
+              src:
+                dataKey: body.pull_request.head.ref
+                dependencyName: github-pr-opened
+            - dest: spec.env.PR_BASE_BRANCH
+              src:
+                dataKey: body.pull_request.base.ref
+                dependencyName: github-pr-opened
+            - dest: spec.env.PR_AUTHOR
+              src:
+                dataKey: body.pull_request.user.login
+                dependencyName: github-pr-opened
+            - dest: spec.env.REPO_FULL_NAME
+              src:
+                dataKey: body.repository.full_name
+                dependencyName: github-pr-opened
+            - dest: spec.env.HEAD_SHA
+              src:
+                dataKey: body.pull_request.head.sha
+                dependencyName: github-pr-opened
+            - dest: spec.env.REVIEW_MODE
+              src:
+                dataTemplate: "review"
+                dependencyName: github-pr-opened
+            - dest: spec.env.TRIGGER
+              src:
+                dataTemplate: "webhook"
+                dependencyName: github-pr-opened
+          source:
+            resource:
+              apiVersion: agents.platform/v1
+              kind: CodeRun
+              metadata:
+                generateName: "review-pr"
+                namespace: cto
+                labels:
+                  workflow-type: stitch-review
+                  trigger: webhook
+              spec:
+                runType: review
+                service: stitch-review
+                repositoryUrl: ""
+                docsRepositoryUrl: ""
+                docsProjectDirectory: "."
+                workingDirectory: "."
+                githubApp: "5DLabs-Stitch"
+                model: "claude-opus-4-5-20251101"
+                env: {}
