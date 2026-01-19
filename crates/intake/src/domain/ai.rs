@@ -324,7 +324,7 @@ impl AIDomain {
     }
 
     /// Internal expand task implementation.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)] // All parameters are distinct task expansion options
     async fn expand_task_internal(
         &self,
         task: &Task,

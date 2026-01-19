@@ -2576,7 +2576,7 @@ async fn main() -> Result<()> {
 // =============================================================================
 
 /// Run the GitHub Actions sensor to monitor for workflow failures.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // CLI entry point with distinct configuration options
 async fn run_github_actions_sensor(
     repositories: &str,
     poll_interval: u64,
@@ -2681,7 +2681,7 @@ async fn run_github_actions_sensor(
 // =============================================================================
 
 /// Run the play monitor to watch for anomalies in running plays.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // CLI entry point with distinct configuration options
 async fn run_play_monitor(
     namespace: &str,
     poll_interval: u64,
@@ -2976,7 +2976,7 @@ fn calculate_duration(started: Option<&str>, finished: Option<&str>) -> Option<i
 // Legacy run_full_loop removed - use run_full_watch instead
 
 /// Run the monitoring loop - emits JSON events (legacy polling mode)
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // CLI entry point configuration
 async fn run_loop(
     play_id: &str,
     namespace: &str,
@@ -3415,7 +3415,7 @@ fn parse_watch_line(line: &str, resource_type: ResourceType) -> Result<WatchMess
 }
 
 /// Run the full E2E monitor with multi-watch streams
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // CLI entry point with distinct configuration options
 async fn run_full_watch(
     task_id: &str,
     config_path: &str,
@@ -3532,7 +3532,7 @@ async fn run_full_watch(
 /// This is the main entry point for E2E testing with self-healing capabilities.
 /// On failure, it triggers a remediation agent to fix the issue, waits for
 /// `ArgoCD` sync, and retries the workflow.
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // CLI entry point configuration
 async fn run_self_healing_loop(
     task_id: &str,
     config_path: &str,
@@ -3829,7 +3829,7 @@ async fn run_self_healing_loop(
 ///
 /// If `remediation_config` is provided and a failure occurs, returns an error
 /// with prefix `REMEDIATION_NEEDED:` to signal the caller to trigger remediation.
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // Multi-watch requires many config options
 async fn run_multi_watch(
     task_id: &str,
     argo_namespace: &str,
@@ -6406,7 +6406,7 @@ async fn handle_completion_check(
 }
 
 /// Handle a detected alert by loading prompt and spawning Factory
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // Alert handling requires full context
 async fn handle_alert(
     alert_id: &str,
     pod_name: &str,
@@ -7134,7 +7134,7 @@ fn load_healer_config(config_path: &str) -> HealerConfig {
 }
 
 /// Build the `CodeRun` YAML manifest using values from config.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // CodeRun manifest requires many configuration fields
 #[allow(clippy::too_many_lines)]
 fn build_coderun_yaml(
     alert: &str,
@@ -8619,7 +8619,7 @@ fn run_reconcile_issues(
 }
 
 /// Build `CodeRun` YAML for scan-based remediation.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // CodeRun manifest requires many configuration fields
 fn build_scan_remediation_coderun(
     coderun_name: &str,
     namespace: &str,

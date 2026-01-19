@@ -855,7 +855,7 @@ fn determine_code_job_state(status: &k8s_openapi::api::batch::v1::JobStatus) -> 
     CodeJobState::Running
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // Status update requires all completion fields
 async fn update_code_status_with_completion(
     code_run: &CodeRun,
     ctx: &Context,
