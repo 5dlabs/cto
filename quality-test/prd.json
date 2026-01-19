@@ -157,7 +157,7 @@
         "Test scripts still work correctly"
       ],
       "testStrategy": "smoke",
-      "passes": false
+      "passes": true
     },
     {
       "id": "CQ-010",

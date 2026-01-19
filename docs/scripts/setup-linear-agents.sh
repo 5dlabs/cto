@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# =============================================================================
+set -euo pipefail# =============================================================================
 # Linear Agent OAuth Setup Helper
 # =============================================================================
 # This script helps you set up Linear OAuth apps for CTO platform agents.

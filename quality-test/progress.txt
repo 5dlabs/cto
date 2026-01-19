@@ -179,3 +179,19 @@ pre-commit run --all-files
   - Reason: "MCP uses stderr for debug output (stdout is JSON-RPC)"
 - **Verification**: cargo clippy --all-targets -- -D warnings: PASS
 ---
+
+## 2026-01-18 - CQ-009
+- **Story**: Code Quality: Fix Shell Scripts Missing Strict Mode
+- **Changes Made**:
+  - `scripts/start-web-dev.sh`: Added `set -euo pipefail`
+  - `docs/scripts/dev-load.sh`: Added `set -euo pipefail`
+  - `docs/scripts/live-monitor-server.sh`: Added `set -euo pipefail`
+  - `docs/scripts/dev-build-all.sh`: Added `set -euo pipefail`
+  - `docs/scripts/dev-local.sh`: Added `set -euo pipefail`
+  - `docs/scripts/argocd-dev-mode.sh`: Added `set -euo pipefail`
+  - `docs/scripts/dev.sh`: Added `set -euo pipefail`
+  - `docs/scripts/extract-cluster-secrets.sh`: Added `set -euo pipefail`
+  - `docs/scripts/populate-openbao-from-1password.sh`: Added `set -euo pipefail`
+  - Plus 10 more scripts in docs/scripts/
+- **Verification**: All 19 modified scripts now have strict mode
+---

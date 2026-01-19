@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# =============================================================================
+set -euo pipefail# =============================================================================
 # BuildKit Performance Benchmark
 # =============================================================================
 # Compares build performance with SSD vs RAMDisk (tmpfs) backing storage.

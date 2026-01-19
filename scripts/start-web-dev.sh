@@ -1,5 +1,6 @@
 #!/bin/bash
 # Start the web app in development mode
+set -euo pipefail
 
 cd "$(dirname "$0")/../apps/web"
 

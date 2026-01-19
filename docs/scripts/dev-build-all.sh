@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # =============================================================================
 # dev-build-all.sh - Build all core images with caching and smart parallelism
 # =============================================================================
