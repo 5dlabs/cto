@@ -680,7 +680,7 @@ impl RemediationState {
     }
 
     /// Record a new attempt.
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_possible_truncation)] // Attempt count is always small
     pub fn record_attempt(&mut self, outcome: AttemptOutcome, coderun_name: &str, agent: Agent) {
         let attempt = RemediationAttempt {
             attempt_number: u32::try_from(self.attempts.len()).unwrap_or_default() + 1,

@@ -589,7 +589,7 @@ impl Default for RetryConfig {
 impl RetryConfig {
     /// Calculate the delay for a given attempt number.
     #[must_use]
-    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_possible_wrap)] // Attempt numbers are small positive integers
     pub fn delay_for_attempt(&self, attempt: u32) -> Duration {
         let exp = i32::try_from(attempt.min(10)).unwrap_or(10);
         let multiplier = self.backoff_multiplier.powi(exp);

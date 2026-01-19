@@ -215,7 +215,7 @@ impl PlayBatch {
 
     /// Get overall progress as percentage.
     #[must_use]
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)] // Progress percentage precision loss is acceptable
     pub fn progress(&self) -> f64 {
         if self.tasks.is_empty() {
             return 0.0;

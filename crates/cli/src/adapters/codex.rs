@@ -33,6 +33,7 @@ fn first_f64(value: &Value, keys: &[&str]) -> Option<f64> {
 fn safe_f32(value: f64) -> Option<f32> {
     if value.is_finite() && value >= f64::from(f32::MIN) && value <= f64::from(f32::MAX) {
         #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        // Bounds already checked above
         {
             Some(value as f32)
         }

@@ -502,7 +502,7 @@ fn extract_params(params: Option<&Value>) -> HashMap<String, Value> {
         .unwrap_or_default()
 }
 
-#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_truncation)] // Retry counts are small positive integers
 fn parse_max_retries_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<u32> {
     arguments.get(key).and_then(|value| match value {
         Value::Number(num) => num.as_u64().map(|v| v as u32),
@@ -2163,7 +2163,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Check if task_id is provided
     let task_id = if let Some(id_value) = arguments.get("task_id") {
         // Explicit task_id provided
-        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_possible_truncation)] // Task IDs are small positive integers
         Some(
             id_value
                 .as_u64()
@@ -3464,7 +3464,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                             let created_secs = created_time.timestamp();
                             // Only process workflows with valid (non-negative) timestamps
                             if created_secs >= 0 {
-                                #[allow(clippy::cast_sign_loss)]
+                                #[allow(clippy::cast_sign_loss)] // Already checked >= 0 above
                                 let created_secs_u64 = created_secs as u64;
 
                                 // Handle clock skew: if workflow timestamp is in the future, treat as age 0
@@ -4354,7 +4354,7 @@ fn handle_anthropic_message_tool(
         .and_then(|v| v.as_str())
         .ok_or(anyhow!("model is required"))?;
     let system = arguments.get("system").and_then(|v| v.as_str());
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_possible_truncation)] // Token counts are small positive integers
     let max_tokens = arguments
         .get("max_tokens")
         .and_then(serde_json::Value::as_u64)

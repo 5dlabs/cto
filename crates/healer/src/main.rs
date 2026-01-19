@@ -4844,6 +4844,7 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
 /// Count deleted resources from kubectl output
 fn count_deleted(output: &[u8]) -> i32 {
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    // Deleted line count is always small
     let count = String::from_utf8_lossy(output)
         .lines()
         .filter(|l| l.contains("deleted"))
@@ -7721,6 +7722,7 @@ fn print_batch_status(tracker: &play::PlayTracker) {
 
     // Progress bar
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    // Progress is 0-100, result fits in usize
     let progress_filled = (summary.progress / 100.0 * 30.0) as usize;
     let progress_empty = 30 - progress_filled;
     println!(

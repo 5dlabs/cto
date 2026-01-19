@@ -1577,7 +1577,7 @@ async fn process_stream_event(
             ..
         } => {
             *total_cost += total_cost_usd.unwrap_or(0.0);
-            #[allow(clippy::cast_precision_loss)]
+            #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for duration display
             let duration_secs = duration_ms.map(|ms| ms as f64 / 1000.0).unwrap_or(0.0);
             let turns = num_turns.unwrap_or(0);
 

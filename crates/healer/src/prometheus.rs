@@ -263,7 +263,7 @@ impl PrometheusClient {
         for sample in restarts {
             let name = sample.labels.get("pod").cloned().unwrap_or_default();
             if let Some(pod) = pods.get_mut(&name) {
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // Restart counts are small positive integers
                 {
                     pod.restart_count = pod.restart_count.saturating_add(sample.value as u32);
                 }
@@ -271,7 +271,7 @@ impl PrometheusClient {
         }
 
         // Process creation time (calculate age)
-        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::cast_precision_loss)] // Timestamp precision loss acceptable for age calculation
         let now = Utc::now().timestamp() as f64;
         for sample in created {
             let name = sample.labels.get("pod").cloned().unwrap_or_default();
@@ -369,7 +369,7 @@ impl PrometheusClient {
         for result in results {
             if let Some((timestamp, value_str)) = &result.value {
                 let value: f64 = value_str.parse().unwrap_or(0.0);
-                #[allow(clippy::cast_possible_truncation)]
+                #[allow(clippy::cast_possible_truncation)] // Prometheus timestamps fit in i64
                 let ts = DateTime::from_timestamp(*timestamp as i64, 0)
                     .unwrap_or_else(Utc::now);
 
@@ -392,7 +392,7 @@ impl PrometheusClient {
             if let Some(values) = &result.values {
                 for (timestamp, value_str) in values {
                     let value: f64 = value_str.parse().unwrap_or(0.0);
-                    #[allow(clippy::cast_possible_truncation)]
+                    #[allow(clippy::cast_possible_truncation)] // Prometheus timestamps fit in i64
                     let ts = DateTime::from_timestamp(*timestamp as i64, 0)
                         .unwrap_or_else(Utc::now);
 

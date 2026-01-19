@@ -48,7 +48,7 @@ impl EditResult {
 
     /// Calculate the reduction ratio.
     #[must_use]
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for ratio display
     pub fn reduction_ratio(&self) -> f32 {
         if self.original_tokens == 0 {
             0.0

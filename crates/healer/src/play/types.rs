@@ -385,7 +385,7 @@ impl EvaluationProbe {
             .filter(|kw| response_lower.contains(&kw.to_lowercase()))
             .count();
 
-        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::cast_precision_loss)] // Score precision loss is acceptable
         let score = matches as f32 / self.expected_keywords.len() as f32;
         score
     }

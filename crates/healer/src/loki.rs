@@ -305,7 +305,7 @@ impl LokiClient {
                 // Parse nanosecond timestamp
                 if let Ok(ns) = timestamp_ns.parse::<i64>() {
                     let secs = ns / 1_000_000_000;
-                    #[allow(clippy::cast_sign_loss)]
+                    #[allow(clippy::cast_sign_loss)] // Nanoseconds modulo is always positive
                     let nsecs = (ns % 1_000_000_000) as u32;
                     if let Some(dt) = DateTime::from_timestamp(secs, nsecs) {
                         entries.push(LogEntry {
@@ -364,7 +364,7 @@ impl LokiClient {
     ///
     /// # Errors
     /// Returns an error if the Loki query fails or returns an invalid response.
-    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_possible_wrap)] // Window minutes are small config values
     pub async fn query_logs_around_failure(
         &self,
         namespace: &str,

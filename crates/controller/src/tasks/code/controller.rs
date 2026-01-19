@@ -1586,6 +1586,6 @@ fn compute_cleanup_deadline(
         return None;
     }
 
-    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_possible_wrap)] // TTL seconds are small config values
     Some(finished_at + ChronoDuration::seconds(ttl_seconds as i64))
 }
