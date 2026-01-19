@@ -35,6 +35,29 @@ You are an autonomous code quality improvement agent working on the CTO platform
 5. **Update progress.txt** with detailed notes
 6. **Mark story complete** only when ALL criteria pass
 
+## MANDATORY GATES (Must Pass Before Push)
+
+**CRITICAL:** Do NOT push changes until ALL of these pass:
+
+```bash
+# Gate 1: Format (REQUIRED)
+cargo fmt --all --check
+
+# Gate 2: Clippy Warnings (REQUIRED)
+cargo clippy --all-targets -- -D warnings
+
+# Gate 3: Clippy Pedantic (track count, should decrease)
+cargo clippy --all-targets -- -W clippy::pedantic 2>&1 | grep -c "warning:"
+
+# Gate 4: Unit Tests (REQUIRED)
+cargo test --all --lib
+
+# Gate 5: Integration Tests (best effort)
+cargo test --all -- --ignored || echo "Some integration tests skipped"
+```
+
+If ANY required gate fails, FIX IT before pushing.
+
 ## Key Commands
 
 ```bash
@@ -48,7 +71,7 @@ cargo clippy --all-targets -- -D warnings
 cargo clippy --all-targets -- -D warnings -W clippy::pedantic 2>&1 | head -100
 
 # 4. Tests (must pass)
-cargo test
+cargo test --all
 
 # 5. Search for specific allow attributes
 rg '#\[allow\(clippy::unused_self\)' crates/ -l
@@ -145,6 +168,55 @@ let small: u32 = big_number as u32;
 // Keep the allow but add a reason:
 #[allow(clippy::disallowed_macros, reason = "MCP protocol requires stdout")]
 println!("{}", response);
+```
+
+### CQ-015: Blocking I/O (HIGH SEVERITY)
+```rust
+// BEFORE: Blocking in async context
+async fn read_config() -> Result<Config> {
+    let content = std::fs::read_to_string("config.json")?;  // BLOCKS!
+    Ok(serde_json::from_str(&content)?)
+}
+
+// AFTER: Non-blocking async I/O
+async fn read_config() -> Result<Config> {
+    let content = tokio::fs::read_to_string("config.json").await?;
+    Ok(serde_json::from_str(&content)?)
+}
+
+// Note: Keep std::fs in sync-only code (CLI main, tests)
+```
+
+### CQ-016: Excessive unwrap() (HIGH SEVERITY)
+```rust
+// BEFORE: Panic on error
+let value = config.get("key").unwrap();
+
+// AFTER: Option A - Propagate with context
+let value = config.get("key")
+    .context("config missing required 'key' field")?;
+
+// AFTER: Option B - Expect with invariant reason
+let value = config.get("key")
+    .expect("invariant: 'key' is always set by load_defaults()");
+
+// AFTER: Option C - Handle None/Err case
+let value = config.get("key").unwrap_or_default();
+```
+
+### CQ-017: println! to tracing (MEDIUM SEVERITY)
+```rust
+// BEFORE: println! in library code
+println!("Processing file: {}", path);
+
+// AFTER: Structured logging with tracing
+tracing::info!(path = %path, "Processing file");
+
+// For errors:
+tracing::error!(error = %e, "Failed to process");
+
+// For debug:
+tracing::debug!(value = ?data, "Intermediate state");
 ```
 
 ## Verification Checklist

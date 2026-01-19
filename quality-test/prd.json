@@ -241,21 +241,123 @@
     },
     {
       "id": "CQ-015",
-      "title": "Final Verification: Clippy Pedantic Pass",
-      "description": "Verify all changes compile and pass Clippy pedantic",
+      "title": "HIGH: Reduce Blocking I/O in Async Contexts - Phase 1",
+      "description": "Replace std::fs with tokio::fs in async code paths to prevent blocking the runtime",
+      "priority": 2,
+      "complexity": "high",
+      "acceptanceCriteria": [
+        "Identify std::fs calls in async functions (137 occurrences baseline)",
+        "Phase 1: Fix high-traffic async paths in controller, healer, intake",
+        "Replace std::fs::read_to_string with tokio::fs::read_to_string().await",
+        "Replace std::fs::write with tokio::fs::write().await",
+        "Keep std::fs in sync-only code paths (CLI main, tests)",
+        "cargo test passes",
+        "Document remaining std::fs usage with justification"
+      ],
+      "testStrategy": "integration",
+      "passes": false,
+      "notes": "HIGH severity per CODE_QUALITY_ANALYSIS.md - 137 std::fs vs 47 tokio::fs calls"
+    },
+    {
+      "id": "CQ-016",
+      "title": "HIGH: Reduce unwrap() Usage - Phase 1 (Top 5 Files)",
+      "description": "Replace panic-inducing unwrap() with proper error handling in highest-concentration files",
+      "priority": 2,
+      "complexity": "high",
+      "acceptanceCriteria": [
+        "Target top 5 files: healer/ci/router.rs (45), controller/cli/adapters/claude.rs (35), controller/tasks/code/templates.rs (36), intake/storage/file.rs (26), controller/tasks/code/agent.rs (22)",
+        "Replace unwrap() with .context('description')? or .expect('invariant: reason')",
+        "Use anyhow::Context for error enrichment",
+        "Reduce unwrap count in target files by 50%",
+        "cargo test passes"
+      ],
+      "testStrategy": "integration",
+      "passes": false,
+      "notes": "HIGH severity per CODE_QUALITY_ANALYSIS.md - 706 unwrap() calls total"
+    },
+    {
+      "id": "CQ-017",
+      "title": "MEDIUM: Migrate println! to tracing - healer/main.rs",
+      "description": "Replace println! with tracing macros for structured logging in healer",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Replace println! with tracing::info!, tracing::debug!, tracing::warn!, tracing::error!",
+        "Keep eprintln! for CLI error output where appropriate",
+        "Ensure tracing subscriber is initialized",
+        "Verify log output works correctly",
+        "cargo test passes"
+      ],
+      "testStrategy": "integration",
+      "passes": false,
+      "notes": "MEDIUM severity - healer/main.rs has 412 println! calls"
+    },
+    {
+      "id": "CQ-018",
+      "title": "Final Verification: Full Quality Gate Pass",
+      "description": "Verify all changes compile and pass all quality gates",
       "priority": 5,
       "complexity": "low",
       "acceptanceCriteria": [
         "cargo fmt --all --check passes",
+        "cargo clippy --all-targets -- -D warnings passes",
         "cargo clippy --all-targets -- -D warnings -W clippy::pedantic has fewer warnings than baseline",
-        "cargo test passes",
+        "cargo test --all passes (unit tests)",
+        "cargo test --all -- --ignored passes (integration tests)",
         "Document remaining allows with justifications",
-        "Update progress.txt with final metrics"
+        "Update progress.txt with final metrics comparison to baseline"
       ],
       "testStrategy": "integration",
       "passes": false
     }
   ],
+  "gates": {
+    "beforePush": {
+      "required": true,
+      "checks": [
+        {
+          "name": "format",
+          "command": "cargo fmt --all --check",
+          "description": "Code must be formatted"
+        },
+        {
+          "name": "clippy-warnings",
+          "command": "cargo clippy --all-targets -- -D warnings",
+          "description": "No Clippy warnings allowed"
+        },
+        {
+          "name": "clippy-pedantic",
+          "command": "cargo clippy --all-targets -- -W clippy::pedantic 2>&1 | grep -c 'warning:' | xargs -I {} test {} -lt 100",
+          "description": "Clippy pedantic warnings under threshold"
+        },
+        {
+          "name": "unit-tests",
+          "command": "cargo test --all --lib",
+          "description": "All unit tests must pass"
+        },
+        {
+          "name": "integration-tests",
+          "command": "cargo test --all -- --ignored || true",
+          "description": "Integration tests (best effort)"
+        }
+      ]
+    },
+    "beforeMerge": {
+      "required": true,
+      "checks": [
+        {
+          "name": "full-test-suite",
+          "command": "cargo test --all",
+          "description": "Full test suite must pass"
+        },
+        {
+          "name": "no-regressions",
+          "command": "cargo clippy --all-targets -- -D warnings -W clippy::pedantic 2>&1 | grep -c 'warning:'",
+          "description": "Pedantic warning count must not increase from baseline"
+        }
+      ]
+    }
+  },
   "config": {
     "freshStartThreshold": 3,
     "cli": "claude",
