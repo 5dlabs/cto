@@ -5,7 +5,11 @@
 # Triggers Stitch code review agent when PRs are opened or updated.
 # Completely independent of the Play workflow - reviews ANY PR on monitored repos.
 #
-# Monitored repos are configured in cto-config.json under defaults.stitch.repos
+# Filter Configuration (aligned with cto-config.json defaults.stitch):
+#   - repos: Only trigger for repos in the allowlist (5dlabs/cto, 5dlabs/web)
+#   - excludeLabels: Skip PRs with "skip-review" or "bot" labels
+#   - excludeAuthors: Bot accounts filtered via user.type == "User" check
+#
 # Currently hardcoded here for simplicity; can be made dynamic via ConfigMap.
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
@@ -46,6 +50,12 @@ spec:
             fields:
               - name: repository
                 path: body.repository.full_name
+          # Exclude PRs with skip-review or bot labels (from cto-config.json excludeLabels)
+          # The [*].name JSONPath extracts all label names into an array
+          - expr: '!("skip-review" in labels) && !("bot" in labels)'
+            fields:
+              - name: labels
+                path: body.pull_request.labels[*].name
       name: github-pr-opened
   deploymentStrategy:
     rollingUpdate:
