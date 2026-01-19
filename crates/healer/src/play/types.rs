@@ -559,7 +559,7 @@ impl EvaluationResults {
 /// This combines evaluator, feedback, and artifact tracking settings into
 /// a single configuration struct that can be serialized and passed around.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(clippy::struct_excessive_bools)]
+#[allow(clippy::struct_excessive_bools)] // Config struct with boolean feature toggles by design
 pub struct EvaluationConfig {
     /// Whether probe-based evaluation is enabled
     pub enabled: bool,

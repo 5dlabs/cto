@@ -272,7 +272,7 @@ impl Default for Config {
 
 /// Intake workflow configuration.
 #[derive(Debug, Clone)]
-#[allow(clippy::struct_excessive_bools)]
+#[allow(clippy::struct_excessive_bools)] // Config struct with boolean feature toggles by design
 pub struct IntakeConfig {
     /// Container image for intake workflows (derived from CLI selection).
     pub runtime_image: String,
