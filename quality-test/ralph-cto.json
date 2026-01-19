@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "project": {
+    "name": "cto-code-quality",
+    "description": "Systematic code quality improvements using Clippy pedantic, CODE_QUALITY_ANALYSIS.md findings",
+    "repository": "5dlabs/cto",
+    "branch": "ralph/code-quality"
+  },
+  "paths": {
+    "prdPath": "quality-test/prd.json",
+    "execPromptPath": "quality-test/prompt.md",
+    "objectivePath": "quality-test/current-objective.md",
+    "progressPath": "quality-test/progress.txt",
+    "reportPath": "quality-test/report.json",
+    "statePath": "quality-test/ralph-cto.state.json",
+    "analysisPath": "docs/CODE_QUALITY_ANALYSIS.md"
+  },
+  "runner": {
+    "cli": "claude",
+    "command": "claude --dangerously-skip-permissions -p"
+  },
+  "attended": {
+    "enabled": true,
+    "requiredRuns": 1
+  },
+  "infinite": {
+    "enabled": true,
+    "cooldownSeconds": 30,
+    "successCooldownSeconds": 60,
+    "maxConsecutiveFailures": 5,
+    "enableRemediation": false
+  },
+  "preflight": {
+    "requiredCommands": [
+      "cargo",
+      "git",
+      "rg"
+    ],
+    "checks": [
+      {
+        "name": "cargo-available",
+        "command": "cargo --version"
+      },
+      {
+        "name": "clippy-available",
+        "command": "cargo clippy --version"
+      },
+      {
+        "name": "git-clean",
+        "command": "git diff --quiet HEAD || echo 'Uncommitted changes'"
+      },
+      {
+        "name": "on-quality-branch",
+        "command": "git rev-parse --abbrev-ref HEAD | grep -q 'ralph/code-quality'"
+      }
+    ]
+  },
+  "verification": {
+    "afterEachStory": [
+      "cargo fmt --all --check",
+      "cargo clippy --all-targets -- -D warnings",
+      "cargo test --all --lib"
+    ],
+    "beforeCommit": [
+      "cargo fmt --all",
+      "cargo clippy --all-targets -- -D warnings"
+    ]
+  },
+  "phases": [
+    {
+      "id": "clippy-low-hanging",
+      "description": "Address simple Clippy allows that can be fixed without design changes",
+      "stories": ["CQ-002", "CQ-003", "CQ-004", "CQ-007", "CQ-008", "CQ-012"],
+      "timeoutMinutes": 60,
+      "gates": [
+        {
+          "name": "unused-self-removed",
+          "description": "No unused_self allows remaining",
+          "command": "rg '#\\[allow\\(clippy::unused_self\\)\\]' crates --count-matches | wc -l | xargs test 0 -eq"
+        },
+        {
+          "name": "all-allows-documented",
+          "description": "All remaining allows have reason comments",
+          "command": "rg '#\\[allow\\(clippy::' crates | grep -v '//' | wc -l | xargs test 0 -eq"
+        }
+      ]
+    },
+    {
+      "id": "shell-scripts",
+      "description": "Add strict mode to shell scripts",
+      "stories": ["CQ-009"],
+      "timeoutMinutes": 30,
+      "gates": [
+        {
+          "name": "all-scripts-strict",
+          "description": "All shell scripts have set -euo pipefail",
+          "command": "find scripts docs -name '*.sh' -exec sh -c 'head -25 \"$1\" | grep -q \"set -e\"' _ {} \\; -print | wc -l | xargs test 0 -eq"
+        }
+      ]
+    },
+    {
+      "id": "clippy-medium",
+      "description": "Address medium-complexity Clippy issues",
+      "stories": ["CQ-005", "CQ-006", "CQ-011"],
+      "timeoutMinutes": 120,
+      "gates": [
+        {
+          "name": "cast-safety-addressed",
+          "description": "Cast safety allows documented or fixed",
+          "command": "rg '#\\[allow\\(clippy::cast_' crates --count-matches || echo 0"
+        }
+      ]
+    },
+    {
+      "id": "code-quality",
+      "description": "Address code quality findings from CODE_QUALITY_ANALYSIS.md",
+      "stories": ["CQ-010", "CQ-013"],
+      "timeoutMinutes": 60,
+      "gates": [
+        {
+          "name": "todo-markers-tracked",
+          "description": "TODO markers documented in progress.txt",
+          "command": "grep -q 'TODO Audit' quality-test/progress.txt"
+        }
+      ]
+    },
+    {
+      "id": "final-verification",
+      "description": "Final Clippy pedantic pass and verification",
+      "stories": ["CQ-014", "CQ-015"],
+      "timeoutMinutes": 60,
+      "gates": [
+        {
+          "name": "clippy-pedantic-clean",
+          "description": "Clippy pedantic passes with minimal allows",
+          "command": "cargo clippy --all-targets -- -D warnings -W clippy::pedantic 2>&1 | grep -c 'warning:' | xargs test 50 -gt"
+        },
+        {
+          "name": "tests-pass",
+          "description": "All tests pass",
+          "command": "cargo test --all --lib"
+        }
+      ]
+    }
+  ],
+  "commitStrategy": {
+    "afterEachStory": true,
+    "pushAfterCommit": true,
+    "commitMessagePrefix": "feat(quality):",
+    "branchProtection": {
+      "requireCI": true,
+      "allowForcePush": false
+    }
+  },
+  "metrics": {
+    "track": [
+      "clippy_allows_count",
+      "unwrap_calls",
+      "println_calls",
+      "todo_markers",
+      "test_coverage"
+    ],
+    "baselinePath": "quality-test/baseline-metrics.json"
+  }
+}
