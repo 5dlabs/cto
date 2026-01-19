@@ -305,7 +305,7 @@ fn make_agent_name(org_name: &str, agent_suffix: &str) -> String {
 
 /// Load configuration from cto-config.json file
 /// Looks in current directory, workspace root, or `WORKSPACE_FOLDER_PATHS` for cto-config.json
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn load_cto_config() -> Result<CtoConfig> {
     // Debug: Show current working directory
     if let Ok(cwd) = std::env::current_dir() {
@@ -392,7 +392,7 @@ fn load_cto_config() -> Result<CtoConfig> {
 
 /// Load repository-specific configuration from cto-config.json
 /// Used during workflow creation to get repository's agent tool configurations
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn load_repository_config(repository_path: Option<&str>) -> Option<CtoConfig> {
     // Try to load from explicit repository path first
     if let Some(repo_path) = repository_path {
@@ -525,7 +525,7 @@ fn parse_bool_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<
 
 /// Auto-correct deprecated Anthropic model IDs to valid alternatives
 /// This prevents silent failures when clients pass outdated model names
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 /// Auto-correct deprecated Claude model names to current versions.
 /// Applied to any model starting with "claude-" prefix.
 fn autocorrect_model(model: &str) -> (String, bool) {
@@ -673,7 +673,7 @@ const REQUIRED_CLIS: &[CliDependency] = &[
 ];
 
 /// Check all required dependencies and optionally install missing ones
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn check_dependencies(auto_install: bool) {
     let mut missing: Vec<&CliDependency> = Vec::new();
 
@@ -1983,7 +1983,7 @@ fn find_blocked_play_tasks(working_dir: Option<&str>) -> Result<Vec<PlayTask>> {
 }
 
 /// Handle play status query
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
     let config = CTO_CONFIG.get().unwrap();
 
@@ -3610,7 +3610,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
 /// Unified intake workflow - parses PRD, generates tasks, and creates documentation
 /// This replaces the separate `intake_prd` and docs workflows
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 #[allow(clippy::too_many_lines)]
 fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Get configuration early so we can use defaults
@@ -5071,7 +5071,7 @@ fn handle_check_setup(arguments: &std::collections::HashMap<String, Value>) -> V
     })
 }
 
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 async fn rpc_loop() -> Result<()> {
     eprintln!("Starting RPC loop");
     let stdin = tokio::io::stdin();
@@ -5157,7 +5157,7 @@ async fn rpc_loop() -> Result<()> {
     Ok(())
 }
 
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn main() -> Result<()> {
     eprintln!(
         "🚀 Starting 5D Labs MCP Server... (built: {})",

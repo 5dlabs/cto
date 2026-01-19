@@ -1168,7 +1168,7 @@ mod cto_config_tests {
 
     /// Test that `generate_cto_config` produces valid config for all use cases
     #[test]
-    #[allow(clippy::similar_names)]
+    #[allow(clippy::similar_names)] // task1, task2, task3 are intentional test fixtures
     fn test_generate_cto_config_roundtrip() {
         use intake::domain::cto_config::CtoConfig;
 
@@ -1291,7 +1291,7 @@ mod cto_config_tests {
 // ===========================================================================
 // These tests verify the autoAppendDeployTask feature works correctly.
 
-#[allow(clippy::similar_names)]
+#[allow(clippy::similar_names)] // Test module uses task1, task2, etc. as fixtures
 mod auto_append_deploy_tests {
     use super::*;
     use intake::domain::{create_deploy_task, has_deploy_task};

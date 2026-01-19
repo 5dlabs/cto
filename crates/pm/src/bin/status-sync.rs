@@ -1401,7 +1401,7 @@ async fn inject_artifact_summary(input_fifo: &str, trail: &ArtifactTrail) -> boo
 
 /// Track tool invocation state for proper action activities
 #[derive(Default)]
-#[allow(clippy::struct_field_names)]
+#[allow(clippy::struct_field_names)] // current_ prefix is intentional for state tracking clarity
 struct ToolState {
     current_tool: Option<String>,
     current_input: Option<String>,

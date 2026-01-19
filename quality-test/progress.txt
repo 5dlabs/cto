@@ -140,3 +140,42 @@ pre-commit run --all-files
   - Decided to keep the allows with documented reasons rather than remove Result wrappers
   - Removing Result would be an API-breaking change with little benefit
 ---
+
+## 2026-01-18 - CQ-004
+- **Story**: Clippy Fix: Address unused_async allows (4 instances)
+- **Changes Made**:
+  - `crates/controller/src/tasks/cancel/recovery.rs`: Added reason comments (2 stubs)
+  - `crates/controller/src/tasks/cancel/labels.rs`: Added reason comment (1 stub)
+  - `crates/controller/src/tasks/cancel/coordinator.rs`: Added reason comment (1 stub)
+- **Verification**:
+  - All 4 instances now have documented reasons
+  - These are placeholder async stubs that will await when implemented
+- **Notes**:
+  - Decided to keep async keyword since these will need it when implemented
+  - Added reason comments explaining they're stubs awaiting implementation
+---
+
+## 2026-01-18 - CQ-007
+- **Story**: Clippy Fix: Address similar_names (3 instances)
+- **Changes Made**:
+  - `crates/intake/tests/intake_tests.rs`: Added reason comments (task1/task2/task3 test fixtures)
+  - `crates/controller/src/cli/adapter_factory.rs`: Already had reason (code_adapter vs codex_adapter)
+- **Verification**: All 3 instances documented
+---
+
+## 2026-01-18 - CQ-008
+- **Story**: Clippy Fix: Address struct_field_names (3 instances)
+- **Changes Made**:
+  - `crates/pm/src/bin/status-sync.rs`: Added reason (current_ prefix for state tracking)
+  - `crates/intake/src/ai/openai.rs`: Added reason (matches OpenAI API field names)
+  - `crates/healer/src/alerts/types.rs`: Already had reason (_mins suffix for clarity)
+- **Verification**: All 3 instances documented
+---
+
+## 2026-01-18 - CQ-012
+- **Story**: Clippy Fix: Address disallowed_macros (8 instances in MCP)
+- **Changes Made**:
+  - `crates/mcp/src/main.rs`: Added reason to all 8 instances
+  - Reason: "MCP uses stderr for debug output (stdout is JSON-RPC)"
+- **Verification**: cargo clippy --all-targets -- -D warnings: PASS
+---

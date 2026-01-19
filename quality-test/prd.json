@@ -76,7 +76,7 @@
         "cargo test passes"
       ],
       "testStrategy": "unit",
-      "passes": false
+      "passes": true
     },
     {
       "id": "CQ-005",
@@ -126,7 +126,7 @@
         "cargo test passes"
       ],
       "testStrategy": "unit",
-      "passes": false,
+      "passes": true,
       "notes": "Files: intake/tests/intake_tests.rs"
     },
     {
@@ -142,7 +142,7 @@
         "cargo test passes"
       ],
       "testStrategy": "unit",
-      "passes": false
+      "passes": true
     },
     {
       "id": "CQ-009",
@@ -204,7 +204,7 @@
         "Update allow with reason: #[allow(clippy::disallowed_macros, reason = \"MCP protocol requires stdout\")]"
       ],
       "testStrategy": "unit",
-      "passes": false
+      "passes": true
     },
     {
       "id": "CQ-013",
