@@ -1029,7 +1029,7 @@ mod cto_config_tests {
     /// Test that cto-config.json can be parsed with MCP's expected structure
     /// MCP uses a slightly different struct but should be compatible
     #[test]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn test_parse_cto_config_mcp_compatible() {
         // This mirrors the MCP's CtoConfig structure
         #[derive(Debug, serde::Deserialize)]

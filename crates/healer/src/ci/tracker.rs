@@ -168,7 +168,7 @@ impl RemediationTracker {
     /// # Errors
     ///
     /// Returns an error if spawning a retry `CodeRun` fails.
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     pub async fn handle_completion(
         &self,
         completion: CodeRunCompletion,

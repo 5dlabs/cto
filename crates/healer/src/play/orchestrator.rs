@@ -322,7 +322,7 @@ impl HealerOrchestrator {
     }
 
     /// Convert error log entries into session issues.
-    #[allow(clippy::too_many_lines, clippy::unused_self)]
+    #[allow(clippy::too_many_lines, clippy::unused_self)] // Complex log parsing logic
     fn logs_to_issues(
         &self,
         _session: &PlaySession,

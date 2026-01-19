@@ -80,7 +80,7 @@ pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Re
 }
 
 #[instrument(skip(ctx), fields(code_run_name = %code_run.name_any(), namespace = %ctx.namespace))]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) -> Result<Action> {
     let code_run_name = code_run.name_any();
     debug!(
@@ -1092,7 +1092,7 @@ async fn handle_workflow_resumption_on_failure(code_run: &CodeRun, ctx: &Context
 }
 
 /// Handle timeout when no PR is created
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn handle_no_pr_timeout(
     workflow_name: &str,
     code_run: &CodeRun,

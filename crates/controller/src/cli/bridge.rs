@@ -31,7 +31,7 @@ pub struct MarkdownCLIAdapter;
 
 #[async_trait]
 impl CLIAdapter for MarkdownCLIAdapter {
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
         // Generate CLAUDE.md content
         let mut claude_md = String::new();
@@ -312,7 +312,7 @@ pub struct FactoryCLIAdapter;
 
 #[async_trait]
 impl CLIAdapter for FactoryCLIAdapter {
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
         let sandbox_mode = universal.settings.sandbox_mode.clone();
         let auto_level = match sandbox_mode.as_str() {

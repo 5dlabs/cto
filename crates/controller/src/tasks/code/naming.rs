@@ -31,7 +31,7 @@ impl ResourceNaming {
     ///
     /// This is the single source of truth for job names.
     #[must_use]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     pub fn job_name(code_run: &CodeRun) -> String {
         let uid_suffix = code_run
             .metadata

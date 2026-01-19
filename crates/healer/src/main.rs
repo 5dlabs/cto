@@ -2143,7 +2143,7 @@ fn resolve_agent_config(
 }
 
 #[tokio::main]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -4548,7 +4548,7 @@ fn output_result<T: Serialize>(result: &T, format: OutputFormat) -> Result<()> {
 }
 
 /// Reset the E2E environment - clean cluster and reset test repo
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn reset_environment(
     namespace: &str,
     org: &str,
@@ -4699,7 +4699,7 @@ fn reset_environment(
 }
 
 /// Reset GitHub repository - delete and recreate with minimal structure
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetResult> {
     let full_repo = format!("{org}/{repo}");
     let mut result = GithubResetResult {
@@ -4853,7 +4853,7 @@ fn count_deleted(output: &[u8]) -> i32 {
 }
 
 /// Run/submit a play workflow via Argo CLI (reads all parameters from config)
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
     println!(
         "{}",
@@ -5188,7 +5188,7 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
 /// 5. Evaluates against acceptance criteria
 /// 6. On success: exits 0 (ends loop)
 /// 7. On failure: writes issue to PVC, creates Remediation `CodeRun`, exits 1
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
     println!(
         "{}",
@@ -5647,7 +5647,7 @@ fn verify_templates_directory(templates_dir: &str) -> Result<()> {
 }
 
 /// Watch for alerts and spawn Factory when detected.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn run_alert_watch(
     namespace: &str,
     prompts_dir: &str,
@@ -7135,7 +7135,7 @@ fn load_healer_config(config_path: &str) -> HealerConfig {
 
 /// Build the `CodeRun` YAML manifest using values from config.
 #[allow(clippy::too_many_arguments)] // CodeRun manifest requires many configuration fields
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn build_coderun_yaml(
     alert: &str,
     task_id: &str,
@@ -7531,7 +7531,7 @@ fn fetch_kubectl_output(args: &[&str], output_file: &str) -> Result<usize> {
 // =============================================================================
 
 /// Handle play orchestration commands.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
     use play::cleanup::PlayCleanup;
     use play::{PlayBatch, PlayTracker};
@@ -8119,7 +8119,7 @@ async fn run_play_api_command(addr: &str, namespace: &str) -> Result<()> {
 }
 
 /// Run the log scanning command.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn run_scan_logs_command(
     window: &str,
     namespaces: &str,
@@ -8278,7 +8278,7 @@ async fn run_scan_logs_command(
 ///
 /// Reads scan JSON from stdin, parses it, and spawns `CodeRuns` for services
 /// that need remediation.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn run_remediate_from_scan(config_path: &str, dry_run: bool, max_coderuns: usize) -> Result<()> {
     use scanner::{determine_agent_for_service, ScanReport};
     use std::io::{self, BufRead};

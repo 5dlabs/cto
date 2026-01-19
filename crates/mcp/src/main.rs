@@ -810,7 +810,7 @@ struct IntakeSetupIssue {
 
 /// Create Linear project and PRD issue for intake via PM server.
 /// This avoids needing the Linear API key on the client side.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn create_linear_intake_setup(
     project_name: &str,
     prd_content: &str,
@@ -1564,7 +1564,7 @@ fn clear_play_progress(repo: &str) {
 /// - Expected tools per agent
 /// - Task dependencies
 /// - Repository and service details
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn notify_healer(
     healer_endpoint: &str,
     play_id: &str,
@@ -3611,7 +3611,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 /// Unified intake workflow - parses PRD, generates tasks, and creates documentation
 /// This replaces the separate `intake_prd` and docs workflows
 #[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Get configuration early so we can use defaults
     let config = CTO_CONFIG

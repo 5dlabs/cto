@@ -383,7 +383,7 @@ data:
 /// # Errors
 ///
 /// Returns an error if kubectl commands fail.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub fn deploy_local_path_provisioner(
     kubeconfig: &Path,
     schedule_on_control_plane: bool,

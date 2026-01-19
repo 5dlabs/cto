@@ -205,7 +205,7 @@ impl OnboardingMachine {
     }
 
     /// Process an action and transition state
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     pub fn transition(&mut self, action: OnboardingAction) -> OnboardingResponse {
         let (new_state, message, actions, progress) = match (&self.state, action) {
             // Welcome -> GitHubConnect

@@ -338,7 +338,7 @@ impl BootstrapConfig {
     ///     .with_ingress_firewall("10.8.0.0/24", &["10.8.0.1"]);
     /// ```
     #[must_use]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     pub fn with_ingress_firewall(self, cluster_subnet: &str, controlplane_ips: &[&str]) -> Self {
         // ========================================================================
         // Common rules - applied to ALL nodes (control plane and workers)

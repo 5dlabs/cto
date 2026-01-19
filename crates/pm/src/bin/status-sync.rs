@@ -1418,7 +1418,7 @@ struct ToolState {
 /// - Transient status → ephemeral `thought` activities
 ///
 /// Also tracks file operations for the artifact trail (context engineering best practice).
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn process_stream_event(
     client: &LinearApiClient,
     session_id: &str,
@@ -1791,7 +1791,7 @@ async fn fifo_writer_task(config: Arc<Config>, mut fifo_rx: mpsc::Receiver<Strin
 /// 1. Firm reminder to focus
 /// 2. Sharp directive to execute NOW
 /// 3. Critical warning with timeout threat
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn progress_monitor_task(
     config: Arc<Config>,
     fifo_tx: mpsc::Sender<String>,

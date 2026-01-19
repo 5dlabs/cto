@@ -932,7 +932,7 @@ pub async fn read_project_config(
 ///
 /// # Returns
 /// `IntakeResult` with the `CodeRun` name and `ConfigMap` name
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn submit_intake_coderun(
     kube_client: &KubeClient,
     namespace: &str,
@@ -1202,7 +1202,7 @@ pub async fn submit_intake_coderun(
 /// Creates a `ConfigMap` with PRD content and submits an Argo workflow.
 ///
 /// Creates a `ConfigMap` with PRD content and submits an Argo workflow.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn submit_intake_workflow(
     kube_client: &KubeClient,
     namespace: &str,
@@ -1397,7 +1397,7 @@ pub async fn create_task_issues(
 }
 
 /// Create Linear issues for generated tasks, optionally linked to a project.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn create_task_issues_with_project(
     client: &LinearClient,
     request: &IntakeRequest,

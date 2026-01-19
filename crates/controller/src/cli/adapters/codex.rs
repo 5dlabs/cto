@@ -256,7 +256,7 @@ impl CliAdapter for CodexAdapter {
         Ok(true)
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String> {
         debug!(
             github_app = %agent_config.github_app,
