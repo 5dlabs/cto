@@ -14,3 +14,4 @@
 # Test after sensor update 1768801088
 # Final test 1768819769
 # Test 1768819909
+# Test with fixed partials 1768820705
