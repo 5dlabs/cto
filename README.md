@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/5dlabs-logo-dark.svg" alt="5D Labs Logo" width="400px">
+<img src="assets/46de8cb0-c4ee-4982-94c4-180f5da96bc4.jpg" alt="5D Labs Logo" width="400px">
 
 # **Cognitive Task Orchestrator**
 ## **AI Engineering Team + Open Source Bare Metal Infrastructure** 🚀
