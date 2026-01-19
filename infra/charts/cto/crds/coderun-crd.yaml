@@ -49,11 +49,13 @@ spec:
               runType:
                 type: string
                 default: "implementation"
-                description: "Type of run: implementation (default), documentation, or intake"
+                description: "Type of run: implementation (default), documentation, intake, review, or remediate"
                 enum:
                 - implementation
                 - documentation
                 - intake
+                - review
+                - remediate
               taskId:
                 type: integer
                 description: "Task ID to implement (required for implementation runs, optional for docs/intake)"
