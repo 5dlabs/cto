@@ -170,7 +170,7 @@ fn get_error_level_regexes() -> &'static Vec<Regex> {
             .filter_map(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    eprintln!("Failed to compile error level regex '{p}': {e}");
+                    tracing::warn!("Failed to compile error level regex '{p}': {e}");
                     None
                 }
             })
@@ -187,7 +187,7 @@ fn get_false_positive_regexes() -> &'static Vec<Regex> {
             .filter_map(|p| match Regex::new(p) {
                 Ok(r) => Some(r),
                 Err(e) => {
-                    eprintln!("Failed to compile false positive regex '{p}': {e}");
+                    tracing::warn!("Failed to compile false positive regex '{p}': {e}");
                     None
                 }
             })

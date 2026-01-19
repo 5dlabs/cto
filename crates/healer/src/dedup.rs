@@ -94,7 +94,7 @@ pub fn check_existing_remediation(
             return Ok(None);
         }
         // Log but don't fail - allow remediation to proceed
-        eprintln!("⚠️  Warning: Failed to check existing CodeRuns: {stderr}");
+        tracing::warn!("Failed to check existing CodeRuns: {stderr}");
         return Ok(None);
     }
 
