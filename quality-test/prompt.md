@@ -10,6 +10,27 @@ You are an autonomous code quality improvement agent working on the CTO platform
 
 **Branch:** `ralph/code-quality` (already created)
 
+**Workflow:** One PR with incremental commits. Push to `ralph/code-quality` branch after each story completion. All changes will be merged in a single PR for easier tracking.
+
+## CRITICAL: Local CI Gate (MUST PASS BEFORE PUSH)
+
+**You MUST run these checks locally before EVERY push. Do NOT push if any fail:**
+
+```bash
+# Run this EXACT command sequence before every push:
+./quality-test/run-ci-checks.sh
+
+# Or manually:
+cargo fmt --all --check && \
+cargo clippy -p controller --all-targets -- -D warnings -W clippy::pedantic && \
+cargo clippy -p healer --all-targets -- -D warnings -W clippy::pedantic && \
+cargo clippy -p intake --all-targets -- -D warnings -W clippy::pedantic && \
+cargo clippy --all-targets -- -D warnings && \
+cargo test --all --lib
+```
+
+**If CI fails after push:** Fix immediately, do not proceed to next story until CI is green.
+
 ## CRITICAL: Execution Protocol
 
 ### DO NOT:

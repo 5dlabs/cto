@@ -101,7 +101,7 @@ impl LabelOrchestrator {
             })?;
 
         // Validate transition conditions
-        self.validate_transition_conditions(&transition, task_id)?;
+        Self::validate_transition_conditions(&transition, task_id)?;
 
         // Execute the transition
         self.execute_transition(pr_number, task_id, transition.clone(), context)
@@ -155,7 +155,7 @@ impl LabelOrchestrator {
             .label_schema
             .get_transition(from_state, to_state, trigger)
         {
-            self.validate_transition_conditions(transition, task_id)?;
+            Self::validate_transition_conditions(transition, task_id)?;
             Ok(true)
         } else {
             Ok(false)
@@ -177,12 +177,11 @@ impl LabelOrchestrator {
 
     /// Validate all conditions for a transition
     fn validate_transition_conditions(
-        &self,
         transition: &StateTransition,
         task_id: &str,
     ) -> Result<(), OrchestratorError> {
         for condition in &transition.conditions {
-            if !self.evaluate_condition(condition, task_id)? {
+            if !Self::evaluate_condition(condition, task_id)? {
                 return Err(OrchestratorError::ConditionError(format!(
                     "Condition '{condition}' not satisfied for task {task_id}"
                 )));
@@ -192,11 +191,7 @@ impl LabelOrchestrator {
     }
 
     /// Evaluate a single condition
-    fn evaluate_condition(
-        &self,
-        condition: &str,
-        task_id: &str,
-    ) -> Result<bool, OrchestratorError> {
+    fn evaluate_condition(condition: &str, task_id: &str) -> Result<bool, OrchestratorError> {
         if condition.starts_with("iteration ") {
             let current_iteration = Self::get_current_iteration(task_id);
             Self::evaluate_iteration_condition(condition, current_iteration)
