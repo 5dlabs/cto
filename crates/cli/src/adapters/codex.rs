@@ -58,8 +58,7 @@ impl CodexAdapter {
         Ok(Self { base })
     }
 
-    #[allow(clippy::unused_self)]
-    fn render_config(&self, context: &Value) -> AdapterResult<String> {
+    fn render_config(context: &Value) -> AdapterResult<String> {
         use std::fmt::Write;
 
         let model = context["model"].as_str().unwrap_or("gpt-4");
@@ -315,7 +314,7 @@ impl CliAdapter for CodexAdapter {
             "model_reasoning_effort": reasoning_effort,
         });
 
-        let config = self.render_config(&context)?;
+        let config = Self::render_config(&context)?;
 
         info!(
             config_length = config.len(),

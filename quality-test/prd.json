@@ -1,0 +1,265 @@
+{
+  "name": "CTO Platform Code Quality - Ralph Loop",
+  "description": "Systematic code quality improvements addressing Clippy pedantic exclusions and issues from CODE_QUALITY_ANALYSIS.md. Focus on low-hanging fruit first, avoiding major architectural changes.",
+  "branchName": "ralph/code-quality",
+  "qualityMetrics": {
+    "baseline": {
+      "clippyAllows": 240,
+      "unwrapCalls": 706,
+      "printlnCalls": 1339,
+      "blockingIoCalls": 137,
+      "todoMarkers": 52
+    }
+  },
+  "userStories": [
+    {
+      "id": "CQ-001",
+      "title": "Pre-Flight: Verify Baseline and Setup",
+      "description": "Establish baseline metrics and verify build passes before any changes",
+      "priority": 1,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "cargo fmt --all --check passes",
+        "cargo clippy --all-targets -- -D warnings passes (without pedantic for baseline)",
+        "cargo test passes",
+        "Document baseline Clippy pedantic warning count",
+        "Record baseline counts: clippy allows, unwraps, printlns"
+      ],
+      "testStrategy": "smoke",
+      "passes": true
+    },
+    {
+      "id": "CQ-002",
+      "title": "Clippy Fix: Remove unused_self allows (23 instances)",
+      "description": "Fix methods that don't use self - either use self or make the method a free function/associated function",
+      "priority": 2,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "Review each #[allow(clippy::unused_self)] in crates/",
+        "For each: either use self in the method body OR convert to associated function (Self::method())",
+        "Remove the allow attribute after fixing",
+        "cargo clippy --all-targets -- -D warnings -W clippy::pedantic passes for affected files",
+        "cargo test passes"
+      ],
+      "testStrategy": "unit",
+      "passes": true,
+      "notes": "Files: healer/src/scanner.rs, healer/src/reconcile.rs, healer/src/prometheus.rs, healer/src/play/*.rs, research/src/storage/markdown.rs"
+    },
+    {
+      "id": "CQ-003",
+      "title": "Clippy Fix: Remove unnecessary_wraps allows (4 instances)",
+      "description": "Fix functions that wrap results unnecessarily",
+      "priority": 2,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "Review each #[allow(clippy::unnecessary_wraps)]",
+        "Either remove the Result wrapper OR document why it's needed for API consistency",
+        "Remove the allow attribute",
+        "cargo clippy --all-targets -- -D warnings -W clippy::pedantic passes",
+        "cargo test passes"
+      ],
+      "testStrategy": "unit",
+      "passes": true,
+      "notes": "Files: intake/src/ai/cli_provider.rs, controller/src/tasks/code/templates.rs"
+    },
+    {
+      "id": "CQ-004",
+      "title": "Clippy Fix: Remove unused_async allows (4 instances)",
+      "description": "Fix async functions that don't actually await anything",
+      "priority": 2,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "Review each #[allow(clippy::unused_async)]",
+        "Remove async keyword if function doesn't await OR add await if appropriate",
+        "Remove the allow attribute",
+        "cargo clippy --all-targets -- -D warnings -W clippy::pedantic passes",
+        "cargo test passes"
+      ],
+      "testStrategy": "unit",
+      "passes": false
+    },
+    {
+      "id": "CQ-005",
+      "title": "Clippy Fix: Address cast safety issues (51 instances)",
+      "description": "Fix numeric casts that may truncate, lose precision, or wrap",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Review cast_possible_truncation (18), cast_precision_loss (15), cast_possible_wrap (10), cast_sign_loss (8)",
+        "Use TryFrom/TryInto where appropriate",
+        "Add explicit bounds checking where needed",
+        "Document with expect() where truncation is intentional and safe",
+        "Remove allow attributes after fixing",
+        "cargo test passes"
+      ],
+      "testStrategy": "unit",
+      "passes": false,
+      "notes": "Focus on intake, controller, healer crates first"
+    },
+    {
+      "id": "CQ-006",
+      "title": "Clippy Fix: Address struct_excessive_bools (6 instances)",
+      "description": "Refactor structs with too many boolean fields",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Review each #[allow(clippy::struct_excessive_bools)]",
+        "Consider using enums or bitflags where appropriate",
+        "For CLI structs (flags), document why bools are appropriate",
+        "Remove allow attributes where refactored",
+        "cargo test passes"
+      ],
+      "testStrategy": "unit",
+      "passes": false,
+      "notes": "Files: pm/src/config.rs, healer/src/play/types.rs"
+    },
+    {
+      "id": "CQ-007",
+      "title": "Clippy Fix: Address similar_names (3 instances)",
+      "description": "Rename variables with confusingly similar names",
+      "priority": 2,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "Review each #[allow(clippy::similar_names)]",
+        "Rename variables to be more distinct",
+        "Remove allow attributes",
+        "cargo test passes"
+      ],
+      "testStrategy": "unit",
+      "passes": false,
+      "notes": "Files: intake/tests/intake_tests.rs"
+    },
+    {
+      "id": "CQ-008",
+      "title": "Clippy Fix: Address struct_field_names (3 instances)",
+      "description": "Fix struct fields with names that match the struct type",
+      "priority": 2,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "Review each #[allow(clippy::struct_field_names)]",
+        "Rename fields to not include the struct type name",
+        "Remove allow attributes",
+        "cargo test passes"
+      ],
+      "testStrategy": "unit",
+      "passes": false
+    },
+    {
+      "id": "CQ-009",
+      "title": "Code Quality: Fix Shell Scripts Missing Strict Mode",
+      "description": "Add set -euo pipefail to shell scripts missing it",
+      "priority": 2,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "Audit all .sh files for strict mode",
+        "Add 'set -euo pipefail' to scripts missing it",
+        "Run shellcheck on modified scripts",
+        "Test scripts still work correctly"
+      ],
+      "testStrategy": "smoke",
+      "passes": false
+    },
+    {
+      "id": "CQ-010",
+      "title": "Code Quality: Review and Track TODO Markers",
+      "description": "Review all TODO/FIXME markers and either fix or create tracked issues",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "List all todo!/unimplemented!/FIXME/TODO markers",
+        "For quick fixes: implement the TODO",
+        "For larger items: convert to issue reference (// TODO(#issue): description)",
+        "Document remaining TODOs in progress.txt"
+      ],
+      "testStrategy": "manual",
+      "passes": false,
+      "notes": "52 markers across 20 files per CODE_QUALITY_ANALYSIS.md"
+    },
+    {
+      "id": "CQ-011",
+      "title": "Clippy Fix: Address too_many_arguments (10 instances)",
+      "description": "Refactor functions with too many arguments",
+      "priority": 3,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Review each #[allow(clippy::too_many_arguments)]",
+        "Consider using builder pattern or config structs",
+        "Refactor where practical without major design changes",
+        "Document exceptions (CLI handlers) with reason",
+        "Remove allow attributes where fixed"
+      ],
+      "testStrategy": "unit",
+      "passes": false
+    },
+    {
+      "id": "CQ-012",
+      "title": "Clippy Fix: Address disallowed_macros (9 instances in MCP)",
+      "description": "Review why macros are disallowed and fix or document",
+      "priority": 3,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "Review each #[allow(clippy::disallowed_macros)] in mcp/src/main.rs",
+        "If println! for MCP protocol: document why it's needed",
+        "If regular logging: migrate to tracing",
+        "Update allow with reason: #[allow(clippy::disallowed_macros, reason = \"MCP protocol requires stdout\")]"
+      ],
+      "testStrategy": "unit",
+      "passes": false
+    },
+    {
+      "id": "CQ-013",
+      "title": "Code Quality: Audit Mutex Usage for Await Points",
+      "description": "Review all Mutex/RwLock usage to ensure no deadlocks",
+      "priority": 2,
+      "complexity": "medium",
+      "acceptanceCriteria": [
+        "Audit each Mutex::new/RwLock::new in async code",
+        "Verify locks are not held across .await points",
+        "Add drop(guard) before await if needed",
+        "Document any intentional patterns"
+      ],
+      "testStrategy": "review",
+      "passes": false,
+      "notes": "40 instances across 21 files per CODE_QUALITY_ANALYSIS.md"
+    },
+    {
+      "id": "CQ-014",
+      "title": "Clippy Fix: Reduce too_many_lines allows - Phase 1",
+      "description": "Refactor the most egregious too_many_lines functions",
+      "priority": 4,
+      "complexity": "high",
+      "acceptanceCriteria": [
+        "Identify top 10 longest functions with #[allow(clippy::too_many_lines)]",
+        "Extract logical sections into helper functions",
+        "Maintain same behavior (no functionality changes)",
+        "Remove allow attributes where function now under limit",
+        "cargo test passes"
+      ],
+      "testStrategy": "integration",
+      "passes": false,
+      "notes": "79 instances - this is Phase 1 targeting quick wins"
+    },
+    {
+      "id": "CQ-015",
+      "title": "Final Verification: Clippy Pedantic Pass",
+      "description": "Verify all changes compile and pass Clippy pedantic",
+      "priority": 5,
+      "complexity": "low",
+      "acceptanceCriteria": [
+        "cargo fmt --all --check passes",
+        "cargo clippy --all-targets -- -D warnings -W clippy::pedantic has fewer warnings than baseline",
+        "cargo test passes",
+        "Document remaining allows with justifications",
+        "Update progress.txt with final metrics"
+      ],
+      "testStrategy": "integration",
+      "passes": false
+    }
+  ],
+  "config": {
+    "freshStartThreshold": 3,
+    "cli": "claude",
+    "avoidMajorDesignChanges": true,
+    "focusOnLowHangingFruit": true
+  }
+}

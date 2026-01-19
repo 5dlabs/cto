@@ -199,7 +199,7 @@ impl LabelOrchestrator {
     ) -> Result<bool, OrchestratorError> {
         if condition.starts_with("iteration ") {
             let current_iteration = Self::get_current_iteration(task_id);
-            self.evaluate_iteration_condition(condition, current_iteration)
+            Self::evaluate_iteration_condition(condition, current_iteration)
         } else {
             warn!("Unknown condition type: {}", condition);
             Ok(false)
@@ -213,9 +213,7 @@ impl LabelOrchestrator {
     }
 
     /// Evaluate iteration-based conditions
-    #[allow(clippy::unused_self)]
     fn evaluate_iteration_condition(
-        &self,
         condition: &str,
         current_iteration: i32,
     ) -> Result<bool, OrchestratorError> {
@@ -420,7 +418,7 @@ impl LabelOrchestrator {
         let _current_state = self.label_schema.determine_workflow_state(&current_labels);
 
         // Calculate required operations to reach target state
-        let operations = self.calculate_force_operations(&current_labels, &target_state);
+        let operations = Self::calculate_force_operations(&current_labels, &target_state);
 
         // Execute operations
         if !operations.is_empty() {
@@ -437,9 +435,7 @@ impl LabelOrchestrator {
     }
 
     /// Calculate operations needed to force a state
-    #[allow(clippy::unused_self)]
     fn calculate_force_operations(
-        &self,
         current_labels: &[String],
         target_state: &WorkflowState,
     ) -> Vec<LabelOperation> {

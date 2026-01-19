@@ -146,7 +146,7 @@ impl PrometheusClient {
             anyhow::bail!("Prometheus query returned status: {}", prom_response.status);
         }
 
-        Ok(self.parse_results(&prom_response.data.result))
+        Ok(Self::parse_results(&prom_response.data.result))
     }
 
     /// Execute a range query.
@@ -204,7 +204,7 @@ impl PrometheusClient {
             );
         }
 
-        Ok(self.parse_range_results(&prom_response.data.result))
+        Ok(Self::parse_range_results(&prom_response.data.result))
     }
 
     /// Get pod statuses for a namespace.
@@ -363,8 +363,7 @@ impl PrometheusClient {
     }
 
     /// Parse instant query results.
-    #[allow(clippy::unused_self)]
-    fn parse_results(&self, results: &[PrometheusResult]) -> Vec<MetricSample> {
+    fn parse_results(results: &[PrometheusResult]) -> Vec<MetricSample> {
         let mut samples = Vec::new();
 
         for result in results {
@@ -386,8 +385,7 @@ impl PrometheusClient {
     }
 
     /// Parse range query results (flattens all time series).
-    #[allow(clippy::unused_self)]
-    fn parse_range_results(&self, results: &[PrometheusResult]) -> Vec<MetricSample> {
+    fn parse_range_results(results: &[PrometheusResult]) -> Vec<MetricSample> {
         let mut samples = Vec::new();
 
         for result in results {

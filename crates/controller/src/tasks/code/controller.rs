@@ -178,7 +178,12 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
         let coderuns_api: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
         match coderuns_api.get(&code_run.name_any()).await {
             Ok(fresh) => {
-                if fresh.status.as_ref().and_then(|s| s.job_name.as_ref()).is_some() {
+                if fresh
+                    .status
+                    .as_ref()
+                    .and_then(|s| s.job_name.as_ref())
+                    .is_some()
+                {
                     debug!(
                         "Fresh CodeRun has job_name: {:?}",
                         fresh.status.as_ref().and_then(|s| s.job_name.as_ref())

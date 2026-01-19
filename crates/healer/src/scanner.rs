@@ -630,8 +630,8 @@ impl LogScanner {
             }
 
             // Group by service/pod
-            self.process_entries(namespace, &error_entries, "error", &mut all_issues);
-            self.process_entries(namespace, &warn_entries, "warn", &mut all_issues);
+            Self::process_entries(namespace, &error_entries, "error", &mut all_issues);
+            Self::process_entries(namespace, &warn_entries, "warn", &mut all_issues);
 
             total_errors += u32::try_from(error_entries.len()).unwrap_or(u32::MAX);
             total_warnings += u32::try_from(warn_entries.len()).unwrap_or(u32::MAX);
@@ -648,7 +648,7 @@ impl LogScanner {
 
         // Determine if remediation is recommended
         let (remediation_recommended, recommendation_reason) =
-            self.analyze_for_remediation(&services_with_issues);
+            Self::analyze_for_remediation(&services_with_issues);
 
         Ok(ScanReport {
             scan_time: end,
@@ -663,9 +663,7 @@ impl LogScanner {
     }
 
     /// Process log entries and group by service.
-    #[allow(clippy::unused_self)]
     fn process_entries(
-        &self,
         namespace: &str,
         entries: &[LogEntry],
         level: &str,
@@ -745,8 +743,7 @@ impl LogScanner {
     }
 
     /// Analyze issues to determine if remediation should be triggered.
-    #[allow(clippy::unused_self)]
-    fn analyze_for_remediation(&self, issues: &[ServiceIssue]) -> (bool, Option<String>) {
+    fn analyze_for_remediation(issues: &[ServiceIssue]) -> (bool, Option<String>) {
         if issues.is_empty() {
             return (false, None);
         }

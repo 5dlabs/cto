@@ -55,7 +55,7 @@ impl RemediationEngine {
         // Get PR context if we have a PR number
         if let Some(task) = task {
             if let Some(pr_number) = task.pr_number {
-                context.pr_state = self.fetch_pr_context(&batch.repository, pr_number).ok();
+                context.pr_state = Self::fetch_pr_context(&batch.repository, pr_number).ok();
             }
         }
 
@@ -112,8 +112,7 @@ impl RemediationEngine {
     }
 
     /// Fetch PR context from GitHub.
-    #[allow(clippy::unused_self)]
-    fn fetch_pr_context(&self, repository: &str, pr_number: u32) -> Result<PrContext> {
+    fn fetch_pr_context(repository: &str, pr_number: u32) -> Result<PrContext> {
         let output = Command::new("gh")
             .args([
                 "pr",

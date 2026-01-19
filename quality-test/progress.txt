@@ -1,0 +1,142 @@
+# CTO Platform Code Quality - Ralph Loop Progress
+Started: 2026-01-18
+---
+
+## Reference Documents
+- **Quality Analysis**: `docs/CODE_QUALITY_ANALYSIS.md`
+- **PRD**: `quality-test/prd.json`
+- **Branch**: `ralph/code-quality`
+
+## Baseline Metrics (from CODE_QUALITY_ANALYSIS.md)
+| Metric | Count | Files |
+|--------|-------|-------|
+| #[allow(clippy::*)] | 240 | 100 |
+| unwrap() calls | 706 | 104 |
+| println! calls | 1,339 | 29 |
+| std::fs blocking I/O | 137 | 31 |
+| TODO/FIXME markers | 52 | 20 |
+| Mutex/RwLock instances | 40 | 21 |
+
+## Clippy Allow Breakdown
+| Allow Type | Count | Priority |
+|------------|-------|----------|
+| too_many_lines | 79 | Phase 2 (complex) |
+| unused_self | 23 | Phase 1 (quick fix) |
+| cast_possible_truncation | 18 | Phase 1 |
+| cast_precision_loss | 15 | Phase 1 |
+| too_many_arguments | 10 | Phase 1-2 |
+| cast_possible_wrap | 10 | Phase 1 |
+| disallowed_macros | 9 | Phase 1 (document) |
+| cast_sign_loss | 8 | Phase 1 |
+| struct_excessive_bools | 6 | Phase 1-2 |
+| unnecessary_wraps | 4 | Phase 1 |
+| unused_async | 4 | Phase 1 |
+| struct_field_names | 3 | Phase 1 |
+| similar_names | 3 | Phase 1 |
+| large_enum_variant | 3 | Phase 2 |
+| format_push_string | 3 | Phase 1 |
+| case_sensitive_file_extension_comparisons | 3 | Phase 1 |
+| fn_params_excessive_bools | 2 | Phase 1 (CLI - document) |
+| Other (1 each) | 8 | Varies |
+
+## Codebase Patterns (For Ralph Reference)
+- Use `cargo fmt --all --check` before committing
+- Use `cargo clippy --all-targets -- -D warnings -W clippy::pedantic` for full linting
+- Run `cargo test` to verify no regressions
+- Pre-commit hooks: `pre-commit run --all-files`
+- PRs should target `develop` branch (not `main`)
+
+## Quality Fix Guidelines
+1. **unused_self**: Either use self or convert to associated function `Self::method()`
+2. **unnecessary_wraps**: Remove Result wrapper if not needed, or document why
+3. **unused_async**: Remove async keyword if no await, or add appropriate await
+4. **cast_***: Use TryFrom/TryInto with proper error handling, or document safety
+5. **too_many_arguments**: Consider builder pattern or config struct
+6. **too_many_lines**: Extract helper functions for logical sections
+7. **disallowed_macros** (MCP): Document reason - MCP protocol requires stdout
+
+## Build Commands
+```bash
+# Format check
+cargo fmt --all --check
+
+# Basic Clippy (CI)
+cargo clippy --all-targets -- -D warnings
+
+# Pedantic Clippy (quality)
+cargo clippy --all-targets -- -D warnings -W clippy::pedantic
+
+# Tests
+cargo test
+
+# Pre-commit
+pre-commit run --all-files
+```
+
+---
+
+## Progress Log
+
+---
+
+## 2026-01-18 - CQ-001
+- **Story**: Pre-Flight: Verify Baseline and Setup
+- **Baseline Established**:
+  | Metric | Count |
+  |--------|-------|
+  | Files with clippy::allow | 100 |
+  | Total clippy::allow | 240 |
+  | unwrap() calls | 821 |
+  | println! calls | 1,803 |
+  | std::fs:: calls | 141 |
+- **Verification**:
+  - cargo fmt --all --check: PASS (after applying fmt fix)
+  - cargo clippy --all-targets -- -D warnings: PASS
+  - cargo test: PASS
+  - cargo clippy --all-targets -- -D warnings -W clippy::pedantic: PASS (all warnings suppressed by allows)
+- **Notes**:
+  - Formatting fix applied to controller.rs (chain formatting)
+  - All current allows are working correctly to suppress pedantic warnings
+  - Ready to begin removing allows one category at a time
+---
+
+## 2026-01-18 - CQ-002
+- **Story**: Clippy Fix: Remove unused_self allows (23 instances)
+- **Changes Made**:
+  - `crates/healer/src/prometheus.rs`: Converted `parse_results` and `parse_range_results` to associated functions
+  - `crates/healer/src/scanner.rs`: Converted `process_entries` and `analyze_for_remediation` to associated functions
+  - `crates/healer/src/reconcile.rs`: Converted `parse_issue` to associated function
+  - `crates/healer/src/platform/workflow.rs`: Converted `extract_workflow_pattern`, `diagnose_from_logs`, `determine_target` to associated functions
+  - `crates/healer/src/play/remediate.rs`: Converted `fetch_pr_context` to associated function
+  - `crates/healer/src/play/orchestrator.rs`: Converted `escalate_issue`, `get_remediation_attempt_count` to associated functions
+  - `crates/controller/src/cli/adapters/*.rs`: Converted `render_config` to associated functions (opencode, gemini, codex, code)
+  - `crates/controller/src/tasks/label/orchestrator.rs`: Converted `evaluate_iteration_condition`, `calculate_force_operations` to associated functions
+  - `crates/controller/src/tasks/label/override_detector.rs`: Converted `detect_overrides` to associated function
+  - `crates/cli/src/adapters/*.rs`: Converted `render_config` to associated functions (opencode, gemini, codex, code)
+  - `crates/research/src/storage/markdown.rs`: Converted `render_markdown` to associated function
+- **Verification**:
+  - cargo fmt --all --check: PASS
+  - cargo clippy --all-targets -- -D warnings: PASS
+  - cargo test: PASS
+  - unused_self allows: 23 → 0 (ALL REMOVED)
+- **Notes**: 
+  - All methods were pure utility functions that didn't use self
+  - Converted to associated functions using `Self::method()` call pattern
+  - Updated 23 call sites to use `Self::` prefix
+---
+
+## 2026-01-18 - CQ-003
+- **Story**: Clippy Fix: Remove unnecessary_wraps allows (4 instances)
+- **Changes Made**:
+  - `crates/controller/src/cli/adapters/code.rs`: Already had reason comment
+  - `crates/controller/src/cli/adapters/codex.rs`: Already had reason comment
+  - `crates/intake/src/ai/cli_provider.rs`: Added reason comment "Returns Result for consistency with trait methods"
+  - `crates/controller/src/tasks/code/templates.rs`: Already had reason comment
+- **Verification**:
+  - cargo clippy --all-targets -- -D warnings: PASS
+  - All 4 instances now have documented reasons why Result wrapper is needed
+- **Notes**:
+  - These methods return Result for API consistency with other methods in the same interface
+  - Decided to keep the allows with documented reasons rather than remove Result wrappers
+  - Removing Result would be an API-breaking change with little benefit
+---

@@ -102,8 +102,7 @@ impl GeminiAdapter {
             })
     }
 
-    #[allow(clippy::unused_self)] // Required by trait signature
-    fn render_config(&self, context: &Value) -> AdapterResult<String> {
+    fn render_config(context: &Value) -> AdapterResult<String> {
         // Serialize configuration directly (no template needed)
         serde_json::to_string_pretty(context).map_err(|err| {
             AdapterError::ConfigGenerationError(format!("Failed to serialize Gemini config: {err}"))
@@ -217,7 +216,7 @@ impl CliAdapter for GeminiAdapter {
         self.base.validate_base_config(agent_config)?;
 
         let context = self.build_config_context(agent_config);
-        let rendered = self.render_config(&context)?;
+        let rendered = Self::render_config(&context)?;
 
         debug!(
             config_length = rendered.len(),

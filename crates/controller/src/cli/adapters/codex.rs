@@ -100,9 +100,8 @@ impl CodexAdapter {
             })
     }
 
-    #[allow(clippy::unused_self)] // Required by trait signature
-    #[allow(clippy::unnecessary_wraps)] // Required by trait signature
-    fn render_config(&self, context: &Value) -> AdapterResult<String> {
+    #[allow(clippy::unnecessary_wraps)] // Returns Result for consistency with other adapters
+    fn render_config(context: &Value) -> AdapterResult<String> {
         use std::fmt::Write;
         // Generate TOML configuration directly (no template needed)
         // This is only used for health checks, so a simplified format is sufficient
@@ -383,7 +382,7 @@ impl CliAdapter for CodexAdapter {
             "raw_additional_toml": raw_additional_toml,
         });
 
-        let config = self.render_config(&context)?;
+        let config = Self::render_config(&context)?;
 
         info!(
             config_length = config.len(),

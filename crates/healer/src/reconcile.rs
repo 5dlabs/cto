@@ -217,15 +217,14 @@ impl IssueReconciler {
 
         let issues = raw_issues
             .into_iter()
-            .filter_map(|v| self.parse_issue(&v))
+            .filter_map(|v| Self::parse_issue(&v))
             .collect();
 
         Ok(issues)
     }
 
     /// Parse a raw JSON issue into a `HealerIssue`.
-    #[allow(clippy::unused_self)]
-    fn parse_issue(&self, value: &serde_json::Value) -> Option<HealerIssue> {
+    fn parse_issue(value: &serde_json::Value) -> Option<HealerIssue> {
         let number = value["number"].as_u64()?;
         let title = value["title"].as_str()?.to_string();
         let created_at_str = value["createdAt"].as_str()?;

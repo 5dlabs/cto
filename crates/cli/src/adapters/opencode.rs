@@ -59,8 +59,7 @@ impl OpenCodeAdapter {
         Ok(Self { base })
     }
 
-    #[allow(clippy::unused_self)]
-    fn render_config(&self, context: &Value) -> AdapterResult<String> {
+    fn render_config(context: &Value) -> AdapterResult<String> {
         serde_json::to_string_pretty(context).map_err(|err| {
             AdapterError::ConfigGenerationError(format!(
                 "Failed to serialize OpenCode config: {err}"
@@ -195,7 +194,7 @@ impl CliAdapter for OpenCodeAdapter {
         self.base.validate_base_config(agent_config)?;
 
         let context = self.build_config_context(agent_config);
-        let rendered = self.render_config(&context)?;
+        let rendered = Self::render_config(&context)?;
 
         debug!(
             config_length = rendered.len(),

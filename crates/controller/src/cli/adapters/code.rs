@@ -138,9 +138,8 @@ impl CodeAdapter {
             })
     }
 
-    #[allow(clippy::unused_self)]
-    #[allow(clippy::unnecessary_wraps)]
-    fn render_config(&self, context: &Value) -> AdapterResult<String> {
+    #[allow(clippy::unnecessary_wraps)] // Returns Result for consistency with other adapters
+    fn render_config(context: &Value) -> AdapterResult<String> {
         use std::fmt::Write;
 
         // Generate TOML configuration for Every Code (~/.code/config.toml)
@@ -380,7 +379,7 @@ impl CliAdapter for CodeAdapter {
             "model_reasoning_summary": reasoning_summary,
         });
 
-        let config = self.render_config(&context)?;
+        let config = Self::render_config(&context)?;
 
         info!(
             config_length = config.len(),

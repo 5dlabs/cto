@@ -606,7 +606,7 @@ impl CLITextGenerator {
     }
 
     /// Parse CLI output and extract the actual content.
-    #[allow(clippy::unnecessary_wraps)]
+    #[allow(clippy::unnecessary_wraps)] // Returns Result for consistency with trait methods
     fn parse_cli_output(&self, output: &str, _model: &str) -> TasksResult<(String, TokenUsage)> {
         // Log output for debugging
         let output_preview = if output.len() > 500 {

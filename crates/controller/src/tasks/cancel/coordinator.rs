@@ -32,7 +32,7 @@ impl CancellationCoordinator {
         Self {}
     }
 
-    #[allow(clippy::unused_async)]
+    #[allow(clippy::unused_async)] // Stub: will await cancellation workflow when implemented
     pub async fn request_cancellation(&self, _task_id: &str) -> Result<(), String> {
         // Placeholder implementation
         Ok(())
