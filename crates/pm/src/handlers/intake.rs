@@ -1037,6 +1037,7 @@ pub async fn submit_intake_coderun(
         "cli": cli,
         "linear_session_id": request.session_id,
         "linear_issue_id": request.prd_issue_id,
+        "linear_issue_identifier": request.prd_identifier,
         "linear_team_id": request.team_id,
         "linear_project_id": project_id,
         // Morgan's tools from project cto-config.json
@@ -1264,6 +1265,7 @@ pub async fn submit_intake_workflow(
         // Linear-specific metadata for callbacks.
         "linear_session_id": request.session_id,
         "linear_issue_id": request.prd_issue_id,
+        "linear_issue_identifier": request.prd_identifier,
         "linear_team_id": request.team_id,
     });
 

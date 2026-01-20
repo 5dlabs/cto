@@ -6,7 +6,7 @@
     "pid": null
   },
   "remediation": {
-    "status": "idle",
+    "status": "stopped",
     "currentIssue": null,
     "pid": 92116
   },
