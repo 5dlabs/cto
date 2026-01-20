@@ -386,7 +386,7 @@ pub fn get_verification_hints(agent_hint: &str) -> VerificationHints {
         },
         "bolt" => VerificationHints {
             tests: "helm lint charts/*",
-            lint: "kubectl apply --dry-run=client -f",
+            lint: "kubectl apply --dry-run=client -f . -R",
             format: "yamllint .",
             build: "helm template charts/*",
         },
