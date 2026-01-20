@@ -2445,12 +2445,7 @@ impl CodeTemplateGenerator {
         );
 
         // Generate prompt.md for review task
-        let pr_url = code_run
-            .spec
-            .env
-            .get("PR_URL")
-            .cloned()
-            .unwrap_or_default();
+        let pr_url = code_run.spec.env.get("PR_URL").cloned().unwrap_or_default();
         let pr_title = code_run
             .spec
             .env

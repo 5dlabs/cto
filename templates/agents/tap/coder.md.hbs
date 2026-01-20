@@ -373,24 +373,34 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 eas env:pull --environment development
 ```
 
-## Local Validation Commands
+## Tiered Validation (Ralph Backpressure)
+
+Use fast feedback loops during development, full validation before PR.
+
+### After Each Code Change (Tier 1 - Immediate, <5s)
 
 ```bash
-# Type check
-npx tsc --noEmit
-
-# Lint
-npx eslint .
-
-# Tests
-npm test
-
-# Doctor check
-npx expo-doctor
-
-# Start dev
-npx expo start
+npx tsc --noEmit  # Type check only, catches most issues fast
 ```
+
+### After Completing a Component/Feature (Tier 2 - Fast, <30s)
+
+```bash
+npx eslint app/path/to/changed/  # Lint changed files
+npm test -- --testPathPattern="changed-component"  # Test related component
+```
+
+### Before Creating PR (Tier 3 - Full, MANDATORY)
+
+```bash
+npx tsc --noEmit
+npx eslint .
+npm test
+npx expo-doctor
+npx expo export  # Verify production bundle builds
+```
+
+**DO NOT skip Tier 3 before PR.** Fast tiers are for iteration speed, not completeness.
 
 ## OpenMemory (Persistent Agent Memory)
 

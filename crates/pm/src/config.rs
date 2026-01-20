@@ -413,12 +413,8 @@ impl Default for PlayConfig {
                 .unwrap_or_else(|_| "5DLabs-Rex".to_string()),
             frontend_agent: env::var("FRONTEND_AGENT")
                 .unwrap_or_else(|_| "5DLabs-Blaze".to_string()),
-            go_agent: Some(
-                env::var("GO_AGENT").unwrap_or_else(|_| "5DLabs-Grizz".to_string()),
-            ),
-            node_agent: Some(
-                env::var("NODE_AGENT").unwrap_or_else(|_| "5DLabs-Nova".to_string()),
-            ),
+            go_agent: Some(env::var("GO_AGENT").unwrap_or_else(|_| "5DLabs-Grizz".to_string())),
+            node_agent: Some(env::var("NODE_AGENT").unwrap_or_else(|_| "5DLabs-Nova".to_string())),
             mobile_agent: Some(
                 env::var("MOBILE_AGENT").unwrap_or_else(|_| "5DLabs-Tap".to_string()),
             ),

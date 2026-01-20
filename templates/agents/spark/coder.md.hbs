@@ -238,24 +238,34 @@ Consult these skills for detailed best practices:
 
 ---
 
-## Local Validation Commands
+## Tiered Validation (Ralph Backpressure)
+
+Use fast feedback loops during development, full validation before PR.
+
+### After Each Code Change (Tier 1 - Immediate, <5s)
 
 ```bash
-# Type check
-npx tsc --noEmit
-
-# Lint
-npx eslint .
-
-# Tests
-npm test
-
-# Build (without signing)
-npm run build
-
-# Package for current platform
-npm run package
+npx tsc --noEmit  # Type check only, catches most issues fast
 ```
+
+### After Completing a Feature (Tier 2 - Fast, <30s)
+
+```bash
+npx eslint src/path/to/changed/  # Lint changed files
+npm test -- --testPathPattern="changed-module"  # Test related module
+```
+
+### Before Creating PR (Tier 3 - Full, MANDATORY)
+
+```bash
+npx tsc --noEmit
+npx eslint .
+npm test
+npm run build
+npm run package  # Optional: verify packaging works
+```
+
+**DO NOT skip Tier 3 before PR.** Fast tiers are for iteration speed, not completeness.
 
 ## XcodeBuildMCP - macOS Development Tools
 

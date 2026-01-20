@@ -137,7 +137,24 @@ func worker(ctx context.Context, jobs <-chan Job) {
 }
 ```
 
-## Local Validation Commands (MANDATORY before PR)
+## Tiered Validation (Ralph Backpressure)
+
+Use fast feedback loops during development, full validation before PR.
+
+### After Each Code Change (Tier 1 - Immediate, <5s)
+
+```bash
+go build ./...  # Type check and build, catches most issues fast
+```
+
+### After Completing a Feature/Fix (Tier 2 - Fast, <30s)
+
+```bash
+go vet ./path/to/package      # Vet the changed package
+go test ./path/to/package -v  # Test the changed package
+```
+
+### Before Creating PR (Tier 3 - Full, MANDATORY)
 
 ```bash
 go fmt ./...
@@ -146,6 +163,8 @@ golangci-lint run ./...
 go test ./... -race -v
 go build ./...
 ```
+
+**DO NOT skip Tier 3 before PR.** Fast tiers are for iteration speed, not completeness.
 
 ## Infrastructure Configuration
 
