@@ -77,7 +77,7 @@ pub struct CallbackState {
 ///
 /// This is called by the Argo intake workflow when it completes.
 /// It creates Linear sub-issues for each generated task.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn handle_intake_complete(
     State(state): State<Arc<CallbackState>>,
     Json(payload): Json<IntakeCompleteCallback>,
@@ -520,7 +520,7 @@ pub struct PlayCompleteCallback {
 ///
 /// This is called by the Argo play workflow when it completes.
 /// It updates the Linear issue state, agent status label, and emits completion activity.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn handle_play_complete(
     State(state): State<Arc<CallbackState>>,
     Json(payload): Json<PlayCompleteCallback>,
@@ -784,7 +784,7 @@ pub async fn handle_pr_created(
 ///
 /// This is called when an agent begins work on a task.
 /// It sets the delegate, moves to started state, and updates labels.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn handle_agent_work_started(
     State(state): State<Arc<CallbackState>>,
     Json(payload): Json<AgentWorkStartedCallback>,
@@ -1000,7 +1000,7 @@ pub struct AgentWorkStartedCallback {
 ///
 /// This endpoint receives status updates from the sidecar container
 /// and syncs them to Linear (issue state + agent status labels + activities).
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn handle_status_sync(
     State(state): State<Arc<CallbackState>>,
     Json(payload): Json<StatusSyncPayload>,

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Live Monitor Server - Provides real-time cluster data for the dashboard
 # Usage: ./live-monitor-server.sh [port]
 

@@ -901,7 +901,7 @@ impl CodeTemplateGenerator {
         Ok(templates)
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn generate_factory_container_script(
         code_run: &CodeRun,
         cli_config: &Value,
@@ -1326,7 +1326,7 @@ impl CodeTemplateGenerator {
             })
     }
 
-    #[allow(clippy::too_many_lines, clippy::items_after_statements)]
+    #[allow(clippy::too_many_lines, clippy::items_after_statements)] // Complex memory generation
     fn generate_claude_memory(
         code_run: &CodeRun,
         cli_config: &Value,
@@ -1857,7 +1857,7 @@ impl CodeTemplateGenerator {
         enriched
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn build_cli_render_settings(code_run: &CodeRun, cli_config: &Value) -> CliRenderSettings {
         let settings = cli_config
             .get("settings")
@@ -2268,7 +2268,7 @@ impl CodeTemplateGenerator {
     }
 
     /// Generate templates for review tasks (Stitch PR Review)
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn generate_review_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
@@ -2500,7 +2500,7 @@ Be constructive and explain the "why" behind your suggestions.
     }
 
     /// Generate templates for remediate tasks (Rex PR Remediation)
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn generate_remediate_templates(
         code_run: &CodeRun,
         config: &ControllerConfig,
@@ -2653,7 +2653,7 @@ Be constructive and explain the "why" behind your suggestions.
         Ok(templates)
     }
 
-    #[allow(clippy::too_many_lines, clippy::items_after_statements)]
+    #[allow(clippy::too_many_lines, clippy::items_after_statements)] // Complex config generation
     fn generate_client_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
         use serde_json::to_string_pretty;
 
@@ -3493,7 +3493,7 @@ Be constructive and explain the "why" behind your suggestions.
             })
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn generate_gemini_memory(
         code_run: &CodeRun,
         cli_config: &Value,
@@ -4377,7 +4377,7 @@ Be constructive and explain the "why" behind your suggestions.
 
     /// Register shared function and bootstrap partials
     /// These partials provide CLI-agnostic building blocks for container scripts
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn register_shared_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
             // New templates partials
@@ -4509,7 +4509,7 @@ Be constructive and explain the "why" behind your suggestions.
 
     /// Register shared agent system prompt partials
     /// These partials are used by agent-specific templates via {{> agents/partial-name}}
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
         use crate::tasks::template_paths::{
             PARTIAL_FRONTEND_TOOLKITS, PARTIAL_INFRASTRUCTURE_OPERATORS,

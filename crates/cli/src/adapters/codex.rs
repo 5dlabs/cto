@@ -33,6 +33,7 @@ fn first_f64(value: &Value, keys: &[&str]) -> Option<f64> {
 fn safe_f32(value: f64) -> Option<f32> {
     if value.is_finite() && value >= f64::from(f32::MIN) && value <= f64::from(f32::MAX) {
         #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        // Bounds already checked above
         {
             Some(value as f32)
         }
@@ -58,8 +59,7 @@ impl CodexAdapter {
         Ok(Self { base })
     }
 
-    #[allow(clippy::unused_self)]
-    fn render_config(&self, context: &Value) -> AdapterResult<String> {
+    fn render_config(context: &Value) -> AdapterResult<String> {
         use std::fmt::Write;
 
         let model = context["model"].as_str().unwrap_or("gpt-4");
@@ -208,7 +208,7 @@ impl CliAdapter for CodexAdapter {
         Ok(true)
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String> {
         debug!(
             github_app = %agent_config.github_app,
@@ -315,7 +315,7 @@ impl CliAdapter for CodexAdapter {
             "model_reasoning_effort": reasoning_effort,
         });
 
-        let config = self.render_config(&context)?;
+        let config = Self::render_config(&context)?;
 
         info!(
             config_length = config.len(),

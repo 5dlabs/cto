@@ -59,7 +59,7 @@ struct TokenErrorResponse {
 ///
 /// This endpoint is called by Linear after user authorizes the app.
 /// We exchange the code for an access token and store it.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn handle_oauth_callback(
     State(state): State<AppState>,
     Query(params): Query<OAuthCallback>,

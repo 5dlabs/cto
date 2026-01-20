@@ -46,6 +46,7 @@ fn first_f64(value: &Value, keys: &[&str]) -> Option<f64> {
 fn safe_f32(value: f64) -> Option<f32> {
     if value.is_finite() && value >= f64::from(f32::MIN) && value <= f64::from(f32::MAX) {
         #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        // Bounds already checked above
         {
             Some(value as f32)
         }
@@ -73,8 +74,7 @@ impl CodeAdapter {
         Ok(Self { base })
     }
 
-    #[allow(clippy::unused_self)]
-    fn render_config(&self, context: &Value) -> AdapterResult<String> {
+    fn render_config(context: &Value) -> AdapterResult<String> {
         use std::fmt::Write;
 
         // Generate TOML configuration for Every Code (~/.code/config.toml)
@@ -225,7 +225,7 @@ impl CliAdapter for CodeAdapter {
         Ok(true)
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String> {
         debug!(
             github_app = %agent_config.github_app,
@@ -313,7 +313,7 @@ impl CliAdapter for CodeAdapter {
             "model_reasoning_summary": reasoning_summary,
         });
 
-        let config = self.render_config(&context)?;
+        let config = Self::render_config(&context)?;
 
         info!(
             config_length = config.len(),

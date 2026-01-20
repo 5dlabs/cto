@@ -101,7 +101,7 @@ fn extract_task_id_from_title(title: &str) -> Option<u32> {
 }
 
 /// Submit a play workflow to Kubernetes.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn submit_play_workflow(
     namespace: &str,
     request: &PlayRequest,

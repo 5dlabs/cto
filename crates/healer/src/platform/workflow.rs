@@ -99,7 +99,7 @@ impl WorkflowRemediator {
         let platform_alert: PlatformAlert = alert.clone().into();
 
         // Determine remediation target based on diagnosis
-        let target = self.determine_target(&diagnosis);
+        let target = Self::determine_target(&diagnosis);
 
         // Create issue
         let issue = PlatformIssue {
@@ -143,19 +143,18 @@ impl WorkflowRemediator {
             self.fetch_pod_logs(namespace, pod_name).await?
         } else {
             // Try to find workflow pods from the alert
-            let workflow_pattern = self.extract_workflow_pattern(alert);
+            let workflow_pattern = Self::extract_workflow_pattern(alert);
             self.fetch_workflow_logs(namespace, &workflow_pattern).await?
         };
 
         // Analyze logs to determine diagnosis
-        let diagnosis = self.diagnose_from_logs(&logs, alert);
+        let diagnosis = Self::diagnose_from_logs(&logs, alert);
 
         Ok((logs, diagnosis))
     }
 
     /// Extract workflow name pattern from alert.
-    #[allow(clippy::unused_self)]
-    fn extract_workflow_pattern(&self, alert: &AlertmanagerAlert) -> String {
+    fn extract_workflow_pattern(alert: &AlertmanagerAlert) -> String {
         // Try to extract from labels
         if let Some(pod) = alert.pod() {
             // Pod names follow pattern: workflow-name-step-random
@@ -215,8 +214,7 @@ impl WorkflowRemediator {
     }
 
     /// Diagnose the issue from logs.
-    #[allow(clippy::unused_self)]
-    fn diagnose_from_logs(&self, logs: &str, alert: &AlertmanagerAlert) -> String {
+    fn diagnose_from_logs(logs: &str, alert: &AlertmanagerAlert) -> String {
         let logs_lower = logs.to_lowercase();
 
         // Check for common patterns
@@ -271,8 +269,7 @@ impl WorkflowRemediator {
     }
 
     /// Determine remediation target based on diagnosis.
-    #[allow(clippy::unused_self)]
-    fn determine_target(&self, diagnosis: &str) -> RemediationTarget {
+    fn determine_target(diagnosis: &str) -> RemediationTarget {
         let diagnosis_lower = diagnosis.to_lowercase();
 
         // Rust code issues -> Rex
@@ -433,7 +430,7 @@ spec:
         let active = self.active.read().await;
         if let Some(tracked) = active.get(fingerprint) {
             let elapsed = Utc::now() - tracked.started_at;
-            #[allow(clippy::cast_possible_wrap)]
+            #[allow(clippy::cast_possible_wrap)] // dedup_window_mins is a small config value, won't wrap
             if elapsed.num_minutes() < self.dedup_window_mins as i64 {
                 return true;
             }

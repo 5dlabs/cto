@@ -15,7 +15,7 @@ use tower::ServiceExt;
 
 /// Test the full Play session lifecycle via HTTP.
 #[tokio::test]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn test_play_session_lifecycle_http() {
     // Create the API state and router
     let state = Arc::new(PlayApiState::new("cto"));

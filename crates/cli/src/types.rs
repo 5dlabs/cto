@@ -151,7 +151,7 @@ pub enum SessionType {
 }
 
 /// CLI capability profile
-#[allow(clippy::struct_excessive_bools)]
+#[allow(clippy::struct_excessive_bools)] // Capabilities struct with boolean feature flags by design
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CLICapabilities {
     /// Maximum context window size

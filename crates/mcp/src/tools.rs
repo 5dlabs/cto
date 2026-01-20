@@ -166,7 +166,7 @@ fn get_intake_sync_task_schema() -> Value {
     })
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
         "name": "play",

@@ -606,7 +606,7 @@ impl CLITextGenerator {
     }
 
     /// Parse CLI output and extract the actual content.
-    #[allow(clippy::unnecessary_wraps)]
+    #[allow(clippy::unnecessary_wraps)] // Returns Result for consistency with trait methods
     fn parse_cli_output(&self, output: &str, _model: &str) -> TasksResult<(String, TokenUsage)> {
         // Log output for debugging
         let output_preview = if output.len() > 500 {
@@ -654,6 +654,7 @@ impl CLITextGenerator {
                             }
                             // Extract usage from result event
                             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                            // Token counts are small positive integers
                             if let Some(total_cost) = json
                                 .get("total_cost_usd")
                                 .and_then(serde_json::Value::as_f64)
@@ -708,6 +709,7 @@ impl CLITextGenerator {
                         Some("turn.completed") => {
                             if let Some(usage_obj) = json.get("usage") {
                                 #[allow(clippy::cast_possible_truncation)]
+                                // Token counts fit in u32
                                 {
                                     usage.input_tokens = usage_obj
                                         .get("input_tokens")
@@ -739,6 +741,7 @@ impl CLITextGenerator {
                             if let Some(part) = json.get("part") {
                                 if let Some(tokens) = part.get("tokens") {
                                     #[allow(clippy::cast_possible_truncation)]
+                                    // Token counts fit in u32
                                     {
                                         usage.input_tokens = tokens
                                             .get("input")
@@ -773,7 +776,7 @@ impl CLITextGenerator {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(output) {
             // Claude/Cursor/Factory JSON format: {"type":"result","result":"...","duration_ms":...}
             if let Some(result) = json.get("result").and_then(serde_json::Value::as_str) {
-                #[allow(clippy::cast_possible_truncation)]
+                #[allow(clippy::cast_possible_truncation)] // Token counts fit in u32
                 let usage = TokenUsage {
                     input_tokens: json
                         .get("input_tokens")

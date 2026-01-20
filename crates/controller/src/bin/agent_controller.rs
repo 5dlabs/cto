@@ -67,7 +67,7 @@ const DEFAULT_AGENT_TEMPLATES_PATH: &str = "/app/templates";
 ///
 /// Templates are now embedded in the Docker image rather than loaded from `ConfigMaps`.
 /// This check verifies the templates directory is accessible at startup.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn verify_templates_directory() -> Result<(), Box<dyn std::error::Error>> {
     let templates_path = std::env::var("AGENT_TEMPLATES_PATH")
         .unwrap_or_else(|_| DEFAULT_AGENT_TEMPLATES_PATH.to_string());
@@ -332,7 +332,7 @@ fn load_controller_config() -> ControllerConfig {
     }
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn webhook_handler(
     State(_state): State<AppState>,
     headers: HeaderMap,

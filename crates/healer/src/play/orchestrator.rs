@@ -216,10 +216,10 @@ impl HealerOrchestrator {
             if strategy == RemediationStrategy::Escalate {
                 // Don't spawn a CodeRun, escalate to humans
                 result.issues_escalated += 1;
-                self.escalate_issue(session, issue);
+                Self::escalate_issue(session, issue);
             } else {
                 // Spawn a remediation CodeRun
-                let attempt = self.get_remediation_attempt_count(session, issue);
+                let attempt = Self::get_remediation_attempt_count(session, issue);
                 match self
                     .remediation_spawner
                     .spawn_remediation(session, issue, attempt)
@@ -238,7 +238,7 @@ impl HealerOrchestrator {
                             .is_some_and(|e| e.contains("Max retries") || e.contains("exceeded"))
                         {
                             result.issues_escalated += 1;
-                            self.escalate_issue(session, issue);
+                            Self::escalate_issue(session, issue);
                         } else {
                             result.errors.push(
                                 spawn_result
@@ -322,7 +322,7 @@ impl HealerOrchestrator {
     }
 
     /// Convert error log entries into session issues.
-    #[allow(clippy::too_many_lines, clippy::unused_self)]
+    #[allow(clippy::too_many_lines, clippy::unused_self)] // Complex log parsing logic
     fn logs_to_issues(
         &self,
         _session: &PlaySession,
@@ -473,8 +473,7 @@ impl HealerOrchestrator {
     /// This will:
     /// 1. Create a GitHub issue for tracking
     /// 2. Send Discord notification via the notify crate
-    #[allow(clippy::unused_self)]
-    fn escalate_issue(&self, session: &PlaySession, issue: &SessionIssue) {
+    fn escalate_issue(session: &PlaySession, issue: &SessionIssue) {
         warn!(
             play_id = %session.play_id,
             issue_type = ?issue.issue_type,
@@ -650,8 +649,8 @@ impl HealerOrchestrator {
     }
 
     /// Get the number of remediation attempts for an issue.
-    #[allow(clippy::unused_self)] // Will use self when attempt tracking is implemented
-    fn get_remediation_attempt_count(&self, _session: &PlaySession, _issue: &SessionIssue) -> u32 {
+    // TODO: Will use session state when attempt tracking is implemented
+    fn get_remediation_attempt_count(_session: &PlaySession, _issue: &SessionIssue) -> u32 {
         // TODO: Track attempts in session state
         // For now, return 1 (first attempt)
         1

@@ -35,6 +35,7 @@ fn first_f64(value: &Value, keys: &[&str]) -> Option<f64> {
 fn safe_f32(value: f64) -> Option<f32> {
     if value.is_finite() && value >= f64::from(f32::MIN) && value <= f64::from(f32::MAX) {
         #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        // Bounds already checked above
         {
             Some(value as f32)
         }
@@ -59,8 +60,7 @@ impl OpenCodeAdapter {
         Ok(Self { base })
     }
 
-    #[allow(clippy::unused_self)]
-    fn render_config(&self, context: &Value) -> AdapterResult<String> {
+    fn render_config(context: &Value) -> AdapterResult<String> {
         serde_json::to_string_pretty(context).map_err(|err| {
             AdapterError::ConfigGenerationError(format!(
                 "Failed to serialize OpenCode config: {err}"
@@ -195,7 +195,7 @@ impl CliAdapter for OpenCodeAdapter {
         self.base.validate_base_config(agent_config)?;
 
         let context = self.build_config_context(agent_config);
-        let rendered = self.render_config(&context)?;
+        let rendered = Self::render_config(&context)?;
 
         debug!(
             config_length = rendered.len(),

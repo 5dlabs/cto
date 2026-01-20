@@ -168,7 +168,7 @@ impl BehaviorAnalyzer {
     }
 
     /// Load built-in behavior patterns for all agents
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn load_builtin_patterns(&mut self) {
         // Global failure patterns (apply to all agents)
         self.global_failure_patterns = vec![

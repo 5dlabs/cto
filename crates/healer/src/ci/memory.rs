@@ -260,7 +260,7 @@ impl MemoryClient {
         }
 
         // Calculate success rates
-        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for success rate display
         let mut rates: Vec<(String, f32)> = agent_stats
             .into_iter()
             .map(|(agent, (successes, total))| {

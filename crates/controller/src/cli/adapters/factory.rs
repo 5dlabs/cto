@@ -181,7 +181,7 @@ impl CliAdapter for FactoryAdapter {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     async fn parse_response(&self, response: &str) -> Result<ParsedResponse> {
         let mut aggregated_messages: Vec<String> = Vec::new();
         let mut plain_segments: Vec<String> = Vec::new();

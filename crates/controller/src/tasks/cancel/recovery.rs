@@ -21,13 +21,13 @@ impl RecoveryManager {
         Self {}
     }
 
-    #[allow(clippy::unused_async)]
+    #[allow(clippy::unused_async)] // Stub: will await K8s API calls when implemented
     pub async fn start_reconciliation(&self) {
         // Placeholder implementation
         // Would run every 30 seconds to detect and repair inconsistencies
     }
 
-    #[allow(clippy::unused_async)]
+    #[allow(clippy::unused_async)] // Stub: will await K8s API calls when implemented
     pub async fn reconcile(&self) -> Result<(), String> {
         // Placeholder implementation
         Ok(())

@@ -80,7 +80,7 @@ pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Re
 }
 
 #[instrument(skip(ctx), fields(code_run_name = %code_run.name_any(), namespace = %ctx.namespace))]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) -> Result<Action> {
     let code_run_name = code_run.name_any();
     debug!(
@@ -178,7 +178,12 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
         let coderuns_api: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
         match coderuns_api.get(&code_run.name_any()).await {
             Ok(fresh) => {
-                if fresh.status.as_ref().and_then(|s| s.job_name.as_ref()).is_some() {
+                if fresh
+                    .status
+                    .as_ref()
+                    .and_then(|s| s.job_name.as_ref())
+                    .is_some()
+                {
                     debug!(
                         "Fresh CodeRun has job_name: {:?}",
                         fresh.status.as_ref().and_then(|s| s.job_name.as_ref())
@@ -850,7 +855,7 @@ fn determine_code_job_state(status: &k8s_openapi::api::batch::v1::JobStatus) -> 
     CodeJobState::Running
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // Status update requires all completion fields
 async fn update_code_status_with_completion(
     code_run: &CodeRun,
     ctx: &Context,
@@ -1087,7 +1092,7 @@ async fn handle_workflow_resumption_on_failure(code_run: &CodeRun, ctx: &Context
 }
 
 /// Handle timeout when no PR is created
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn handle_no_pr_timeout(
     workflow_name: &str,
     code_run: &CodeRun,
@@ -1581,6 +1586,6 @@ fn compute_cleanup_deadline(
         return None;
     }
 
-    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_possible_wrap)] // TTL seconds are small config values
     Some(finished_at + ChronoDuration::seconds(ttl_seconds as i64))
 }

@@ -65,7 +65,7 @@ impl AlertHandler for Handler {
         // that has been running longer than the threshold. The caller (run_alert_watch)
         // tracks timestamps and only calls evaluate when the threshold has passed.
 
-        #[allow(clippy::cast_possible_wrap)]
+        #[allow(clippy::cast_possible_wrap)] // threshold_mins is a small config value, won't wrap
         let threshold_mins = ctx.config.stuck_coderun_threshold_mins as i64;
 
         Some(
@@ -113,6 +113,7 @@ impl CodeRunTracker {
         if let Some(first_seen) = self.first_seen.get(name) {
             let elapsed = Utc::now() - *first_seen;
             #[allow(clippy::cast_possible_wrap)]
+            // threshold_mins already validated as small positive
             let threshold = Duration::minutes(threshold_mins as i64);
             return elapsed > threshold;
         }

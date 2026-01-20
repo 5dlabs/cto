@@ -2143,7 +2143,7 @@ fn resolve_agent_config(
 }
 
 #[tokio::main]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -2576,7 +2576,7 @@ async fn main() -> Result<()> {
 // =============================================================================
 
 /// Run the GitHub Actions sensor to monitor for workflow failures.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // CLI entry point with distinct configuration options
 async fn run_github_actions_sensor(
     repositories: &str,
     poll_interval: u64,
@@ -2681,7 +2681,7 @@ async fn run_github_actions_sensor(
 // =============================================================================
 
 /// Run the play monitor to watch for anomalies in running plays.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // CLI entry point with distinct configuration options
 async fn run_play_monitor(
     namespace: &str,
     poll_interval: u64,
@@ -2976,7 +2976,7 @@ fn calculate_duration(started: Option<&str>, finished: Option<&str>) -> Option<i
 // Legacy run_full_loop removed - use run_full_watch instead
 
 /// Run the monitoring loop - emits JSON events (legacy polling mode)
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // CLI entry point configuration
 async fn run_loop(
     play_id: &str,
     namespace: &str,
@@ -3415,7 +3415,7 @@ fn parse_watch_line(line: &str, resource_type: ResourceType) -> Result<WatchMess
 }
 
 /// Run the full E2E monitor with multi-watch streams
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // CLI entry point with distinct configuration options
 async fn run_full_watch(
     task_id: &str,
     config_path: &str,
@@ -3532,7 +3532,7 @@ async fn run_full_watch(
 /// This is the main entry point for E2E testing with self-healing capabilities.
 /// On failure, it triggers a remediation agent to fix the issue, waits for
 /// `ArgoCD` sync, and retries the workflow.
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // CLI entry point configuration
 async fn run_self_healing_loop(
     task_id: &str,
     config_path: &str,
@@ -3829,7 +3829,7 @@ async fn run_self_healing_loop(
 ///
 /// If `remediation_config` is provided and a failure occurs, returns an error
 /// with prefix `REMEDIATION_NEEDED:` to signal the caller to trigger remediation.
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // Multi-watch requires many config options
 async fn run_multi_watch(
     task_id: &str,
     argo_namespace: &str,
@@ -4548,7 +4548,7 @@ fn output_result<T: Serialize>(result: &T, format: OutputFormat) -> Result<()> {
 }
 
 /// Reset the E2E environment - clean cluster and reset test repo
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn reset_environment(
     namespace: &str,
     org: &str,
@@ -4699,7 +4699,7 @@ fn reset_environment(
 }
 
 /// Reset GitHub repository - delete and recreate with minimal structure
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetResult> {
     let full_repo = format!("{org}/{repo}");
     let mut result = GithubResetResult {
@@ -4844,6 +4844,7 @@ fn reset_github_repo(org: &str, repo: &str, _force: bool) -> Result<GithubResetR
 /// Count deleted resources from kubectl output
 fn count_deleted(output: &[u8]) -> i32 {
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    // Deleted line count is always small
     let count = String::from_utf8_lossy(output)
         .lines()
         .filter(|l| l.contains("deleted"))
@@ -4852,7 +4853,7 @@ fn count_deleted(output: &[u8]) -> i32 {
 }
 
 /// Run/submit a play workflow via Argo CLI (reads all parameters from config)
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
     println!(
         "{}",
@@ -5187,7 +5188,7 @@ fn run_workflow(config: &RunWorkflowConfig<'_>) -> Result<RunResponse> {
 /// 5. Evaluates against acceptance criteria
 /// 6. On success: exits 0 (ends loop)
 /// 7. On failure: writes issue to PVC, creates Remediation `CodeRun`, exits 1
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn run_monitor_loop(params: &MonitorParams) -> Result<()> {
     println!(
         "{}",
@@ -5646,7 +5647,7 @@ fn verify_templates_directory(templates_dir: &str) -> Result<()> {
 }
 
 /// Watch for alerts and spawn Factory when detected.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn run_alert_watch(
     namespace: &str,
     prompts_dir: &str,
@@ -6405,7 +6406,7 @@ async fn handle_completion_check(
 }
 
 /// Handle a detected alert by loading prompt and spawning Factory
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // Alert handling requires full context
 async fn handle_alert(
     alert_id: &str,
     pod_name: &str,
@@ -7133,8 +7134,8 @@ fn load_healer_config(config_path: &str) -> HealerConfig {
 }
 
 /// Build the `CodeRun` YAML manifest using values from config.
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments)] // CodeRun manifest requires many configuration fields
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn build_coderun_yaml(
     alert: &str,
     task_id: &str,
@@ -7530,7 +7531,7 @@ fn fetch_kubectl_output(args: &[&str], output_file: &str) -> Result<usize> {
 // =============================================================================
 
 /// Handle play orchestration commands.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn handle_play_command(action: PlayCommands, namespace: &str) -> Result<()> {
     use play::cleanup::PlayCleanup;
     use play::{PlayBatch, PlayTracker};
@@ -7721,6 +7722,7 @@ fn print_batch_status(tracker: &play::PlayTracker) {
 
     // Progress bar
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    // Progress is 0-100, result fits in usize
     let progress_filled = (summary.progress / 100.0 * 30.0) as usize;
     let progress_empty = 30 - progress_filled;
     println!(
@@ -8117,7 +8119,7 @@ async fn run_play_api_command(addr: &str, namespace: &str) -> Result<()> {
 }
 
 /// Run the log scanning command.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn run_scan_logs_command(
     window: &str,
     namespaces: &str,
@@ -8276,7 +8278,7 @@ async fn run_scan_logs_command(
 ///
 /// Reads scan JSON from stdin, parses it, and spawns `CodeRuns` for services
 /// that need remediation.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn run_remediate_from_scan(config_path: &str, dry_run: bool, max_coderuns: usize) -> Result<()> {
     use scanner::{determine_agent_for_service, ScanReport};
     use std::io::{self, BufRead};
@@ -8617,7 +8619,7 @@ fn run_reconcile_issues(
 }
 
 /// Build `CodeRun` YAML for scan-based remediation.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // CodeRun manifest requires many configuration fields
 fn build_scan_remediation_coderun(
     coderun_name: &str,
     namespace: &str,

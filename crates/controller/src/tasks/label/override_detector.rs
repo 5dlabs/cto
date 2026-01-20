@@ -151,7 +151,7 @@ impl OverrideDetector {
                 OverrideError::ProcessingError(format!("Failed to get labels: {e}"))
             })?;
 
-        let overrides = self.detect_overrides(&labels);
+        let overrides = Self::detect_overrides(&labels);
 
         if overrides.is_empty() {
             debug!("No override labels detected on PR #{}", pr_number);
@@ -193,8 +193,7 @@ impl OverrideDetector {
     }
 
     /// Detect all override labels in a set of labels
-    #[allow(clippy::unused_self)]
-    fn detect_overrides(&self, labels: &[String]) -> Vec<Override> {
+    fn detect_overrides(labels: &[String]) -> Vec<Override> {
         let mut overrides = Vec::new();
 
         // Define override label mappings

@@ -300,7 +300,7 @@ pub async fn delete_external_secret(client: &Client, tenant: &Tenant) -> Result<
 ///
 /// # Errors
 /// Returns an error if Application creation fails.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn create_argocd_app(client: &Client, tenant: &Tenant) -> Result<()> {
     let app_name = tenant.argocd_app_name();
     let namespace = tenant.namespace_name();

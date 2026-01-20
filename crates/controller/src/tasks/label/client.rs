@@ -292,6 +292,7 @@ impl GitHubLabelClient {
                             backoff_ms, attempt, max_retries
                         );
                         #[allow(clippy::cast_sign_loss)]
+                        // backoff_ms is always positive (calculated exponentially)
                         sleep(Duration::from_millis(backoff_ms as u64)).await;
                     }
                 }
@@ -508,7 +509,7 @@ impl GitHubLabelClient {
             .and_then(|s| s.parse::<i64>().ok())
         {
             let now = chrono::Utc::now().timestamp();
-            #[allow(clippy::cast_sign_loss)]
+            #[allow(clippy::cast_sign_loss)] // max(0) ensures non-negative
             let seconds_until_reset = (reset - now).max(0) as u64;
             self.rate_limit_reset = Some(Instant::now() + Duration::from_secs(seconds_until_reset));
         }
@@ -523,7 +524,7 @@ impl GitHubLabelClient {
             .and_then(|s| s.parse::<i64>().ok())
             .map(|reset_timestamp| {
                 let now = chrono::Utc::now().timestamp();
-                #[allow(clippy::cast_sign_loss)]
+                #[allow(clippy::cast_sign_loss)] // max(0) ensures non-negative
                 let seconds_until_reset = (reset_timestamp - now).max(0) as u64;
                 Duration::from_secs(seconds_until_reset)
             })

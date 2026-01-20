@@ -64,7 +64,7 @@ impl AgentSessionContext {
 /// 3. Store the session-to-workflow mapping
 /// 4. Move the issue to "started" state
 /// 5. Emit an initial thought activity within 10 seconds
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn handle_agent_session_created(
     state: &AppState,
     payload: &WebhookPayload,

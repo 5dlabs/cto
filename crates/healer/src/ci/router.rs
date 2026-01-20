@@ -218,7 +218,7 @@ impl CiRouter {
     }
 
     /// Score agents based on log content.
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)] // Score precision loss acceptable for ranking
     fn score_from_logs(logs: &str, scores: &mut [(Agent, f32)]) {
         // Check Rust patterns
         let rust_matches = RUST_PATTERNS.iter().filter(|p| p.is_match(logs)).count();
@@ -261,7 +261,7 @@ impl CiRouter {
     }
 
     /// Score agents based on changed files.
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)] // Score precision loss acceptable for ranking
     fn score_from_files(files: &[ChangedFile], scores: &mut [(Agent, f32)]) {
         let total = files.len() as f32;
         if total == 0.0 {
