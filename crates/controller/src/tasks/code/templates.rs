@@ -2285,9 +2285,15 @@ impl CodeTemplateGenerator {
         handlebars.set_strict_mode(false);
         Self::register_template_helpers(&mut handlebars);
 
-        // Determine CLI type (default to Factory for review tasks)
+        // Determine CLI type (default to Claude for review tasks)
         let cli_type = Self::determine_cli_type(code_run);
         let use_claude = matches!(cli_type, CLIType::Claude);
+
+        // Register shared partials (header, config, git-setup, etc.)
+        Self::register_shared_partials(&mut handlebars)?;
+
+        // Register CLI-specific invoke partial (cli_execute)
+        Self::register_cli_invoke_partial(&mut handlebars, cli_type)?;
 
         // Extract PR number from labels or env
         let pr_number = code_run
@@ -2341,6 +2347,18 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
         let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
 
+        // Determine agent name from service or default to "stitch"
+        let agent_name = code_run
+            .spec
+            .service
+            .split('-')
+            .next()
+            .unwrap_or("stitch")
+            .to_lowercase();
+
+        // CLI type name for templates
+        let cli_type_name = cli_type.to_string();
+
         let context = json!({
             "github_app": code_run.spec.github_app.as_deref().unwrap_or("5DLabs-Stitch"),
             "pr_number": pr_number,
@@ -2352,6 +2370,12 @@ impl CodeTemplateGenerator {
             "model": code_run.spec.model,
             "tools_url": render_settings.tools_url,
             "remote_tools": remote_tools,
+            // Template variables expected by container.sh.hbs
+            "agent_name": agent_name,
+            "cli_type": cli_type_name,
+            "job_type": "review",
+            "default_retries": 3,
+            "task_language": "",
         });
 
         // Generate client-config.json for MCP tools
@@ -2419,6 +2443,58 @@ impl CodeTemplateGenerator {
             "mcp.json".to_string(),
             Self::generate_mcp_config(code_run, config)?,
         );
+
+        // Generate prompt.md for review task
+        let pr_url = code_run
+            .spec
+            .env
+            .get("PR_URL")
+            .cloned()
+            .unwrap_or_default();
+        let pr_title = code_run
+            .spec
+            .env
+            .get("PR_TITLE")
+            .cloned()
+            .unwrap_or_default();
+        let pr_author = code_run
+            .spec
+            .env
+            .get("PR_AUTHOR")
+            .cloned()
+            .unwrap_or_default();
+
+        let prompt = format!(
+            r#"# Code Review Request
+
+Review the pull request and provide feedback.
+
+## PR Details
+
+- **PR URL**: {pr_url}
+- **PR Number**: {pr_number}
+- **Title**: {pr_title}
+- **Author**: {pr_author}
+- **Head SHA**: {head_sha}
+
+## Instructions
+
+1. Use the `github_get_pull_request_files` tool to fetch the files changed in PR #{pr_number}
+2. Review each changed file for:
+   - Correctness
+   - Security vulnerabilities  
+   - Performance issues
+   - Code style and maintainability
+3. Use `github_add_pull_request_review_comment` to add inline comments on specific issues
+4. Use `github_create_pull_request_review` to submit your overall review with:
+   - `event: "APPROVE"` if changes look good
+   - `event: "REQUEST_CHANGES"` if there are blocking issues
+   - `event: "COMMENT"` if there are suggestions but no blocking issues
+
+Be constructive and explain the "why" behind your suggestions.
+"#
+        );
+        templates.insert("prompt.md".to_string(), prompt);
 
         Ok(templates)
     }

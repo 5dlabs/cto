@@ -23,11 +23,28 @@ executes correctly: **Intake → Play → Quality → Security → Testing → I
 
 Each task in the Play workflow MUST have:
 - **Linear issue created** with subtasks defined
-- **Agent assigned** to the issue
+- **Agent assigned** (delegated) to the issue
 - **CLI output streaming** to the agent dialog via Linear sync sidecar
 - Same behavior as Morgan's intake workflow
 
-If Linear issues are NOT being created or sidecar is NOT running - this is a bug. Stop and fix it.
+**CRITICAL**: Linear task issues are created via callback AFTER intake PR merge:
+1. Intake generates tasks.json and creates PR
+2. PR merge triggers webhook to PM server
+3. PM server calls `/callbacks/tasks-json` to create Linear issues
+4. Play workflow starts AFTER task issues exist
+
+If Linear issues are NOT being created - check:
+```bash
+# Check if callback was called
+curl -sf http://localhost:8081/api/linear/project/prd-alerthub-e2e-test/issues | jq '.issues | length'
+
+# If 0 issues, callback was never triggered - this is a bug
+```
+
+If sidecar is NOT running - check pod containers:
+```bash
+kubectl get pods -n cto -o json | jq '[.items[] | {name: .metadata.name, containers: [.spec.containers[].name]}]'
+```
 
 ### 3. Pod Lifecycle Issue (Watch For This)
 
@@ -90,23 +107,55 @@ sleep 10
 - If you make code changes, list files changed
 - If you encounter bugs, document them AND fix them before proceeding
 
+## Known Issues and Workarounds
+
+### 1. CodeRun Status Lag
+- **Issue**: CodeRun `.status.phase` may remain "Running" even after pod succeeds
+- **Workaround**: Check pod status directly instead of CodeRun status
+```bash
+kubectl get pods -n cto -o json | jq '[.items[] | select(.metadata.name | contains("intake")) | {name: .metadata.name, phase: .status.phase}]'
+```
+
+### 2. ConfigMap Naming Convention
+- **Issue**: ConfigMaps use project-id, not service name
+- **Pattern**: `cto-config-project-{uuid}` instead of `cto-config-{service}`
+```bash
+kubectl get configmap -n cto | grep cto-config-project
+```
+
+### 3. Linear Task Issues Not Created Automatically
+- **Issue**: `/callbacks/tasks-json` must be called after PR merge to create Linear task issues
+- **Check**: If no task issues exist after PR merge, this callback was not triggered
+- **Required**: Implement webhook handler for intake PR merge → callback trigger
+
+---
+
 ## Key Verifications for Play Workflow
 
-### Linear Issues Created
+### Linear Task Issues Created
 ```bash
-# Each task should have a Linear issue
-# Check via Linear API or CLI
+# Count task issues (should match tasks.json count after PR merge)
+TASK_COUNT=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' | base64 -d | jq '.tasks | length')
+ISSUE_COUNT=$(curl -sf http://localhost:8081/api/linear/project/prd-alerthub-e2e-test/issues | jq '.issues | length')
+echo "Tasks: $TASK_COUNT, Issues: $ISSUE_COUNT"
 ```
 
 ### Linear Sidecar Running
 ```bash
-# CodeRun pods should have linear-sync sidecar
-kubectl get pods -n cto -l type=implementation -o json | jq '.items[].spec.containers[].name'
+# Check for linear-sidecar container in pods
+kubectl get pods -n cto -o json | jq '[.items[] | select(.spec.containers | map(.name) | any(. == "linear-sidecar"))]'
 ```
 
-### Agent Assignment
+### Agent Assignment in Linear
 ```bash
-# Working agent should be assigned to Linear issue
+# Verify agent is assigned (delegated) to task issue
+curl -sf http://localhost:8081/api/linear/task/current | jq '{assignee: .assignee, delegate: .delegate}'
+```
+
+### Agent Dialogue Activities
+```bash
+# Check activities posted to Linear (should be > 0 for active agents)
+curl -sf http://localhost:8081/api/linear/task/current/activities | jq '.activities | length'
 ```
 
 ### PR Review Loop

@@ -215,6 +215,10 @@ pub async fn submit_play_workflow(
         args.push("-p".to_string());
         args.push(format!("desktop-agent={desktop_agent}"));
     }
+    if let Some(infrastructure_agent) = &config.infrastructure_agent {
+        args.push("-p".to_string());
+        args.push(format!("infrastructure-agent={infrastructure_agent}"));
+    }
 
     // Add docs project directory if configured
     if let Some(docs_dir) = &config.docs_project_directory {

@@ -426,8 +426,35 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Option<Agent> {
         || content.contains("cypress")
         || content.contains("playwright")
         || content.contains("e2e test")
+        || content.contains("end-to-end test")
+        || content.contains("end to end test")
+        || content.contains("integration test")
+        || content.contains("flow test")
     {
         return Some(Agent::Tess);
+    }
+
+    // GDPR/Compliance (routes to backend - Rex handles data layer operations)
+    // Data export/deletion are backend concerns, not security audit
+    if content.contains("gdpr")
+        || content.contains("data export")
+        || content.contains("data deletion")
+        || content.contains("data erasure")
+        || content.contains("data portability")
+        || content.contains("compliance")
+    {
+        return Some(Agent::Rex);
+    }
+
+    // Documentation (routes to Rex as default - documentation is often backend/API docs)
+    // NOTE: This is a fallback for generic documentation tasks
+    if content.contains("readme")
+        || content.contains("documentation")
+        || content.contains("api docs")
+        || content.contains("openapi")
+        || content.contains("swagger")
+    {
+        return Some(Agent::Rex);
     }
 
     // Integration/Merge (LAST - these are very generic keywords)
