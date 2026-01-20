@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail# =============================================================================
+set -euo pipefail
+# =============================================================================
 # Setup Cluster BuildKit Builder
 # =============================================================================
 # Configures docker buildx to use the BuildKit instance running on the cluster.

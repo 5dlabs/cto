@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euo pipefail# Docker Runtime Benchmark Script
+set -euo pipefail
+# Docker Runtime Benchmark Script
 # Compares Docker Desktop, OrbStack, and Colima for Rust builds
 #
 # Run this ON the remote Mac after running setup-remote-runtimes.sh

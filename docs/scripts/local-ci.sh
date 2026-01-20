@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail# =============================================================================
+set -euo pipefail
+# =============================================================================
 # local-ci.sh - Run the same checks locally that CI runs
 # =============================================================================
 # This script mirrors ALL GitHub Actions CI checks:

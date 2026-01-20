@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail# =============================================================================
+set -euo pipefail
+# =============================================================================
 # dev-push.sh - Fast iteration cycle for development
 # =============================================================================
 # Build and push images directly to the Talos cluster, bypassing CI.

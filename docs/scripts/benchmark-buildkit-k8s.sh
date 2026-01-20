@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail# =============================================================================
+set -euo pipefail
+# =============================================================================
 # BuildKit RAMDisk Benchmark - Kubernetes Version
 # =============================================================================
 # Runs the benchmark directly on the cluster using a Job, avoiding network

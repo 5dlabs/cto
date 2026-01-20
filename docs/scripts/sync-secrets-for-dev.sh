@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail# =============================================================================
+set -euo pipefail
+# =============================================================================
 # sync-secrets-for-dev.sh - Fetch secrets from 1Password for local development
 # =============================================================================
 # This script fetches secrets from 1Password and writes them to .env.local
