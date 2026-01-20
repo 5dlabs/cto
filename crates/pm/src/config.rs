@@ -386,6 +386,8 @@ pub struct PlayConfig {
     pub mobile_agent: Option<String>,
     /// Desktop agent (spark for Electron).
     pub desktop_agent: Option<String>,
+    /// Infrastructure agent (bolt for DevOps/K8s).
+    pub infrastructure_agent: Option<String>,
     /// Testing agent.
     pub testing_agent: String,
     /// Quality agent.
@@ -411,10 +413,21 @@ impl Default for PlayConfig {
                 .unwrap_or_else(|_| "5DLabs-Rex".to_string()),
             frontend_agent: env::var("FRONTEND_AGENT")
                 .unwrap_or_else(|_| "5DLabs-Blaze".to_string()),
-            go_agent: env::var("GO_AGENT").ok(),
-            node_agent: env::var("NODE_AGENT").ok(),
-            mobile_agent: env::var("MOBILE_AGENT").ok(),
-            desktop_agent: env::var("DESKTOP_AGENT").ok(),
+            go_agent: Some(
+                env::var("GO_AGENT").unwrap_or_else(|_| "5DLabs-Grizz".to_string()),
+            ),
+            node_agent: Some(
+                env::var("NODE_AGENT").unwrap_or_else(|_| "5DLabs-Nova".to_string()),
+            ),
+            mobile_agent: Some(
+                env::var("MOBILE_AGENT").unwrap_or_else(|_| "5DLabs-Tap".to_string()),
+            ),
+            desktop_agent: Some(
+                env::var("DESKTOP_AGENT").unwrap_or_else(|_| "5DLabs-Spark".to_string()),
+            ),
+            infrastructure_agent: Some(
+                env::var("INFRASTRUCTURE_AGENT").unwrap_or_else(|_| "5DLabs-Bolt".to_string()),
+            ),
             testing_agent: env::var("TESTING_AGENT").unwrap_or_else(|_| "5DLabs-Tess".to_string()),
             quality_agent: env::var("QUALITY_AGENT").unwrap_or_else(|_| "5DLabs-Cleo".to_string()),
             security_agent: env::var("SECURITY_AGENT")

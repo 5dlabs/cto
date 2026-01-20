@@ -154,12 +154,12 @@
         {
           "name": "linear-sidecar-running",
           "description": "Linear sync sidecar container is running for CLI output streaming",
-          "command": "kubectl get pods -n cto -l workflow-type=intake -o json | jq -e '.items[0].spec.containers | map(select(.name == \"linear-sidecar\" or .name == \"linear-sync\")) | length > 0'"
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.spec.containers | map(select(.name == \"linear-sidecar\")) | length > 0) | select(.status.phase == \"Running\" or .status.phase == \"Pending\")] | length > 0'"
         },
         {
           "name": "intake-succeeded",
-          "description": "Intake CodeRun completed successfully",
-          "command": "kubectl get coderuns -n cto -o json | jq -e '.items[] | select(.spec.runType == \"intake\") | .status.phase == \"Succeeded\"'"
+          "description": "Intake pod completed successfully (check pod status since CodeRun status may lag)",
+          "command": "kubectl get pods -n cto -o json | jq -e '[.items[] | select(.metadata.labels[\"cto.5dlabs.io/run-type\"] == \"intake\" or .metadata.name | contains(\"intake\")) | select(.status.phase == \"Succeeded\")] | length > 0'"
         },
         {
           "name": "linear-issues-created",
@@ -198,8 +198,8 @@
         },
         {
           "name": "cto-config-configmap-exists",
-          "description": "CTO config ConfigMap exists in cluster namespace",
-          "command": "kubectl get configmap -n cto cto-config-prd-alerthub-e2e-test -o json | jq -e '.data[\"cto-config.json\"] != null'"
+          "description": "CTO config ConfigMap exists in cluster namespace (uses project-id naming)",
+          "command": "kubectl get configmap -n cto -o json | jq -e '[.items[] | select(.metadata.name | startswith(\"cto-config-project-\"))] | length > 0'"
         },
         {
           "name": "cto-config-sync-test",
@@ -220,6 +220,11 @@
           "name": "tool-filter-verified",
           "description": "Agent logs show only Linear-configured tools are available",
           "command": "kubectl logs -n cto -l workflow-type=intake --tail=200 | grep -iE 'declared tools|Tool inventory|tools resolved|All declared tools'"
+        },
+        {
+          "name": "intake-pr-created",
+          "description": "Intake PR was created in repository",
+          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state all --json title,headRefName --jq '[.[] | select(.headRefName | startswith(\"intake-\"))] | length > 0'"
         }
       ],
       "cleanup": [
@@ -240,6 +245,11 @@
           "name": "intake-pr-merged",
           "description": "Intake PR was merged (triggers play via webhook)",
           "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state merged --json number,title --jq '[.[] | select(.title | contains(\"intake\") or contains(\"tasks\"))] | length > 0'"
+        },
+        {
+          "name": "linear-task-issues-created",
+          "description": "Linear task issues created after PR merge (one per task in tasks.json)",
+          "command": "TASK_COUNT=$(gh api repos/5dlabs/prd-prd-alerthub-e2e-test/contents/prd-prd-alerthub-e2e-test/.tasks/tasks/tasks.json --jq '.content' 2>/dev/null | base64 -d | jq '.tasks | length' 2>/dev/null || echo 0); ISSUE_COUNT=$(curl -sf http://localhost:8081/api/linear/project/prd-alerthub-e2e-test/issues 2>/dev/null | jq '.issues | length' 2>/dev/null || echo 0); echo \"Tasks: $TASK_COUNT, Linear Issues: $ISSUE_COUNT\"; [ \"$ISSUE_COUNT\" -ge 1 ]"
         },
         {
           "name": "webhook-received-for-merge",

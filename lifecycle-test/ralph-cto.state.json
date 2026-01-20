@@ -1,7 +1,10 @@
 {
   "phase": "intake",
-  "attempts": {},
+  "attempts": {
+    "intake": 1
+  },
   "completedObjectives": [],
   "attendedCompleted": 2,
-  "last_success": null
+  "failures": [],
+  "lastUpdated": null
 }

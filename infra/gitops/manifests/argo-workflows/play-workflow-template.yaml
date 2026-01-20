@@ -2207,13 +2207,21 @@ spec:
           fi
 
           # CRITICAL: Additional validation - check task content for Material-UI to catch misrouted frontend tasks
-          if [ -z "$AGENT_TYPE" ] || [ "$AGENT_TYPE" != "frontend" ]; then
+          # BUT: Skip this validation for mobile agents (tap/mobile/react-native/expo) since they legitimately use React
+          IS_MOBILE_AGENT="false"
+          case "$AGENT_TYPE" in
+            "mobile"|"react-native"|"expo"|"ios"|"android"|"tap")
+              IS_MOBILE_AGENT="true"
+              ;;
+          esac
+
+          if [ "$IS_MOBILE_AGENT" = "false" ] && [ -z "$AGENT_TYPE" ] || ([ "$AGENT_TYPE" != "frontend" ] && [ "$IS_MOBILE_AGENT" = "false" ]); then
             VALIDATION_CONTENT="$TASK_TITLE $TASK_DESC $TASK_DETAILS"
             if [ -n "$TASK_FILE" ]; then
               VALIDATION_CONTENT="$VALIDATION_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
             fi
 
-            # If we find React/frontend keywords but agent type isn't frontend, force frontend routing
+            # If we find React/frontend keywords but agent type isn't frontend or mobile, force frontend routing
             if echo "$VALIDATION_CONTENT" | grep -qiE "(react.*component|react.*frontend|material-ui|mui|@mui/material|next\.js.*component)"; then
               echo "🚨 CRITICAL: Detected frontend/React task but agent type is '${AGENT_TYPE}'"
               echo "🔄 FORCING frontend agent routing (Blaze required for React/frontend tasks)"

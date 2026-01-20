@@ -1,0 +1,417 @@
+{
+  "timestamp": "2026-01-20T02:16:50.500396Z",
+  "hasFailures": true,
+  "pods": {
+    "cto-web-569f6786fb-v2hs7": {
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "web",
+          "ready": true,
+          "state": "running"
+        }
+      ]
+    },
+    "review-pr3880-stitch-opus45-84914916-v1-d8m4w": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "claude-claude-opus-4-5-20251101",
+          "ready": false,
+          "state": "PodInitializing"
+        },
+        {
+          "name": "docker-daemon",
+          "ready": false,
+          "state": "PodInitializing"
+        }
+      ]
+    },
+    "tweakcn-678f4cfd84-759jc": {
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "tweakcn",
+          "ready": true,
+          "state": "running"
+        }
+      ]
+    },
+    "review-pr3880-stitch-opus45-d2b56e9e-v1-nbsk5": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "claude-claude-opus-4-5-20251101",
+          "ready": false,
+          "state": "PodInitializing"
+        },
+        {
+          "name": "docker-daemon",
+          "ready": false,
+          "state": "PodInitializing"
+        }
+      ]
+    },
+    "review-pr3880-stitch-opus45-13a283c3-v1-zmkm9": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "claude-claude-opus-4-5-20251101",
+          "ready": false,
+          "state": "PodInitializing"
+        },
+        {
+          "name": "docker-daemon",
+          "ready": false,
+          "state": "PodInitializing"
+        }
+      ]
+    },
+    "cto-tools-5b5dd86567-bl4gx": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "docker-daemon",
+          "ready": false,
+          "state": "PodInitializing"
+        },
+        {
+          "name": "tools",
+          "ready": false,
+          "state": "PodInitializing"
+        }
+      ]
+    },
+    "event-cleaner-29481180-l85s4": {
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "cleaner",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        }
+      ]
+    },
+    "workspace-pvc-cleaner-29481255-pjqwn": {
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "cleaner",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        }
+      ]
+    },
+    "cto-controller-5c4bd88bd6-d5f6h": {
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "controller",
+          "ready": true,
+          "state": "running"
+        }
+      ]
+    },
+    "review-pr3880-stitch-opus45-1c8d7521-v1-lhkkm": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "claude-claude-opus-4-5-20251101",
+          "ready": false,
+          "state": "PodInitializing"
+        },
+        {
+          "name": "docker-daemon",
+          "ready": false,
+          "state": "PodInitializing"
+        }
+      ]
+    },
+    "review-pr3880-stitch-opus45-4a9f570c-v1-gcpjx": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "claude-claude-opus-4-5-20251101",
+          "ready": false,
+          "state": "PodInitializing"
+        },
+        {
+          "name": "docker-daemon",
+          "ready": false,
+          "state": "PodInitializing"
+        }
+      ]
+    },
+    "review-pr3880-stitch-opus45-98e7404d-v1-6frpr": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "claude-claude-opus-4-5-20251101",
+          "ready": false,
+          "state": "PodInitializing"
+        },
+        {
+          "name": "docker-daemon",
+          "ready": false,
+          "state": "PodInitializing"
+        }
+      ]
+    },
+    "event-cleaner-29481150-czc58": {
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "cleaner",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        }
+      ]
+    },
+    "event-cleaner-29481240-j5zfl": {
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "cleaner",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        }
+      ]
+    },
+    "cto-web-569f6786fb-mlzpz": {
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "web",
+          "ready": true,
+          "state": "running"
+        }
+      ]
+    },
+    "event-cleaner-29480880-qx2vz": {
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "cleaner",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        }
+      ]
+    },
+    "cto-openmemory-584b65789b-tvwkm": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "openmemory",
+          "ready": false,
+          "state": "ContainerCreating"
+        }
+      ]
+    },
+    "review-pr3880-stitch-opus45-79ad73c4-v1-vgdmr": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "claude-claude-opus-4-5-20251101",
+          "ready": false,
+          "state": "PodInitializing"
+        },
+        {
+          "name": "docker-daemon",
+          "ready": false,
+          "state": "PodInitializing"
+        }
+      ]
+    },
+    "workspace-pvc-cleaner-29481195-zh4mh": {
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "cleaner",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        }
+      ]
+    },
+    "review-pr3880-stitch-opus45-5591e94c-v1-964h4": {
+      "phase": "Pending",
+      "containers": [
+        {
+          "name": "claude-claude-opus-4-5-20251101",
+          "ready": false,
+          "state": "PodInitializing"
+        },
+        {
+          "name": "docker-daemon",
+          "ready": false,
+          "state": "PodInitializing"
+        }
+      ]
+    }
+  },
+  "coderuns": {
+    "review-pr3880-hffks": {
+      "phase": "Running"
+    },
+    "review-pr3880-6vgd8": {
+      "phase": "Running"
+    },
+    "review-pr3880-l8m8q": {
+      "phase": "Running"
+    },
+    "review-pr3880-7tz99": {
+      "phase": "Running"
+    },
+    "review-pr3880-gr2v5": {
+      "phase": "Running"
+    },
+    "review-pr3880-c2xtq": {
+      "phase": "Running"
+    },
+    "review-pr3880-5975s": {
+      "phase": "Running"
+    },
+    "review-pr3880-k4x24": {
+      "phase": "Running"
+    }
+  },
+  "failures": [
+    {
+      "timestamp": "2026-01-20T01:17:30.403786Z",
+      "type": "event",
+      "resource": "TunnelBinding/web-tunnel",
+      "message": "FailedReadingTxt: FQDN present but unmanaged by Tunnel"
+    },
+    {
+      "timestamp": "2026-01-20T01:17:30.404054Z",
+      "type": "event",
+      "resource": "TunnelBinding/web-tunnel",
+      "message": "FailedDNSCreatePartial: Some DNS entries failed to create"
+    },
+    {
+      "timestamp": "2026-01-20T02:16:09.572545Z",
+      "type": "event",
+      "resource": "TunnelBinding/cto-main",
+      "message": "FailedService: Failed to get Service"
+    },
+    {
+      "timestamp": "2026-01-20T02:16:09.572809Z",
+      "type": "event",
+      "resource": "TunnelBinding/cto-main",
+      "message": "ErrBuildConfig: Error building TunnelBinding configuration, svc: cto-web-cto"
+    },
+    {
+      "timestamp": "2026-01-20T02:16:09.573224Z",
+      "type": "event",
+      "resource": "TunnelBinding/cto-main",
+      "message": "FailedReadingTxt: FQDN present but unmanaged by Tunnel"
+    },
+    {
+      "timestamp": "2026-01-20T02:16:09.573275Z",
+      "type": "event",
+      "resource": "TunnelBinding/cto-main",
+      "message": "FailedDNSCreatePartial: Some DNS entries failed to create"
+    },
+    {
+      "timestamp": "2026-01-20T02:16:09.573336Z",
+      "type": "event",
+      "resource": "ExternalSecret/web-github-oauth",
+      "message": "UpdateFailed: error processing spec.data[0] (key: secret/web-app/github-oauth), err: Secret does not exist"
+    },
+    {
+      "timestamp": "2026-01-20T02:16:09.573469Z",
+      "type": "event",
+      "resource": "TunnelBinding/web-tunnel",
+      "message": "FailedReadingTxt: FQDN present but unmanaged by Tunnel"
+    },
+    {
+      "timestamp": "2026-01-20T02:16:09.573888Z",
+      "type": "event",
+      "resource": "TunnelBinding/web-tunnel",
+      "message": "FailedDNSCreatePartial: Some DNS entries failed to create"
+    },
+    {
+      "timestamp": "2026-01-20T02:16:48.757425Z",
+      "type": "event",
+      "resource": "ExternalSecret/web-github-oauth",
+      "message": "UpdateFailed: error processing spec.data[0] (key: secret/web-app/github-oauth), err: Secret does not exist"
+    }
+  ],
+  "completedLogs": [
+    {
+      "pod": "log-error-scanner-1768852800-healer-scan-2450104598",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/log-error-scanner-1768852800-healer-scan-2450104598_20260119_200004.log",
+      "timestamp": "2026-01-19T20:00:04.872381Z",
+      "exit_code": 0,
+      "phase": "Running"
+    },
+    {
+      "pod": "log-error-scanner-1768852800-report-4100414017",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/log-error-scanner-1768852800-report-4100414017_20260119_200015.log",
+      "timestamp": "2026-01-19T20:00:15.009867Z",
+      "exit_code": 0,
+      "phase": "Running"
+    },
+    {
+      "pod": "workspace-pvc-cleaner-29480895-hvzhl",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/workspace-pvc-cleaner-29480895-hvzhl_20260119_201502.log",
+      "timestamp": "2026-01-19T20:15:02.927092Z",
+      "exit_code": 0,
+      "phase": "Pending"
+    },
+    {
+      "pod": "event-cleaner-29480940-dqlr9",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/event-cleaner-29480940-dqlr9_20260119_210241.log",
+      "timestamp": "2026-01-19T21:02:41.395931Z",
+      "exit_code": 0,
+      "phase": "Succeeded"
+    },
+    {
+      "pod": "event-cleaner-29481150-czc58",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/event-cleaner-29481150-czc58_20260120_004542.log",
+      "timestamp": "2026-01-20T00:45:42.059867Z",
+      "exit_code": 0,
+      "phase": "Succeeded"
+    },
+    {
+      "pod": "workspace-pvc-cleaner-29481135-6bcgr",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/workspace-pvc-cleaner-29481135-6bcgr_20260120_004542.log",
+      "timestamp": "2026-01-20T00:45:42.101173Z",
+      "exit_code": 0,
+      "phase": "Succeeded"
+    },
+    {
+      "pod": "event-cleaner-29481180-l85s4",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/event-cleaner-29481180-l85s4_20260120_010133.log",
+      "timestamp": "2026-01-20T01:01:33.857729Z",
+      "exit_code": 0,
+      "phase": "Succeeded"
+    },
+    {
+      "pod": "workspace-pvc-cleaner-29481195-zh4mh",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/workspace-pvc-cleaner-29481195-zh4mh_20260120_011503.log",
+      "timestamp": "2026-01-20T01:15:03.646449Z",
+      "exit_code": 0,
+      "phase": "Running"
+    },
+    {
+      "pod": "event-cleaner-29481240-j5zfl",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/event-cleaner-29481240-j5zfl_20260120_021609.log",
+      "timestamp": "2026-01-20T02:16:09.805032Z",
+      "exit_code": 0,
+      "phase": "Succeeded"
+    },
+    {
+      "pod": "workspace-pvc-cleaner-29481255-pjqwn",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/workspace-pvc-cleaner-29481255-pjqwn_20260120_021609.log",
+      "timestamp": "2026-01-20T02:16:09.830125Z",
+      "exit_code": 0,
+      "phase": "Succeeded"
+    }
+  ]
+}
