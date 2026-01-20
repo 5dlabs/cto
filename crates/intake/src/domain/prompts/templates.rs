@@ -330,10 +330,84 @@ pub fn generate_task_prompt(task: &Task) -> String {
     content
 }
 
+/// Verification command hints for acceptance criteria (Ralph "signs" style).
+///
+/// These hints tell the agent HOW to verify each criterion, enabling faster
+/// backpressure loops and more deterministic validation.
+#[derive(Debug, Clone)]
+pub struct VerificationHints {
+    /// Command to run tests
+    pub tests: &'static str,
+    /// Command to run linter
+    pub lint: &'static str,
+    /// Command to check formatting
+    pub format: &'static str,
+    /// Command to verify build
+    pub build: &'static str,
+}
+
+/// Get verification command hints based on agent type.
+///
+/// Returns language-specific commands that agents should run to verify
+/// acceptance criteria. This implements the Ralph methodology's "signs"
+/// concept - steering prompts that tell agents HOW to verify, not just WHAT.
+#[must_use]
+pub fn get_verification_hints(agent_hint: &str) -> VerificationHints {
+    match agent_hint {
+        "rex" => VerificationHints {
+            tests: "cargo test --workspace",
+            lint: "cargo clippy --all-targets -- -D warnings -W clippy::pedantic",
+            format: "cargo fmt --all --check",
+            build: "cargo build --release",
+        },
+        "grizz" => VerificationHints {
+            tests: "go test ./...",
+            lint: "golangci-lint run",
+            format: "gofmt -l .",
+            build: "go build ./...",
+        },
+        "nova" => VerificationHints {
+            tests: "bun test",
+            lint: "bun run lint",
+            format: "bun run format:check",
+            build: "bun run build",
+        },
+        "blaze" | "spark" => VerificationHints {
+            tests: "npm run test",
+            lint: "npm run lint",
+            format: "npm run format:check",
+            build: "npm run build",
+        },
+        "tap" => VerificationHints {
+            tests: "npm run test",
+            lint: "npm run lint",
+            format: "npm run format:check",
+            build: "npx expo-doctor",
+        },
+        "bolt" => VerificationHints {
+            tests: "helm lint charts/*",
+            lint: "kubectl apply --dry-run=client -f",
+            format: "yamllint .",
+            build: "helm template charts/*",
+        },
+        _ => VerificationHints {
+            tests: "run project test suite",
+            lint: "run linter",
+            format: "run formatter --check",
+            build: "run build",
+        },
+    }
+}
+
 /// Generate acceptance-criteria.md content for a task.
+///
+/// Includes verification command hints (Ralph "signs" style) to tell agents
+/// HOW to verify each criterion, enabling faster backpressure loops.
 #[must_use]
 pub fn generate_acceptance_criteria(task: &Task) -> String {
     let mut content = String::new();
+    let agent_hint = task.agent_hint.as_deref().unwrap_or("rex");
+    let hints = get_verification_hints(agent_hint);
 
     writeln!(content, "# Acceptance Criteria: Task {}\n", task.id).ok();
     writeln!(content, "- [ ] {}", task.description).ok();
@@ -343,8 +417,10 @@ pub fn generate_acceptance_criteria(task: &Task) -> String {
     }
 
     writeln!(content, "- [ ] All requirements implemented").ok();
-    writeln!(content, "- [ ] Tests passing").ok();
-    writeln!(content, "- [ ] Code follows conventions").ok();
+    writeln!(content, "- [ ] Tests passing (`{}` exits 0)", hints.tests).ok();
+    writeln!(content, "- [ ] Lints passing (`{}` exits 0)", hints.lint).ok();
+    writeln!(content, "- [ ] Formatted (`{}` exits 0)", hints.format).ok();
+    writeln!(content, "- [ ] Build succeeds (`{}` exits 0)", hints.build).ok();
     writeln!(content, "- [ ] PR created and ready for review").ok();
 
     // Add subtask acceptance criteria if any
@@ -724,7 +800,48 @@ Other requirements."
         assert!(md.contains("# Acceptance Criteria: Task 1"));
         assert!(md.contains("- [ ] Create CRUD endpoints"));
         assert!(md.contains("- [ ] All requirements implemented"));
-        assert!(md.contains("- [ ] Tests passing"));
+        // Verify Ralph-style verification hints are included
+        assert!(md.contains("- [ ] Tests passing (`cargo test --workspace` exits 0)"));
+        assert!(md.contains("- [ ] Lints passing (`cargo clippy"));
+        assert!(md.contains("- [ ] Formatted (`cargo fmt --all --check` exits 0)"));
+        assert!(md.contains("- [ ] Build succeeds (`cargo build --release` exits 0)"));
+    }
+
+    #[test]
+    fn test_get_verification_hints_rust() {
+        let hints = get_verification_hints("rex");
+        assert_eq!(hints.tests, "cargo test --workspace");
+        assert!(hints.lint.contains("clippy"));
+        assert!(hints.lint.contains("pedantic"));
+        assert_eq!(hints.format, "cargo fmt --all --check");
+        assert_eq!(hints.build, "cargo build --release");
+    }
+
+    #[test]
+    fn test_get_verification_hints_typescript() {
+        let hints = get_verification_hints("blaze");
+        assert_eq!(hints.tests, "npm run test");
+        assert_eq!(hints.lint, "npm run lint");
+        assert_eq!(hints.format, "npm run format:check");
+        assert_eq!(hints.build, "npm run build");
+    }
+
+    #[test]
+    fn test_get_verification_hints_go() {
+        let hints = get_verification_hints("grizz");
+        assert_eq!(hints.tests, "go test ./...");
+        assert!(hints.lint.contains("golangci-lint"));
+    }
+
+    #[test]
+    fn test_acceptance_criteria_uses_agent_hint() {
+        let mut task = sample_task();
+        task.agent_hint = Some("blaze".to_string());
+        let md = generate_acceptance_criteria(&task);
+
+        // Should use Blaze-specific commands (npm)
+        assert!(md.contains("npm run test"));
+        assert!(md.contains("npm run lint"));
     }
 
     #[test]

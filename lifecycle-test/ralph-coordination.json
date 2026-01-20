@@ -1,0 +1,37 @@
+{
+  "monitor": {
+    "status": "stopped",
+    "currentPhase": "intake",
+    "lastCheck": "2026-01-20T03:32:01Z",
+    "pid": null
+  },
+  "remediation": {
+    "status": "idle",
+    "currentIssue": null,
+    "pid": 92116
+  },
+  "issueQueue": [],
+  "circuitBreaker": {
+    "state": "closed",
+    "noProgressCount": 0,
+    "sameErrorCount": 0,
+    "lastError": null,
+    "lastFileChange": null,
+    "openedAt": null
+  },
+  "session": {
+    "id": null,
+    "startedAt": null,
+    "lastActivity": null,
+    "expirationHours": 24
+  },
+  "stats": {
+    "totalIssues": 0,
+    "resolved": 0,
+    "failed": 0,
+    "circuitBreakerTrips": 0,
+    "sessionResets": 0,
+    "averageResolutionTime": null,
+    "lastSuccessfulPhase": null
+  }
+}

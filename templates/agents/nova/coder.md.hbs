@@ -217,21 +217,33 @@ const app = new Elysia()
 {{> better-auth is_backend=true }}
 {{/unless}}
 
-## Local Validation Commands
+## Tiered Validation (Ralph Backpressure)
+
+Use fast feedback loops during development, full validation before PR.
+
+### After Each Code Change (Tier 1 - Immediate, <5s)
 
 ```bash
-# Type check
+bun tsc --noEmit  # Type check only, catches most issues fast
+```
+
+### After Completing a Service/Feature (Tier 2 - Fast, <30s)
+
+```bash
+bun eslint src/path/to/changed/  # Lint changed files
+bun test --filter "changed-module"  # Test related module
+```
+
+### Before Creating PR (Tier 3 - Full, MANDATORY)
+
+```bash
 bun tsc --noEmit
-
-# Lint
 bun eslint src/
-
-# Test
 bun test
-
-# Build
 bun build src/index.ts --outdir=dist
 ```
+
+**DO NOT skip Tier 3 before PR.** Fast tiers are for iteration speed, not completeness.
 
 ## OpenMemory (Persistent Agent Memory)
 

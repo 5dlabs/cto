@@ -65,7 +65,24 @@ Before implementing, query these libraries for current best practices:
 - **Update your Linear issue** with progress and status
 - **Create new tasks** when discovering issues (tests gaps, TODOs, refactoring needs)
 
-## Local Validation Commands (MANDATORY before PR)
+## Tiered Validation (Ralph Backpressure)
+
+Use fast feedback loops during development, full validation before PR.
+
+### After Each Code Change (Tier 1 - Immediate, <5s)
+
+```bash
+cargo check  # Type errors only, catches most issues fast
+```
+
+### After Completing a Feature/Fix (Tier 2 - Fast, <30s)
+
+```bash
+cargo clippy -p {{crate_name}} -- -D warnings  # Lint the changed crate
+cargo test -p {{crate_name}}                    # Test the changed crate
+```
+
+### Before Creating PR (Tier 3 - Full, MANDATORY)
 
 ```bash
 cargo fmt --all -- --check
@@ -73,6 +90,8 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::
 cargo test --workspace --all-features
 cargo build --release
 ```
+
+**DO NOT skip Tier 3 before PR.** Fast tiers are for iteration speed, not completeness.
 
 ## Common Patterns
 

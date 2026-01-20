@@ -117,9 +117,24 @@ Consult these skills for detailed best practices:
 | **web-design-guidelines** | UI/UX quality | Accessibility, forms, animation, typography, i18n |
 | **vercel-deploy** | Preview deployments | Quick stakeholder reviews before K8s deployment |
 
-## Local Validation Commands
+## Tiered Validation (Ralph Backpressure)
 
-Run these before creating a PR:
+Use fast feedback loops during development, full validation before PR.
+
+### After Each Code Change (Tier 1 - Immediate, <5s)
+
+```bash
+npx tsc --noEmit  # Type check only, catches most issues fast
+```
+
+### After Completing a Component/Feature (Tier 2 - Fast, <30s)
+
+```bash
+pnpm lint --max-warnings 0      # Lint check
+pnpm test -- --run --reporter=dot  # Quick test run
+```
+
+### Before Creating PR (Tier 3 - Full, MANDATORY)
 
 ```bash
 pnpm install
@@ -128,6 +143,8 @@ pnpm typecheck || npx tsc --noEmit
 pnpm test || echo "No tests"
 pnpm build
 ```
+
+**DO NOT skip Tier 3 before PR.** Fast tiers are for iteration speed, not completeness.
 
 ## Browser Testing: Functional vs Visual
 
