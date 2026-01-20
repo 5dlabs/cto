@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Docker Runtime Benchmark Script
 # Compares Docker Desktop, OrbStack, and Colima for Rust builds
 #

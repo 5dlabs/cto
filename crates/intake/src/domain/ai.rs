@@ -324,7 +324,7 @@ impl AIDomain {
     }
 
     /// Internal expand task implementation.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)] // All parameters are distinct task expansion options
     async fn expand_task_internal(
         &self,
         task: &Task,
@@ -356,6 +356,7 @@ impl AIDomain {
         let next_id = task.subtasks.iter().map(|s| s.id).max().unwrap_or(0) + 1;
 
         #[allow(clippy::cast_possible_wrap)]
+        // Subtask IDs are small positive integers, wrap not possible
         let context = ExpandTaskContext {
             subtask_count: count,
             task: TaskSummary::from(task),
@@ -568,7 +569,7 @@ impl AIDomain {
     }
 
     /// Convert a generated task to a Task entity.
-    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_sign_loss)] // Task IDs from AI are positive integers
     fn generated_task_to_task(gt: GeneratedTask) -> Task {
         let task_id = gt.id.to_string();
         let subtasks = gt
@@ -617,7 +618,7 @@ impl AIDomain {
     }
 
     /// Convert a generated subtask to a Subtask entity.
-    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_sign_loss)] // Subtask IDs from AI are positive integers
     fn generated_subtask_to_subtask(gs: GeneratedSubtask, parent_id: &str) -> Subtask {
         let mut subtask = Subtask::new(gs.id as u32, parent_id, gs.title, gs.description);
         subtask.status = gs.status.unwrap_or(TaskStatus::Pending);

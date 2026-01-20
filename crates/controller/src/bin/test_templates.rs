@@ -84,7 +84,7 @@ fn register_shared_partials(
     Ok(())
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn test_code_templates(
     handlebars: &mut Handlebars,
     template_dir: &Path,

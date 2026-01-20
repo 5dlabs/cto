@@ -384,7 +384,7 @@ async fn trigger_intake(
 /// `POST /api/intake/setup`
 ///
 /// This is called by the MCP tool to set up Linear before the user triggers intake.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn handle_intake_setup(
     State(state): State<AppState>,
     Json(request): Json<IntakeSetupRequest>,
@@ -930,7 +930,7 @@ pub async fn linear_webhook_handler(
 /// Handle new agent session (delegation or mention).
 ///
 /// Determines if this is an intake or play request based on issue labels/content.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn handle_session_created(
     state: &AppState,
     payload: &WebhookPayload,
@@ -1351,7 +1351,7 @@ async fn handle_session_created(
 }
 
 /// Handle prompted session (follow-up message or stop signal).
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn handle_session_prompted(
     state: &AppState,
     payload: &WebhookPayload,
@@ -1524,7 +1524,7 @@ async fn handle_session_prompted(
 ///
 /// Syncs `cto-config.json` documents to Kubernetes `ConfigMaps` for project-specific
 /// Play workflow configuration.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn handle_document_event(
     state: &AppState,
     payload: &WebhookPayload,

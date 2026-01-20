@@ -118,7 +118,7 @@ pub fn compute_subtask_execution_levels(subtasks: &mut [Subtask]) -> ExecutionLe
         ready.sort_unstable();
 
         // Current level index (subtask execution levels won't exceed u32::MAX in practice)
-        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_possible_truncation)] // Task levels are small positive integers
         let level_idx = levels.len() as u32;
 
         // Mark these subtasks as resolved at this level
@@ -145,8 +145,7 @@ pub fn compute_subtask_execution_levels(subtasks: &mut [Subtask]) -> ExecutionLe
     let total_subtasks = subtasks.len();
     let total_levels = levels.len();
     let max_parallelism = levels.iter().map(Vec::len).max().unwrap_or(0);
-    // Precision loss is acceptable for statistics (f64 can represent integers up to 2^53 exactly)
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for statistics
     let avg_parallelism = if total_levels > 0 {
         total_subtasks as f64 / total_levels as f64
     } else {

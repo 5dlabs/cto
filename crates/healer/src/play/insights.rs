@@ -195,7 +195,7 @@ impl InsightCollector {
 
     /// Get agent performance stats.
     #[must_use]
-    #[allow(clippy::cast_precision_loss, clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_wrap)] // Stats are for display, precision loss acceptable
     pub fn agent_stats(&self, agent: &str) -> AgentStats {
         let obs = self.for_agent(agent);
 

@@ -168,7 +168,7 @@ impl RemediationTracker {
     /// # Errors
     ///
     /// Returns an error if spawning a retry `CodeRun` fails.
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     pub async fn handle_completion(
         &self,
         completion: CodeRunCompletion,
@@ -272,7 +272,7 @@ impl RemediationTracker {
             Ok(CompletionAction::Success)
         } else {
             // Check if we should retry
-            #[allow(clippy::cast_possible_truncation)]
+            #[allow(clippy::cast_possible_truncation)] // Attempt count is always small
             let attempts_made = tracked.state.attempts.len() as u32;
             let should_retry = attempts_made < self.config.max_attempts;
 
@@ -326,7 +326,7 @@ impl RemediationTracker {
 
                 // Store escalation in memory
                 if let Some(memory) = &self.memory {
-                    #[allow(clippy::cast_possible_truncation)]
+                    #[allow(clippy::cast_possible_truncation)] // Attempt count is always small
                     let attempts_count = tracked.state.attempts.len() as u32;
                     let _ = memory
                         .store_escalation(

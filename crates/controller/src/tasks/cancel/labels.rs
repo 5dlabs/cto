@@ -32,7 +32,7 @@ impl AtomicLabelManager {
         Self {}
     }
 
-    #[allow(clippy::unused_async)]
+    #[allow(clippy::unused_async)] // Stub: will await GitHub API calls when implemented
     pub async fn atomic_label_transition(
         &self,
         _pr_number: i32,

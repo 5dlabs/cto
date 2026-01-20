@@ -46,7 +46,7 @@ impl<'a> CodeResourceManager<'a> {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     pub async fn reconcile_create_or_update(&self, code_run: &Arc<CodeRun>) -> Result<Action> {
         let name = code_run.name_any();
         info!("🚀 Creating/updating code resources for: {}", name);
@@ -601,7 +601,7 @@ impl<'a> CodeResourceManager<'a> {
         ResourceNaming::job_name(code_run)
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn build_job_spec(&self, code_run: &CodeRun, job_name: &str, cm_name: &str) -> Result<Job> {
         let labels = Self::create_task_labels(code_run);
 
@@ -1412,7 +1412,7 @@ impl<'a> CodeResourceManager<'a> {
         Ok(serde_json::from_value(job_spec)?)
     }
 
-    #[allow(clippy::too_many_lines, clippy::items_after_statements)]
+    #[allow(clippy::too_many_lines, clippy::items_after_statements)] // Complex task requirement processing
     fn process_task_requirements(
         code_run: &CodeRun,
         mut env_vars: Vec<serde_json::Value>,
@@ -1750,7 +1750,7 @@ impl<'a> CodeResourceManager<'a> {
         Ok(())
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     async fn cleanup_old_configmaps(&self, code_run: &CodeRun) -> Result<()> {
         // Generate current ConfigMap name to avoid deleting it
         let current_cm_name = Self::generate_configmap_name(code_run);

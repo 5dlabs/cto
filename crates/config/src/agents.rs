@@ -26,7 +26,7 @@ pub fn default_remote_tools() -> Vec<String> {
 
 /// Get the default configuration for an agent by name.
 #[must_use]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub fn get_agent_config(agent_name: &str) -> AgentConfig {
     match agent_name.to_lowercase().as_str() {
         "morgan" => AgentConfig {

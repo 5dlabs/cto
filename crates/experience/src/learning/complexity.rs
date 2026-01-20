@@ -88,7 +88,7 @@ impl ComplexityFilter {
 
     /// Calculate complexity score for a task (0.0 - 1.0).
     #[must_use]
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for score calculation
     pub fn calculate_complexity(&self, task: &TaskRecord) -> f32 {
         let mut score = 0.0f32;
 
@@ -122,7 +122,7 @@ impl ComplexityFilter {
 
     /// Get detailed complexity breakdown for debugging.
     #[must_use]
-    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_sign_loss)] // Duration seconds are always positive after max(0)
     pub fn complexity_breakdown(&self, task: &TaskRecord) -> ComplexityBreakdown {
         let unique_tools = task.unique_tools();
         let duration_secs = task.duration().map_or(0, |d| d.num_seconds().max(0) as u64);

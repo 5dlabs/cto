@@ -1401,7 +1401,7 @@ async fn inject_artifact_summary(input_fifo: &str, trail: &ArtifactTrail) -> boo
 
 /// Track tool invocation state for proper action activities
 #[derive(Default)]
-#[allow(clippy::struct_field_names)]
+#[allow(clippy::struct_field_names)] // current_ prefix is intentional for state tracking clarity
 struct ToolState {
     current_tool: Option<String>,
     current_input: Option<String>,
@@ -1418,7 +1418,7 @@ struct ToolState {
 /// - Transient status → ephemeral `thought` activities
 ///
 /// Also tracks file operations for the artifact trail (context engineering best practice).
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn process_stream_event(
     client: &LinearApiClient,
     session_id: &str,
@@ -1577,7 +1577,7 @@ async fn process_stream_event(
             ..
         } => {
             *total_cost += total_cost_usd.unwrap_or(0.0);
-            #[allow(clippy::cast_precision_loss)]
+            #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for duration display
             let duration_secs = duration_ms.map(|ms| ms as f64 / 1000.0).unwrap_or(0.0);
             let turns = num_turns.unwrap_or(0);
 
@@ -1791,7 +1791,7 @@ async fn fifo_writer_task(config: Arc<Config>, mut fifo_rx: mpsc::Receiver<Strin
 /// 1. Firm reminder to focus
 /// 2. Sharp directive to execute NOW
 /// 3. Critical warning with timeout threat
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn progress_monitor_task(
     config: Arc<Config>,
     fifo_tx: mpsc::Sender<String>,

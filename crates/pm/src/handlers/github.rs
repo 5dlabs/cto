@@ -129,7 +129,7 @@ pub struct IntakeMetadata {
 }
 
 /// Handle GitHub webhook
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 pub async fn handle_github_webhook(
     State(state): State<Arc<CallbackState>>,
     headers: HeaderMap,
@@ -386,7 +386,7 @@ struct IntakeProjectResult {
 }
 
 /// Create a Linear project from a merged intake PR
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn create_project_from_intake(
     state: &Arc<CallbackState>,
     client: &LinearClient,
@@ -922,7 +922,7 @@ pub struct PlayTriggerResult {
 /// Creates a `CodeRun` CRD with Morgan as the agent to start the play workflow.
 /// This ensures the project-specific `ConfigMap` (`cto-config-project-{project_id}`)
 /// is mounted, providing the correct agent assignments and settings.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn trigger_play_workflow(
     state: &Arc<CallbackState>,
     client: &LinearClient,

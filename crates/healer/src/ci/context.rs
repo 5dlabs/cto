@@ -154,7 +154,7 @@ impl ContextGatherer {
     /// # Errors
     ///
     /// Returns an error if the `gh` CLI command fails to execute.
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_possible_truncation)] // PR numbers are small positive integers
     pub fn fetch_pr_for_branch(&self, branch: &str) -> Result<Option<PullRequest>> {
         let output = Command::new("gh")
             .args([

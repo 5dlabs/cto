@@ -111,8 +111,8 @@ pub async fn resume_workflow_for_no_pr(
 }
 
 /// Resume workflow by forcing re-evaluation of stuck resource nodes
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments)] // Workflow resume requires multiple context parameters
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn resume_workflow_via_http(
     _client: &Client,
     namespace: &str,

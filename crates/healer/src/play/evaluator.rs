@@ -323,7 +323,7 @@ Answer the question based ONLY on the context provided above. Be specific and in
                         .filter(|kw| context_lower.contains(&kw.to_lowercase()))
                         .count();
 
-                    #[allow(clippy::cast_precision_loss)]
+                    #[allow(clippy::cast_precision_loss)] // Score precision loss is acceptable
                     let s = matches as f32 / probe.expected_keywords.len() as f32;
                     s
                 };

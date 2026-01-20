@@ -69,7 +69,7 @@ struct OpenAIChoice {
 
 /// OpenAI API usage
 #[derive(Debug, Deserialize)]
-#[allow(clippy::struct_field_names)]
+#[allow(clippy::struct_field_names)] // Matches OpenAI API response field names
 struct OpenAIUsage {
     prompt_tokens: u32,
     completion_tokens: u32,

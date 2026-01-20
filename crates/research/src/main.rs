@@ -278,7 +278,7 @@ async fn main() -> Result<()> {
 }
 
 #[allow(clippy::fn_params_excessive_bools)] // CLI flags
-#[allow(clippy::too_many_arguments)] // CLI parameters
+#[allow(clippy::too_many_arguments)] // CLI entry point with distinct configuration options
 async fn run_poll(
     output: PathBuf,
     state_path: PathBuf,

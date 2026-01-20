@@ -153,6 +153,7 @@ impl SkillLearner {
                 Self::generate_action_description(&tool_call.tool_name, &tool_call.arguments);
 
             #[allow(clippy::cast_possible_truncation)]
+            // Step count won't exceed u32::MAX in practice
             let step = ToolStep::new((steps.len() + 1) as u32, &tool_call.tool_name, action);
 
             steps.push(step);

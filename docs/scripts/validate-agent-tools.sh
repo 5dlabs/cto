@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # Validate that each agent can access their configured tools via MCP
 #
 # This script tests the tool routing for all 12 agents by attempting

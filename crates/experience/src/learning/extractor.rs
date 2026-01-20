@@ -405,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     fn test_enhance_existing_tasks_scopes_messages_by_task_time() {
         let extractor = TaskExtractor::new();
 

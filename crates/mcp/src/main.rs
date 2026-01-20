@@ -305,7 +305,7 @@ fn make_agent_name(org_name: &str, agent_suffix: &str) -> String {
 
 /// Load configuration from cto-config.json file
 /// Looks in current directory, workspace root, or `WORKSPACE_FOLDER_PATHS` for cto-config.json
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn load_cto_config() -> Result<CtoConfig> {
     // Debug: Show current working directory
     if let Ok(cwd) = std::env::current_dir() {
@@ -392,7 +392,7 @@ fn load_cto_config() -> Result<CtoConfig> {
 
 /// Load repository-specific configuration from cto-config.json
 /// Used during workflow creation to get repository's agent tool configurations
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn load_repository_config(repository_path: Option<&str>) -> Option<CtoConfig> {
     // Try to load from explicit repository path first
     if let Some(repo_path) = repository_path {
@@ -502,7 +502,7 @@ fn extract_params(params: Option<&Value>) -> HashMap<String, Value> {
         .unwrap_or_default()
 }
 
-#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_possible_truncation)] // Retry counts are small positive integers
 fn parse_max_retries_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<u32> {
     arguments.get(key).and_then(|value| match value {
         Value::Number(num) => num.as_u64().map(|v| v as u32),
@@ -525,7 +525,7 @@ fn parse_bool_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<
 
 /// Auto-correct deprecated Anthropic model IDs to valid alternatives
 /// This prevents silent failures when clients pass outdated model names
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 /// Auto-correct deprecated Claude model names to current versions.
 /// Applied to any model starting with "claude-" prefix.
 fn autocorrect_model(model: &str) -> (String, bool) {
@@ -673,7 +673,7 @@ const REQUIRED_CLIS: &[CliDependency] = &[
 ];
 
 /// Check all required dependencies and optionally install missing ones
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn check_dependencies(auto_install: bool) {
     let mut missing: Vec<&CliDependency> = Vec::new();
 
@@ -810,7 +810,7 @@ struct IntakeSetupIssue {
 
 /// Create Linear project and PRD issue for intake via PM server.
 /// This avoids needing the Linear API key on the client side.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn create_linear_intake_setup(
     project_name: &str,
     prd_content: &str,
@@ -1564,7 +1564,7 @@ fn clear_play_progress(repo: &str) {
 /// - Expected tools per agent
 /// - Task dependencies
 /// - Repository and service details
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn notify_healer(
     healer_endpoint: &str,
     play_id: &str,
@@ -1983,7 +1983,7 @@ fn find_blocked_play_tasks(working_dir: Option<&str>) -> Result<Vec<PlayTask>> {
 }
 
 /// Handle play status query
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
     let config = CTO_CONFIG.get().unwrap();
 
@@ -2163,7 +2163,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Check if task_id is provided
     let task_id = if let Some(id_value) = arguments.get("task_id") {
         // Explicit task_id provided
-        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_possible_truncation)] // Task IDs are small positive integers
         Some(
             id_value
                 .as_u64()
@@ -3464,7 +3464,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                             let created_secs = created_time.timestamp();
                             // Only process workflows with valid (non-negative) timestamps
                             if created_secs >= 0 {
-                                #[allow(clippy::cast_sign_loss)]
+                                #[allow(clippy::cast_sign_loss)] // Already checked >= 0 above
                                 let created_secs_u64 = created_secs as u64;
 
                                 // Handle clock skew: if workflow timestamp is in the future, treat as age 0
@@ -3610,8 +3610,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
 /// Unified intake workflow - parses PRD, generates tasks, and creates documentation
 /// This replaces the separate `intake_prd` and docs workflows
-#[allow(clippy::disallowed_macros)]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
+#[allow(clippy::too_many_lines)] // Complex function not easily split
 fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Get configuration early so we can use defaults
     let config = CTO_CONFIG
@@ -4354,7 +4354,7 @@ fn handle_anthropic_message_tool(
         .and_then(|v| v.as_str())
         .ok_or(anyhow!("model is required"))?;
     let system = arguments.get("system").and_then(|v| v.as_str());
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_possible_truncation)] // Token counts are small positive integers
     let max_tokens = arguments
         .get("max_tokens")
         .and_then(serde_json::Value::as_u64)
@@ -5071,7 +5071,7 @@ fn handle_check_setup(arguments: &std::collections::HashMap<String, Value>) -> V
     })
 }
 
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 async fn rpc_loop() -> Result<()> {
     eprintln!("Starting RPC loop");
     let stdin = tokio::io::stdin();
@@ -5157,7 +5157,7 @@ async fn rpc_loop() -> Result<()> {
     Ok(())
 }
 
-#[allow(clippy::disallowed_macros)]
+#[allow(clippy::disallowed_macros)] // MCP uses stderr for debug output (stdout is JSON-RPC)
 fn main() -> Result<()> {
     eprintln!(
         "🚀 Starting 5D Labs MCP Server... (built: {})",

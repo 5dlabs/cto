@@ -18,7 +18,7 @@ impl TokenCounter {
 
     /// Count tokens in a string.
     #[must_use]
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_possible_truncation)] // Token count won't exceed u32::MAX for any practical input
     pub fn count(&self, text: &str) -> u32 {
         self.bpe.encode_ordinary(text).len() as u32
     }

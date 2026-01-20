@@ -151,7 +151,7 @@ impl TagStats {
     }
 
     /// Calculate completion percentage
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for percentage display
     pub fn completion_percent(&self) -> f64 {
         if self.task_count == 0 {
             0.0

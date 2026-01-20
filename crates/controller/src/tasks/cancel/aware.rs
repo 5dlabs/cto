@@ -91,7 +91,7 @@ impl StateAwareCancellation {
     /// Panics if `SystemTime::now()` returns a value earlier than `UNIX_EPOCH`
     /// while generating the correlation identifier. This is not expected in
     /// normal environments.
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines)] // Complex function not easily split
     pub async fn cancel_agents_with_state_check(
         &self,
         task_id: &str,

@@ -321,7 +321,7 @@ spec:
         if let Some(tracked) = active.get(fingerprint) {
             // Check if within dedup window
             let elapsed = Utc::now() - tracked.started_at;
-            #[allow(clippy::cast_possible_wrap)]
+            #[allow(clippy::cast_possible_wrap)] // dedup_window_mins is a small config value, won't wrap
             if elapsed.num_minutes() < self.dedup_window_mins as i64 {
                 return true;
             }

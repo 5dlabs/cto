@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # =============================================================================
 # install-hooks.sh - Install git hooks for local CI with Claude auto-fix
 # =============================================================================

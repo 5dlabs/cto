@@ -100,7 +100,7 @@ impl MarkdownWriter {
             std::fs::create_dir_all(parent)?;
         }
 
-        let content = self.render_markdown(entry);
+        let content = Self::render_markdown(entry);
         std::fs::write(&path, content)?;
 
         tracing::info!(path = %path.display(), "Wrote research entry");
@@ -116,8 +116,7 @@ impl MarkdownWriter {
     }
 
     /// Render a research entry as markdown with frontmatter.
-    #[allow(clippy::unused_self)]
-    fn render_markdown(&self, entry: &ResearchEntry) -> String {
+    fn render_markdown(entry: &ResearchEntry) -> String {
         let mut md = String::new();
 
         // YAML frontmatter
