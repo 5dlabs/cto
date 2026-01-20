@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-20T04:31:56.265450Z",
+  "timestamp": "2026-01-20T04:36:02.263283Z",
   "hasFailures": true,
   "pods": {
     "cto-web-569f6786fb-v2hs7": {
@@ -75,6 +75,17 @@
         }
       ]
     },
+    "cto-healer-reconciler-29481395-zn9nh": {
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "reconciler",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        }
+      ]
+    },
     "event-cleaner-29481390-swbjc": {
       "phase": "Succeeded",
       "containers": [
@@ -107,6 +118,40 @@
         }
       ]
     },
+    "task-complete-pr3880-srg8c": {
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "main",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        },
+        {
+          "name": "wait",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        }
+      ]
+    },
+    "task-complete-pr3880-zd45p": {
+      "phase": "Succeeded",
+      "containers": [
+        {
+          "name": "main",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        },
+        {
+          "name": "wait",
+          "ready": false,
+          "state": "terminated",
+          "exit_code": 0
+        }
+      ]
+    },
     "tweakcn-678f4cfd84-759jc": {
       "phase": "Running",
       "containers": [
@@ -122,17 +167,6 @@
       "containers": [
         {
           "name": "cleaner",
-          "ready": false,
-          "state": "terminated",
-          "exit_code": 0
-        }
-      ]
-    },
-    "cto-healer-reconciler-29481390-lgcp6": {
-      "phase": "Succeeded",
-      "containers": [
-        {
-          "name": "reconciler",
           "ready": false,
           "state": "terminated",
           "exit_code": 0
@@ -191,95 +225,67 @@
   "coderuns": {},
   "failures": [
     {
-      "timestamp": "2026-01-20T04:31:54.263295Z",
-      "type": "event",
-      "resource": "Job/research-poller-29481375",
-      "message": "BackoffLimitExceeded: Job has reached the specified backoff limit"
-    },
-    {
-      "timestamp": "2026-01-20T04:31:54.263330Z",
-      "type": "event",
-      "resource": "Pod/research-poller-29481380-n48th",
-      "message": "BackOff: Back-off restarting failed container research in pod research-poller-29481380-n48th_cto(8dbeeba1-c6c2-4b9d-b53f-d1d91c2ef5c4)"
-    },
-    {
-      "timestamp": "2026-01-20T04:31:54.263356Z",
-      "type": "event",
-      "resource": "Job/research-poller-29481380",
-      "message": "BackoffLimitExceeded: Job has reached the specified backoff limit"
-    },
-    {
-      "timestamp": "2026-01-20T04:31:54.263377Z",
-      "type": "event",
-      "resource": "Pod/research-poller-29481385-pnhpg",
-      "message": "BackOff: Back-off restarting failed container research in pod research-poller-29481385-pnhpg_cto(d6590999-0ade-4ebd-8fab-79e1740839f9)"
-    },
-    {
-      "timestamp": "2026-01-20T04:31:54.263395Z",
-      "type": "event",
-      "resource": "Job/research-poller-29481385",
-      "message": "BackoffLimitExceeded: Job has reached the specified backoff limit"
-    },
-    {
-      "timestamp": "2026-01-20T04:31:54.263413Z",
-      "type": "event",
-      "resource": "Pod/research-poller-29481390-q5q4b",
-      "message": "BackOff: Back-off restarting failed container research in pod research-poller-29481390-q5q4b_cto(a716ab62-8044-433f-8ac6-0bafae77a991)"
-    },
-    {
-      "timestamp": "2026-01-20T04:31:54.263432Z",
-      "type": "event",
-      "resource": "Job/research-poller-29481390",
-      "message": "BackoffLimitExceeded: Job has reached the specified backoff limit"
-    },
-    {
-      "timestamp": "2026-01-20T04:31:54.263467Z",
-      "type": "event",
-      "resource": "ExternalSecret/web-github-oauth",
-      "message": "UpdateFailed: error processing spec.data[0] (key: secret/web-app/github-oauth), err: Secret does not exist"
-    },
-    {
-      "timestamp": "2026-01-20T04:31:54.263485Z",
-      "type": "event",
-      "resource": "TunnelBinding/web-tunnel",
-      "message": "FailedReadingTxt: FQDN present but unmanaged by Tunnel"
-    },
-    {
       "timestamp": "2026-01-20T04:31:54.263509Z",
       "type": "event",
       "resource": "TunnelBinding/web-tunnel",
       "message": "FailedDNSCreatePartial: Some DNS entries failed to create"
+    },
+    {
+      "timestamp": "2026-01-20T04:33:16.095118Z",
+      "type": "partial_failure",
+      "resource": "Pod/task-complete-pr3880-srg8c",
+      "message": "Some containers terminated while others still running"
+    },
+    {
+      "timestamp": "2026-01-20T04:33:16.629017Z",
+      "type": "partial_failure",
+      "resource": "Pod/task-complete-pr3880-zd45p",
+      "message": "Some containers terminated while others still running"
+    },
+    {
+      "timestamp": "2026-01-20T04:35:10.738954Z",
+      "type": "event",
+      "resource": "Pod/research-poller-29481395-rmqwf",
+      "message": "BackOff: Back-off restarting failed container research in pod research-poller-29481395-rmqwf_cto(3533af08-2bb3-4e91-97d6-3f9490162a94)"
+    },
+    {
+      "timestamp": "2026-01-20T04:35:22.708668Z",
+      "type": "event",
+      "resource": "Pod/research-poller-29481395-rmqwf",
+      "message": "BackOff: Back-off restarting failed container research in pod research-poller-29481395-rmqwf_cto(3533af08-2bb3-4e91-97d6-3f9490162a94)"
+    },
+    {
+      "timestamp": "2026-01-20T04:35:25.026672Z",
+      "type": "event",
+      "resource": "Job/research-poller-29481395",
+      "message": "BackoffLimitExceeded: Job has reached the specified backoff limit"
+    },
+    {
+      "timestamp": "2026-01-20T04:36:00.688847Z",
+      "type": "event",
+      "resource": "Job/cto-healer-reconciler-29480580",
+      "message": "DeadlineExceeded: Job was active longer than specified deadline"
+    },
+    {
+      "timestamp": "2026-01-20T04:36:00.688949Z",
+      "type": "event",
+      "resource": "Job/research-poller-29480580",
+      "message": "BackoffLimitExceeded: Job has reached the specified backoff limit"
+    },
+    {
+      "timestamp": "2026-01-20T04:36:00.689032Z",
+      "type": "event",
+      "resource": "Pod/research-poller-29481335-zk2b5",
+      "message": "BackOff: Back-off restarting failed container research in pod research-poller-29481335-zk2b5_cto(a2a338fe-ac6a-4993-bb95-99f4dae93de7)"
+    },
+    {
+      "timestamp": "2026-01-20T04:36:00.689100Z",
+      "type": "event",
+      "resource": "Job/research-poller-29481335",
+      "message": "BackoffLimitExceeded: Job has reached the specified backoff limit"
     }
   ],
   "completedLogs": [
-    {
-      "pod": "research-poller-29481360-98qdk",
-      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/research-poller-29481360-98qdk_20260120_040020.log",
-      "timestamp": "2026-01-20T04:00:20.821521Z",
-      "exit_code": 1,
-      "phase": "Running"
-    },
-    {
-      "pod": "log-error-scanner-1768881600-report-1081611883",
-      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/log-error-scanner-1768881600-report-1081611883_20260120_040020.log",
-      "timestamp": "2026-01-20T04:00:20.820371Z",
-      "exit_code": 0,
-      "phase": "Running"
-    },
-    {
-      "pod": "cto-healer-reconciler-29481365-k4mbs",
-      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/cto-healer-reconciler-29481365-k4mbs_20260120_040505.log",
-      "timestamp": "2026-01-20T04:05:05.086910Z",
-      "exit_code": 0,
-      "phase": "Running"
-    },
-    {
-      "pod": "research-poller-29481365-lkrkz",
-      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/research-poller-29481365-lkrkz_20260120_040513.log",
-      "timestamp": "2026-01-20T04:05:13.826545Z",
-      "exit_code": 1,
-      "phase": "Running"
-    },
     {
       "pod": "cto-healer-reconciler-29481370-pxxf2",
       "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/cto-healer-reconciler-29481370-pxxf2_20260120_041004.log",
@@ -321,6 +327,34 @@
       "timestamp": "2026-01-20T04:31:54.585559Z",
       "exit_code": 0,
       "phase": "Succeeded"
+    },
+    {
+      "pod": "task-complete-pr3880-srg8c",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/task-complete-pr3880-srg8c_20260120_043316.log",
+      "timestamp": "2026-01-20T04:33:16.095385Z",
+      "exit_code": 0,
+      "phase": "Running"
+    },
+    {
+      "pod": "task-complete-pr3880-zd45p",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/task-complete-pr3880-zd45p_20260120_043316.log",
+      "timestamp": "2026-01-20T04:33:16.629337Z",
+      "exit_code": 0,
+      "phase": "Running"
+    },
+    {
+      "pod": "cto-healer-reconciler-29481395-zn9nh",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/cto-healer-reconciler-29481395-zn9nh_20260120_043504.log",
+      "timestamp": "2026-01-20T04:35:04.983047Z",
+      "exit_code": 0,
+      "phase": "Running"
+    },
+    {
+      "pod": "research-poller-29481395-rmqwf",
+      "path": "/Users/jonathonfritz/code/work-projects/5dlabs/cto/lifecycle-test/observe/logs/completed/research-poller-29481395-rmqwf_20260120_043508.log",
+      "timestamp": "2026-01-20T04:35:08.666808Z",
+      "exit_code": 1,
+      "phase": "Running"
     }
   ]
 }

@@ -382,7 +382,7 @@ pub fn get_verification_hints(agent_hint: &str) -> VerificationHints {
             tests: "npm run test",
             lint: "npm run lint",
             format: "npm run format:check",
-            build: "npx expo-doctor",
+            build: "npx expo export",
         },
         "bolt" => VerificationHints {
             tests: "helm lint charts/*",

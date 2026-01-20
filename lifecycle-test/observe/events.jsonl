@@ -2677,3 +2677,10 @@
 {"timestamp":"2026-01-20T04:31:54.263449Z","type":"Warning","reason":"UpdateFailed","object":"ExternalSecret/web-github-oauth","message":"error processing spec.data[0] (key: secret/web-app/github-oauth), err: Secret does not exist"}
 {"timestamp":"2026-01-20T04:31:54.263475Z","type":"Warning","reason":"FailedReadingTxt","object":"TunnelBinding/web-tunnel","message":"FQDN present but unmanaged by Tunnel"}
 {"timestamp":"2026-01-20T04:31:54.263493Z","type":"Warning","reason":"FailedDNSCreatePartial","object":"TunnelBinding/web-tunnel","message":"Some DNS entries failed to create"}
+{"timestamp":"2026-01-20T04:35:10.738829Z","type":"Warning","reason":"BackOff","object":"Pod/research-poller-29481395-rmqwf","message":"Back-off restarting failed container research in pod research-poller-29481395-rmqwf_cto(3533af08-2bb3-4e91-97d6-3f9490162a94)"}
+{"timestamp":"2026-01-20T04:35:22.708574Z","type":"Warning","reason":"BackOff","object":"Pod/research-poller-29481395-rmqwf","message":"Back-off restarting failed container research in pod research-poller-29481395-rmqwf_cto(3533af08-2bb3-4e91-97d6-3f9490162a94)"}
+{"timestamp":"2026-01-20T04:35:25.026569Z","type":"Warning","reason":"BackoffLimitExceeded","object":"Job/research-poller-29481395","message":"Job has reached the specified backoff limit"}
+{"timestamp":"2026-01-20T04:36:00.688529Z","type":"Warning","reason":"DeadlineExceeded","object":"Job/cto-healer-reconciler-29480580","message":"Job was active longer than specified deadline"}
+{"timestamp":"2026-01-20T04:36:00.688880Z","type":"Warning","reason":"BackoffLimitExceeded","object":"Job/research-poller-29480580","message":"Job has reached the specified backoff limit"}
+{"timestamp":"2026-01-20T04:36:00.688982Z","type":"Warning","reason":"BackOff","object":"Pod/research-poller-29481335-zk2b5","message":"Back-off restarting failed container research in pod research-poller-29481335-zk2b5_cto(a2a338fe-ac6a-4993-bb95-99f4dae93de7)"}
+{"timestamp":"2026-01-20T04:36:00.689072Z","type":"Warning","reason":"BackoffLimitExceeded","object":"Job/research-poller-29481335","message":"Job has reached the specified backoff limit"}
