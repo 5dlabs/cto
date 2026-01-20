@@ -41,6 +41,50 @@ LOG_DIR="${ROOT_DIR}/lifecycle-test/ralph-logs"
 
 log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] [MONITOR] $*" >&2; }
 
+# Safe atomic update of coordination file with error handling
+# Usage: safe_update_coordination '.path = "value"' or pipe jq expression
+safe_update_coordination() {
+  local jq_expr="$1"
+  shift
+  local tmp
+  tmp="$(mktemp)"
+  
+  if ! jq "$jq_expr" "$@" "$COORDINATION_FILE" > "$tmp"; then
+    log "ERROR: Failed to update coordination file (jq failed)"
+    rm -f "$tmp"
+    return 1
+  fi
+  
+  if ! mv "$tmp" "$COORDINATION_FILE"; then
+    log "ERROR: Failed to update coordination file (mv failed)"
+    rm -f "$tmp"
+    return 1
+  fi
+  
+  return 0
+}
+
+# Portable ISO8601 date parsing (works on both macOS and Linux)
+# Returns epoch seconds or 0 on failure
+parse_iso8601_to_epoch() {
+  local date_str="$1"
+  local epoch
+  
+  # Try macOS BSD date first
+  epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$date_str" "+%s" 2>/dev/null) && echo "$epoch" && return 0
+  
+  # Try GNU date (Linux)
+  epoch=$(date -d "$date_str" "+%s" 2>/dev/null) && echo "$epoch" && return 0
+  
+  # Try Python as last resort (most portable)
+  epoch=$(python3 -c "from datetime import datetime; print(int(datetime.fromisoformat('${date_str}'.replace('Z', '+00:00')).timestamp()))" 2>/dev/null) && echo "$epoch" && return 0
+  
+  # Failed to parse
+  log "WARNING: Failed to parse date: $date_str"
+  echo "0"
+  return 1
+}
+
 # Ensure coordination file exists
 ensure_coordination_file() {
   if [[ ! -f "$COORDINATION_FILE" ]]; then
@@ -124,7 +168,7 @@ is_session_expired() {
   local now
   local started_epoch
   now=$(date +%s)
-  started_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" "+%s" 2>/dev/null || date -d "$started_at" "+%s" 2>/dev/null || echo 0)
+  started_epoch=$(parse_iso8601_to_epoch "$started_at")
   
   local elapsed_hours
   elapsed_hours=$(( (now - started_epoch) / 3600 ))
@@ -141,16 +185,17 @@ is_session_expired() {
 start_session() {
   local session_id
   session_id=$(generate_session_id)
-  local tmp
-  tmp="$(mktemp)"
   
-  jq --arg id "$session_id" \
-     --arg hours "$SESSION_EXPIRATION_HOURS" \
+  if ! safe_update_coordination \
      '.session.id = $id |
       .session.startedAt = (now | todate) |
       .session.lastActivity = (now | todate) |
       .session.expirationHours = ($hours | tonumber)' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+     --arg id "$session_id" \
+     --arg hours "$SESSION_EXPIRATION_HOURS"; then
+    log "ERROR: Failed to start session"
+    return 1
+  fi
   
   # Increment session reset count
   increment_session_resets
@@ -161,11 +206,7 @@ start_session() {
 
 # Update session activity timestamp
 update_session_activity() {
-  local tmp
-  tmp="$(mktemp)"
-  
-  jq '.session.lastActivity = (now | todate)' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+  safe_update_coordination '.session.lastActivity = (now | todate)'
 }
 
 # Reset session (clear and start new)
@@ -182,11 +223,7 @@ reset_session() {
 
 # Increment session reset count in stats
 increment_session_resets() {
-  local tmp
-  tmp="$(mktemp)"
-  
-  jq '.stats.sessionResets = ((.stats.sessionResets // 0) + 1)' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+  safe_update_coordination '.stats.sessionResets = ((.stats.sessionResets // 0) + 1)'
 }
 
 # Ensure valid session (start new if needed)
@@ -256,19 +293,20 @@ is_circuit_breaker_open() {
 # Set circuit breaker state
 set_circuit_breaker_state() {
   local state="$1"
-  local tmp
-  tmp="$(mktemp)"
   
   local opened_at="null"
   if [[ "$state" == "open" ]]; then
     opened_at="\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\""
   fi
   
-  jq --arg state "$state" \
-     --argjson opened_at "$opened_at" \
+  if ! safe_update_coordination \
      '.circuitBreaker.state = $state |
       .circuitBreaker.openedAt = $opened_at' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+     --arg state "$state" \
+     --argjson opened_at "$opened_at"; then
+    log "ERROR: Failed to set circuit breaker state"
+    return 1
+  fi
   
   log "Circuit breaker state set to: $state"
 }
@@ -276,8 +314,6 @@ set_circuit_breaker_state() {
 # Update circuit breaker after a failure
 update_circuit_breaker_failure() {
   local error_msg="$1"
-  local tmp
-  tmp="$(mktemp)"
   
   # Get current state
   local last_error
@@ -299,13 +335,16 @@ update_circuit_breaker_failure() {
   no_progress_count=$((no_progress_count + 1))
   
   # Update coordination file
-  jq --arg error "$error_msg" \
-     --argjson same_count "$same_error_count" \
-     --argjson no_progress "$no_progress_count" \
+  if ! safe_update_coordination \
      '.circuitBreaker.lastError = $error |
       .circuitBreaker.sameErrorCount = $same_count |
       .circuitBreaker.noProgressCount = $no_progress' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+     --arg error "$error_msg" \
+     --argjson same_count "$same_error_count" \
+     --argjson no_progress "$no_progress_count"; then
+    log "ERROR: Failed to update circuit breaker failure state"
+    return 1
+  fi
   
   log "Circuit breaker: noProgressCount=$no_progress_count, sameErrorCount=$same_error_count"
   
@@ -329,9 +368,6 @@ update_circuit_breaker_failure() {
 
 # Update circuit breaker after success (progress detected)
 update_circuit_breaker_success() {
-  local tmp
-  tmp="$(mktemp)"
-  
   local state
   state=$(get_circuit_breaker_state)
   
@@ -342,38 +378,33 @@ update_circuit_breaker_success() {
   fi
   
   # Reset counters
-  jq '.circuitBreaker.noProgressCount = 0 |
+  safe_update_coordination \
+     '.circuitBreaker.noProgressCount = 0 |
       .circuitBreaker.sameErrorCount = 0 |
-      .circuitBreaker.lastFileChange = (now | todate)' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+      .circuitBreaker.lastFileChange = (now | todate)'
 }
 
 # Reset circuit breaker
 reset_circuit_breaker() {
-  local tmp
-  tmp="$(mktemp)"
-  
-  jq '.circuitBreaker = {
+  if ! safe_update_coordination \
+     '.circuitBreaker = {
         "state": "closed",
         "noProgressCount": 0,
         "sameErrorCount": 0,
         "lastError": null,
         "lastFileChange": (now | todate),
         "openedAt": null
-      }' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+      }'; then
+    log "ERROR: Failed to reset circuit breaker"
+    return 1
+  fi
   
   log "Circuit breaker reset"
 }
 
 # Increment circuit breaker trip count in stats
 increment_circuit_breaker_trips() {
-  local tmp
-  tmp="$(mktemp)"
-  
-  # Ensure stats.circuitBreakerTrips exists
-  jq '.stats.circuitBreakerTrips = ((.stats.circuitBreakerTrips // 0) + 1)' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+  safe_update_coordination '.stats.circuitBreakerTrips = ((.stats.circuitBreakerTrips // 0) + 1)'
 }
 
 # =============================================================================
@@ -384,16 +415,15 @@ increment_circuit_breaker_trips() {
 update_monitor_status() {
   local status="$1"
   local phase="${2:-null}"
-  local tmp
-  tmp="$(mktemp)"
-  jq --arg status "$status" \
-     --arg phase "$phase" \
-     --arg pid "$$" \
+  
+  safe_update_coordination \
      '.monitor.status = $status | 
       .monitor.currentPhase = (if $phase == "null" then null else $phase end) | 
       .monitor.lastCheck = (now | todate) |
       .monitor.pid = ($pid | tonumber)' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+     --arg status "$status" \
+     --arg phase "$phase" \
+     --arg pid "$$"
 }
 
 # Write failure to issue queue
@@ -403,18 +433,11 @@ write_failure_to_queue() {
   local log_file="$3"
   local exit_code="${4:-1}"
   local diagnostics="${5:-{}}"
-  local tmp
-  tmp="$(mktemp)"
   
   local issue_id
   issue_id="issue-$(date +%s)-$$"
   
-  jq --arg id "$issue_id" \
-     --arg phase "$phase" \
-     --arg gate "$gate" \
-     --arg log "$log_file" \
-     --arg exit "$exit_code" \
-     --argjson diag "$diagnostics" \
+  if ! safe_update_coordination \
      '.issueQueue += [{
         id: $id,
         timestamp: (now | todate),
@@ -427,7 +450,15 @@ write_failure_to_queue() {
         retryCount: 0
       }] | 
       .stats.totalIssues += 1' \
-     "$COORDINATION_FILE" > "$tmp" && mv "$tmp" "$COORDINATION_FILE"
+     --arg id "$issue_id" \
+     --arg phase "$phase" \
+     --arg gate "$gate" \
+     --arg log "$log_file" \
+     --arg exit "$exit_code" \
+     --argjson diag "$diagnostics"; then
+    log "ERROR: Failed to write failure to queue"
+    return 1
+  fi
   
   log "Wrote failure to queue: $issue_id (phase=$phase, gate=$gate)"
   echo "$issue_id"

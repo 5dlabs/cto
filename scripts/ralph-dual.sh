@@ -127,6 +127,40 @@ get_screen_pid() {
   screen -list 2>&1 | grep "\.$name" | awk -F'[.\t]' '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/) {print $i; exit}}'
 }
 
+# Wait for screen session to start with proper health check
+# Args: $1 = screen name, $2 = log file, $3 = timeout seconds (default 10)
+wait_for_screen_healthy() {
+  local screen_name="$1"
+  local log_file="$2"
+  local timeout="${3:-10}"
+  local waited=0
+  
+  while [[ $waited -lt $timeout ]]; do
+    # Check if screen exists
+    if screen_exists "$screen_name"; then
+      # Verify the script is actually running by checking log file activity
+      if [[ -f "$log_file" ]]; then
+        local log_age
+        log_age=$(( $(date +%s) - $(stat -f %m "$log_file" 2>/dev/null || stat -c %Y "$log_file" 2>/dev/null || echo 0) ))
+        # If log was modified in last 5 seconds, script is running
+        if [[ $log_age -lt 5 ]]; then
+          return 0
+        fi
+      fi
+      # Screen exists but no log activity yet, wait a bit more
+      sleep 1
+      waited=$((waited + 1))
+    else
+      # Screen doesn't exist yet, wait
+      sleep 1
+      waited=$((waited + 1))
+    fi
+  done
+  
+  # Final check - just verify screen exists if log check isn't working
+  screen_exists "$screen_name"
+}
+
 # Start monitor agent
 start_monitor() {
   if screen_exists "$MONITOR_SCREEN"; then
@@ -134,16 +168,17 @@ start_monitor() {
     return 0
   fi
   
+  # Clear old log for fresh start detection
+  : > /tmp/ralph-monitor.log
+  
   info "Starting monitor agent in screen session: $MONITOR_SCREEN"
   screen -dmS "$MONITOR_SCREEN" bash -c "cd '$ROOT_DIR' && ./scripts/ralph-monitor.sh 2>&1 | tee -a /tmp/ralph-monitor.log"
   
-  # Give screen time to initialize and start the script
-  sleep 3
-  
-  if screen_exists "$MONITOR_SCREEN"; then
+  # Wait for screen session to be healthy (with timeout)
+  if wait_for_screen_healthy "$MONITOR_SCREEN" "/tmp/ralph-monitor.log" 10; then
     success "Monitor agent started"
   else
-    error "Failed to start monitor agent"
+    error "Failed to start monitor agent (timeout waiting for initialization)"
     error "Check /tmp/ralph-monitor.log for details"
     return 1
   fi
@@ -156,16 +191,17 @@ start_remediation() {
     return 0
   fi
   
+  # Clear old log for fresh start detection
+  : > /tmp/ralph-remediation.log
+  
   info "Starting remediation agent in screen session: $REMEDIATION_SCREEN"
   screen -dmS "$REMEDIATION_SCREEN" bash -c "cd '$ROOT_DIR' && ./scripts/ralph-remediation.sh 2>&1 | tee -a /tmp/ralph-remediation.log"
   
-  # Give screen time to initialize and start the script
-  sleep 3
-  
-  if screen_exists "$REMEDIATION_SCREEN"; then
+  # Wait for screen session to be healthy (with timeout)
+  if wait_for_screen_healthy "$REMEDIATION_SCREEN" "/tmp/ralph-remediation.log" 10; then
     success "Remediation agent started"
   else
-    error "Failed to start remediation agent"
+    error "Failed to start remediation agent (timeout waiting for initialization)"
     error "Check /tmp/ralph-remediation.log for details"
     return 1
   fi
