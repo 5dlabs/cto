@@ -1,0 +1,32 @@
+# CTO Namespaces
+# Base namespaces required for the platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-system
+  labels:
+    app.kubernetes.io/part-of: cto
+    cto.5dlabs.ai/managed: "true"
+    # Enable Cilium network policies
+    "io.cilium.k8s.policy.serviceaccount": "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-agents
+  labels:
+    app.kubernetes.io/part-of: cto
+    cto.5dlabs.ai/managed: "true"
+    # Agent pods run in this namespace
+    cto.5dlabs.ai/agent-namespace: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-workspaces
+  labels:
+    app.kubernetes.io/part-of: cto
+    cto.5dlabs.ai/managed: "true"
+    # Persistent workspaces for agents
+    cto.5dlabs.ai/workspace-namespace: "true"

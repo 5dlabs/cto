@@ -390,7 +390,8 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: observability
+    # Match namespaceOverride so CreateNamespace applies to the actual target
+    namespace: telemetry
   syncPolicy:
     automated:
       prune: true
@@ -400,3 +401,11 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

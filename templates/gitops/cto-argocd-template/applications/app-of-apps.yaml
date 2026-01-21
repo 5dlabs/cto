@@ -1,0 +1,29 @@
+# App-of-Apps Pattern
+# This root Application manages all other Applications in this repository
+# ArgoCD automatically deploys and syncs all child applications
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: "{{GITOPS_REPO_URL}}"
+    targetRevision: HEAD
+    path: applications
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -113,12 +113,16 @@ case "$BINARY" in
   pm-activity)
     compile_binary "pm-activity" "pm"
     ;;
+  installer)
+    compile_binary "installer" "installer"
+    ;;
   all)
     compile_binary "intake" "intake"
     compile_binary "pm-activity" "pm"
+    compile_binary "installer" "installer"
     ;;
   *)
-    echo "❌ Unknown binary: $BINARY (options: intake, pm-activity, all)"
+    echo "❌ Unknown binary: $BINARY (options: intake, pm-activity, installer, all)"
     exit 1
     ;;
 esac

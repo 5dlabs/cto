@@ -1,0 +1,44 @@
+# CTO Agent Controller
+# Watches CodeRun CRDs and spawns agent pods
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agent-controller
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: ghcr.io/5dlabs/helm-charts
+    targetRevision: "0.1.0"
+    chart: agent-controller
+    helm:
+      values: |
+        replicaCount: 1
+        image:
+          repository: ghcr.io/5dlabs/agent-controller
+          tag: latest
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        serviceAccount:
+          create: true
+          name: agent-controller
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -69,6 +69,14 @@ rules:
   - apiGroups: ["agents.platform"]
     resources: ["coderuns", "coderuns/status"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # BOLT-001/BOLT-002: BoltRun CRD for admin provisioning tasks
+  - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["boltruns", "boltruns/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # BOLT-003: ExternalSecrets for credential injection
+  - apiGroups: ["external-secrets.io"]
+    resources: ["externalsecrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Namespaces (for multi-namespace operations)
   - apiGroups: [""]
     resources: ["namespaces"]

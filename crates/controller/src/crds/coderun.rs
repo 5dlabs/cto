@@ -98,6 +98,76 @@ pub struct SubtaskSpec {
     pub dependencies: Vec<String>,
 }
 
+/// Default watcher check interval in seconds (2 minutes).
+fn default_watcher_check_interval() -> u64 {
+    120
+}
+
+/// Default circuit breaker threshold.
+fn default_watcher_circuit_breaker() -> u32 {
+    3
+}
+
+/// Watcher configuration for dual-model execution pattern.
+///
+/// When enabled, a second "watcher" CodeRun is spawned alongside the executor
+/// that monitors progress, detects issues, and writes them to a coordination
+/// file for the executor to self-correct.
+///
+/// CLI-agnostic: supports any CLI (claude, codex, factory, droid, gemini, opencode, cursor).
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct WatcherConfig {
+    /// Enable watcher mode for this CodeRun.
+    /// When true, a paired watcher CodeRun is created alongside the executor.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// CLI to use for the watcher (e.g., "factory", "droid", "claude").
+    /// Any supported CLI works.
+    #[serde(default)]
+    pub cli: Option<String>,
+
+    /// Model to use for the watcher.
+    /// Typically a cheaper model since watcher does monitoring, not code generation.
+    #[serde(default)]
+    pub model: Option<String>,
+
+    /// Interval between watcher checks in seconds.
+    /// Default: 120 (2 minutes).
+    #[serde(
+        default = "default_watcher_check_interval",
+        rename = "checkIntervalSecs"
+    )]
+    pub check_interval_secs: u64,
+
+    /// Prompt template for the watcher.
+    /// Default: "watcher/base".
+    #[serde(default)]
+    pub template: Option<String>,
+
+    /// Circuit breaker threshold - after this many failures on the same step,
+    /// escalate to human intervention.
+    /// Default: 3.
+    #[serde(
+        default = "default_watcher_circuit_breaker",
+        rename = "circuitBreakerThreshold"
+    )]
+    pub circuit_breaker_threshold: u32,
+}
+
+impl Default for WatcherConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            cli: None,
+            model: None,
+            check_interval_secs: default_watcher_check_interval(),
+            template: None,
+            circuit_breaker_threshold: default_watcher_circuit_breaker(),
+        }
+    }
+}
+
 /// CLI-specific configuration
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct CLIConfig {
@@ -257,6 +327,17 @@ pub struct CodeRunSpec {
     /// Optional list of subtasks that break down this CodeRun into smaller units of work
     #[serde(default)]
     pub subtasks: Option<Vec<SubtaskSpec>>,
+
+    /// Watcher configuration for dual-model execution pattern.
+    /// When enabled, a paired watcher CodeRun monitors this executor and provides
+    /// real-time feedback via a coordination file.
+    #[serde(default, rename = "watcherConfig")]
+    pub watcher_config: Option<WatcherConfig>,
+
+    /// If this CodeRun is a watcher, the name of the executor CodeRun it monitors.
+    /// This field is set automatically by the controller when creating watcher CodeRuns.
+    #[serde(default, rename = "watcherFor")]
+    pub watcher_for: Option<String>,
 }
 
 impl Default for CodeRunSpec {
@@ -290,6 +371,8 @@ impl Default for CodeRunSpec {
             local_tools: None,
             fresh_workspace: None,
             subtasks: None,
+            watcher_config: None,
+            watcher_for: None,
         }
     }
 }
@@ -356,6 +439,17 @@ pub struct CodeRunStatus {
     /// Tracks whether the code implementation work has been completed successfully
     /// This field is used for idempotent reconciliation and TTL safety
     pub work_completed: Option<bool>,
+
+    /// Name of the associated watcher CodeRun (if watcher mode is enabled)
+    #[serde(rename = "watcherCodeRun", skip_serializing_if = "Option::is_none")]
+    pub watcher_coderun: Option<String>,
+
+    /// Name of the coordination ConfigMap shared between executor and watcher
+    #[serde(
+        rename = "coordinationConfigMap",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub coordination_configmap: Option<String>,
 }
 
 /// Condition for the `CodeRun`
@@ -408,5 +502,70 @@ mod tests {
         assert_eq!(cli_config.model, "gpt-4");
         assert_eq!(cli_config.max_tokens, Some(4096));
         assert_eq!(cli_config.temperature, Some(0.7));
+    }
+
+    #[test]
+    fn test_watcher_config_default() {
+        let config = WatcherConfig::default();
+        assert!(!config.enabled);
+        assert!(config.cli.is_none());
+        assert!(config.model.is_none());
+        assert_eq!(config.check_interval_secs, 120);
+        assert!(config.template.is_none());
+        assert_eq!(config.circuit_breaker_threshold, 3);
+    }
+
+    #[test]
+    fn test_watcher_config_from_json() {
+        let json = r#"{
+            "enabled": true,
+            "cli": "factory",
+            "model": "glm-4-plus",
+            "checkIntervalSecs": 60,
+            "template": "watcher/custom",
+            "circuitBreakerThreshold": 5
+        }"#;
+        let config: WatcherConfig = serde_json::from_str(json).unwrap();
+        assert!(config.enabled);
+        assert_eq!(config.cli, Some("factory".to_string()));
+        assert_eq!(config.model, Some("glm-4-plus".to_string()));
+        assert_eq!(config.check_interval_secs, 60);
+        assert_eq!(config.template, Some("watcher/custom".to_string()));
+        assert_eq!(config.circuit_breaker_threshold, 5);
+    }
+
+    #[test]
+    fn test_coderun_spec_with_watcher() {
+        let json = r#"{
+            "service": "test-service",
+            "repositoryUrl": "https://github.com/test/repo",
+            "docsRepositoryUrl": "https://github.com/test/docs",
+            "model": "claude-opus",
+            "watcherConfig": {
+                "enabled": true,
+                "cli": "droid",
+                "model": "glm-4-plus"
+            }
+        }"#;
+        let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
+        assert!(spec.watcher_config.is_some());
+        let watcher = spec.watcher_config.unwrap();
+        assert!(watcher.enabled);
+        assert_eq!(watcher.cli, Some("droid".to_string()));
+    }
+
+    #[test]
+    fn test_coderun_spec_watcher_for() {
+        let json = r#"{
+            "service": "test-service",
+            "repositoryUrl": "https://github.com/test/repo",
+            "docsRepositoryUrl": "https://github.com/test/docs",
+            "model": "glm-4-plus",
+            "runType": "watcher",
+            "watcherFor": "my-executor-coderun"
+        }"#;
+        let spec: CodeRunSpec = serde_json::from_str(json).unwrap();
+        assert_eq!(spec.watcher_for, Some("my-executor-coderun".to_string()));
+        assert_eq!(spec.run_type, "watcher");
     }
 }

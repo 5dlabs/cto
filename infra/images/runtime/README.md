@@ -115,6 +115,13 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **Ruby** - Ruby programming language
 - **Perl** - Perl programming language
 
+### Browser Automation & Testing
+- **Playwright** - Cross-browser automation framework with Chromium
+- **agent-browser** - Headless browser automation CLI for AI agents ([docs](https://github.com/vercel-labs/agent-browser))
+  - Uses Playwright's Chromium installation (no duplicate downloads)
+  - Supports snapshot-based element refs for deterministic AI interaction
+  - Run `agent-browser --help` for available commands
+
 ### Kubernetes & Cloud Native
 - **kubectl** - Kubernetes command-line tool
 - **Helm** - Kubernetes package manager

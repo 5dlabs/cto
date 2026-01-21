@@ -3,12 +3,12 @@
 //! This module provides comprehensive audit logging for security events,
 //! access control, and compliance tracking in the Agent Remediation Loop.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use thiserror::Error;
-use chrono::{DateTime, Utc};
+use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 /// Audit logging errors
@@ -77,6 +77,7 @@ impl AuditLogger {
     }
 
     /// Initialize the audit logger
+    #[allow(clippy::unused_async)]
     pub async fn initialize(&self) -> AuditResult<()> {
         info!("Initializing audit logger");
         Ok(())
@@ -126,11 +127,20 @@ impl AuditLogger {
             timestamp: Utc::now(),
             event_type: "authentication".to_string(),
             actor: actor.to_string(),
-            action: if success { "login_success" } else { "login_failure" }.to_string(),
+            action: if success {
+                "login_success"
+            } else {
+                "login_failure"
+            }
+            .to_string(),
             resource: "system".to_string(),
             success,
-            severity: if success { AuditSeverity::Info } else { AuditSeverity::Warning },
-            error_message: error_message.map(|s| s.to_string()),
+            severity: if success {
+                AuditSeverity::Info
+            } else {
+                AuditSeverity::Warning
+            },
+            error_message: error_message.map(ToString::to_string),
             resource_id: None,
             task_id: None,
             pr_number: None,
@@ -162,8 +172,12 @@ impl AuditLogger {
             action: action.to_string(),
             resource: resource.to_string(),
             success,
-            severity: if success { AuditSeverity::Info } else { AuditSeverity::Warning },
-            error_message: error_message.map(|s| s.to_string()),
+            severity: if success {
+                AuditSeverity::Info
+            } else {
+                AuditSeverity::Warning
+            },
+            error_message: error_message.map(ToString::to_string),
             resource_id: None,
             task_id: None,
             pr_number: None,
@@ -190,7 +204,11 @@ impl AuditLogger {
             action: "validate_input".to_string(),
             resource: input_type.to_string(),
             success,
-            severity: if success { AuditSeverity::Info } else { AuditSeverity::Warning },
+            severity: if success {
+                AuditSeverity::Info
+            } else {
+                AuditSeverity::Warning
+            },
             error_message: if violations.is_empty() {
                 None
             } else {
@@ -224,12 +242,21 @@ impl AuditLogger {
             timestamp: Utc::now(),
             event_type: "rate_limiting".to_string(),
             actor: actor.to_string(),
-            action: if limit_exceeded { "limit_exceeded" } else { "within_limit" }.to_string(),
+            action: if limit_exceeded {
+                "limit_exceeded"
+            } else {
+                "within_limit"
+            }
+            .to_string(),
             resource: resource.to_string(),
             success: !limit_exceeded,
-            severity: if limit_exceeded { AuditSeverity::Warning } else { AuditSeverity::Info },
+            severity: if limit_exceeded {
+                AuditSeverity::Warning
+            } else {
+                AuditSeverity::Info
+            },
             error_message: if limit_exceeded {
-                Some(format!("Rate limit exceeded: {}/{}", current_count, limit))
+                Some(format!("Rate limit exceeded: {current_count}/{limit}"))
             } else {
                 None
             },
@@ -281,23 +308,31 @@ impl AuditLogger {
     }
 
     /// Validate audit event
+    #[allow(clippy::unused_self)]
     fn validate_event(&self, event: &AuditEvent) -> AuditResult<()> {
         if event.actor.is_empty() {
-            return Err(AuditError::LoggingError("Actor cannot be empty".to_string()));
+            return Err(AuditError::LoggingError(
+                "Actor cannot be empty".to_string(),
+            ));
         }
 
         if event.action.is_empty() {
-            return Err(AuditError::LoggingError("Action cannot be empty".to_string()));
+            return Err(AuditError::LoggingError(
+                "Action cannot be empty".to_string(),
+            ));
         }
 
         if event.resource.is_empty() {
-            return Err(AuditError::LoggingError("Resource cannot be empty".to_string()));
+            return Err(AuditError::LoggingError(
+                "Resource cannot be empty".to_string(),
+            ));
         }
 
         Ok(())
     }
 
     /// Log event to console
+    #[allow(clippy::unused_self)]
     fn log_to_console(&self, event: &AuditEvent) {
         let level = match event.severity {
             AuditSeverity::Info => "INFO",
@@ -331,7 +366,8 @@ impl AuditLogger {
     }
 
     /// Log event to file
-    async fn log_to_file(&self, event: &AuditEvent, file_path: &str) -> AuditResult<()> {
+    #[allow(clippy::unused_async)]
+    async fn log_to_file(&self, _event: &AuditEvent, file_path: &str) -> AuditResult<()> {
         // In a real implementation, this would write to a file
         // For now, just log that we would write to file
         debug!("Would write audit event to file: {}", file_path);
@@ -352,17 +388,20 @@ impl AuditLogger {
         stats.insert("failed_events".to_string(), failed_events);
 
         // Count by severity
-        let critical_events = events.iter()
+        let critical_events = events
+            .iter()
             .filter(|e| matches!(e.severity, AuditSeverity::Critical))
             .count() as u64;
         stats.insert("critical_events".to_string(), critical_events);
 
-        let error_events = events.iter()
+        let error_events = events
+            .iter()
             .filter(|e| matches!(e.severity, AuditSeverity::Error))
             .count() as u64;
         stats.insert("error_events".to_string(), error_events);
 
-        let warning_events = events.iter()
+        let warning_events = events
+            .iter()
             .filter(|e| matches!(e.severity, AuditSeverity::Warning))
             .count() as u64;
         stats.insert("warning_events".to_string(), warning_events);
@@ -374,7 +413,7 @@ impl AuditLogger {
         }
 
         for (event_type, count) in event_types {
-            stats.insert(format!("{}_events", event_type), count);
+            stats.insert(format!("{event_type}_events"), count);
         }
 
         Ok(stats)
@@ -396,35 +435,60 @@ impl AuditLogger {
     pub async fn search_events(&self, filters: HashMap<String, String>) -> Vec<AuditEvent> {
         let events = self.events.read().await;
 
-        events.iter().filter(|event| {
-            for (key, value) in &filters {
-                match key.as_str() {
-                    "actor" => if event.actor != *value { return false; }
-                    "action" => if event.action != *value { return false; }
-                    "resource" => if event.resource != *value { return false; }
-                    "event_type" => if event.event_type != *value { return false; }
-                    "success" => {
-                        let success_filter = value.parse::<bool>().unwrap_or(true);
-                        if event.success != success_filter { return false; }
+        events
+            .iter()
+            .filter(|event| {
+                for (key, value) in &filters {
+                    match key.as_str() {
+                        "actor" => {
+                            if event.actor != *value {
+                                return false;
+                            }
+                        }
+                        "action" => {
+                            if event.action != *value {
+                                return false;
+                            }
+                        }
+                        "resource" => {
+                            if event.resource != *value {
+                                return false;
+                            }
+                        }
+                        "event_type" => {
+                            if event.event_type != *value {
+                                return false;
+                            }
+                        }
+                        "success" => {
+                            let success_filter = value.parse::<bool>().unwrap_or(true);
+                            if event.success != success_filter {
+                                return false;
+                            }
+                        }
+                        "severity" => {
+                            let severity_matches = match value.as_str() {
+                                "info" => matches!(event.severity, AuditSeverity::Info),
+                                "warning" => matches!(event.severity, AuditSeverity::Warning),
+                                "error" => matches!(event.severity, AuditSeverity::Error),
+                                "critical" => matches!(event.severity, AuditSeverity::Critical),
+                                _ => false,
+                            };
+                            if !severity_matches {
+                                return false;
+                            }
+                        }
+                        _ => {} // Unknown filter, ignore
                     }
-                    "severity" => {
-                        let severity_matches = match value.as_str() {
-                            "info" => matches!(event.severity, AuditSeverity::Info),
-                            "warning" => matches!(event.severity, AuditSeverity::Warning),
-                            "error" => matches!(event.severity, AuditSeverity::Error),
-                            "critical" => matches!(event.severity, AuditSeverity::Critical),
-                            _ => false,
-                        };
-                        if !severity_matches { return false; }
-                    }
-                    _ => {} // Unknown filter, ignore
                 }
-            }
-            true
-        }).cloned().collect()
+                true
+            })
+            .cloned()
+            .collect()
     }
 
     /// Check if audit logger is healthy
+    #[allow(clippy::unused_async)]
     pub async fn is_healthy(&self) -> bool {
         // Check if we can access the events store
         self.events.try_read().is_ok()
@@ -441,7 +505,7 @@ impl AuditLogger {
     pub async fn export_events(&self) -> AuditResult<String> {
         let events = self.events.read().await;
         serde_json::to_string(&*events)
-            .map_err(|e| AuditError::LoggingError(format!("Export failed: {}", e)))
+            .map_err(|e| AuditError::LoggingError(format!("Export failed: {e}")))
     }
 
     /// Configure file logging

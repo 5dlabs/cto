@@ -1,0 +1,76 @@
+# CTO Platform RBAC
+---
+# Agent Controller Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-controller
+  namespace: cto-system
+---
+# Agent Controller Role - can manage CodeRun CRDs and agent pods
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cto-agent-controller
+rules:
+  - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["coderuns", "coderuns/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+# Bind role to service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cto-agent-controller
+subjects:
+  - kind: ServiceAccount
+    name: agent-controller
+    namespace: cto-system
+roleRef:
+  kind: ClusterRole
+  name: cto-agent-controller
+  apiGroup: rbac.authorization.k8s.io
+---
+# Agent Pod Service Account (used by individual agent pods)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cto-agent
+  namespace: cto-agents
+---
+# Agent Pod Role - limited permissions for agent execution
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cto-agent
+  namespace: cto-agents
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cto-agent
+  namespace: cto-agents
+subjects:
+  - kind: ServiceAccount
+    name: cto-agent
+    namespace: cto-agents
+roleRef:
+  kind: Role
+  name: cto-agent
+  apiGroup: rbac.authorization.k8s.io

@@ -7,6 +7,9 @@ metadata:
   labels:
     app.kubernetes.io/name: gateway-api-crds
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Deploy CRDs early to avoid Gateway API race conditions
+    argocd.argoproj.io/sync-wave: "-5"
 spec:
   project: platform
 

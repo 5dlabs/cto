@@ -28,7 +28,8 @@ spec:
     targetRevision: main
     directory:
       recurse: false
-      exclude: networking-apps.yaml  # Exclude self to prevent recursion
+      # Exclude disabled apps by default (enable by removing from exclude list)
+      exclude: "{networking-apps.yaml,headscale.yaml,headscale-namespace.yaml,tailscale-subnet-router.yaml}"
 
   destination:
     server: https://kubernetes.default.svc

@@ -13,8 +13,8 @@ metadata:
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: security
   annotations:
-    # Deploy early - other apps depend on certificates
-    argocd.argoproj.io/sync-wave: "-3"
+    # Deploy CRDs early - other apps depend on certificates
+    argocd.argoproj.io/sync-wave: "-5"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -108,6 +108,7 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
+      - SkipDryRunOnMissingResource=true
       - RespectIgnoreDifferences=true
 
     retry:

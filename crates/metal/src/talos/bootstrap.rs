@@ -258,6 +258,7 @@ impl BootstrapConfig {
     /// * `vlan_id` - VLAN ID (VID) from the provider (e.g., 2063)
     /// * `private_ip_cidr` - Static IP with CIDR (e.g., "10.8.0.1/24")
     /// * `parent_interface` - Parent NIC name (e.g., "eth1", "eno2", "enp1s0")
+    /// * `primary_interface` - Primary NIC name for public IP (DHCP)
     ///
     /// # Example
     ///
@@ -265,7 +266,7 @@ impl BootstrapConfig {
     /// use metal::talos::BootstrapConfig;
     ///
     /// let config = BootstrapConfig::new("cluster", "64.34.91.100")
-    ///     .with_vlan_interface(2063, "10.8.0.1/24", "eth1")
+    ///     .with_vlan_interface(2063, "10.8.0.1/24", "eth1", Some("eth0"))
     ///     .with_private_network("10.8.0.0/24")
     ///     .with_cilium_cni();
     /// ```
@@ -275,19 +276,23 @@ impl BootstrapConfig {
         vlan_id: u16,
         private_ip_cidr: &str,
         parent_interface: &str,
+        primary_interface: Option<&str>,
     ) -> Self {
-        let patch = format!(
-            "machine:
-  network:
-    interfaces:
-      - interface: {parent_interface}
-        vlans:
-          - vlanId: {vlan_id}
-            addresses:
-              - {private_ip_cidr}
-            mtu: 1500
-"
+        let mut interfaces = String::new();
+
+        if let Some(primary) = primary_interface {
+            let _ = write!(
+                interfaces,
+                "      - interface: {primary}\n        dhcp: true\n"
+            );
+        }
+
+        let _ = write!(
+            interfaces,
+            "      - interface: {parent_interface}\n        vlans:\n          - vlanId: {vlan_id}\n            addresses:\n              - {private_ip_cidr}\n            mtu: 1500\n"
         );
+
+        let patch = format!("machine:\n  network:\n    interfaces:\n{interfaces}");
         // Apply VLAN config only to control plane
         // Workers get their VLAN config at apply time with their specific IP
         self.with_controlplane_patch(patch)
@@ -529,10 +534,92 @@ pub fn wait_for_talos(ip: &str, timeout: Duration) -> Result<()> {
     }
 }
 
-/// Detect the secondary network interface for VLAN configuration.
+/// Detected primary and secondary network interfaces.
+#[derive(Debug, Clone)]
+pub struct DetectedInterfaces {
+    /// Primary interface with the public IP (DHCP).
+    pub primary: String,
+    /// Secondary interface used for VLAN/private networking.
+    pub secondary: String,
+}
+
+fn parse_primary_interface_from_addresses(ip: &str, stdout: &str) -> Option<String> {
+    let ip_cidr = format!("{ip}/");
+    let deserializer = serde_json::Deserializer::from_str(stdout);
+
+    for json in deserializer.into_iter::<serde_json::Value>().flatten() {
+        if let (Some(link), Some(address)) = (
+            json["spec"]["linkName"].as_str(),
+            json["spec"]["address"].as_str(),
+        ) {
+            if address.starts_with(ip) || address.contains(&ip_cidr) {
+                return Some(link.to_string());
+            }
+        }
+    }
+
+    None
+}
+
+/// Detect the primary network interface for public IP (DHCP).
+///
+/// This only relies on Talos addresses output, so it can succeed even if
+/// link detection is incomplete. Used as a fallback when VLAN detection fails.
+///
+/// # Errors
+///
+/// Returns an error if the primary interface cannot be detected.
+pub fn detect_primary_interface(ip: &str) -> Result<String> {
+    info!("Detecting primary interface on {ip}...");
+
+    let output = Command::new("talosctl")
+        .args(["get", "addresses", "--insecure", "-n", ip, "-o", "json"])
+        .output()
+        .context("Failed to run talosctl get addresses")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("Failed to get addresses: {stderr}");
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    parse_primary_interface_from_addresses(ip, &stdout)
+        .context("Could not detect primary interface")
+}
+
+/// Guess the primary interface name from the VLAN parent interface.
+///
+/// This is a heuristic fallback for cases where interface detection fails.
+/// Examples: "eno2" -> "eno1", "eth1" -> "eth0", "enp1s0f1" -> "enp1s0f0".
+#[must_use]
+pub fn guess_primary_interface(parent_interface: &str) -> Option<String> {
+    let mut digits_rev = String::new();
+    for ch in parent_interface.chars().rev() {
+        if ch.is_ascii_digit() {
+            digits_rev.push(ch);
+        } else {
+            break;
+        }
+    }
+
+    if digits_rev.is_empty() {
+        return None;
+    }
+
+    let digits: String = digits_rev.chars().rev().collect();
+    let prefix_len = parent_interface.len().saturating_sub(digits.len());
+    let prefix = &parent_interface[..prefix_len];
+    let number: u32 = digits.parse().ok()?;
+    let sibling = if number == 0 { 1 } else { number - 1 };
+
+    Some(format!("{prefix}{sibling}"))
+}
+
+/// Detect the primary and secondary network interfaces for VLAN configuration.
 ///
 /// This queries the Talos node in maintenance mode to find the physical
-/// interfaces and determines which one to use for VLAN (the non-primary).
+/// interfaces and determines which one has the public IP (primary) and which
+/// one should be used for VLAN (secondary).
 ///
 /// # Arguments
 ///
@@ -540,13 +627,14 @@ pub fn wait_for_talos(ip: &str, timeout: Duration) -> Result<()> {
 ///
 /// # Returns
 ///
-/// The name of the secondary interface (e.g., "eno2", "enp1s0f1")
+/// A [`DetectedInterfaces`] struct with primary + secondary interface names
+/// (e.g., primary "enp1s0f0", secondary "enp1s0f1").
 ///
 /// # Errors
 ///
-/// Returns an error if the interface cannot be detected.
-pub fn detect_secondary_interface(ip: &str) -> Result<String> {
-    info!("Detecting secondary network interface on {ip}...");
+/// Returns an error if the interfaces cannot be detected.
+pub fn detect_network_interfaces(ip: &str) -> Result<DetectedInterfaces> {
+    info!("Detecting primary/secondary network interfaces on {ip}...");
 
     // Query links via talosctl (in maintenance mode, we use --insecure)
     // Note: --insecure must come after the command name
@@ -589,12 +677,7 @@ pub fn detect_secondary_interface(ip: &str) -> Result<String> {
         physical_interfaces
     );
 
-    if physical_interfaces.len() < 2 {
-        bail!("Expected at least 2 physical interfaces, found: {physical_interfaces:?}",);
-    }
-
-    // Now determine which interface has the public IP (primary)
-    // Query addresses to find which interface has the IP
+    // Determine which interface has the public IP (primary)
     let output = Command::new("talosctl")
         .args(["get", "addresses", "--insecure", "-n", ip, "-o", "json"])
         .output()
@@ -606,34 +689,45 @@ pub fn detect_secondary_interface(ip: &str) -> Result<String> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut primary_interface: Option<String> = None;
+    let primary = parse_primary_interface_from_addresses(ip, &stdout)
+        .context("Could not detect primary interface")?;
+    info!("Primary interface detected: {primary}");
 
-    // Use serde_json's streaming deserializer for concatenated JSON objects
-    let deserializer = serde_json::Deserializer::from_str(&stdout);
-    for json in deserializer.into_iter::<serde_json::Value>().flatten() {
-        if let (Some(link), Some(address)) = (
-            json["spec"]["linkName"].as_str(),
-            json["spec"]["address"].as_str(),
-        ) {
-            // Check if this address matches our public IP
-            if address.starts_with(ip) || address.contains(&format!("{ip}/")) {
-                primary_interface = Some(link.to_string());
-                info!("Primary interface detected: {link} (has IP {address})");
-                break;
-            }
-        }
+    if physical_interfaces.is_empty() {
+        warn!(
+            "No physical interfaces detected from talosctl; falling back to '{primary}' for VLAN"
+        );
+        physical_interfaces.push(primary.clone());
+    } else if physical_interfaces.len() < 2 {
+        warn!(
+            "Expected at least 2 physical interfaces, found: {:?}. Using fallback VLAN parent",
+            physical_interfaces
+        );
     }
-
-    let primary = primary_interface.context("Could not detect primary interface")?;
 
     // Find the secondary interface (first physical NIC that's not the primary)
     let secondary = physical_interfaces
-        .into_iter()
-        .find(|iface| iface != &primary)
-        .context("Could not find secondary interface")?;
+        .iter()
+        .find(|iface| *iface != &primary)
+        .cloned()
+        .or_else(|| physical_interfaces.first().cloned())
+        .context("Could not determine VLAN parent interface")?;
 
+    info!("Primary interface: {}", primary);
     info!("Secondary interface for VLAN: {}", secondary);
-    Ok(secondary)
+
+    Ok(DetectedInterfaces { primary, secondary })
+}
+
+/// Detect the secondary network interface for VLAN configuration.
+///
+/// This is a compatibility wrapper around [`detect_network_interfaces`].
+///
+/// # Errors
+///
+/// Returns an error if the interface cannot be detected.
+pub fn detect_secondary_interface(ip: &str) -> Result<String> {
+    Ok(detect_network_interfaces(ip)?.secondary)
 }
 
 /// Check if talosctl is installed.
@@ -800,6 +894,8 @@ pub struct VlanConfig {
     pub private_ip_cidr: String,
     /// Parent NIC name (e.g., "enp1s0f1").
     pub parent_interface: String,
+    /// Primary NIC name for public IP (DHCP).
+    pub primary_interface: Option<String>,
 }
 
 /// Apply Talos machine configuration to a worker node with VLAN config.
@@ -828,19 +924,50 @@ pub fn apply_config_with_vlan(node_ip: &str, config_path: &Path, vlan: &VlanConf
         vlan.vlan_id, vlan.parent_interface
     );
 
-    let vlan_patch = format!(
-        "machine:
-  network:
-    interfaces:
-      - interface: {}
-        vlans:
-          - vlanId: {}
-            addresses:
-              - {}
-            mtu: 1500
-",
-        vlan.parent_interface, vlan.vlan_id, vlan.private_ip_cidr
+    let parent_interface = &vlan.parent_interface;
+    let vlan_id = vlan.vlan_id;
+    let private_ip_cidr = &vlan.private_ip_cidr;
+
+    // LESSON LEARNED: Without primary DHCP interface, nodes lose public connectivity after install.
+    // Ensure we always attempt to include a primary interface even if detection failed earlier.
+    let mut primary_interface = vlan.primary_interface.clone();
+    if primary_interface.is_none() {
+        match detect_primary_interface(node_ip) {
+            Ok(primary) => {
+                info!("  Detected primary interface on node: {primary}");
+                primary_interface = Some(primary);
+            }
+            Err(e) => {
+                warn!("  Failed to detect primary interface: {e}");
+            }
+        }
+    }
+
+    if primary_interface.is_none() {
+        if let Some(guess) = guess_primary_interface(parent_interface) {
+            warn!(
+                "  Guessing primary interface '{guess}' based on VLAN parent '{parent_interface}'"
+            );
+            primary_interface = Some(guess);
+        }
+    }
+
+    let mut interfaces = String::new();
+
+    if let Some(primary) = primary_interface.as_deref() {
+        let _ = write!(
+            interfaces,
+            "      - interface: {primary}\n        dhcp: true\n"
+        );
+    } else {
+        warn!("  No primary interface available; VLAN config will omit DHCP interface");
+    }
+    let _ = write!(
+        interfaces,
+        "      - interface: {parent_interface}\n        vlans:\n          - vlanId: {vlan_id}\n            addresses:\n              - {private_ip_cidr}\n            mtu: 1500\n"
     );
+
+    let vlan_patch = format!("machine:\n  network:\n    interfaces:\n{interfaces}");
 
     let output = Command::new("talosctl")
         .args(["apply-config", "--insecure", "--nodes", node_ip, "--file"])
@@ -1291,6 +1418,7 @@ mod tests {
             2063,
             "10.8.0.1/24",
             "eth1",
+            Some("eth0"),
         );
 
         // VLAN interface is now a control-plane-only patch
@@ -1376,7 +1504,7 @@ mod tests {
     #[test]
     fn test_full_vlan_config() {
         let config = BootstrapConfig::new("full-vlan", "64.34.91.100")
-            .with_vlan_interface(2063, "10.8.0.1/24", "eth1")
+            .with_vlan_interface(2063, "10.8.0.1/24", "eth1", Some("eth0"))
             .with_private_network("10.8.0.0/24")
             .with_ingress_firewall("10.8.0.0/24", &["10.8.0.1"])
             .with_cilium_cni();
@@ -1386,5 +1514,20 @@ mod tests {
         assert_eq!(config.config_patches.len(), 3);
         // Control plane patches: VLAN (1) + etcd-advertisedSubnets (1) + firewall-controlplane (1) = 3
         assert_eq!(config.config_patches_controlplane.len(), 3);
+    }
+
+    #[test]
+    fn test_guess_primary_interface() {
+        assert_eq!(guess_primary_interface("eno2"), Some("eno1".to_string()));
+        assert_eq!(guess_primary_interface("eth1"), Some("eth0".to_string()));
+        assert_eq!(
+            guess_primary_interface("enp1s0f1"),
+            Some("enp1s0f0".to_string())
+        );
+        assert_eq!(
+            guess_primary_interface("enp1s0f0"),
+            Some("enp1s0f1".to_string())
+        );
+        assert_eq!(guess_primary_interface("lo"), None);
     }
 }

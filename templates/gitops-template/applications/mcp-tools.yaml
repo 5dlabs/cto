@@ -1,0 +1,79 @@
+# MCP Tools Application
+# Deploys MCP server sidecars for agent tool access
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-tools
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: cto
+    cto.5dlabs.ai/component: mcp
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: ghcr.io/5dlabs/charts
+    chart: mcp-tools
+    targetRevision: "0.2.17"
+    helm:
+      releaseName: mcp-tools
+      valuesObject:
+        # Tenant-specific configuration
+        tenant:
+          id: "TENANT_ID_PLACEHOLDER"
+
+        # MCP server configuration
+        servers:
+          # GitHub MCP for repo operations
+          github:
+            enabled: true
+            image:
+              repository: ghcr.io/5dlabs/mcp-github
+              tag: "0.2.17"
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+
+          # Linear MCP for issue tracking (optional)
+          linear:
+            enabled: false
+            image:
+              repository: ghcr.io/5dlabs/mcp-linear
+              tag: "0.2.17"
+
+          # Provider MCP for infrastructure self-healing
+          latitude:
+            enabled: true
+            image:
+              repository: ghcr.io/5dlabs/mcp-latitude
+              tag: "0.2.17"
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+
+        # Shared configuration
+        shared:
+          # Secret containing MCP credentials
+          credentialsSecret: mcp-credentials  # pragma: allowlist secret
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

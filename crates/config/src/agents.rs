@@ -47,6 +47,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "rex" => AgentConfig {
             github_app: "5DLabs-Rex".to_string(),
@@ -70,6 +71,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "grizz" => AgentConfig {
             github_app: "5DLabs-Grizz".to_string(),
@@ -90,6 +92,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "nova" => AgentConfig {
             github_app: "5DLabs-Nova".to_string(),
@@ -110,6 +113,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "blaze" => AgentConfig {
             github_app: "5DLabs-Blaze".to_string(),
@@ -140,6 +144,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: Some("shadcn".to_string()),
             features: None,
             subagents: None,
+            watcher: None,
         },
         "tap" => AgentConfig {
             github_app: "5DLabs-Tap".to_string(),
@@ -160,6 +165,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "spark" => AgentConfig {
             github_app: "5DLabs-Spark".to_string(),
@@ -180,6 +186,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "cleo" => AgentConfig {
             github_app: "5DLabs-Cleo".to_string(),
@@ -200,6 +207,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "cipher" => AgentConfig {
             github_app: "5DLabs-Cipher".to_string(),
@@ -222,6 +230,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "tess" => AgentConfig {
             github_app: "5DLabs-Tess".to_string(),
@@ -243,6 +252,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "atlas" => AgentConfig {
             github_app: "5DLabs-Atlas".to_string(),
@@ -263,6 +273,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         "bolt" => AgentConfig {
             github_app: "5DLabs-Bolt".to_string(),
@@ -292,6 +303,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
         // Default to Rex-like config for unknown agents
         _ => AgentConfig {
@@ -305,6 +317,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             frontend_stack: None,
             features: None,
             subagents: None,
+            watcher: None,
         },
     }
 }

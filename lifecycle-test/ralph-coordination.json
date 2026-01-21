@@ -1,37 +1,91 @@
 {
-  "monitor": {
-    "status": "stopped",
-    "currentPhase": "intake",
-    "lastCheck": "2026-01-20T03:32:01Z",
+  "deployer": {
+    "status": "completed",
+    "currentApp": null,
+    "totalApps": 67,
+    "syncedApps": 35,
+    "healthyApps": 58,
+    "outOfSyncApps": 31,
+    "degradedApps": 5,
+    "progressingApps": 4,
+    "failedApps": ["cto", "external-dns", "mayastor"],
+    "lastUpdate": "2026-01-21T00:32:00Z",
+    "actionsCompleted": [
+      "Triggered refresh on 30+ OutOfSync applications",
+      "Fixed ntfy PVC - changed from mayastor to local-path storage",
+      "Created temporal-operator webhook certificate",
+      "Restarted temporal-operator pod - now healthy"
+    ]
+  },
+  "hardener": {
+    "status": "not_started",
+    "lastCheck": null,
+    "checkCount": 0,
     "pid": null
   },
-  "remediation": {
-    "status": "idle",
-    "currentIssue": null,
-    "pid": 92116
+  "cluster": {
+    "kubeconfig": "/tmp/latitude-test/kubeconfig",
+    "argocdNamespace": "argocd",
+    "argocdReady": true,
+    "argocdPods": 8,
+    "nodes": 2,
+    "storageClass": "local-path (default)",
+    "openbaoStatus": "running",
+    "clusterSecretStoreReady": true
   },
-  "issueQueue": [],
-  "circuitBreaker": {
-    "state": "closed",
-    "noProgressCount": 0,
-    "sameErrorCount": 0,
-    "lastError": null,
-    "lastFileChange": null,
-    "openedAt": null
+  "infrastructure": {
+    "openbao": "running",
+    "externalSecrets": "running",
+    "clusterSecretStore": "ready",
+    "secretsSeeded": false,
+    "failingExternalSecrets": 47,
+    "note": "ExternalSecrets can't fetch data - OpenBao secrets not seeded"
   },
   "session": {
-    "id": null,
-    "startedAt": null,
-    "lastActivity": null,
-    "expirationHours": 24
+    "id": "gitops-deploy-20260121-session3",
+    "startedAt": "2026-01-21T00:15:00Z",
+    "lastActivity": "2026-01-21T00:32:00Z"
   },
   "stats": {
-    "totalIssues": 0,
-    "resolved": 0,
-    "failed": 0,
-    "circuitBreakerTrips": 0,
-    "sessionResets": 0,
-    "averageResolutionTime": null,
-    "lastSuccessfulPhase": null
+    "appsFixed": 2,
+    "pvcsPatched": 1,
+    "certificatesCreated": 1,
+    "issuesRemaining": 5
+  },
+  "blockedApps": {
+    "missingSecrets": {
+      "description": "47 ExternalSecrets failing - OpenBao needs secrets seeded",
+      "critical": [
+        "cloudflare-api-credentials",
+        "ghcr-credentials",
+        "ghcr-secret",
+        "mayastor-etcd-jwt-token",
+        "tailscale-auth"
+      ],
+      "impact": ["cto", "external-dns", "mayastor", "headscale", "tailscale-subnet-router"]
+    },
+    "syncFailures": {
+      "cto": "Missing ghcr-secret for image pulls, PVCs pending mayastor",
+      "mayastor": "Pre-upgrade hook waiting for non-existent job",
+      "external-dns": "Cloudflare API error 6003 - invalid credentials"
+    },
+    "missing": ["mayastor"],
+    "fixed": ["ntfy (PVC)", "temporal-operator (webhook cert)"]
+  },
+  "knownIssues": {
+    "primaryBlocker": "OpenBao has no secrets seeded - 47 ExternalSecrets failing",
+    "hubbleRelay": "CrashLoopBackOff - can't connect to hubble-peer",
+    "cilium": "Degraded due to hubble-relay - core networking still works",
+    "cto": "Degraded - missing ghcr-secret, 4 PVCs pending mayastor",
+    "mayastor": "Missing - pre-upgrade hook stuck",
+    "questdb-operator": "Unknown - private repo auth required",
+    "external-dns": "CrashLoopBackOff - credentials invalid",
+    "outOfSyncApps": "Many apps show OutOfSync due to CiliumIdentity drift (not blocking)"
+  },
+  "nextSteps": {
+    "1": "Seed secrets into OpenBao (ghcr-*, cloudflare-*, github-app-*, linear-app-*)",
+    "2": "Fix or remove mayastor dependency - consider local-path storage",
+    "3": "Add questdb-operator repo credentials to ArgoCD",
+    "4": "Investigate hubble-relay TLS issues for Cilium"
   }
 }

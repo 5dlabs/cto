@@ -9,6 +9,9 @@ metadata:
   labels:
     app.kubernetes.io/name: tenant-crd
     app.kubernetes.io/part-of: cto-platform
+  annotations:
+    # Deploy CRD early to prevent Tenant resource race conditions
+    argocd.argoproj.io/sync-wave: "-4"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -27,6 +30,17 @@ spec:
     automated:
       prune: true
       selfHeal: true
+      allowEmpty: false
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m

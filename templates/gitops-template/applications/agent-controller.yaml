@@ -1,0 +1,64 @@
+# CTO Agent Controller Application
+# Watches CodeRun CRDs and spawns agent pods
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agent-controller
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: cto
+    cto.5dlabs.ai/component: controller
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: ghcr.io/5dlabs/charts
+    chart: agent-controller
+    targetRevision: "0.2.17"
+    helm:
+      releaseName: agent-controller
+      valuesObject:
+        # Tenant-specific configuration
+        tenant:
+          id: "TENANT_ID_PLACEHOLDER"
+
+        # Controller configuration
+        controller:
+          replicas: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # Agent pod defaults
+        agent:
+          image:
+            repository: ghcr.io/5dlabs/cto-agent
+            tag: "0.2.17"
+          defaultModel: claude-sonnet-4-20250514
+
+        # Service account for agent pods
+        serviceAccount:
+          create: true
+          name: cto-agent
+
+        # RBAC for CodeRun management
+        rbac:
+          create: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

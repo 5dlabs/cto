@@ -4,5 +4,6 @@ pub mod naming;
 pub mod resources;
 pub mod status;
 pub mod templates;
+pub mod watcher;
 
 pub use controller::*;

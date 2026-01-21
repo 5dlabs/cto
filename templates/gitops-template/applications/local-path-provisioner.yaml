@@ -1,0 +1,54 @@
+# Local Path Provisioner Application
+# Provides dynamic storage provisioning for the cluster
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: local-path-provisioner
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: cto
+    cto.5dlabs.ai/component: storage
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/rancher/local-path-provisioner
+    path: deploy/chart/local-path-provisioner
+    targetRevision: v0.0.30
+    helm:
+      releaseName: local-path-provisioner
+      valuesObject:
+        # Storage configuration
+        storageClass:
+          # Set as default storage class
+          defaultClass: true
+          name: local-path
+          reclaimPolicy: Delete
+
+        # Node path for storage
+        nodePathMap:
+          - node: DEFAULT_PATH_FOR_NON_LISTED_NODES
+            paths:
+              - /opt/local-path-provisioner
+
+        # Resource limits
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: local-path-storage
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

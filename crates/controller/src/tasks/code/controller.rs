@@ -1,5 +1,6 @@
 use super::naming::ResourceNaming;
 use super::resources::CodeResourceManager;
+use super::watcher::{cleanup_watcher, is_watcher_coderun, spawn_watcher_if_enabled};
 use crate::crds::CodeRun;
 use crate::tasks::cleanup;
 use crate::tasks::tool_inventory::log_tool_inventory;
@@ -315,6 +316,15 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 ExpireAtUpdate::Clear,
             )
             .await?;
+
+            // Spawn watcher CodeRun if enabled (dual-model pattern)
+            if let Err(e) = spawn_watcher_if_enabled(&ctx_arc, &code_run).await {
+                warn!(
+                    "Failed to spawn watcher for CodeRun {}: {}",
+                    code_run_name, e
+                );
+                // Don't fail the reconciliation - executor can still run without watcher
+            }
 
             // Requeue to check job progress
             // Using 90s instead of 30s to reduce reconciliation load
@@ -772,6 +782,20 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 #[instrument(skip(ctx), fields(code_run_name = %code_run.name_any(), namespace = %ctx.namespace))]
 async fn cleanup_code_resources(code_run: Arc<CodeRun>, ctx: &Context) -> Result<Action> {
     debug!("Cleaning up resources for CodeRun");
+
+    // Clean up watcher if this is an executor with a watcher
+    // Note: Watcher has owner reference to executor, so Kubernetes will
+    // handle deletion automatically, but we do explicit cleanup for faster cleanup
+    if !is_watcher_coderun(&code_run) {
+        if let Err(e) = cleanup_watcher(&ctx.client, &ctx.namespace, &code_run).await {
+            warn!(
+                "Failed to clean up watcher for CodeRun {}: {}",
+                code_run.name_any(),
+                e
+            );
+            // Don't fail cleanup - continue with other resources
+        }
+    }
 
     // Create APIs
     let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), &ctx.namespace);

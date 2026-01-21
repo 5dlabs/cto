@@ -26,6 +26,8 @@ metadata:
     app.kubernetes.io/part-of: cto-platform
     app.kubernetes.io/branch: main
   annotations:
+    # Deploy after Argo Workflows/Events and ExternalSecrets resources are established
+    argocd.argoproj.io/sync-wave: "1"
     # Image Updater for all CTO images
     # Uses digest strategy to track the 'latest' tag specifically
     # NOTE: Version constraint (:latest) required for digest strategy
@@ -80,6 +82,7 @@ spec:
       values: |
         global:
           namespace: cto
+          createNamespace: false
           imagePullSecrets:
             - name: ghcr-secret
           storageClass: "mayastor"  # OpenEBS Mayastor for distributed storage
@@ -198,6 +201,7 @@ spec:
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - RespectIgnoreDifferences=true
+      - SkipDryRunOnMissingResource=true
 
     retry:
       limit: 5

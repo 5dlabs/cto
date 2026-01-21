@@ -1,0 +1,186 @@
+{
+  "deployer": {
+    "status": "running",
+    "currentApp": null,
+    "totalApps": 0,
+    "syncedApps": 0,
+    "healthyApps": 0,
+    "failedApps": [],
+    "lastUpdate": "2026-01-21T00:15:13Z",
+    "pid": 86725
+  },
+  "hardener": {
+    "status": "running",
+    "lastCheck": "2026-01-21T02:54:09Z",
+    "checkCount": 28,
+    "pid": 87675
+  },
+  "cluster": {
+    "kubeconfig": "/tmp/latitude-test/kubeconfig",
+    "argocdNamespace": "argocd",
+    "argocdReady": true
+  },
+  "session": {
+    "id": "A3F992F7-FEC9-403C-85E0-64426CB1145D",
+    "startedAt": "2026-01-21T00:15:13Z",
+    "lastActivity": "2026-01-21T04:05:00Z"
+  },
+  "stats": {
+    "totalRetries": 0,
+    "issuesDetected": 14,
+    "issuesFixed": 14,
+    "appsNeedingManualSync": 0
+  },
+  "hardeningActions": [
+    {
+      "timestamp": "2026-01-21T00:25:00Z",
+      "observation": "Tenant CRD lacked explicit sync-wave ordering, risking race conditions for future Tenant resources.",
+      "fix": "Added sync-wave -4 plus retry and standard sync options to install the CRD early.",
+      "files": [
+        "infra/gitops/applications/platform/tenant-crd.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T00:40:00Z",
+      "observation": "CloudNativePG operator lacked explicit sync-wave ordering, risking CRD races for database instances.",
+      "fix": "Added sync-wave 1 to align with other database operators and ensure CRDs/controllers land before database-instances.",
+      "files": [
+        "infra/gitops/applications/operators/cloudnative-pg-operator.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T00:40:00Z",
+      "observation": "Blackbox exporter lacked retry/backoff and standard sync options, risking manual re-sync on transient failures.",
+      "fix": "Added retry/backoff and prune/ignore sync options for more resilient GitOps syncs.",
+      "files": [
+        "infra/gitops/applications/observability/blackbox-exporter.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T01:05:00Z",
+      "observation": "Alertmanager lacked retry/backoff and prune ordering, risking manual re-syncs on transient Helm or secret timing failures.",
+      "fix": "Added retry/backoff plus prune ordering options to improve sync resilience.",
+      "files": [
+        "infra/gitops/applications/observability/alertmanager.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T01:05:00Z",
+      "observation": "Fluent Bit lacked retry/backoff and standard prune/ignore options, increasing the chance of manual re-syncs after transient drift.",
+      "fix": "Added retry/backoff plus PruneLast and RespectIgnoreDifferences for more resilient GitOps syncs.",
+      "files": [
+        "infra/gitops/applications/observability/fluent-bit.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T01:20:00Z",
+      "observation": "ArgoCD Image Updater lacked sync-wave ordering and standard sync options, risking early sync drift and manual re-syncs.",
+      "fix": "Added sync-wave 1 plus standard prune/ignore options and SkipDryRunOnMissingResource for resiliency.",
+      "files": [
+        "infra/gitops/applications/platform/argocd-image-updater.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T01:35:00Z",
+      "observation": "CRD-heavy apps can fail dry-run validation before CRDs register, leaving them OutOfSync and requiring manual re-syncs.",
+      "fix": "Added SkipDryRunOnMissingResource and PruneLast (plus prune propagation for ClickHouse) to improve CRD sync resilience.",
+      "files": [
+        "infra/gitops/applications/platform/argo-workflows.yaml",
+        "infra/gitops/applications/platform/arc-controller.yaml",
+        "infra/gitops/applications/operators/clickhouse-operator.yaml",
+        "infra/gitops/applications/operators/jaeger-operator.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T02:10:00Z",
+      "observation": "AI/database operators can fail initial sync when ArgoCD dry-runs custom resources before CRDs register, leaving dependent stacks OutOfSync.",
+      "fix": "Enabled SkipDryRunOnMissingResource for operator Applications to tolerate CRD registration lag.",
+      "files": [
+        "infra/gitops/applications/operators/cloudnative-pg-operator.yaml",
+        "infra/gitops/applications/operators/redis-operator.yaml",
+        "infra/gitops/applications/operators/kubeai.yaml",
+        "infra/gitops/applications/operators/ollama-operator.yaml",
+        "infra/gitops/applications/operators/llamastack-operator.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T02:25:24Z",
+      "observation": "Platform-ingress applies headscale resources even when headscale apps are disabled, which can fail if the headscale namespace does not exist.",
+      "fix": "Added the headscale namespace to the platform-namespaces app so it exists before platform-ingress syncs.",
+      "files": [
+        "infra/cluster-config/headscale-namespace.yaml",
+        "infra/gitops/applications/platform/platform-namespaces.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T02:30:00Z",
+      "observation": "ExternalSecrets for cto/external-dns namespaces can fail initial sync when those namespaces are created later by workloads, leaving external-secrets-config degraded and credentials missing.",
+      "fix": "Added early namespace provisioning and shifted external-secrets-config to sync after namespace apps; disabled CTO chart namespace creation in GitOps to avoid shared ownership.",
+      "files": [
+        "infra/gitops/applications/platform/platform-namespaces.yaml",
+        "infra/cluster-config/cto-namespace.yaml",
+        "infra/cluster-config/external-dns-namespace.yaml",
+        "infra/charts/cto/templates/namespace.yaml",
+        "infra/charts/cto/values.yaml",
+        "infra/gitops/applications/workloads/cto.yaml",
+        "infra/gitops/applications/secrets/external-secrets-config.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T02:48:39Z",
+      "observation": "Argo Events/Workflows and ARC controller can remain OutOfSync when admission webhook CA bundles rotate after initial sync.",
+      "fix": "Ignored webhook CA bundle fields for Mutating/ValidatingWebhookConfiguration resources to prevent drift.",
+      "files": [
+        "infra/gitops/applications/platform/argo-events.yaml",
+        "infra/gitops/applications/platform/argo-workflows.yaml",
+        "infra/gitops/applications/platform/arc-controller.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T02:55:00Z",
+      "observation": "GitHub webhook sensors can reconcile before CTO workflow templates when github-webhooks and cto-workflows sync in the same wave.",
+      "fix": "Moved github-webhooks to sync-wave 1 so workflow templates land before sensors.",
+      "files": [
+        "infra/gitops/applications/platform/github-webhooks.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T02:55:00Z",
+      "observation": "AI ingress HTTPRoute/GRPCRoute resources can fail dry-run validation if Gateway API CRDs are still registering.",
+      "fix": "Enabled SkipDryRunOnMissingResource to tolerate CRD registration lag for ai-ingress.",
+      "files": [
+        "infra/gitops/applications/ai-models/ai-ingress.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T03:20:00Z",
+      "observation": "cert-manager-config and argocd-image-updater disabled namespace creation, which can fail if their target namespaces are not present during initial sync.",
+      "fix": "Enabled CreateNamespace to let ArgoCD provision namespaces and avoid namespace race failures.",
+      "files": [
+        "infra/gitops/applications/platform/cert-manager-config.yaml",
+        "infra/gitops/applications/platform/argocd-image-updater.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T03:20:00Z",
+      "observation": "Cloudflare operator, CTO workflow templates, and core observability charts lacked retry/backoff, risking manual re-syncs after transient chart/apply errors.",
+      "fix": "Added retry/backoff to improve sync resiliency for cloudflare-operator, cto-workflows, prometheus, loki, and kube-state-metrics.",
+      "files": [
+        "infra/gitops/applications/secrets/cloudflare-operator.yaml",
+        "infra/gitops/applications/platform/cto-workflows.yaml",
+        "infra/gitops/applications/observability/prometheus.yaml",
+        "infra/gitops/applications/observability/loki.yaml",
+        "infra/gitops/applications/observability/kube-state-metrics.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-21T04:05:00Z",
+      "observation": "ExternalSecrets config applies resources in observability/mayastor/openbao namespaces that may not exist during early sync, causing initial failures.",
+      "fix": "Expanded platform-namespaces to create observability, mayastor, and openbao namespaces early and added a managed openbao namespace manifest.",
+      "files": [
+        "infra/gitops/applications/platform/platform-namespaces.yaml",
+        "infra/cluster-config/openbao-namespace.yaml"
+      ]
+    }
+  ]
+}

@@ -14,7 +14,7 @@ metadata:
     app.kubernetes.io/component: security
   annotations:
     # Deploy after cert-manager CRDs are available
-    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/sync-wave: "-4"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -36,8 +36,9 @@ spec:
       allowEmpty: false
 
     syncOptions:
-      - CreateNamespace=false
+      - CreateNamespace=true
       - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
 
     retry:
       limit: 5

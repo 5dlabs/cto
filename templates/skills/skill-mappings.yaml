@@ -34,10 +34,19 @@ blaze:
     - effect-frontend-patterns
     - frontend-excellence
     - frontend-design
+    # React best practices (from skills.sh)
+    - react-best-practices
+    - web-design-guidelines
   coder:
     - tool-design
     - firecrawl
     - compound-engineering
+    - verification-before-completion
+    - systematic-debugging
+    # Workflow skills (from skills.sh)
+    - subagent-driven-development
+    - requesting-code-review
+    - receiving-code-review
   healer:
     - incident-response
     - observability
@@ -58,6 +67,18 @@ blaze:
     ralph-technique:
       triggers: [minimal, ralph, loop, autonomous, simple]
       description: "Minimal prompting technique for loop-based autonomous execution"
+    remotion:
+      triggers: [video, remotion, programmatic video, video generation, react video]
+      description: "Programmatic video creation with React"
+    three-js:
+      triggers: [three.js, threejs, webgl, 3d, canvas, r3f]
+      description: "Three.js optimization for web-based 3D graphics"
+    sentry-tracing:
+      triggers: [sentry, tracing, performance, apm, monitoring]
+      description: "Sentry performance monitoring and tracing setup"
+    playwright-testing:
+      triggers: [playwright, e2e, browser test, integration test]
+      description: "End-to-end testing with Playwright"
 
 tap:
   description: "Expo React Native mobile development"
@@ -72,11 +93,22 @@ tap:
     - github-mcp
     - expo-patterns
     - frontend-design
+    - web-design-guidelines
+    # React Native performance (from skills.sh - Callstack)
+    - react-native-best-practices
+    # Expo skills (from skills.sh - Expo)
+    - expo-building-ui
+    - expo-data-fetching
   coder:
     - tool-design
     - better-auth-expo
     - firecrawl
     - compound-engineering
+    - verification-before-completion
+    - systematic-debugging
+    - subagent-driven-development
+    - requesting-code-review
+    - receiving-code-review
   healer:
     - incident-response
     - observability
@@ -88,6 +120,21 @@ tap:
     expo-upgrading:
       triggers: [upgrade, sdk, version, deprecated, breaking changes, migrate]
       description: "Upgrading Expo SDK versions and fixing dependency issues"
+    expo-api-routes:
+      triggers: [api routes, server, backend, edge functions]
+      description: "Expo API routes for server-side logic"
+    expo-dev-client:
+      triggers: [dev client, custom build, native module, testflight]
+      description: "EAS Build development clients"
+    expo-cicd-workflows:
+      triggers: [eas workflows, ci, cd, automation, deploy]
+      description: "EAS CI/CD workflow YAML configuration"
+    expo-use-dom:
+      triggers: [dom, webview, web library, recharts, syntax highlighter]
+      description: "DOM components for web libraries in native apps"
+    expo-tailwind:
+      triggers: [tailwind, nativewind, css, styling]
+      description: "Tailwind CSS v4 setup with NativeWind v5"
 
 spark:
   description: "Electron desktop application development"
@@ -102,11 +149,14 @@ spark:
     - github-mcp
     - electron-patterns
     - frontend-design
+    - web-design-guidelines
   coder:
     - tool-design
     - better-auth-electron
     - firecrawl
     - compound-engineering
+    - verification-before-completion
+    - systematic-debugging
   healer:
     - incident-response
     - observability
@@ -130,10 +180,17 @@ rex:
     - github-mcp
     - rust-patterns
     - mcp-development
+    # Rust skills (from skills.sh)
+    - rust-error-handling
   coder:
     - tool-design
     - firecrawl
     - compound-engineering
+    - verification-before-completion
+    - systematic-debugging
+    - subagent-driven-development
+    - requesting-code-review
+    - receiving-code-review
   healer:
     - incident-response
     - observability
@@ -151,6 +208,12 @@ rex:
     ralph-technique:
       triggers: [minimal, ralph, loop, autonomous, simple]
       description: "Minimal prompting technique for loop-based autonomous execution"
+    cargo-fuzz:
+      triggers: [fuzz, fuzzing, proptest, arbitrary, test coverage]
+      description: "Rust fuzzing with cargo-fuzz and libFuzzer"
+    fuzzing-obstacles:
+      triggers: [fuzzing, bypass, checksum, obstacle]
+      description: "Overcoming fuzzing obstacles with conditional compilation"
 
 grizz:
   description: "Go specialist with chi, grpc, pgx"
@@ -164,10 +227,17 @@ grizz:
     - llm-docs
     - github-mcp
     - go-patterns
+    # Go skills (from skills.sh)
+    - go-concurrency
   coder:
     - tool-design
     - firecrawl
     - compound-engineering
+    - verification-before-completion
+    - systematic-debugging
+    - subagent-driven-development
+    - requesting-code-review
+    - receiving-code-review
   healer:
     - incident-response
     - observability
@@ -183,6 +253,9 @@ grizz:
     ralph-technique:
       triggers: [minimal, ralph, loop, autonomous, simple]
       description: "Minimal prompting technique for loop-based autonomous execution"
+    go-code-review:
+      triggers: [review, code review, pr, pull request]
+      description: "Go code review best practices and checklist"
 
 nova:
   description: "Node.js/Bun with Elysia, Effect, Drizzle"
@@ -196,11 +269,19 @@ nova:
     - llm-docs
     - github-mcp
     - effect-patterns
+    # Elysia and Drizzle (from skills.sh)
+    - elysia
+    - drizzle-queries
   coder:
     - tool-design
     - better-auth
     - firecrawl
     - compound-engineering
+    - verification-before-completion
+    - systematic-debugging
+    - subagent-driven-development
+    - requesting-code-review
+    - receiving-code-review
   healer:
     - incident-response
     - observability
@@ -217,6 +298,9 @@ nova:
     ralph-technique:
       triggers: [minimal, ralph, loop, autonomous, simple]
       description: "Minimal prompting technique for loop-based autonomous execution"
+    sentry-tracing:
+      triggers: [sentry, tracing, performance, apm]
+      description: "Sentry performance monitoring setup"
 
 # ============================================================================
 # INFRASTRUCTURE AGENTS
@@ -243,15 +327,34 @@ bolt:
     - secrets-management
     - storage-operators
     - mcp-development
+    # MCP skills (from skills.sh)
+    - mcp-builder
   deploy:
     - tool-design
     - compound-engineering
+    - verification-before-completion
   healer:
     - incident-response
   optional:
     ai-ml-infra:
       triggers: [kubeai, gpu, model, inference, vllm, ollama, llm]
       description: "AI/ML model serving and GPU infrastructure"
+    # Cloudflare skills (from skills.sh)
+    cloudflare-workers:
+      triggers: [cloudflare, workers, edge, wrangler, cf]
+      description: "Cloudflare Workers deployment and management"
+    cloudflare-durable-objects:
+      triggers: [durable objects, stateful, edge state, cloudflare do]
+      description: "Stateful edge computing with Durable Objects"
+    cloudflare-mcp-server:
+      triggers: [mcp server, cloudflare mcp, remote mcp]
+      description: "Building MCP servers on Cloudflare Workers"
+    cloudflare-agents-sdk:
+      triggers: [cloudflare agents, agents sdk, stateful agents]
+      description: "Cloudflare Agents SDK for persistent AI agents"
+    cloudflare-wrangler:
+      triggers: [wrangler, wrangler cli, cloudflare deploy]
+      description: "Wrangler CLI for Cloudflare Workers management"
 
 # ============================================================================
 # INTEGRATION AGENTS
@@ -268,9 +371,15 @@ atlas:
     - llm-docs
     - github-mcp
     - git-integration
+    - git-worktrees
     - repomix
+    # Workflow completion (from skills.sh - obra/superpowers)
+    - finishing-branch
   integration:
     - multi-agent-patterns
+    - parallel-agents
+    - verification-before-completion
+    - executing-plans
   optional:
     multi-agent-patterns:
       triggers: [coordination, orchestration, multi-agent]
@@ -311,8 +420,12 @@ cleo:
     - advanced-evaluation
     - repomix
     - firecrawl
+    # Quality assessment (from skills.sh - Trail of Bits)
+    - code-maturity
+    - ask-questions
   quality:
     - tool-design
+    - systematic-debugging
   optional:
     shadcn-stack:
       triggers: [frontend, react, next]
@@ -346,8 +459,15 @@ tess:
     - kubernetes-mcp
     - observability
     - webapp-testing
+    # Testing workflow (from skills.sh - obra/superpowers)
+    - test-driven-development
+    - verification-before-completion
+    # Playwright testing (from skills.sh)
+    - playwright-testing
   test:
     - tool-design
+    - systematic-debugging
+    - property-based-testing
   optional:
     shadcn-stack:
       triggers: [frontend, component, e2e]
@@ -362,6 +482,12 @@ tess:
     ralph-technique:
       triggers: [minimal, ralph, loop, autonomous, simple]
       description: "Minimal prompting technique for loop-based autonomous execution"
+    cargo-fuzz:
+      triggers: [rust, fuzz, fuzzing, proptest]
+      description: "Rust fuzzing for test coverage"
+    fuzzing-obstacles:
+      triggers: [fuzzing, obstacle, checksum]
+      description: "Overcoming fuzzing obstacles"
 
 cipher:
   description: "Security analysis"
@@ -376,8 +502,19 @@ cipher:
     - github-mcp
     - security-analysis
     - observability
+    # Security tools (from skills.sh - Trail of Bits)
+    - semgrep
+    - codeql
+    - sarif-parsing
+    - differential-review
+    # Security skills (from skills.sh - Trail of Bits)
+    - audit-prep-assistant
+    - entry-point-analyzer
+    - variant-analysis
   security:
     - tool-design
+    - property-based-testing
+    - coverage-analysis
   optional:
     better-auth:
       triggers: [auth, oauth, session, token]
@@ -387,6 +524,12 @@ cipher:
       triggers: [go, golang]
     effect-patterns:
       triggers: [effect, typescript]
+    cargo-fuzz:
+      triggers: [rust, fuzz, fuzzing]
+      description: "Rust fuzzing for security testing"
+    fuzzing-obstacles:
+      triggers: [fuzzing, bypass, checksum, obstacle, conditional compilation]
+      description: "Overcoming fuzzing obstacles with conditional compilation"
 
 # ============================================================================
 # PROJECT MANAGEMENT
@@ -406,6 +549,10 @@ morgan:
     - repomix
     - project-development
     - skill-authoring
+    - ask-questions
+    # Planning workflow (from skills.sh - obra/superpowers)
+    - brainstorming
+    - writing-plans
   intake:
     - prd-analysis
     - multi-agent-patterns
@@ -418,6 +565,19 @@ morgan:
     deep-research:
       triggers: [research, competitive, like, similar to, compare, best practices, how do others]
       description: "Deep technical research using Firecrawl Agent for competitive analysis and pattern discovery"
+    # Document handling (from skills.sh - Anthropic)
+    pdf:
+      triggers: [pdf, document, attachment, file]
+      description: "Process PDF documents and PRDs"
+    docx:
+      triggers: [docx, word, word document, doc]
+      description: "Create, edit, and analyze Word documents"
+    xlsx:
+      triggers: [xlsx, excel, spreadsheet, xls]
+      description: "Create, edit, and analyze Excel spreadsheets"
+    pptx:
+      triggers: [pptx, powerpoint, slides, presentation]
+      description: "Create, edit, and analyze PowerPoint presentations"
 
 # ============================================================================
 # VR AGENTS
@@ -440,6 +600,8 @@ vex:
     - tool-design
     - firecrawl
     - compound-engineering
+    - verification-before-completion
+    - systematic-debugging
   healer:
     - incident-response
     - observability
@@ -448,3 +610,6 @@ vex:
     meta-xr:
       triggers: [quest, meta, passthrough, hand tracking, avatars]
       description: "Meta Quest specific features beyond OpenXR"
+    three-js:
+      triggers: [three.js, threejs, webgl, 3d web, web3d, r3f, react three fiber]
+      description: "Three.js optimization for web-based 3D rendering"

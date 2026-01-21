@@ -3,11 +3,11 @@
 //! This module provides distributed rate limiting for the Agent Remediation Loop
 //! to prevent abuse and ensure fair resource usage.
 
+use chrono::{DateTime, Duration, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use thiserror::Error;
-use chrono::{DateTime, Utc, Duration};
+use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 /// Rate limiting errors
@@ -72,11 +72,13 @@ impl RateLimiter {
         self.perform_cleanup(&mut limits, now).await;
 
         // Get or create entry
-        let entry = limits.entry(key.to_string()).or_insert_with(|| RateLimitEntry {
-            request_count: 0,
-            window_start: now,
-            last_request: now - Duration::minutes(1), // Ensure first request is allowed
-        });
+        let entry = limits
+            .entry(key.to_string())
+            .or_insert_with(|| RateLimitEntry {
+                request_count: 0,
+                window_start: now,
+                last_request: now - Duration::minutes(1), // Ensure first request is allowed
+            });
 
         // Check if we need to reset the window
         if (now - entry.window_start).num_minutes() >= 1 {
@@ -89,38 +91,48 @@ impl RateLimiter {
             let reset_time = entry.window_start + Duration::minutes(1);
             let wait_seconds = (reset_time - now).num_seconds();
 
-            return Err(RateLimitError::LimitExceeded(
-                format!("Rate limit exceeded for key '{}'. Try again in {} seconds", key, wait_seconds)
-            ));
+            return Err(RateLimitError::LimitExceeded(format!(
+                "Rate limit exceeded for key '{key}'. Try again in {wait_seconds} seconds"
+            )));
         }
 
         // Check burst capacity (requests within short time window)
         let time_since_last_request = (now - entry.last_request).num_seconds();
-        if time_since_last_request < 60 && entry.request_count >= self.config.requests_per_minute - self.config.burst_capacity {
-            return Err(RateLimitError::LimitExceeded(
-                format!("Burst rate limit exceeded for key '{}'", key)
-            ));
+        if time_since_last_request < 60
+            && entry.request_count >= self.config.requests_per_minute - self.config.burst_capacity
+        {
+            return Err(RateLimitError::LimitExceeded(format!(
+                "Burst rate limit exceeded for key '{key}'"
+            )));
         }
 
         // Allow request
         entry.request_count += 1;
         entry.last_request = now;
 
-        debug!("Rate limit check passed for key: {} (count: {})", key, entry.request_count);
+        debug!(
+            "Rate limit check passed for key: {} (count: {})",
+            key, entry.request_count
+        );
         Ok(())
     }
 
     /// Perform cleanup of old entries
-    async fn perform_cleanup(&self, limits: &mut HashMap<String, RateLimitEntry>, now: DateTime<Utc>) {
+    async fn perform_cleanup(
+        &self,
+        limits: &mut HashMap<String, RateLimitEntry>,
+        now: DateTime<Utc>,
+    ) {
         let mut last_cleanup = self.last_cleanup.write().await;
 
-        if (*last_cleanup - now).num_seconds() < -(self.config.cleanup_interval_seconds as i64) {
+        let cleanup_interval_seconds =
+            i64::try_from(self.config.cleanup_interval_seconds).unwrap_or(i64::MAX);
+
+        if (*last_cleanup - now).num_seconds() < -cleanup_interval_seconds {
             let before_cleanup = limits.len();
 
             // Remove entries older than 1 hour
-            limits.retain(|_, entry| {
-                (now - entry.last_request).num_hours() < 1
-            });
+            limits.retain(|_, entry| (now - entry.last_request).num_hours() < 1);
 
             let after_cleanup = limits.len();
             let removed = before_cleanup - after_cleanup;
@@ -138,11 +150,10 @@ impl RateLimiter {
         let limits = self.limits.read().await;
 
         if let Some(entry) = limits.get(key) {
-            let remaining = if entry.request_count >= self.config.requests_per_minute {
-                0
-            } else {
-                self.config.requests_per_minute - entry.request_count
-            };
+            let remaining = self
+                .config
+                .requests_per_minute
+                .saturating_sub(entry.request_count);
 
             let reset_seconds = if entry.request_count >= self.config.requests_per_minute {
                 let reset_time = entry.window_start + Duration::minutes(1);
@@ -169,20 +180,23 @@ impl RateLimiter {
     pub fn update_config(&mut self, config: RateLimitConfig) -> RateLimitResult<()> {
         if config.requests_per_minute == 0 {
             return Err(RateLimitError::ConfigurationError(
-                "Requests per minute cannot be zero".to_string()
+                "Requests per minute cannot be zero".to_string(),
             ));
         }
 
         if config.burst_capacity > config.requests_per_minute {
             return Err(RateLimitError::ConfigurationError(
-                "Burst capacity cannot exceed requests per minute".to_string()
+                "Burst capacity cannot exceed requests per minute".to_string(),
             ));
         }
 
         let requests_per_minute = config.requests_per_minute;
         let burst_capacity = config.burst_capacity;
         self.config = config;
-        info!("Updated rate limit configuration: {} req/min, {} burst", requests_per_minute, burst_capacity);
+        info!(
+            "Updated rate limit configuration: {} req/min, {} burst",
+            requests_per_minute, burst_capacity
+        );
         Ok(())
     }
 
@@ -193,10 +207,14 @@ impl RateLimiter {
 
         stats.insert("active_keys".to_string(), limits.len() as u64);
 
-        let total_requests: u64 = limits.values().map(|entry| entry.request_count as u64).sum();
+        let total_requests: u64 = limits
+            .values()
+            .map(|entry| u64::from(entry.request_count))
+            .sum();
         stats.insert("total_requests".to_string(), total_requests);
 
-        let rate_limited_keys = limits.values()
+        let rate_limited_keys = limits
+            .values()
             .filter(|entry| entry.request_count >= self.config.requests_per_minute)
             .count() as u64;
         stats.insert("rate_limited_keys".to_string(), rate_limited_keys);
@@ -212,6 +230,7 @@ impl RateLimiter {
     }
 
     /// Check if rate limiter is healthy
+    #[allow(clippy::unused_async)]
     pub async fn is_healthy(&self) -> bool {
         // Check if we can acquire locks (basic health check)
         let limits_result = self.limits.try_read();
@@ -242,7 +261,7 @@ impl RateLimiter {
     pub fn create_custom_limiter(config: RateLimitConfig) -> RateLimitResult<Self> {
         if config.requests_per_minute == 0 {
             return Err(RateLimitError::ConfigurationError(
-                "Requests per minute cannot be zero".to_string()
+                "Requests per minute cannot be zero".to_string(),
             ));
         }
 
@@ -254,7 +273,10 @@ impl RateLimiter {
     }
 
     /// Check multiple keys at once (batch operation)
-    pub async fn check_limits_batch(&self, keys: &[String]) -> RateLimitResult<Vec<Result<(), RateLimitError>>> {
+    pub async fn check_limits_batch(
+        &self,
+        keys: &[String],
+    ) -> RateLimitResult<Vec<Result<(), RateLimitError>>> {
         let mut results = Vec::new();
 
         for key in keys {
@@ -266,7 +288,10 @@ impl RateLimiter {
     }
 
     /// Get rate limit status for multiple keys
-    pub async fn get_limits_status_batch(&self, keys: &[String]) -> RateLimitResult<HashMap<String, (u32, u32, i64)>> {
+    pub async fn get_limits_status_batch(
+        &self,
+        keys: &[String],
+    ) -> RateLimitResult<HashMap<String, (u32, u32, i64)>> {
         let mut results = HashMap::new();
 
         for key in keys {
@@ -282,7 +307,9 @@ impl RateLimiter {
 /// Distributed rate limiter using Kubernetes leases (for future implementation)
 pub struct DistributedRateLimiter {
     base_limiter: RateLimiter,
+    #[allow(dead_code)]
     lease_name: String,
+    #[allow(dead_code)]
     lease_namespace: String,
 }
 
