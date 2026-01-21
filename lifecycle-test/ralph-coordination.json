@@ -33,6 +33,11 @@
     "openbaoStatus": "running",
     "clusterSecretStoreReady": true
   },
+  "remediation": {
+    "status": "stopped",
+    "currentIssue": null,
+    "pid": 92116
+  },
   "infrastructure": {
     "openbao": "running",
     "externalSecrets": "running",

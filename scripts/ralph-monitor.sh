@@ -5,7 +5,7 @@ set -euo pipefail
 # ralph-monitor.sh - Monitor Agent for Dual Ralph Self-Healing System
 # =============================================================================
 # Uses GPT-5.2 (via droid) for systematic gate checking and failure detection.
-# Does NOT attempt fixes - writes failures to coordination file for remediation.
+# Does NOT attempt fixes - writes failures to coordination file for remediation by Claude.
 # =============================================================================
 
 ROOT_DIR="${WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -779,7 +779,7 @@ run_monitor_agent() {
     echo "2. Verify success by checking gates"
     echo "3. Report any issues clearly"
     echo ""
-    echo "Do NOT attempt to fix infrastructure issues - report them and they will be handled."
+    echo "Do NOT attempt to fix infrastructure issues - report them and they will be handled by the remediation agent (Claude)."
   } > "$OBJECTIVE_PATH"
   
   # Create combined prompt
