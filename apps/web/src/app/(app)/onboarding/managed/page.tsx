@@ -411,6 +411,7 @@ export default function ManagedOnboardingPage() {
           component: "github_input",
         },
       ]);
+      setStep("github");
     } finally {
       setIsLoading(false);
     }
