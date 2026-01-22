@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
 
 /**
  * SEC-001: API Key Validation
@@ -27,10 +27,7 @@ interface ValidationResult {
 }
 
 // Provider-specific validation functions
-async function validateLatitudeKey(
-  apiKey: string,
-  region: string
-): Promise<ValidationResult> {
+async function validateLatitudeKey(apiKey: string, region: string): Promise<ValidationResult> {
   try {
     // Call Latitude API to validate key by listing servers
     // The API key should be able to:
@@ -38,25 +35,26 @@ async function validateLatitudeKey(
     // 2. Create servers (write permission)
     // 3. Create VLANs (network permission)
 
-    const response = await fetch("https://api.latitude.sh/servers", {
-      method: "GET",
+    const response = await fetch('https://api.latitude.sh/servers', {
+      method: 'GET',
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
     });
 
     if (response.status === 401) {
       return {
         valid: false,
-        error: "Invalid API key. Please check your key and try again.",
+        error: 'Invalid API key. Please check your key and try again.',
       };
     }
 
     if (response.status === 403) {
       return {
         valid: false,
-        error: "API key lacks required permissions. Ensure it has server and VLAN management access.",
+        error:
+          'API key lacks required permissions. Ensure it has server and VLAN management access.',
       };
     }
 
@@ -72,18 +70,18 @@ async function validateLatitudeKey(
 
     // Check if the region is accessible
     // For Latitude, we can check plans/regions API
-    const regionsResponse = await fetch("https://api.latitude.sh/regions", {
-      method: "GET",
+    const regionsResponse = await fetch('https://api.latitude.sh/regions', {
+      method: 'GET',
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
     });
 
     if (!regionsResponse.ok) {
       return {
         valid: false,
-        error: "Could not verify region access.",
+        error: 'Could not verify region access.',
       };
     }
 
@@ -103,36 +101,29 @@ async function validateLatitudeKey(
     return {
       valid: true,
       serversAvailable: servers.length,
-      permissions: ["servers:read", "servers:write", "vlans:write"],
+      permissions: ['servers:read', 'servers:write', 'vlans:write'],
     };
-
   } catch (error) {
-    console.error("[SEC-001] Latitude validation error:", error);
+    console.error('[SEC-001] Latitude validation error:', error);
     return {
       valid: false,
-      error: "Failed to connect to Latitude API. Please try again.",
+      error: 'Failed to connect to Latitude API. Please try again.',
     };
   }
 }
 
 // Stub functions for other providers
-async function validateHetznerKey(
-  _apiKey: string,
-  _region: string
-): Promise<ValidationResult> {
+async function validateHetznerKey(_apiKey: string, _region: string): Promise<ValidationResult> {
   return {
     valid: false,
-    error: "Hetzner support coming soon.",
+    error: 'Hetzner support coming soon.',
   };
 }
 
-async function validateVultrKey(
-  _apiKey: string,
-  _region: string
-): Promise<ValidationResult> {
+async function validateVultrKey(_apiKey: string, _region: string): Promise<ValidationResult> {
   return {
     valid: false,
-    error: "Vultr support coming soon.",
+    error: 'Vultr support coming soon.',
   };
 }
 
@@ -143,14 +134,14 @@ export async function POST(request: NextRequest) {
   });
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   let body: ValidateKeyRequest;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
   const { provider, region, apiKey } = body;
@@ -158,25 +149,27 @@ export async function POST(request: NextRequest) {
   // Validate required fields
   if (!provider || !region || !apiKey) {
     return NextResponse.json(
-      { error: "Missing required fields: provider, region, apiKey" },
+      { error: 'Missing required fields: provider, region, apiKey' },
       { status: 400 }
     );
   }
 
   // Log validation attempt (without key content)
-  console.log(`[SEC-001] Validating ${provider} key for region ${region}, user: ${session.user.id}`);
+  console.log(
+    `[SEC-001] Validating ${provider} key for region ${region}, user: ${session.user.id}`
+  );
 
   let result: ValidationResult;
 
   // Provider-specific validation
   switch (provider) {
-    case "latitude":
+    case 'latitude':
       result = await validateLatitudeKey(apiKey, region);
       break;
-    case "hetzner":
+    case 'hetzner':
       result = await validateHetznerKey(apiKey, region);
       break;
-    case "vultr":
+    case 'vultr':
       result = await validateVultrKey(apiKey, region);
       break;
     default:
@@ -190,10 +183,7 @@ export async function POST(request: NextRequest) {
   console.log(`[SEC-001] Validation result for ${provider}/${region}: valid=${result.valid}`);
 
   if (!result.valid) {
-    return NextResponse.json(
-      { error: result.error },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
   // If valid, store in OpenBao (SEC-002)
@@ -206,10 +196,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!storeResult.success) {
-      return NextResponse.json(
-        { error: "Failed to store credentials securely" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to store credentials securely' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -218,13 +205,9 @@ export async function POST(request: NextRequest) {
       permissions: result.permissions,
       secretPath: storeResult.secretPath,
     });
-
   } catch (error) {
-    console.error("[SEC-002] Failed to store credentials:", error);
-    return NextResponse.json(
-      { error: "Failed to store credentials securely" },
-      { status: 500 }
-    );
+    console.error('[SEC-002] Failed to store credentials:', error);
+    return NextResponse.json({ error: 'Failed to store credentials securely' }, { status: 500 });
   }
 }
 
@@ -251,13 +234,13 @@ async function storeCredentialsInOpenBao(params: {
   const secretPath = `tenants/${tenantId}/provider-creds`; // pragma: allowlist secret
 
   // Get OpenBao configuration from environment
-  const openbaoAddr = process.env.OPENBAO_ADDR || "http://openbao.openbao-system.svc:8200";
+  const openbaoAddr = process.env.OPENBAO_ADDR || 'http://openbao.openbao-system.svc:8200';
   const openbaoToken = process.env.OPENBAO_TOKEN;
 
   if (!openbaoToken) {
-    console.error("[SEC-002] OPENBAO_TOKEN not configured");
+    console.error('[SEC-002] OPENBAO_TOKEN not configured');
     // In development, allow mock storage
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === 'development') {
       console.log(`[SEC-002] Development mode: would store at ${secretPath}`);
       return { success: true, secretPath };
     }
@@ -267,10 +250,10 @@ async function storeCredentialsInOpenBao(params: {
   try {
     // Store secret in OpenBao KV v2 engine
     const response = await fetch(`${openbaoAddr}/v1/secret/data/${secretPath}`, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "X-Vault-Token": openbaoToken,
-        "Content-Type": "application/json",
+        'X-Vault-Token': openbaoToken,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         data: {
@@ -284,7 +267,7 @@ async function storeCredentialsInOpenBao(params: {
     });
 
     if (!response.ok) {
-      console.error("[SEC-002] OpenBao storage failed:", response.statusText);
+      console.error('[SEC-002] OpenBao storage failed:', response.statusText);
       return { success: false };
     }
 
@@ -294,9 +277,8 @@ async function storeCredentialsInOpenBao(params: {
     await applyTenantACLPolicy(tenantId);
 
     return { success: true, secretPath };
-
   } catch (error) {
-    console.error("[SEC-002] OpenBao storage error:", error);
+    console.error('[SEC-002] OpenBao storage error:', error);
     return { success: false };
   }
 }
@@ -311,11 +293,11 @@ async function storeCredentialsInOpenBao(params: {
  * - All access attempts are audit logged
  */
 async function applyTenantACLPolicy(tenantId: string): Promise<void> {
-  const openbaoAddr = process.env.OPENBAO_ADDR || "http://openbao.openbao-system.svc:8200";
+  const openbaoAddr = process.env.OPENBAO_ADDR || 'http://openbao.openbao-system.svc:8200';
   const openbaoToken = process.env.OPENBAO_TOKEN;
 
   if (!openbaoToken) {
-    console.log("[SEC-003] Skipping ACL policy in development");
+    console.log('[SEC-003] Skipping ACL policy in development');
     return;
   }
 
@@ -350,10 +332,10 @@ path "secret/metadata/tenants/${tenantId}/*" {
 
   try {
     const response = await fetch(`${openbaoAddr}/v1/sys/policies/acl/${policyName}`, {
-      method: "PUT",
+      method: 'PUT',
       headers: {
-        "X-Vault-Token": openbaoToken,
-        "Content-Type": "application/json",
+        'X-Vault-Token': openbaoToken,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         policy: policyHCL,
@@ -366,6 +348,6 @@ path "secret/metadata/tenants/${tenantId}/*" {
       console.error(`[SEC-003] Failed to apply ACL policy: ${response.statusText}`);
     }
   } catch (error) {
-    console.error("[SEC-003] ACL policy error:", error);
+    console.error('[SEC-003] ACL policy error:', error);
   }
 }

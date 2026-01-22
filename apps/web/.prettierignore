@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Generated files
+next-env.d.ts
+*.tsbuildinfo
+
+# Coverage reports
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.min.js
+*.min.css
