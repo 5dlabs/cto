@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
 
 /**
  * ONB-005 & ONB-006: GitHub Organization API
@@ -12,7 +12,7 @@ import { headers } from "next/headers";
  */
 
 interface GitHubRequest {
-  action: "validate" | "create_repo";
+  action: 'validate' | 'create_repo';
   githubOrg: string;
   provider?: string;
   region?: string;
@@ -20,18 +20,18 @@ interface GitHubRequest {
 }
 
 // GitHub App configuration
-const GITHUB_APP_NAME = "5dlabs-cto";
-const GITHUB_APP_ID = process.env.GITHUB_APP_ID || "";
-const GITHUB_APP_PRIVATE_KEY = process.env.GITHUB_APP_PRIVATE_KEY || "";
-const TEMPLATE_REPO = "5dlabs/cto-argocd-template";
-const TARGET_REPO_NAME = "cto-argocd";
+const GITHUB_APP_NAME = '5dlabs-cto';
+const GITHUB_APP_ID = process.env.GITHUB_APP_ID || '';
+const GITHUB_APP_PRIVATE_KEY = process.env.GITHUB_APP_PRIVATE_KEY || '';
+const TEMPLATE_REPO = '5dlabs/cto-argocd-template';
+const TARGET_REPO_NAME = 'cto-argocd';
 
 /**
  * Generate JWT for GitHub App authentication
  */
 async function generateAppJWT(): Promise<string> {
   if (!GITHUB_APP_ID || !GITHUB_APP_PRIVATE_KEY) {
-    throw new Error("GitHub App credentials not configured");
+    throw new Error('GitHub App credentials not configured');
   }
 
   // In production, use proper JWT library
@@ -41,7 +41,7 @@ async function generateAppJWT(): Promise<string> {
     return appToken;
   }
 
-  throw new Error("GitHub App JWT not available");
+  throw new Error('GitHub App JWT not available');
 }
 
 /**
@@ -52,26 +52,20 @@ async function getInstallationToken(org: string): Promise<string | null> {
     const appJWT = await generateAppJWT();
 
     // Get installation for the org
-    const installationResponse = await fetch(
-      `https://api.github.com/orgs/${org}/installation`,
-      {
-        headers: {
-          Authorization: `Bearer ${appJWT}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      }
-    );
+    const installationResponse = await fetch(`https://api.github.com/orgs/${org}/installation`, {
+      headers: {
+        Authorization: `Bearer ${appJWT}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
 
     if (installationResponse.status === 404) {
       return null; // App not installed
     }
 
     if (!installationResponse.ok) {
-      console.error(
-        "[ONB-005] Failed to get installation:",
-        installationResponse.statusText
-      );
+      console.error('[ONB-005] Failed to get installation:', installationResponse.statusText);
       return null;
     }
 
@@ -81,27 +75,24 @@ async function getInstallationToken(org: string): Promise<string | null> {
     const tokenResponse = await fetch(
       `https://api.github.com/app/installations/${installation.id}/access_tokens`,
       {
-        method: "POST",
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${appJWT}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
         },
       }
     );
 
     if (!tokenResponse.ok) {
-      console.error(
-        "[ONB-005] Failed to get installation token:",
-        tokenResponse.statusText
-      );
+      console.error('[ONB-005] Failed to get installation token:', tokenResponse.statusText);
       return null;
     }
 
     const tokenData = await tokenResponse.json();
     return tokenData.token;
   } catch (error) {
-    console.error("[ONB-005] Error getting installation token:", error);
+    console.error('[ONB-005] Error getting installation token:', error);
     return null;
   }
 }
@@ -109,9 +100,7 @@ async function getInstallationToken(org: string): Promise<string | null> {
 /**
  * ONB-005: Validate GitHub organization and app installation
  */
-async function validateGitHubOrg(
-  org: string
-): Promise<{
+async function validateGitHubOrg(org: string): Promise<{
   valid: boolean;
   orgExists: boolean;
   appInstalled: boolean;
@@ -122,8 +111,8 @@ async function validateGitHubOrg(
     // First, check if the org exists (public API)
     const orgResponse = await fetch(`https://api.github.com/orgs/${org}`, {
       headers: {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
       },
     });
 
@@ -150,10 +139,8 @@ async function validateGitHubOrg(
 
     if (!installationToken) {
       // In development mode, simulate app being installed
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          `[ONB-005] Development mode: simulating app installed on ${org}`
-        );
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[ONB-005] Development mode: simulating app installed on ${org}`);
         return {
           valid: true,
           orgExists: true,
@@ -175,12 +162,12 @@ async function validateGitHubOrg(
       appInstalled: true,
     };
   } catch (error) {
-    console.error("[ONB-005] GitHub validation error:", error);
+    console.error('[ONB-005] GitHub validation error:', error);
     return {
       valid: false,
       orgExists: false,
       appInstalled: false,
-      error: "Failed to validate GitHub organization",
+      error: 'Failed to validate GitHub organization',
     };
   }
 }
@@ -205,10 +192,8 @@ async function createGitOpsRepo(
     const installationToken = await getInstallationToken(org);
 
     // In development mode, simulate repo creation
-    if (!installationToken && process.env.NODE_ENV === "development") {
-      console.log(
-        `[ONB-006] Development mode: simulating repo creation for ${org}`
-      );
+    if (!installationToken && process.env.NODE_ENV === 'development') {
+      console.log(`[ONB-006] Development mode: simulating repo creation for ${org}`);
       return {
         success: true,
         repoUrl: `https://github.com/${org}/${TARGET_REPO_NAME}`,
@@ -218,7 +203,7 @@ async function createGitOpsRepo(
     if (!installationToken) {
       return {
         success: false,
-        error: "GitHub App not installed on organization",
+        error: 'GitHub App not installed on organization',
       };
     }
 
@@ -228,8 +213,8 @@ async function createGitOpsRepo(
       {
         headers: {
           Authorization: `Bearer ${installationToken}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
         },
       }
     );
@@ -243,32 +228,28 @@ async function createGitOpsRepo(
     }
 
     // Create repo from template
-    const createResponse = await fetch(
-      `https://api.github.com/repos/${TEMPLATE_REPO}/generate`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${installationToken}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-        body: JSON.stringify({
-          owner: org,
-          name: TARGET_REPO_NAME,
-          description:
-            "ArgoCD GitOps configuration for CTO Managed Dedicated cluster",
-          private: false, // Can be configured per customer preference
-          include_all_branches: false,
-        }),
-      }
-    );
+    const createResponse = await fetch(`https://api.github.com/repos/${TEMPLATE_REPO}/generate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${installationToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      body: JSON.stringify({
+        owner: org,
+        name: TARGET_REPO_NAME,
+        description: 'ArgoCD GitOps configuration for CTO Managed Dedicated cluster',
+        private: false, // Can be configured per customer preference
+        include_all_branches: false,
+      }),
+    });
 
     if (!createResponse.ok) {
       const errorData = await createResponse.json();
-      console.error("[ONB-006] Failed to create repo:", errorData);
+      console.error('[ONB-006] Failed to create repo:', errorData);
       return {
         success: false,
-        error: errorData.message || "Failed to create repository",
+        error: errorData.message || 'Failed to create repository',
       };
     }
 
@@ -283,10 +264,10 @@ async function createGitOpsRepo(
       repoUrl: newRepo.html_url,
     };
   } catch (error) {
-    console.error("[ONB-006] Repo creation error:", error);
+    console.error('[ONB-006] Repo creation error:', error);
     return {
       success: false,
-      error: "Failed to create GitOps repository",
+      error: 'Failed to create GitOps repository',
     };
   }
 }
@@ -311,12 +292,12 @@ async function updateTenantConfig(
 
 tenant:
   id: ${config.tenantId}
-  provider: ${config.provider || "latitude"}
-  region: ${config.region || "DAL"}
-  clusterSize: ${config.size || "medium"}
+  provider: ${config.provider || 'latitude'}
+  region: ${config.region || 'DAL'}
+  clusterSize: ${config.size || 'medium'}
 
 cluster:
-  name: ${config.tenantId.replace("tenant-", "")}-prod
+  name: ${config.tenantId.replace('tenant-', '')}-prod
 
 argocd:
   syncPolicy:
@@ -345,8 +326,8 @@ applications:
       {
         headers: {
           Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
         },
       }
     );
@@ -361,30 +342,27 @@ applications:
     const updateResponse = await fetch(
       `https://api.github.com/repos/${org}/${TARGET_REPO_NAME}/contents/values.yaml`,
       {
-        method: "PUT",
+        method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
         },
         body: JSON.stringify({
           message: `chore: configure tenant ${config.tenantId}`,
-          content: Buffer.from(valuesContent).toString("base64"),
+          content: Buffer.from(valuesContent).toString('base64'),
           ...(sha ? { sha } : {}),
         }),
       }
     );
 
     if (!updateResponse.ok) {
-      console.error(
-        "[ONB-006] Failed to update values.yaml:",
-        updateResponse.statusText
-      );
+      console.error('[ONB-006] Failed to update values.yaml:', updateResponse.statusText);
     } else {
       console.log(`[ONB-006] Updated values.yaml for ${config.tenantId}`);
     }
   } catch (error) {
-    console.error("[ONB-006] Failed to update tenant config:", error);
+    console.error('[ONB-006] Failed to update tenant config:', error);
   }
 }
 
@@ -394,40 +372,32 @@ export async function POST(request: NextRequest) {
   });
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   let body: GitHubRequest;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
   const { action, githubOrg, provider, region, size } = body;
 
   if (!githubOrg) {
-    return NextResponse.json(
-      { error: "Missing required field: githubOrg" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Missing required field: githubOrg' }, { status: 400 });
   }
 
   // Derive tenant ID from user
   const tenantId = `tenant-${session.user.id.slice(0, 8)}`;
 
-  console.log(
-    `[ONB-005/006] ${action} request for org: ${githubOrg}, tenant: ${tenantId}`
-  );
+  console.log(`[ONB-005/006] ${action} request for org: ${githubOrg}, tenant: ${tenantId}`);
 
-  if (action === "validate") {
+  if (action === 'validate') {
     const result = await validateGitHubOrg(githubOrg);
 
     if (!result.orgExists) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -438,7 +408,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (action === "create_repo") {
+  if (action === 'create_repo') {
     const result = await createGitOpsRepo(githubOrg, {
       provider,
       region,
@@ -447,10 +417,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -460,8 +427,5 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  return NextResponse.json(
-    { error: `Unknown action: ${action}` },
-    { status: 400 }
-  );
+  return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
 }

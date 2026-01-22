@@ -11,22 +11,22 @@
  *   DATABASE_URL - PostgreSQL connection string
  */
 
-import { execSync } from "child_process";
+import { execSync } from 'child_process';
 
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  console.error("[Migrate] ERROR: DATABASE_URL is not set");
+  console.error('[Migrate] ERROR: DATABASE_URL is not set');
   process.exit(1);
 }
 
-console.log("[Migrate] Starting database migration...");
-console.log("[Migrate] Database URL:", databaseUrl.replace(/:[^:@]+@/, ":***@")); // Mask password
+console.log('[Migrate] Starting database migration...');
+console.log('[Migrate] Database URL:', databaseUrl.replace(/:[^:@]+@/, ':***@')); // Mask password
 
 try {
   // Run drizzle-kit push to sync schema
-  execSync("npx drizzle-kit push --force", {
-    stdio: "inherit",
+  execSync('npx drizzle-kit push --force', {
+    stdio: 'inherit',
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -34,9 +34,9 @@ try {
     },
   });
 
-  console.log("[Migrate] Migration completed successfully!");
+  console.log('[Migrate] Migration completed successfully!');
   process.exit(0);
 } catch (error) {
-  console.error("[Migrate] Migration failed:", error);
+  console.error('[Migrate] Migration failed:', error);
   process.exit(1);
 }

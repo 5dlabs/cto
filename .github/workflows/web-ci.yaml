@@ -55,7 +55,7 @@ jobs:
             helm:
               - 'infra/charts/cto/templates/web/**'
 
-  # TypeScript linting
+  # TypeScript linting and formatting
   lint-typescript:
     needs: changes
     if: needs.changes.outputs.web == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -74,9 +74,48 @@ jobs:
         working-directory: apps/web
         run: npm ci
 
+      - name: Run Prettier check
+        working-directory: apps/web
+        run: npm run format:check
+
       - name: Run ESLint
         working-directory: apps/web
         run: npm run lint
+
+      - name: Run TypeScript type check
+        working-directory: apps/web
+        run: npm run typecheck
+
+  # Unit tests with coverage
+  test:
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Run tests with coverage
+        working-directory: apps/web
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: apps/web/coverage/
+          retention-days: 30
 
   # Build check - verify Next.js builds successfully
   build-check:
@@ -167,7 +206,7 @@ jobs:
 
   # Build and push Docker image (on push to main or develop)
   build-docker:
-    needs: [lint-typescript, build-check, docker-lint]
+    needs: [lint-typescript, build-check, docker-lint, test]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     runs-on: [k8s-runner]
     permissions:

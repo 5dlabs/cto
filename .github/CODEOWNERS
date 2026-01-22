@@ -1,0 +1,29 @@
+# CODEOWNERS - Code ownership for automated review assignments
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @5dlabs/platform-team
+
+# Rust crates - backend services
+/crates/ @5dlabs/platform-team
+
+# Web application
+/apps/web/ @5dlabs/platform-team
+
+# Marketing website
+/marketing/ @5dlabs/platform-team
+
+# Infrastructure and GitOps
+/infra/ @5dlabs/platform-team
+/.github/workflows/ @5dlabs/platform-team
+
+# Documentation
+/docs/ @5dlabs/platform-team
+AGENTS.md @5dlabs/platform-team
+README.md @5dlabs/platform-team
+
+# Security-sensitive files require platform team review
+/.github/CODEOWNERS @5dlabs/platform-team
+/.github/workflows/ @5dlabs/platform-team
+/infra/gitops/manifests/rbac/ @5dlabs/platform-team
+/infra/gitops/manifests/external-secrets/ @5dlabs/platform-team

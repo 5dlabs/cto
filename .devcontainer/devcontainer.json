@@ -1,0 +1,83 @@
+{
+  "name": "CTO Platform Development",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "helm": "latest",
+      "kubectl": "latest",
+      "minikube": "none"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "vadimcn.vscode-lldb",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "GitHub.copilot",
+        "GitHub.vscode-pull-request-github",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "ms-kubernetes-tools.vscode-kubernetes-tools"
+      ],
+      "settings": {
+        "rust-analyzer.check.command": "clippy",
+        "rust-analyzer.check.extraArgs": [
+          "--",
+          "-W",
+          "clippy::pedantic"
+        ],
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "[rust]": {
+          "editor.defaultFormatter": "rust-lang.rust-analyzer"
+        },
+        "[toml]": {
+          "editor.defaultFormatter": "tamasfe.even-better-toml"
+        },
+        "typescript.preferences.importModuleSpecifier": "relative",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        }
+      }
+    }
+  },
+  "postCreateCommand": "cargo build && cd apps/web && npm ci",
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=${localWorkspaceFolder}/.env.local,target=/workspaces/cto/.env.local,type=bind,consistency=cached"
+  ],
+  "forwardPorts": [
+    3000,
+    8080,
+    8081,
+    8082
+  ],
+  "portsAttributes": {
+    "3000": {
+      "label": "Web App",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "Controller",
+      "onAutoForward": "silent"
+    },
+    "8081": {
+      "label": "PM Server",
+      "onAutoForward": "silent"
+    },
+    "8082": {
+      "label": "Healer",
+      "onAutoForward": "silent"
+    }
+  }
+}

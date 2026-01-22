@@ -1,9 +1,9 @@
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
-import * as schema from "./schema";
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import * as schema from './schema';
 
 // Check if we're in build phase (Next.js static generation)
-const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
 
 // Get database URL with build-time fallback
 const getDatabaseUrl = (): string => {
@@ -11,10 +11,10 @@ const getDatabaseUrl = (): string => {
   if (!envUrl || envUrl.trim().length === 0) {
     // During build phase, use a dummy URL that won't actually be used
     if (isBuildPhase) {
-      return "postgresql://dummy:password@localhost:5432/dummy"; // pragma: allowlist secret
+      return 'postgresql://dummy:password@localhost:5432/dummy'; // pragma: allowlist secret
     }
-    console.error("[DB] DATABASE_URL is not set!");
-    return "";
+    console.error('[DB] DATABASE_URL is not set!');
+    return '';
   }
   return envUrl.trim();
 };
