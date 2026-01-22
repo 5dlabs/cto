@@ -4,15 +4,14 @@ A dual-agent system for continuously merging pending pull requests, remediating 
 
 ## Overview
 
-This system uses three AI agents with distinct roles:
+This system uses two AI agents with distinct roles:
 
 | Agent | CLI | Role |
 |-------|-----|------|
 | **Merger** | Claude | Works on PRs, fixes issues, merges when ready |
 | **Monitor** | Droid | Watches patterns, identifies automation opportunities, implements code fixes |
-| **Remediation** | Claude | Fixes failures that block PR merging (merge conflicts, CI failures, etc.) |
 
-**The Key Insight**: Every time Claude has to manually fix something, Droid asks: "What code change would prevent this next time?" Then Droid implements that fix. When the Merger gets stuck, Remediation unblocks it.
+**The Key Insight**: Every time Claude has to manually fix something, Droid asks: "What code change would prevent this next time?" Then Droid implements that fix.
 
 ### Progressive Hardening Flow
 
@@ -36,18 +35,14 @@ Run N+1: Issue is caught before PR → Claude has less work
 
 # Terminal 2: Start the monitor agent (waits for merger to be running)
 ./run-monitor.sh
-
-# Terminal 3: Start the remediation agent (waits for merger to be running)
-./run-remediation.sh
 ```
 
 ### Unattended Mode (Default)
 
-All agents run in fully unattended mode by default:
+Both agents run in fully unattended mode by default:
 
-- **Merger (Claude)** uses `--dangerously-skip-permissions` to auto-approve all operations
-- **Remediation (Claude)** uses `--dangerously-skip-permissions` to auto-approve all operations
-- **Monitor (Droid)** uses `droid exec --skip-permissions-unsafe --auto high` for non-interactive execution
+- **Claude** uses `--dangerously-skip-permissions` to auto-approve all operations
+- **Droid** uses `droid exec --skip-permissions-unsafe` for non-interactive execution
 
 ### Interactive Mode
 
@@ -60,12 +55,11 @@ For debugging or manual oversight:
 
 ### Coordination
 
-Both monitor and remediation scripts automatically wait for the merger to start before beginning:
+The monitor script automatically waits for the merger to start before beginning checks:
 
 ```bash
 # Skip the wait (useful for debugging)
 ./run-monitor.sh --no-wait
-./run-remediation.sh --no-wait
 ```
 
 ## Files
@@ -74,12 +68,10 @@ Both monitor and remediation scripts automatically wait for the merger to start 
 |------|-------------|
 | `merger-prompt.md` | Instructions for Claude merger agent |
 | `monitor-prompt.md` | Instructions for Droid monitor agent |
-| `remediation-prompt.md` | Instructions for Claude remediation agent |
 | `ralph-coordination.json` | Shared state between agents |
 | `progress.txt` | Human-readable progress log |
-| `run-merger.sh` | Launch script for Claude merger |
-| `run-monitor.sh` | Launch script for Droid monitor |
-| `run-remediation.sh` | Launch script for Claude remediation |
+| `run-merger.sh` | Launch script for Claude |
+| `run-monitor.sh` | Launch script for Droid |
 | `tmux-session.sh` | Tmux session for monitoring |
 
 ## Workflow
@@ -107,35 +99,22 @@ For each PR:
    - Rebase onto base
    - Resolve conflicts
    - Push with `--force-with-lease`
-   - **If conflicts persist after 3 attempts**, add to issue queue for Remediation
 
 3. **Fix Bug-Bot Comments**
    - Parse comments for actionable items
    - Fix code issues (lint, format, tests)
    - Push fixes
    - Wait for CI
-   - **If issues persist**, add to issue queue for Remediation
 
 4. **Ensure CI Passes**
    - Check status: `gh pr checks <number>`
    - Fix failing checks
    - Re-run checks if needed
-   - **If CI keeps failing**, add to issue queue for Remediation
 
 5. **Merge When Ready**
    ```bash
    gh pr merge <number> --squash --delete-branch
    ```
-
-### Phase 2.5: Remediation (When Merger Gets Stuck)
-
-When the Merger Agent adds an issue to the queue:
-1. **Remediation Agent** polls the queue every 10 seconds
-2. **Claims the issue** (marks as "claimed")
-3. **Investigates** the root cause
-4. **Fixes** the issue (merge conflicts, CI failures, etc.)
-5. **Resolves** the issue (marks as "resolved")
-6. **Merger Agent** retries the PR automatically
 
 ### Phase 3: Continuous Loop
 
@@ -160,25 +139,6 @@ The agents coordinate via `ralph-coordination.json`:
     "lastCheck": "2026-01-20T12:00:00Z",
     "fixesImplemented": 0
   },
-  "remediation": {
-    "status": "running|idle",
-    "currentIssue": "issue-1234567890-12345",
-    "lastCheck": "2026-01-20T12:00:00Z",
-    "issuesResolved": 2,
-    "issuesFailed": 0
-  },
-  "issueQueue": [
-    {
-      "id": "issue-1234567890-12345",
-      "timestamp": "2026-01-20T12:00:00Z",
-      "prNumber": 123,
-      "type": "merge_conflict",
-      "description": "PR #123 has merge conflicts",
-      "error": "Merge conflict in src/main.rs",
-      "status": "pending|claimed|resolved|failed",
-      "retryCount": 0
-    }
-  ],
   "hardeningActions": [
     {
       "timestamp": "2026-01-20T12:00:00Z",
@@ -195,17 +155,6 @@ The agents coordinate via `ralph-coordination.json`:
   }
 }
 ```
-
-### Issue Queue
-
-When the Merger Agent encounters a failure it can't fix, it adds an issue to the queue:
-- **prNumber**: The PR that's blocked
-- **type**: Type of issue (merge_conflict, ci_failure, bug_bot, etc.)
-- **description**: Human-readable description
-- **error**: Specific error message
-- **status**: Current status (pending, claimed, resolved, failed)
-
-The Remediation Agent polls this queue and fixes issues.
 
 ### Hardening Actions
 

@@ -68,6 +68,13 @@ check_prereqs() {
     exit 1
   fi
   
+  # LESSON LEARNED: Check jq prerequisite - used by update_coord
+  # See: pr-merge-loop/lessons-learned.md#ISSUE-007
+  if ! command -v jq &> /dev/null; then
+    error "jq not found. Install with: brew install jq"
+    exit 1
+  fi
+  
   # Check GitHub authentication
   if ! gh auth status &> /dev/null; then
     error "GitHub not authenticated. Run: gh auth login"
@@ -127,12 +134,20 @@ EOF
   fi
 }
 
-# Update coordination state
+# Update coordination state with file locking
+# LESSON LEARNED: Use flock to prevent race conditions with concurrent updates
+# See: pr-merge-loop/lessons-learned.md#ISSUE-008
 update_coord() {
   local key="$1"
   local value="$2"
+  local lock_file="$COORD_FILE.lock"
   local tmp=$(mktemp)
-  jq "$key = $value" "$COORD_FILE" > "$tmp" && mv "$tmp" "$COORD_FILE"
+  
+  # Use flock for atomic updates - prevents race condition with monitor
+  (
+    flock -x 200
+    jq "$key = $value" "$COORD_FILE" > "$tmp" && mv "$tmp" "$COORD_FILE"
+  ) 200>"$lock_file"
 }
 
 # Initialize session

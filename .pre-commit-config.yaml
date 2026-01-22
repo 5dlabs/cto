@@ -76,6 +76,29 @@ repos:
   # Custom local hooks
   - repo: local
     hooks:
+      # LESSON LEARNED: Rust format/clippy issues should be caught before PR creation.
+      # Without this, CI catches them and requires additional commits.
+      # See: pr-merge-loop/lessons-learned.md#ISSUE-001
+      - id: cargo-fmt
+        name: Rust Format Check
+        entry: cargo fmt -- --check
+        language: system
+        files: \.rs$
+        pass_filenames: false
+        # Only run when Rust files change
+        types: [rust]
+
+      - id: cargo-clippy
+        name: Rust Clippy (Pedantic)
+        entry: bash -c 'cargo clippy --all-targets -- -D warnings -W clippy::pedantic'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+        # Only run when Rust files change
+        types: [rust]
+        # This can be slow, so run it at the end
+        stages: [pre-commit]
+
       - id: argocd-app-validation
         name: Validate ArgoCD Applications
         entry: >
