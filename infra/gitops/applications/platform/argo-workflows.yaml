@@ -10,6 +10,9 @@ metadata:
   labels:
     app.kubernetes.io/name: argo-workflows
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Ensure CRDs/controllers are ready before workflow templates
+    argocd.argoproj.io/sync-wave: "-1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -121,6 +124,17 @@ spec:
     server: https://kubernetes.default.svc
     namespace: automation
 
+  ignoreDifferences:
+    # Webhook CA bundles are managed by the controller and drift frequently
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+
   # Sync policy
   syncPolicy:
     automated:
@@ -132,6 +146,8 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
       - RespectIgnoreDifferences=true
 
     retry:

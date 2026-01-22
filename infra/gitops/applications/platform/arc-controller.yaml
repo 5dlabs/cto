@@ -77,6 +77,15 @@ spec:
       jsonPointers:
         - /spec/preserveUnknownFields
         - /metadata/annotations
+    # Webhook CA bundles are managed by the controller and drift frequently
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
 
   syncPolicy:
     automated:
@@ -90,6 +99,8 @@ spec:
       # annotation, avoiding Kubernetes' 262144 byte limit for large CRDs like ARC's
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
       - RespectIgnoreDifferences=true
 
     retry:

@@ -36,8 +36,8 @@ spec:
         githubConfigUrl: "https://github.com/5dlabs"
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
-        minRunners: 3  # Reduced temporarily - talos-tq1-f47 node is down
-        maxRunners: 5  # Limited to single healthy worker node capacity
+        minRunners: 2  # Minimum runners for Latitude cluster
+        maxRunners: 5  # Maximum runners based on cluster capacity
         runnerGroup: "Default"
 
         # Docker-in-Docker configuration for container builds

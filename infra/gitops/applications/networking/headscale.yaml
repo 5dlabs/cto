@@ -160,6 +160,7 @@ spec:
   # DISABLED: Manual sync only (automated sync disabled)
   syncPolicy:
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true
 
     retry:

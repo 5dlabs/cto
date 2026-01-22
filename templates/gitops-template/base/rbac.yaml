@@ -1,0 +1,115 @@
+# CTO RBAC Configuration
+# Role-based access control for platform components
+---
+# ClusterRole for Agent Controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cto-agent-controller
+  labels:
+    app.kubernetes.io/part-of: cto
+rules:
+  # Manage CodeRun CRDs
+  - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["coderuns", "coderuns/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Manage BoltRun CRDs (admin tasks)
+  - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["boltruns", "boltruns/status"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  # Create agent pods
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # Manage secrets for credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  # Manage configmaps for config
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # Read namespaces
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+  # Manage events for status reporting
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+# ClusterRoleBinding for Agent Controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cto-agent-controller
+  labels:
+    app.kubernetes.io/part-of: cto
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cto-agent-controller
+subjects:
+  - kind: ServiceAccount
+    name: cto-agent-controller
+    namespace: cto-system
+---
+# Role for Agent Pods (namespace-scoped)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cto-agent
+  namespace: cto-agents
+  labels:
+    app.kubernetes.io/part-of: cto
+rules:
+  # Read own pod info
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+  # Read configmaps in namespace
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+  # Read secrets (mounted via service account)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+# RoleBinding for Agent Pods
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cto-agent
+  namespace: cto-agents
+  labels:
+    app.kubernetes.io/part-of: cto
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cto-agent
+subjects:
+  - kind: ServiceAccount
+    name: cto-agent
+    namespace: cto-system
+---
+# ServiceAccount for Agent Controller
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cto-agent-controller
+  namespace: cto-system
+  labels:
+    app.kubernetes.io/part-of: cto
+---
+# ServiceAccount for Agent Pods
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cto-agent
+  namespace: cto-system
+  labels:
+    app.kubernetes.io/part-of: cto

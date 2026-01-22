@@ -42,7 +42,15 @@
       "implementationMaxRetries": 10,
       "qualityMaxRetries": 5,
       "securityMaxRetries": 2,
-      "testingMaxRetries": 5
+      "testingMaxRetries": 5,
+      "watcher": {
+        "enabled": false,
+        "cli": "factory",
+        "model": "glm-4-plus",
+        "checkIntervalSecs": 120,
+        "template": "watcher/base",
+        "circuitBreakerThreshold": 3
+      }
     },
     "remediation": {
       "repository": "5dlabs/cto",

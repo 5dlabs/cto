@@ -1,0 +1,68 @@
+{
+  "installer": {
+    "status": "pending",
+    "currentStep": null,
+    "stepNumber": 0,
+    "totalSteps": 45,
+    "lastUpdate": null,
+    "lastError": null,
+    "attemptCount": 0,
+    "pid": null
+  },
+  "monitor": {
+    "status": "pending",
+    "lastCheck": null,
+    "checkCount": 0,
+    "pid": null
+  },
+  "clusters": {
+    "adminCTO": {
+      "name": "admin-cto",
+      "region": "DAL",
+      "status": "pending",
+      "kubeconfig": null,
+      "talosconfig": null,
+      "controlPlane": null,
+      "workers": []
+    },
+    "clientCTO": {
+      "name": "client-cto-acme",
+      "region": "NYC",
+      "status": "pending",
+      "kubeconfig": null
+    }
+  },
+  "gates": {
+    "preflight": {"status": "pending", "passedAt": null},
+    "adminInfrastructure": {"status": "pending", "passedAt": null},
+    "adminTalos": {"status": "pending", "passedAt": null},
+    "adminKubernetes": {"status": "pending", "passedAt": null},
+    "adminGitOps": {"status": "pending", "passedAt": null},
+    "platform": {"status": "pending", "passedAt": null},
+    "boltRun": {"status": "pending", "passedAt": null},
+    "uiTesting": {"status": "pending", "passedAt": null},
+    "clientInfra": {"status": "pending", "passedAt": null},
+    "connectivity": {"status": "pending", "passedAt": null}
+  },
+  "issueQueue": [],
+  "session": {
+    "id": null,
+    "startedAt": null,
+    "lastActivity": null,
+    "completedAt": null,
+    "installerCli": "claude",
+    "monitorCli": "droid"
+  },
+  "stats": {
+    "totalIssues": 0,
+    "resolvedIssues": 0,
+    "failedAttempts": 0,
+    "successfulSteps": 0,
+    "totalDuration": null
+  },
+  "unattendedMode": {
+    "enabled": true,
+    "maxRetries": 3,
+    "checkInterval": 120
+  }
+}

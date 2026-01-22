@@ -1,0 +1,39 @@
+# MCP Tools
+# Provides tool sidecars for agent pods
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-tools
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: ghcr.io/5dlabs/helm-charts
+    targetRevision: "0.1.0"
+    chart: mcp-tools
+    helm:
+      values: |
+        tools:
+          github:
+            enabled: true
+          linear:
+            enabled: true
+          filesystem:
+            enabled: true
+          kubernetes:
+            enabled: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cto-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

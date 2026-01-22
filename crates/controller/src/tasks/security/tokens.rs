@@ -3,11 +3,11 @@
 //! This module handles GitHub token validation, permission checking,
 //! and secure token management for the Agent Remediation Loop.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
-use chrono::{DateTime, Utc};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Token management errors
 #[derive(Debug, Error)]
@@ -56,6 +56,7 @@ pub struct TokenInfo {
 /// GitHub token manager
 pub struct GitHubTokenManager {
     token_cache: std::sync::Mutex<HashMap<String, TokenInfo>>,
+    #[allow(dead_code)]
     required_permissions: GitHubPermissions,
     validation_interval_seconds: u64,
     rate_limit_threshold: i32,
@@ -77,7 +78,7 @@ impl GitHubTokenManager {
             token_cache: std::sync::Mutex::new(HashMap::new()),
             required_permissions,
             validation_interval_seconds: 300, // 5 minutes
-            rate_limit_threshold: 100, // Minimum remaining calls before warning
+            rate_limit_threshold: 100,        // Minimum remaining calls before warning
         })
     }
 
@@ -95,12 +96,13 @@ impl GitHubTokenManager {
 
         // Perform fresh validation
         let token_info = self.validate_token_fresh(&token).await?;
-        self.cache_token_info(token, token_info);
+        self.cache_token_info(&token, token_info);
 
         Ok(())
     }
 
     /// Get GitHub token from secure storage
+    #[allow(clippy::unused_self)]
     fn get_github_token(&self) -> TokenResult<String> {
         // In production, this would retrieve from:
         // 1. Kubernetes secrets
@@ -109,12 +111,15 @@ impl GitHubTokenManager {
 
         std::env::var("GITHUB_TOKEN")
             .or_else(|_| std::env::var("GH_TOKEN"))
-            .map_err(|_| TokenError::ValidationError(
-                "GitHub token not found in environment variables".to_string()
-            ))
+            .map_err(|_| {
+                TokenError::ValidationError(
+                    "GitHub token not found in environment variables".to_string(),
+                )
+            })
     }
 
     /// Validate token with fresh API call
+    #[allow(clippy::unused_async)]
     async fn validate_token_fresh(&self, token: &str) -> TokenResult<TokenInfo> {
         // In a real implementation, this would:
         // 1. Make API call to /user to verify token
@@ -136,7 +141,7 @@ impl GitHubTokenManager {
         let token_info = TokenInfo {
             token_id: format!("token-{}", &token[..8]), // Masked for security
             permissions,
-            expires_at: None, // GitHub tokens don't expire by default
+            expires_at: None,           // GitHub tokens don't expire by default
             rate_limit_remaining: 4990, // Simulate remaining calls
             rate_limit_reset: Utc::now() + chrono::Duration::hours(1),
             last_validated: Utc::now(),
@@ -162,6 +167,7 @@ impl GitHubTokenManager {
     }
 
     /// Check if token has required permissions
+    #[allow(clippy::unused_self)]
     fn check_permissions(&self, permissions: &GitHubPermissions) -> TokenResult<()> {
         let mut missing_permissions = Vec::new();
 
@@ -187,13 +193,15 @@ impl GitHubTokenManager {
         if missing_permissions.is_empty() {
             Ok(())
         } else {
-            Err(TokenError::InsufficientPermissions(
-                format!("Missing permissions: {}", missing_permissions.join(", "))
-            ))
+            Err(TokenError::InsufficientPermissions(format!(
+                "Missing permissions: {}",
+                missing_permissions.join(", ")
+            )))
         }
     }
 
     /// Check if token is expired
+    #[allow(clippy::unused_self)]
     fn is_token_expired(&self, token_info: &TokenInfo) -> bool {
         if let Some(expires_at) = token_info.expires_at {
             Utc::now() > expires_at
@@ -218,25 +226,28 @@ impl GitHubTokenManager {
     }
 
     /// Cache token information
-    fn cache_token_info(&self, token: String, info: TokenInfo) {
+    fn cache_token_info(&self, token: &str, info: TokenInfo) {
         let mut cache = self.token_cache.lock().unwrap();
         let token_key = format!("token-{}", &token[..8]);
         cache.insert(token_key, info);
     }
 
     /// Get token statistics
+    #[allow(clippy::unused_async)]
     pub async fn get_statistics(&self) -> TokenResult<HashMap<String, u64>> {
         let mut stats = HashMap::new();
         let cache = self.token_cache.lock().unwrap();
 
         stats.insert("cached_tokens".to_string(), cache.len() as u64);
 
-        let expired_count = cache.values()
+        let expired_count = cache
+            .values()
             .filter(|info| self.is_token_expired(info))
             .count() as u64;
         stats.insert("expired_tokens".to_string(), expired_count);
 
-        let low_rate_limit_count = cache.values()
+        let low_rate_limit_count = cache
+            .values()
             .filter(|info| info.rate_limit_remaining < self.rate_limit_threshold)
             .count() as u64;
         stats.insert("tokens_low_rate_limit".to_string(), low_rate_limit_count);
@@ -245,6 +256,7 @@ impl GitHubTokenManager {
     }
 
     /// Check if token manager is healthy
+    #[allow(clippy::unused_async)]
     pub async fn is_healthy(&self) -> bool {
         // Check if we can access token
         self.get_github_token().is_ok()
@@ -258,12 +270,16 @@ impl GitHubTokenManager {
     }
 
     /// Get current rate limit status
+    #[allow(clippy::unused_async)]
     pub async fn get_rate_limit_status(&self) -> TokenResult<(i32, DateTime<Utc>)> {
         let token = self.get_github_token()?;
 
         if let Some(cached_info) = self.get_cached_token_info(&token) {
             if self.is_cache_valid(&cached_info) {
-                return Ok((cached_info.rate_limit_remaining, cached_info.rate_limit_reset));
+                return Ok((
+                    cached_info.rate_limit_remaining,
+                    cached_info.rate_limit_reset,
+                ));
             }
         }
 
@@ -272,13 +288,17 @@ impl GitHubTokenManager {
     }
 
     /// Test token permissions (non-destructive)
+    #[allow(clippy::unused_async)]
     pub async fn test_token_permissions(&self) -> TokenResult<Vec<String>> {
         let token = self.get_github_token()?;
 
         // In a real implementation, this would make a test API call
         // to verify permissions without side effects
 
-        info!("Testing GitHub token permissions for token: {}", &token[..8]);
+        info!(
+            "Testing GitHub token permissions for token: {}",
+            &token[..8]
+        );
 
         // Simulate permission test results
         let permissions = vec![

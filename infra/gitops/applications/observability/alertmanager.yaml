@@ -8,6 +8,9 @@ metadata:
   labels:
     app.kubernetes.io/name: alertmanager
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Deploy after ExternalSecrets to ensure alertmanager-discord-secret exists
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -157,4 +160,12 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
       - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

@@ -753,5 +753,38 @@
         }
       ]
     }
-  ]
+  ],
+  "dualAgent": {
+    "enabled": true,
+    "monitor": {
+      "cli": "droid",
+      "command": "droid exec --model gpt-5.2 --auto medium -f",
+      "promptPath": "lifecycle-test/monitor-prompt.md"
+    },
+    "remediation": {
+      "cli": "claude",
+      "command": "claude --dangerously-skip-permissions -p",
+      "promptPath": "lifecycle-test/remediation-prompt.md"
+    },
+    "coordination": {
+      "filePath": "lifecycle-test/ralph-coordination.json",
+      "pollIntervalSeconds": 10,
+      "maxConcurrentIssues": 1,
+      "remediationTimeoutSeconds": 600,
+      "maxRetryAfterRemediation": 3
+    },
+    "circuitBreaker": {
+      "noProgressThreshold": 3,
+      "sameErrorThreshold": 5,
+      "recoveryMinutes": 5
+    },
+    "session": {
+      "expirationHours": 24,
+      "autoResetOnCircuitBreak": true
+    },
+    "exitDetection": {
+      "requireExplicitSignal": true,
+      "completionIndicatorThreshold": 2
+    }
+  }
 }

@@ -1,0 +1,9 @@
+---
+# Managed Namespace for OpenBao
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openbao
+  labels:
+    app.kubernetes.io/name: openbao
+    app.kubernetes.io/part-of: platform

@@ -7,6 +7,9 @@ metadata:
   labels:
     app.kubernetes.io/name: argo-events
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Ensure CRDs/controllers are ready before event sources/sensors
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   project: platform
 
@@ -37,6 +40,17 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: automation
+
+  ignoreDifferences:
+    # Webhook CA bundles are managed by the controller and drift frequently
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
 
   syncPolicy:
     automated:

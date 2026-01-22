@@ -3,6 +3,26 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.18](https://github.com/5dlabs/cto/compare/v0.2.17...v0.2.18) (2026-01-22)
+
+
+### 🐛 Bug Fixes
+
+* resolve pre-commit hook failures ([#3885](https://github.com/5dlabs/cto/issues/3885)) ([36f59df](https://github.com/5dlabs/cto/commit/36f59df16207cbdd57733c803e690acdbe7c88c0))
+
+## [0.2.17](https://github.com/5dlabs/cto/compare/v0.2.16...v0.2.17) (2026-01-20)
+
+
+### ✨ Features
+
+* **quality:** setup Ralph code quality workflow and fix unused_self ([#3880](https://github.com/5dlabs/cto/issues/3880)) ([43fbfa3](https://github.com/5dlabs/cto/commit/43fbfa37c676fc2d29f2a98715783846af3abcf8))
+* **stitch:** add standalone PR review sensor and configuration ([#3877](https://github.com/5dlabs/cto/issues/3877)) ([794e50e](https://github.com/5dlabs/cto/commit/794e50e0c11bd7e1eaee9e757418679833f22049))
+
+
+### 📚 Documentation
+
+* update README logo to match web app branding ([#3881](https://github.com/5dlabs/cto/issues/3881)) ([220902e](https://github.com/5dlabs/cto/commit/220902e68aa04f41bff27946c883379d7d34913a))
+
 ## [0.2.16](https://github.com/5dlabs/cto/compare/v0.2.15...v0.2.16) (2026-01-18)
 
 

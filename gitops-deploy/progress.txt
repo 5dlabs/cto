@@ -1,0 +1,26 @@
+# GitOps Deployment Progress Log
+# Session started 2026-01-21T00:00:30Z
+
+[2026-01-21T00:00:43Z] === DEPLOYER AGENT STARTING ===
+[2026-01-21T00:00:43Z] Session ID: 5D024A7D-C286-48BE-8180-8805314D3641
+[2026-01-21T00:08:39Z] === DEPLOYER AGENT STARTING ===
+[2026-01-21T00:08:39Z] Session ID: FA00CFB1-401D-4455-ADF4-C27A22EF611B
+[2026-01-21T00:09:08Z] === DEPLOYER AGENT STARTING ===
+[2026-01-21T00:09:08Z] Session ID: 30C0A13C-9553-46F3-BAF4-6E11B164C6FB
+[2026-01-21T00:14:47Z] === DEPLOYER AGENT STARTING ===
+[2026-01-21T00:14:47Z] Session ID: 761C3F97-8DEB-4931-851D-714413177191
+[2026-01-21T00:15:13Z] === DEPLOYER AGENT STARTING ===
+[2026-01-21T00:15:13Z] Session ID: A3F992F7-FEC9-403C-85E0-64426CB1145D
+[2026-01-21T00:25:00Z] HARDENER: Added sync-wave -4 + retry/sync options to tenant-crd to ensure CRD installs before dependent resources (infra/gitops/applications/platform/tenant-crd.yaml)
+[2026-01-21T00:40:00Z] HARDENER: Added sync-wave ordering for cloudnative-pg-operator and retry/sync options for blackbox-exporter to reduce CRD race risk and improve transient sync resilience (infra/gitops/applications/operators/cloudnative-pg-operator.yaml, infra/gitops/applications/observability/blackbox-exporter.yaml)
+[2026-01-21T01:05:00Z] HARDENER: Added retry/backoff + prune options for alertmanager and fluent-bit to reduce manual re-syncs on transient Helm drift (infra/gitops/applications/observability/alertmanager.yaml, infra/gitops/applications/observability/fluent-bit.yaml)
+[2026-01-21T01:20:00Z] HARDENER: Added sync-wave ordering and standard sync options for argocd-image-updater to reduce early sync drift and manual re-syncs (infra/gitops/applications/platform/argocd-image-updater.yaml)
+[2026-01-21T01:35:00Z] HARDENER: Added SkipDryRunOnMissingResource + PruneLast for CRD-heavy apps to reduce manual re-syncs (infra/gitops/applications/platform/argo-workflows.yaml, infra/gitops/applications/platform/arc-controller.yaml, infra/gitops/applications/operators/clickhouse-operator.yaml, infra/gitops/applications/operators/jaeger-operator.yaml)
+[2026-01-21T01:50:00Z] HARDENER: Moved cert-manager/external-secrets sync-wave ordering earlier and enabled SkipDryRunOnMissingResource for CRD-heavy charts to reduce CRD race sync failures (infra/gitops/applications/platform/cert-manager.yaml, infra/gitops/applications/platform/cert-manager-config.yaml, infra/gitops/applications/secrets/external-secrets.yaml, infra/gitops/applications/secrets/external-secrets-config.yaml)
+[2026-01-21T02:10:00Z] HARDENER: Added SkipDryRunOnMissingResource for AI/database operators to reduce CRD registration race sync failures (infra/gitops/applications/operators/cloudnative-pg-operator.yaml, infra/gitops/applications/operators/redis-operator.yaml, infra/gitops/applications/operators/kubeai.yaml, infra/gitops/applications/operators/ollama-operator.yaml, infra/gitops/applications/operators/llamastack-operator.yaml)
+[2026-01-21T02:25:24Z] HARDENER: Added headscale namespace to platform-namespaces to prevent platform-ingress sync failures when headscale apps are disabled (infra/cluster-config/headscale-namespace.yaml, infra/gitops/applications/platform/platform-namespaces.yaml)
+[2026-01-21T02:30:00Z] HARDENER: Added platform-namespaces app for early cto/external-dns namespaces, disabled CTO chart namespace creation, and shifted external-secrets-config sync-wave to avoid namespace race sync failures (infra/gitops/applications/platform/platform-namespaces.yaml, infra/cluster-config/cto-namespace.yaml, infra/cluster-config/external-dns-namespace.yaml, infra/charts/cto/templates/namespace.yaml, infra/charts/cto/values.yaml, infra/gitops/applications/workloads/cto.yaml, infra/gitops/applications/secrets/external-secrets-config.yaml)
+[2026-01-21T02:48:39Z] HARDENER: Ignored webhook CA bundle drift for Argo Events/Workflows and ARC controller to prevent OutOfSync status after webhook rotation (infra/gitops/applications/platform/argo-events.yaml, infra/gitops/applications/platform/argo-workflows.yaml, infra/gitops/applications/platform/arc-controller.yaml)
+[2026-01-21T02:55:00Z] HARDENER: Ensured github-webhooks syncs after workflow templates and added CRD dry-run bypass for AI ingress to prevent Gateway API race re-syncs (infra/gitops/applications/platform/github-webhooks.yaml, infra/gitops/applications/ai-models/ai-ingress.yaml)
+[2026-01-21T03:20:00Z] HARDENER: Enabled CreateNamespace for cert-manager-config/argocd-image-updater and added retry/backoff for cloudflare-operator, cto-workflows, prometheus, loki, and kube-state-metrics to reduce namespace races and transient re-syncs
+[2026-01-21T04:05:00Z] HARDENER: Added observability/mayastor/openbao namespaces to platform-namespaces to prevent ExternalSecrets config failures when namespaces are missing (infra/gitops/applications/platform/platform-namespaces.yaml, infra/cluster-config/openbao-namespace.yaml)

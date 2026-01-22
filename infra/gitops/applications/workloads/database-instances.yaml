@@ -12,6 +12,9 @@ metadata:
     app.kubernetes.io/name: database-instances
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: database
+  annotations:
+    # Deploy after database operators (CRDs) are established
+    argocd.argoproj.io/sync-wave: "2"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -41,6 +44,7 @@ spec:
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - RespectIgnoreDifferences=true
+      - SkipDryRunOnMissingResource=true
 
     retry:
       limit: 5

@@ -1,0 +1,39 @@
+# CTO App-of-Apps
+# This is the root ArgoCD Application that manages all other applications
+# ArgoCD syncs this first, which then creates/manages child applications
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cto-apps
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: cto
+    cto.5dlabs.ai/managed: "true"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    # Sync from this GitOps repo
+    repoURL: https://github.com/GITHUB_ORG_PLACEHOLDER/cto-argocd
+    targetRevision: HEAD
+    path: applications
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

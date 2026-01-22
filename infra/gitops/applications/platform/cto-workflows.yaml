@@ -9,6 +9,9 @@ metadata:
   labels:
     app.kubernetes.io/name: cto-workflows
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Deploy after Argo Workflows/Events CRDs are available
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -29,5 +32,12 @@ spec:
       selfHeal: true
       allowEmpty: false
     syncOptions:
-      - CreateNamespace=false
+      - CreateNamespace=true
       - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m

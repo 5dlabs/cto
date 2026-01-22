@@ -16,6 +16,9 @@ metadata:
   labels:
     app.kubernetes.io/name: github-webhooks
     app.kubernetes.io/part-of: platform
+  annotations:
+    # Deploy after Argo Events CRDs/controllers and CTO workflow templates
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -42,10 +45,11 @@ spec:
       selfHeal: true
       allowEmpty: false
     syncOptions:
-      - CreateNamespace=false
+      - CreateNamespace=true
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
+      - SkipDryRunOnMissingResource=true
     retry:
       limit: 3
       backoff:

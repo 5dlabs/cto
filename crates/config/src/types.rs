@@ -79,6 +79,111 @@ impl SubagentConfig {
     }
 }
 
+/// Default watcher check interval in seconds (2 minutes).
+fn default_watcher_check_interval() -> u64 {
+    120
+}
+
+/// Default watcher prompt template.
+fn default_watcher_template() -> String {
+    "watcher/base".to_string()
+}
+
+/// Default circuit breaker threshold.
+fn default_circuit_breaker_threshold() -> u32 {
+    3
+}
+
+/// Watcher configuration for dual-model execution pattern.
+///
+/// When enabled, a second "watcher" `CodeRun` is spawned alongside the executor
+/// that monitors progress, detects issues, and writes them to a coordination
+/// file for the executor to self-correct.
+///
+/// CLI-agnostic: supports any CLI (claude, codex, factory, droid, gemini, opencode, cursor).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WatcherDefaults {
+    /// Enable watcher mode for play workflows.
+    /// When true, a paired watcher `CodeRun` is created alongside the executor.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// CLI to use for the watcher (e.g., "factory", "droid", "claude").
+    /// Any supported CLI works - defaults to "factory" for cost efficiency.
+    #[serde(default = "default_watcher_cli")]
+    pub cli: String,
+
+    /// Model to use for the watcher.
+    /// Typically a cheaper model since watcher does monitoring, not code generation.
+    #[serde(default = "default_watcher_model")]
+    pub model: String,
+
+    /// Interval between watcher checks in seconds.
+    /// Default: 120 (2 minutes).
+    #[serde(
+        default = "default_watcher_check_interval",
+        rename = "checkIntervalSecs"
+    )]
+    pub check_interval_secs: u64,
+
+    /// Prompt template for the watcher.
+    /// Default: "watcher/base".
+    #[serde(default = "default_watcher_template")]
+    pub template: String,
+
+    /// Circuit breaker threshold - after this many failures on the same step,
+    /// escalate to human intervention.
+    /// Default: 3.
+    #[serde(
+        default = "default_circuit_breaker_threshold",
+        rename = "circuitBreakerThreshold"
+    )]
+    pub circuit_breaker_threshold: u32,
+}
+
+fn default_watcher_cli() -> String {
+    "factory".to_string()
+}
+
+fn default_watcher_model() -> String {
+    "glm-4-plus".to_string()
+}
+
+impl Default for WatcherDefaults {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            cli: default_watcher_cli(),
+            model: default_watcher_model(),
+            check_interval_secs: default_watcher_check_interval(),
+            template: default_watcher_template(),
+            circuit_breaker_threshold: default_circuit_breaker_threshold(),
+        }
+    }
+}
+
+impl WatcherDefaults {
+    /// Create an enabled watcher config with default settings.
+    #[must_use]
+    pub fn enabled() -> Self {
+        Self {
+            enabled: true,
+            ..Self::default()
+        }
+    }
+
+    /// Create an enabled watcher config with a specific CLI and model.
+    #[must_use]
+    pub fn with_cli_and_model(cli: impl Into<String>, model: impl Into<String>) -> Self {
+        Self {
+            enabled: true,
+            cli: cli.into(),
+            model: model.into(),
+            ..Self::default()
+        }
+    }
+}
+
 /// Individual agent configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgentConfig {
@@ -109,6 +214,11 @@ pub struct AgentConfig {
     /// multiple subagents to work on subtasks concurrently.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subagents: Option<SubagentConfig>,
+
+    /// Per-agent watcher configuration override.
+    /// When set, this agent will use these watcher settings instead of the global defaults.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub watcher: Option<WatcherDefaults>,
 }
 
 /// Play workflow defaults.
@@ -205,6 +315,11 @@ pub struct PlayDefaults {
         default = "default_fresh_start_threshold"
     )]
     pub fresh_start_threshold: u32,
+
+    /// Watcher configuration for dual-model execution pattern.
+    /// When enabled, a second `CodeRun` monitors the executor and provides real-time feedback.
+    #[serde(default)]
+    pub watcher: WatcherDefaults,
 }
 
 fn default_docs_project_directory() -> String {
@@ -240,6 +355,7 @@ impl Default for PlayDefaults {
             working_directory: default_working_directory(),
             healer_endpoint: None,
             fresh_start_threshold: default_fresh_start_threshold(),
+            watcher: WatcherDefaults::default(),
         }
     }
 }
@@ -777,5 +893,88 @@ mod tests {
         }"#;
         let config: AgentConfig = serde_json::from_str(json).unwrap();
         assert!(config.subagents.is_none());
+    }
+
+    #[test]
+    fn test_watcher_defaults_default() {
+        let watcher = WatcherDefaults::default();
+        assert!(!watcher.enabled);
+        assert_eq!(watcher.cli, "factory");
+        assert_eq!(watcher.model, "glm-4-plus");
+        assert_eq!(watcher.check_interval_secs, 120);
+        assert_eq!(watcher.template, "watcher/base");
+        assert_eq!(watcher.circuit_breaker_threshold, 3);
+    }
+
+    #[test]
+    fn test_watcher_defaults_enabled() {
+        let watcher = WatcherDefaults::enabled();
+        assert!(watcher.enabled);
+        assert_eq!(watcher.cli, "factory");
+        assert_eq!(watcher.model, "glm-4-plus");
+    }
+
+    #[test]
+    fn test_watcher_defaults_with_cli_and_model() {
+        let watcher = WatcherDefaults::with_cli_and_model("claude", "claude-sonnet-4-20250514");
+        assert!(watcher.enabled);
+        assert_eq!(watcher.cli, "claude");
+        assert_eq!(watcher.model, "claude-sonnet-4-20250514");
+    }
+
+    #[test]
+    fn test_watcher_defaults_from_json() {
+        let json = r#"{
+            "enabled": true,
+            "cli": "droid",
+            "model": "gpt-4o-mini",
+            "checkIntervalSecs": 60,
+            "template": "watcher/custom",
+            "circuitBreakerThreshold": 5
+        }"#;
+        let watcher: WatcherDefaults = serde_json::from_str(json).unwrap();
+        assert!(watcher.enabled);
+        assert_eq!(watcher.cli, "droid");
+        assert_eq!(watcher.model, "gpt-4o-mini");
+        assert_eq!(watcher.check_interval_secs, 60);
+        assert_eq!(watcher.template, "watcher/custom");
+        assert_eq!(watcher.circuit_breaker_threshold, 5);
+    }
+
+    #[test]
+    fn test_play_defaults_with_watcher() {
+        let json = r#"{
+            "repository": "test-repo",
+            "service": "test-service",
+            "watcher": {
+                "enabled": true,
+                "cli": "factory",
+                "model": "glm-4-plus"
+            }
+        }"#;
+        let defaults: PlayDefaults = serde_json::from_str(json).unwrap();
+        assert!(defaults.watcher.enabled);
+        assert_eq!(defaults.watcher.cli, "factory");
+    }
+
+    #[test]
+    fn test_agent_config_with_watcher_override() {
+        let json = r#"{
+            "githubApp": "5DLabs-Rex",
+            "cli": "claude",
+            "model": "claude-opus-4-5-20251101",
+            "watcher": {
+                "enabled": true,
+                "cli": "droid",
+                "model": "glm-4-plus",
+                "checkIntervalSecs": 90
+            }
+        }"#;
+        let config: AgentConfig = serde_json::from_str(json).unwrap();
+        assert!(config.watcher.is_some());
+        let watcher = config.watcher.unwrap();
+        assert!(watcher.enabled);
+        assert_eq!(watcher.cli, "droid");
+        assert_eq!(watcher.check_interval_secs, 90);
     }
 }
