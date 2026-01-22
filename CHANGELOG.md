@@ -3,6 +3,14 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.22](https://github.com/5dlabs/cto/compare/v0.2.21...v0.2.22) (2026-01-22)
+
+
+### 🔧 Maintenance
+
+* **deps:** bump the actions group with 9 updates ([#3896](https://github.com/5dlabs/cto/issues/3896)) ([ccb5911](https://github.com/5dlabs/cto/commit/ccb5911b7921137ea61ac170c4bea46adf21fdcf))
+* **deps:** bump the rust-minor group with 24 updates ([#3898](https://github.com/5dlabs/cto/issues/3898)) ([911b516](https://github.com/5dlabs/cto/commit/911b516ea0ae26a665430cde503d0a44616201f0))
+
 ## [0.2.21](https://github.com/5dlabs/cto/compare/v0.2.20...v0.2.21) (2026-01-22)
 
 
