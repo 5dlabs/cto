@@ -1,0 +1,25 @@
+# CTO Platform Namespaces
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-system
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    cto.5dlabs.ai/component: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-agents
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    cto.5dlabs.ai/component: agents
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-workspaces
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    cto.5dlabs.ai/component: workspaces

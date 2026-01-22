@@ -1,0 +1,38 @@
+{
+  "executor": {
+    "status": "running",
+    "currentStep": "starting",
+    "stepNumber": 0,
+    "lastUpdate": "{{timestamp}}",
+    "lastError": null,
+    "attemptCount": 1,
+    "coderunName": "{{executorName}}"
+  },
+  "watcher": {
+    "status": "starting",
+    "lastCheck": null,
+    "checkCount": 0,
+    "coderunName": "{{watcherName}}"
+  },
+  "issueQueue": [],
+  "circuitBreaker": {
+    "state": "closed",
+    "failureCount": 0,
+    "sameStepFailures": 0,
+    "lastFailedStep": null,
+    "lastError": null,
+    "openedAt": null,
+    "threshold": {{circuitBreakerThreshold}}
+  },
+  "session": {
+    "id": "{{sessionId}}",
+    "startedAt": "{{timestamp}}",
+    "lastActivity": "{{timestamp}}"
+  },
+  "config": {
+    "checkIntervalSecs": {{checkIntervalSecs}},
+    "service": "{{service}}",
+    "taskId": {{#if taskId}}{{taskId}}{{else}}null{{/if}},
+    "repository": "{{repository}}"
+  }
+}

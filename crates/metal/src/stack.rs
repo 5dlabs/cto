@@ -246,7 +246,7 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// `OpenBao` initialization response containing unseal keys and root token.
 #[derive(Debug, Clone)]
@@ -765,6 +765,7 @@ pub fn deploy_cert_manager(kubeconfig: &Path) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if kubectl/helm commands fail.
+#[allow(clippy::too_many_lines)]
 pub fn deploy_argocd(kubeconfig: &Path) -> Result<()> {
     println!("   Deploying ArgoCD...");
 
@@ -864,21 +865,50 @@ pub fn deploy_argocd(kubeconfig: &Path) -> Result<()> {
         ],
     );
 
-    // Wait for ArgoCD to be ready
+    // LESSON LEARNED: `kubectl wait` can fail with "no matching resources found"
+    // immediately after applying manifests. Retry until pods exist or timeout.
     println!("   Waiting for ArgoCD pods...");
-    kubectl(
-        kubeconfig,
-        &[
-            "wait",
-            "--for=condition=Ready",
-            "pods",
-            "-l",
-            "app.kubernetes.io/part-of=argocd",
-            "-n",
-            "argocd",
-            "--timeout=300s",
-        ],
-    )?;
+    let start = Instant::now();
+    let timeout = Duration::from_secs(300);
+
+    loop {
+        if start.elapsed() > timeout {
+            anyhow::bail!("Timeout waiting for ArgoCD pods to be ready");
+        }
+
+        let wait_result = kubectl(
+            kubeconfig,
+            &[
+                "wait",
+                "--for=condition=Ready",
+                "pods",
+                "-l",
+                "app.kubernetes.io/part-of=argocd",
+                "-n",
+                "argocd",
+                "--timeout=30s",
+            ],
+        );
+
+        match wait_result {
+            Ok(_) => break,
+            Err(err) => {
+                let message = err.to_string().to_lowercase();
+                if message.contains("no matching resources found")
+                    || message.contains("not found")
+                    || message.contains("notfound")
+                    || message.contains("timeout")
+                    || message.contains("timed out")
+                {
+                    std::thread::sleep(Duration::from_secs(5));
+                    continue;
+                }
+
+                // Keep retrying for transient API races until the overall timeout.
+                std::thread::sleep(Duration::from_secs(5));
+            }
+        }
+    }
 
     println!("   ✅ ArgoCD deployed");
     Ok(())

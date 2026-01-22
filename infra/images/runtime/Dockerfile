@@ -278,10 +278,11 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     curl -fsSL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${DL_ARCH}" && \
     chmod +x /usr/local/bin/yq && \
     # stern
-    curl -fsSL "https://github.com/stern/stern/releases/latest/download/stern_linux_${DL_ARCH}.tar.gz" | tar -xzf - -C /usr/local/bin stern && \
+    STERN_VERSION=$(curl -s https://api.github.com/repos/stern/stern/releases/latest | jq -r '.tag_name' | sed 's/^v//') && \
+    curl -fsSL "https://github.com/stern/stern/releases/latest/download/stern_${STERN_VERSION}_linux_${DL_ARCH}.tar.gz" | tar -xzf - -C /usr/local/bin stern && \
     # Docker Compose
     COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name') && \
-    curl -fsSL -o /usr/local/bin/docker-compose "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${DL_ARCH}" && \
+    curl -fsSL -o /usr/local/bin/docker-compose "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${AWS_ARCH}" && \
     chmod +x /usr/local/bin/docker-compose && \
     # k9s
     curl -fsSL "https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_${DL_ARCH}.tar.gz" | tar -xzf - -C /usr/local/bin k9s && \
@@ -510,6 +511,14 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     npm install -g @playwright/test && \
     npx playwright install --with-deps chromium && \
     chown -R node:node /usr/local/share/npm-global
+
+# Install agent-browser CLI for AI agent browser automation
+# Uses Playwright's Chromium installation to avoid duplicate browser downloads
+RUN npm install -g agent-browser && \
+    chown -R node:node /usr/local/share/npm-global && \
+    # Create profile script to set Chromium path for agent-browser at runtime
+    echo 'export AGENT_BROWSER_EXECUTABLE_PATH="$(find /root/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1)"' > /etc/profile.d/agent-browser.sh && \
+    chmod +x /etc/profile.d/agent-browser.sh
 USER node
 
 # Go environment for non-root user

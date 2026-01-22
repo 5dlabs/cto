@@ -11,7 +11,6 @@ pub mod tokens;
 pub mod validation;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -266,10 +265,7 @@ impl SecurityManager {
         let audit_event = audit::AuditEvent {
             timestamp: context.timestamp,
             event_type: event_type.to_string(),
-            actor: context
-                .user
-                .clone()
-                .unwrap_or_else(|| "system".to_string()),
+            actor: context.user.clone().unwrap_or_else(|| "system".to_string()),
             action: context.operation.clone(),
             resource: context
                 .task_id
@@ -281,7 +277,7 @@ impl SecurityManager {
             } else {
                 audit::AuditSeverity::Warning
             },
-            error_message: error_message.map(|s| s.to_string()),
+            error_message: error_message.map(ToString::to_string),
             resource_id: context.task_id.clone(),
             task_id: context.task_id.clone(),
             pr_number: context.pr_number,

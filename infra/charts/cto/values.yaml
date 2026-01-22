@@ -14,6 +14,7 @@
 # Global configuration shared across all components
 global:
   namespace: cto
+  createNamespace: true
   imagePullSecrets:
     - name: ghcr-secret
   # Storage class for PVCs

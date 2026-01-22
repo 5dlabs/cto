@@ -1,4 +1,4 @@
-use crate::crds::CodeRun;
+use crate::crds::{BoltRun, CodeRun};
 use futures::StreamExt;
 use k8s_openapi::api::batch::v1::Job;
 use kube::api::ListParams;
@@ -7,8 +7,9 @@ use kube::runtime::watcher::Config;
 use kube::{Api, Client, ResourceExt};
 use notify::Notifier;
 use std::sync::Arc;
-use tracing::{debug, error, info, instrument, Instrument};
+use tracing::{debug, error, info, instrument, warn, Instrument};
 
+pub mod bolt;
 pub mod cancel;
 pub mod cleanup;
 pub mod code;
@@ -17,6 +18,7 @@ pub mod github;
 pub mod heal;
 pub mod label;
 pub mod play;
+pub mod security;
 pub mod template_paths;
 pub mod tool_catalog;
 pub mod tool_inventory;
@@ -24,6 +26,7 @@ pub mod types;
 pub mod workflow;
 
 // Re-export commonly used items
+pub use bolt::reconcile_bolt_run;
 pub use code::reconcile_code_run;
 pub use config::ControllerConfig;
 pub use types::{Error, Result};
@@ -33,6 +36,7 @@ use types::Context;
 
 /// Main entry point for the separated task controllers
 #[instrument(skip(client), fields(namespace = %namespace))]
+#[allow(clippy::too_many_lines)] // Complex controller startup flow not easily split
 pub async fn run_task_controller(client: Client, namespace: String) -> Result<()> {
     info!(
         "Starting separated task controllers in namespace: {}",
@@ -131,6 +135,39 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
         }
     }
 
+    // BOLT-002: Startup visibility for BoltRuns
+    {
+        let bolt_api: Api<BoltRun> = Api::namespaced(client.clone(), &namespace);
+        match bolt_api.list(&ListParams::default()).await {
+            Ok(list) => {
+                info!(
+                    "Controller startup: found {} BoltRun(s) in namespace {}",
+                    list.items.len(),
+                    namespace
+                );
+                for br in list.items {
+                    let name = br.name_any();
+                    let tenant = br.spec.tenant_ref.clone();
+                    let phase = br
+                        .status
+                        .as_ref()
+                        .map_or_else(String::new, |s| format!("{:?}", s.phase));
+                    info!(
+                        "Existing BoltRun: name={}, tenant={}, phase='{}'",
+                        name, tenant, phase
+                    );
+                }
+            }
+            Err(e) => {
+                // BoltRun CRD may not be installed yet, this is not fatal
+                warn!(
+                    "Failed to list BoltRuns at startup (CRD may not be installed): {}",
+                    e
+                );
+            }
+        }
+    }
+
     // NOTE: Periodic resync loop disabled due to performance regression
     // The thundering herd of reconciliations every 120s was causing excessive
     // CPU and memory usage. The kube-rs controller runtime already handles
@@ -141,10 +178,32 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
     // 2. Rate limiting the patches
     // 3. Only patching resources stuck for >N minutes
 
-    // Run CodeRun controller
-    info!("Starting CodeRun controller...");
+    // Run both CodeRun and BoltRun controllers concurrently
+    info!("Starting CodeRun and BoltRun controllers...");
 
-    run_code_controller(client, namespace, context).await?;
+    let code_context = context.clone();
+    let bolt_context = context.clone();
+    let code_client = client.clone();
+    let bolt_client = client.clone();
+    let code_namespace = namespace.clone();
+    let bolt_namespace = namespace.clone();
+
+    // Use tokio::select! to run both controllers concurrently
+    // Either controller completing or failing will stop both
+    tokio::select! {
+        result = run_code_controller(code_client, code_namespace, code_context) => {
+            match result {
+                Ok(()) => info!("CodeRun controller completed"),
+                Err(e) => error!("CodeRun controller failed: {:?}", e),
+            }
+        }
+        result = run_bolt_controller(bolt_client, bolt_namespace, bolt_context) => {
+            match result {
+                Ok(()) => info!("BoltRun controller completed"),
+                Err(e) => error!("BoltRun controller failed: {:?}", e),
+            }
+        }
+    }
 
     info!("Task controller shutting down");
     Ok(())
@@ -203,4 +262,65 @@ fn error_policy_code(_code_run: Arc<CodeRun>, err: &Error, _ctx: Arc<Context>) -
     );
     // Don't retry - just stop on first failure
     Action::await_change()
+}
+
+/// BOLT-002: Run the BoltRun controller
+///
+/// Controller watches BoltRun resources in cto-admin namespace
+/// On create: spawns Bolt agent pod with installer binary
+/// Passes tenant config and credential ref to pod
+/// Updates BoltRun status as pod progresses
+/// Handles pod completion/failure appropriately
+#[instrument(skip(client, context), fields(namespace = %namespace))]
+async fn run_bolt_controller(
+    client: Client,
+    namespace: String,
+    context: Arc<Context>,
+) -> Result<()> {
+    info!("Starting BoltRun controller for admin provisioning tasks");
+
+    let bolt_api: Api<BoltRun> = Api::namespaced(client.clone(), &namespace);
+    let jobs_api: Api<Job> = Api::namespaced(client.clone(), &namespace);
+    let watcher_config = Config::default().any_semantic();
+
+    Controller::new(bolt_api, watcher_config.clone())
+        .owns(jobs_api, watcher_config)
+        .run(reconcile_bolt_run, error_policy_bolt, context)
+        .for_each(|reconciliation_result| {
+            let bolt_span = tracing::info_span!("bolt_reconciliation_result");
+            async move {
+                match reconciliation_result {
+                    Ok(bolt_run_resource) => {
+                        info!(
+                            resource = ?bolt_run_resource,
+                            "BoltRun reconciliation successful"
+                        );
+                    }
+                    Err(reconciliation_err) => {
+                        error!(
+                            error = ?reconciliation_err,
+                            "BoltRun reconciliation error"
+                        );
+                    }
+                }
+            }
+            .instrument(bolt_span)
+        })
+        .await;
+
+    info!("BoltRun controller shutting down");
+    Ok(())
+}
+
+/// Error policy for BoltRun controller
+#[instrument(skip(_ctx), fields(bolt_run_name = %_bolt_run.name_any(), namespace = %_ctx.namespace))]
+#[allow(clippy::used_underscore_binding)]
+fn error_policy_bolt(_bolt_run: Arc<BoltRun>, err: &Error, _ctx: Arc<Context>) -> Action {
+    error!(
+        error = ?err,
+        bolt_run_name = %_bolt_run.name_any(),
+        "BoltRun reconciliation failed - will retry"
+    );
+    // Retry after a delay for BoltRun - provisioning tasks may have transient failures
+    Action::requeue(std::time::Duration::from_secs(30))
 }

@@ -30,11 +30,11 @@ pub type RBACResult<T> = Result<T, RBACError>;
 /// Required Kubernetes permissions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequiredPermissions {
-    pub configmaps: Vec<String>,     // get, list, create, update, patch, delete
-    pub secrets: Vec<String>,        // get, list (limited)
-    pub coderuns: Vec<String>,       // get, list, create, update, patch, delete, watch
-    pub events: Vec<String>,         // create, patch
-    pub leases: Vec<String>,         // get, list, create, update, patch, delete
+    pub configmaps: Vec<String>, // get, list, create, update, patch, delete
+    pub secrets: Vec<String>,    // get, list (limited)
+    pub coderuns: Vec<String>,   // get, list, create, update, patch, delete, watch
+    pub events: Vec<String>,     // create, patch
+    pub leases: Vec<String>,     // get, list, create, update, patch, delete
 }
 
 /// RBAC validation result
@@ -53,6 +53,7 @@ pub struct RBACValidator {
     namespace: String,
     required_permissions: RequiredPermissions,
     validation_cache: std::sync::Mutex<HashMap<String, RBACValidationResult>>,
+    #[allow(dead_code)]
     cache_ttl_seconds: u64,
 }
 
@@ -68,10 +69,7 @@ impl RBACValidator {
                 "patch".to_string(),
                 "delete".to_string(),
             ],
-            secrets: vec![
-                "get".to_string(),
-                "list".to_string(),
-            ],
+            secrets: vec!["get".to_string(), "list".to_string()],
             coderuns: vec![
                 "get".to_string(),
                 "list".to_string(),
@@ -81,10 +79,7 @@ impl RBACValidator {
                 "delete".to_string(),
                 "watch".to_string(),
             ],
-            events: vec![
-                "create".to_string(),
-                "patch".to_string(),
-            ],
+            events: vec!["create".to_string(), "patch".to_string()],
             leases: vec![
                 "get".to_string(),
                 "list".to_string(),
@@ -121,8 +116,15 @@ impl RBACValidator {
     }
 
     /// Perform fresh RBAC validation
-    async fn validate_permissions_fresh(&self, operation: &str) -> RBACResult<RBACValidationResult> {
-        info!("Performing fresh RBAC validation for operation: {}", operation);
+    #[allow(clippy::unused_async)]
+    async fn validate_permissions_fresh(
+        &self,
+        operation: &str,
+    ) -> RBACResult<RBACValidationResult> {
+        info!(
+            "Performing fresh RBAC validation for operation: {}",
+            operation
+        );
 
         // In a real implementation, this would:
         // 1. Use SelfSubjectAccessReview to test permissions
@@ -137,17 +139,17 @@ impl RBACValidator {
         match operation {
             "coderun_create" | "coderun_update" | "coderun_delete" => {
                 for perm in &self.required_permissions.coderuns {
-                    granted_permissions.push(format!("coderuns/{}", perm));
+                    granted_permissions.push(format!("coderuns/{perm}"));
                 }
             }
             "configmap_access" | "state_operation" => {
                 for perm in &self.required_permissions.configmaps {
-                    granted_permissions.push(format!("configmaps/{}", perm));
+                    granted_permissions.push(format!("configmaps/{perm}"));
                 }
             }
             "lease_operation" => {
                 for perm in &self.required_permissions.leases {
-                    granted_permissions.push(format!("leases/{}", perm));
+                    granted_permissions.push(format!("leases/{perm}"));
                 }
             }
             _ => {
@@ -173,18 +175,23 @@ impl RBACValidator {
     }
 
     /// Validate cached RBAC result
+    #[allow(clippy::unused_self)]
     fn validate_cached_result(&self, result: &RBACValidationResult) -> RBACResult<()> {
         if result.has_permissions {
-            debug!("RBAC validation passed for service account: {}", result.service_account);
+            debug!(
+                "RBAC validation passed for service account: {}",
+                result.service_account
+            );
             Ok(())
         } else {
             error!(
                 "RBAC validation failed. Missing permissions: {:?}",
                 result.missing_permissions
             );
-            Err(RBACError::PermissionDenied(
-                format!("Missing permissions: {}", result.missing_permissions.join(", "))
-            ))
+            Err(RBACError::PermissionDenied(format!(
+                "Missing permissions: {}",
+                result.missing_permissions.join(", ")
+            )))
         }
     }
 
@@ -201,6 +208,7 @@ impl RBACValidator {
     }
 
     /// Check if cache entry is still valid
+    #[allow(clippy::unused_self)]
     fn is_cache_valid(&self, result: &RBACValidationResult) -> bool {
         // In a real implementation, this would check timestamp
         // For now, assume cache is always valid
@@ -208,13 +216,15 @@ impl RBACValidator {
     }
 
     /// Get RBAC statistics
+    #[allow(clippy::unused_async)]
     pub async fn get_statistics(&self) -> RBACResult<HashMap<String, u64>> {
         let mut stats = HashMap::new();
         let cache = self.validation_cache.lock().unwrap();
 
         stats.insert("cached_validations".to_string(), cache.len() as u64);
 
-        let failed_validations = cache.values()
+        let failed_validations = cache
+            .values()
             .filter(|result| !result.has_permissions)
             .count() as u64;
         stats.insert("failed_validations".to_string(), failed_validations);
@@ -223,6 +233,7 @@ impl RBACValidator {
     }
 
     /// Check if RBAC validator is healthy
+    #[allow(clippy::unused_async)]
     pub async fn is_healthy(&self) -> bool {
         // Check if we can access Kubernetes API
         // In a real implementation, this would test API connectivity
@@ -239,21 +250,24 @@ impl RBACValidator {
     /// Get required permissions for an operation
     pub fn get_required_permissions(&self, operation: &str) -> Vec<String> {
         match operation {
-            "coderun_create" | "coderun_update" | "coderun_delete" => {
-                self.required_permissions.coderuns.iter()
-                    .map(|p| format!("coderuns/{}", p))
-                    .collect()
-            }
-            "configmap_access" | "state_operation" => {
-                self.required_permissions.configmaps.iter()
-                    .map(|p| format!("configmaps/{}", p))
-                    .collect()
-            }
-            "lease_operation" => {
-                self.required_permissions.leases.iter()
-                    .map(|p| format!("leases/{}", p))
-                    .collect()
-            }
+            "coderun_create" | "coderun_update" | "coderun_delete" => self
+                .required_permissions
+                .coderuns
+                .iter()
+                .map(|p| format!("coderuns/{p}"))
+                .collect(),
+            "configmap_access" | "state_operation" => self
+                .required_permissions
+                .configmaps
+                .iter()
+                .map(|p| format!("configmaps/{p}"))
+                .collect(),
+            "lease_operation" => self
+                .required_permissions
+                .leases
+                .iter()
+                .map(|p| format!("leases/{p}"))
+                .collect(),
             _ => vec!["generic_access".to_string()],
         }
     }

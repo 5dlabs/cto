@@ -522,9 +522,11 @@ impl Latitude {
     ///
     /// # API Availability Note
     ///
-    /// As of December 2025, the Latitude.sh public API does not expose the
-    /// server-to-VLAN assignment endpoint. This method will return an error
-    /// indicating manual assignment via the Latitude dashboard is required.
+    /// Some Latitude accounts do not expose the nested server-to-VLAN assignment
+    /// endpoint. When the nested endpoint returns 404/405/422/501, this method
+    /// falls back to the top-level `virtual_network_assignments` endpoint and
+    /// then retries a legacy `private_networks` path before requiring manual
+    /// assignment.
     ///
     /// For Talos-based clusters, VLAN configuration can still be achieved by:
     /// 1. Creating the VLAN via API (works)
@@ -555,13 +557,52 @@ impl Latitude {
                 resource_type: "virtual_network_assignment".to_string(),
                 attributes: AssignVirtualNetworkAttributes {
                     server_id: server_id.to_string(),
+                    virtual_network_id: None,
                 },
             },
         };
 
-        let response: ApiResponse<VirtualNetworkAssignmentResource> = self
+        let response: ApiResponse<VirtualNetworkAssignmentResource> = match self
             .post(&format!("/virtual_networks/{vlan_id}/assignments"), &body)
-            .await?;
+            .await
+        {
+            Ok(response) => response,
+            Err(err) if Self::should_fallback_assignment(&err) => {
+                warn!(
+                    vlan_id = %vlan_id,
+                    error = %err,
+                    "VLAN assignment endpoint unavailable; retrying via virtual_network_assignments"
+                );
+
+                let fallback_body = AssignVirtualNetworkBody {
+                    data: AssignVirtualNetworkData {
+                        resource_type: "virtual_network_assignment".to_string(),
+                        attributes: AssignVirtualNetworkAttributes {
+                            server_id: server_id.to_string(),
+                            virtual_network_id: Some(vlan_id.to_string()),
+                        },
+                    },
+                };
+
+                match self
+                    .post("/virtual_network_assignments", &fallback_body)
+                    .await
+                {
+                    Ok(response) => response,
+                    Err(err) if Self::should_fallback_assignment(&err) => {
+                        warn!(
+                            vlan_id = %vlan_id,
+                            error = %err,
+                            "virtual_network_assignments unavailable; retrying via private_networks"
+                        );
+                        self.post(&format!("/private_networks/{vlan_id}/assignments"), &body)
+                            .await?
+                    }
+                    Err(err) => return Err(err),
+                }
+            }
+            Err(err) => return Err(err),
+        };
 
         info!(
             assignment_id = %response.data.id,
@@ -581,10 +622,48 @@ impl Latitude {
         &self,
         vlan_id: &str,
     ) -> Result<Vec<VirtualNetworkAssignmentResource>, ProviderError> {
-        let response: ApiResponse<Vec<VirtualNetworkAssignmentResource>> = self
+        let response: ApiResponse<Vec<VirtualNetworkAssignmentResource>> = match self
             .get(&format!("/virtual_networks/{vlan_id}/assignments"))
-            .await?;
+            .await
+        {
+            Ok(response) => response,
+            Err(err) if Self::should_fallback_assignment(&err) => {
+                warn!(
+                    vlan_id = %vlan_id,
+                    error = %err,
+                    "VLAN assignment list endpoint unavailable; retrying via virtual_network_assignments"
+                );
+                match self
+                    .get(&format!(
+                        "/virtual_network_assignments?filter[virtual_network_id]={vlan_id}"
+                    ))
+                    .await
+                {
+                    Ok(response) => response,
+                    Err(err) if Self::should_fallback_assignment(&err) => {
+                        warn!(
+                            vlan_id = %vlan_id,
+                            error = %err,
+                            "virtual_network_assignments list unavailable; retrying via private_networks"
+                        );
+                        self.get(&format!("/private_networks/{vlan_id}/assignments"))
+                            .await?
+                    }
+                    Err(err) => return Err(err),
+                }
+            }
+            Err(err) => return Err(err),
+        };
         Ok(response.data)
+    }
+
+    /// Check whether VLAN assignment endpoints are unavailable (use fallback).
+    fn should_fallback_assignment(error: &ProviderError) -> bool {
+        matches!(
+            error,
+            ProviderError::Api { status, .. }
+                if matches!(status, 404 | 405 | 422 | 501)
+        ) || matches!(error, ProviderError::NotFound(_))
     }
 
     /// Delete a Virtual Network.

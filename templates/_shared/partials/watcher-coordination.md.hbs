@@ -1,0 +1,47 @@
+{{!-- 
+  Watcher Coordination Partial
+  
+  Include this in executor prompts when watcher mode is enabled.
+  The watcher monitors your progress and reports issues via the coordination file.
+--}}
+{{#if watcherEnabled}}
+## Watcher Coordination
+
+A watcher agent is monitoring your progress and will report issues to `/workspace/coordination.json`.
+
+### Checking for Issues
+
+Before starting each major step, check for watcher-reported issues:
+
+```bash
+# Check if watcher found any issues
+if [ -f /workspace/coordination.json ]; then
+  issues=$(jq '.issueQueue | length' /workspace/coordination.json 2>/dev/null || echo "0")
+  if [ "$issues" != "0" ] && [ "$issues" != "null" ]; then
+    echo "⚠️ Watcher detected $issues issue(s):"
+    jq -r '.issueQueue[] | "[\(.severity)] \(.summary)"' /workspace/coordination.json
+  fi
+fi
+```
+
+### Responding to Issues
+
+When the watcher reports an issue:
+1. **Read the issue details** from `issueQueue` in the coordination file
+2. **Address the issue** before continuing with your current step
+3. **Clear the issue** from the queue after fixing (or acknowledge if cannot fix)
+
+### Updating Your Progress
+
+Update the coordination file when you complete steps:
+
+```bash
+# Update current step (helps watcher track progress)
+jq '.executor.currentStep = "step_name" | .executor.lastUpdate = "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"' \
+  /workspace/coordination.json > /tmp/coord.json && mv /tmp/coord.json /workspace/coordination.json
+```
+
+### Circuit Breaker
+
+If the watcher escalates via circuit breaker (same step failing repeatedly), stop and request human intervention.
+{{/if}}

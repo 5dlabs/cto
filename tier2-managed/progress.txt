@@ -1,0 +1,45 @@
+# Unified E2E Progress Log
+# Admin CTO + Tier 2 Managed Flow
+# Fresh Start: 2026-01-21
+
+---
+
+## Cleanup Completed
+
+- Deleted servers: admin-cto-cp1, admin-cto-worker1
+- VLANs pending deletion (Latitude API timing issue)
+- Local state cleared
+- Coordination reset
+
+---
+
+## Phases Overview
+
+1. Pre-Flight (PRE-001 to PRE-003)
+2. Admin CTO Infrastructure (ADMIN-INF-001 to ADMIN-INF-003)
+3. Admin CTO Talos (ADMIN-TALOS-001 to ADMIN-TALOS-003)
+4. Admin CTO Kubernetes (ADMIN-K8S-001 to ADMIN-K8S-003)
+5. Admin CTO GitOps (ADMIN-GITOPS-001 to ADMIN-GITOPS-003)
+6. Platform Stack (PLATFORM-001 to PLATFORM-005)
+7. BoltRun Verification (BOLT-001 to BOLT-005)
+8. UI Testing (UI-001 to UI-005)
+9. Client CTO Infrastructure (CLIENT-INF-001 to CLIENT-INF-003)
+10. Connectivity (CONN-001 to CONN-005)
+11. Final Verification (VERIFY-001 to VERIFY-004)
+
+---
+
+## Lessons from Previous Run
+
+1. **Runtime image** needs cilium CLI installed (was missing)
+2. **Controller image** needed BoltRun reconciler (was fixed, use controller:boltrun-v3)
+3. **BoltRun CLI args** fixed: use --nodes instead of --cp-nodes/--worker-nodes
+4. **VLANs** sometimes take time to delete after servers
+5. **Kubeconfig/Talosconfig** should be backed up to prevent loss on reset
+
+---
+
+## Progress
+
+(Entries will be added by installer and monitor agents)
+

@@ -75,7 +75,7 @@ impl InputValidator {
             // Command injection
             Regex::new(r";\s*(?:cat|ls|rm|cp|mv)")?,
             Regex::new(r"\|\s*(?:cat|ls|rm|cp|mv)")?,
-            Regex::new(r"`.*?`")?, // Backticks
+            Regex::new(r"`.*?`")?,     // Backticks
             Regex::new(r"\$\(.*?\)")?, // Command substitution
         ];
 
@@ -103,10 +103,7 @@ impl InputValidator {
         // Check for malicious patterns
         for pattern in &self.malicious_patterns {
             if pattern.is_match(input) {
-                errors.push(format!(
-                    "Malicious pattern detected: {}",
-                    pattern.as_str()
-                ));
+                errors.push(format!("Malicious pattern detected: {}", pattern.as_str()));
             }
         }
 
@@ -147,6 +144,7 @@ impl InputValidator {
     }
 
     /// Sanitize input for safe processing
+    #[allow(clippy::unused_async)]
     pub async fn sanitize_input(&self, input: &str) -> ValidationResult<String> {
         let mut sanitized = input.to_string();
 
@@ -300,6 +298,7 @@ impl InputValidator {
     }
 
     /// Get validation statistics
+    #[allow(clippy::unused_async)]
     pub async fn get_statistics(&self) -> HashMap<String, u64> {
         let mut stats = HashMap::new();
 
@@ -341,8 +340,9 @@ impl InputValidator {
 
     /// Add malicious pattern
     pub fn add_malicious_pattern(&mut self, pattern: &str) -> ValidationResult<()> {
-        let regex = Regex::new(pattern)
-            .map_err(|e| ValidationError::ValidationFailed(format!("Invalid regex pattern: {e}")))?;
+        let regex = Regex::new(pattern).map_err(|e| {
+            ValidationError::ValidationFailed(format!("Invalid regex pattern: {e}"))
+        })?;
 
         self.malicious_patterns.push(regex);
         Ok(())

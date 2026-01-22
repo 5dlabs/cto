@@ -1,0 +1,19 @@
+Every 2.0s: cat ralph-conathons-MacBook-Pro.local: 17:42:00
+                                               in 0.007s (0)
+[1;39m{                                                     
+  [0m[1;34m"installer"[0m[1;39m: [0m[1;39m{                 
+    [0m[1;34m"status"[0m[1;39m: [0m[0;32m"running"[0m[1;39m,
+    [0m[1;34m"currentStep"[0m[1;39m: [0m[0;32m"BOLT-002"[0m[
+1;39m,                                                      
+    [0m[1;34m"stepNumber"[0m[1;39m: [0m[0;39m20[0m[1;39m,   
+    [0m[1;34m"totalSteps"[0m[1;39m: [0m[0;39m45[0m[1;39m,   
+    [0m[1;34m"lastUpdate"[0m[1;39m: [0m[0;32m"2026-01-21T01:
+35:57Z"[0m[1;39m,                                           
+    [0m[1;34m"lastError"[0m[1;39m: [0m[0;32m"Controller imag
+e v0.2.17 does not have BoltRun reconciler compiled in"[0m[1
+;39m,                                                       
+    [0m[1;34m"attemptCount"[0m[1;39m: [0m[0;39m0[0m[1;39m,  
+    [0m[1;34m"pid"[0m[1;39m: [0m[0;39m16896[0m[1;39m        
+  [1;39m}[0m[1;39m,                                         
+  [0m[1;34m"monitor"[0m[1;39m: [0m[1;39m{                   
+    [0m[1;34m"status"[0m[1;39m: [0m[0;32m"running"[0m[1;39m,

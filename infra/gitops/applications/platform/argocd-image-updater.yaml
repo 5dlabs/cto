@@ -20,6 +20,9 @@ metadata:
   labels:
     app.kubernetes.io/name: argocd-image-updater
     app.kubernetes.io/part-of: argocd
+  annotations:
+    # Deploy after core ArgoCD components are ready
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -82,8 +85,12 @@ spec:
       selfHeal: true
       allowEmpty: false
     syncOptions:
-      - CreateNamespace=false
+      - CreateNamespace=true
       - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - RespectIgnoreDifferences=true
+      - SkipDryRunOnMissingResource=true
     retry:
       limit: 3
       backoff:

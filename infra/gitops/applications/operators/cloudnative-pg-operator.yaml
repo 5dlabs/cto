@@ -12,6 +12,9 @@ metadata:
     app.kubernetes.io/name: cloudnative-pg-operator
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: database
+  annotations:
+    # Ensure operator CRDs/controllers are ready before database-instances
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -80,6 +83,7 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
+      - SkipDryRunOnMissingResource=true
       - RespectIgnoreDifferences=true
 
     retry:

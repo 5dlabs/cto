@@ -457,6 +457,8 @@ pub struct VirtualNetworkAssignmentResource {
 pub struct VirtualNetworkAssignmentAttributes {
     /// Server ID assigned to the VLAN.
     pub server_id: Option<String>,
+    /// Virtual Network ID for this assignment.
+    pub virtual_network_id: Option<String>,
     /// VLAN ID.
     pub vid: Option<u16>,
     /// Private IP assigned on this VLAN.
@@ -487,4 +489,7 @@ pub struct AssignVirtualNetworkData {
 pub struct AssignVirtualNetworkAttributes {
     /// Server ID to assign.
     pub server_id: String,
+    /// Virtual Network ID when using the top-level assignments endpoint.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub virtual_network_id: Option<String>,
 }

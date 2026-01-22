@@ -1,0 +1,73 @@
+# Tenant Configuration
+# This file is auto-generated during onboarding
+# Customize settings below to adjust your cluster configuration
+
+tenant:
+  id: "{{TENANT_ID}}"
+  provider: "{{PROVIDER}}"
+  region: "{{REGION}}"
+  clusterSize: "{{CLUSTER_SIZE}}"
+
+cluster:
+  name: "{{CLUSTER_NAME}}"
+
+argocd:
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+
+# Runtime components to deploy
+# Set enabled: false to disable a component
+applications:
+  - name: agent-controller
+    enabled: true
+    namespace: cto-system
+    chart: agent-controller
+    version: "0.1.0"
+
+  - name: mcp-tools
+    enabled: true
+    namespace: cto-system
+    chart: mcp-tools
+    version: "0.1.0"
+
+  - name: cilium
+    enabled: true
+    namespace: kube-system
+    chart: cilium
+    version: "1.15.0"
+    values:
+      cluster:
+        name: "{{CLUSTER_NAME}}"
+      clustermesh:
+        useAPIServer: true
+        apiserver:
+          service:
+            type: LoadBalancer
+
+  - name: local-path-provisioner
+    enabled: true
+    namespace: local-path-storage
+    chart: local-path-provisioner
+    version: "0.0.24"
+
+# Feature flags
+features:
+  warpConnector: true
+  clusterMesh: true
+  monitoring: true
+  logging: true
+
+# Resource limits (optional overrides)
+# resources:
+#   agentController:
+#     requests:
+#       memory: "256Mi"
+#       cpu: "100m"
+#     limits:
+#       memory: "512Mi"
+#       cpu: "500m"
