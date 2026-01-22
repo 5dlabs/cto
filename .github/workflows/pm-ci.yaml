@@ -41,7 +41,7 @@ jobs:
       docker: ${{ steps.filter.outputs.docker }}
       helm: ${{ steps.filter.outputs.helm }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -63,7 +63,7 @@ jobs:
     outputs:
       format-needed: ${{ steps.lint.outputs.format-needed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -84,7 +84,7 @@ jobs:
     if: needs.changes.outputs.pm == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -103,7 +103,7 @@ jobs:
     if: needs.changes.outputs.pm == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -123,10 +123,10 @@ jobs:
     if: needs.changes.outputs.helm == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Helm
-        uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v3
         with:
           version: 'latest'
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -150,7 +150,7 @@ jobs:
     runs-on: [k8s-runner]
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -166,10 +166,10 @@ jobs:
     if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: infra/images/pm-server/Dockerfile
           failure-threshold: error
@@ -186,7 +186,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s

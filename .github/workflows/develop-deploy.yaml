@@ -37,7 +37,7 @@ jobs:
       healer: ${{ steps.filter.outputs.healer }}
       tools: ${{ steps.filter.outputs.tools }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -68,7 +68,7 @@ jobs:
     if: needs.changes.outputs.pm == 'true' || github.event.inputs.force_all == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -87,7 +87,7 @@ jobs:
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push pm-server
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v6.18.0
         with:
           context: .
           file: ./infra/images/pm-server/Dockerfile
@@ -109,7 +109,7 @@ jobs:
     if: needs.changes.outputs.controller == 'true' || github.event.inputs.force_all == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -128,7 +128,7 @@ jobs:
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push controller
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v6.18.0
         with:
           context: .
           file: ./infra/images/controller/Dockerfile
@@ -150,7 +150,7 @@ jobs:
     if: needs.changes.outputs.sidecar == 'true' || github.event.inputs.force_all == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -169,7 +169,7 @@ jobs:
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push linear-sidecar
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v6.18.0
         with:
           context: .
           file: ./infra/images/linear-sidecar/Dockerfile
@@ -191,7 +191,7 @@ jobs:
     if: needs.changes.outputs.healer == 'true' || github.event.inputs.force_all == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -210,7 +210,7 @@ jobs:
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push healer
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v6.18.0
         with:
           context: .
           file: ./infra/images/healer/Dockerfile
@@ -232,7 +232,7 @@ jobs:
     if: needs.changes.outputs.tools == 'true' || github.event.inputs.force_all == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -251,7 +251,7 @@ jobs:
           echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and push tools
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v6.18.0
         with:
           context: .
           file: ./infra/images/tools/Dockerfile

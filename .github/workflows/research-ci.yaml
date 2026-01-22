@@ -38,7 +38,7 @@ jobs:
       research: ${{ steps.filter.outputs.research }}
       docker: ${{ steps.filter.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -57,7 +57,7 @@ jobs:
     outputs:
       format-needed: ${{ steps.lint.outputs.format-needed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -81,7 +81,7 @@ jobs:
     if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -100,7 +100,7 @@ jobs:
     if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -120,10 +120,10 @@ jobs:
     if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: infra/images/research/Dockerfile
           failure-threshold: error
@@ -137,7 +137,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
