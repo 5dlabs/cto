@@ -1,5 +1,6 @@
 use super::agent::AgentClassifier;
 use super::naming::ResourceNaming;
+use super::watcher::coordination_configmap_name;
 use crate::cli::types::CLIType;
 use crate::crds::{CLIConfig, CodeRun};
 use crate::tasks::cleanup::{
@@ -855,6 +856,27 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
+        // Watcher coordination ConfigMap volume
+        // When this is a watcher CodeRun, mount the coordination ConfigMap so the watcher
+        // can read the initial coordination state. An init container copies it to the workspace.
+        if let Some(executor_name) = &code_run.spec.watcher_for {
+            let coordination_cm_name = coordination_configmap_name(executor_name);
+            info!(
+                "🔗 Watcher CodeRun detected for executor {}, mounting coordination ConfigMap: {}",
+                executor_name, coordination_cm_name
+            );
+            volumes.push(json!({
+                "name": "coordination-config",
+                "configMap": {
+                    "name": coordination_cm_name
+                }
+            }));
+            volume_mounts.push(json!({
+                "name": "coordination-config",
+                "mountPath": "/config/coordination"
+            }));
+        }
+
         // GitHub App authentication only - no SSH volumes needed
         // Validate github_app is present and non-empty
         let github_app = code_run
@@ -1316,6 +1338,49 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
+        // Build init containers array
+        // Always include the workspace permissions fix init container
+        let mut init_containers = vec![json!({
+            "name": "fix-workspace-perms",
+            "image": "busybox:1.36",
+            "command": ["/bin/sh", "-lc", "chown -R 1000:1000 /workspace && chmod -R ug+rwX /workspace || true"],
+            "securityContext": {
+                "runAsUser": 0,
+                "runAsGroup": 0,
+                "allowPrivilegeEscalation": false
+            },
+            "volumeMounts": [ {"name": "workspace", "mountPath": "/workspace"} ]
+        })];
+
+        // For watcher CodeRuns, add init container to copy coordination.json to workspace
+        // This copies the initial state from the ConfigMap to the shared workspace PVC
+        // The watcher (and executor) can then read/write this file for coordination
+        if code_run.spec.watcher_for.is_some() {
+            init_containers.push(json!({
+                "name": "copy-coordination",
+                "image": "busybox:1.36",
+                "command": ["/bin/sh", "-c"],
+                "args": [
+                    // Copy coordination.json if it doesn't exist (preserve existing state)
+                    // or always overwrite on watcher start to ensure fresh state
+                    "cp /config/coordination/coordination.json /workspace/coordination.json && \
+                     chown 1000:1000 /workspace/coordination.json && \
+                     chmod 664 /workspace/coordination.json && \
+                     echo 'Copied coordination.json to workspace'"
+                ],
+                "securityContext": {
+                    "runAsUser": 0,
+                    "runAsGroup": 0,
+                    "allowPrivilegeEscalation": false
+                },
+                "volumeMounts": [
+                    {"name": "workspace", "mountPath": "/workspace"},
+                    {"name": "coordination-config", "mountPath": "/config/coordination"}
+                ]
+            }));
+            info!("Added coordination copy init container for watcher CodeRun");
+        }
+
         // Build Pod spec and set ServiceAccountName (required by CRD)
         let mut pod_spec = json!({
             "shareProcessNamespace": true,
@@ -1327,17 +1392,7 @@ impl<'a> CodeResourceManager<'a> {
                 "fsGroup": 1000,
                 "fsGroupChangePolicy": "OnRootMismatch"
             },
-            "initContainers": [{
-                "name": "fix-workspace-perms",
-                "image": "busybox:1.36",
-                "command": ["/bin/sh", "-lc", "chown -R 1000:1000 /workspace && chmod -R ug+rwX /workspace || true"],
-                "securityContext": {
-                    "runAsUser": 0,
-                    "runAsGroup": 0,
-                    "allowPrivilegeEscalation": false
-                },
-                "volumeMounts": [ {"name": "workspace", "mountPath": "/workspace"} ]
-            }],
+            "initContainers": init_containers,
             "containers": containers,
             "volumes": volumes
         });
