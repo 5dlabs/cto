@@ -12,6 +12,14 @@ on:
       - '.github/workflows/infra-ci.yaml'
   workflow_dispatch:
 
+# LESSON LEARNED: Without concurrency controls, multiple runs for the same branch
+# compete for limited runners, causing queue buildup. This cancels outdated runs
+# when a new commit is pushed to the same branch.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-005
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 env:
   ARGOCD_VERSION: v2.9.3
   KUBECONFORM_VERSION: v0.6.4

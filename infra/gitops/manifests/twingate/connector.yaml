@@ -1,0 +1,30 @@
+---
+# Twingate Connector - Deploys connector pods in the cluster
+# Connectors establish the secure tunnel between Twingate and the cluster
+apiVersion: twingate.com/v1alpha1
+kind: TwingateConnector
+metadata:
+  name: latitude-connector
+  namespace: operators
+  labels:
+    app.kubernetes.io/name: twingate-connector
+    app.kubernetes.io/part-of: networking
+spec:
+  # Reference to the RemoteNetwork
+  remoteNetworkRef:
+    name: latitude-cluster
+
+  # Connector name
+  name: latitude-connector
+
+  # Optional: Replica count for HA
+  replicas: 2
+
+  # Optional: Resource limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

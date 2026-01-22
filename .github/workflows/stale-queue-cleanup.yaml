@@ -1,0 +1,157 @@
+---
+# Automatically cancels workflow runs that have been queued for too long
+# This prevents runner queue buildup from blocking CI
+#
+# LESSON LEARNED (ISSUE-003): When concurrency controls are added to workflows,
+# existing queued runs created BEFORE the fix are not automatically cancelled.
+# This workflow provides a safety net to clean up stale queued runs.
+#
+# LESSON LEARNED (ISSUE-011): Runs for merged/deleted branches continue to queue
+# and consume capacity even though they can never complete. This workflow now also
+# detects and cancels runs for branches that no longer have open PRs.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-003, #ISSUE-011
+
+name: Stale Queue Cleanup
+
+on:
+  # Run every 15 minutes to catch stale queued runs
+  schedule:
+    - cron: '*/15 * * * *'
+  # Allow manual trigger for immediate cleanup
+  workflow_dispatch:
+    inputs:
+      max_queue_minutes:
+        description: 'Maximum minutes a run can be queued before cancellation'
+        required: true
+        default: '30'
+        type: string
+      dry_run:
+        description: 'Dry run (log but do not cancel)'
+        required: true
+        default: false
+        type: boolean
+
+# This workflow runs on ubuntu-latest to avoid consuming self-hosted runners
+# when they're already capacity-constrained
+jobs:
+  cleanup-stale-queued:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      # ISSUE-012: Required for pulls.list API call to detect merged branches
+      pull-requests: read
+    steps:
+      - name: Cancel stale queued runs
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const maxQueueMinutes = parseInt('${{ inputs.max_queue_minutes || 30 }}', 10);
+            const dryRun = ${{ inputs.dry_run || false }};
+            const now = new Date();
+            const cutoffTime = new Date(now.getTime() - maxQueueMinutes * 60 * 1000);
+            
+            console.log(`🧹 Stale Queue Cleanup`);
+            console.log(`  Max queue time: ${maxQueueMinutes} minutes`);
+            console.log(`  Cutoff time: ${cutoffTime.toISOString()}`);
+            console.log(`  Dry run: ${dryRun}`);
+            console.log(``);
+            
+            // Get all queued workflow runs
+            const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              status: 'queued',
+              per_page: 100
+            });
+            
+            console.log(`Found ${runs.workflow_runs.length} queued runs`);
+            
+            let cancelledCount = 0;
+            let skippedCount = 0;
+            let mergedBranchCount = 0;
+            
+            // ISSUE-011: Also cancel runs for merged/deleted branches
+            // These runs will never complete successfully since the branch no longer exists
+            // Get list of open PRs to identify merged branches
+            // ISSUE-013: Paginate through all open PRs (handles repos with 100+ open PRs)
+            let allOpenPRs = [];
+            let page = 1;
+            while (true) {
+              const { data: prs } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100,
+                page: page
+              });
+              allOpenPRs = allOpenPRs.concat(prs);
+              if (prs.length < 100) break; // No more pages
+              page++;
+            }
+            const activeBranches = new Set(allOpenPRs.map(pr => pr.head.ref));
+            // ISSUE-012b: Include long-lived branches that don't have open PRs
+            // These branches trigger workflows but never have PRs
+            activeBranches.add('main');
+            activeBranches.add('develop');
+            
+            console.log(`Found ${allOpenPRs.length} open PRs with ${activeBranches.size} active branches`);
+            
+            for (const run of runs.workflow_runs) {
+              const createdAt = new Date(run.created_at);
+              const queuedMinutes = Math.round((now - createdAt) / 60000);
+              const branch = run.head_branch;
+              const isActiveBranch = activeBranches.has(branch);
+              
+              // Cancel if: stale (>30min) OR branch is merged/deleted (not in active PRs)
+              const isStale = createdAt < cutoffTime;
+              const isMergedBranch = !isActiveBranch && branch !== 'main';
+              
+              if (isStale || isMergedBranch) {
+                const reason = isMergedBranch ? 'MERGED/DELETED BRANCH' : 'STALE';
+                console.log(`  ⏳ ${reason}: ${run.name} (${branch}) - queued ${queuedMinutes}min`);
+                
+                if (!dryRun) {
+                  try {
+                    await github.rest.actions.cancelWorkflowRun({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      run_id: run.id
+                    });
+                    console.log(`    ✅ Cancelled run ${run.id}`);
+                    cancelledCount++;
+                    if (isMergedBranch) mergedBranchCount++;
+                  } catch (e) {
+                    console.log(`    ❌ Failed to cancel: ${e.message}`);
+                  }
+                } else {
+                  console.log(`    [DRY RUN] Would cancel run ${run.id}`);
+                  cancelledCount++;
+                  if (isMergedBranch) mergedBranchCount++;
+                }
+              } else {
+                console.log(`  ✓ OK: ${run.name} (${branch}) - queued ${queuedMinutes}min`);
+                skippedCount++;
+              }
+            }
+            
+            console.log(``);
+            console.log(`📊 Summary:`);
+            console.log(`  ${dryRun ? 'Would cancel' : 'Cancelled'}: ${cancelledCount} runs total`);
+            console.log(`    - Merged/deleted branches: ${mergedBranchCount}`);
+            console.log(`    - Stale (>${maxQueueMinutes}min): ${cancelledCount - mergedBranchCount}`);
+            console.log(`  Skipped (active): ${skippedCount} runs`);
+            
+            // Create a summary
+            const summary = `## 🧹 Stale Queue Cleanup
+            
+            | Metric | Value |
+            |--------|-------|
+            | Max queue time | ${maxQueueMinutes} minutes |
+            | Queued runs found | ${runs.workflow_runs.length} |
+            | Runs ${dryRun ? 'to cancel' : 'cancelled'} | ${cancelledCount} |
+            | - Merged/deleted branches | ${mergedBranchCount} |
+            | - Stale (>${maxQueueMinutes}min) | ${cancelledCount - mergedBranchCount} |
+            | Active runs kept | ${skippedCount} |
+            `;
+            
+            await core.summary.addRaw(summary).write();
