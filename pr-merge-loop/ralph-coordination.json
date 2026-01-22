@@ -12,10 +12,10 @@
   },
   "monitor": {
     "status": "running",
-    "lastCheck": "2026-01-22T09:05:00Z",
-    "fixesImplemented": 14,
+    "lastCheck": "2026-01-22T09:13:13Z",
+    "fixesImplemented": 17,
     "pid": 25878,
-    "checkCount": 12
+    "checkCount": 13
   },
   "hardeningActions": [
     {
@@ -78,6 +78,33 @@
       "issueId": "ISSUE-011",
       "observation": "Merged branch workflow runs continue to queue and consume capacity",
       "fix": "Enhanced stale-queue-cleanup.yaml to cancel runs for merged/deleted branches",
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-22T09:13:13Z",
+      "issueId": "ISSUE-012",
+      "observation": "Bugbot: Missing pull-requests:read permission for stale cleanup workflow",
+      "fix": "Added pull-requests: read permission to stale-queue-cleanup.yaml",
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-22T09:13:13Z",
+      "issueId": "ISSUE-012b",
+      "observation": "Bugbot: Develop branch missing from active branches list",
+      "fix": "Added develop to always-active branches alongside main",
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-22T09:13:13Z",
+      "issueId": "ISSUE-013",
+      "observation": "Bugbot: Open PR pagination may cause false positive cancellations",
+      "fix": "Added pagination loop to fetch all open PRs (handles 100+ PRs)",
       "files": [
         ".github/workflows/stale-queue-cleanup.yaml"
       ]

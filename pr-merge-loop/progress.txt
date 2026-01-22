@@ -414,3 +414,58 @@ This file tracks the progress of the PR merge loop system.
 [2026-01-22T09:05:00Z] TOTAL FIXES THIS SESSION: 14
   - ISSUE-001 through ISSUE-010: Previously documented
   - ISSUE-011: Merged branch workflow run detection (this check)
+
+## Monitor Check #13 (2026-01-22T09:13:13Z)
+
+[2026-01-22T09:13:13Z] === MONITOR AGENT HARDENING CHECK #13 ===
+[2026-01-22T09:13:13Z] Session state: PR #3904 CI queued, 3 Bugbot issues blocking merge
+
+### Bugbot Issues Identified on PR #3904
+
+[2026-01-22T09:13:13Z] OBSERVATION: 3 unresolved Cursor Bugbot comments blocking PR #3904:
+  1. HIGH: Missing pull-requests:read permission for pulls.list API
+  2. MEDIUM: Develop branch runs would be incorrectly cancelled
+  3. LOW: Open PR pagination may cause false positives with 100+ PRs
+
+[2026-01-22T09:13:13Z] ROOT CAUSE ANALYSIS:
+  - ISSUE-011 added merged branch detection but introduced 3 edge cases
+  - The pulls.list() call requires pull-requests:read permission
+  - Long-lived branches like develop don't have open PRs
+  - Repos with 100+ open PRs would have branches missed
+
+[2026-01-22T09:13:13Z] ACTIONS TAKEN - IMPLEMENTED 3 CODE FIXES:
+
+1. **ISSUE-012: Added Missing Permission**
+   - File: .github/workflows/stale-queue-cleanup.yaml
+   - Added: pull-requests: read to permissions block
+   - Rationale: Required for pulls.list API on private repos
+
+2. **ISSUE-012b: Added Develop to Active Branches**
+   - File: .github/workflows/stale-queue-cleanup.yaml
+   - Changed: activeBranches now includes both 'main' and 'develop'
+   - Rationale: Long-lived branches trigger workflows but don't have PRs
+
+3. **ISSUE-013: Added PR Pagination**
+   - File: .github/workflows/stale-queue-cleanup.yaml
+   - Added: Pagination loop to fetch all open PRs
+   - Rationale: Handles repos with more than 100 open PRs
+
+[2026-01-22T09:13:13Z] FILES MODIFIED:
+  - .github/workflows/stale-queue-cleanup.yaml (all 3 fixes)
+  - pr-merge-loop/lessons-learned.md (documented ISSUE-012, 012b, 013)
+  - pr-merge-loop/ralph-coordination.json (recorded hardening actions)
+  - pr-merge-loop/progress.txt (this file)
+
+[2026-01-22T09:13:13Z] CURRENT STATUS:
+  - PR #3904: CI queued (10 jobs pending), 3 Bugbot issues need resolution
+  - Queue: 20 runs across branches (fix/issue-010, dependabot, main)
+  - Merger: Idle, waiting for PR to process
+
+[2026-01-22T09:13:13Z] EXPECTED IMPACT:
+  - Bugbot issues addressed, PR #3904 can be unblocked
+  - Changes need to be committed and pushed to PR branch
+  - Once merged, stale-queue-cleanup will be more robust
+
+[2026-01-22T09:13:13Z] TOTAL FIXES THIS SESSION: 17
+  - ISSUE-001 through ISSUE-011: Previously documented
+  - ISSUE-012, 012b, 013: Bugbot issue fixes (this check)

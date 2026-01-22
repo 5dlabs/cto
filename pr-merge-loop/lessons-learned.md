@@ -167,3 +167,36 @@ concurrency:
 **Fix Applied**: Enhanced `stale-queue-cleanup.yaml` to also detect and cancel runs for merged/deleted branches by checking against the list of open PRs.
 **Files Modified**: `.github/workflows/stale-queue-cleanup.yaml`
 **Status**: fixed
+
+---
+
+### [ISSUE-012] Missing pull-requests:read Permission for Stale Cleanup
+
+**Date**: 2026-01-22
+**Observation**: Cursor Bugbot flagged that `stale-queue-cleanup.yaml` calls `github.rest.pulls.list()` but only has `actions: write` permission. On private repos, this would fail with 403 error.
+**Root Cause**: ISSUE-011 added the `pulls.list` API call but didn't update the permissions block. GitHub Actions sets unspecified permissions to `none` when a `permissions` block is present.
+**Fix Applied**: Added `pull-requests: read` permission to the workflow permissions block.
+**Files Modified**: `.github/workflows/stale-queue-cleanup.yaml`
+**Status**: fixed
+
+---
+
+### [ISSUE-012b] Develop Branch Missing from Active Branches List
+
+**Date**: 2026-01-22
+**Observation**: Cursor Bugbot flagged that the ISSUE-011 fix only added `main` to `activeBranches`, but workflows also trigger on `develop` branch pushes. Since `develop` is a long-lived branch without open PRs, its runs would be incorrectly cancelled.
+**Root Cause**: The active branch list only included `main` plus branches with open PRs, not accounting for other long-lived branches.
+**Fix Applied**: Added `develop` to the list of always-active branches alongside `main`.
+**Files Modified**: `.github/workflows/stale-queue-cleanup.yaml`
+**Status**: fixed
+
+---
+
+### [ISSUE-013] Open PR Pagination May Cause False Positive Cancellations
+
+**Date**: 2026-01-22
+**Observation**: Cursor Bugbot flagged that the `pulls.list` API call uses `per_page: 100` without pagination. If the repo has 100+ open PRs, branches from older PRs would be incorrectly cancelled.
+**Root Cause**: The original implementation assumed there would never be more than 100 open PRs at once.
+**Fix Applied**: Added pagination loop to fetch all open PRs regardless of count.
+**Files Modified**: `.github/workflows/stale-queue-cleanup.yaml`
+**Status**: fixed
