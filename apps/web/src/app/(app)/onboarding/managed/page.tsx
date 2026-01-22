@@ -137,7 +137,6 @@ export default function ManagedOnboardingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [validationResult, setValidationResult] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [state, setState] = useState<OnboardingState>({
@@ -237,7 +236,6 @@ export default function ManagedOnboardingPage() {
 
     setIsLoading(true);
     setValidationError(null);
-    setValidationResult(null);
 
     setMessages(prev => [
       ...prev,
@@ -269,7 +267,6 @@ export default function ManagedOnboardingPage() {
 
       // Success - key never stored in state, only in memory until stored in OpenBao
       setState(prev => ({ ...prev, apiKeyValidated: true }));
-      setValidationResult(`API key valid! ${result.serversAvailable || 0} servers available in ${state.region}.`);
 
       // ONB-005: After API key validation, ask for GitHub organization
       setMessages(prev => [
