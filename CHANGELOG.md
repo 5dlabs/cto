@@ -3,6 +3,23 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.19](https://github.com/5dlabs/cto/compare/v0.2.18...v0.2.19) (2026-01-22)
+
+
+### ✨ Features
+
+* Add Twingate Operator for Latitude cluster zero-trust access ([#3897](https://github.com/5dlabs/cto/issues/3897)) ([adfd629](https://github.com/5dlabs/cto/commit/adfd629baac34d42f9ca3ae75bccaebaf859fb65))
+
+
+### 🐛 Bug Fixes
+
+* **ci:** use ubuntu-latest for path filter jobs (ISSUE-010) ([#3904](https://github.com/5dlabs/cto/issues/3904)) ([51d5fb2](https://github.com/5dlabs/cto/commit/51d5fb2535e7bb68daa98f137bd0241a7aa4bc39))
+
+
+### 🔧 Maintenance
+
+* **monitor:** update tracking for check [#15](https://github.com/5dlabs/cto/issues/15) - system healthy after 17 fixes ([444d191](https://github.com/5dlabs/cto/commit/444d191d95ead3a80caa836e9b0cfde3415c40ad))
+
 ## [0.2.18](https://github.com/5dlabs/cto/compare/v0.2.17...v0.2.18) (2026-01-22)
 
 
