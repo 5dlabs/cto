@@ -1,0 +1,111 @@
+---
+# Automatically cancels workflow runs that have been queued for too long
+# This prevents runner queue buildup from blocking CI
+#
+# LESSON LEARNED: When concurrency controls are added to workflows, existing
+# queued runs created BEFORE the fix are not automatically cancelled. This
+# workflow provides a safety net to clean up stale queued runs.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-003
+
+name: Stale Queue Cleanup
+
+on:
+  # Run every 15 minutes to catch stale queued runs
+  schedule:
+    - cron: '*/15 * * * *'
+  # Allow manual trigger for immediate cleanup
+  workflow_dispatch:
+    inputs:
+      max_queue_minutes:
+        description: 'Maximum minutes a run can be queued before cancellation'
+        required: true
+        default: '30'
+        type: string
+      dry_run:
+        description: 'Dry run (log but do not cancel)'
+        required: true
+        default: false
+        type: boolean
+
+# This workflow runs on ubuntu-latest to avoid consuming self-hosted runners
+# when they're already capacity-constrained
+jobs:
+  cleanup-stale-queued:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel stale queued runs
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const maxQueueMinutes = parseInt('${{ inputs.max_queue_minutes || 30 }}', 10);
+            const dryRun = ${{ inputs.dry_run || false }};
+            const now = new Date();
+            const cutoffTime = new Date(now.getTime() - maxQueueMinutes * 60 * 1000);
+            
+            console.log(`🧹 Stale Queue Cleanup`);
+            console.log(`  Max queue time: ${maxQueueMinutes} minutes`);
+            console.log(`  Cutoff time: ${cutoffTime.toISOString()}`);
+            console.log(`  Dry run: ${dryRun}`);
+            console.log(``);
+            
+            // Get all queued workflow runs
+            const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              status: 'queued',
+              per_page: 100
+            });
+            
+            console.log(`Found ${runs.workflow_runs.length} queued runs`);
+            
+            let cancelledCount = 0;
+            let skippedCount = 0;
+            
+            for (const run of runs.workflow_runs) {
+              const createdAt = new Date(run.created_at);
+              const queuedMinutes = Math.round((now - createdAt) / 60000);
+              
+              if (createdAt < cutoffTime) {
+                console.log(`  ⏳ STALE: ${run.name} (${run.head_branch}) - queued ${queuedMinutes}min`);
+                
+                if (!dryRun) {
+                  try {
+                    await github.rest.actions.cancelWorkflowRun({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      run_id: run.id
+                    });
+                    console.log(`    ✅ Cancelled run ${run.id}`);
+                    cancelledCount++;
+                  } catch (e) {
+                    console.log(`    ❌ Failed to cancel: ${e.message}`);
+                  }
+                } else {
+                  console.log(`    [DRY RUN] Would cancel run ${run.id}`);
+                  cancelledCount++;
+                }
+              } else {
+                console.log(`  ✓ OK: ${run.name} (${run.head_branch}) - queued ${queuedMinutes}min`);
+                skippedCount++;
+              }
+            }
+            
+            console.log(``);
+            console.log(`📊 Summary:`);
+            console.log(`  ${dryRun ? 'Would cancel' : 'Cancelled'}: ${cancelledCount} stale runs`);
+            console.log(`  Skipped (fresh): ${skippedCount} runs`);
+            
+            // Create a summary
+            const summary = `## 🧹 Stale Queue Cleanup
+            
+            | Metric | Value |
+            |--------|-------|
+            | Max queue time | ${maxQueueMinutes} minutes |
+            | Queued runs found | ${runs.workflow_runs.length} |
+            | Stale runs ${dryRun ? 'to cancel' : 'cancelled'} | ${cancelledCount} |
+            | Fresh runs kept | ${skippedCount} |
+            `;
+            
+            await core.summary.addRaw(summary).write();
