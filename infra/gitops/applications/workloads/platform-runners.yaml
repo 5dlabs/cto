@@ -36,8 +36,12 @@ spec:
         githubConfigUrl: "https://github.com/5dlabs"
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
-        minRunners: 3  # Reduced temporarily - talos-tq1-f47 node is down
-        maxRunners: 5  # Limited to single healthy worker node capacity
+        minRunners: 2  # Minimum runners for Latitude cluster
+        # LESSON LEARNED: With 5 maxRunners, queued jobs piled up repeatedly
+        # when multiple PRs triggered workflows simultaneously. Increased to 8
+        # to provide more capacity headroom and prevent queue buildup.
+        # See: pr-merge-loop/lessons-learned.md#ISSUE-004
+        maxRunners: 8  # Increased from 5 to handle concurrent PR workflows
         runnerGroup: "Default"
 
         # Docker-in-Docker configuration for container builds
