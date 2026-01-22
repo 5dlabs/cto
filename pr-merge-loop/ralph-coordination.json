@@ -2,20 +2,21 @@
   "merger": {
     "status": "running",
     "currentPr": null,
-    "lastUpdate": "2026-01-22T08:54:30Z",
-    "prsProcessed": 1,
-    "prsMerged": 1,
+    "lastUpdate": "2026-01-22T09:32:30Z",
+    "prsProcessed": 2,
+    "prsMerged": 2,
     "prsFailed": 0,
     "pid": 24707,
-    "lastMergedPr": 3897,
-    "lastMergedAt": "2026-01-22T08:46:31Z"
+    "mergedPrs": [3897, 3904],
+    "lastMergedPr": 3904,
+    "lastMergedAt": "2026-01-22T09:32:00Z"
   },
   "monitor": {
     "status": "running",
-    "lastCheck": "2026-01-22T09:13:13Z",
+    "lastCheck": "2026-01-22T09:32:30Z",
     "fixesImplemented": 17,
     "pid": 25878,
-    "checkCount": 13
+    "checkCount": 15
   },
   "hardeningActions": [
     {
@@ -118,6 +119,6 @@
   "session": {
     "id": "c49cdb27-bdf7-4b93-95bc-e19f33b7c625",
     "startedAt": "2026-01-22T07:16:54Z",
-    "lastActivity": "2026-01-22T08:54:30Z"
+    "lastActivity": "2026-01-22T09:32:30Z"
   }
 }
