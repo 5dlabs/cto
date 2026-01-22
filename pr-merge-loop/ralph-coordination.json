@@ -1,28 +1,38 @@
 {
   "merger": {
-    "status": "not_started",
-    "currentPr": null,
-    "lastUpdate": null,
+    "status": "processing",
+    "currentPr": 3897,
+    "lastUpdate": "2026-01-22T07:17:55Z",
     "prsProcessed": 0,
     "prsMerged": 0,
     "prsFailed": 0,
-    "pid": null
+    "pid": 24707,
+    "waitingForCi": true
   },
   "monitor": {
-    "status": "not_started",
-    "lastCheck": null,
-    "fixesImplemented": 0,
-    "pid": null
+    "status": "running",
+    "lastCheck": "2026-01-22T07:17:21Z",
+    "fixesImplemented": 1,
+    "pid": 25878,
+    "checkCount": 1
   },
-  "hardeningActions": [],
+  "hardeningActions": [
+    {
+      "timestamp": "2026-01-22T07:18:00Z",
+      "issueId": "ISSUE-001",
+      "observation": "Pre-commit hooks missing Rust linting (cargo fmt, clippy) - only CI caught these issues",
+      "fix": "Added cargo-fmt and cargo-clippy hooks to .pre-commit-config.yaml matching CI rust-lint settings",
+      "files": [".pre-commit-config.yaml", "pr-merge-loop/lessons-learned.md"]
+    }
+  ],
   "circuitBreaker": {
     "state": "closed",
     "failureCount": 0,
     "threshold": 3
   },
   "session": {
-    "id": null,
-    "startedAt": null,
-    "lastActivity": null
+    "id": "c49cdb27-bdf7-4b93-95bc-e19f33b7c625",
+    "startedAt": "2026-01-22T07:16:54Z",
+    "lastActivity": "2026-01-22T07:17:55Z"
   }
 }

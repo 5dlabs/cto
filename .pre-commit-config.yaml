@@ -52,6 +52,27 @@ repos:
         args: [--config=.markdownlint.yaml]
         files: \.md$
 
+  # Rust linting (matches CI rust-lint composite action)
+  # LESSON LEARNED: Catch Rust format/clippy issues before PR creation
+  # See: pr-merge-loop/lessons-learned.md#ISSUE-001
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: Cargo Format Check
+        entry: bash -c 'cargo fmt --all -- --check'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: cargo-clippy
+        name: Cargo Clippy (Pedantic)
+        entry: bash -c 'cargo clippy --all-targets -- -D warnings -W clippy::pedantic'
+        language: system
+        files: \.rs$
+        pass_filenames: false
+        stages: [pre-commit]
+
   # Custom local hooks
   - repo: local
     hooks:
