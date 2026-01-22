@@ -29,8 +29,11 @@ env:
 
 jobs:
   # Change detection job (lightweight - stays on ubuntu)
+  # LESSON LEARNED: Path filter jobs should use ubuntu-latest, not k8s-runner,
+  # to avoid consuming expensive self-hosted runner capacity for simple git operations.
+  # See: pr-merge-loop/lessons-learned.md#ISSUE-010
   changes:
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     outputs:
       research: ${{ steps.filter.outputs.research }}
       docker: ${{ steps.filter.outputs.docker }}

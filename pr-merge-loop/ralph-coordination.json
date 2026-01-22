@@ -1,100 +1,113 @@
 {
   "merger": {
-    "status": "waiting-for-approval",
-    "currentPr": 3897,
-    "lastUpdate": "2026-01-22T08:31:30Z",
+    "status": "running",
+    "currentPr": null,
+    "lastUpdate": "2026-01-22T08:54:30Z",
     "prsProcessed": 1,
-    "prsMerged": 0,
+    "prsMerged": 1,
     "prsFailed": 0,
     "pid": 24707,
-    "waitingForCi": false,
-    "autoMergeEnabled": true,
-    "waitReason": "CI passed, auto-merge enabled, waiting for branch protection requirements"
+    "lastMergedPr": 3897,
+    "lastMergedAt": "2026-01-22T08:46:31Z"
   },
   "monitor": {
     "status": "running",
-    "lastCheck": "2026-01-22T08:35:00Z",
-    "fixesImplemented": 11,
+    "lastCheck": "2026-01-22T09:13:13Z",
+    "fixesImplemented": 17,
     "pid": 25878,
-    "checkCount": 9
+    "checkCount": 13
   },
   "hardeningActions": [
     {
       "timestamp": "2026-01-22T07:18:00Z",
       "issueId": "ISSUE-001",
-      "observation": "Pre-commit hooks missing Rust linting (cargo fmt, clippy) - only CI caught these issues",
-      "fix": "Added cargo-fmt and cargo-clippy hooks to .pre-commit-config.yaml matching CI rust-lint settings",
-      "files": [".pre-commit-config.yaml", "pr-merge-loop/lessons-learned.md"]
+      "observation": "Pre-commit hooks missing Rust linting",
+      "fix": "Added cargo-fmt and cargo-clippy hooks to pre-commit",
+      "files": [
+        ".pre-commit-config.yaml"
+      ]
     },
     {
       "timestamp": "2026-01-22T07:28:00Z",
       "issueId": "ISSUE-002",
-      "observation": "15+ workflow runs stuck in queued status for 10-30+ minutes. Multiple runs for same branch competing for 5 max runners. No concurrency controls on most workflows.",
-      "fix": "Added concurrency settings to 7 workflow files (controller-ci, codeql, infra-ci, healer-ci, tools-ci, web-ci, code-quality) to auto-cancel outdated PR runs",
-      "files": [".github/workflows/controller-ci.yaml", ".github/workflows/codeql.yaml", ".github/workflows/infra-ci.yaml", ".github/workflows/healer-ci.yaml", ".github/workflows/tools-ci.yaml", ".github/workflows/web-ci.yaml", ".github/workflows/code-quality.yaml", "pr-merge-loop/lessons-learned.md"]
-    },
-    {
-      "timestamp": "2026-01-22T07:36:00Z",
-      "issueId": "ISSUE-002-ext",
-      "observation": "Stale queued runs from before ISSUE-002 fix still blocking runners. Two more PR-triggered workflows (pm-ci, research-ci) missing concurrency controls.",
-      "fix": "1) Cancelled 5 stale Validate ArgoCD runs from observe-state-sync branch. 2) Added concurrency controls to pm-ci.yaml and research-ci.yaml",
-      "files": [".github/workflows/pm-ci.yaml", ".github/workflows/research-ci.yaml"]
+      "observation": "No concurrency controls on workflows",
+      "fix": "Added concurrency settings to 7 workflow files",
+      "files": [
+        "Various .github/workflows/*.yaml"
+      ]
     },
     {
       "timestamp": "2026-01-22T07:47:00Z",
       "issueId": "ISSUE-003",
-      "observation": "Stale queued runs from before concurrency fixes required repeated manual cancellation. Cancelled 16+ stale runs manually across observe-state-sync, dependabot, and main branches.",
-      "fix": "Created stale-queue-cleanup.yaml - scheduled workflow that runs every 15 minutes to auto-cancel runs queued >30 minutes. Uses ubuntu-latest to avoid consuming capacity-constrained self-hosted runners.",
-      "files": [".github/workflows/stale-queue-cleanup.yaml", "pr-merge-loop/lessons-learned.md"]
+      "observation": "Stale queued runs blocking runners",
+      "fix": "Created stale-queue-cleanup.yaml scheduled workflow",
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
     },
     {
       "timestamp": "2026-01-22T07:53:00Z",
       "issueId": "ISSUE-004",
-      "observation": "Repeated queue buildup despite concurrency controls. 20+ runs queued with only 2 in_progress. 5 maxRunners insufficient for burst traffic from 15+ simultaneous PRs.",
-      "fix": "1) Cancelled 24+ stale queued runs to clear backlog. 2) Increased maxRunners from 5 to 8 in platform-runners.yaml to prevent future queue buildup.",
-      "files": ["infra/gitops/applications/workloads/platform-runners.yaml", "pr-merge-loop/lessons-learned.md"]
+      "observation": "maxRunners=5 insufficient",
+      "fix": "Increased maxRunners from 5 to 8",
+      "files": [
+        "infra/gitops/applications/workloads/platform-runners.yaml"
+      ]
     },
     {
       "timestamp": "2026-01-22T08:15:00Z",
       "issueId": "ISSUE-005",
-      "observation": "ISSUE-002 concurrency controls were documented but not actually applied. infra-ci.yaml (Validate ArgoCD Applications) and other workflow files still had no concurrency, causing continued queue buildup.",
-      "fix": "Actually added concurrency controls to all 9 PR-triggered workflows. Cancelled 13 stale queued runs blocking CI.",
-      "files": [".github/workflows/infra-ci.yaml", ".github/workflows/controller-ci.yaml", ".github/workflows/codeql.yaml", ".github/workflows/healer-ci.yaml", ".github/workflows/pm-ci.yaml", ".github/workflows/research-ci.yaml", ".github/workflows/tools-ci.yaml", ".github/workflows/web-ci.yaml", ".github/workflows/code-quality.yaml", "pr-merge-loop/lessons-learned.md"]
+      "observation": "Concurrency controls not actually applied",
+      "fix": "Actually added concurrency to all 9 workflows",
+      "files": [
+        "9 workflow files"
+      ]
     },
     {
-      "timestamp": "2026-01-22T08:28:00Z",
-      "issueId": "ISSUE-001-ext",
-      "observation": "ISSUE-001 documented adding Rust hooks to pre-commit but hooks were never actually committed. pre-commit-config.yaml had no cargo-fmt or cargo-clippy hooks.",
-      "fix": "Actually added cargo-fmt and cargo-clippy hooks to .pre-commit-config.yaml. Matches CI rust-lint settings: cargo fmt --check and clippy with -D warnings -W clippy::pedantic.",
-      "files": [".pre-commit-config.yaml", "pr-merge-loop/lessons-learned.md"]
+      "timestamp": "2026-01-22T08:52:24Z",
+      "issueId": "ISSUE-010-followup",
+      "observation": "ISSUE-010 fix was documented but not in merged PR #3897",
+      "fix": "Created separate PR #3904 with the ubuntu-latest changes for changes jobs",
+      "files": [
+        ".github/workflows/pm-ci.yaml",
+        ".github/workflows/research-ci.yaml"
+      ]
     },
     {
-      "timestamp": "2026-01-22T08:35:00Z",
-      "issueId": "ISSUE-006",
-      "observation": "Cursor Bugbot flagged unpinned helm chart version (targetRevision: latest) in twingate-operator.yaml blocking PR merge due to required_conversation_resolution",
-      "fix": "Pinned Twingate operator to v0.28.0, matching established pattern in operators directory",
-      "files": ["infra/gitops/applications/operators/twingate-operator.yaml", "pr-merge-loop/lessons-learned.md"]
+      "timestamp": "2026-01-22T09:05:00Z",
+      "issueId": "ISSUE-011",
+      "observation": "Merged branch workflow runs continue to queue and consume capacity",
+      "fix": "Enhanced stale-queue-cleanup.yaml to cancel runs for merged/deleted branches",
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
     },
     {
-      "timestamp": "2026-01-22T08:35:00Z",
-      "issueId": "ISSUE-007",
-      "observation": "Cursor Bugbot flagged missing jq prerequisite check in both Ralph loop scripts",
-      "fix": "Added jq check to check_prereqs() in both run-merger.sh and run-monitor.sh",
-      "files": ["pr-merge-loop/run-merger.sh", "pr-merge-loop/run-monitor.sh", "pr-merge-loop/lessons-learned.md"]
+      "timestamp": "2026-01-22T09:13:13Z",
+      "issueId": "ISSUE-012",
+      "observation": "Bugbot: Missing pull-requests:read permission for stale cleanup workflow",
+      "fix": "Added pull-requests: read permission to stale-queue-cleanup.yaml",
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
     },
     {
-      "timestamp": "2026-01-22T08:35:00Z",
-      "issueId": "ISSUE-008",
-      "observation": "Cursor Bugbot flagged race condition in concurrent coordination file updates",
-      "fix": "Added flock-based file locking to update_coord() in both scripts to ensure atomic updates",
-      "files": ["pr-merge-loop/run-merger.sh", "pr-merge-loop/run-monitor.sh", "pr-merge-loop/lessons-learned.md"]
+      "timestamp": "2026-01-22T09:13:13Z",
+      "issueId": "ISSUE-012b",
+      "observation": "Bugbot: Develop branch missing from active branches list",
+      "fix": "Added develop to always-active branches alongside main",
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
     },
     {
-      "timestamp": "2026-01-22T08:35:00Z",
-      "issueId": "ISSUE-009",
-      "observation": "Cursor Bugbot flagged documentation mismatch - claimed --auto high flag that doesn't exist",
-      "fix": "Removed non-existent --auto high flag from run-monitor.sh warning and README.md",
-      "files": ["pr-merge-loop/run-monitor.sh", "pr-merge-loop/README.md", "pr-merge-loop/lessons-learned.md"]
+      "timestamp": "2026-01-22T09:13:13Z",
+      "issueId": "ISSUE-013",
+      "observation": "Bugbot: Open PR pagination may cause false positive cancellations",
+      "fix": "Added pagination loop to fetch all open PRs (handles 100+ PRs)",
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
     }
   ],
   "circuitBreaker": {
@@ -105,6 +118,6 @@
   "session": {
     "id": "c49cdb27-bdf7-4b93-95bc-e19f33b7c625",
     "startedAt": "2026-01-22T07:16:54Z",
-    "lastActivity": "2026-01-22T08:35:00Z"
+    "lastActivity": "2026-01-22T08:54:30Z"
   }
 }
