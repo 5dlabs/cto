@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.20](https://github.com/5dlabs/cto/compare/v0.2.19...v0.2.20) (2026-01-22)
+
+
+### 🔧 Maintenance
+
+* **deps:** bump opentelemetry_sdk from 0.24.1 to 0.30.0 ([#3902](https://github.com/5dlabs/cto/issues/3902)) ([76d4703](https://github.com/5dlabs/cto/commit/76d4703a63aae5e78647bca810efd5155b5c1285))
+
 ## [0.2.19](https://github.com/5dlabs/cto/compare/v0.2.18...v0.2.19) (2026-01-22)
 
 
