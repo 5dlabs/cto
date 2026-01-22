@@ -3,6 +3,14 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.21](https://github.com/5dlabs/cto/compare/v0.2.20...v0.2.21) (2026-01-22)
+
+
+### 🔧 Maintenance
+
+* **deps:** bump opentelemetry-otlp from 0.17.0 to 0.31.0 ([#3899](https://github.com/5dlabs/cto/issues/3899)) ([59099eb](https://github.com/5dlabs/cto/commit/59099ebd95e35f5c82ddeffcae6b8a7829fa53fe))
+* **deps:** bump tiktoken-rs from 0.6.0 to 0.9.1 ([#3901](https://github.com/5dlabs/cto/issues/3901)) ([e748bea](https://github.com/5dlabs/cto/commit/e748bead4c20d40cc9891f6072a5e88a0eb67d0b))
+
 ## [0.2.20](https://github.com/5dlabs/cto/compare/v0.2.19...v0.2.20) (2026-01-22)
 
 
