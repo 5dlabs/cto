@@ -145,3 +145,25 @@ concurrency:
 **Fix Applied**: Updated `run-monitor.sh` warning message and `README.md` to remove the non-existent `--auto high` flag.
 **Files Modified**: `pr-merge-loop/run-monitor.sh`, `pr-merge-loop/README.md`
 **Status**: fixed
+
+---
+
+### [ISSUE-010] Path Filter Jobs Using Self-Hosted Runners Unnecessarily
+
+**Date**: 2026-01-22
+**Observation**: The `changes` jobs in `pm-ci.yaml` and `research-ci.yaml` used `runs-on: [k8s-runner]` (self-hosted) but only run path filters. These jobs don't need Rust toolchains or repository access, so they waste limited self-hosted runner capacity.
+**Root Cause**: Copy-paste from other CI workflows that do need self-hosted runners.
+**Fix Applied**: Changed `changes` jobs to use `runs-on: ubuntu-latest` (GitHub-hosted).
+**Files Modified**: `.github/workflows/pm-ci.yaml`, `.github/workflows/research-ci.yaml`
+**Status**: fixed (PR #3904)
+
+---
+
+### [ISSUE-011] Merged Branch Workflow Runs Continue to Queue
+
+**Date**: 2026-01-22
+**Observation**: After PR #3897 merged, workflow runs from the `observe-state-sync` branch continued to sit in the queue for 25+ minutes. These runs can never succeed because the branch no longer exists, but they consume runner queue capacity.
+**Root Cause**: The `stale-queue-cleanup.yaml` workflow only cancelled runs older than 30 minutes. It didn't check if the branch still exists or has an open PR.
+**Fix Applied**: Enhanced `stale-queue-cleanup.yaml` to also detect and cancel runs for merged/deleted branches by checking against the list of open PRs.
+**Files Modified**: `.github/workflows/stale-queue-cleanup.yaml`
+**Status**: fixed

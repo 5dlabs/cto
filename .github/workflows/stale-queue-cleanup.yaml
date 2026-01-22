@@ -2,10 +2,14 @@
 # Automatically cancels workflow runs that have been queued for too long
 # This prevents runner queue buildup from blocking CI
 #
-# LESSON LEARNED: When concurrency controls are added to workflows, existing
-# queued runs created BEFORE the fix are not automatically cancelled. This
-# workflow provides a safety net to clean up stale queued runs.
-# See: pr-merge-loop/lessons-learned.md#ISSUE-003
+# LESSON LEARNED (ISSUE-003): When concurrency controls are added to workflows,
+# existing queued runs created BEFORE the fix are not automatically cancelled.
+# This workflow provides a safety net to clean up stale queued runs.
+#
+# LESSON LEARNED (ISSUE-011): Runs for merged/deleted branches continue to queue
+# and consume capacity even though they can never complete. This workflow now also
+# detects and cancels runs for branches that no longer have open PRs.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-003, #ISSUE-011
 
 name: Stale Queue Cleanup
 
@@ -62,13 +66,33 @@ jobs:
             
             let cancelledCount = 0;
             let skippedCount = 0;
+            let mergedBranchCount = 0;
+            
+            // ISSUE-011: Also cancel runs for merged/deleted branches
+            // These runs will never complete successfully since the branch no longer exists
+            // Get list of open PRs to identify merged branches
+            const { data: openPRs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+            const activeBranches = new Set(openPRs.map(pr => pr.head.ref));
+            activeBranches.add('main'); // Always keep main branch runs
             
             for (const run of runs.workflow_runs) {
               const createdAt = new Date(run.created_at);
               const queuedMinutes = Math.round((now - createdAt) / 60000);
+              const branch = run.head_branch;
+              const isActiveBranch = activeBranches.has(branch);
               
-              if (createdAt < cutoffTime) {
-                console.log(`  ⏳ STALE: ${run.name} (${run.head_branch}) - queued ${queuedMinutes}min`);
+              // Cancel if: stale (>30min) OR branch is merged/deleted (not in active PRs)
+              const isStale = createdAt < cutoffTime;
+              const isMergedBranch = !isActiveBranch && branch !== 'main';
+              
+              if (isStale || isMergedBranch) {
+                const reason = isMergedBranch ? 'MERGED/DELETED BRANCH' : 'STALE';
+                console.log(`  ⏳ ${reason}: ${run.name} (${branch}) - queued ${queuedMinutes}min`);
                 
                 if (!dryRun) {
                   try {
@@ -79,23 +103,27 @@ jobs:
                     });
                     console.log(`    ✅ Cancelled run ${run.id}`);
                     cancelledCount++;
+                    if (isMergedBranch) mergedBranchCount++;
                   } catch (e) {
                     console.log(`    ❌ Failed to cancel: ${e.message}`);
                   }
                 } else {
                   console.log(`    [DRY RUN] Would cancel run ${run.id}`);
                   cancelledCount++;
+                  if (isMergedBranch) mergedBranchCount++;
                 }
               } else {
-                console.log(`  ✓ OK: ${run.name} (${run.head_branch}) - queued ${queuedMinutes}min`);
+                console.log(`  ✓ OK: ${run.name} (${branch}) - queued ${queuedMinutes}min`);
                 skippedCount++;
               }
             }
             
             console.log(``);
             console.log(`📊 Summary:`);
-            console.log(`  ${dryRun ? 'Would cancel' : 'Cancelled'}: ${cancelledCount} stale runs`);
-            console.log(`  Skipped (fresh): ${skippedCount} runs`);
+            console.log(`  ${dryRun ? 'Would cancel' : 'Cancelled'}: ${cancelledCount} runs total`);
+            console.log(`    - Merged/deleted branches: ${mergedBranchCount}`);
+            console.log(`    - Stale (>${maxQueueMinutes}min): ${cancelledCount - mergedBranchCount}`);
+            console.log(`  Skipped (active): ${skippedCount} runs`);
             
             // Create a summary
             const summary = `## 🧹 Stale Queue Cleanup
@@ -104,8 +132,10 @@ jobs:
             |--------|-------|
             | Max queue time | ${maxQueueMinutes} minutes |
             | Queued runs found | ${runs.workflow_runs.length} |
-            | Stale runs ${dryRun ? 'to cancel' : 'cancelled'} | ${cancelledCount} |
-            | Fresh runs kept | ${skippedCount} |
+            | Runs ${dryRun ? 'to cancel' : 'cancelled'} | ${cancelledCount} |
+            | - Merged/deleted branches | ${mergedBranchCount} |
+            | - Stale (>${maxQueueMinutes}min) | ${cancelledCount - mergedBranchCount} |
+            | Active runs kept | ${skippedCount} |
             `;
             
             await core.summary.addRaw(summary).write();

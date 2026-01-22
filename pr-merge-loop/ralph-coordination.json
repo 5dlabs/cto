@@ -12,10 +12,10 @@
   },
   "monitor": {
     "status": "running",
-    "lastCheck": "2026-01-22T08:52:24Z",
-    "fixesImplemented": 13,
+    "lastCheck": "2026-01-22T09:05:00Z",
+    "fixesImplemented": 14,
     "pid": 25878,
-    "checkCount": 11
+    "checkCount": 12
   },
   "hardeningActions": [
     {
@@ -23,42 +23,64 @@
       "issueId": "ISSUE-001",
       "observation": "Pre-commit hooks missing Rust linting",
       "fix": "Added cargo-fmt and cargo-clippy hooks to pre-commit",
-      "files": [".pre-commit-config.yaml"]
+      "files": [
+        ".pre-commit-config.yaml"
+      ]
     },
     {
       "timestamp": "2026-01-22T07:28:00Z",
       "issueId": "ISSUE-002",
       "observation": "No concurrency controls on workflows",
       "fix": "Added concurrency settings to 7 workflow files",
-      "files": ["Various .github/workflows/*.yaml"]
+      "files": [
+        "Various .github/workflows/*.yaml"
+      ]
     },
     {
       "timestamp": "2026-01-22T07:47:00Z",
       "issueId": "ISSUE-003",
       "observation": "Stale queued runs blocking runners",
       "fix": "Created stale-queue-cleanup.yaml scheduled workflow",
-      "files": [".github/workflows/stale-queue-cleanup.yaml"]
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
     },
     {
       "timestamp": "2026-01-22T07:53:00Z",
       "issueId": "ISSUE-004",
       "observation": "maxRunners=5 insufficient",
       "fix": "Increased maxRunners from 5 to 8",
-      "files": ["infra/gitops/applications/workloads/platform-runners.yaml"]
+      "files": [
+        "infra/gitops/applications/workloads/platform-runners.yaml"
+      ]
     },
     {
       "timestamp": "2026-01-22T08:15:00Z",
       "issueId": "ISSUE-005",
       "observation": "Concurrency controls not actually applied",
       "fix": "Actually added concurrency to all 9 workflows",
-      "files": ["9 workflow files"]
+      "files": [
+        "9 workflow files"
+      ]
     },
     {
       "timestamp": "2026-01-22T08:52:24Z",
       "issueId": "ISSUE-010-followup",
       "observation": "ISSUE-010 fix was documented but not in merged PR #3897",
       "fix": "Created separate PR #3904 with the ubuntu-latest changes for changes jobs",
-      "files": [".github/workflows/pm-ci.yaml", ".github/workflows/research-ci.yaml"]
+      "files": [
+        ".github/workflows/pm-ci.yaml",
+        ".github/workflows/research-ci.yaml"
+      ]
+    },
+    {
+      "timestamp": "2026-01-22T09:05:00Z",
+      "issueId": "ISSUE-011",
+      "observation": "Merged branch workflow runs continue to queue and consume capacity",
+      "fix": "Enhanced stale-queue-cleanup.yaml to cancel runs for merged/deleted branches",
+      "files": [
+        ".github/workflows/stale-queue-cleanup.yaml"
+      ]
     }
   ],
   "circuitBreaker": {

@@ -354,3 +354,63 @@ This file tracks the progress of the PR merge loop system.
 [2026-01-22T08:52:24Z] TOTAL FIXES THIS SESSION: 13
   - ISSUE-001 through ISSUE-010: All documented
   - ISSUE-010 now in separate PR #3904 (was not in original PR #3897)
+
+## Monitor Check #12 (2026-01-22T09:05:00Z)
+
+[2026-01-22T09:05:00Z] === MONITOR AGENT HARDENING CHECK #12 ===
+[2026-01-22T09:05:00Z] Session state: PR #3904 CI running (queued)
+
+### Queue Status Analysis
+
+[2026-01-22T09:05:00Z] OBSERVATION: Queue showing 20 runs across branches
+  - fix/issue-010-changes-job-runner: 4 runs (CodeQL, Controller CI, PM CI, Research CI)
+  - dependabot/github_actions/actions-40576457d1: 8 runs (various CI workflows)
+  - main: 7 runs (from PR #3897 merge)
+  - observe-state-sync: 1 stale run (25+ minutes old, branch already merged)
+
+[2026-01-22T09:05:00Z] HARDENING ISSUE IDENTIFIED: ISSUE-011
+
+### ISSUE-011: Merged Branch Workflow Runs Continue to Queue
+
+[2026-01-22T09:05:00Z] OBSERVATION: After PR #3897 merged, observe-state-sync branch runs still queued
+  - Run 21241678631 (Validate ArgoCD) queued at 08:39, still waiting at 09:05 (26+ minutes)
+  - This branch was merged/deleted, so runs can never complete successfully
+  - These zombie runs consume queue capacity that could be used by active PRs
+
+[2026-01-22T09:05:00Z] ROOT CAUSE ANALYSIS:
+  - stale-queue-cleanup.yaml (ISSUE-003) only cancels runs older than 30 minutes
+  - It doesn't check if the branch still exists or has an open PR
+  - Merged branches can have runs sitting in queue indefinitely until 30min threshold
+
+[2026-01-22T09:05:00Z] ACTIONS TAKEN:
+
+1. **MANUALLY CANCELLED STALE OBSERVE-STATE-SYNC RUN**
+   - Cancelled run 21241678631 immediately to free queue capacity
+
+2. **ENHANCED STALE-QUEUE-CLEANUP WORKFLOW**
+   - Modified: .github/workflows/stale-queue-cleanup.yaml
+   - Added logic to detect merged/deleted branches by checking against open PRs
+   - Now cancels runs for branches that:
+     a) Are older than 30 minutes (existing behavior), OR
+     b) Don't have an open PR (new ISSUE-011 fix)
+   - Added tracking for merged branch cancellations in summary output
+
+[2026-01-22T09:05:00Z] FILES MODIFIED:
+  - .github/workflows/stale-queue-cleanup.yaml (enhanced merged branch detection)
+  - pr-merge-loop/lessons-learned.md (documented ISSUE-010 and ISSUE-011)
+  - pr-merge-loop/ralph-coordination.json (recorded hardening action)
+  - pr-merge-loop/progress.txt (this file)
+
+[2026-01-22T09:05:00Z] EXPECTED IMPACT:
+  - Immediate: Stale observe-state-sync run cleared manually
+  - Short-term: Next stale-queue-cleanup run (every 15 min) will auto-cancel merged branch runs
+  - Long-term: Queue capacity better utilized for active PR branches
+
+[2026-01-22T09:05:00Z] PR #3904 STATUS:
+  - CI jobs still queued (waiting for runner capacity)
+  - Clearing merged branch runs should help capacity
+  - No failures detected, just queue waiting
+
+[2026-01-22T09:05:00Z] TOTAL FIXES THIS SESSION: 14
+  - ISSUE-001 through ISSUE-010: Previously documented
+  - ISSUE-011: Merged branch workflow run detection (this check)
