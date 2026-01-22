@@ -42,7 +42,7 @@ Run N+1: Issue is caught before PR → Claude has less work
 Both agents run in fully unattended mode by default:
 
 - **Claude** uses `--dangerously-skip-permissions` to auto-approve all operations
-- **Droid** uses `droid exec --skip-permissions-unsafe --auto high` for non-interactive execution
+- **Droid** uses `droid exec --skip-permissions-unsafe` for non-interactive execution
 
 ### Interactive Mode
 
