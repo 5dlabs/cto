@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.18"
+version = "0.2.20"
 edition = "2021"
 authors = ["5D team"]
 license = "AGPL-3.0"
@@ -54,8 +54,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # OpenTelemetry
 opentelemetry = "0.30.0"
-opentelemetry-otlp = { version = "0.17", features = ["tonic"] }
-opentelemetry_sdk = { version = "0.24", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.31", features = ["tonic"] }
+opentelemetry_sdk = { version = "0.30", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.31.0"
 
 # CLI
