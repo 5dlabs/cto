@@ -1,0 +1,28 @@
+{
+  "merger": {
+    "status": "not_started",
+    "currentPr": null,
+    "lastUpdate": null,
+    "prsProcessed": 0,
+    "prsMerged": 0,
+    "prsFailed": 0,
+    "pid": null
+  },
+  "monitor": {
+    "status": "not_started",
+    "lastCheck": null,
+    "fixesImplemented": 0,
+    "pid": null
+  },
+  "hardeningActions": [],
+  "circuitBreaker": {
+    "state": "closed",
+    "failureCount": 0,
+    "threshold": 3
+  },
+  "session": {
+    "id": null,
+    "startedAt": null,
+    "lastActivity": null
+  }
+}

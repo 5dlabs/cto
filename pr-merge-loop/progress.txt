@@ -1,0 +1,7 @@
+# PR Merge Loop Progress Log
+
+This file tracks the progress of the PR merge loop system.
+
+## Session Started
+
+[Session will start when merger agent runs]
