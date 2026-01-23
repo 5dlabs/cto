@@ -115,6 +115,13 @@ spec:
                   name: tools-latitude-secrets
                   key: LATITUDE_API_KEY
                   optional: true
+            # Firecrawl API key for web scraping and crawling
+            - name: FIRECRAWL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tools-firecrawl-secrets
+                  key: FIRECRAWL_API_KEY
+                  optional: true
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
           volumeMounts:
