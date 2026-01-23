@@ -484,6 +484,35 @@ impl ServerConnectionPool {
             .stdout
             .take()
             .ok_or_else(|| anyhow::anyhow!("Failed to get stdout for server '{server_name}'"))?;
+        let stderr = process
+            .stderr
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get stderr for server '{server_name}'"))?;
+
+        // Spawn a task to consume stderr to prevent blocking
+        // This is critical - npx outputs installation progress to stderr which can fill the buffer
+        // and block the process if not consumed
+        let server_name_for_stderr = server_name.to_string();
+        tokio::spawn(async move {
+            let mut stderr_reader = BufReader::new(stderr);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match stderr_reader.read_line(&mut line).await {
+                    Ok(0) => break, // EOF
+                    Ok(_) => {
+                        if !line.trim().is_empty() {
+                            tracing::debug!(
+                                "🔍 [{}] stderr: {}",
+                                server_name_for_stderr,
+                                line.trim()
+                            );
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
 
         let stdout_reader = BufReader::new(stdout);
 
@@ -682,7 +711,7 @@ impl ServerConnectionPool {
             }
             line.clear();
             let bytes_read = tokio::time::timeout(
-                tokio::time::Duration::from_secs(30), // Increased timeout for large responses
+                tokio::time::Duration::from_secs(120), // Increased timeout for npx package downloads
                 conn.stdout_reader.read_line(&mut line),
             )
             .await
