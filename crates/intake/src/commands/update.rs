@@ -199,32 +199,76 @@ impl UpdateDomain {
 
         // Individual task doc files for added/modified tasks
         for task in &delta.added {
-            files.push(PathBuf::from(format!(".tasks/docs/{}/prompt.md", task.id)));
-            files.push(PathBuf::from(format!(".tasks/docs/{}/prompt.xml", task.id)));
+            let task_dir = if task.id.starts_with("task-") {
+                task.id.clone()
+            } else {
+                format!("task-{}", task.id)
+            };
+            files.push(PathBuf::from(format!(".tasks/docs/{task_dir}/prompt.md")));
+            files.push(PathBuf::from(format!(".tasks/docs/{task_dir}/prompt.xml")));
             files.push(PathBuf::from(format!(
-                ".tasks/docs/{}/acceptance.md",
-                task.id
+                ".tasks/docs/{task_dir}/acceptance.md"
             )));
+
+            for subtask in &task.subtasks {
+                let subtask_dir = format!("{task_dir}/subtasks/{task_dir}.{}", subtask.id);
+                files.push(PathBuf::from(format!(
+                    ".tasks/docs/{subtask_dir}/prompt.md"
+                )));
+                files.push(PathBuf::from(format!(
+                    ".tasks/docs/{subtask_dir}/prompt.xml"
+                )));
+                files.push(PathBuf::from(format!(
+                    ".tasks/docs/{subtask_dir}/acceptance.md"
+                )));
+            }
         }
 
-        for (_, new_task) in &delta.modified {
+        for (old_task, new_task) in &delta.modified {
+            let task_dir = if new_task.id.starts_with("task-") {
+                new_task.id.clone()
+            } else {
+                format!("task-{}", new_task.id)
+            };
+            files.push(PathBuf::from(format!(".tasks/docs/{task_dir}/prompt.md")));
+            files.push(PathBuf::from(format!(".tasks/docs/{task_dir}/prompt.xml")));
             files.push(PathBuf::from(format!(
-                ".tasks/docs/{}/prompt.md",
-                new_task.id
+                ".tasks/docs/{task_dir}/acceptance.md"
             )));
-            files.push(PathBuf::from(format!(
-                ".tasks/docs/{}/prompt.xml",
-                new_task.id
-            )));
-            files.push(PathBuf::from(format!(
-                ".tasks/docs/{}/acceptance.md",
-                new_task.id
-            )));
+
+            // Track new/modified subtasks
+            for subtask in &new_task.subtasks {
+                let subtask_dir = format!("{task_dir}/subtasks/{task_dir}.{}", subtask.id);
+                files.push(PathBuf::from(format!(
+                    ".tasks/docs/{subtask_dir}/prompt.md"
+                )));
+                files.push(PathBuf::from(format!(
+                    ".tasks/docs/{subtask_dir}/prompt.xml"
+                )));
+                files.push(PathBuf::from(format!(
+                    ".tasks/docs/{subtask_dir}/acceptance.md"
+                )));
+            }
+
+            // Track removed subtasks (existed in old task but not in new task)
+            let new_subtask_ids: std::collections::HashSet<u32> =
+                new_task.subtasks.iter().map(|s| s.id).collect();
+            for old_subtask in &old_task.subtasks {
+                if !new_subtask_ids.contains(&old_subtask.id) {
+                    let subtask_dir = format!("{task_dir}/subtasks/{task_dir}.{}", old_subtask.id);
+                    files.push(PathBuf::from(format!(".tasks/docs/{subtask_dir}/")));
+                }
+            }
         }
 
         // Mark removed task docs (they would be deleted)
         for task in &delta.removed {
-            files.push(PathBuf::from(format!(".tasks/docs/{}/", task.id)));
+            let task_dir = if task.id.starts_with("task-") {
+                task.id.clone()
+            } else {
+                format!("task-{}", task.id)
+            };
+            files.push(PathBuf::from(format!(".tasks/docs/{task_dir}/")));
         }
 
         files
