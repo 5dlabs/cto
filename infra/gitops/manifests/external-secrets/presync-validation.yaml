@@ -94,6 +94,7 @@ spec:
               # Optional secrets (warn but don't fail)
               OPTIONAL_SECRETS="
                 tools-kubernetes
+                tools-kubernetes-fra
                 tools-appstore-connect
                 research-twitter
                 research-digest

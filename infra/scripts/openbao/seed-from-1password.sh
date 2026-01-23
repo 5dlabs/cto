@@ -318,13 +318,22 @@ seed_tools() {
         log_warning "Missing: Latitude.sh API"
     fi
     
-    # tools-kubernetes
-    local kubeconfig
-    kubeconfig=$(op_get_field "Kubeconfig - Latitude cto-dal" "credential")
-    if [[ -n "$kubeconfig" ]]; then
-        bao_put "tools-kubernetes" "KUBECONFIG" "$kubeconfig"
+    # tools-kubernetes (Dallas cluster - cto-dal)
+    local kubeconfig_dal
+    kubeconfig_dal=$(op_get_field "Kubeconfig - Latitude cto-dal" "credential")
+    if [[ -n "$kubeconfig_dal" ]]; then
+        bao_put "tools-kubernetes" "KUBECONFIG" "$kubeconfig_dal"
     else
         log_warning "Missing: Kubeconfig - Latitude cto-dal"
+    fi
+    
+    # tools-kubernetes-fra (Frankfurt cluster - cto-fra)
+    local kubeconfig_fra
+    kubeconfig_fra=$(op_get_field "Kubeconfig - Latitude cto-fra" "credential")
+    if [[ -n "$kubeconfig_fra" ]]; then
+        bao_put "tools-kubernetes-fra" "KUBECONFIG" "$kubeconfig_fra"
+    else
+        log_warning "Missing: Kubeconfig - Latitude cto-fra"
     fi
     
     # tools-appstore-connect

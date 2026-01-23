@@ -176,6 +176,10 @@ secrets:
     kubernetes:
       enabled: true
       baoKey: tools-kubernetes
+    kubernetesFra:
+      enabled: true
+      baoKey: tools-kubernetes-fra
+      # Keys: KUBECONFIG (Frankfurt cluster - cto-fra)
     appstoreConnect:
       enabled: true
       baoKey: tools-appstore-connect
@@ -503,7 +507,7 @@ tools:
         url: "https://mcp.solana.com/mcp"
         workingDirectory: "/tmp"
 
-      # --- Web Scraping & Search ---
+      # --- Web Scraping ---
       firecrawl:
         name: "Firecrawl"
         description: "Web scraping, crawling, and content extraction with search capabilities"
@@ -511,16 +515,8 @@ tools:
         command: "npx"
         args: ["-y", "firecrawl-mcp"]
         workingDirectory: "/tmp"
-
-      tavily:
-        name: "Tavily"
-        description: "AI-powered search engine for real-time web search, news, and research with citation support"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "tavily-mcp@latest"]
-        workingDirectory: "/tmp"
         env:
-          TAVILY_API_KEY: "${TAVILY_API_KEY}"
+          FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
 
       # --- Codebase Analysis ---
       repomix:

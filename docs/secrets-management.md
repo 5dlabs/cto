@@ -147,6 +147,7 @@ Multiple 1Password items combine into one OpenBao secret:
 | `Firecrawl API Key` | `tools-firecrawl` | `FIRECRAWL_API_KEY` |
 | `Latitude.sh API` | `tools-latitude` | `LATITUDE_API_KEY` |
 | `Kubeconfig - Latitude cto-dal` | `tools-kubernetes` | `KUBECONFIG` |
+| `Kubeconfig - Latitude cto-fra` | `tools-kubernetes-fra` | `KUBECONFIG` |
 | `App Store Connect API` | `tools-appstore-connect` | `APP_STORE_KEY_ID`, `APP_STORE_ISSUER_ID`, `APP_STORE_P8_KEY` |
 
 ## Monitoring and Alerts
