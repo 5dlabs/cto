@@ -407,14 +407,35 @@ impl TemplateContext {
 }
 
 /// Substitute template variables in a string
-/// Supports: {{project_dir}}, {{working_dir}}, {{server_name}}
+/// Supports:
+/// - {{project_dir}}, {{working_dir}}, {{server_name}} - context variables
+/// - ${VAR} - environment variable expansion
+/// - ${VAR:-default} - environment variable with default value
 pub fn substitute_template_variables(template: &str, context: &TemplateContext) -> String {
+    use regex::Regex;
+    use std::env;
+
     let mut result = template.to_string();
 
-    // Replace template variables
+    // Replace context template variables ({{...}} syntax)
     result = result.replace("{{project_dir}}", &context.project_dir.to_string_lossy());
     result = result.replace("{{working_dir}}", &context.working_dir.to_string_lossy());
     result = result.replace("{{server_name}}", &context.server_name);
+
+    // Expand ${VAR} and ${VAR:-default} patterns from environment
+    // This regex matches:
+    // - ${VAR} - simple variable reference
+    // - ${VAR:-default} - variable with default value if not set or empty
+    let env_pattern =
+        Regex::new(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}").expect("Invalid regex pattern");
+
+    result = env_pattern
+        .replace_all(&result, |caps: &regex::Captures| {
+            let var_name = &caps[1];
+            let default = caps.get(2).map_or("", |m| m.as_str());
+            env::var(var_name).unwrap_or_else(|_| default.to_string())
+        })
+        .to_string();
 
     result
 }
