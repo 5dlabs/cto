@@ -122,6 +122,13 @@ spec:
                   name: tools-firecrawl-secrets
                   key: FIRECRAWL_API_KEY
                   optional: true
+            # Tavily API key for web search
+            - name: TAVILY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tools-tavily-secrets
+                  key: TAVILY_API_KEY
+                  optional: true
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
           volumeMounts:
