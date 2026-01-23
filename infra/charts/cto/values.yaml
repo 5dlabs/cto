@@ -249,7 +249,7 @@ agent:
   cliImages:
     claude:
       repository: ghcr.io/5dlabs/claude
-      tag: latest
+      tag: dev
     cursor:
       repository: ghcr.io/5dlabs/cursor
       tag: latest
