@@ -620,7 +620,7 @@ dependencies = [
  "handlebars",
  "k8s-openapi 0.22.0",
  "kube 0.93.1",
- "kube-derive 0.93.1",
+ "kube-derive 0.98.0",
  "lazy_static",
  "mockall",
  "notify",
