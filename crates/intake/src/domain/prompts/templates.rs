@@ -83,6 +83,15 @@ fn subtask_dir_name(task_dir: &str, subtask_id: u32) -> String {
     format!("{task_dir}.{subtask_id}")
 }
 
+/// Create a full subtask ID that matches the directory naming convention.
+///
+/// This returns format like "task-1.1" which matches the directory structure
+/// `.tasks/docs/task-1/subtasks/task-1.1/`.
+fn subtask_full_id(task_id: &str, subtask_id: u32) -> String {
+    let task_dir = task_dir_name(task_id);
+    subtask_dir_name(&task_dir, subtask_id)
+}
+
 /// Get validation commands based on agent type.
 fn get_validation_commands(agent_hint: &str) -> &'static str {
     match agent_hint {
@@ -440,12 +449,8 @@ pub fn generate_acceptance_criteria(task: &Task) -> String {
     if !task.subtasks.is_empty() {
         writeln!(content, "\n## Subtasks\n").ok();
         for subtask in &task.subtasks {
-            writeln!(
-                content,
-                "- [ ] {}.{}: {}",
-                task.id, subtask.id, subtask.title
-            )
-            .ok();
+            let full_id = subtask_full_id(&task.id, subtask.id);
+            writeln!(content, "- [ ] {full_id}: {}", subtask.title).ok();
         }
     }
 
@@ -456,7 +461,7 @@ pub fn generate_acceptance_criteria(task: &Task) -> String {
 pub fn generate_subtask_prompt(task: &Task, subtask: &Subtask) -> String {
     let mut content = String::new();
     let task_title = &task.title;
-    let subtask_id = subtask.full_id();
+    let subtask_id = subtask_full_id(&task.id, subtask.id);
     let subagent = subtask
         .subagent_type
         .map(|t| t.to_string())
@@ -511,7 +516,7 @@ pub fn generate_subtask_prompt(task: &Task, subtask: &Subtask) -> String {
 #[must_use]
 pub fn generate_subtask_acceptance(task: &Task, subtask: &Subtask) -> String {
     let mut content = String::new();
-    let subtask_id = subtask.full_id();
+    let subtask_id = subtask_full_id(&task.id, subtask.id);
     let task_dir = task_dir_name(&task.id);
 
     writeln!(content, "# Acceptance Criteria: Subtask {subtask_id}\n").ok();
@@ -545,7 +550,7 @@ pub fn generate_subtask_xml(task: &Task, subtask: &Subtask) -> String {
     let details_esc = xml_escape(&subtask.details);
     let test_esc = xml_escape(&subtask.test_strategy);
     let parent_title_esc = xml_escape(&task.title);
-    let subtask_id = xml_escape(&subtask.full_id());
+    let subtask_id = xml_escape(&subtask_full_id(&task.id, subtask.id));
 
     let requirements_content = if details_esc.is_empty() {
         format!("Implement subtask {subtask_id} for task {parent_title_esc}.")
@@ -1083,8 +1088,8 @@ Other requirements."
         let md = generate_acceptance_criteria(&task);
 
         assert!(md.contains("## Subtasks"));
-        assert!(md.contains("- [ ] 1.1: Create endpoint"));
-        assert!(md.contains("- [ ] 1.2: Add validation"));
+        assert!(md.contains("- [ ] task-1.1: Create endpoint"));
+        assert!(md.contains("- [ ] task-1.2: Add validation"));
     }
 
     #[test]
