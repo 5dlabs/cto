@@ -3,6 +3,23 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.23](https://github.com/5dlabs/cto/compare/v0.2.22...v0.2.23) (2026-01-23)
+
+
+### ✨ Features
+
+* **intake:** Generate documentation for subtasks ([#3910](https://github.com/5dlabs/cto/issues/3910)) ([ecc30b4](https://github.com/5dlabs/cto/commit/ecc30b4d3f0fc191a1a7b79e15d2fb06ca3b0e32))
+
+
+### 🐛 Bug Fixes
+
+* **tools:** consume stderr and increase timeout in connection pool ([#3911](https://github.com/5dlabs/cto/issues/3911)) ([047efb3](https://github.com/5dlabs/cto/commit/047efb3c1ca6ff565ce0fa9900c3c5fd4179a5ff))
+
+
+### 🔧 Maintenance
+
+* **deps:** bump the npm-minor group in /apps/web with 7 updates ([#3891](https://github.com/5dlabs/cto/issues/3891)) ([9ab8f63](https://github.com/5dlabs/cto/commit/9ab8f63647f3393c9db8c432c4a512bb9ced3f9e))
+
 ## [0.2.22](https://github.com/5dlabs/cto/compare/v0.2.21...v0.2.22) (2026-01-22)
 
 
