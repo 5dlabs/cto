@@ -438,6 +438,14 @@ tools:
           # Set to true for read-only and create/update only (no delete operations)
           ALLOW_ONLY_NON_DESTRUCTIVE_TOOLS: "${K8S_NON_DESTRUCTIVE:-false}"
 
+      kubernetes-mcp:
+        name: "Kubernetes MCP"
+        description: "Kubernetes cluster operations via containers/kubernetes-mcp-server - pod management, deployments, services, and cluster resources"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "kubernetes-mcp-server@latest"]
+        workingDirectory: "/tmp"
+
       terraform:
         name: "Terraform"
         description: "Terraform Registry API integration"
