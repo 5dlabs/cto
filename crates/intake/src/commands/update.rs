@@ -263,7 +263,12 @@ impl UpdateDomain {
 
         // Mark removed task docs (they would be deleted)
         for task in &delta.removed {
-            files.push(PathBuf::from(format!(".tasks/docs/{}/", task.id)));
+            let task_dir = if task.id.starts_with("task-") {
+                task.id.clone()
+            } else {
+                format!("task-{}", task.id)
+            };
+            files.push(PathBuf::from(format!(".tasks/docs/{task_dir}/")));
         }
 
         files
