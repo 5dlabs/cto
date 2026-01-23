@@ -1423,6 +1423,17 @@ impl<'a> CodeResourceManager<'a> {
         {
             pod_spec["serviceAccountName"] = json!(default_sa.clone());
         }
+        // Add imagePullSecrets from controller config if any are defined
+        if !self.config.agent.image_pull_secrets.is_empty() {
+            let secrets: Vec<serde_json::Value> = self
+                .config
+                .agent
+                .image_pull_secrets
+                .iter()
+                .map(|name| json!({"name": name}))
+                .collect();
+            pod_spec["imagePullSecrets"] = json!(secrets);
+        }
 
         let mut job_spec = json!({
             "apiVersion": "batch/v1",
