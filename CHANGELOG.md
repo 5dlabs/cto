@@ -3,6 +3,27 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.24](https://github.com/5dlabs/cto/compare/v0.2.23...v0.2.24) (2026-01-23)
+
+
+### ✨ Features
+
+* add Frankfurt cluster kubeconfig to secrets pipeline ([#3919](https://github.com/5dlabs/cto/issues/3919)) ([cec6876](https://github.com/5dlabs/cto/commit/cec68768250cc08aed32a2d24f6b8d77762a5245))
+* **tools:** add kubernetes-mcp server to MCP configuration ([#3917](https://github.com/5dlabs/cto/issues/3917)) ([572a7e1](https://github.com/5dlabs/cto/commit/572a7e1b7ea45d78e8fa04b98c974dce03d3b4cc))
+* **tools:** add Tavily MCP server for AI-powered web search ([#3915](https://github.com/5dlabs/cto/issues/3915)) ([8a5d409](https://github.com/5dlabs/cto/commit/8a5d40941f2a145a38284a7366c610e3fd346d49))
+
+
+### 🐛 Bug Fixes
+
+* **controller:** add imagePullSecrets to CodeRun pod specs ([#3920](https://github.com/5dlabs/cto/issues/3920)) ([cead939](https://github.com/5dlabs/cto/commit/cead93922eb9666e98839922a4749e95c810bcd5))
+* **tools:** inject FIRECRAWL_API_KEY env var into tools deployment ([#3913](https://github.com/5dlabs/cto/issues/3913)) ([35383e9](https://github.com/5dlabs/cto/commit/35383e97b112e966c626b7f1188e4a1cc5c5c761))
+
+
+### 🔧 Maintenance
+
+* update claude image tag to dev for v0.2.23 intake fix ([#3912](https://github.com/5dlabs/cto/issues/3912)) ([c822c7e](https://github.com/5dlabs/cto/commit/c822c7e23a732430527e50a0d81c6aa7c3b563bb))
+* update play workflow template to use claude:dev ([#3914](https://github.com/5dlabs/cto/issues/3914)) ([c485fc7](https://github.com/5dlabs/cto/commit/c485fc74615310ddf6e40971e4cb3e6070237576))
+
 ## [0.2.23](https://github.com/5dlabs/cto/compare/v0.2.22...v0.2.23) (2026-01-23)
 
 
