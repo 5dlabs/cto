@@ -558,6 +558,20 @@ dev-image-local:
 dev-runtime-all:
     ./scripts/build-dev-image.sh --binary all --image runtime --push
 
+
+
+# Build and push dev linear-sidecar image with local status-sync
+dev-sidecar-image:
+    @echo "Building dev sidecar image with local status-sync..."
+    cargo zigbuild --release --target x86_64-unknown-linux-gnu -p pm --bin status-sync
+    cp target/x86_64-unknown-linux-gnu/release/status-sync .
+    docker buildx build --platform linux/amd64 --push --target production \
+        -f infra/images/linear-sidecar/Dockerfile \
+        -t ghcr.io/5dlabs/linear-sidecar:dev .
+    rm status-sync
+    @echo "✅ Dev sidecar image pushed to ghcr.io/5dlabs/linear-sidecar:dev"
+
+
 # Install cross-compilation tools for dev builds
 install-cross-tools:
     @echo "Installing cross-compilation tools..."
@@ -638,3 +652,15 @@ cleanup-test-projects:
         echo "Aborted"
       fi
     fi
+
+# Build and push dev sidecar image (cross-compiled for linux-x86_64)
+dev-sidecar-image-cross:
+    @echo "Cross-compiling status-sync for linux-x86_64..."
+    cargo zigbuild --release --target x86_64-unknown-linux-gnu -p pm --bin status-sync
+    cp target/x86_64-unknown-linux-gnu/release/status-sync .
+    @echo "Building and pushing ghcr.io/5dlabs/linear-sidecar:dev..."
+    docker buildx build --platform linux/amd64 --push --target production \
+        -f infra/images/linear-sidecar/Dockerfile \
+        -t ghcr.io/5dlabs/linear-sidecar:dev .
+    rm status-sync
+    @echo "✅ Dev sidecar image pushed to ghcr.io/5dlabs/linear-sidecar:dev"

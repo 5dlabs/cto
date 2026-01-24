@@ -139,6 +139,7 @@ pub async fn handle_intake_complete(
     // Create intake request from callback
     let request = IntakeRequest {
         session_id: payload.session_id.clone(),
+        access_token: None,
         prd_issue_id: payload.issue_id.clone(),
         prd_identifier: payload.issue_identifier.clone(),
         team_id: payload.team_id.clone(),

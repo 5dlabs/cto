@@ -82,6 +82,7 @@ git checkout -b feat/my-feature
 - **Tap** (Expo) - expo-router, react-native, Better Auth
 - **Spark** (Electron) - electron-builder, react, Better Auth
 - **Vex** (Unity/C#) - XR Interaction Toolkit, OpenXR, Meta XR SDK
+- **Forge** (Unreal/Godot) - Unreal Engine 5, C++, Blueprints, GDScript
 
 **Support Agents:**
 - **Morgan** - Project management, PRD intake

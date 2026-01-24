@@ -15,6 +15,7 @@ use std::sync::Arc;
 use crate::ai::schemas::ComplexityReport;
 use crate::entities::{Task, TaskStatus};
 use crate::errors::{TasksError, TasksResult};
+use crate::progress::{emit_progress, ProgressEvent};
 use crate::storage::Storage;
 
 use super::cto_config::{generate_cto_config, save_cto_config};
@@ -192,6 +193,17 @@ impl IntakeDomain {
     pub async fn run(&self, config: &IntakeConfig) -> TasksResult<IntakeResult> {
         let mut total_input_tokens = 0u32;
         let mut total_output_tokens = 0u32;
+        let start_time = std::time::Instant::now();
+
+        // Emit progress config event for Linear sidecar
+        let cli_type = std::env::var("TASKS_CLI").unwrap_or_else(|_| "claude".to_string());
+        #[allow(clippy::cast_sign_loss)] // num_tasks is always positive from CLI
+        emit_progress(&ProgressEvent::config(
+            config.model.as_deref().unwrap_or("default"),
+            &cli_type,
+            config.num_tasks as u32,
+            90, // Default acceptance threshold
+        ));
 
         // 1. Read PRD content
         let prd_content = tokio::fs::read_to_string(&config.prd_path)
@@ -228,6 +240,10 @@ impl IntakeDomain {
         };
 
         // 3. Parse PRD to generate tasks
+        emit_progress(&ProgressEvent::step_started(
+            1,
+            "Parse PRD and generate tasks",
+        ));
         tracing::info!(
             "Step 1/4: Parsing PRD to generate ~{} tasks...",
             config.num_tasks
@@ -247,9 +263,15 @@ impl IntakeDomain {
         total_output_tokens += prd_usage.output_tokens;
 
         tracing::info!("Generated {} tasks", tasks.len());
+        emit_progress(&ProgressEvent::step_completed(
+            1,
+            "Parse PRD and generate tasks",
+            Some(&format!("{} tasks generated", tasks.len())),
+        ));
 
         // 4. Analyze complexity if requested
         let complexity_report = if config.analyze {
+            emit_progress(&ProgressEvent::step_started(2, "Analyze task complexity"));
             tracing::info!("Step 2/4: Analyzing task complexity...");
             let (report, analyze_usage) = self
                 .ai_domain
@@ -265,9 +287,19 @@ impl IntakeDomain {
             total_output_tokens += analyze_usage.output_tokens;
 
             tracing::info!("Complexity analysis complete");
+            emit_progress(&ProgressEvent::step_completed(
+                2,
+                "Analyze task complexity",
+                None,
+            ));
             Some(report)
         } else {
             tracing::info!("Step 2/4: Skipping complexity analysis");
+            emit_progress(&ProgressEvent::step_skipped(
+                2,
+                "Analyze task complexity",
+                "analyze=false",
+            ));
             None
         };
 
@@ -280,6 +312,10 @@ impl IntakeDomain {
                 .map(|t| t.id.clone())
                 .collect();
 
+            emit_progress(&ProgressEvent::step_started(
+                3,
+                "Expand tasks into subtasks",
+            ));
             tracing::info!(
                 "Step 3/4: Expanding {} tasks into subtasks...",
                 tasks_to_expand.len()
@@ -330,8 +366,18 @@ impl IntakeDomain {
                 }
             }
             tracing::info!("Generated {} subtasks total", subtasks_count);
+            emit_progress(&ProgressEvent::step_completed(
+                3,
+                "Expand tasks into subtasks",
+                Some(&format!("{} subtasks", subtasks_count)),
+            ));
         } else {
             tracing::info!("Step 3/4: Skipping task expansion");
+            emit_progress(&ProgressEvent::step_skipped(
+                3,
+                "Expand tasks into subtasks",
+                "expand=false",
+            ));
         }
 
         // 5.5: Normalize agent hints to lowercase
@@ -481,6 +527,7 @@ impl IntakeDomain {
         }
 
         // 9. Generate documentation
+        emit_progress(&ProgressEvent::step_started(4, "Generate documentation"));
         tracing::info!("Step 4/4: Generating per-task documentation...");
         let docs_dir = config.output_dir.join("docs");
         let docs_result = generate_all_docs(&tasks, &docs_dir).await?;
@@ -489,6 +536,11 @@ impl IntakeDomain {
             "Created {} task documentation directories",
             docs_result.task_dirs_created
         );
+        emit_progress(&ProgressEvent::step_completed(
+            4,
+            "Generate documentation",
+            Some(&format!("{} doc dirs", docs_result.task_dirs_created)),
+        ));
 
         // 10. Generate cto-config.json with per-agent tools
         if config.repository.is_some() || config.service.is_some() {
@@ -545,6 +597,14 @@ impl IntakeDomain {
             subtasks_count,
             docs_result.task_dirs_created
         );
+
+        #[allow(clippy::cast_possible_truncation)] // Task count realistically < 4B
+        emit_progress(&ProgressEvent::complete(
+            tasks.len() as u32,
+            start_time.elapsed().as_secs_f64(),
+            true,
+            None,
+        ));
 
         Ok(IntakeResult {
             tasks_count: tasks.len(),

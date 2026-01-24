@@ -59,6 +59,10 @@ pub struct LinearIntegration {
     #[serde(rename = "sessionId", default)]
     pub session_id: Option<String>,
 
+    /// OAuth access token for Linear agent API calls (from webhook)
+    #[serde(rename = "accessToken", default)]
+    pub access_token: Option<String>,
+
     /// Linear issue ID for status updates
     #[serde(rename = "issueId", default)]
     pub issue_id: Option<String>,

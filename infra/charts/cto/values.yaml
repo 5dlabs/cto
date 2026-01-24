@@ -238,7 +238,7 @@ controller:
 
   # Linear sidecar configuration (whip cracking enabled)
   linear:
-    sidecarImage: ghcr.io/5dlabs/linear-sidecar:latest
+    sidecarImage: ghcr.io/5dlabs/linear-sidecar:dev
     serviceUrl: http://pm-server:8080
 
 # =============================================================================
