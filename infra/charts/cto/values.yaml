@@ -1047,7 +1047,7 @@ research:
   # Research configuration
   minRelevance: "0.5"
   batchSize: "10"
-  model: "claude-sonnet-4-20250514"
+  model: "claude-sonnet-4-5-20250929"
 
   # PR creation
   createPR: true
