@@ -476,6 +476,9 @@ mod tests {
                 topics: vec!["testing".to_string()],
                 should_enrich: false,
                 implementation_ideas: vec!["Test idea".to_string()],
+                feature_score: crate::analysis::FeatureScore::default(),
+                priority: crate::analysis::Priority::default(),
+                affected_agents: vec![],
             },
         );
 
