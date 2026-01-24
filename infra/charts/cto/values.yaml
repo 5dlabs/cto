@@ -1055,6 +1055,32 @@ research:
   baseBranch: "main"
   researchDir: "docs/research"
 
+  # Enrichment configuration
+  enrichment:
+    # Firecrawl - scrapes linked URLs for content
+    firecrawl:
+      enabled: true
+    # OctoCode - searches GitHub for code examples
+    octocode:
+      enabled: true
+      maxExamplesPerTopic: 3
+    # Tavily - web research for competitive analysis
+    tavily:
+      enabled: true
+      maxResultsPerTopic: 5
+
+  # Analysis configuration
+  analysis:
+    # Enable platform context-aware analysis
+    contextAware: true
+    # Multi-dimensional scoring
+    scoringDimensions:
+      - technicalFit
+      - impact
+      - effort
+      - urgency
+      - strategicAlignment
+
   persistence:
     size: 10Gi
     storageClass: ""  # Uses global.storageClass if empty
@@ -1079,6 +1105,10 @@ research:
     model: ""
     # Kubernetes Secret containing: GMAIL_USERNAME, GMAIL_APP_PASSWORD, optional DIGEST_* vars
     secretName: "research-digest-secrets" # pragma: allowlist secret
+    # Digest format: "prioritized" (groups by priority) or "chronological"
+    format: "prioritized"
+    # Auto-merge research PRs (requires GitHub workflow)
+    autoMerge: true
 
 # =============================================================================
 # Maintenance - Workspace and Event Cleanup

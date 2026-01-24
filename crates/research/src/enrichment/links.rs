@@ -81,6 +81,25 @@ impl LinkEnricher {
         Ok(enriched)
     }
 
+    /// Enrich a list of URLs directly (without a Bookmark).
+    pub async fn enrich_urls(&self, urls: &[String]) -> Result<Vec<EnrichedLink>> {
+        let mut enriched = Vec::new();
+
+        for url in urls.iter().take(self.config.max_links) {
+            match self.scrape_url(url).await {
+                Ok(link) => {
+                    tracing::info!(url, "Successfully enriched link");
+                    enriched.push(link);
+                }
+                Err(e) => {
+                    tracing::warn!(url, error = %e, "Failed to enrich link");
+                }
+            }
+        }
+
+        Ok(enriched)
+    }
+
     /// Scrape a single URL and create an enriched link.
     async fn scrape_url(&self, url: &str) -> Result<EnrichedLink> {
         let options = ScrapeOptions {
