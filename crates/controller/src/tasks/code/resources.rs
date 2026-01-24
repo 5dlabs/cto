@@ -995,6 +995,10 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "MCP_CLIENT_CONFIG",
                 "value": "/workspace/client-config.json"
             }),
+            json!({
+                "name": "PROGRESS_FILE",
+                "value": "/workspace/progress.jsonl"
+            }),
         ];
 
         if cli_type == CLIType::Codex {
@@ -1269,6 +1273,7 @@ impl<'a> CodeResourceManager<'a> {
                     json!({ "name": "RUST_LOG", "value": "info" }),
                     // New: Log streaming and input polling paths
                     json!({ "name": "LOG_FILE_PATH", "value": "/workspace/agent.log" }),
+                    json!({ "name": "PROGRESS_FILE", "value": "/workspace/progress.jsonl" }),
                     json!({ "name": "INPUT_FIFO_PATH", "value": "/workspace/agent-input.jsonl" }),
                     json!({ "name": "HTTP_PORT", "value": "8080" }),
                     // Whip cracking - progress monitoring with escalating nudges
@@ -1278,29 +1283,43 @@ impl<'a> CodeResourceManager<'a> {
                     json!({ "name": "MAX_NUDGE_LEVEL", "value": "3" }),
                 ];
 
-                // Add LINEAR_OAUTH_TOKEN from agent-specific secret
-                // Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex", "cto-dev" -> "morgan")
-                let agent_name = code_run
-                    .spec
-                    .github_app
-                    .as_deref()
-                    .and_then(|app| {
-                        app.strip_prefix("5DLabs-")
-                            .or_else(|| app.strip_prefix("5dlabs-"))
-                    })
-                    .map_or_else(|| "morgan".to_string(), str::to_lowercase);
-                let agent_secret_name = format!("linear-app-{agent_name}");
+                // Add LINEAR_OAUTH_TOKEN - prefer access_token from CodeRun spec (from webhook),
+                // fall back to agent-specific secret
+                if let Some(access_token) = linear.access_token.as_ref() {
+                    info!("Using OAuth access token from CodeRun spec (webhook payload)");
+                    sidecar_env.push(json!({
+                        "name": "LINEAR_OAUTH_TOKEN",
+                        "value": access_token
+                    }));
+                } else {
+                    // Fall back to agent-specific secret
+                    // Extract agent name from github_app (e.g., "5DLabs-Rex" -> "rex", "cto-dev" -> "morgan")
+                    let agent_name = code_run
+                        .spec
+                        .github_app
+                        .as_deref()
+                        .and_then(|app| {
+                            app.strip_prefix("5DLabs-")
+                                .or_else(|| app.strip_prefix("5dlabs-"))
+                        })
+                        .map_or_else(|| "morgan".to_string(), str::to_lowercase);
+                    let agent_secret_name = format!("linear-app-{agent_name}");
 
-                sidecar_env.push(json!({
-                    "name": "LINEAR_OAUTH_TOKEN",
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": agent_secret_name.clone(),
-                            "key": "access_token",
-                            "optional": true
+                    info!(
+                        "No access token in CodeRun spec, falling back to secret {}",
+                        agent_secret_name
+                    );
+                    sidecar_env.push(json!({
+                        "name": "LINEAR_OAUTH_TOKEN",
+                        "valueFrom": {
+                            "secretKeyRef": {
+                                "name": agent_secret_name.clone(),
+                                "key": "access_token",
+                                "optional": true
+                            }
                         }
-                    }
-                }));
+                    }));
+                }
                 // Also add LINEAR_API_KEY as fallback (status-sync uses either)
                 sidecar_env.push(json!({
                     "name": "LINEAR_API_KEY",
@@ -1312,14 +1331,23 @@ impl<'a> CodeResourceManager<'a> {
                         }
                     }
                 }));
-                info!(
-                    "Using agent secret {} for Linear OAuth token",
-                    agent_secret_name
-                );
 
+                let sidecar_image = self
+                    .config
+                    .linear
+                    .sidecar_image
+                    .clone()
+                    .unwrap_or_else(|| "ghcr.io/5dlabs/linear-sidecar:latest".to_string());
+                let sidecar_pull_policy =
+                    if sidecar_image.ends_with(":latest") || sidecar_image.ends_with(":dev") {
+                        "Always"
+                    } else {
+                        "IfNotPresent"
+                    };
                 let sidecar_spec = json!({
                     "name": "linear-sidecar",
-                    "image": self.config.linear.sidecar_image.clone().unwrap_or_else(|| "ghcr.io/5dlabs/linear-sidecar:latest".to_string()),
+                    "image": sidecar_image,
+                    "imagePullPolicy": sidecar_pull_policy,
                     "env": sidecar_env,
                     "volumeMounts": [
                         { "name": "linear-status", "mountPath": "/status" },
@@ -2293,6 +2321,7 @@ mod tests {
             Some(LinearIntegration {
                 enabled: true,
                 session_id: Some("test-session-123".to_string()),
+                access_token: None,
                 issue_id: Some("TEST-456".to_string()),
                 team_id: Some("team-789".to_string()),
             })

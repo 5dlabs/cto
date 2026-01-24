@@ -56,6 +56,7 @@ pub struct Config {
     pub log_file: String,
     pub input_fifo: String,
     pub claude_stream_file: String,
+    pub progress_file: String,
 
     // Service URLs
     pub linear_service_url: String,
@@ -127,6 +128,8 @@ impl Config {
                 .unwrap_or_else(|_| "/workspace/agent-input.jsonl".to_string()),
             claude_stream_file: std::env::var("CLAUDE_STREAM_FILE")
                 .unwrap_or_else(|_| "/workspace/claude-stream.jsonl".to_string()),
+            progress_file: std::env::var("PROGRESS_FILE")
+                .unwrap_or_else(|_| "/workspace/progress.jsonl".to_string()),
 
             linear_service_url: std::env::var("LINEAR_SERVICE_URL")
                 .unwrap_or_else(|_| "http://pm-svc.cto.svc.cluster.local:8081".to_string()),
@@ -238,31 +241,23 @@ impl Config {
 /// Activity content types for Linear Agent API.
 /// Follows Linear's agent activity specification.
 #[derive(Debug, Clone, Serialize)]
-#[serde(untagged)]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum LinearActivityContent {
     /// A thought or internal note
-    Thought { thought: ThoughtBody },
+    Thought { body: String },
     /// A tool invocation or action
-    Action { action: ActionBody },
+    Action {
+        action: String,
+        parameter: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        result: Option<String>,
+    },
     /// Request for user input
-    Elicitation { elicitation: ThoughtBody },
+    Elicitation { body: String },
     /// Final response/completion
-    Response { response: ThoughtBody },
+    Response { body: String },
     /// Error report
-    Error { error: ThoughtBody },
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ThoughtBody {
-    pub body: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ActionBody {
-    pub action: String,
-    pub parameter: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<String>,
+    Error { body: String },
 }
 
 /// Agent plan step status (per Linear API)
@@ -370,6 +365,7 @@ impl LinearApiClient {
             },
         };
 
+        debug!(session_id = %session_id, "Emitting Linear activity");
         let response = self
             .client
             .post(&self.api_url)
@@ -378,9 +374,26 @@ impl LinearApiClient {
             .await
             .context("Failed to send activity request")?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+
+        // Check for GraphQL errors in response body
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
+            if let Some(errors) = json.get("errors") {
+                warn!(errors = %errors, "Linear GraphQL errors");
+            }
+            if let Some(data) = json.get("data") {
+                if let Some(create) = data.get("agentActivityCreate") {
+                    if create.get("success") == Some(&serde_json::Value::Bool(true)) {
+                        debug!(session_id = %session_id, "Activity emitted successfully");
+                    } else {
+                        warn!(response = %body, "Activity creation returned success=false");
+                    }
+                }
+            }
+        }
+
+        if !status.is_success() {
             warn!(status = %status, body = %body, "Linear API activity emission failed");
         }
 
@@ -396,9 +409,7 @@ impl LinearApiClient {
         self.emit_activity(
             session_id,
             LinearActivityContent::Thought {
-                thought: ThoughtBody {
-                    body: body.to_string(),
-                },
+                body: body.to_string(),
             },
             false,
         )
@@ -414,9 +425,7 @@ impl LinearApiClient {
         self.emit_activity(
             session_id,
             LinearActivityContent::Thought {
-                thought: ThoughtBody {
-                    body: body.to_string(),
-                },
+                body: body.to_string(),
             },
             true,
         )
@@ -432,11 +441,9 @@ impl LinearApiClient {
         self.emit_activity(
             session_id,
             LinearActivityContent::Action {
-                action: ActionBody {
-                    action: action.to_string(),
-                    parameter: parameter.to_string(),
-                    result: None,
-                },
+                action: action.to_string(),
+                parameter: parameter.to_string(),
+                result: None,
             },
             false,
         )
@@ -458,11 +465,9 @@ impl LinearApiClient {
         self.emit_activity(
             session_id,
             LinearActivityContent::Action {
-                action: ActionBody {
-                    action: action.to_string(),
-                    parameter: parameter.to_string(),
-                    result: Some(result.to_string()),
-                },
+                action: action.to_string(),
+                parameter: parameter.to_string(),
+                result: Some(result.to_string()),
             },
             false,
         )
@@ -478,9 +483,7 @@ impl LinearApiClient {
         self.emit_activity(
             session_id,
             LinearActivityContent::Error {
-                error: ThoughtBody {
-                    body: body.to_string(),
-                },
+                body: body.to_string(),
             },
             false,
         )
@@ -496,9 +499,7 @@ impl LinearApiClient {
         self.emit_activity(
             session_id,
             LinearActivityContent::Response {
-                response: ThoughtBody {
-                    body: body.to_string(),
-                },
+                body: body.to_string(),
             },
             false,
         )
@@ -996,6 +997,37 @@ fn strip_ansi_codes(s: &str) -> String {
     re.replace_all(s, "").to_string()
 }
 
+/// Check if a log line is internal intake/sidecar noise that should be filtered.
+/// These are implementation details, not user-visible progress.
+fn is_internal_noise(line: &str) -> bool {
+    // Intake binary internal messages
+    line.contains("Streaming output to file for sidecar")
+        || line.contains("cli_type=")
+        || line.contains("prompt_len=")
+        || line.contains("extended_thinking=")
+        || line.contains("force_disable_thinking=")
+        || line.contains("thinking_budget=")
+        || line.contains("mcp_config=")
+        // Sidecar internal logs
+        || line.contains("Starting Linear sidecar")
+        || line.contains("Sidecar configured")
+        || line.contains("Linear API client initialized")
+        || line.contains("Setting initial agent plan")
+        || line.contains("Whip cracker starting")
+        || line.contains("Starting main container exit watch")
+        || line.contains("Starting HTTP server")
+        || line.contains("Initial process count")
+        || line.contains("Initialized with existing activities")
+        || line.contains("Starting log file streaming")
+        || line.contains("Starting Claude stream parsing")
+        || line.contains("Starting intake progress stream")
+        // Other noise
+        || line.contains("Generating text via CLI")
+        || line.contains("[DEBUG]")
+        || line.starts_with("Fresh ")
+        || line.starts_with("   Compiling ")
+}
+
 /// Log streaming task - tails log file and posts to Linear.
 async fn log_stream_task(config: Arc<Config>, linear_client: Option<LinearApiClient>) {
     let Some(client) = linear_client else {
@@ -1056,6 +1088,11 @@ async fn log_stream_task(config: Arc<Config>, linear_client: Option<LinearApiCli
                 sleep(Duration::from_millis(100)).await;
             }
             Ok(_) => {
+                // Filter out internal noise - don't add to buffer
+                if is_internal_noise(&line) {
+                    continue;
+                }
+
                 buffer.push_str(&line);
 
                 // Post immediately on important events or when buffer is large
@@ -1177,6 +1214,60 @@ pub enum ContentBlock {
 pub struct UsageInfo {
     pub input_tokens: Option<u64>,
     pub output_tokens: Option<u64>,
+}
+
+// =============================================================================
+// Intake Progress Events (for intake workflow monitoring)
+// =============================================================================
+
+/// Step status for tracking workflow progress.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IntakeStepStatus {
+    Pending,
+    InProgress,
+    Completed,
+    Skipped,
+    Failed,
+}
+
+/// Progress events emitted by intake workflow.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum IntakeProgressEvent {
+    /// Initial configuration summary.
+    Config {
+        model: String,
+        cli: String,
+        target_tasks: u32,
+        acceptance: u32,
+    },
+    /// Workflow step progress update.
+    Step {
+        step: u8,
+        total: u8,
+        name: String,
+        status: IntakeStepStatus,
+        #[serde(default)]
+        details: Option<String>,
+    },
+    /// Retry attempt notification.
+    Retry {
+        step: u8,
+        attempt: u8,
+        max: u8,
+        reason: String,
+    },
+    /// Task generation progress.
+    TaskProgress { generated: u32, target: u32 },
+    /// Workflow completion summary.
+    Complete {
+        tasks: u32,
+        duration_secs: f64,
+        success: bool,
+        #[serde(default)]
+        error: Option<String>,
+    },
 }
 
 /// Artifact trail file path
@@ -1397,6 +1488,184 @@ async fn inject_artifact_summary(input_fifo: &str, trail: &ArtifactTrail) -> boo
             false
         }
     }
+}
+
+/// Intake progress stream task - reads progress.jsonl and updates Linear plan.
+/// Maps intake progress events to Linear activities for better visibility.
+async fn progress_stream_task(config: Arc<Config>, linear_client: Option<LinearApiClient>) {
+    let Some(client) = linear_client else {
+        info!("Linear API not configured, progress stream parsing disabled");
+        return;
+    };
+
+    // Wait for progress file to exist
+    loop {
+        if fs::metadata(&config.progress_file).await.is_ok() {
+            break;
+        }
+        debug!(path = %config.progress_file, "Waiting for progress file to exist");
+        sleep(Duration::from_secs(2)).await;
+    }
+
+    info!(path = %config.progress_file, "Starting intake progress stream parsing");
+
+    // Open file and track position
+    let file = match File::open(&config.progress_file).await {
+        Ok(f) => f,
+        Err(e) => {
+            error!(error = %e, "Failed to open progress file");
+            return;
+        }
+    };
+
+    let mut reader = BufReader::new(file);
+    let mut current_plan: Vec<PlanStep> = vec![
+        PlanStep {
+            content: "Parse PRD and generate tasks".to_string(),
+            status: PlanStepStatus::Pending,
+        },
+        PlanStep {
+            content: "Analyze task complexity".to_string(),
+            status: PlanStepStatus::Pending,
+        },
+        PlanStep {
+            content: "Expand tasks into subtasks".to_string(),
+            status: PlanStepStatus::Pending,
+        },
+        PlanStep {
+            content: "Generate documentation".to_string(),
+            status: PlanStepStatus::Pending,
+        },
+    ];
+
+    // Set initial plan
+    if let Err(e) = client
+        .update_plan(&config.linear_session_id, &current_plan)
+        .await
+    {
+        warn!(error = %e, "Failed to set initial intake plan");
+    }
+
+    loop {
+        let mut line = String::new();
+        match reader.read_line(&mut line).await {
+            Ok(0) => {
+                sleep(Duration::from_millis(config.stream_poll_interval_ms)).await;
+            }
+            Ok(_) => {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+
+                // Parse the JSON event
+                match serde_json::from_str::<IntakeProgressEvent>(line) {
+                    Ok(event) => {
+                        if let Err(e) = process_progress_event(
+                            &client,
+                            &config.linear_session_id,
+                            &event,
+                            &mut current_plan,
+                        )
+                        .await
+                        {
+                            warn!(error = %e, "Failed to process progress event");
+                        }
+                    }
+                    Err(e) => {
+                        debug!(error = %e, line = %line, "Failed to parse progress event");
+                    }
+                }
+            }
+            Err(e) => {
+                error!(error = %e, "Error reading progress file");
+                sleep(Duration::from_secs(1)).await;
+            }
+        }
+    }
+}
+
+/// Process a single intake progress event and update Linear.
+#[allow(clippy::ptr_arg)] // plan needs to be Vec for update_plan API
+async fn process_progress_event(
+    client: &LinearApiClient,
+    session_id: &str,
+    event: &IntakeProgressEvent,
+    plan: &mut Vec<PlanStep>,
+) -> Result<()> {
+    match event {
+        IntakeProgressEvent::Config {
+            model,
+            cli,
+            target_tasks,
+            acceptance,
+        } => {
+            info!(model = %model, cli = %cli, target = %target_tasks, "Processing config event");
+            let msg = format!(
+                "**Intake starting** | Model: `{model}` | CLI: `{cli}` | Target: ~{target_tasks} tasks | Acceptance: {acceptance}%",
+            );
+            client.emit_thought(session_id, &msg).await?;
+        }
+        IntakeProgressEvent::Step {
+            step,
+            name,
+            status,
+            details,
+            ..
+        } => {
+            info!(step = %step, name = %name, status = ?status, "Processing step event");
+            let step_idx = (*step as usize).saturating_sub(1);
+            if step_idx < plan.len() {
+                // Update plan step status
+                plan[step_idx].status = match status {
+                    IntakeStepStatus::Pending => PlanStepStatus::Pending,
+                    IntakeStepStatus::InProgress => PlanStepStatus::InProgress,
+                    IntakeStepStatus::Completed => PlanStepStatus::Completed,
+                    IntakeStepStatus::Skipped | IntakeStepStatus::Failed => {
+                        PlanStepStatus::Canceled
+                    }
+                };
+
+                // Update content with details if completed
+                if matches!(status, IntakeStepStatus::Completed) {
+                    if let Some(d) = details {
+                        plan[step_idx].content = format!("{name} ({d})");
+                    }
+                }
+
+                client.update_plan(session_id, plan).await?;
+            }
+        }
+        IntakeProgressEvent::Retry {
+            step,
+            attempt,
+            max,
+            reason,
+        } => {
+            let msg = format!("⚠️ **Retry {attempt}/{max}** (Step {step}): {reason}");
+            client.emit_ephemeral_thought(session_id, &msg).await?;
+        }
+        IntakeProgressEvent::TaskProgress { generated, target } => {
+            let msg = format!("📊 Generated {generated}/{target} tasks");
+            client.emit_ephemeral_thought(session_id, &msg).await?;
+        }
+        IntakeProgressEvent::Complete {
+            tasks,
+            duration_secs,
+            success,
+            error,
+        } => {
+            if *success {
+                let msg = format!("✅ **Intake complete** | {tasks} tasks | {duration_secs:.1}s",);
+                client.emit_response(session_id, &msg).await?;
+            } else {
+                let err_msg = error.as_deref().unwrap_or("Unknown error");
+                let msg = format!("❌ **Intake failed** | {err_msg}");
+                client.emit_error(session_id, &msg).await?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Track tool invocation state for proper action activities
@@ -2315,6 +2584,15 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Intake progress stream parsing task (plan updates from progress.jsonl)
+    let config_clone = config.clone();
+    let linear_client_clone = linear_client.clone();
+    let progress_handle = tokio::spawn(async move {
+        if config_clone.has_linear_api() {
+            progress_stream_task(config_clone, linear_client_clone).await;
+        }
+    });
+
     // Clone fifo_tx for both input polling and progress monitor
     let fifo_tx_for_input = fifo_tx.clone();
     let fifo_tx_for_whip = fifo_tx;
@@ -2395,6 +2673,12 @@ async fn main() -> Result<()> {
             }
             warn!("Claude stream task exited");
         }
+        result = progress_handle => {
+            if let Err(e) = result {
+                warn!(error = %e, "Progress stream task panicked");
+            }
+            info!("Progress stream task exited");
+        }
         result = input_handle => {
             if let Err(e) = result {
                 warn!(error = %e, "Input poll task panicked");
@@ -2429,4 +2713,121 @@ async fn main() -> Result<()> {
 
     info!("Sidecar shutdown complete");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that `IntakeProgressEvent::Step` deserializes correctly when `details` field is missing.
+    /// This is critical because the producer uses `#[serde(skip_serializing_if = "Option::is_none")]`
+    /// to omit the field when `None`, and without `#[serde(default)]` on the consumer side,
+    /// deserialization would fail.
+    #[test]
+    fn test_step_event_deserialize_without_details() {
+        let json = r#"{"type":"step","step":1,"total":4,"name":"Parse PRD","status":"in_progress"}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        match event {
+            IntakeProgressEvent::Step {
+                step,
+                total,
+                name,
+                status,
+                details,
+            } => {
+                assert_eq!(step, 1);
+                assert_eq!(total, 4);
+                assert_eq!(name, "Parse PRD");
+                assert!(matches!(status, IntakeStepStatus::InProgress));
+                assert!(details.is_none());
+            }
+            _ => panic!("Expected Step variant"),
+        }
+    }
+
+    /// Test that `IntakeProgressEvent::Step` deserializes correctly when `details` field is present.
+    #[test]
+    fn test_step_event_deserialize_with_details() {
+        let json = r#"{"type":"step","step":2,"total":4,"name":"Generate Tasks","status":"completed","details":"Generated 50 tasks"}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        match event {
+            IntakeProgressEvent::Step {
+                step,
+                total,
+                name,
+                status,
+                details,
+            } => {
+                assert_eq!(step, 2);
+                assert_eq!(total, 4);
+                assert_eq!(name, "Generate Tasks");
+                assert!(matches!(status, IntakeStepStatus::Completed));
+                assert_eq!(details.as_deref(), Some("Generated 50 tasks"));
+            }
+            _ => panic!("Expected Step variant"),
+        }
+    }
+
+    /// Test that `IntakeProgressEvent::Complete` deserializes correctly when `error` field is missing.
+    /// This is the success case - workflows complete successfully without an error field.
+    #[test]
+    fn test_complete_event_deserialize_without_error() {
+        let json = r#"{"type":"complete","tasks":50,"duration_secs":120.5,"success":true}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        match event {
+            IntakeProgressEvent::Complete {
+                tasks,
+                duration_secs,
+                success,
+                error,
+            } => {
+                assert_eq!(tasks, 50);
+                assert!((duration_secs - 120.5).abs() < f64::EPSILON);
+                assert!(success);
+                assert!(error.is_none());
+            }
+            _ => panic!("Expected Complete variant"),
+        }
+    }
+
+    /// Test that `IntakeProgressEvent::Complete` deserializes correctly when `error` field is present.
+    /// This is the failure case - workflows fail with an error message.
+    #[test]
+    fn test_complete_event_deserialize_with_error() {
+        let json = r#"{"type":"complete","tasks":0,"duration_secs":30.0,"success":false,"error":"Failed to parse PRD"}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        match event {
+            IntakeProgressEvent::Complete {
+                tasks,
+                duration_secs,
+                success,
+                error,
+            } => {
+                assert_eq!(tasks, 0);
+                assert!((duration_secs - 30.0).abs() < f64::EPSILON);
+                assert!(!success);
+                assert_eq!(error.as_deref(), Some("Failed to parse PRD"));
+            }
+            _ => panic!("Expected Complete variant"),
+        }
+    }
+
+    /// Test deserialization of all other event types to ensure they still work.
+    #[test]
+    fn test_other_event_types_deserialize() {
+        // Config event
+        let json = r#"{"type":"config","model":"claude-opus-4-5","cli":"claude","target_tasks":50,"acceptance":90}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        assert!(matches!(event, IntakeProgressEvent::Config { .. }));
+
+        // Retry event
+        let json = r#"{"type":"retry","step":1,"attempt":2,"max":3,"reason":"Extended thinking disabled"}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        assert!(matches!(event, IntakeProgressEvent::Retry { .. }));
+
+        // TaskProgress event
+        let json = r#"{"type":"task_progress","generated":25,"target":50}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        assert!(matches!(event, IntakeProgressEvent::TaskProgress { .. }));
+    }
 }

@@ -20,6 +20,7 @@ use crate::ai::{
 };
 use crate::entities::{DecisionPoint, Subtask, Task, TaskPriority, TaskStatus};
 use crate::errors::{TasksError, TasksResult};
+use crate::progress::{emit_progress, ProgressEvent};
 use crate::storage::Storage;
 
 /// Maximum retry attempts for PRD parsing when AI returns invalid responses
@@ -146,12 +147,16 @@ impl AIDomain {
         // IMPORTANT: Explicitly disable MCP tools for PRD parsing to force pure JSON output.
         // When Claude has access to tools (Read, Write, Glob, etc.), it tends to use them
         // instead of outputting JSON directly, which breaks the prefill technique.
+        // IMPORTANT: Disable extended thinking for PRD parsing.
+        // Extended thinking causes Claude to generate explanations/summaries instead of raw JSON.
+        // The retry logic will also keep thinking disabled to ensure consistent JSON output.
         let options = GenerateOptions {
             temperature: Some(0.7),
             max_tokens: Some(64_000),
             json_mode: true,
             mcp_config: None,
-            disable_mcp: true, // Disable MCP to force pure JSON output
+            disable_mcp: true,            // Disable MCP to force pure JSON output
+            force_disable_thinking: true, // Disable extended thinking for strict JSON output
             ..Default::default()
         };
 
@@ -169,6 +174,13 @@ impl AIDomain {
                     max_retries = MAX_PRD_PARSE_RETRIES,
                     "Retrying PRD parsing with extended thinking force-disabled"
                 );
+                #[allow(clippy::cast_possible_truncation)]
+                emit_progress(&ProgressEvent::retry(
+                    1,                           // Step 1: Parse PRD
+                    (attempt + 1) as u8,         // Safe: attempt < MAX_PRD_PARSE_RETRIES (3)
+                    MAX_PRD_PARSE_RETRIES as u8, // Safe: constant = 3
+                    "Extended thinking disabled, retrying",
+                ));
                 GenerateOptions {
                     force_disable_thinking: true, // Force disable thinking on retry
                     temperature: Some(0.8),       // Slightly higher temp for variety
@@ -198,6 +210,13 @@ impl AIDomain {
                     error = %e,
                     "AI returned invalid content, will retry if attempts remaining"
                 );
+                #[allow(clippy::cast_possible_truncation)]
+                emit_progress(&ProgressEvent::retry(
+                    1,                           // Step 1: Parse PRD
+                    (attempt + 1) as u8,         // Safe: attempt < MAX_PRD_PARSE_RETRIES (3)
+                    MAX_PRD_PARSE_RETRIES as u8, // Safe: constant = 3
+                    "AI returned invalid content",
+                ));
                 last_error = Some(e);
                 continue;
             }
@@ -228,6 +247,13 @@ impl AIDomain {
                         error = %e,
                         "Failed to parse AI response as JSON, will retry if attempts remaining"
                     );
+                    #[allow(clippy::cast_possible_truncation)]
+                    emit_progress(&ProgressEvent::retry(
+                        1,                           // Step 1: Parse PRD
+                        (attempt + 1) as u8,         // Safe: attempt < MAX_PRD_PARSE_RETRIES (3)
+                        MAX_PRD_PARSE_RETRIES as u8, // Safe: constant = 3
+                        "JSON parse failed",
+                    ));
                     last_error = Some(e);
                 }
             }

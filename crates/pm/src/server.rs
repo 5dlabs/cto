@@ -328,17 +328,17 @@ async fn trigger_intake(
         .unwrap_or_else(|| format!("manual-intake-{}", chrono::Utc::now().timestamp()));
 
     // Extract intake request (reads PRD/arch from ConfigMap if available)
-    let intake_request = match extract_intake_request(&state.kube_client, &session_id, &issue).await
-    {
-        Ok(req) => req,
-        Err(e) => {
-            error!(error = %e, "Failed to extract intake request");
-            return Ok(Json(json!({
-                "status": "error",
-                "error": format!("Failed to extract intake request: {e}")
-            })));
-        }
-    };
+    let intake_request =
+        match extract_intake_request(&state.kube_client, &session_id, None, &issue).await {
+            Ok(req) => req,
+            Err(e) => {
+                error!(error = %e, "Failed to extract intake request");
+                return Ok(Json(json!({
+                    "status": "error",
+                    "error": format!("Failed to extract intake request: {e}")
+                })));
+            }
+        };
 
     // Submit the CodeRun (new architecture - direct CodeRun creation)
     let namespace = &state.config.namespace;
@@ -1059,7 +1059,7 @@ async fn handle_session_created(
 
         // Extract intake request from issue (reads PRD/arch from ConfigMap if available)
         let intake_request =
-            match extract_intake_request(&state.kube_client, session_id, &issue).await {
+            match extract_intake_request(&state.kube_client, session_id, None, &issue).await {
                 Ok(req) => req,
                 Err(e) => {
                     error!(error = %e, "Failed to extract intake request");

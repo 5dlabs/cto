@@ -296,6 +296,7 @@ impl RelevanceAnalyzer {
         let feature_score = raw.feature_score.map_or_else(
             || {
                 // Infer from simple score if feature_score not provided
+                #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                 let score_scaled = (raw.score * 10.0) as u8;
                 FeatureScore {
                     technical_fit: score_scaled.min(10),
