@@ -1248,6 +1248,7 @@ pub enum IntakeProgressEvent {
         total: u8,
         name: String,
         status: IntakeStepStatus,
+        #[serde(default)]
         details: Option<String>,
     },
     /// Retry attempt notification.
@@ -1264,6 +1265,7 @@ pub enum IntakeProgressEvent {
         tasks: u32,
         duration_secs: f64,
         success: bool,
+        #[serde(default)]
         error: Option<String>,
     },
 }
@@ -2711,4 +2713,121 @@ async fn main() -> Result<()> {
 
     info!("Sidecar shutdown complete");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that `IntakeProgressEvent::Step` deserializes correctly when `details` field is missing.
+    /// This is critical because the producer uses `#[serde(skip_serializing_if = "Option::is_none")]`
+    /// to omit the field when `None`, and without `#[serde(default)]` on the consumer side,
+    /// deserialization would fail.
+    #[test]
+    fn test_step_event_deserialize_without_details() {
+        let json = r#"{"type":"step","step":1,"total":4,"name":"Parse PRD","status":"in_progress"}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        match event {
+            IntakeProgressEvent::Step {
+                step,
+                total,
+                name,
+                status,
+                details,
+            } => {
+                assert_eq!(step, 1);
+                assert_eq!(total, 4);
+                assert_eq!(name, "Parse PRD");
+                assert!(matches!(status, IntakeStepStatus::InProgress));
+                assert!(details.is_none());
+            }
+            _ => panic!("Expected Step variant"),
+        }
+    }
+
+    /// Test that `IntakeProgressEvent::Step` deserializes correctly when `details` field is present.
+    #[test]
+    fn test_step_event_deserialize_with_details() {
+        let json = r#"{"type":"step","step":2,"total":4,"name":"Generate Tasks","status":"completed","details":"Generated 50 tasks"}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        match event {
+            IntakeProgressEvent::Step {
+                step,
+                total,
+                name,
+                status,
+                details,
+            } => {
+                assert_eq!(step, 2);
+                assert_eq!(total, 4);
+                assert_eq!(name, "Generate Tasks");
+                assert!(matches!(status, IntakeStepStatus::Completed));
+                assert_eq!(details.as_deref(), Some("Generated 50 tasks"));
+            }
+            _ => panic!("Expected Step variant"),
+        }
+    }
+
+    /// Test that `IntakeProgressEvent::Complete` deserializes correctly when `error` field is missing.
+    /// This is the success case - workflows complete successfully without an error field.
+    #[test]
+    fn test_complete_event_deserialize_without_error() {
+        let json = r#"{"type":"complete","tasks":50,"duration_secs":120.5,"success":true}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        match event {
+            IntakeProgressEvent::Complete {
+                tasks,
+                duration_secs,
+                success,
+                error,
+            } => {
+                assert_eq!(tasks, 50);
+                assert!((duration_secs - 120.5).abs() < f64::EPSILON);
+                assert!(success);
+                assert!(error.is_none());
+            }
+            _ => panic!("Expected Complete variant"),
+        }
+    }
+
+    /// Test that `IntakeProgressEvent::Complete` deserializes correctly when `error` field is present.
+    /// This is the failure case - workflows fail with an error message.
+    #[test]
+    fn test_complete_event_deserialize_with_error() {
+        let json = r#"{"type":"complete","tasks":0,"duration_secs":30.0,"success":false,"error":"Failed to parse PRD"}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        match event {
+            IntakeProgressEvent::Complete {
+                tasks,
+                duration_secs,
+                success,
+                error,
+            } => {
+                assert_eq!(tasks, 0);
+                assert!((duration_secs - 30.0).abs() < f64::EPSILON);
+                assert!(!success);
+                assert_eq!(error.as_deref(), Some("Failed to parse PRD"));
+            }
+            _ => panic!("Expected Complete variant"),
+        }
+    }
+
+    /// Test deserialization of all other event types to ensure they still work.
+    #[test]
+    fn test_other_event_types_deserialize() {
+        // Config event
+        let json = r#"{"type":"config","model":"claude-opus-4-5","cli":"claude","target_tasks":50,"acceptance":90}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        assert!(matches!(event, IntakeProgressEvent::Config { .. }));
+
+        // Retry event
+        let json = r#"{"type":"retry","step":1,"attempt":2,"max":3,"reason":"Extended thinking disabled"}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        assert!(matches!(event, IntakeProgressEvent::Retry { .. }));
+
+        // TaskProgress event
+        let json = r#"{"type":"task_progress","generated":25,"target":50}"#;
+        let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
+        assert!(matches!(event, IntakeProgressEvent::TaskProgress { .. }));
+    }
 }
