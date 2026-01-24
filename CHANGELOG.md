@@ -3,6 +3,43 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.26](https://github.com/5dlabs/cto/compare/v0.2.25...v0.2.26) (2026-01-24)
+
+
+### ✨ Features
+
+* **marketing:** update landing page messaging based on competitor analysis ([#3940](https://github.com/5dlabs/cto/issues/3940)) ([0f6ee00](https://github.com/5dlabs/cto/commit/0f6ee0022158cf3023abbc50c8d443626409b16e))
+* **research:** add platform-aware analysis and multi-tool enrichment ([#3933](https://github.com/5dlabs/cto/issues/3933)) ([6f0d272](https://github.com/5dlabs/cto/commit/6f0d272137444c3c28ea7345eadeed685008d2bc))
+
+
+### 🐛 Bug Fixes
+
+* **research:** update model to valid Claude Sonnet 4.5 ([#3932](https://github.com/5dlabs/cto/issues/3932)) ([3350c09](https://github.com/5dlabs/cto/commit/3350c09cc4e5633427b163ec37c9ce5e9504de7a))
+
+
+### 📚 Documentation
+
+* **research:** add 10 new research entries ([#3923](https://github.com/5dlabs/cto/issues/3923)) ([fc4c4db](https://github.com/5dlabs/cto/commit/fc4c4dba7afffac88071b91101f356ff69b203b6))
+* **research:** add 3 new research entries ([#3930](https://github.com/5dlabs/cto/issues/3930)) ([5dfe744](https://github.com/5dlabs/cto/commit/5dfe744b5b70e0534ac164be1655df2bfaaa47ff))
+* **research:** add 3 new research entries ([#3934](https://github.com/5dlabs/cto/issues/3934)) ([ac657c2](https://github.com/5dlabs/cto/commit/ac657c20be51dd7a70ba16c225f7eebf43aed2df))
+* **research:** add 3 new research entries ([#3939](https://github.com/5dlabs/cto/issues/3939)) ([9e96f06](https://github.com/5dlabs/cto/commit/9e96f069f94084b6ef24f86806f3a3b1117139c2))
+* **research:** add 4 new research entries ([#3928](https://github.com/5dlabs/cto/issues/3928)) ([c89abbf](https://github.com/5dlabs/cto/commit/c89abbf73a0ed16b3e80425f128c5ad5e3686ca2))
+* **research:** add 4 new research entries ([#3941](https://github.com/5dlabs/cto/issues/3941)) ([e628433](https://github.com/5dlabs/cto/commit/e628433ec77bcf706c927f271729e3219a78914c))
+* **research:** add 4 new research entries ([#3944](https://github.com/5dlabs/cto/issues/3944)) ([2deff56](https://github.com/5dlabs/cto/commit/2deff566f65f24ddf07827d58e8699f8ae1d818b))
+* **research:** add 5 new research entries ([#3927](https://github.com/5dlabs/cto/issues/3927)) ([8639290](https://github.com/5dlabs/cto/commit/863929094fdd2d433fd0e427db35926ff668b811))
+* **research:** add 5 new research entries ([#3931](https://github.com/5dlabs/cto/issues/3931)) ([4e2d52d](https://github.com/5dlabs/cto/commit/4e2d52d621b27cc692b59f8d707385c2dcdd5fe5))
+* **research:** add 5 new research entries ([#3936](https://github.com/5dlabs/cto/issues/3936)) ([cf3a96b](https://github.com/5dlabs/cto/commit/cf3a96bdd11410300e47f275cc7852fbad08d89e))
+* **research:** add 5 new research entries ([#3937](https://github.com/5dlabs/cto/issues/3937)) ([f55f2c7](https://github.com/5dlabs/cto/commit/f55f2c72d4448126ccad7065eb88ffebac34b34c))
+* **research:** add 5 new research entries ([#3938](https://github.com/5dlabs/cto/issues/3938)) ([c96893d](https://github.com/5dlabs/cto/commit/c96893d76802917f8aae5ca396c3eeaa268335fe))
+* **research:** add 5 new research entries ([#3942](https://github.com/5dlabs/cto/issues/3942)) ([a961a0b](https://github.com/5dlabs/cto/commit/a961a0beadd71b7e1a16706fa6de6de863d8b618))
+* **research:** add 5 new research entries ([#3946](https://github.com/5dlabs/cto/issues/3946)) ([48feedb](https://github.com/5dlabs/cto/commit/48feedb2b8e5ff77730689e03ed51159e9cdc0f4))
+* **research:** add 6 new research entries ([#3924](https://github.com/5dlabs/cto/issues/3924)) ([46f4a8e](https://github.com/5dlabs/cto/commit/46f4a8e8dfb521b999735013701948d9f02e8fed))
+* **research:** add 6 new research entries ([#3926](https://github.com/5dlabs/cto/issues/3926)) ([0a83881](https://github.com/5dlabs/cto/commit/0a83881163db3bad2a90748e65c72fe774187de2))
+* **research:** add 7 new research entries ([#3929](https://github.com/5dlabs/cto/issues/3929)) ([4e8f120](https://github.com/5dlabs/cto/commit/4e8f12052befc7c2b753903a70045a7d5fcc7126))
+* **research:** add 8 new research entries ([#3935](https://github.com/5dlabs/cto/issues/3935)) ([4e87426](https://github.com/5dlabs/cto/commit/4e87426eed754e354b26626ef6adaa484f860d5a))
+* **research:** add 8 new research entries ([#3943](https://github.com/5dlabs/cto/issues/3943)) ([2a13f1c](https://github.com/5dlabs/cto/commit/2a13f1c011e3640cd465ac1861463ecbc0169ced))
+* **research:** add 8 new research entries ([#3945](https://github.com/5dlabs/cto/issues/3945)) ([cb70356](https://github.com/5dlabs/cto/commit/cb70356483c13d35f9b1e05cb37645f742c75cf6))
+
 ## [0.2.25](https://github.com/5dlabs/cto/compare/v0.2.24...v0.2.25) (2026-01-24)
 
 
