@@ -321,6 +321,10 @@ impl IntakeDomain {
                 tasks_to_expand.len()
             );
 
+            // Track expansion progress for task_progress events
+            let total_to_expand = tasks_to_expand.len();
+            let mut expanded_count: u32 = 0;
+
             for (idx, task) in tasks.iter_mut().enumerate() {
                 // Skip done tasks
                 if task.status == TaskStatus::Done {
@@ -335,7 +339,7 @@ impl IntakeDomain {
                 tracing::debug!(
                     "Expanding task {}/{}: {}",
                     idx + 1,
-                    tasks_to_expand.len(),
+                    total_to_expand,
                     task.id
                 );
 
@@ -359,6 +363,15 @@ impl IntakeDomain {
                         task.subtasks = subtasks;
                         total_input_tokens += expand_usage.input_tokens;
                         total_output_tokens += expand_usage.output_tokens;
+
+                        // Emit task progress for the Linear sidecar to display
+                        expanded_count += 1;
+                        #[allow(clippy::cast_possible_truncation)]
+                        // total_to_expand is realistically < 4B tasks
+                        emit_progress(&ProgressEvent::task_progress(
+                            expanded_count,
+                            total_to_expand as u32,
+                        ));
                     }
                     Err(e) => {
                         tracing::warn!("Failed to expand task {}: {}", task.id, e);
