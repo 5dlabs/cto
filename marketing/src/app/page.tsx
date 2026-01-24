@@ -175,7 +175,7 @@ export default function Home() {
             >
               <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
               <span className="text-sm text-cyan font-medium">
-                Transmitting from the Fifth Dimension
+                From PRD to Production — Autonomously
               </span>
             </motion.div>
 
@@ -198,7 +198,7 @@ export default function Home() {
               transition={{ delay: 0.5, duration: 1, ease: "easeOut" }}
               className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10"
             >
-              Thirteen specialists from the Fifth Dimension. Bare metal infrastructure. Zero cloud tax.
+              Thirteen specialized AI agents that ship complete features. From requirements to deployed code—automatically.
             </motion.p>
 
             {/* CTA Buttons */}
@@ -228,15 +228,15 @@ export default function Home() {
             >
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">60-80%</span>
-                <span>less than cloud</span>
+                <span>cost savings vs cloud</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">13</span>
-                <span>AI specialists</span>
+                <span>specialized agents</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">∞</span>
-                <span>Engineering velocity</span>
+                <span>faster shipping</span>
               </div>
             </motion.div>
           </motion.div>
@@ -272,7 +272,7 @@ export default function Home() {
                 We Brought the <span className="gradient-text">Whole Team</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                Thirteen specialists from beyond—a complete engineering collective that ships while you sleep.
+                Not one generic AI—thirteen domain experts working in parallel across your entire development lifecycle.
               </p>
             </motion.div>
 
@@ -445,7 +445,7 @@ export default function Home() {
               className="text-center mt-12"
             >
               <p className="text-muted-foreground">
-                Connect your GitHub repo. CTO handles the rest—from PRD to production.
+                Submit a PRD, connect your repo, and watch your AI team ship. No manual handoffs, no context switching.
               </p>
             </motion.div>
           </div>
@@ -689,7 +689,7 @@ export default function Home() {
                 Why <span className="gradient-text">CTO</span>?
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Modern AI CLIs are incredible. We orchestrate them—so you get multi-agent workflows on fully managed infrastructure.
+                Other tools help you code. CTO ships complete features—from PRD to production—with specialized agents for every stage of development.
               </p>
             </motion.div>
 
@@ -831,7 +831,7 @@ export default function Home() {
               Start <span className="gradient-text">Shipping</span>
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
-              Your engineering team is ready. No hiring, no onboarding—just results.
+              Your AI engineering team is ready. Give it a PRD—get production code.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               {featureFlags.showStartNowButton && (
@@ -855,7 +855,7 @@ export default function Home() {
               <img src="/5dlabs-logo-header-v2.png" alt="5D Labs" className="h-16 opacity-90" />
             </div>
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} 5D Labs. Transmitting from the Fifth Dimension.
+              © {new Date().getFullYear()} 5D Labs. From PRD to Production — Autonomously.
             </p>
           </div>
         </footer>
