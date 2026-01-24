@@ -342,6 +342,15 @@ mod tests {
     }
 
     #[test]
+    fn test_task_progress_event_serialization() {
+        let event = ProgressEvent::task_progress(5, 10);
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains(r#""type":"task_progress""#));
+        assert!(json.contains(r#""generated":5"#));
+        assert!(json.contains(r#""target":10"#));
+    }
+
+    #[test]
     fn test_progress_writer() {
         let temp = NamedTempFile::new().unwrap();
         let path = temp.path().to_path_buf();
