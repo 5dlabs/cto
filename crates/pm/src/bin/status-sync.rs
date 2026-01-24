@@ -997,6 +997,37 @@ fn strip_ansi_codes(s: &str) -> String {
     re.replace_all(s, "").to_string()
 }
 
+/// Check if a log line is internal intake/sidecar noise that should be filtered.
+/// These are implementation details, not user-visible progress.
+fn is_internal_noise(line: &str) -> bool {
+    // Intake binary internal messages
+    line.contains("Streaming output to file for sidecar")
+        || line.contains("cli_type=")
+        || line.contains("prompt_len=")
+        || line.contains("extended_thinking=")
+        || line.contains("force_disable_thinking=")
+        || line.contains("thinking_budget=")
+        || line.contains("mcp_config=")
+        // Sidecar internal logs
+        || line.contains("Starting Linear sidecar")
+        || line.contains("Sidecar configured")
+        || line.contains("Linear API client initialized")
+        || line.contains("Setting initial agent plan")
+        || line.contains("Whip cracker starting")
+        || line.contains("Starting main container exit watch")
+        || line.contains("Starting HTTP server")
+        || line.contains("Initial process count")
+        || line.contains("Initialized with existing activities")
+        || line.contains("Starting log file streaming")
+        || line.contains("Starting Claude stream parsing")
+        || line.contains("Starting intake progress stream")
+        // Other noise
+        || line.contains("Generating text via CLI")
+        || line.contains("[DEBUG]")
+        || line.starts_with("Fresh ")
+        || line.starts_with("   Compiling ")
+}
+
 /// Log streaming task - tails log file and posts to Linear.
 async fn log_stream_task(config: Arc<Config>, linear_client: Option<LinearApiClient>) {
     let Some(client) = linear_client else {
@@ -1057,6 +1088,11 @@ async fn log_stream_task(config: Arc<Config>, linear_client: Option<LinearApiCli
                 sleep(Duration::from_millis(100)).await;
             }
             Ok(_) => {
+                // Filter out internal noise - don't add to buffer
+                if is_internal_noise(&line) {
+                    continue;
+                }
+
                 buffer.push_str(&line);
 
                 // Post immediately on important events or when buffer is large
