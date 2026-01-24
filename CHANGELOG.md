@@ -3,6 +3,21 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.27](https://github.com/5dlabs/cto/compare/v0.2.26...v0.2.27) (2026-01-24)
+
+
+### 📚 Documentation
+
+* **research:** add 2 new research entries ([#3952](https://github.com/5dlabs/cto/issues/3952)) ([527fdc2](https://github.com/5dlabs/cto/commit/527fdc27b9866c86088e2b4c3fabc74c19fb70e7))
+* **research:** add 2 new research entries ([#3956](https://github.com/5dlabs/cto/issues/3956)) ([1f47ac3](https://github.com/5dlabs/cto/commit/1f47ac3dfd13f83470fc30646c4a109f9fc2ebc3))
+* **research:** add 4 new research entries ([#3959](https://github.com/5dlabs/cto/issues/3959)) ([4683cee](https://github.com/5dlabs/cto/commit/4683cee4e7742c1c3407a45d4fe9cffec64bca42))
+* **research:** add 5 new research entries ([#3954](https://github.com/5dlabs/cto/issues/3954)) ([77c5be5](https://github.com/5dlabs/cto/commit/77c5be53d821c78d1844e6f82129466c0ad8af77))
+* **research:** add 5 new research entries ([#3955](https://github.com/5dlabs/cto/issues/3955)) ([328f35f](https://github.com/5dlabs/cto/commit/328f35f4858cdf2cd0a0a90b1803c8a477767302))
+* **research:** add 5 new research entries ([#3960](https://github.com/5dlabs/cto/issues/3960)) ([ef9c9e8](https://github.com/5dlabs/cto/commit/ef9c9e89c9da1abd02d3eac78377127a3fdf04f3))
+* **research:** add 6 new research entries ([#3957](https://github.com/5dlabs/cto/issues/3957)) ([1347ffc](https://github.com/5dlabs/cto/commit/1347ffc5deb8d39eee758c5bc8c319658d5b01fa))
+* **research:** add 6 new research entries ([#3958](https://github.com/5dlabs/cto/issues/3958)) ([bfba91f](https://github.com/5dlabs/cto/commit/bfba91f4714e4705f9621d006a6ffed5c176f6fb))
+* **research:** add 7 new research entries ([#3953](https://github.com/5dlabs/cto/issues/3953)) ([bdd8f2a](https://github.com/5dlabs/cto/commit/bdd8f2adbedd951c8691abbf020c687a6a0b3bf1))
+
 ## [0.2.26](https://github.com/5dlabs/cto/compare/v0.2.25...v0.2.26) (2026-01-24)
 
 
