@@ -131,6 +131,27 @@ spec:
                   optional: true
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
+          # Readiness probe - ensures service doesn't receive traffic until tools are discovered
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            # Allow time for initial tool discovery (can take 2-4 minutes)
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            # Allow up to 5 minutes (30 failures * 10s period) for full initialization
+            failureThreshold: 30
+          # Liveness probe - restart if server becomes unresponsive
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            # Give server time to start before checking liveness
+            initialDelaySeconds: 300
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
           volumeMounts:
             - name: config
               mountPath: /config

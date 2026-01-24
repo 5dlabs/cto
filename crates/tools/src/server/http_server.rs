@@ -3054,18 +3054,30 @@ async fn health_check() -> Json<Value> {
 async fn readiness_check(State(state): State<BridgeState>) -> Result<Json<Value>, StatusCode> {
     let config_manager = state.system_config_manager.read().await;
     let servers = config_manager.get_servers();
+    let available_tools = state.available_tools.read().await;
+    let tools_count = available_tools.len();
 
     // Check if we have any servers configured
     if servers.is_empty() {
+        tracing::debug!("Readiness check failed: no servers configured");
         return Err(StatusCode::SERVICE_UNAVAILABLE);
     }
 
-    // For now, just check if servers are configured
-    // TODO: In the future, we could ping each server to check actual availability
+    // Check if tools have been discovered - at least some tools should be available
+    // This ensures the readiness probe fails until initialization completes
+    if tools_count == 0 {
+        tracing::debug!(
+            "Readiness check failed: no tools discovered yet (servers_configured={})",
+            servers.len()
+        );
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    }
+
     Ok(Json(json!({
         "status": "ready",
         "service": "tools",
         "servers_configured": servers.len(),
+        "tools_available": tools_count,
         "timestamp": Utc::now().to_rfc3339()
     })))
 }
