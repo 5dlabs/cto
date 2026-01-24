@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.25](https://github.com/5dlabs/cto/compare/v0.2.24...v0.2.25) (2026-01-24)
+
+
+### 🐛 Bug Fixes
+
+* **tools:** add ${VAR} env substitution and readiness probes ([#3921](https://github.com/5dlabs/cto/issues/3921)) ([f0ffa79](https://github.com/5dlabs/cto/commit/f0ffa7971bf0ff465adcc5d46570700cbce9d925))
+
 ## [0.2.24](https://github.com/5dlabs/cto/compare/v0.2.23...v0.2.24) (2026-01-23)
 
 
