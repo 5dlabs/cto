@@ -464,6 +464,7 @@ Your task is to evaluate tweets and determine:
 2. What SPECIFIC features or improvements could we implement?
 3. Is this actionable, or just interesting reading?
 4. Whether linked content likely contains implementation details worth scraping
+5. Whether the content references an INSTALLABLE SKILL or MCP SERVER
 
 ## Scoring Dimensions
 
@@ -482,6 +483,29 @@ Provide multi-dimensional scoring:
 - 0.5-0.7 = "Interesting but low priority" - tangentially useful
 - <0.5 = "Not actionable" - news, opinions, or irrelevant tech
 
+## Installable Asset Detection
+
+Detect content that references installable assets:
+
+### Installable Skills
+A skill is a GitHub repository containing a SKILL.md file that provides capabilities to AI agents.
+Look for:
+- Links to GitHub repos that mention "skill", "agent skill", or "SKILL.md"
+- Repos in known skill directories (e.g., .factory/skills/, .cursor/skills/)
+- Content describing agent capabilities that can be installed
+
+### Installable MCP Servers
+An MCP (Model Context Protocol) server provides tools and resources to AI agents.
+Look for:
+- Links to GitHub repos that mention "MCP server", "mcp-server-", or "@modelcontextprotocol"
+- Repos that implement the MCP protocol for tool integration
+- Content describing MCP tools or server implementations
+
+For each detected asset, provide:
+- github_url: The full GitHub repository URL
+- name: Human-readable name of the asset
+- confidence: How confident you are this is an installable asset (0.0-1.0)
+
 ## Response Format
 
 Always respond with valid JSON including:
@@ -493,6 +517,8 @@ Always respond with valid JSON including:
 - implementation_ideas (array of strings)
 - feature_score (object with technical_fit, impact, effort, urgency, strategic_alignment)
 - affected_agents (array of agent names that would implement this: Rex, Blaze, Nova, Tess, etc.)
+- installable_skill (object with github_url, name, confidence - or null if not detected)
+- installable_mcp_server (object with github_url, name, confidence - or null if not detected)
 
 Be specific about WHAT we could implement and HOW."#;
 
