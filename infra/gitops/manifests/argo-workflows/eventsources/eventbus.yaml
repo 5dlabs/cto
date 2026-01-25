@@ -1,0 +1,27 @@
+---
+# =============================================================================
+# EventBus
+# =============================================================================
+# The EventBus provides the transport layer between EventSources and Sensors.
+# Using the "native" type which runs embedded NATS JetStream - simple and
+# reliable for single-cluster deployments.
+#
+# Without an EventBus, EventSources cannot communicate with Sensors.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: eventbus
+    app.kubernetes.io/component: messaging
+    platform.5dlabs.io/log-collection: enabled
+spec:
+  # Native NATS implementation (embedded JetStream)
+  # This is the simplest option - runs NATS pods in the same namespace
+  nats:
+    native:
+      # Single replica is fine for dev/staging; increase for production HA
+      replicas: 3
+      auth: token
