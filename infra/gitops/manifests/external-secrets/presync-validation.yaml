@@ -84,6 +84,7 @@ spec:
                 api-keys
                 tools-github
                 tools-firecrawl
+                tools-tavily
                 tools-latitude
                 cloudflare
                 ghcr-secret

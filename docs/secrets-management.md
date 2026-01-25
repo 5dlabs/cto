@@ -145,6 +145,7 @@ Multiple 1Password items combine into one OpenBao secret:
 |----------------|-------------|--------|
 | `GitHub PAT - Tools MCP Server` | `tools-github` | `GITHUB_PERSONAL_ACCESS_TOKEN` |
 | `Firecrawl API Key` | `tools-firecrawl` | `FIRECRAWL_API_KEY` |
+| `MCP-tavily API Key` | `tools-tavily` | `TAVILY_API_KEY` |
 | `Latitude.sh API` | `tools-latitude` | `LATITUDE_API_KEY` |
 | `Kubeconfig - Latitude cto-dal` | `tools-kubernetes` | `KUBECONFIG` |
 | `Kubeconfig - Latitude cto-fra` | `tools-kubernetes-fra` | `KUBECONFIG` |
