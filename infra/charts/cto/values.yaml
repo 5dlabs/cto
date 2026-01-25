@@ -515,6 +515,13 @@ tools:
         url: "https://mcp.solana.com/mcp"
         workingDirectory: "/tmp"
 
+      # --- Web Search ---
+      exa-mcp:
+        name: "Exa"
+        description: "AI-powered web search, code search, and company research with clean content extraction"
+        transport: "http"
+        url: "https://mcp.exa.ai/mcp"
+
       # --- Web Scraping ---
       firecrawl:
         name: "Firecrawl"
