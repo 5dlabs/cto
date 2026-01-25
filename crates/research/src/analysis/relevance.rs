@@ -91,7 +91,7 @@ impl FeatureScore {
 }
 
 /// Priority classification for features.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum Priority {
     /// Implement this week - high impact + urgent.
     Critical,
@@ -102,6 +102,7 @@ pub enum Priority {
     /// Nice to have - low priority.
     Low,
     /// Needs more investigation.
+    #[default]
     Research,
 }
 
@@ -114,12 +115,6 @@ impl std::fmt::Display for Priority {
             Self::Low => write!(f, "🟢 Low"),
             Self::Research => write!(f, "🔬 Research"),
         }
-    }
-}
-
-impl Default for Priority {
-    fn default() -> Self {
-        Self::Research
     }
 }
 

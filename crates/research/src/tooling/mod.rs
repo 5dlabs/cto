@@ -218,9 +218,7 @@ impl ToolingClient {
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             return Err(anyhow::anyhow!(
-                "MCP server returned error status {}: {}",
-                status,
-                body
+                "MCP server returned error status {status}: {body}"
             ));
         }
 

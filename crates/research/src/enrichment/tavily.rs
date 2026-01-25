@@ -148,7 +148,7 @@ impl TavilyClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Tavily API error {}: {}", status, body));
+            return Err(anyhow!("Tavily API error {status}: {body}"));
         }
 
         let search_result: SearchResponse = response.json().await?;
