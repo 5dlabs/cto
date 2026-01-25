@@ -558,7 +558,19 @@ mod tests {
             feature_score: FeatureScore::default(),
             priority: Priority::default(),
             affected_agents: vec![],
+            installable_skill: None,
+            installable_mcp_server: None,
         };
         assert!(result.is_worth_investigating());
+    }
+
+    #[test]
+    fn test_installable_asset() {
+        let asset = InstallableAsset {
+            github_url: "https://github.com/example/skill".to_string(),
+            name: "example-skill".to_string(),
+            confidence: 0.9,
+        };
+        assert!((asset.confidence - 0.9).abs() < f32::EPSILON);
     }
 }
