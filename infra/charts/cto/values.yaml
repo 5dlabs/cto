@@ -414,6 +414,14 @@ tools:
         args: ["-y", "@upstash/context7-mcp"]
         workingDirectory: "/tmp"
 
+      prompts:
+        name: "MCP Prompts"
+        description: "Prompt management, versioning, and templates for LLM applications with cognitive architecture"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@sparesparrow/mcp-prompts"]
+        workingDirectory: "/tmp"
+
       courses:
         name: "Anthropic Courses"
         description: "Access to Anthropic's educational courses including API fundamentals, prompt engineering, and tool use"
