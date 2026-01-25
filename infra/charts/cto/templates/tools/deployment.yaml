@@ -34,6 +34,8 @@ spec:
       securityContext:
         # Match the 'app' user/group from the container image (UID/GID 1001)
         fsGroup: 1001
+        # GID 2375 is the docker group used by docker:dind for the socket
+        supplementalGroups: [2375]
       initContainers:
         - name: setup-directories
           image: alpine:latest
