@@ -261,13 +261,17 @@ async fn store_access_token(
         patch_data["refresh_token"] = json!(encoded_refresh_token);
     }
 
-    // Calculate and add expires_at if expires_in is provided
-    if let Some(expires_in_secs) = expires_in {
+    // Always update expires_at: calculate new value if expires_in is provided,
+    // otherwise clear it to avoid preserving stale expiration timestamps from
+    // previous tokens that may already be expired.
+    let encoded_expires_at = if let Some(expires_in_secs) = expires_in {
         let expires_at = Utc::now().timestamp() + expires_in_secs;
-        let encoded_expires_at =
-            base64::engine::general_purpose::STANDARD.encode(expires_at.to_string());
-        patch_data["expires_at"] = json!(encoded_expires_at);
-    }
+        base64::engine::general_purpose::STANDARD.encode(expires_at.to_string())
+    } else {
+        // Empty string clears the field in the K8s secret
+        String::new()
+    };
+    patch_data["expires_at"] = json!(encoded_expires_at);
 
     let patch = json!({
         "data": patch_data

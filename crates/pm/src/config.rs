@@ -307,9 +307,10 @@ impl LinearConfig {
             if let Some(rt) = refresh_token {
                 app.refresh_token = Some(rt.to_string());
             }
-            if let Some(expires_in_secs) = expires_in {
-                app.expires_at = Some(Utc::now().timestamp() + expires_in_secs);
-            }
+            // Always update expires_at: calculate new value if expires_in is provided,
+            // otherwise clear it to avoid preserving stale expiration timestamps from
+            // previous tokens that may already be expired.
+            app.expires_at = expires_in.map(|secs| Utc::now().timestamp() + secs);
         }
     }
 }
@@ -855,5 +856,93 @@ mod tests {
         assert_eq!(super::capitalize("blaze"), "Blaze");
         assert_eq!(super::capitalize(""), "");
         assert_eq!(super::capitalize("a"), "A");
+    }
+
+    // =========================================================================
+    // Token Update Tests
+    // =========================================================================
+
+    #[test]
+    fn test_update_tokens_with_expires_in() {
+        let mut config = LinearConfig::default();
+        config.apps.insert(
+            "rex".to_string(),
+            LinearAppConfig::new(
+                "id".to_string(),
+                "secret".to_string(),
+                "webhook".to_string(),
+            ),
+        );
+
+        config.update_tokens(
+            "rex",
+            "new_access_token",
+            Some("new_refresh_token"),
+            Some(3600),
+        );
+
+        let app = config.get_app("rex").unwrap();
+        assert_eq!(app.access_token, Some("new_access_token".to_string()));
+        assert_eq!(app.refresh_token, Some("new_refresh_token".to_string()));
+        assert!(app.expires_at.is_some());
+        // expires_at should be approximately now + 3600 seconds
+        let now = Utc::now().timestamp();
+        let expires_at = app.expires_at.unwrap();
+        assert!(expires_at > now && expires_at <= now + 3600);
+    }
+
+    #[test]
+    fn test_update_tokens_clears_expires_at_when_expires_in_is_none() {
+        let mut config = LinearConfig::default();
+        let mut app_config = LinearAppConfig::new(
+            "id".to_string(),
+            "secret".to_string(),
+            "webhook".to_string(),
+        );
+        // Set up an app with an old expires_at timestamp in the past
+        app_config.access_token = Some("old_token".to_string());
+        app_config.refresh_token = Some("old_refresh".to_string());
+        app_config.expires_at = Some(Utc::now().timestamp() - 3600); // 1 hour ago (expired)
+        config.apps.insert("rex".to_string(), app_config);
+
+        // Verify the old token is considered expired
+        assert!(config.get_app("rex").unwrap().is_token_expired());
+
+        // Refresh tokens without expires_in
+        config.update_tokens("rex", "new_access_token", Some("new_refresh_token"), None);
+
+        let app = config.get_app("rex").unwrap();
+        assert_eq!(app.access_token, Some("new_access_token".to_string()));
+        assert_eq!(app.refresh_token, Some("new_refresh_token".to_string()));
+        // expires_at should be cleared to None, not preserved as the old stale value
+        assert!(
+            app.expires_at.is_none(),
+            "expires_at should be cleared when expires_in is None"
+        );
+    }
+
+    #[test]
+    fn test_update_tokens_replaces_old_expires_at() {
+        let mut config = LinearConfig::default();
+        let mut app_config = LinearAppConfig::new(
+            "id".to_string(),
+            "secret".to_string(),
+            "webhook".to_string(),
+        );
+        // Set up an app with an old expires_at timestamp
+        app_config.access_token = Some("old_token".to_string());
+        app_config.expires_at = Some(12345); // Some old timestamp
+        config.apps.insert("rex".to_string(), app_config);
+
+        // Update tokens with new expires_in
+        config.update_tokens("rex", "new_access_token", None, Some(7200));
+
+        let app = config.get_app("rex").unwrap();
+        assert_eq!(app.access_token, Some("new_access_token".to_string()));
+        // expires_at should be updated to a new value, not 12345
+        let expires_at = app.expires_at.unwrap();
+        assert_ne!(expires_at, 12345);
+        let now = Utc::now().timestamp();
+        assert!(expires_at > now && expires_at <= now + 7200);
     }
 }
