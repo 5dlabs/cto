@@ -93,6 +93,15 @@
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
       "model": "claude-opus-4-5-20251101",
+      "skills": [
+        "build",
+        "conductor-setup",
+        "favicon",
+        "issues",
+        "new-rails-project",
+        "readme",
+        "screenshots"
+      ],
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -132,6 +141,15 @@
           "claude-opus-4-5-20251101"
         ]
       },
+      "skills": [
+        "build",
+        "conductor-setup",
+        "favicon",
+        "issues",
+        "new-rails-project",
+        "readme",
+        "screenshots"
+      ],
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -239,6 +257,15 @@
           "claude-opus-4-5-20251101"
         ]
       },
+      "skills": [
+        "build",
+        "conductor-setup",
+        "favicon",
+        "issues",
+        "new-rails-project",
+        "readme",
+        "screenshots"
+      ],
       "tools": {
         "remote": [
           "context7_resolve_library_id",
