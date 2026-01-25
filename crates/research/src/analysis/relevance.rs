@@ -500,6 +500,10 @@ For each detected asset, provide:
 - github_url: The full GitHub repository URL
 - name: Human-readable name of the asset
 - confidence: How confident you are this is an installable asset (0.0-1.0)
+  - 0.9+ = Explicit GitHub URL with clear SKILL.md or MCP server indication
+  - 0.7-0.9 = GitHub URL mentioned, likely a skill/MCP based on context
+  - 0.5-0.7 = Possible skill/MCP, needs verification
+  - <0.5 = Not a skill/MCP or insufficient information
 
 ## Response Format
 
