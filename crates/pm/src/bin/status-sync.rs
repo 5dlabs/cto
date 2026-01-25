@@ -2725,7 +2725,8 @@ mod tests {
     /// deserialization would fail.
     #[test]
     fn test_step_event_deserialize_without_details() {
-        let json = r#"{"type":"step","step":1,"total":4,"name":"Parse PRD","status":"in_progress"}"#;
+        let json =
+            r#"{"type":"step","step":1,"total":4,"name":"Parse PRD","status":"in_progress"}"#;
         let event: IntakeProgressEvent = serde_json::from_str(json).unwrap();
         match event {
             IntakeProgressEvent::Step {
