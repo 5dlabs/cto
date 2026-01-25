@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.31](https://github.com/5dlabs/cto/compare/v0.2.30...v0.2.31) (2026-01-25)
+
+
+### 🐛 Bug Fixes
+
+* **stitch:** add EventBus and webhook secret for PR reviews ([#4061](https://github.com/5dlabs/cto/issues/4061)) ([b3282c4](https://github.com/5dlabs/cto/commit/b3282c41c00ce9d11d33d847e8dc1486d8501057))
+
 ## [0.2.30](https://github.com/5dlabs/cto/compare/v0.2.29...v0.2.30) (2026-01-25)
 
 
