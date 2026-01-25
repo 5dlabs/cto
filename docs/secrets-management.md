@@ -135,6 +135,7 @@ Multiple 1Password items combine into one OpenBao secret:
 | 1Password Item | OpenBao Key | Fields |
 |----------------|-------------|--------|
 | `Cloudflare API` | `cloudflare` | `email`, `api-key` (credential) |
+| `Cloudflare Tunnel Token` | `cloudflare-tunnel` | API token with Account Settings Read, Cloudflare Tunnel Read/Write, Zone Read, DNS Read permissions |
 | `GHCR Pull Secret` | `ghcr-secret` | `.dockerconfigjson` (from credential JSON) |
 | `Discord Alertmanager Webhook` | `alertmanager-discord` | `webhook-url` |
 | `Linear API Credentials` | `linear-sync` | `LINEAR_API_KEY`, `LINEAR_WEBHOOK_SECRET`, etc. |
