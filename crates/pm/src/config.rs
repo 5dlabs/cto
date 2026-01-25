@@ -1,5 +1,6 @@
 //! Configuration for the PM service.
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
@@ -55,6 +56,12 @@ pub struct LinearAppConfig {
     /// OAuth access token (obtained after installation).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_token: Option<String>,
+    /// OAuth refresh token (for obtaining new access tokens).
+    #[serde(skip_serializing)]
+    pub refresh_token: Option<String>,
+    /// Unix timestamp when the access token expires.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<i64>,
     /// Human-readable display name (e.g., "5DLabs-Rex").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
@@ -69,6 +76,8 @@ impl LinearAppConfig {
             client_secret,
             webhook_secret,
             access_token: None,
+            refresh_token: None,
+            expires_at: None,
             display_name: None,
         }
     }
@@ -85,6 +94,35 @@ impl LinearAppConfig {
         !self.client_id.is_empty()
             && !self.client_secret.is_empty()
             && !self.webhook_secret.is_empty()
+    }
+
+    /// Check if the access token has expired.
+    ///
+    /// Returns true if:
+    /// - There is an `expires_at` timestamp and it's in the past (or within 5 min buffer)
+    /// - There is no `expires_at` (assume expired to be safe)
+    ///
+    /// Returns false if there's no access token at all.
+    #[must_use]
+    pub fn is_token_expired(&self) -> bool {
+        if self.access_token.is_none() {
+            return false; // No token to expire
+        }
+
+        match self.expires_at {
+            Some(expires_at) => {
+                let now = Utc::now().timestamp();
+                // Consider expired if less than 5 minutes remaining
+                expires_at - now < 300
+            }
+            None => true, // No expiration info, assume expired to be safe
+        }
+    }
+
+    /// Check if the token can be refreshed.
+    #[must_use]
+    pub fn can_refresh(&self) -> bool {
+        self.refresh_token.is_some() && !self.client_id.is_empty() && !self.client_secret.is_empty()
     }
 }
 
@@ -107,6 +145,8 @@ impl LinearConfig {
     /// - `LINEAR_APP_{AGENT}_CLIENT_SECRET`
     /// - `LINEAR_APP_{AGENT}_WEBHOOK_SECRET`
     /// - `LINEAR_APP_{AGENT}_ACCESS_TOKEN` (optional)
+    /// - `LINEAR_APP_{AGENT}_REFRESH_TOKEN` (optional)
+    /// - `LINEAR_APP_{AGENT}_EXPIRES_AT` (optional, Unix timestamp)
     #[must_use]
     pub fn from_env() -> Self {
         let mut apps = HashMap::new();
@@ -126,9 +166,21 @@ impl LinearConfig {
                 .or_else(|| env::var(format!("LINEAR_APP_{upper}_ACCESS_TOKEN_DIRECT")).ok())
                 .filter(|s| !s.is_empty());
 
+            // Load refresh token if available
+            let refresh_token = env::var(format!("LINEAR_APP_{upper}_REFRESH_TOKEN"))
+                .ok()
+                .filter(|s| !s.is_empty());
+
+            // Load expiration timestamp if available
+            let expires_at = env::var(format!("LINEAR_APP_{upper}_EXPIRES_AT"))
+                .ok()
+                .and_then(|s| s.parse::<i64>().ok());
+
             if !client_id.is_empty() {
                 let mut config = LinearAppConfig::new(client_id, client_secret, webhook_secret);
                 config.access_token = access_token;
+                config.refresh_token = refresh_token;
+                config.expires_at = expires_at;
                 config.display_name = Some(format!("5DLabs-{}", capitalize(agent)));
                 apps.insert((*agent).to_string(), config);
             }

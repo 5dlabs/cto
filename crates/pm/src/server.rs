@@ -41,7 +41,21 @@ use crate::LinearClient;
 /// - The agent doesn't have an access token (OAuth not completed)
 /// - Failed to create the client
 fn get_agent_client(config: &Config, agent_name: &str) -> Option<LinearClient> {
-    let token = config.linear.get_access_token(agent_name)?;
+    let app = config.linear.get_app(agent_name)?;
+
+    // Check if token is expired
+    if app.is_token_expired() {
+        warn!(
+            agent = %agent_name,
+            expires_at = ?app.expires_at,
+            can_refresh = app.can_refresh(),
+            "Agent token is expired or near expiration"
+        );
+        // Token is expired - caller should trigger refresh via /oauth/refresh endpoint
+        // For now, still try to use the token as it might still work
+    }
+
+    let token = app.access_token.as_deref()?;
     match LinearClient::new(token) {
         Ok(client) => {
             debug!(agent = %agent_name, "Created agent-specific Linear client");
@@ -56,6 +70,95 @@ fn get_agent_client(config: &Config, agent_name: &str) -> Option<LinearClient> {
             None
         }
     }
+}
+
+/// Get an agent-specific Linear client, refreshing the token if expired.
+///
+/// This async version attempts to refresh expired tokens before returning a client.
+/// Use this when you need a client and want automatic token refresh.
+#[allow(dead_code)]
+async fn get_agent_client_with_refresh(
+    config: &Config,
+    kube_client: &kube::Client,
+    agent_name: &str,
+) -> Option<LinearClient> {
+    let app = config.linear.get_app(agent_name)?;
+
+    // Check if token is expired and can be refreshed
+    if app.is_token_expired() && app.can_refresh() {
+        info!(
+            agent = %agent_name,
+            "Token expired, attempting proactive refresh"
+        );
+
+        // Try to refresh the token
+        if let Some(refresh_token) = &app.refresh_token {
+            match crate::handlers::oauth::refresh_access_token(
+                refresh_token,
+                &app.client_id,
+                &app.client_secret,
+            )
+            .await
+            {
+                Ok(token_response) => {
+                    // Store the new tokens in K8s secret
+                    if let Err(e) = crate::handlers::oauth::store_access_token_public(
+                        kube_client,
+                        &config.namespace,
+                        agent_name,
+                        &token_response.access_token,
+                        token_response.refresh_token.as_deref(),
+                        token_response.expires_in,
+                    )
+                    .await
+                    {
+                        warn!(
+                            agent = %agent_name,
+                            error = %e,
+                            "Failed to store refreshed token"
+                        );
+                    } else {
+                        info!(
+                            agent = %agent_name,
+                            "Successfully refreshed and stored token"
+                        );
+                    }
+
+                    // Create client with the new token
+                    return LinearClient::new(&token_response.access_token)
+                        .map_err(|e| {
+                            warn!(
+                                agent = %agent_name,
+                                error = %e,
+                                "Failed to create client with refreshed token"
+                            );
+                            e
+                        })
+                        .ok();
+                }
+                Err(e) => {
+                    warn!(
+                        agent = %agent_name,
+                        error = %e,
+                        "Failed to refresh token"
+                    );
+                }
+            }
+        }
+    }
+
+    // Fall back to using existing token
+    let token = app.access_token.as_deref()?;
+    LinearClient::new(token)
+        .map_err(|e| {
+            warn!(
+                agent = %agent_name,
+                error = %e,
+                "Failed to create agent-specific Linear client"
+            );
+            e
+        })
+        .ok()
 }
 
 /// Shared application state.
@@ -138,6 +241,10 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/oauth/start",
             axum::routing::get(crate::handlers::oauth::handle_oauth_start),
+        )
+        .route(
+            "/oauth/refresh/{agent}",
+            axum::routing::post(crate::handlers::oauth::handle_oauth_refresh),
         )
         // Health check
         .route("/health", axum::routing::get(health_check))
