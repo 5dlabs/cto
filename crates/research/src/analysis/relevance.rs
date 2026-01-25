@@ -14,6 +14,17 @@ use super::prompts::PromptManager;
 use crate::context::PlatformContext;
 use crate::twitter::Bookmark;
 
+/// Represents an installable asset (skill or MCP server) detected in content.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct InstallableAsset {
+    /// GitHub repository URL for the asset.
+    pub github_url: String,
+    /// Human-readable name of the asset.
+    pub name: String,
+    /// Confidence score for this detection (0.0-1.0).
+    pub confidence: f32,
+}
+
 /// Multi-dimensional feature scoring.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FeatureScore {
@@ -141,6 +152,12 @@ pub struct RelevanceResult {
     /// Agents that would be affected by this feature.
     #[serde(default)]
     pub affected_agents: Vec<String>,
+    /// Detected installable skill (GitHub repo with SKILL.md).
+    #[serde(default)]
+    pub installable_skill: Option<InstallableAsset>,
+    /// Detected installable MCP server.
+    #[serde(default)]
+    pub installable_mcp_server: Option<InstallableAsset>,
 }
 
 impl RelevanceResult {
@@ -177,6 +194,17 @@ impl RelevanceResult {
     }
 }
 
+/// Raw installable asset from AI response.
+#[derive(Debug, Deserialize, Default)]
+struct RawInstallableAsset {
+    #[serde(default)]
+    github_url: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    confidence: f32,
+}
+
 /// Raw response from AI for parsing.
 #[derive(Debug, Deserialize)]
 struct RawRelevanceResponse {
@@ -191,6 +219,10 @@ struct RawRelevanceResponse {
     feature_score: Option<RawFeatureScore>,
     #[serde(default)]
     affected_agents: Vec<String>,
+    #[serde(default)]
+    installable_skill: Option<RawInstallableAsset>,
+    #[serde(default)]
+    installable_mcp_server: Option<RawInstallableAsset>,
 }
 
 /// Raw feature score from AI response.
@@ -324,6 +356,31 @@ impl RelevanceAnalyzer {
             raw.affected_agents
         };
 
+        // Convert installable assets
+        let installable_skill = raw.installable_skill.and_then(|asset| {
+            if asset.github_url.is_empty() {
+                None
+            } else {
+                Some(InstallableAsset {
+                    github_url: asset.github_url,
+                    name: asset.name,
+                    confidence: asset.confidence.clamp(0.0, 1.0),
+                })
+            }
+        });
+
+        let installable_mcp_server = raw.installable_mcp_server.and_then(|asset| {
+            if asset.github_url.is_empty() {
+                None
+            } else {
+                Some(InstallableAsset {
+                    github_url: asset.github_url,
+                    name: asset.name,
+                    confidence: asset.confidence.clamp(0.0, 1.0),
+                })
+            }
+        });
+
         Ok(RelevanceResult {
             score: raw.score.clamp(0.0, 1.0),
             reasoning: raw.reasoning,
@@ -334,6 +391,8 @@ impl RelevanceAnalyzer {
             feature_score,
             priority,
             affected_agents,
+            installable_skill,
+            installable_mcp_server,
         })
     }
 
