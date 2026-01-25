@@ -11,6 +11,7 @@ use crate::auth::Session;
 use crate::digest::DigestState;
 use crate::enrichment::{EnrichedLink, LinkEnricher};
 use crate::storage::{IndexEntry, MarkdownWriter, ResearchEntry, ResearchIndex};
+use crate::tooling::ToolingClient;
 use crate::twitter::{BookmarkPoller, PollConfig, PollState};
 
 /// Configuration for the research pipeline.
@@ -260,6 +261,85 @@ impl Pipeline {
                 categories = ?entry.relevance.categories,
                 "Saved research entry"
             );
+
+            // Trigger auto-install for detected skills and MCP servers
+            if let Ok(client) = ToolingClient::from_env() {
+                if client.is_enabled() {
+                    // Install skill if detected with sufficient confidence
+                    if let Some(ref skill) = entry.relevance.installable_skill {
+                        if skill.confidence >= 0.7 {
+                            tracing::info!(
+                                id = %bookmark.id,
+                                skill_url = %skill.github_url,
+                                skill_name = %skill.name,
+                                confidence = skill.confidence,
+                                "Detected installable skill - triggering auto-install"
+                            );
+                            match client.install_skill(&skill.github_url).await {
+                                Ok(install_result) => {
+                                    if install_result.success {
+                                        tracing::info!(
+                                            skill_url = %skill.github_url,
+                                            coderun = ?install_result.coderun_name,
+                                            "Skill install triggered successfully"
+                                        );
+                                    } else {
+                                        tracing::warn!(
+                                            skill_url = %skill.github_url,
+                                            message = %install_result.message,
+                                            "Skill install not triggered"
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        skill_url = %skill.github_url,
+                                        error = %e,
+                                        "Failed to trigger skill install"
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    // Install MCP server if detected with sufficient confidence
+                    if let Some(ref mcp_server) = entry.relevance.installable_mcp_server {
+                        if mcp_server.confidence >= 0.7 {
+                            tracing::info!(
+                                id = %bookmark.id,
+                                mcp_url = %mcp_server.github_url,
+                                mcp_name = %mcp_server.name,
+                                confidence = mcp_server.confidence,
+                                "Detected installable MCP server - triggering auto-install"
+                            );
+                            match client.install_mcp_server(&mcp_server.github_url).await {
+                                Ok(install_result) => {
+                                    if install_result.success {
+                                        tracing::info!(
+                                            mcp_url = %mcp_server.github_url,
+                                            coderun = ?install_result.coderun_name,
+                                            "MCP server install triggered successfully"
+                                        );
+                                    } else {
+                                        tracing::warn!(
+                                            mcp_url = %mcp_server.github_url,
+                                            message = %install_result.message,
+                                            "MCP server install not triggered"
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        mcp_url = %mcp_server.github_url,
+                                        error = %e,
+                                        "Failed to trigger MCP server install"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Save state and index
