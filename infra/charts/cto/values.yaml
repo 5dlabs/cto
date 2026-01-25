@@ -538,8 +538,6 @@ tools:
         command: "npx"
         args: ["-y", "firecrawl-mcp"]
         workingDirectory: "/tmp"
-        env:
-          FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
 
       # --- Codebase Analysis ---
       repomix:

@@ -69,9 +69,9 @@ RUN groupadd -g 1000 node 2>/dev/null || groupadd node 2>/dev/null || true && \
     echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd && \
     chmod 0440 /etc/sudoers.d/99-node-nopasswd
 
-# Install Node.js LTS
+# Install Node.js 22 LTS (required for modern MCP servers like firecrawl-mcp)
 RUN --mount=type=cache,target=/root/.cache \
-    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get -o Acquire::ForceIPv4=true install -y nodejs && \
     npm install -g npm@latest && \
     rm -rf /var/lib/apt/lists/*
@@ -210,9 +210,9 @@ RUN groupadd -g 1000 node 2>/dev/null || groupadd node 2>/dev/null || true && \
 RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd \
   && chmod 0440 /etc/sudoers.d/99-node-nopasswd
 
-# Install Node.js directly (not via nvm) for better compatibility
+# Install Node.js 22 LTS (required for modern MCP servers like firecrawl-mcp)
 RUN --mount=type=cache,target=/root/.cache \
-  curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
   && apt-get -o Acquire::ForceIPv4=true install -y nodejs \
   && npm install -g npm@latest \
   && rm -rf /var/lib/apt/lists/*
