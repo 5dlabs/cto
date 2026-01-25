@@ -515,6 +515,13 @@ tools:
         url: "https://mcp.solana.com/mcp"
         workingDirectory: "/tmp"
 
+      # --- Web Search ---
+      exa-mcp:
+        name: "Exa"
+        description: "AI-powered web search, code search, and company research with clean content extraction"
+        transport: "http"
+        url: "https://mcp.exa.ai/mcp"
+
       # --- Web Scraping ---
       firecrawl:
         name: "Firecrawl"
@@ -600,6 +607,17 @@ tools:
         env:
           MINIMAX_API_KEY: "${MINIMAX_API_KEY}"
           MINIMAX_GROUP_ID: "${MINIMAX_GROUP_ID}"
+
+      # --- Web Search & Research ---
+      modelcontextprotocol:
+        name: "Perplexity"
+        description: "Perplexity AI web search, research, and reasoning - real-time search, deep research with sonar-deep-research, and advanced reasoning with sonar-reasoning-pro"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@perplexity-ai/mcp-server"]
+        workingDirectory: "/tmp"
+        env:
+          PERPLEXITY_API_KEY: "${PERPLEXITY_API_KEY}"
 
       # --- Bare Metal Cloud ---
       latitudesh:
