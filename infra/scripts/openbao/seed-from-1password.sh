@@ -309,6 +309,15 @@ seed_tools() {
         log_warning "Missing: Firecrawl API Key"
     fi
     
+    # tools-tavily
+    local tavily_key
+    tavily_key=$(op_get_field "MCP-tavily API Key" "credential")
+    if [[ -n "$tavily_key" ]]; then
+        bao_put "tools-tavily" "TAVILY_API_KEY" "$tavily_key"
+    else
+        log_warning "Missing: MCP-tavily API Key"
+    fi
+    
     # tools-latitude
     local latitude_key
     latitude_key=$(op_get_field "Latitude.sh API" "credential")
