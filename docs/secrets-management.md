@@ -138,6 +138,7 @@ Multiple 1Password items combine into one OpenBao secret:
 | `GHCR Pull Secret` | `ghcr-secret` | `.dockerconfigjson` (from credential JSON) |
 | `Discord Alertmanager Webhook` | `alertmanager-discord` | `webhook-url` |
 | `Linear API Credentials` | `linear-sync` | `LINEAR_API_KEY`, `LINEAR_WEBHOOK_SECRET`, etc. |
+| `GitHub Organization Webhook` | `github-webhook` | `secret` (for Stitch PR reviews) |
 
 ### Tool Secrets
 
