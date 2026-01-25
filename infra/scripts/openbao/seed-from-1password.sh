@@ -398,6 +398,16 @@ seed_infrastructure() {
         log_warning "Missing: Discord Alertmanager Webhook"
     fi
     
+    # github-webhook - GitHub organization webhook secret for Argo Events
+    # Used by the GitHub EventSource to verify webhook payloads from GitHub
+    local github_webhook_secret
+    github_webhook_secret=$(op item get "GitHub Organization Webhook" --fields "credential" --reveal 2>/dev/null || echo "")
+    if [[ -n "$github_webhook_secret" ]]; then
+        bao_put "github-webhook" "secret" "$github_webhook_secret"
+    else
+        log_warning "Missing: GitHub Organization Webhook (needed for Stitch PR reviews)"
+    fi
+    
     # linear-sync (Linear API for the platform)
     local linear_api_key linear_webhook_secret
     linear_api_key=$(op item get "Linear API Credentials" --fields "credential" --reveal 2>/dev/null || echo "")
