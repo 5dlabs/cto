@@ -4,6 +4,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
+use std::sync::{Arc, RwLock};
 
 /// PM webhook handler configuration.
 #[derive(Clone)]
@@ -27,7 +28,10 @@ pub struct Config {
     /// Play configuration.
     pub play: PlayConfig,
     /// Multi-agent Linear OAuth configuration.
-    pub linear: LinearConfig,
+    ///
+    /// Wrapped in `Arc<RwLock<>>` to allow updating tokens after OAuth refresh
+    /// while sharing the config across axum request handlers.
+    pub linear: Arc<RwLock<LinearConfig>>,
     /// Skip webhook signature verification (for local development only).
     pub skip_signature_verification: bool,
 }
@@ -279,6 +283,35 @@ impl LinearConfig {
             )
         })
     }
+
+    /// Update tokens for an agent after a successful OAuth token refresh.
+    ///
+    /// This updates the in-memory config to reflect the new tokens, ensuring
+    /// subsequent calls see the fresh token data and don't try to refresh again
+    /// with stale/rotated refresh tokens.
+    ///
+    /// # Arguments
+    /// * `agent` - Agent name (e.g., "morgan", "rex")
+    /// * `access_token` - New access token
+    /// * `refresh_token` - New refresh token (may be rotated by Linear)
+    /// * `expires_in` - Token lifetime in seconds (optional)
+    pub fn update_tokens(
+        &mut self,
+        agent: &str,
+        access_token: &str,
+        refresh_token: Option<&str>,
+        expires_in: Option<i64>,
+    ) {
+        if let Some(app) = self.apps.get_mut(&agent.to_lowercase()) {
+            app.access_token = Some(access_token.to_string());
+            if let Some(rt) = refresh_token {
+                app.refresh_token = Some(rt.to_string());
+            }
+            if let Some(expires_in_secs) = expires_in {
+                app.expires_at = Some(Utc::now().timestamp() + expires_in_secs);
+            }
+        }
+    }
 }
 
 /// Capitalize the first letter of a string.
@@ -314,7 +347,7 @@ impl Default for Config {
             linear_team_id: env::var("LINEAR_TEAM_ID").ok().filter(|s| !s.is_empty()),
             intake: IntakeConfig::default(),
             play: PlayConfig::default(),
-            linear: LinearConfig::from_env(),
+            linear: Arc::new(RwLock::new(LinearConfig::from_env())),
             skip_signature_verification: env::var("LINEAR_SKIP_SIGNATURE_VERIFICATION")
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),

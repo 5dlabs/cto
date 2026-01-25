@@ -518,7 +518,7 @@ checksum = "c3e64b0cc0439b12df2fa678eae89a1c56a529fd067a9115f7827f1fffd22b32"
 
 [[package]]
 name = "cli"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -578,7 +578,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "serde",
  "serde_json",
@@ -608,7 +608,7 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
 name = "controller"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1250,7 +1250,7 @@ dependencies = [
 
 [[package]]
 name = "experience"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1527,7 +1527,7 @@ dependencies = [
 
 [[package]]
 name = "gpu"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1640,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "healer"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "axum",
@@ -2073,7 +2073,7 @@ dependencies = [
 
 [[package]]
 name = "installer"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2110,7 +2110,7 @@ dependencies = [
 
 [[package]]
 name = "intake"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2717,7 +2717,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "metal"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2823,7 +2823,7 @@ dependencies = [
 
 [[package]]
 name = "notify"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3407,7 +3407,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "pm"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3837,7 +3837,7 @@ dependencies = [
 
 [[package]]
 name = "research"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "chromiumoxide",
@@ -5180,7 +5180,7 @@ dependencies = [
 
 [[package]]
 name = "tools"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "axum",
@@ -5541,7 +5541,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.2.28"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "clap",

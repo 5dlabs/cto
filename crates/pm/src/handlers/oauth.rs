@@ -97,11 +97,28 @@ pub async fn handle_oauth_callback(
     );
 
     // Get the app config for this agent
-    let app_config = state.config.linear.get_app(agent_name);
-    let Some(app_config) = app_config else {
-        warn!(agent = %agent_name, "Unknown agent in OAuth callback");
-        return Html(format!(
-            r#"<!DOCTYPE html>
+    let (client_id, client_secret) = {
+        let linear_config = match state.config.linear.read() {
+            Ok(config) => config,
+            Err(e) => {
+                error!(error = %e, "Failed to acquire read lock on linear config");
+                return Html(format!(
+                    r"<!DOCTYPE html>
+<html>
+<head><title>Internal Error</title></head>
+<body>
+<h1>❌ Internal Error</h1>
+<p>Failed to read configuration: {e}</p>
+</body>
+</html>"
+                ))
+                .into_response();
+            }
+        };
+        let Some(app_config) = linear_config.get_app(agent_name) else {
+            warn!(agent = %agent_name, "Unknown agent in OAuth callback");
+            return Html(format!(
+                r#"<!DOCTYPE html>
 <html>
 <head><title>Unknown Agent</title></head>
 <body>
@@ -110,18 +127,25 @@ pub async fn handle_oauth_callback(
 <p><a href="/">Return to home</a></p>
 </body>
 </html>"#
-        ))
-        .into_response();
+            ))
+            .into_response();
+        };
+        (
+            app_config.client_id.clone(),
+            app_config.client_secret.clone(),
+        )
     };
 
+    let redirect_uri = state
+        .config
+        .linear
+        .read()
+        .map(|c| c.redirect_uri.clone())
+        .unwrap_or_default();
+
     // Exchange code for token
-    let token_result = exchange_code_for_token(
-        &params.code,
-        &app_config.client_id,
-        &app_config.client_secret,
-        &state.config.linear.redirect_uri,
-    )
-    .await;
+    let token_result =
+        exchange_code_for_token(&params.code, &client_id, &client_secret, &redirect_uri).await;
 
     match token_result {
         Ok(token_response) => {
@@ -146,6 +170,18 @@ pub async fn handle_oauth_callback(
             match store_result {
                 Ok(()) => {
                     info!(agent = %agent_name, "Access token stored in Kubernetes secret");
+
+                    // Also update in-memory config so subsequent calls see the fresh token
+                    if let Ok(mut linear_config) = state.config.linear.write() {
+                        linear_config.update_tokens(
+                            agent_name,
+                            &token_response.access_token,
+                            token_response.refresh_token.as_deref(),
+                            token_response.expires_in,
+                        );
+                        info!(agent = %agent_name, "Updated in-memory token config");
+                    }
+
                     Html(format!(
                         r"<!DOCTYPE html>
 <html>
@@ -411,33 +447,45 @@ pub async fn handle_oauth_refresh(
     info!(agent = %agent, "Manual token refresh requested");
 
     // Get the app config for this agent
-    let Some(app_config) = state.config.linear.get_app(&agent) else {
-        return (
-            StatusCode::NOT_FOUND,
-            format!("Agent '{agent}' is not configured"),
-        )
-            .into_response();
-    };
+    let (refresh_token, client_id, client_secret) = {
+        let linear_config = match state.config.linear.read() {
+            Ok(config) => config,
+            Err(e) => {
+                error!(error = %e, "Failed to acquire read lock on linear config");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to read configuration: {e}"),
+                )
+                    .into_response();
+            }
+        };
+        let Some(app_config) = linear_config.get_app(&agent) else {
+            return (
+                StatusCode::NOT_FOUND,
+                format!("Agent '{agent}' is not configured"),
+            )
+                .into_response();
+        };
 
-    // Check if we have a refresh token
-    let Some(refresh_token) = &app_config.refresh_token else {
-        return (
-            StatusCode::BAD_REQUEST,
-            format!("No refresh token available for agent '{agent}'"),
+        let Some(rt) = app_config.refresh_token.clone() else {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("No refresh token available for agent '{agent}'"),
+            )
+                .into_response();
+        };
+
+        (
+            rt,
+            app_config.client_id.clone(),
+            app_config.client_secret.clone(),
         )
-            .into_response();
     };
 
     // Refresh the token
-    match refresh_access_token(
-        refresh_token,
-        &app_config.client_id,
-        &app_config.client_secret,
-    )
-    .await
-    {
+    match refresh_access_token(&refresh_token, &client_id, &client_secret).await {
         Ok(token_response) => {
-            // Store the new tokens
+            // Store the new tokens in K8s
             let store_result = store_access_token(
                 &state.kube_client,
                 &state.config.namespace,
@@ -450,7 +498,19 @@ pub async fn handle_oauth_refresh(
 
             match store_result {
                 Ok(()) => {
-                    info!(agent = %agent, "Token refresh successful and stored");
+                    info!(agent = %agent, "Token refresh successful and stored in K8s");
+
+                    // Also update in-memory config so subsequent calls see the fresh token
+                    if let Ok(mut linear_config) = state.config.linear.write() {
+                        linear_config.update_tokens(
+                            &agent,
+                            &token_response.access_token,
+                            token_response.refresh_token.as_deref(),
+                            token_response.expires_in,
+                        );
+                        info!(agent = %agent, "Updated in-memory token config");
+                    }
+
                     (
                         StatusCode::OK,
                         format!("Token refreshed successfully for agent '{agent}'"),
@@ -487,7 +547,22 @@ pub async fn handle_oauth_start(
 ) -> impl IntoResponse {
     let agent = params.agent.as_deref().unwrap_or("morgan");
 
-    let Some(url) = state.config.linear.oauth_url(agent) else {
+    let url = {
+        let linear_config = match state.config.linear.read() {
+            Ok(config) => config,
+            Err(e) => {
+                error!(error = %e, "Failed to acquire read lock on linear config");
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to read configuration: {e}"),
+                )
+                    .into_response();
+            }
+        };
+        linear_config.oauth_url(agent)
+    };
+
+    let Some(url) = url else {
         return (
             StatusCode::NOT_FOUND,
             format!("Agent '{agent}' is not configured"),
