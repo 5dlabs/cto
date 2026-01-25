@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.30](https://github.com/5dlabs/cto/compare/v0.2.29...v0.2.30) (2026-01-25)
+
+
+### 🐛 Bug Fixes
+
+* **tools:** upgrade Node.js to v22 LTS for firecrawl-mcp compatibility ([#4058](https://github.com/5dlabs/cto/issues/4058)) ([199f5d7](https://github.com/5dlabs/cto/commit/199f5d7ed033f5992c7d9c5d89f1de9edead441c))
+
 ## [0.2.29](https://github.com/5dlabs/cto/compare/v0.2.28...v0.2.29) (2026-01-25)
 
 
