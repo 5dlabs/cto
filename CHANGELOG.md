@@ -3,6 +3,21 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.29](https://github.com/5dlabs/cto/compare/v0.2.28...v0.2.29) (2026-01-25)
+
+
+### ✨ Features
+
+* **mcp:** add add_skills tool to import skills from GitHub repos ([#4057](https://github.com/5dlabs/cto/issues/4057)) ([3d95e70](https://github.com/5dlabs/cto/commit/3d95e7096c7d06a0819d013f23465d25d944a4b5))
+* **tools:** add CONTEXT7_API_KEY to context7 MCP server config ([#4055](https://github.com/5dlabs/cto/issues/4055)) ([e802eaf](https://github.com/5dlabs/cto/commit/e802eaf8513e6d3e2a4c14622537167369e401d2))
+* **tools:** add MCP Prompts server for prompt management ([#4056](https://github.com/5dlabs/cto/issues/4056)) ([9a50027](https://github.com/5dlabs/cto/commit/9a500275ac08cb2b4124234d53550b5057be53ab))
+* **tools:** add Tavily API key to OpenBao seed script ([#4052](https://github.com/5dlabs/cto/issues/4052)) ([2c78c7a](https://github.com/5dlabs/cto/commit/2c78c7add31cde154171c30d0ad4490ed4b5bb69))
+
+
+### 🐛 Bug Fixes
+
+* **tools:** add supplementalGroups for Docker socket access ([#4054](https://github.com/5dlabs/cto/issues/4054)) ([c17e6fb](https://github.com/5dlabs/cto/commit/c17e6fbd626ec5451b04f238afbbede6f7ffe365))
+
 ## [0.2.28](https://github.com/5dlabs/cto/compare/v0.2.27...v0.2.28) (2026-01-24)
 
 
