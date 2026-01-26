@@ -36,7 +36,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 reqwest = { version = "0.12", features = ["json"] }
 
 # Schema validation
-schemars = "0.8"
+schemars = "1.2"
 
 [dev-dependencies]
 tokio-test = "0.4"
