@@ -3860,6 +3860,7 @@ dependencies = [
  "tokio-test",
  "tracing",
  "tracing-subscriber",
+ "url",
  "urlencoding",
  "uuid",
  "walkdir",

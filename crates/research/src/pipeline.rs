@@ -33,6 +33,8 @@ pub struct PipelineConfig {
     pub digest_state_path: Option<PathBuf>,
     /// Maximum age of bookmarks to fetch (days).
     pub max_age_days: i64,
+    /// Minimum confidence score to trigger auto-install of skills/MCP servers (0.0-1.0).
+    pub min_install_confidence: f32,
 }
 
 impl Default for PipelineConfig {
@@ -46,6 +48,10 @@ impl Default for PipelineConfig {
             model: "claude-sonnet-4-20250514".to_string(),
             digest_state_path: Some(PathBuf::from("/data/digest-state.json")),
             max_age_days: 60,
+            min_install_confidence: std::env::var("MIN_INSTALL_CONFIDENCE")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.7),
         }
     }
 }
@@ -130,6 +136,12 @@ impl Pipeline {
             }
         };
         let writer = MarkdownWriter::new(self.config.output_dir.clone());
+
+        // Set up tooling client once for auto-install (outside the loop)
+        let tooling_client = ToolingClient::from_env().ok();
+        if tooling_client.is_none() {
+            tracing::debug!("Tooling client not available - auto-install disabled");
+        }
 
         // Fetch all bookmarks and get stats
         let fetch_result = match poller.fetch_all_bookmarks(&state).await {
@@ -263,11 +275,11 @@ impl Pipeline {
             );
 
             // Trigger auto-install for detected skills and MCP servers
-            if let Ok(client) = ToolingClient::from_env() {
+            if let Some(ref client) = tooling_client {
                 if client.is_enabled() {
                     // Install skill if detected with sufficient confidence
                     if let Some(ref skill) = entry.relevance.installable_skill {
-                        if skill.confidence >= 0.7 {
+                        if skill.confidence >= self.config.min_install_confidence {
                             tracing::info!(
                                 id = %bookmark.id,
                                 skill_url = %skill.github_url,
@@ -304,7 +316,7 @@ impl Pipeline {
 
                     // Install MCP server if detected with sufficient confidence
                     if let Some(ref mcp_server) = entry.relevance.installable_mcp_server {
-                        if mcp_server.confidence >= 0.7 {
+                        if mcp_server.confidence >= self.config.min_install_confidence {
                             tracing::info!(
                                 id = %bookmark.id,
                                 mcp_url = %mcp_server.github_url,

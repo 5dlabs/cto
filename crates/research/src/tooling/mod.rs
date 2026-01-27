@@ -7,9 +7,39 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::Duration;
+use url::Url;
 
 /// Default URL for the CTO tools MCP service.
 const DEFAULT_MCP_SERVER_URL: &str = "http://cto-tools.cto.svc.cluster.local:3000/mcp";
+
+/// Validate that a URL is a valid GitHub repository URL.
+///
+/// This prevents SSRF attacks by ensuring only trusted GitHub URLs are processed.
+fn validate_github_url(url: &str) -> Result<()> {
+    let parsed = Url::parse(url).context("Invalid URL format")?;
+
+    // Only allow HTTPS URLs
+    if parsed.scheme() != "https" {
+        anyhow::bail!("Only HTTPS URLs are allowed, got: {}", parsed.scheme());
+    }
+
+    // Only allow github.com
+    let host = parsed.host_str().unwrap_or("");
+    if host != "github.com" && !host.ends_with(".github.com") {
+        anyhow::bail!("Only github.com URLs are allowed, got: {host}");
+    }
+
+    // Ensure it looks like a repository URL (has at least owner/repo path)
+    let path_segments: Vec<&str> = parsed.path().split('/').filter(|s| !s.is_empty()).collect();
+    if path_segments.len() < 2 {
+        anyhow::bail!(
+            "URL must be a GitHub repository (owner/repo), got path: {}",
+            parsed.path()
+        );
+    }
+
+    Ok(())
+}
 
 /// Default agents to assign new skills to.
 const DEFAULT_SKILL_AGENTS: &[&str] = &["rex", "blaze", "nova"];
@@ -38,9 +68,16 @@ impl Default for ToolingConfig {
                 .iter()
                 .map(|s| (*s).to_string())
                 .collect(),
-            skip_merge: false,
-            timeout_secs: 30,
-            enabled: true,
+            skip_merge: std::env::var("AUTO_INSTALL_SKIP_MERGE")
+                .map(|s| s == "true" || s == "1")
+                .unwrap_or(false),
+            timeout_secs: std::env::var("MCP_TIMEOUT_SECS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(30),
+            enabled: std::env::var("AUTO_INSTALL_ENABLED")
+                .map(|s| s != "false" && s != "0")
+                .unwrap_or(true),
         }
     }
 }
@@ -113,7 +150,13 @@ impl ToolingClient {
                         .map(|s| (*s).to_string())
                         .collect()
                 },
-                |s| s.split(',').map(str::trim).map(String::from).collect(),
+                |s| {
+                    s.split(',')
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(String::from)
+                        .collect()
+                },
             ),
             skip_merge: std::env::var("AUTO_INSTALL_SKIP_MERGE")
                 .map(|s| s == "true" || s == "1")
@@ -156,6 +199,10 @@ impl ToolingClient {
             });
         }
 
+        // Validate URL to prevent SSRF attacks
+        validate_github_url(github_url)
+            .with_context(|| format!("Invalid skill GitHub URL: {github_url}"))?;
+
         tracing::info!(url = %github_url, agents = ?agents, "Installing skill from research");
 
         let arguments = json!({
@@ -176,6 +223,10 @@ impl ToolingClient {
                 coderun_name: None,
             });
         }
+
+        // Validate URL to prevent SSRF attacks
+        validate_github_url(github_url)
+            .with_context(|| format!("Invalid MCP server GitHub URL: {github_url}"))?;
 
         tracing::info!(url = %github_url, "Installing MCP server from research");
 
@@ -299,5 +350,47 @@ mod tests {
         };
         assert!(result.success);
         assert!(result.coderun_name.is_some());
+    }
+
+    #[test]
+    fn test_validate_github_url_valid() {
+        // Valid GitHub URLs
+        assert!(validate_github_url("https://github.com/owner/repo").is_ok());
+        assert!(validate_github_url("https://github.com/owner/repo/tree/main").is_ok());
+        assert!(validate_github_url("https://github.com/5dlabs/cto").is_ok());
+    }
+
+    #[test]
+    fn test_validate_github_url_invalid_scheme() {
+        // HTTP not allowed
+        assert!(validate_github_url("http://github.com/owner/repo").is_err());
+        // FTP not allowed
+        assert!(validate_github_url("ftp://github.com/owner/repo").is_err());
+    }
+
+    #[test]
+    fn test_validate_github_url_invalid_host() {
+        // Wrong domain
+        assert!(validate_github_url("https://gitlab.com/owner/repo").is_err());
+        assert!(validate_github_url("https://evil.com/github.com/owner/repo").is_err());
+        assert!(validate_github_url("https://notgithub.com/owner/repo").is_err());
+        // Internal URLs (SSRF attack vectors)
+        assert!(validate_github_url("https://localhost/owner/repo").is_err());
+        assert!(validate_github_url("https://127.0.0.1/owner/repo").is_err());
+        assert!(validate_github_url("https://internal.corp/owner/repo").is_err());
+    }
+
+    #[test]
+    fn test_validate_github_url_invalid_path() {
+        // No repo path
+        assert!(validate_github_url("https://github.com/").is_err());
+        assert!(validate_github_url("https://github.com/onlyowner").is_err());
+    }
+
+    #[test]
+    fn test_validate_github_url_invalid_format() {
+        // Not a URL at all
+        assert!(validate_github_url("not-a-url").is_err());
+        assert!(validate_github_url("").is_err());
     }
 }
