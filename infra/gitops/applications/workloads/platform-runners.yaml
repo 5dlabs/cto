@@ -36,7 +36,7 @@ spec:
         githubConfigUrl: "https://github.com/5dlabs"
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
-        minRunners: 2  # Minimum runners for Latitude cluster
+        minRunners: 8  # Keep 8 runners always available to avoid queue buildup
         # LESSON LEARNED: With 5 maxRunners, queued jobs piled up repeatedly
         # when multiple PRs triggered workflows simultaneously. Increased to 8
         # to provide more capacity headroom and prevent queue buildup.
