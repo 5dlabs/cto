@@ -43,6 +43,11 @@ hubble:
   relay:
     enabled: true
     replicas: 1
+    # Use host network to access Cilium agents (required for Talos)
+    hostNetwork: true
+    # Remove pod affinity since we're using host network
+    affinity:
+      podAffinity: {}
   # Hubble UI for visualization
   ui:
     enabled: true
