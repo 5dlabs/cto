@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.31"
+version = "0.2.32"
 edition = "2021"
 authors = ["5D team"]
 license = "AGPL-3.0"
@@ -55,13 +55,13 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 # OpenTelemetry
 opentelemetry = "0.30.0"
 opentelemetry-otlp = { version = "0.31", features = ["tonic"] }
-opentelemetry_sdk = { version = "0.30", features = ["rt-tokio"] }
+opentelemetry_sdk = { version = "0.31", features = ["rt-tokio"] }
 tracing-opentelemetry = "0.31.0"
 
 # CLI
 clap = { version = "4.5", features = ["derive", "env", "cargo"] }
 dialoguer = "0.11"
-indicatif = "0.17"
+indicatif = "0.18"
 colored = "3.1.1"
 
 # HTTP Client
@@ -85,7 +85,7 @@ wiremock = "0.6"
 serial_test = "3.3"
 
 # UUID generation
-uuid = { version = "1.19", features = ["v4", "serde"] }
+uuid = { version = "1.20", features = ["v4", "serde"] }
 
 [profile.release]
 lto = true
