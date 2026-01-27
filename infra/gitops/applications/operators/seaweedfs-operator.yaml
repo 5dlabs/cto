@@ -65,17 +65,30 @@ spec:
           podAnnotations:
             logs.platform.5dlabs.io/collect: "true"
             logs.platform.5dlabs.io/service: seaweedfs-master
+          # Allow scheduling on control-plane if needed
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
           # Default replication strategy
           # 000 = no replication
           # 001 = replicate once on different rack
           # 010 = replicate once on different node
           # 100 = replicate once on different data center
-          defaultReplication: "001"
+          # Using 000 for single-node setup (no replication)
+          defaultReplication: "000"
 
         # Volume server configuration
         volume:
           enabled: true
-          replicas: 2  # Match worker node count (2 workers)
+          replicas: 1  # Single node setup - increase when adding worker nodes
+          # Disable anti-affinity for single-node cluster
+          affinity: ""
+          # Allow scheduling on control-plane if needed
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
           port: 8080
           grpcPort: 18080
           # Persistence for actual data storage
@@ -135,6 +148,11 @@ spec:
           podAnnotations:
             logs.platform.5dlabs.io/collect: "true"
             logs.platform.5dlabs.io/service: seaweedfs-filer
+          # Allow scheduling on control-plane if needed
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
 
         # S3 API gateway (uses filer's S3 capability)
         s3:
