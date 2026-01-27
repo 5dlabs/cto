@@ -3,6 +3,18 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.33](https://github.com/5dlabs/cto/compare/v0.2.32...v0.2.33) (2026-01-27)
+
+
+### ✨ Features
+
+* **research:** auto-install skills and MCP servers from research items ([#4066](https://github.com/5dlabs/cto/issues/4066)) ([0660026](https://github.com/5dlabs/cto/commit/06600260daad9a2f0e960a05a92b04c172d89fed))
+
+
+### 🔧 Maintenance
+
+* **deps:** Bump uuid in the rust-minor group across 1 directory ([#4079](https://github.com/5dlabs/cto/issues/4079)) ([916a25d](https://github.com/5dlabs/cto/commit/916a25da673e28c2ac1f58d3860fa03e2c5042eb))
+
 ## [0.2.32](https://github.com/5dlabs/cto/compare/v0.2.31...v0.2.32) (2026-01-27)
 
 
