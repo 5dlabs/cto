@@ -19,7 +19,6 @@ tower-http = { workspace = true }
 
 # Kubernetes
 kube = { workspace = true }
-kube-derive = { workspace = true }
 k8s-openapi = { workspace = true }
 schemars = { workspace = true }
 

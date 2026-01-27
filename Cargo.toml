@@ -34,7 +34,6 @@ tower-http = { version = "0.5", features = ["trace", "cors", "limit", "timeout"]
 
 # Kubernetes
 kube = { version = "0.93", features = ["runtime", "derive", "client", "ws"] }
-kube-derive = "0.98"
 k8s-openapi = { version = "0.22", features = ["v1_30"] }
 schemars = "0.8"
 
