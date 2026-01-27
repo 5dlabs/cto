@@ -44,7 +44,11 @@ hubble:
     enabled: true
     replicas: 1
     # Use host network to access Cilium agents (required for Talos)
+    # Talos Linux has strict host network policies that prevent pods
+    # from reaching host network ports by default
     hostNetwork: true
+    # Use cluster DNS even on host network
+    dnsPolicy: ClusterFirstWithHostNet
     # Remove pod affinity since we're using host network
     affinity:
       podAffinity: {}
