@@ -21,7 +21,7 @@ spec:
   source:
     repoURL: https://twingate.github.io/helm-charts
     chart: connector
-    targetRevision: latest
+    targetRevision: 0.1.*
     helm:
       values: |
         # Twingate connector configuration
