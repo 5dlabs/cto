@@ -28,10 +28,13 @@ pub mod enrichment;
 pub mod pipeline;
 pub mod publish;
 pub mod storage;
+pub mod tooling;
 pub mod twitter;
 
 // Re-export main types
-pub use analysis::{Category, FeatureScore, Priority, RelevanceAnalyzer, RelevanceResult};
+pub use analysis::{
+    Category, FeatureScore, InstallableAsset, Priority, RelevanceAnalyzer, RelevanceResult,
+};
 pub use auth::Session;
 pub use context::{AgentProfile, AgentRole, PlatformContext};
 pub use digest::{
@@ -45,4 +48,5 @@ pub use enrichment::{
 pub use pipeline::{Pipeline, PipelineConfig, PollCycleResult};
 pub use publish::{PublishConfig, Publisher};
 pub use storage::ResearchEntry;
+pub use tooling::{InstallResult, ToolingClient, ToolingConfig};
 pub use twitter::{Author, Bookmark};

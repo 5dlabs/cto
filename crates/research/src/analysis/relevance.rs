@@ -14,6 +14,17 @@ use super::prompts::PromptManager;
 use crate::context::PlatformContext;
 use crate::twitter::Bookmark;
 
+/// Represents an installable asset (skill or MCP server) detected in content.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct InstallableAsset {
+    /// GitHub repository URL for the asset.
+    pub github_url: String,
+    /// Human-readable name of the asset.
+    pub name: String,
+    /// Confidence score for this detection (0.0-1.0).
+    pub confidence: f32,
+}
+
 /// Multi-dimensional feature scoring.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FeatureScore {
@@ -80,7 +91,7 @@ impl FeatureScore {
 }
 
 /// Priority classification for features.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum Priority {
     /// Implement this week - high impact + urgent.
     Critical,
@@ -91,6 +102,7 @@ pub enum Priority {
     /// Nice to have - low priority.
     Low,
     /// Needs more investigation.
+    #[default]
     Research,
 }
 
@@ -103,12 +115,6 @@ impl std::fmt::Display for Priority {
             Self::Low => write!(f, "🟢 Low"),
             Self::Research => write!(f, "🔬 Research"),
         }
-    }
-}
-
-impl Default for Priority {
-    fn default() -> Self {
-        Self::Research
     }
 }
 
@@ -141,6 +147,12 @@ pub struct RelevanceResult {
     /// Agents that would be affected by this feature.
     #[serde(default)]
     pub affected_agents: Vec<String>,
+    /// Detected installable skill (GitHub repo with SKILL.md).
+    #[serde(default)]
+    pub installable_skill: Option<InstallableAsset>,
+    /// Detected installable MCP server.
+    #[serde(default)]
+    pub installable_mcp_server: Option<InstallableAsset>,
 }
 
 impl RelevanceResult {
@@ -177,6 +189,17 @@ impl RelevanceResult {
     }
 }
 
+/// Raw installable asset from AI response.
+#[derive(Debug, Deserialize, Default)]
+struct RawInstallableAsset {
+    #[serde(default)]
+    github_url: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    confidence: f32,
+}
+
 /// Raw response from AI for parsing.
 #[derive(Debug, Deserialize)]
 struct RawRelevanceResponse {
@@ -191,6 +214,10 @@ struct RawRelevanceResponse {
     feature_score: Option<RawFeatureScore>,
     #[serde(default)]
     affected_agents: Vec<String>,
+    #[serde(default)]
+    installable_skill: Option<RawInstallableAsset>,
+    #[serde(default)]
+    installable_mcp_server: Option<RawInstallableAsset>,
 }
 
 /// Raw feature score from AI response.
@@ -324,6 +351,31 @@ impl RelevanceAnalyzer {
             raw.affected_agents
         };
 
+        // Convert installable assets
+        let installable_skill = raw.installable_skill.and_then(|asset| {
+            if asset.github_url.is_empty() {
+                None
+            } else {
+                Some(InstallableAsset {
+                    github_url: asset.github_url,
+                    name: asset.name,
+                    confidence: asset.confidence.clamp(0.0, 1.0),
+                })
+            }
+        });
+
+        let installable_mcp_server = raw.installable_mcp_server.and_then(|asset| {
+            if asset.github_url.is_empty() {
+                None
+            } else {
+                Some(InstallableAsset {
+                    github_url: asset.github_url,
+                    name: asset.name,
+                    confidence: asset.confidence.clamp(0.0, 1.0),
+                })
+            }
+        });
+
         Ok(RelevanceResult {
             score: raw.score.clamp(0.0, 1.0),
             reasoning: raw.reasoning,
@@ -334,6 +386,8 @@ impl RelevanceAnalyzer {
             feature_score,
             priority,
             affected_agents,
+            installable_skill,
+            installable_mcp_server,
         })
     }
 
@@ -405,6 +459,7 @@ Your task is to evaluate tweets and determine:
 2. What SPECIFIC features or improvements could we implement?
 3. Is this actionable, or just interesting reading?
 4. Whether linked content likely contains implementation details worth scraping
+5. Whether the content references an INSTALLABLE SKILL or MCP SERVER
 
 ## Scoring Dimensions
 
@@ -423,6 +478,33 @@ Provide multi-dimensional scoring:
 - 0.5-0.7 = "Interesting but low priority" - tangentially useful
 - <0.5 = "Not actionable" - news, opinions, or irrelevant tech
 
+## Installable Asset Detection
+
+Detect content that references installable assets:
+
+### Installable Skills
+A skill is a GitHub repository containing a SKILL.md file that provides capabilities to AI agents.
+Look for:
+- Links to GitHub repos that mention "skill", "agent skill", or "SKILL.md"
+- Repos in known skill directories (e.g., .factory/skills/, .cursor/skills/)
+- Content describing agent capabilities that can be installed
+
+### Installable MCP Servers
+An MCP (Model Context Protocol) server provides tools and resources to AI agents.
+Look for:
+- Links to GitHub repos that mention "MCP server", "mcp-server-", or "@modelcontextprotocol"
+- Repos that implement the MCP protocol for tool integration
+- Content describing MCP tools or server implementations
+
+For each detected asset, provide:
+- github_url: The full GitHub repository URL
+- name: Human-readable name of the asset
+- confidence: How confident you are this is an installable asset (0.0-1.0)
+  - 0.9+ = Explicit GitHub URL with clear SKILL.md or MCP server indication
+  - 0.7-0.9 = GitHub URL mentioned, likely a skill/MCP based on context
+  - 0.5-0.7 = Possible skill/MCP, needs verification
+  - <0.5 = Not a skill/MCP or insufficient information
+
 ## Response Format
 
 Always respond with valid JSON including:
@@ -434,6 +516,8 @@ Always respond with valid JSON including:
 - implementation_ideas (array of strings)
 - feature_score (object with technical_fit, impact, effort, urgency, strategic_alignment)
 - affected_agents (array of agent names that would implement this: Rex, Blaze, Nova, Tess, etc.)
+- installable_skill (object with github_url, name, confidence - or null if not detected)
+- installable_mcp_server (object with github_url, name, confidence - or null if not detected)
 
 Be specific about WHAT we could implement and HOW."#;
 
@@ -499,7 +583,19 @@ mod tests {
             feature_score: FeatureScore::default(),
             priority: Priority::default(),
             affected_agents: vec![],
+            installable_skill: None,
+            installable_mcp_server: None,
         };
         assert!(result.is_worth_investigating());
+    }
+
+    #[test]
+    fn test_installable_asset() {
+        let asset = InstallableAsset {
+            github_url: "https://github.com/example/skill".to_string(),
+            name: "example-skill".to_string(),
+            confidence: 0.9,
+        };
+        assert!((asset.confidence - 0.9).abs() < f32::EPSILON);
     }
 }
