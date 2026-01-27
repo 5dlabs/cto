@@ -406,12 +406,12 @@ async fn run_reviews(
                 println!("Review comments for PR #{pr} ({} total):\n", comments.len());
                 for comment in comments {
                     // Header with author and location
-                    let location = if !comment.path.is_empty() && comment.line.is_some() {
-                        format!("{}:{}", comment.path, comment.line.unwrap())
-                    } else if !comment.path.is_empty() {
-                        comment.path.clone()
-                    } else {
+                    let location = if comment.path.is_empty() {
                         "general comment".to_string()
+                    } else if let Some(line) = comment.line {
+                        format!("{}:{}", comment.path, line)
+                    } else {
+                        comment.path.clone()
                     };
 
                     let source = if comment.is_bugbot {

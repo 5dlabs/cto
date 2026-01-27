@@ -88,7 +88,7 @@ Common failure patterns:
 
 Once you've identified the root cause:
 
-1. **For merge conflicts**: 
+1. **For merge conflicts**:
    ```bash
    git fetch origin develop
    git checkout <branch>
