@@ -4,8 +4,9 @@ kind: Kustomization
 
 resources:
   - letsencrypt-issuer.yaml
-  - certificates.yaml
-  - platform-ingress.yaml
+  - certificates-fra.yaml  # Frankfurt cluster (*.fra.5dlabs.ai)
+  - platform-ingress-fra.yaml  # Frankfurt cluster (*.fra.5dlabs.ai)
+  # For home cluster, use: certificates-home.yaml + platform-ingress-home.yaml (*.home.5dlabs.ai)
 
 # Common labels
 commonLabels:

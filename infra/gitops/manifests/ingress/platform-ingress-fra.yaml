@@ -1,0 +1,156 @@
+---
+# Platform Ingress Configuration - Frankfurt Cluster
+# Exposes ArgoCD, Argo Workflows, and Headscale via ingress-nginx
+# DNS: *.fra.5dlabs.ai
+
+# ArgoCD Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-ingress
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/instance: platform-ingress
+  annotations:
+    # Exclude from external-dns (LAN access only)
+    external-dns.alpha.kubernetes.io/exclude: "true"
+    # NGINX ingress configuration - TLS terminates at ingress, plain HTTP to backend
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Increase timeouts for git operations
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    # Use self-signed cluster issuer
+    cert-manager.io/cluster-issuer: "selfsigned-issuer"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: argocd.fra.5dlabs.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - argocd.fra.5dlabs.ai
+      secretName: argocd-server-tls
+---
+# Argo Workflows Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argo-workflows-server
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: argo-workflows-ingress
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/instance: platform-ingress
+  annotations:
+    external-dns.alpha.kubernetes.io/exclude: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization"
+    cert-manager.io/cluster-issuer: "selfsigned-issuer"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: workflows.fra.5dlabs.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argo-workflows-server
+                port:
+                  number: 2746
+  tls:
+    - hosts:
+        - workflows.fra.5dlabs.ai
+      secretName: argo-workflows-server-tls
+---
+# Headscale Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: headscale
+  namespace: headscale
+  labels:
+    app.kubernetes.io/name: headscale-ingress
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/instance: platform-ingress
+  annotations:
+    external-dns.alpha.kubernetes.io/exclude: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "headscale/nginx-headers"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "selfsigned-issuer"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: headscale.fra.5dlabs.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: headscale
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - headscale.fra.5dlabs.ai
+      secretName: headscale-tls
+---
+# NGINX headers ConfigMap for Headscale WebSocket support
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-headers
+  namespace: headscale
+data:
+  Upgrade: "$http_upgrade"
+  Connection: "upgrade"
+---
+# Hubble UI Ingress (Cilium observability)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: hubble-ui-ingress
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/instance: platform-ingress
+  annotations:
+    external-dns.alpha.kubernetes.io/exclude: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "selfsigned-issuer"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: hubble.fra.5dlabs.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hubble-ui
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - hubble.fra.5dlabs.ai
+      secretName: hubble-ui-tls
