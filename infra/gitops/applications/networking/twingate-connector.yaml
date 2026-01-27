@@ -28,7 +28,7 @@ spec:
         connector:
           # Twingate network subdomain
           network: turquoiseelephant631
-          
+
           # Connector tokens from Kubernetes secret
           # Secret is managed by ExternalSecret (twingate-connector-tokens)
           accessToken:
@@ -39,10 +39,10 @@ spec:
             secretRef:
               name: twingate-connector-tokens
               key: refreshToken
-        
+
         # Replica count for HA
         replicaCount: 2
-        
+
         # Resource limits
         resources:
           requests:
@@ -51,16 +51,16 @@ spec:
           limits:
             cpu: 500m
             memory: 512Mi
-        
+
         # Pod labels for log collection
         podLabels:
           platform.5dlabs.io/log-collection: enabled
-        
+
         # Pod annotations for log collection
         podAnnotations:
           logs.platform.5dlabs.io/collect: "true"
           logs.platform.5dlabs.io/service: twingate-connector
-        
+
         # Service account
         serviceAccount:
           create: true
