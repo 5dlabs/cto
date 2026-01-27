@@ -28,17 +28,13 @@ spec:
         connector:
           # Twingate network subdomain
           network: turquoiseelephant631
-
-          # Connector tokens from Kubernetes secret
+          
+          # Use existing secret for connector tokens
           # Secret is managed by ExternalSecret (twingate-connector-tokens)
-          accessToken:
-            secretRef:
-              name: twingate-connector-tokens
-              key: accessToken
-          refreshToken:
-            secretRef:
-              name: twingate-connector-tokens
-              key: refreshToken
+          existingSecret:
+            name: twingate-connector-tokens
+            accessTokenKey: accessToken
+            refreshTokenKey: refreshToken
 
         # Replica count for HA
         replicaCount: 2
