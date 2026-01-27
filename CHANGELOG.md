@@ -3,6 +3,23 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.32](https://github.com/5dlabs/cto/compare/v0.2.31...v0.2.32) (2026-01-27)
+
+
+### 🐛 Bug Fixes
+
+* **cloudflare:** support existing tunnels in ClusterTunnel ([#4065](https://github.com/5dlabs/cto/issues/4065)) ([cdc4ac4](https://github.com/5dlabs/cto/commit/cdc4ac422798d05c6bfe84ffa54e1d29a7df2513))
+
+
+### 🔧 Maintenance
+
+* **deps:** Bump actions/checkout from 4 to 6 in the actions group ([#4077](https://github.com/5dlabs/cto/issues/4077)) ([c24cbcc](https://github.com/5dlabs/cto/commit/c24cbccaeb88daf70e959887051da1ebb519c675))
+* **deps:** Bump indicatif from 0.17.11 to 0.18.3 ([#4075](https://github.com/5dlabs/cto/issues/4075)) ([bbec339](https://github.com/5dlabs/cto/commit/bbec3390afd89ac6394b91b406996c58084d7b26))
+* **deps:** Bump jsdom from 26.1.0 to 27.4.0 in /apps/web ([#4074](https://github.com/5dlabs/cto/issues/4074)) ([9f10095](https://github.com/5dlabs/cto/commit/9f1009522e313c373109f161aa85599edea3e61a))
+* **deps:** Bump the npm-minor group in /apps/web with 6 updates ([#4069](https://github.com/5dlabs/cto/issues/4069)) ([94a14bc](https://github.com/5dlabs/cto/commit/94a14bc6fc41bdfbbfbb303964784d2f2be0a0be))
+* **deps:** Bump vitest from 3.2.4 to 4.0.18 in /apps/web ([#4076](https://github.com/5dlabs/cto/issues/4076)) ([40190cf](https://github.com/5dlabs/cto/commit/40190cf4192c7af1b2320d23880aa3595958ee3a))
+* **infra:** increase minRunners to 8 to avoid CI queue buildup ([272b3a6](https://github.com/5dlabs/cto/commit/272b3a69feace5574106c8b68e15dec0136132bb))
+
 ## [0.2.31](https://github.com/5dlabs/cto/compare/v0.2.30...v0.2.31) (2026-01-25)
 
 
