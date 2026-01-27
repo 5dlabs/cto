@@ -137,7 +137,7 @@ repos:
 
 # Configuration for specific hooks
 default_language_version:
-  python: python3.11
+  python: python3.12
 
 # Don't run on CI
 ci:

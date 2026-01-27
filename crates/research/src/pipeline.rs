@@ -11,6 +11,7 @@ use crate::auth::Session;
 use crate::digest::DigestState;
 use crate::enrichment::{EnrichedLink, LinkEnricher};
 use crate::storage::{IndexEntry, MarkdownWriter, ResearchEntry, ResearchIndex};
+use crate::tooling::ToolingClient;
 use crate::twitter::{BookmarkPoller, PollConfig, PollState};
 
 /// Configuration for the research pipeline.
@@ -32,6 +33,8 @@ pub struct PipelineConfig {
     pub digest_state_path: Option<PathBuf>,
     /// Maximum age of bookmarks to fetch (days).
     pub max_age_days: i64,
+    /// Minimum confidence score to trigger auto-install of skills/MCP servers (0.0-1.0).
+    pub min_install_confidence: f32,
 }
 
 impl Default for PipelineConfig {
@@ -45,6 +48,10 @@ impl Default for PipelineConfig {
             model: "claude-sonnet-4-20250514".to_string(),
             digest_state_path: Some(PathBuf::from("/data/digest-state.json")),
             max_age_days: 60,
+            min_install_confidence: std::env::var("MIN_INSTALL_CONFIDENCE")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.7),
         }
     }
 }
@@ -129,6 +136,12 @@ impl Pipeline {
             }
         };
         let writer = MarkdownWriter::new(self.config.output_dir.clone());
+
+        // Set up tooling client once for auto-install (outside the loop)
+        let tooling_client = ToolingClient::from_env().ok();
+        if tooling_client.is_none() {
+            tracing::debug!("Tooling client not available - auto-install disabled");
+        }
 
         // Fetch all bookmarks and get stats
         let fetch_result = match poller.fetch_all_bookmarks(&state).await {
@@ -260,6 +273,85 @@ impl Pipeline {
                 categories = ?entry.relevance.categories,
                 "Saved research entry"
             );
+
+            // Trigger auto-install for detected skills and MCP servers
+            if let Some(ref client) = tooling_client {
+                if client.is_enabled() {
+                    // Install skill if detected with sufficient confidence
+                    if let Some(ref skill) = entry.relevance.installable_skill {
+                        if skill.confidence >= self.config.min_install_confidence {
+                            tracing::info!(
+                                id = %bookmark.id,
+                                skill_url = %skill.github_url,
+                                skill_name = %skill.name,
+                                confidence = skill.confidence,
+                                "Detected installable skill - triggering auto-install"
+                            );
+                            match client.install_skill(&skill.github_url).await {
+                                Ok(install_result) => {
+                                    if install_result.success {
+                                        tracing::info!(
+                                            skill_url = %skill.github_url,
+                                            coderun = ?install_result.coderun_name,
+                                            "Skill install triggered successfully"
+                                        );
+                                    } else {
+                                        tracing::warn!(
+                                            skill_url = %skill.github_url,
+                                            message = %install_result.message,
+                                            "Skill install not triggered"
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        skill_url = %skill.github_url,
+                                        error = %e,
+                                        "Failed to trigger skill install"
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    // Install MCP server if detected with sufficient confidence
+                    if let Some(ref mcp_server) = entry.relevance.installable_mcp_server {
+                        if mcp_server.confidence >= self.config.min_install_confidence {
+                            tracing::info!(
+                                id = %bookmark.id,
+                                mcp_url = %mcp_server.github_url,
+                                mcp_name = %mcp_server.name,
+                                confidence = mcp_server.confidence,
+                                "Detected installable MCP server - triggering auto-install"
+                            );
+                            match client.install_mcp_server(&mcp_server.github_url).await {
+                                Ok(install_result) => {
+                                    if install_result.success {
+                                        tracing::info!(
+                                            mcp_url = %mcp_server.github_url,
+                                            coderun = ?install_result.coderun_name,
+                                            "MCP server install triggered successfully"
+                                        );
+                                    } else {
+                                        tracing::warn!(
+                                            mcp_url = %mcp_server.github_url,
+                                            message = %install_result.message,
+                                            "MCP server install not triggered"
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        mcp_url = %mcp_server.github_url,
+                                        error = %e,
+                                        "Failed to trigger MCP server install"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Save state and index

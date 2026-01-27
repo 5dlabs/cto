@@ -321,6 +321,7 @@ async fn run_poll(
         model,
         digest_state_path: Some(output.join("digest-state.json")),
         max_age_days,
+        ..Default::default()
     };
 
     // Run pipeline

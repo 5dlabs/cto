@@ -479,6 +479,8 @@ mod tests {
                 feature_score: crate::analysis::FeatureScore::default(),
                 priority: crate::analysis::Priority::default(),
                 affected_agents: vec![],
+                installable_skill: None,
+                installable_mcp_server: None,
             },
         );
 

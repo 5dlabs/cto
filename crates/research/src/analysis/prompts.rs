@@ -71,12 +71,26 @@ interesting reads, but actionable ideas, patterns, tools, or techniques we could
 - Workflow automation improvements
 - Developer tooling we could integrate
 - AI/LLM techniques that would improve our agents
+- **Installable skills** (GitHub repos with SKILL.md that provide agent capabilities)
+- **MCP servers** (GitHub repos implementing Model Context Protocol for tool integration)
 
 ## Lower Priority (Still Track)
 - General industry news or announcements
 - High-level thought leadership without specifics
 - Tools in languages/stacks we don't use
 - Already well-known patterns we've implemented
+
+## Installable Asset Detection
+
+Look for content that references installable assets:
+
+### Skills
+- Links to GitHub repos mentioning "skill", "agent skill", or containing SKILL.md
+- Repos in skill directories (e.g., .factory/skills/, .cursor/skills/)
+
+### MCP Servers
+- Links to GitHub repos mentioning "MCP server", "mcp-server-", or "@modelcontextprotocol"
+- Repos implementing MCP protocol for tool integration
 
 ## Tweet to Analyze
 Author: @{{author}}
@@ -96,7 +110,17 @@ Evaluate this for implementation potential. Respond with JSON:
   "categories": ["<matching categories>"],
   "topics": ["<key topics/technologies>"],
   "should_enrich": <true if links likely contain implementation details worth scraping>,
-  "implementation_ideas": ["<specific things we could build or integrate>"]
+  "implementation_ideas": ["<specific things we could build or integrate>"],
+  "feature_score": {
+    "technical_fit": <0-10>,
+    "impact": <0-10>,
+    "effort": <1-10>,
+    "urgency": <0-10>,
+    "strategic_alignment": <0-10>
+  },
+  "affected_agents": ["<agent names: Rex, Blaze, Nova, Tess, Cipher, Bolt, etc.>"],
+  "installable_skill": <{"github_url": "<url>", "name": "<name>", "confidence": <0.0-1.0>} or null>,
+  "installable_mcp_server": <{"github_url": "<url>", "name": "<name>", "confidence": <0.0-1.0>} or null>
 }
 "#;
 
