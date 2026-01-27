@@ -41,7 +41,22 @@ use crate::LinearClient;
 /// - The agent doesn't have an access token (OAuth not completed)
 /// - Failed to create the client
 fn get_agent_client(config: &Config, agent_name: &str) -> Option<LinearClient> {
-    let token = config.linear.get_access_token(agent_name)?;
+    let linear_config = config.linear.read().ok()?;
+    let app = linear_config.get_app(agent_name)?;
+
+    // Check if token is expired
+    if app.is_token_expired() {
+        warn!(
+            agent = %agent_name,
+            expires_at = ?app.expires_at,
+            can_refresh = app.can_refresh(),
+            "Agent token is expired or near expiration"
+        );
+        // Token is expired - caller should trigger refresh via /oauth/refresh endpoint
+        // For now, still try to use the token as it might still work
+    }
+
+    let token = app.access_token.as_deref()?;
     match LinearClient::new(token) {
         Ok(client) => {
             debug!(agent = %agent_name, "Created agent-specific Linear client");
@@ -56,6 +71,134 @@ fn get_agent_client(config: &Config, agent_name: &str) -> Option<LinearClient> {
             None
         }
     }
+}
+
+/// Get an agent-specific Linear client, refreshing the token if expired.
+///
+/// This async version attempts to refresh expired tokens before returning a client.
+/// Use this when you need a client and want automatic token refresh.
+///
+/// **Important:** After a successful token refresh, this function updates both:
+/// 1. The Kubernetes secret (persistent storage)
+/// 2. The in-memory config (via the `Arc<RwLock<LinearConfig>>`)
+///
+/// This ensures subsequent calls see the fresh token data and don't attempt
+/// to refresh again using stale (potentially rotated) refresh tokens.
+#[allow(dead_code)]
+async fn get_agent_client_with_refresh(
+    config: &Config,
+    kube_client: &kube::Client,
+    agent_name: &str,
+) -> Option<LinearClient> {
+    // First, read the current token state
+    let (is_expired, can_refresh, refresh_token, client_id, client_secret, existing_token) = {
+        let linear_config = config.linear.read().ok()?;
+        let app = linear_config.get_app(agent_name)?;
+        (
+            app.is_token_expired(),
+            app.can_refresh(),
+            app.refresh_token.clone(),
+            app.client_id.clone(),
+            app.client_secret.clone(),
+            app.access_token.clone(),
+        )
+    };
+
+    // Check if token is expired and can be refreshed
+    if is_expired && can_refresh {
+        info!(
+            agent = %agent_name,
+            "Token expired, attempting proactive refresh"
+        );
+
+        // Try to refresh the token
+        if let Some(refresh_token) = refresh_token {
+            match crate::handlers::oauth::refresh_access_token(
+                &refresh_token,
+                &client_id,
+                &client_secret,
+            )
+            .await
+            {
+                Ok(token_response) => {
+                    // Store the new tokens in K8s secret
+                    if let Err(e) = crate::handlers::oauth::store_access_token_public(
+                        kube_client,
+                        &config.namespace,
+                        agent_name,
+                        &token_response.access_token,
+                        token_response.refresh_token.as_deref(),
+                        token_response.expires_in,
+                    )
+                    .await
+                    {
+                        warn!(
+                            agent = %agent_name,
+                            error = %e,
+                            "Failed to store refreshed token in K8s"
+                        );
+                    } else {
+                        info!(
+                            agent = %agent_name,
+                            "Successfully stored refreshed token in K8s"
+                        );
+                    }
+
+                    // **FIX:** Update the in-memory config so subsequent calls see fresh tokens.
+                    // This prevents re-using stale/rotated refresh tokens on the next call.
+                    if let Ok(mut linear_config) = config.linear.write() {
+                        linear_config.update_tokens(
+                            agent_name,
+                            &token_response.access_token,
+                            token_response.refresh_token.as_deref(),
+                            token_response.expires_in,
+                        );
+                        info!(
+                            agent = %agent_name,
+                            "Updated in-memory token config"
+                        );
+                    } else {
+                        warn!(
+                            agent = %agent_name,
+                            "Failed to acquire write lock for in-memory config update"
+                        );
+                    }
+
+                    // Create client with the new token
+                    return LinearClient::new(&token_response.access_token)
+                        .map_err(|e| {
+                            warn!(
+                                agent = %agent_name,
+                                error = %e,
+                                "Failed to create client with refreshed token"
+                            );
+                            e
+                        })
+                        .ok();
+                }
+                Err(e) => {
+                    warn!(
+                        agent = %agent_name,
+                        error = %e,
+                        "Failed to refresh token"
+                    );
+                }
+            }
+        }
+    }
+
+    // Fall back to using existing token
+    let token = existing_token?;
+    LinearClient::new(&token)
+        .map_err(|e| {
+            warn!(
+                agent = %agent_name,
+                error = %e,
+                "Failed to create agent-specific Linear client"
+            );
+            e
+        })
+        .ok()
 }
 
 /// Shared application state.
@@ -138,6 +281,10 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/oauth/start",
             axum::routing::get(crate::handlers::oauth::handle_oauth_start),
+        )
+        .route(
+            "/oauth/refresh/{agent}",
+            axum::routing::post(crate::handlers::oauth::handle_oauth_refresh),
         )
         // Health check
         .route("/health", axum::routing::get(health_check))
@@ -328,17 +475,17 @@ async fn trigger_intake(
         .unwrap_or_else(|| format!("manual-intake-{}", chrono::Utc::now().timestamp()));
 
     // Extract intake request (reads PRD/arch from ConfigMap if available)
-    let intake_request = match extract_intake_request(&state.kube_client, &session_id, &issue).await
-    {
-        Ok(req) => req,
-        Err(e) => {
-            error!(error = %e, "Failed to extract intake request");
-            return Ok(Json(json!({
-                "status": "error",
-                "error": format!("Failed to extract intake request: {e}")
-            })));
-        }
-    };
+    let intake_request =
+        match extract_intake_request(&state.kube_client, &session_id, None, &issue).await {
+            Ok(req) => req,
+            Err(e) => {
+                error!(error = %e, "Failed to extract intake request");
+                return Ok(Json(json!({
+                    "status": "error",
+                    "error": format!("Failed to extract intake request: {e}")
+                })));
+            }
+        };
 
     // Submit the CodeRun (new architecture - direct CodeRun creation)
     let namespace = &state.config.namespace;
@@ -808,6 +955,7 @@ async fn readiness_check(State(state): State<AppState>) -> Result<Json<Value>, S
 /// 1. Verifies webhook signature (if secret configured)
 /// 2. Validates timestamp freshness
 /// 3. Routes to appropriate handler based on event type
+#[allow(clippy::too_many_lines)] // Complex function with multiple code paths
 pub async fn linear_webhook_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -851,12 +999,17 @@ pub async fn linear_webhook_handler(
         None
     } else if let Some(sig) = &signature {
         // Try multi-app identification first, fall back to legacy single secret
+        let linear_config = state.config.linear.read().map_err(|e| {
+            error!("Failed to acquire read lock on linear config: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
         let id = identify_agent_or_legacy(
             &body,
             sig,
-            &state.config.linear,
+            &linear_config,
             state.config.webhook_secret.as_deref(),
         );
+        drop(linear_config); // Release the lock early
 
         if let Some(ref agent_id) = id {
             debug!(
@@ -869,11 +1022,19 @@ pub async fn linear_webhook_handler(
             return Err(StatusCode::UNAUTHORIZED);
         }
         id
-    } else if state.config.webhook_secret.is_some() || !state.config.linear.apps.is_empty() {
-        // Signature required but missing
-        warn!("Missing Linear-Signature header");
-        return Err(StatusCode::UNAUTHORIZED);
     } else {
+        // Check if signature is required
+        let has_apps = state
+            .config
+            .linear
+            .read()
+            .map(|c| !c.apps.is_empty())
+            .unwrap_or(false);
+        if state.config.webhook_secret.is_some() || has_apps {
+            // Signature required but missing
+            warn!("Missing Linear-Signature header");
+            return Err(StatusCode::UNAUTHORIZED);
+        }
         // No secrets configured, allow unsigned webhooks (dev mode)
         debug!("No webhook secrets configured, accepting unsigned webhook");
         None
@@ -1059,7 +1220,7 @@ async fn handle_session_created(
 
         // Extract intake request from issue (reads PRD/arch from ConfigMap if available)
         let intake_request =
-            match extract_intake_request(&state.kube_client, session_id, &issue).await {
+            match extract_intake_request(&state.kube_client, session_id, None, &issue).await {
                 Ok(req) => req,
                 Err(e) => {
                     error!(error = %e, "Failed to extract intake request");

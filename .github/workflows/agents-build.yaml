@@ -60,10 +60,10 @@ jobs:
       built: ${{ steps.set-built.outputs.built }}
       tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js (for npm version discovery)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           check-latest: true
@@ -235,7 +235,7 @@ jobs:
 
       - name: Build and push base image
         if: steps.check.outputs.exists == 'false' || inputs.force_rebuild == true
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
           context: .
           file: ./infra/images/runtime/Dockerfile
@@ -283,7 +283,7 @@ jobs:
       packages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
@@ -304,7 +304,7 @@ jobs:
           echo "📦 Sidecar version: $VERSION"
 
       - name: Build and push linear-sidecar
-        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: .
           file: ./infra/images/linear-sidecar/Dockerfile
@@ -341,7 +341,7 @@ jobs:
       packages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
@@ -361,7 +361,7 @@ jobs:
           echo "📦 cursor version (dir hash): $VERSION"
 
       - name: Build cursor (cache warmup)
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
           context: ./infra/images/cursor
           file: ./infra/images/cursor/Dockerfile
@@ -446,7 +446,7 @@ jobs:
           #   file: ./infra/images/dexter/Dockerfile
           #   version_type: dir_hash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
@@ -459,7 +459,7 @@ jobs:
       # Instead, we rely on registry buildcache to provide base image layers
 
       - name: Setup Node.js (ensure npm available in runner)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           check-latest: true
@@ -552,7 +552,7 @@ jobs:
         # Registry cache will help with base image layers
 
       - name: Build and push image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}

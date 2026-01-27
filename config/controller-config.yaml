@@ -152,5 +152,5 @@ cleanup:
   deleteConfigMap: true
 
 linear:
-  sidecarImage: "ghcr.io/5dlabs/linear-sidecar:latest"
+  sidecarImage: "ghcr.io/5dlabs/linear-sidecar:dev"
   serviceUrl: "http://localhost:8081"

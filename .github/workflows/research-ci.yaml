@@ -16,19 +16,29 @@ on:
       - '.github/workflows/research-ci.yaml'
   workflow_dispatch:
 
+# LESSON LEARNED: Without concurrency controls, multiple runs for the same branch
+# compete for limited runners, causing queue buildup. This cancels outdated runs.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-005
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: 5dlabs
 
 jobs:
   # Change detection job (lightweight - stays on ubuntu)
+  # LESSON LEARNED: Path filter jobs should use ubuntu-latest, not k8s-runner,
+  # to avoid consuming expensive self-hosted runner capacity for simple git operations.
+  # See: pr-merge-loop/lessons-learned.md#ISSUE-010
   changes:
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     outputs:
       research: ${{ steps.filter.outputs.research }}
       docker: ${{ steps.filter.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -47,7 +57,7 @@ jobs:
     outputs:
       format-needed: ${{ steps.lint.outputs.format-needed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -71,7 +81,7 @@ jobs:
     if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -90,7 +100,7 @@ jobs:
     if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -110,10 +120,10 @@ jobs:
     if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: infra/images/research/Dockerfile
           failure-threshold: error
@@ -127,7 +137,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s

@@ -407,14 +407,39 @@ impl TemplateContext {
 }
 
 /// Substitute template variables in a string
-/// Supports: {{project_dir}}, {{working_dir}}, {{server_name}}
+/// Supports:
+/// - {{project_dir}}, {{working_dir}}, {{server_name}} - context variables
+/// - ${VAR} - environment variable expansion
+/// - ${VAR:-default} - environment variable with default value
 pub fn substitute_template_variables(template: &str, context: &TemplateContext) -> String {
+    use regex::Regex;
+    use std::env;
+
     let mut result = template.to_string();
 
-    // Replace template variables
+    // Replace context template variables ({{...}} syntax)
     result = result.replace("{{project_dir}}", &context.project_dir.to_string_lossy());
     result = result.replace("{{working_dir}}", &context.working_dir.to_string_lossy());
     result = result.replace("{{server_name}}", &context.server_name);
+
+    // Expand ${VAR} and ${VAR:-default} patterns from environment
+    // This regex matches:
+    // - ${VAR} - simple variable reference
+    // - ${VAR:-default} - variable with default value if not set or empty
+    let env_pattern =
+        Regex::new(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}").expect("Invalid regex pattern");
+
+    result = env_pattern
+        .replace_all(&result, |caps: &regex::Captures| {
+            let var_name = &caps[1];
+            let default = caps.get(2).map_or("", |m| m.as_str());
+            // Use default if variable is not set OR is empty (matches shell `:-` behavior)
+            env::var(var_name)
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| default.to_string())
+        })
+        .to_string();
 
     result
 }
@@ -431,4 +456,118 @@ pub fn process_env_templates(
             (processed_key, processed_value)
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    fn create_test_context() -> TemplateContext {
+        TemplateContext {
+            project_dir: PathBuf::from("/test/project"),
+            working_dir: PathBuf::from("/test/working"),
+            server_name: "test-server".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_env_var_default_when_unset() {
+        let context = create_test_context();
+
+        // Ensure the variable is not set
+        env::remove_var("TEST_UNSET_VAR_12345");
+
+        let result = substitute_template_variables("${TEST_UNSET_VAR_12345:-fallback}", &context);
+        assert_eq!(result, "fallback");
+    }
+
+    #[test]
+    fn test_env_var_default_when_empty() {
+        let context = create_test_context();
+
+        // Set variable to empty string
+        env::set_var("TEST_EMPTY_VAR_12345", "");
+
+        let result = substitute_template_variables("${TEST_EMPTY_VAR_12345:-fallback}", &context);
+        assert_eq!(
+            result, "fallback",
+            "Should use default when env var is set to empty string"
+        );
+
+        // Cleanup
+        env::remove_var("TEST_EMPTY_VAR_12345");
+    }
+
+    #[test]
+    fn test_env_var_no_default_when_set() {
+        let context = create_test_context();
+
+        // Set variable to a value
+        env::set_var("TEST_SET_VAR_12345", "actual_value");
+
+        let result = substitute_template_variables("${TEST_SET_VAR_12345:-fallback}", &context);
+        assert_eq!(
+            result, "actual_value",
+            "Should use actual value when env var is set"
+        );
+
+        // Cleanup
+        env::remove_var("TEST_SET_VAR_12345");
+    }
+
+    #[test]
+    fn test_env_var_simple_substitution() {
+        let context = create_test_context();
+
+        env::set_var("TEST_SIMPLE_VAR_12345", "simple_value");
+
+        let result =
+            substitute_template_variables("prefix_${TEST_SIMPLE_VAR_12345}_suffix", &context);
+        assert_eq!(result, "prefix_simple_value_suffix");
+
+        // Cleanup
+        env::remove_var("TEST_SIMPLE_VAR_12345");
+    }
+
+    #[test]
+    fn test_env_var_simple_unset_becomes_empty() {
+        let context = create_test_context();
+
+        // Ensure the variable is not set
+        env::remove_var("TEST_SIMPLE_UNSET_12345");
+
+        // Without default, unset variable becomes empty string
+        let result =
+            substitute_template_variables("prefix_${TEST_SIMPLE_UNSET_12345}_suffix", &context);
+        assert_eq!(result, "prefix__suffix");
+    }
+
+    #[test]
+    fn test_template_context_variables() {
+        let context = create_test_context();
+
+        let result = substitute_template_variables(
+            "{{project_dir}}/{{server_name}}/{{working_dir}}",
+            &context,
+        );
+        // working_dir is an absolute path (/test/working), so the result includes that leading /
+        assert_eq!(result, "/test/project/test-server//test/working");
+    }
+
+    #[test]
+    fn test_mixed_template_and_env_vars() {
+        let context = create_test_context();
+
+        env::set_var("TEST_MIXED_VAR_12345", "env_value");
+
+        let result = substitute_template_variables(
+            "{{project_dir}}/${TEST_MIXED_VAR_12345:-default}",
+            &context,
+        );
+        assert_eq!(result, "/test/project/env_value");
+
+        // Cleanup
+        env::remove_var("TEST_MIXED_VAR_12345");
+    }
 }

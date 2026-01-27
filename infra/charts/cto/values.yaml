@@ -176,6 +176,10 @@ secrets:
     kubernetes:
       enabled: true
       baoKey: tools-kubernetes
+    kubernetesFra:
+      enabled: true
+      baoKey: tools-kubernetes-fra
+      # Keys: KUBECONFIG (Frankfurt cluster - cto-fra)
     appstoreConnect:
       enabled: true
       baoKey: tools-appstore-connect
@@ -234,7 +238,7 @@ controller:
 
   # Linear sidecar configuration (whip cracking enabled)
   linear:
-    sidecarImage: ghcr.io/5dlabs/linear-sidecar:latest
+    sidecarImage: ghcr.io/5dlabs/linear-sidecar:dev
     serviceUrl: http://pm-server:8080
 
 # =============================================================================
@@ -249,7 +253,7 @@ agent:
   cliImages:
     claude:
       repository: ghcr.io/5dlabs/claude
-      tag: latest
+      tag: dev
     cursor:
       repository: ghcr.io/5dlabs/cursor
       tag: latest
@@ -410,6 +414,14 @@ tools:
         args: ["-y", "@upstash/context7-mcp"]
         workingDirectory: "/tmp"
 
+      prompts:
+        name: "MCP Prompts"
+        description: "Prompt management, versioning, and templates for LLM applications with cognitive architecture"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@sparesparrow/mcp-prompts"]
+        workingDirectory: "/tmp"
+
       courses:
         name: "Anthropic Courses"
         description: "Access to Anthropic's educational courses including API fundamentals, prompt engineering, and tool use"
@@ -437,6 +449,14 @@ tools:
         env:
           # Set to true for read-only and create/update only (no delete operations)
           ALLOW_ONLY_NON_DESTRUCTIVE_TOOLS: "${K8S_NON_DESTRUCTIVE:-false}"
+
+      kubernetes-mcp:
+        name: "Kubernetes MCP"
+        description: "Native Go Kubernetes MCP server with direct API access - pods, deployments, services, logs, and Helm operations"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "kubernetes-mcp-server@latest"]
+        workingDirectory: "/tmp"
 
       terraform:
         name: "Terraform"
@@ -502,6 +522,13 @@ tools:
         transport: "http"
         url: "https://mcp.solana.com/mcp"
         workingDirectory: "/tmp"
+
+      # --- Web Search ---
+      exa-mcp:
+        name: "Exa"
+        description: "AI-powered web search, code search, and company research with clean content extraction"
+        transport: "http"
+        url: "https://mcp.exa.ai/mcp"
 
       # --- Web Scraping ---
       firecrawl:
@@ -586,6 +613,17 @@ tools:
         env:
           MINIMAX_API_KEY: "${MINIMAX_API_KEY}"
           MINIMAX_GROUP_ID: "${MINIMAX_GROUP_ID}"
+
+      # --- Web Search & Research ---
+      modelcontextprotocol:
+        name: "Perplexity"
+        description: "Perplexity AI web search, research, and reasoning - real-time search, deep research with sonar-deep-research, and advanced reasoning with sonar-reasoning-pro"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "@perplexity-ai/mcp-server"]
+        workingDirectory: "/tmp"
+        env:
+          PERPLEXITY_API_KEY: "${PERPLEXITY_API_KEY}"
 
       # --- Bare Metal Cloud ---
       latitudesh:
@@ -1033,13 +1071,39 @@ research:
   # Research configuration
   minRelevance: "0.5"
   batchSize: "10"
-  model: "claude-sonnet-4-20250514"
+  model: "claude-sonnet-4-5-20250929"
 
   # PR creation
   createPR: true
   repo: "5dlabs/cto"
   baseBranch: "main"
   researchDir: "docs/research"
+
+  # Enrichment configuration
+  enrichment:
+    # Firecrawl - scrapes linked URLs for content
+    firecrawl:
+      enabled: true
+    # OctoCode - searches GitHub for code examples
+    octocode:
+      enabled: true
+      maxExamplesPerTopic: 3
+    # Tavily - web research for competitive analysis
+    tavily:
+      enabled: true
+      maxResultsPerTopic: 5
+
+  # Analysis configuration
+  analysis:
+    # Enable platform context-aware analysis
+    contextAware: true
+    # Multi-dimensional scoring
+    scoringDimensions:
+      - technicalFit
+      - impact
+      - effort
+      - urgency
+      - strategicAlignment
 
   persistence:
     size: 10Gi
@@ -1065,6 +1129,10 @@ research:
     model: ""
     # Kubernetes Secret containing: GMAIL_USERNAME, GMAIL_APP_PASSWORD, optional DIGEST_* vars
     secretName: "research-digest-secrets" # pragma: allowlist secret
+    # Digest format: "prioritized" (groups by priority) or "chronological"
+    format: "prioritized"
+    # Auto-merge research PRs (requires GitHub workflow)
+    autoMerge: true
 
 # =============================================================================
 # Maintenance - Workspace and Event Cleanup
@@ -1098,11 +1166,15 @@ cloudflare:
   # Email for API Key authentication
   email: j@jonathonfritz.com
   # Secret name (in cloudflare-operator-system namespace)
-  secretName: cloudflare-api-credentials
+  # This secret must contain CLOUDFLARE_API_TOKEN with tunnel permissions
+  secretName: cto-main-tunnel-credentials  # pragma: allowlist secret
 
   # Tunnel configuration
   tunnel:
     name: cto-main
+    # Use existing tunnel ID (recommended after initial tunnel creation)
+    # This avoids needing full API permissions to create new tunnels
+    existingId: "87889b67-ee20-4ed1-8de7-fb43d1b5156f"
 
   # Service bindings
   bindings:

@@ -50,7 +50,7 @@ tracing-subscriber = { workspace = true }
 chrono = { workspace = true }
 
 # File system
-tempfile = "3.8"
+tempfile = "3.24"
 
 # Process execution
 which = "7.0"

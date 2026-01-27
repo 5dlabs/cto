@@ -3,9 +3,11 @@
 //! This crate provides:
 //! - Twitter/X bookmark polling using browser automation
 //! - AI-powered relevance analysis using Claude/GPT
-//! - Link enrichment via Firecrawl
+//! - Multi-dimensional feature scoring for prioritization
+//! - Link enrichment via Firecrawl, OctoCode, and Tavily
 //! - Markdown storage with YAML frontmatter
 //! - GitHub PR creation for research entries
+//! - Platform-aware context for analysis
 
 // Allow pedantic lints that are overly strict for this utility crate
 #![allow(clippy::missing_errors_doc)] // Error documentation not critical for research tool
@@ -20,6 +22,7 @@
 
 pub mod analysis;
 pub mod auth;
+pub mod context;
 pub mod digest;
 pub mod enrichment;
 pub mod pipeline;
@@ -28,13 +31,17 @@ pub mod storage;
 pub mod twitter;
 
 // Re-export main types
-pub use analysis::{Category, RelevanceResult};
+pub use analysis::{Category, FeatureScore, Priority, RelevanceAnalyzer, RelevanceResult};
 pub use auth::Session;
+pub use context::{AgentProfile, AgentRole, PlatformContext};
 pub use digest::{
     ActionItem, DigestAnalysis, DigestAnalyzer, DigestConfig, DigestGenerator, DigestState,
     EmailSender,
 };
-pub use enrichment::EnrichedLink;
+pub use enrichment::{
+    CodeExample, EnhancedEnricher, EnrichedContent, EnrichedLink, EnrichmentConfig, ResearchReport,
+    ResearchResult,
+};
 pub use pipeline::{Pipeline, PipelineConfig, PollCycleResult};
 pub use publish::{PublishConfig, Publisher};
 pub use storage::ResearchEntry;

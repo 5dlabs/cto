@@ -1,6 +1,8 @@
 {{- if .Values.cloudflare.enabled }}
 ---
 # ClusterTunnel: Main Cloudflare Tunnel for CTO Platform
+# Supports both creating new tunnels and connecting to existing tunnels.
+# For existing tunnels, set cloudflare.tunnel.existingId in values.yaml.
 apiVersion: networking.cfargotunnel.com/v1alpha2
 kind: ClusterTunnel
 metadata:
@@ -9,8 +11,16 @@ metadata:
     {{- include "cto.labels" . | nindent 4 }}
     app.kubernetes.io/component: cloudflare-tunnel
 spec:
+  {{- if .Values.cloudflare.tunnel.existingId }}
+  # Use existing tunnel (recommended after initial creation)
+  existingTunnel:
+    id: {{ .Values.cloudflare.tunnel.existingId | quote }}
+    name: {{ .Values.cloudflare.tunnel.name }}
+  {{- else }}
+  # Create new tunnel
   newTunnel:
     name: {{ .Values.cloudflare.tunnel.name }}
+  {{- end }}
   cloudflare:
     domain: {{ .Values.cloudflare.domain }}
     secret: {{ .Values.cloudflare.secretName }}
@@ -19,6 +29,8 @@ spec:
     email: {{ .Values.cloudflare.email }}
     {{- end }}
   fallbackTarget: http_status:404
+  noTlsVerify: false
+  protocol: auto
 {{- end }}
 
 

@@ -71,6 +71,8 @@ pub struct TechStack {
 pub struct IntakeRequest {
     /// Linear session ID for activity updates.
     pub session_id: String,
+    /// OAuth access token from Linear webhook (for agent API calls).
+    pub access_token: Option<String>,
     /// PRD issue ID.
     pub prd_issue_id: String,
     /// PRD issue identifier (e.g., "TSK-1").
@@ -650,6 +652,7 @@ pub fn extract_github_visibility(labels: &[Label]) -> String {
 pub async fn extract_intake_request(
     kube_client: &KubeClient,
     session_id: &str,
+    access_token: Option<&str>,
     issue: &Issue,
 ) -> Result<IntakeRequest> {
     let team_id = issue
@@ -726,6 +729,7 @@ pub async fn extract_intake_request(
 
     Ok(IntakeRequest {
         session_id: session_id.to_string(),
+        access_token: access_token.map(String::from),
         prd_issue_id: issue.id.clone(),
         prd_identifier: issue.identifier.clone(),
         team_id,
@@ -1166,6 +1170,7 @@ pub async fn submit_intake_coderun(
             "linearIntegration": {
                 "enabled": true,
                 "sessionId": request.session_id,
+                "accessToken": request.access_token,
                 "issueId": request.prd_issue_id,
                 "teamId": request.team_id,
                 "projectId": project_id
@@ -2507,6 +2512,7 @@ Content here";
     fn create_test_intake_request() -> IntakeRequest {
         IntakeRequest {
             session_id: "test-session-123".to_string(),
+            access_token: None,
             prd_issue_id: "issue-456".to_string(),
             prd_identifier: "TSK-1".to_string(),
             team_id: "team-789".to_string(),

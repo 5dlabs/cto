@@ -16,7 +16,8 @@ pub fn get_tool_schemas() -> Value {
             get_add_mcp_server_schema(),
             get_remove_mcp_server_schema(),
             get_update_mcp_server_schema(),
-            get_check_setup_schema()
+            get_check_setup_schema(),
+            get_add_skills_schema()
         ]
     })
 }
@@ -36,7 +37,8 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
             get_add_mcp_server_schema(),
             get_remove_mcp_server_schema(),
             get_update_mcp_server_schema(),
-            get_check_setup_schema()
+            get_check_setup_schema(),
+            get_add_skills_schema()
         ]
     })
 }
@@ -421,6 +423,38 @@ fn get_check_setup_schema() -> Value {
                 }
             },
             "required": []
+        }
+    })
+}
+
+fn get_add_skills_schema() -> Value {
+    json!({
+        "name": "add_skills",
+        "description": "Add skills from a GitHub repository to the platform. Analyzes the repo to discover SKILL.md files, copies them to templates/skills/, updates cto-config.json to assign skills to specified agents, creates PR, and auto-merges after CI passes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "github_url": {
+                    "type": "string",
+                    "description": "GitHub repository URL containing skills (SKILL.md files). Can be a skills-specific repo or any repo with a skills/ directory (e.g., https://github.com/org/my-skills, https://github.com/user/dotfiles with .claude/skills/)"
+                },
+                "agents": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of agent names to assign the skills to (e.g., ['rex', 'blaze', 'morgan']). Skills will be added to each agent's skills array in cto-config.json."
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Optional: Category to place skills under in templates/skills/{category}/. If not provided, Rex will analyze the skills and determine appropriate categories."
+                },
+                "skip_merge": {
+                    "type": "boolean",
+                    "description": "If true, create PR but don't auto-merge. Useful for review before deployment. Default: false"
+                }
+            },
+            "required": ["github_url", "agents"]
         }
     })
 }

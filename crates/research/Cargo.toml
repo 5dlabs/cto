@@ -54,6 +54,7 @@ octocrab = "0.38"
 
 # File system utilities
 walkdir = "2"
+urlencoding = "2"
 tempfile = "3"
 
 # Local crates

@@ -8,4 +8,4 @@ mod relevance;
 
 pub use categories::Category;
 pub use prompts::PromptManager;
-pub use relevance::{RelevanceAnalyzer, RelevanceResult};
+pub use relevance::{FeatureScore, Priority, RelevanceAnalyzer, RelevanceResult};

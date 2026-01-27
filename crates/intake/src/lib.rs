@@ -15,6 +15,8 @@
 #![allow(clippy::unused_self)]
 #![allow(clippy::if_not_else)]
 #![allow(clippy::map_unwrap_or)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
 
 //! # Intake
 //!
@@ -62,6 +64,9 @@ pub mod ui;
 // AI integration
 pub mod ai;
 
+// Progress event types for Linear integration
+pub mod progress;
+
 // Re-export key types for convenience
 pub use entities::{
     ComplexityInfo, GlobalConfig, ModelConfig, ModelSettings, RuntimeState, Subtask, TagMetadata,
@@ -75,3 +80,6 @@ pub use ai::{
     AIMessage, AIProvider, AIResponse, AIRole, GenerateOptions, PromptManager, PromptTemplate,
     ProviderRegistry, TokenUsage,
 };
+
+// Re-export progress types
+pub use progress::{emit_progress, progress_writer, ProgressEvent, ProgressWriter, StepStatus};

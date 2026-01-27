@@ -253,6 +253,7 @@ async fn test_intake_issue_creation_flow() {
     // Create a mock intake request
     let request = IntakeRequest {
         session_id: "test-session-123".to_string(),
+        access_token: None,
         prd_issue_id: "mock-prd-id".to_string(), // We won't actually link to a real PRD
         prd_identifier: "TEST-PRD".to_string(),
         team_id: team_id.clone(),

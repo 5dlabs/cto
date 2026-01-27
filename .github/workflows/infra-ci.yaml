@@ -12,6 +12,14 @@ on:
       - '.github/workflows/infra-ci.yaml'
   workflow_dispatch:
 
+# LESSON LEARNED: Without concurrency controls, multiple runs for the same branch
+# compete for limited runners, causing queue buildup. This cancels outdated runs
+# when a new commit is pushed to the same branch.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-005
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 env:
   ARGOCD_VERSION: v2.9.3
   KUBECONFORM_VERSION: v0.6.4
@@ -23,10 +31,10 @@ jobs:
     runs-on: [k8s-runner]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -41,7 +49,7 @@ jobs:
     runs-on: [k8s-runner]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup tools
         run: |
@@ -152,10 +160,10 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Helm
-        uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v3
         with:
           version: 'latest'
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -198,7 +206,7 @@ jobs:
     runs-on: [k8s-runner]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup tools
         run: |
@@ -264,7 +272,7 @@ jobs:
     runs-on: [k8s-runner]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run Trivy security scanner
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # master
@@ -286,7 +294,7 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -339,7 +347,7 @@ jobs:
           echo "</details>" >> diff-summary.md
 
       - name: Comment PR with diff
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');

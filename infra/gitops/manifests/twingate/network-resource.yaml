@@ -1,0 +1,34 @@
+---
+# Twingate Network Resource - Exposes cluster pod network to Twingate clients
+# This allows Twingate clients to access pods and services in the cluster
+apiVersion: twingate.com/v1alpha1
+kind: TwingateResource
+metadata:
+  name: latitude-pod-network
+  namespace: operators
+  labels:
+    app.kubernetes.io/name: twingate-network-resource
+    app.kubernetes.io/part-of: networking
+spec:
+  # Resource name in Twingate
+  name: Latitude Cluster Pod Network
+
+  # Reference to the RemoteNetwork
+  remoteNetworkRef:
+    name: latitude-cluster
+
+  # Network address (pod CIDR)
+  # This allows Twingate clients to access all pods in the cluster
+  address: "10.4.0.0/16"
+
+  # Protocol (TCP/UDP/ALL)
+  protocol: "TCP"
+
+  # Optional: Port range (empty means all ports)
+  # ports: []
+
+  # Optional: Access policy
+  # accessPolicy:
+  #   users: []
+  #   groups: []
+  #   serviceAccounts: []

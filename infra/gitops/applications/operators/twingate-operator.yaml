@@ -1,0 +1,104 @@
+---
+# Twingate Operator - Zero Trust Network Access
+# License: MPL-2.0 - Safe to distribute commercially
+# Source: https://github.com/Twingate/kubernetes-operator
+#
+# Features:
+# - Zero Trust Network Access (ZTNA)
+# - Remote Network management
+# - Connector deployment
+# - Network resource management
+# - Application access control
+#
+# Prerequisites:
+# - Twingate account with Remote Network configured
+# - Twingate API token with Read/Write/Provision permissions
+# - Connectors deployed (can be managed via operator)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: twingate-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: twingate-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/type: security
+    platform.5dlabs.io/license: mpl-2.0
+    platform.5dlabs.io/distributable: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: oci://ghcr.io/twingate/helmcharts/twingate-operator
+    # LESSON LEARNED: Always pin helm chart versions for reproducible deployments
+    # See: pr-merge-loop/lessons-learned.md#ISSUE-006
+    targetRevision: v0.28.0
+    helm:
+      values: |  # pragma: allowlist secret
+        # Twingate Operator configuration
+        twingateOperator:
+          # API token from ExternalSecret
+          # pragma: allowlist secret
+          apiToken:  # pragma: allowlist secret
+            secretRef:
+              name: twingate-api-secret
+              key: apiToken
+
+          # Resource limits
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          # Pod labels for log collection
+          podLabels:
+            platform.5dlabs.io/log-collection: enabled
+
+          # Pod annotations for log collection
+          podAnnotations:
+            logs.platform.5dlabs.io/collect: "true"
+            logs.platform.5dlabs.io/service: twingate-operator
+
+          # Service account
+          serviceAccount:
+            create: true
+            name: twingate-operator
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: operators
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore CRD differences
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/annotations
+        - /spec/conversion
+
+  revisionHistoryLimit: 5

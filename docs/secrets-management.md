@@ -135,9 +135,11 @@ Multiple 1Password items combine into one OpenBao secret:
 | 1Password Item | OpenBao Key | Fields |
 |----------------|-------------|--------|
 | `Cloudflare API` | `cloudflare` | `email`, `api-key` (credential) |
+| `Cloudflare Tunnel Token` | `cloudflare-tunnel` | API token with Account Settings Read, Cloudflare Tunnel Read/Write, Zone Read, DNS Read permissions |
 | `GHCR Pull Secret` | `ghcr-secret` | `.dockerconfigjson` (from credential JSON) |
 | `Discord Alertmanager Webhook` | `alertmanager-discord` | `webhook-url` |
 | `Linear API Credentials` | `linear-sync` | `LINEAR_API_KEY`, `LINEAR_WEBHOOK_SECRET`, etc. |
+| `GitHub Organization Webhook` | `github-webhook` | `secret` (for Stitch PR reviews) |
 
 ### Tool Secrets
 
@@ -145,8 +147,10 @@ Multiple 1Password items combine into one OpenBao secret:
 |----------------|-------------|--------|
 | `GitHub PAT - Tools MCP Server` | `tools-github` | `GITHUB_PERSONAL_ACCESS_TOKEN` |
 | `Firecrawl API Key` | `tools-firecrawl` | `FIRECRAWL_API_KEY` |
+| `MCP-tavily API Key` | `tools-tavily` | `TAVILY_API_KEY` |
 | `Latitude.sh API` | `tools-latitude` | `LATITUDE_API_KEY` |
 | `Kubeconfig - Latitude cto-dal` | `tools-kubernetes` | `KUBECONFIG` |
+| `Kubeconfig - Latitude cto-fra` | `tools-kubernetes-fra` | `KUBECONFIG` |
 | `App Store Connect API` | `tools-appstore-connect` | `APP_STORE_KEY_ID`, `APP_STORE_ISSUER_ID`, `APP_STORE_P8_KEY` |
 
 ## Monitoring and Alerts

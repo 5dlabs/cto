@@ -337,6 +337,7 @@ fn test_generate_completion_summary() {
 
     let request = IntakeRequest {
         session_id: "test-session".to_string(),
+        access_token: None,
         prd_issue_id: "prd-123".to_string(),
         prd_identifier: "TSK-1".to_string(),
         team_id: "team-abc".to_string(),

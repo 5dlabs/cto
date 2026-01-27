@@ -34,6 +34,8 @@ spec:
       securityContext:
         # Match the 'app' user/group from the container image (UID/GID 1001)
         fsGroup: 1001
+        # GID 2375 is the docker group used by docker:dind for the socket
+        supplementalGroups: [2375]
       initContainers:
         - name: setup-directories
           image: alpine:latest
@@ -115,8 +117,43 @@ spec:
                   name: tools-latitude-secrets
                   key: LATITUDE_API_KEY
                   optional: true
+            # Firecrawl API key for web scraping and crawling
+            - name: FIRECRAWL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tools-firecrawl-secrets
+                  key: FIRECRAWL_API_KEY
+                  optional: true
+            # Tavily API key for web search
+            - name: TAVILY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tools-tavily-secrets
+                  key: TAVILY_API_KEY
+                  optional: true
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
+          # Readiness probe - ensures service doesn't receive traffic until tools are discovered
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            # Allow time for initial tool discovery (can take 2-4 minutes)
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            # Allow up to 5 minutes (30 failures * 10s period) for full initialization
+            failureThreshold: 30
+          # Liveness probe - restart if server becomes unresponsive
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            # Give server time to start before checking liveness
+            initialDelaySeconds: 300
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
           volumeMounts:
             - name: config
               mountPath: /config

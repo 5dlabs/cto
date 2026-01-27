@@ -84,6 +84,7 @@ spec:
                 api-keys
                 tools-github
                 tools-firecrawl
+                tools-tavily
                 tools-latitude
                 cloudflare
                 ghcr-secret
@@ -94,6 +95,7 @@ spec:
               # Optional secrets (warn but don't fail)
               OPTIONAL_SECRETS="
                 tools-kubernetes
+                tools-kubernetes-fra
                 tools-appstore-connect
                 research-twitter
                 research-digest
@@ -103,6 +105,7 @@ spec:
                 web-app/database-url
                 web-app/auth-secret
                 web-app/github-oauth
+                github-webhook
               "
 
               MISSING=""

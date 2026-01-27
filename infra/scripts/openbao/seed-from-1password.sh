@@ -309,6 +309,15 @@ seed_tools() {
         log_warning "Missing: Firecrawl API Key"
     fi
     
+    # tools-tavily
+    local tavily_key
+    tavily_key=$(op_get_field "MCP-tavily API Key" "credential")
+    if [[ -n "$tavily_key" ]]; then
+        bao_put "tools-tavily" "TAVILY_API_KEY" "$tavily_key"
+    else
+        log_warning "Missing: MCP-tavily API Key"
+    fi
+    
     # tools-latitude
     local latitude_key
     latitude_key=$(op_get_field "Latitude.sh API" "credential")
@@ -318,13 +327,22 @@ seed_tools() {
         log_warning "Missing: Latitude.sh API"
     fi
     
-    # tools-kubernetes
-    local kubeconfig
-    kubeconfig=$(op_get_field "Kubeconfig - Latitude cto-dal" "credential")
-    if [[ -n "$kubeconfig" ]]; then
-        bao_put "tools-kubernetes" "KUBECONFIG" "$kubeconfig"
+    # tools-kubernetes (Dallas cluster - cto-dal)
+    local kubeconfig_dal
+    kubeconfig_dal=$(op_get_field "Kubeconfig - Latitude cto-dal" "credential")
+    if [[ -n "$kubeconfig_dal" ]]; then
+        bao_put "tools-kubernetes" "KUBECONFIG" "$kubeconfig_dal"
     else
         log_warning "Missing: Kubeconfig - Latitude cto-dal"
+    fi
+    
+    # tools-kubernetes-fra (Frankfurt cluster - cto-fra)
+    local kubeconfig_fra
+    kubeconfig_fra=$(op_get_field "Kubeconfig - Latitude cto-fra" "credential")
+    if [[ -n "$kubeconfig_fra" ]]; then
+        bao_put "tools-kubernetes-fra" "KUBECONFIG" "$kubeconfig_fra"
+    else
+        log_warning "Missing: Kubeconfig - Latitude cto-fra"
     fi
     
     # tools-appstore-connect
@@ -378,6 +396,16 @@ seed_infrastructure() {
         bao_put "alertmanager-discord" "webhook-url" "$discord_webhook"
     else
         log_warning "Missing: Discord Alertmanager Webhook"
+    fi
+    
+    # github-webhook - GitHub organization webhook secret for Argo Events
+    # Used by the GitHub EventSource to verify webhook payloads from GitHub
+    local github_webhook_secret
+    github_webhook_secret=$(op item get "GitHub Organization Webhook" --fields "credential" --reveal 2>/dev/null || echo "")
+    if [[ -n "$github_webhook_secret" ]]; then
+        bao_put "github-webhook" "secret" "$github_webhook_secret"
+    else
+        log_warning "Missing: GitHub Organization Webhook (needed for Stitch PR reviews)"
     fi
     
     # linear-sync (Linear API for the platform)

@@ -55,15 +55,13 @@ WORKDIR /build
 # =============================================================================
 FROM ubuntu:24.04 AS runtime-base
 
-# Install system dependencies and all runtimes
+# Install system dependencies and all runtimes (except Node.js which needs NodeSource)
 # hadolint ignore=DL3008,DL3015
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     git \
     bash \
-    nodejs \
-    npm \
     python3 \
     python3-dev \
     python3-pip \
@@ -78,6 +76,13 @@ RUN apt-get update && apt-get install -y \
     gzip \
     unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 22 LTS from NodeSource (required for modern MCP servers like firecrawl-mcp)
+# hadolint ignore=DL3008
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@latest && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install kubectl (architecture-aware)
 # hadolint ignore=DL3059

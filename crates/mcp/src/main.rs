@@ -4081,6 +4081,7 @@ fn handle_intake_sync_task(arguments: &HashMap<String, Value>) -> Result<Value> 
     }))
 }
 
+#[allow(clippy::too_many_lines)]
 fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Option<Result<Value>> {
     match method {
         "tools/call" => {
@@ -4163,6 +4164,12 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                     }]
                 }))),
                 Ok("update_mcp_server") => Some(handle_update_mcp_server(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("add_skills") => Some(handle_add_skills(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
@@ -4941,6 +4948,355 @@ fn handle_update_mcp_server(arguments: &std::collections::HashMap<String, Value>
         "github_url": github_url,
         "skip_merge": skip_merge,
         "note": "Monitor the CodeRun for progress."
+    }))
+}
+
+/// Build prompt for `add_skills` `CodeRun`
+#[allow(clippy::too_many_lines)]
+fn build_add_skills_prompt(
+    github_url: &str,
+    agents: &[String],
+    category: Option<&str>,
+    readme_content: Option<&str>,
+    skip_merge: bool,
+) -> String {
+    let agents_str = agents.join(", ");
+    let category_instruction = category.map_or_else(
+        || {
+            "Analyze each skill's content and place it in the most appropriate category. \
+             Existing categories: animations, auth, context, design, documents, languages, \
+             llm-docs, platforms, quality, security, stacks, tools, workflow. \
+             You may create a new category if none of the existing ones fit."
+                .to_string()
+        },
+        |cat| format!("Place all skills in the `{cat}` category."),
+    );
+
+    // Build acceptance criteria FIRST (context engineering: beginning has highest attention)
+    let acceptance_criteria = if skip_merge {
+        format!(
+            r"## ⚠️ ACCEPTANCE CRITERIA (REQUIRED - Read First!)
+
+You MUST complete ALL of these steps before finishing:
+
+1. [ ] **Repository analyzed** - Found all SKILL.md files in the source repository
+2. [ ] **Skills copied** - Each skill copied to `templates/skills/{{category}}/{{skill-name}}/SKILL.md`
+3. [ ] **cto-config.json updated** - Added skill names to the `skills` array for agents: {agents_str}
+4. [ ] **Valid JSON** - cto-config.json parses without errors
+5. [ ] **PR created** - Pull request targeting `develop` branch
+6. [ ] **CI passes** - Wait for CI checks to complete successfully
+
+**Note:** `skip_merge=true` was set, so stop after CI passes. Do NOT merge the PR.
+
+---
+
+"
+        )
+    } else {
+        format!(
+            r"## ⚠️ ACCEPTANCE CRITERIA (REQUIRED - Read First!)
+
+You MUST complete ALL of these steps before finishing:
+
+1. [ ] **Repository analyzed** - Found all SKILL.md files in the source repository
+2. [ ] **Skills copied** - Each skill copied to `templates/skills/{{category}}/{{skill-name}}/SKILL.md`
+3. [ ] **cto-config.json updated** - Added skill names to the `skills` array for agents: {agents_str}
+4. [ ] **Valid JSON** - cto-config.json parses without errors
+5. [ ] **PR created** - Pull request targeting `develop` branch
+6. [ ] **CI passes** - Wait for CI checks to complete successfully
+7. [ ] **PR merged** - Use `github_merge_pull_request` to merge
+
+**Keep iterating until ALL criteria are met.** Use the MCP tools to verify each step.
+
+---
+
+"
+        )
+    };
+
+    let readme_section = readme_content.map_or_else(
+        || "README not available - explore the repository directly using GitHub tools.".to_string(),
+        |content| format!("### README Documentation:\n\n```\n{content}\n```"),
+    );
+
+    format!(
+        r#"# Add Skills Task
+
+{acceptance_criteria}
+
+## Task: Add Skills from GitHub Repository
+
+Add skills from the repository at `{github_url}` to the platform and assign them to agents: **{agents_str}**.
+
+### Instructions:
+
+1. **Explore the repository** to find all SKILL.md files
+   - Use `github_get_file_content` or `github_view_repo_structure` to find skills
+   - Skills may be in a `skills/` directory, `.claude/skills/`, `.cursor/skills/`, or at the root
+   - Each skill should have a `SKILL.md` file
+
+2. **For each skill found:**
+   - Determine the skill name from the directory name or SKILL.md content
+   - {category_instruction}
+   - Create the directory: `templates/skills/{{category}}/{{skill-name}}/`
+   - Copy the SKILL.md file to that directory
+
+3. **Update cto-config.json:**
+   - Add the skill name (directory name, not full path) to the `skills` array for each agent: {agents_str}
+   - Skills should be added to the agent's existing skills array
+   - Do NOT add duplicates if the skill already exists
+
+4. **Create a PR** with all changes
+
+### Source Repository:
+
+**GitHub URL:** {github_url}
+
+{readme_section}
+
+## Target File Locations
+
+- Skills directory: `templates/skills/{{category}}/{{skill-name}}/SKILL.md`
+- Config file: `cto-config.json`
+
+## Skills Directory Structure
+
+Skills are organized by category:
+
+```
+templates/skills/
+├── animations/          # Animation libraries
+├── auth/                # Authentication patterns  
+├── context/             # Context engineering
+├── design/              # UI/UX design
+├── documents/           # Document processing
+├── languages/           # Language patterns (rust, go, etc.)
+├── llm-docs/            # LLM documentation
+├── platforms/           # Platform-specific (expo, k8s, etc.)
+├── quality/             # Code quality
+├── security/            # Security tools
+├── stacks/              # Full stack configs
+├── tools/               # Tool integrations
+└── workflow/            # Workflow patterns
+```
+
+## cto-config.json Structure
+
+Skills are configured per-agent:
+
+```json
+{{
+  "agents": {{
+    "rex": {{
+      "skills": [
+        "rust-patterns",
+        "existing-skill",
+        "new-skill-to-add"
+      ]
+    }},
+    "blaze": {{
+      "skills": [
+        "react-best-practices",
+        "new-skill-to-add"
+      ]
+    }}
+  }}
+}}
+```
+
+## Available MCP Tools
+
+You have access to these MCP tools for this task:
+
+### GitHub Tools
+- `github_get_file_content` - Read file contents from repository
+- `github_view_repo_structure` - View repository structure
+- `github_create_pull_request` - Create the PR
+- `github_merge_pull_request` - Merge after CI passes
+- `github_get_pull_request` - Check PR status and CI checks
+"#
+    )
+}
+
+/// Create a `CodeRun` for `add_skills` task
+fn create_add_skills_coderun(
+    github_url: &str,
+    agents: &[String],
+    category: Option<&str>,
+    readme_content: Option<&str>,
+    skip_merge: bool,
+) -> Result<String> {
+    let kubectl_cmd = find_command("kubectl");
+
+    // Get Rex agent config from cto-config.json
+    let config = CTO_CONFIG
+        .get()
+        .ok_or_else(|| anyhow!("CTO config not loaded"))?;
+    let rex_config = config
+        .agents
+        .get("rex")
+        .ok_or_else(|| anyhow!("Rex agent not found in config"))?;
+
+    let model = &rex_config.model;
+    let cli_type = &rex_config.cli;
+    let github_app = &rex_config.github_app;
+
+    // Build the prompt for Rex
+    let prompt = build_add_skills_prompt(github_url, agents, category, readme_content, skip_merge);
+
+    // Build environment variables for the CodeRun
+    let mut env_map = serde_json::Map::new();
+    env_map.insert("SKILLS_TASK".to_string(), json!("add"));
+    env_map.insert("SKILLS_GITHUB_URL".to_string(), json!(github_url));
+    env_map.insert("SKILLS_AGENTS".to_string(), json!(agents.join(",")));
+    env_map.insert("SKIP_MERGE".to_string(), json!(skip_merge.to_string()));
+
+    if let Some(cat) = category {
+        env_map.insert("SKILLS_CATEGORY".to_string(), json!(cat));
+    }
+
+    // Derive a short name for the CodeRun from the repo
+    let repo_name = doc_proxy::parse_github_url(github_url)
+        .map(|(_, repo)| repo)
+        .unwrap_or_else(|_| "unknown".to_string());
+    let short_name = repo_name
+        .trim_start_matches("skills-")
+        .trim_end_matches("-skills")
+        .chars()
+        .take(20)
+        .collect::<String>();
+
+    // Build the CodeRun manifest using Rex's config from cto-config.json
+    let coderun = json!({
+        "apiVersion": "agents.platform/v1",
+        "kind": "CodeRun",
+        "metadata": {
+            "generateName": format!("coderun-skills-{}-", short_name),
+            "namespace": "cto",
+            "labels": {
+                "agent": "rex",
+                "task-type": "skills-add",
+                "skills-source": short_name
+            }
+        },
+        "spec": {
+            "taskId": 0,
+            "service": format!("skills-{}", short_name),
+            "repositoryUrl": "https://github.com/5dlabs/cto",
+            "docsRepositoryUrl": "https://github.com/5dlabs/cto",
+            "workingDirectory": ".",
+            "model": model,
+            "githubApp": github_app,
+            "continueSession": false,
+            "overwriteMemory": true,
+            "promptModification": prompt,
+            "cliConfig": {
+                "cliType": cli_type,
+                "model": model
+            },
+            "remoteTools": "mcp_tools_github_*",
+            "env": env_map
+        }
+    });
+
+    // Write to temp file and apply
+    let coderun_json = serde_json::to_string_pretty(&coderun)?;
+    let mut temp_file = NamedTempFile::new()?;
+    temp_file.write_all(coderun_json.as_bytes())?;
+    temp_file.flush()?;
+
+    let output = Command::new(&kubectl_cmd)
+        .args([
+            "create",
+            "-f",
+            temp_file.path().to_str().unwrap(),
+            "-o",
+            "jsonpath={.metadata.name}",
+        ])
+        .output()
+        .map_err(|e| anyhow!("Failed to execute kubectl: {e}"))?;
+
+    if output.status.success() {
+        let name = String::from_utf8(output.stdout)?.trim().to_string();
+        Ok(name)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(anyhow!("Failed to create CodeRun: {stderr}"))
+    }
+}
+
+/// Handle the `add_skills` tool - add skills from a GitHub repository
+#[allow(clippy::disallowed_macros)]
+fn handle_add_skills(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let github_url = arguments
+        .get("github_url")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("github_url is required"))?;
+
+    let agents: Vec<String> = arguments
+        .get("agents")
+        .and_then(|v| v.as_array())
+        .ok_or(anyhow!("agents is required and must be an array"))?
+        .iter()
+        .filter_map(|v| v.as_str().map(String::from))
+        .collect();
+
+    if agents.is_empty() {
+        return Err(anyhow!("agents array must not be empty"));
+    }
+
+    let category = arguments.get("category").and_then(|v| v.as_str());
+
+    let skip_merge = arguments
+        .get("skip_merge")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+
+    // Parse and validate GitHub URL
+    let (_org, repo) = doc_proxy::parse_github_url(github_url)?;
+
+    eprintln!("📚 Adding skills from {github_url}");
+    eprintln!("   Target agents: {}", agents.join(", "));
+    if let Some(cat) = category {
+        eprintln!("   Category: {cat}");
+    }
+
+    // Fetch README via Firecrawl
+    eprintln!("📄 Fetching README from GitHub...");
+    let readme_content = match doc_proxy::scrape_readme(github_url) {
+        Ok(content) => {
+            eprintln!("   ✅ README fetched ({} chars)", content.len());
+            Some(content)
+        }
+        Err(e) => {
+            eprintln!("   ⚠️ Could not fetch README: {e}");
+            eprintln!("   Rex will explore the repository directly");
+            None
+        }
+    };
+
+    // Create CodeRun for Rex
+    eprintln!("🚀 Creating CodeRun for Rex...");
+    let coderun_name = create_add_skills_coderun(
+        github_url,
+        &agents,
+        category,
+        readme_content.as_deref(),
+        skip_merge,
+    )?;
+
+    eprintln!("   ✅ CodeRun created: {coderun_name}");
+
+    Ok(json!({
+        "success": true,
+        "message": "CodeRun created - Rex will analyze repository, copy skills to templates, update cto-config.json, and create PR",
+        "coderun_name": coderun_name,
+        "github_url": github_url,
+        "repository": repo,
+        "agents": agents,
+        "category": category,
+        "skip_merge": skip_merge,
+        "note": "Monitor the CodeRun for progress. Skills will be added to templates/skills/ and assigned to the specified agents in cto-config.json."
     }))
 }
 

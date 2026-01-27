@@ -68,7 +68,7 @@ jobs:
             version: "1.0.0"
             description: "Visual theme editor for shadcn/ui components"
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98 # v4
 
       - name: Check if should build this image
         id: should-build
@@ -115,7 +115,7 @@ jobs:
 
       - name: Build and push ${{ matrix.name }} image
         if: steps.should-build.outputs.build == 'true'
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
@@ -164,7 +164,7 @@ jobs:
     runs-on: [k8s-runner]
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98 # v4
         with:
           fetch-depth: 2  # Need HEAD~1 for git diff
 

@@ -12,6 +12,7 @@ use crate::entities::Task;
 use crate::errors::{TasksError, TasksResult};
 
 use super::super::tasks::routing::get_role_for_hint;
+use crate::entities::Subtask;
 
 /// XML escape special characters.
 fn xml_escape(s: &str) -> String {
@@ -68,6 +69,27 @@ fn get_language_for_agent(agent_hint: &str) -> &'static str {
         "bolt" => "yaml",
         _ => "text",
     }
+}
+
+fn task_dir_name(task_id: &str) -> String {
+    if task_id.starts_with("task-") {
+        task_id.to_string()
+    } else {
+        format!("task-{task_id}")
+    }
+}
+
+fn subtask_dir_name(task_dir: &str, subtask_id: u32) -> String {
+    format!("{task_dir}.{subtask_id}")
+}
+
+/// Create a full subtask ID that matches the directory naming convention.
+///
+/// This returns format like "task-1.1" which matches the directory structure
+/// `.tasks/docs/task-1/subtasks/task-1.1/`.
+fn subtask_full_id(task_id: &str, subtask_id: u32) -> String {
+    let task_dir = task_dir_name(task_id);
+    subtask_dir_name(&task_dir, subtask_id)
 }
 
 /// Get validation commands based on agent type.
@@ -427,16 +449,163 @@ pub fn generate_acceptance_criteria(task: &Task) -> String {
     if !task.subtasks.is_empty() {
         writeln!(content, "\n## Subtasks\n").ok();
         for subtask in &task.subtasks {
-            writeln!(
-                content,
-                "- [ ] {}.{}: {}",
-                task.id, subtask.id, subtask.title
-            )
-            .ok();
+            let full_id = subtask_full_id(&task.id, subtask.id);
+            writeln!(content, "- [ ] {full_id}: {}", subtask.title).ok();
         }
     }
 
     content
+}
+
+#[must_use]
+pub fn generate_subtask_prompt(task: &Task, subtask: &Subtask) -> String {
+    let mut content = String::new();
+    let task_title = &task.title;
+    let subtask_id = subtask_full_id(&task.id, subtask.id);
+    let subagent = subtask
+        .subagent_type
+        .map(|t| t.to_string())
+        .unwrap_or_else(|| "implementer".to_string());
+    let execution_level = subtask
+        .execution_level
+        .map(|level| level.to_string())
+        .unwrap_or_else(|| "unspecified".to_string());
+    let dependencies = if subtask.dependencies.is_empty() {
+        "none".to_string()
+    } else {
+        subtask.dependencies.join(", ")
+    };
+
+    writeln!(content, "# Subtask {subtask_id}: {}\n", subtask.title).ok();
+    writeln!(content, "**Parent Task:** {task_title}").ok();
+    writeln!(content, "**Subagent Type:** {subagent}").ok();
+    writeln!(content, "**Execution Level:** {execution_level}").ok();
+    writeln!(
+        content,
+        "**Parallelizable:** {}\n",
+        if subtask.parallelizable { "yes" } else { "no" }
+    )
+    .ok();
+
+    writeln!(content, "## Description\n").ok();
+    writeln!(content, "{}\n", subtask.description).ok();
+
+    if !subtask.details.is_empty() {
+        writeln!(content, "## Details\n").ok();
+        writeln!(content, "{}\n", subtask.details).ok();
+    }
+
+    writeln!(content, "## Dependencies\n").ok();
+    writeln!(content, "{dependencies}\n").ok();
+
+    if !subtask.test_strategy.is_empty() {
+        writeln!(content, "## Test Strategy\n").ok();
+        writeln!(content, "{}\n", subtask.test_strategy).ok();
+    }
+
+    writeln!(
+        content,
+        "## Notes\n\nRefer to `.tasks/docs/prd.txt` for requirements and `.tasks/docs/{}/prompt.md` for the parent task context.\n",
+        task_dir_name(&task.id)
+    )
+    .ok();
+
+    content
+}
+
+#[must_use]
+pub fn generate_subtask_acceptance(task: &Task, subtask: &Subtask) -> String {
+    let mut content = String::new();
+    let subtask_id = subtask_full_id(&task.id, subtask.id);
+    let task_dir = task_dir_name(&task.id);
+
+    writeln!(content, "# Acceptance Criteria: Subtask {subtask_id}\n").ok();
+    writeln!(content, "- [ ] {}", subtask.description).ok();
+
+    if !subtask.test_strategy.is_empty() {
+        writeln!(content, "- [ ] {}", subtask.test_strategy).ok();
+    }
+
+    writeln!(content, "- [ ] Changes applied and verified").ok();
+    writeln!(content, "- [ ] Parent task requirements still satisfied").ok();
+    writeln!(
+        content,
+        "\nRefer to `.tasks/docs/{task_dir}/acceptance.md` for parent task acceptance criteria."
+    )
+    .ok();
+
+    content
+}
+
+#[must_use]
+pub fn generate_subtask_xml(task: &Task, subtask: &Subtask) -> String {
+    let agent_hint = task.agent_hint.as_deref().unwrap_or("rex");
+    let role = get_role_for_hint(agent_hint);
+    let priority = task.priority.to_string();
+    let dependencies = subtask.dependencies.join(", ");
+    let validation_commands = get_validation_commands(agent_hint);
+
+    let title_esc = xml_escape(&subtask.title);
+    let desc_esc = xml_escape(&subtask.description);
+    let details_esc = xml_escape(&subtask.details);
+    let test_esc = xml_escape(&subtask.test_strategy);
+    let parent_title_esc = xml_escape(&task.title);
+    let subtask_id = xml_escape(&subtask_full_id(&task.id, subtask.id));
+
+    let requirements_content = if details_esc.is_empty() {
+        format!("Implement subtask {subtask_id} for task {parent_title_esc}.")
+    } else {
+        details_esc
+    };
+
+    let acceptance_content = if test_esc.is_empty() {
+        String::new()
+    } else {
+        format!("<criterion>{test_esc}</criterion>")
+    };
+
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<task id="{id}" priority="{priority}" agent="{agent}">
+    <meta>
+        <title>{title}</title>
+        <priority>{priority}</priority>
+        <dependencies>{deps}</dependencies>
+        <agent_hint>{agent}</agent_hint>
+    </meta>
+
+    <role>You are a {role}. Implement subtask {id} with production-quality output.</role>
+
+    <context>
+        <overview>{desc}</overview>
+        <background>
+            Parent task: {parent_title}
+        </background>
+    </context>
+
+    <requirements>
+        {requirements}
+    </requirements>
+
+    <acceptance_criteria>
+        {acceptance}
+    </acceptance_criteria>
+
+    <validation>
+        {validation}
+    </validation>
+</task>"#,
+        id = subtask_id,
+        priority = priority,
+        agent = agent_hint,
+        title = title_esc,
+        deps = xml_escape(&dependencies),
+        desc = desc_esc,
+        parent_title = parent_title_esc,
+        requirements = requirements_content,
+        acceptance = acceptance_content,
+        validation = validation_commands
+    )
 }
 
 /// Generate decisions.md template for a task.
@@ -550,6 +719,14 @@ pub struct DocsGenerationResult {
     pub acceptance_files: usize,
     /// Number of decisions.md files generated.
     pub decision_files: usize,
+    /// Number of subtask directories created.
+    pub subtask_dirs_created: usize,
+    /// Number of subtask prompt files generated.
+    pub subtask_prompt_files: usize,
+    /// Number of subtask acceptance files generated.
+    pub subtask_acceptance_files: usize,
+    /// Number of subtask XML files generated.
+    pub subtask_xml_files: usize,
 }
 
 /// Generate all documentation files for a list of tasks.
@@ -573,11 +750,7 @@ pub async fn generate_all_docs(
 
     for task in tasks {
         // Use task ID directly if it already starts with "task-", otherwise prefix it
-        let dir_name = if task.id.starts_with("task-") {
-            task.id.clone()
-        } else {
-            format!("task-{}", task.id)
-        };
+        let dir_name = task_dir_name(&task.id);
         let task_dir = output_dir.join(&dir_name);
 
         // Create task directory
@@ -632,6 +805,58 @@ pub async fn generate_all_docs(
                 reason: e.to_string(),
             })?;
         result.decision_files += 1;
+
+        if !task.subtasks.is_empty() {
+            let subtasks_dir = task_dir.join("subtasks");
+            tokio::fs::create_dir_all(&subtasks_dir)
+                .await
+                .map_err(|e| TasksError::FileWriteError {
+                    path: subtasks_dir.display().to_string(),
+                    reason: e.to_string(),
+                })?;
+
+            for subtask in &task.subtasks {
+                let subtask_dir_name = subtask_dir_name(&dir_name, subtask.id);
+                let subtask_dir = subtasks_dir.join(&subtask_dir_name);
+                tokio::fs::create_dir_all(&subtask_dir).await.map_err(|e| {
+                    TasksError::FileWriteError {
+                        path: subtask_dir.display().to_string(),
+                        reason: e.to_string(),
+                    }
+                })?;
+                result.subtask_dirs_created += 1;
+
+                let subtask_prompt = generate_subtask_prompt(task, subtask);
+                let subtask_prompt_path = subtask_dir.join("prompt.md");
+                tokio::fs::write(&subtask_prompt_path, &subtask_prompt)
+                    .await
+                    .map_err(|e| TasksError::FileWriteError {
+                        path: subtask_prompt_path.display().to_string(),
+                        reason: e.to_string(),
+                    })?;
+                result.subtask_prompt_files += 1;
+
+                let subtask_acceptance = generate_subtask_acceptance(task, subtask);
+                let subtask_acceptance_path = subtask_dir.join("acceptance.md");
+                tokio::fs::write(&subtask_acceptance_path, &subtask_acceptance)
+                    .await
+                    .map_err(|e| TasksError::FileWriteError {
+                        path: subtask_acceptance_path.display().to_string(),
+                        reason: e.to_string(),
+                    })?;
+                result.subtask_acceptance_files += 1;
+
+                let subtask_xml = generate_subtask_xml(task, subtask);
+                let subtask_xml_path = subtask_dir.join("prompt.xml");
+                tokio::fs::write(&subtask_xml_path, &subtask_xml)
+                    .await
+                    .map_err(|e| TasksError::FileWriteError {
+                        path: subtask_xml_path.display().to_string(),
+                        reason: e.to_string(),
+                    })?;
+                result.subtask_xml_files += 1;
+            }
+        }
     }
 
     Ok(result)
@@ -863,8 +1088,8 @@ Other requirements."
         let md = generate_acceptance_criteria(&task);
 
         assert!(md.contains("## Subtasks"));
-        assert!(md.contains("- [ ] 1.1: Create endpoint"));
-        assert!(md.contains("- [ ] 1.2: Add validation"));
+        assert!(md.contains("- [ ] task-1.1: Create endpoint"));
+        assert!(md.contains("- [ ] task-1.2: Add validation"));
     }
 
     #[test]

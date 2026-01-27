@@ -123,8 +123,28 @@ pub async fn handle_agent_session_created(
                         warn!(error = %e, "Failed to emit initial thought for intake");
                     }
 
+                    // Get OAuth access token from webhook payload (for agent API calls)
+                    let access_token = payload
+                        .agent_session
+                        .as_ref()
+                        .and_then(|s| s.access_token.as_deref());
+
+                    if access_token.is_some() {
+                        info!("Got OAuth access token from webhook payload");
+                    } else {
+                        warn!(
+                            "No OAuth access token in webhook payload - Linear activities may fail"
+                        );
+                    }
+
                     // Extract intake request from issue (reads PRD/arch from ConfigMap)
-                    match extract_intake_request(&state.kube_client, &ctx.session_id, &issue).await
+                    match extract_intake_request(
+                        &state.kube_client,
+                        &ctx.session_id,
+                        access_token,
+                        &issue,
+                    )
+                    .await
                     {
                         Ok(intake_request) => {
                             // Submit intake CodeRun (new architecture - direct CodeRun creation)

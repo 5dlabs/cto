@@ -46,7 +46,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       publishing: ${{ steps.version.outputs.publishing }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Determine version and tag
         id: version
@@ -90,7 +90,7 @@ jobs:
             https://github.com/axodotdev/cargo-dist/releases/download/v${{ env.CARGO_DIST_VERSION }}/cargo-dist-installer.sh | sh
 
       - name: Upload cargo-dist binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: cargo-dist-bin
           path: ~/.cargo/bin/dist
@@ -179,7 +179,7 @@ jobs:
     runs-on: ${{ matrix.target.os }}
     name: build-${{ matrix.package.binary }}-${{ matrix.target.suffix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
@@ -237,7 +237,7 @@ jobs:
           ls -lh "$DEST"
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: binary-${{ matrix.package.binary }}-${{ matrix.target.suffix }}
           path: dist/
@@ -248,7 +248,7 @@ jobs:
     if: needs.plan.outputs.publishing == 'true'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check disk space
         run: |
@@ -258,13 +258,13 @@ jobs:
           ls -la /cache/buildx/ 2>/dev/null || echo "No buildx cache yet"
 
       - name: Download Linux x86_64 tools binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: binary-tools-server-linux-x86_64
           path: artifacts/
 
       - name: Download Linux x86_64 cto-mcp binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: binary-cto-mcp-linux-x86_64
           path: artifacts/
@@ -289,7 +289,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
           context: ./infra/images/tools
           file: ./infra/images/tools/Dockerfile
@@ -318,7 +318,7 @@ jobs:
     if: needs.plan.outputs.publishing == 'true'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check disk space
         run: |
@@ -328,7 +328,7 @@ jobs:
           ls -la /cache/buildx/ 2>/dev/null || echo "No buildx cache yet"
 
       - name: Download Linux x86_64 controller binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: binary-agent-controller-linux-x86_64
           path: artifacts/
@@ -353,7 +353,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
           context: ./infra/images/controller
           file: ./infra/images/controller/Dockerfile
@@ -382,7 +382,7 @@ jobs:
     if: needs.plan.outputs.publishing == 'true'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check disk space
         run: |
@@ -392,7 +392,7 @@ jobs:
           ls -la /cache/buildx/ 2>/dev/null || echo "No buildx cache yet"
 
       - name: Download Linux x86_64 healer binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: binary-healer-linux-x86_64
           path: artifacts/
@@ -417,7 +417,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
           context: ./infra/images/healer
           file: ./infra/images/healer/Dockerfile
@@ -448,7 +448,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install GitHub CLI
         run: |
@@ -458,7 +458,7 @@ jobs:
           sudo apt-get install -y gh
 
       - name: Download all binary artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: binary-*
           path: artifacts/

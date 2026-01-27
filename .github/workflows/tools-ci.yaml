@@ -20,6 +20,13 @@ on:
       - '.github/workflows/tools-ci.yaml'
   workflow_dispatch:
 
+# LESSON LEARNED: Without concurrency controls, multiple runs for the same branch
+# compete for limited runners, causing queue buildup. This cancels outdated runs.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-005
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: 5dlabs
@@ -34,7 +41,7 @@ jobs:
       helm: ${{ steps.filter.outputs.helm }}
       docker: ${{ steps.filter.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -58,7 +65,7 @@ jobs:
     outputs:
       format-needed: ${{ steps.lint-tools.outputs.format-needed || steps.lint-mcp.outputs.format-needed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -87,7 +94,7 @@ jobs:
     if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -113,7 +120,7 @@ jobs:
     if: needs.changes.outputs.tools == 'true' || needs.changes.outputs.mcp == 'true' || github.event_name == 'push'
     runs-on: [k8s-runner]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s
@@ -148,10 +155,10 @@ jobs:
     if: needs.changes.outputs.helm == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest  # Use ubuntu-latest for stability (no k8s resources needed)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Helm
-        uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v3
         with:
           version: 'latest'
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -174,10 +181,10 @@ jobs:
     if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest  # Use ubuntu-latest for stability (no k8s resources needed)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: infra/images/tools/Dockerfile
           failure-threshold: error
@@ -189,7 +196,7 @@ jobs:
     runs-on: ubuntu-latest  # Use ubuntu-latest for stability (cargo-audit doesn't need k8s)
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -208,7 +215,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust (k8s-runner)
         uses: ./.github/actions/setup-rust-k8s

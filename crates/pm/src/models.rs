@@ -267,6 +267,10 @@ pub enum AgentSessionState {
 pub struct AgentSession {
     /// Unique identifier
     pub id: String,
+    /// OAuth access token for this session (from Linear webhook)
+    /// This token can be used for agentActivityCreate and other agent API calls
+    #[serde(default, rename = "accessToken")]
+    pub access_token: Option<String>,
     /// Session state
     #[serde(default)]
     pub state: Option<AgentSessionState>,

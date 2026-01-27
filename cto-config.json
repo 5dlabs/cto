@@ -3,7 +3,7 @@
   "orgName": "5DLabs",
   "defaults": {
     "intake": {
-    "local": false,
+      "local": false,
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
       "includeCodebase": false,
@@ -78,8 +78,14 @@
         "5dlabs/cto",
         "5dlabs/web"
       ],
-      "excludeLabels": ["skip-review", "bot"],
-      "excludeAuthors": ["dependabot[bot]", "renovate[bot]"]
+      "excludeLabels": [
+        "skip-review",
+        "bot"
+      ],
+      "excludeAuthors": [
+        "dependabot[bot]",
+        "renovate[bot]"
+      ]
     }
   },
   "agents": {
@@ -120,7 +126,11 @@
       "model": "claude-opus-4-5-20251101",
       "modelRotation": {
         "enabled": true,
-        "models": ["claude-opus-4-5-20251101", "claude-sonnet-4-20250514", "claude-opus-4-5-20251101"]
+        "models": [
+          "claude-opus-4-5-20251101",
+          "claude-sonnet-4-20250514",
+          "claude-opus-4-5-20251101"
+        ]
       },
       "tools": {
         "remote": [
@@ -223,7 +233,11 @@
       "model": "claude-opus-4-5-20251101",
       "modelRotation": {
         "enabled": true,
-        "models": ["claude-opus-4-5-20251101", "claude-sonnet-4-20250514", "claude-opus-4-5-20251101"]
+        "models": [
+          "claude-opus-4-5-20251101",
+          "claude-sonnet-4-20250514",
+          "claude-opus-4-5-20251101"
+        ]
       },
       "tools": {
         "remote": [
@@ -258,7 +272,14 @@
           "github_create_branch",
           "github_get_file_contents"
         ],
-        "localServers": {}
+        "localServers": {
+          "remotion-documentation": {
+            "command": "npx",
+            "args": [
+              "@remotion/mcp@latest"
+            ]
+          }
+        }
       }
     },
     "cipher": {
