@@ -79,6 +79,38 @@ fn get_current_namespace() -> String {
     }
 }
 
+/// Add custom headers from server config to a request builder
+/// Headers support environment variable substitution: ${VAR} or ${VAR:-default}
+fn add_custom_headers(
+    mut request_builder: reqwest::RequestBuilder,
+    headers: &HashMap<String, String>,
+    server_name: &str,
+) -> reqwest::RequestBuilder {
+    use tools::config::{substitute_template_variables, TemplateContext};
+
+    // Create a minimal template context for header substitution
+    let context = TemplateContext::new(
+        std::path::PathBuf::from("/"),
+        std::path::PathBuf::from("/"),
+        server_name.to_string(),
+    );
+
+    for (key, value) in headers {
+        // Substitute environment variables in header values
+        let processed_value = substitute_template_variables(value, &context);
+        if !processed_value.is_empty() {
+            tracing::debug!(
+                "🔐 [{}] Adding custom header: {}={}...",
+                server_name,
+                key,
+                &processed_value[..processed_value.len().min(20)]
+            );
+            request_builder = request_builder.header(key.as_str(), processed_value);
+        }
+    }
+    request_builder
+}
+
 /// Tools HTTP MCP Server
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -766,13 +798,19 @@ impl ServerConnectionPool {
             if let Some(url) = &server_config.url {
                 tracing::info!("🌐 Forwarding HTTP request to: {}", url);
 
+                // Clone values before dropping the config lock
+                let url = url.clone();
+                let transport = server_config.transport.clone();
+                let custom_headers = server_config.headers.clone();
+                drop(config_manager); // Release the read lock
+
                 // Create HTTP client if not exists
                 let client = reqwest::Client::new();
 
                 // Use transport type to determine communication method
-                if server_config.transport == "sse" {
+                if transport == "sse" {
                     // Use SSE bidirectional communication
-                    return call_tool_via_sse(&client, server_name, url, tool_name, arguments)
+                    return call_tool_via_sse(&client, server_name, &url, tool_name, arguments)
                         .await;
                 }
                 // Direct HTTP endpoint (like Solana)
@@ -794,8 +832,12 @@ impl ServerConnectionPool {
 
                 // Send HTTP POST request with proper Accept headers and session ID
                 let mut request_builder = client
-                    .post(url)
+                    .post(&url)
                     .header("Accept", "application/json,text/event-stream");
+
+                // Add custom headers from config (e.g., Authorization)
+                request_builder =
+                    add_custom_headers(request_builder, &custom_headers, server_name);
 
                 if let Some(ref sid) = session_id {
                     tracing::info!("🔑 [{}] Including Mcp-Session-Id in request", server_name);
@@ -1631,9 +1673,13 @@ impl BridgeState {
                     server_name,
                     message_url
                 );
-                let init_response = client
+                let init_request_builder = client
                     .post(&message_url)
-                    .header("Accept", "application/json,text/event-stream")
+                    .header("Accept", "application/json,text/event-stream");
+                // Add custom headers from config (e.g., Authorization)
+                let init_request_builder =
+                    add_custom_headers(init_request_builder, &config.headers, server_name);
+                let init_response = init_request_builder
                     .json(&init_request)
                     .send()
                     .await
@@ -1677,6 +1723,10 @@ impl BridgeState {
                 let mut request_builder = client
                     .post(&message_url)
                     .header("Accept", "application/json,text/event-stream");
+
+                // Add custom headers from config (e.g., Authorization)
+                request_builder =
+                    add_custom_headers(request_builder, &config.headers, server_name);
 
                 if let Some(ref sid) = mcp_session_id {
                     request_builder = request_builder.header("Mcp-Session-Id", sid);

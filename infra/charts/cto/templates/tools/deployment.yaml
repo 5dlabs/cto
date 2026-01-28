@@ -167,6 +167,26 @@ spec:
                   name: cto-secrets
                   key: PERPLEXITY_API_KEY
                   optional: true
+            # MiniMax AI suite - text, video, speech, and music generation
+            - name: MINIMAX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cto-secrets
+                  key: MINIMAX_API_KEY
+                  optional: true
+            - name: MINIMAX_GROUP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: cto-secrets
+                  key: MINIMAX_GROUP_ID
+                  optional: true
+            # Cloudflare API token for Workers, DNS, and edge services
+            - name: CLOUDFLARE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflare-api-credentials
+                  key: CLOUDFLARE_API_TOKEN
+                  optional: true
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
           # Readiness probe - ensures service doesn't receive traffic until tools are discovered
