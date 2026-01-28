@@ -614,6 +614,8 @@ tools:
         transport: "http"
         url: "https://bindings.mcp.cloudflare.com/mcp"
         workingDirectory: "/tmp"
+        headers:
+          Authorization: "Bearer ${CLOUDFLARE_API_TOKEN}"
 
       # --- AI Generation ---
       minimax:

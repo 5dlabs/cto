@@ -56,6 +56,10 @@ pub struct ServerConfig {
     pub url: Option<String>,
     #[serde(default)]
     pub env: HashMap<String, String>,
+    /// For http: Custom headers to include in requests (e.g., Authorization)
+    /// Values support environment variable substitution: ${VAR} or ${VAR:-default}
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
     /// Working directory for the server process (optional, defaults to project directory)
     /// Supports: "project_root", absolute paths like "/usr/local/bin", or relative paths
     #[serde(rename = "workingDirectory", default)]
