@@ -540,7 +540,7 @@ tools:
         description: "Web scraping, crawling, and content extraction with search capabilities"
         transport: "stdio"
         command: "npx"
-        args: ["-y", "firecrawl-mcp"]
+        args: ["-y", "@iflow-mcp/firecrawl-mcp"]
         workingDirectory: "/tmp"
         env:
           FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
