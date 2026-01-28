@@ -640,6 +640,16 @@ tools:
         env:
           PERPLEXITY_API_KEY: "${PERPLEXITY_API_KEY}"
 
+      tavily:
+        name: "Tavily"
+        description: "Tavily AI search engine - optimized for AI agents with focused, reliable web search and content extraction"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "tavily-mcp@latest"]
+        workingDirectory: "/tmp"
+        env:
+          TAVILY_API_KEY: "${TAVILY_API_KEY}"
+
       # --- Bare Metal Cloud ---
       latitudesh:
         name: "Latitude.sh"
