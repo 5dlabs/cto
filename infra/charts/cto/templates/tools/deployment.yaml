@@ -131,6 +131,42 @@ spec:
                   name: tools-tavily-secrets
                   key: TAVILY_API_KEY
                   optional: true
+            # Linear API key for project management MCP server
+            - name: LINEAR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: linear-secrets
+                  key: LINEAR_API_KEY
+                  optional: true
+            # GitHub token for OctoCode and GitHub MCP servers
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tools-github-secrets
+                  key: GITHUB_PERSONAL_ACCESS_TOKEN
+                  optional: true
+            # Grafana observability stack
+            - name: GRAFANA_URL
+              value: "http://grafana.observability.svc:80"
+            - name: GRAFANA_SERVICE_ACCOUNT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tools-grafana-secrets
+                  key: GRAFANA_SERVICE_ACCOUNT_TOKEN
+                  optional: true
+            # Loki for log queries
+            - name: LOKI_URL
+              value: "http://loki.observability.svc:3100"
+            # Prometheus for metrics
+            - name: PROMETHEUS_URL
+              value: "http://prometheus.observability.svc:9090"
+            # Perplexity API key for web search
+            - name: PERPLEXITY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cto-secrets
+                  key: PERPLEXITY_API_KEY
+                  optional: true
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
           # Readiness probe - ensures service doesn't receive traffic until tools are discovered
