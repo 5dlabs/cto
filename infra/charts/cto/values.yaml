@@ -413,6 +413,8 @@ tools:
         command: "npx"
         args: ["-y", "@upstash/context7-mcp"]
         workingDirectory: "/tmp"
+        env:
+          CONTEXT7_API_KEY: "${CONTEXT7_API_KEY}"
 
       prompts:
         name: "MCP Prompts"
@@ -474,6 +476,8 @@ tools:
         command: "npx"
         args: ["-y", "@modelcontextprotocol/server-github"]
         workingDirectory: "/tmp"
+        env:
+          GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 
       # --- UI Components ---
       shadcn:
@@ -538,6 +542,8 @@ tools:
         command: "npx"
         args: ["-y", "firecrawl-mcp"]
         workingDirectory: "/tmp"
+        env:
+          FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
 
       # --- Codebase Analysis ---
       repomix:
@@ -577,6 +583,9 @@ tools:
         command: "docker"
         args: ["run", "-i", "--rm", "-e", "GRAFANA_URL", "-e", "GRAFANA_SERVICE_ACCOUNT_TOKEN", "mcp/grafana", "-t", "stdio"]
         workingDirectory: "/tmp"
+        env:
+          GRAFANA_URL: "${GRAFANA_URL:-http://grafana.observability.svc:80}"
+          GRAFANA_SERVICE_ACCOUNT_TOKEN: "${GRAFANA_SERVICE_ACCOUNT_TOKEN}"
 
       loki:
         name: "Loki"
@@ -585,6 +594,8 @@ tools:
         command: "docker"
         args: ["run", "-i", "--rm", "-e", "LOKI_URL", "grafana/loki-mcp:latest"]
         workingDirectory: "/tmp"
+        env:
+          LOKI_URL: "${LOKI_URL:-http://loki.observability.svc:3100}"
 
       prometheus:
         name: "Prometheus"
@@ -593,6 +604,8 @@ tools:
         command: "docker"
         args: ["run", "-i", "--rm", "-e", "PROMETHEUS_URL", "ghcr.io/pab1it0/prometheus-mcp-server:latest"]
         workingDirectory: "/tmp"
+        env:
+          PROMETHEUS_URL: "${PROMETHEUS_URL:-http://prometheus.observability.svc:9090}"
 
       # --- Edge & CDN ---
       cloudflare:
