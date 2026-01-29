@@ -140,8 +140,16 @@ jobs:
               fi
             fi
 
+            # Check for intake-agent (TypeScript/Bun compiled) if not yet found
+            if [ -z "$INTAKE_AGENT_VERSION" ]; then
+              if gh release download "$TAG" --pattern 'intake-agent-linux-x86_64' --skip-existing --dir .docker-binaries 2>/dev/null; then
+                echo "📦 Found intake-agent in release: $VERSION"
+                INTAKE_AGENT_VERSION="$VERSION"
+              fi
+            fi
+
             # Exit early if all found
-            if [ -n "$TOOLS_VERSION" ] && [ -n "$MONITOR_VERSION" ] && [ -n "$TASKS_VERSION" ]; then
+            if [ -n "$TOOLS_VERSION" ] && [ -n "$MONITOR_VERSION" ] && [ -n "$TASKS_VERSION" ] && [ -n "$INTAKE_AGENT_VERSION" ]; then
               break
             fi
           done
@@ -177,16 +185,26 @@ jobs:
             echo "tasks_version=skip" >> "$GITHUB_OUTPUT"
           fi
 
+          # Output intake-agent version
+          if [ -n "$INTAKE_AGENT_VERSION" ]; then
+            echo "✅ Using intake-agent version: $INTAKE_AGENT_VERSION"
+            echo "intake_agent_version=$INTAKE_AGENT_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "⚠️ No release with intake-agent found, skipping intake-agent"
+            echo "intake_agent_version=skip" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Compute base tag (Dockerfile hash + binary versions)
         id: tag
         run: |
           set -euo pipefail
           # Include Dockerfile hash and binary versions in tag to ensure rebuilds
-          # when tools-client, play-monitor, or intake becomes available or version changes
+          # when tools-client, play-monitor, intake, or intake-agent becomes available or version changes
           DOCKERFILE_HASH=$(git log -1 --format="%h" -- infra/images/runtime/Dockerfile)
           TOOLS_VER="${{ steps.binaries-version.outputs.tools_version }}"
           MONITOR_VER="${{ steps.binaries-version.outputs.play_monitor_version }}"
           TASKS_VER="${{ steps.binaries-version.outputs.tasks_version }}"
+          INTAKE_AGENT_VER="${{ steps.binaries-version.outputs.intake_agent_version }}"
 
           # Build version suffix from available binaries
           VERSION_SUFFIX=""
@@ -198,6 +216,9 @@ jobs:
           fi
           if [ "$TASKS_VER" != "skip" ] && [ -n "$TASKS_VER" ]; then
             VERSION_SUFFIX="${VERSION_SUFFIX}-tk$(echo "$TASKS_VER" | tr '.' '-')"
+          fi
+          if [ "$INTAKE_AGENT_VER" != "skip" ] && [ -n "$INTAKE_AGENT_VER" ]; then
+            VERSION_SUFFIX="${VERSION_SUFFIX}-ia$(echo "$INTAKE_AGENT_VER" | tr '.' '-')"
           fi
 
           # Fallback if no binaries available
@@ -255,6 +276,7 @@ jobs:
             TOOLS_VERSION=${{ steps.binaries-version.outputs.tools_version }}
             PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
             TASKS_VERSION=${{ steps.binaries-version.outputs.tasks_version }}
+            INTAKE_AGENT_VERSION=${{ steps.binaries-version.outputs.intake_agent_version }}
             TASKMASTER_VERSION=${{ steps.taskmaster-version.outputs.version }}
           # Cache strategy: GHA cache (fast) + registry cache (persistent fallback)
           # Registry cache survives even when no_cache=true (only disables GHA cache)

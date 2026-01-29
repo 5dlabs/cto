@@ -106,6 +106,12 @@ RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/bi
       chmod +x /usr/local/bin/intake; \
     fi
 
+ARG INTAKE_AGENT_VERSION=skip
+RUN if [ "$INTAKE_AGENT_VERSION" != "skip" ] && [ -n "$INTAKE_AGENT_VERSION" ] && [ -f /tmp/binaries/intake-agent-linux-x86_64 ]; then \
+      mv /tmp/binaries/intake-agent-linux-x86_64 /usr/local/bin/intake-agent && \
+      chmod +x /usr/local/bin/intake-agent; \
+    fi
+
 RUN rm -rf /tmp/binaries
 
 # Configure git defaults
@@ -400,6 +406,7 @@ COPY .docker-binaries/ /tmp/binaries/
 ARG TOOLS_VERSION=skip
 ARG PLAY_MONITOR_VERSION=skip
 ARG TASKS_VERSION=0.2.12
+ARG INTAKE_AGENT_VERSION=skip
 RUN set -eux && \
     # tools client
     if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
@@ -412,6 +419,10 @@ RUN set -eux && \
     # intake CLI
     if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
       mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && chmod +x /usr/local/bin/intake; \
+    fi && \
+    # intake-agent (TypeScript/Bun compiled)
+    if [ "$INTAKE_AGENT_VERSION" != "skip" ] && [ -n "$INTAKE_AGENT_VERSION" ] && [ -f /tmp/binaries/intake-agent-linux-x86_64 ]; then \
+      mv /tmp/binaries/intake-agent-linux-x86_64 /usr/local/bin/intake-agent && chmod +x /usr/local/bin/intake-agent; \
     fi && \
     rm -rf /tmp/binaries
 

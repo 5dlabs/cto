@@ -1,0 +1,83 @@
+{
+  "swarmMode": true,
+  "coordinator": "swarm-coordinator.md",
+  "agents": [
+    {
+      "name": "oauth-agent",
+      "prompt": "agents/oauth.md",
+      "priority": 1,
+      "blocking": true,
+      "allowedTools": ["read", "write", "shell", "grep"]
+    },
+    {
+      "name": "environment-agent",
+      "prompt": "agents/environment.md",
+      "priority": 2,
+      "blocking": false,
+      "allowedTools": ["read", "write", "shell", "grep", "glob"]
+    },
+    {
+      "name": "intake-mcp-agent",
+      "prompt": "agents/intake-mcp.md",
+      "priority": 3,
+      "blocking": false,
+      "allowedTools": ["read", "write", "shell", "grep", "mcp"]
+    },
+    {
+      "name": "tools-validation-agent",
+      "prompt": "agents/tools-validation.md",
+      "priority": 3,
+      "blocking": false,
+      "allowedTools": ["read", "shell", "grep"]
+    },
+    {
+      "name": "linear-sync-agent",
+      "prompt": "agents/linear-sync.md",
+      "priority": 4,
+      "blocking": false,
+      "allowedTools": ["read", "write", "shell", "grep"]
+    },
+    {
+      "name": "linear-update-agent",
+      "prompt": "agents/linear-update.md",
+      "priority": 5,
+      "blocking": false,
+      "allowedTools": ["read", "write", "shell", "grep"]
+    },
+    {
+      "name": "parity-agent",
+      "prompt": "agents/parity.md",
+      "priority": 6,
+      "blocking": false,
+      "allowedTools": ["read", "shell", "grep", "glob"]
+    },
+    {
+      "name": "critic-observer-agent",
+      "prompt": "agents/critic-observer.md",
+      "priority": 4,
+      "blocking": false,
+      "allowedTools": ["read", "shell", "grep"]
+    },
+    {
+      "name": "failback-agent",
+      "prompt": "agents/failback.md",
+      "priority": 7,
+      "blocking": false,
+      "allowedTools": ["read", "write", "shell", "grep"]
+    },
+    {
+      "name": "features-agent",
+      "prompt": "agents/features.md",
+      "priority": 8,
+      "blocking": false,
+      "allowedTools": ["read", "write", "shell", "grep", "glob"]
+    }
+  ],
+  "sharedContext": [
+    "ralph-coordination.json",
+    "PLAN.md",
+    "issues/"
+  ],
+  "outputDir": "output",
+  "issuesDir": "issues"
+}

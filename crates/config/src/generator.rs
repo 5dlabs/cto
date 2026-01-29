@@ -8,7 +8,7 @@ use crate::agents::{capitalize, get_agent_config, workflow_agents};
 use crate::tools::{analyze_agent_tasks_for_tools, analyze_all_tasks_for_tools, ToolAnalyzable};
 use crate::types::{
     CtoConfig, Defaults, IntakeDefaults, IntakeModels, LinearDefaults, LinearIntakeSettings,
-    PlayDefaults, CTO_CONFIG_VERSION,
+    MultiModelConfig, PlayDefaults, CTO_CONFIG_VERSION,
 };
 
 /// Input for generating a project CTO config.
@@ -95,6 +95,7 @@ pub fn generate_project_config(input: &ProjectConfigInput) -> CtoConfig {
                     cli_models: HashMap::new(),
                 },
                 auto_append_deploy_task: false,
+                multi_model: MultiModelConfig::default(),
             },
             linear: LinearDefaults {
                 team_id: input.team_id.clone(),
@@ -228,6 +229,7 @@ pub fn generate_config_with_tasks<T: ToolAnalyzable>(
                     cli_models: HashMap::new(),
                 },
                 auto_append_deploy_task: false,
+                multi_model: MultiModelConfig::default(),
             },
             linear: LinearDefaults {
                 team_id: input.team_id.clone(),

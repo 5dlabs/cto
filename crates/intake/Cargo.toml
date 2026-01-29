@@ -77,6 +77,9 @@ pm = { path = "../pm" }
 # Temporary directories
 tempfile = "3.24"
 
+# JSON repair for malformed LLM output
+jsonrepair = "0.1"
+
 [features]
 default = ["ai"]
 ai = []

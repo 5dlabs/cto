@@ -614,6 +614,8 @@ tools:
         transport: "http"
         url: "https://bindings.mcp.cloudflare.com/mcp"
         workingDirectory: "/tmp"
+        headers:
+          Authorization: "Bearer ${CLOUDFLARE_API_TOKEN}"
 
       # --- AI Generation ---
       minimax:
@@ -637,6 +639,16 @@ tools:
         workingDirectory: "/tmp"
         env:
           PERPLEXITY_API_KEY: "${PERPLEXITY_API_KEY}"
+
+      tavily:
+        name: "Tavily"
+        description: "Tavily AI search engine - optimized for AI agents with focused, reliable web search and content extraction"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "tavily-mcp@latest"]
+        workingDirectory: "/tmp"
+        env:
+          TAVILY_API_KEY: "${TAVILY_API_KEY}"
 
       # --- Bare Metal Cloud ---
       latitudesh:

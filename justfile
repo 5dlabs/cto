@@ -149,6 +149,28 @@ healer-play-api:
 intake *ARGS:
     cargo run --bin intake -- {{ARGS}}
 
+# =============================================================================
+# Intake Agent (TypeScript SDK wrapper)
+# =============================================================================
+
+# Build intake-agent TypeScript binary
+intake-agent-build:
+    @echo "Building intake-agent TypeScript binary..."
+    cd tools/intake-agent && bun install && bun run build
+    @echo "Binary built: tools/intake-agent/dist/intake-agent"
+
+# Type check intake-agent
+intake-agent-typecheck:
+    cd tools/intake-agent && bun run typecheck
+
+# Test intake-agent with ping
+intake-agent-ping:
+    echo '{"operation":"ping"}' | ./tools/intake-agent/dist/intake-agent
+
+# Clean intake-agent build artifacts
+intake-agent-clean:
+    cd tools/intake-agent && bun run clean
+
 # Run research CLI
 research *ARGS:
     cargo run --bin research -- {{ARGS}}

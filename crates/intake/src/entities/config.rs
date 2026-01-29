@@ -40,7 +40,7 @@ pub struct ModelConfig {
 /// Individual model settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelSettings {
-    /// Provider name (e.g., "anthropic", "openai")
+    /// Provider name (e.g., "sdk")
     pub provider: String,
 
     /// Model ID
@@ -71,7 +71,7 @@ const fn default_temperature() -> f32 {
 impl Default for ModelSettings {
     fn default() -> Self {
         Self {
-            provider: "anthropic".to_string(),
+            provider: "sdk".to_string(),
             model_id: "claude-sonnet-4-20250514".to_string(),
             max_tokens: default_max_tokens(),
             temperature: default_temperature(),
@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn test_model_settings_default() {
         let settings = ModelSettings::default();
-        assert_eq!(settings.provider, "anthropic");
+        assert_eq!(settings.provider, "sdk");
         assert_eq!(settings.max_tokens, 64000);
     }
 

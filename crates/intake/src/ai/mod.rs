@@ -1,20 +1,24 @@
 //! AI integration for task management.
 //!
 //! This module provides:
-//! - AI provider abstraction (Anthropic, OpenAI, etc.)
+//! - AI provider abstraction (Claude Agent SDK via TypeScript binary)
 //! - Prompt template system with Handlebars
 //! - Structured response schemas
 //! - Provider registry for dynamic provider management
+//!
+//! # Design Philosophy
+//!
+//! - Single Claude Agent SDK provider with MCP support - no fallbacks
+//! - Fail fast to surface problems immediately
+//! - Clean JSON protocol over subprocess (no CLI output parsing)
 
 pub mod prompts;
 pub mod provider;
 pub mod registry;
 pub mod schemas;
 
-// Provider implementations
-pub mod anthropic;
-pub mod cli_provider;
-pub mod openai;
+// Claude Agent SDK provider (TypeScript binary with MCP support)
+pub mod sdk_provider;
 
 // Re-exports
 pub use prompts::{PromptManager, PromptTemplate};
@@ -24,3 +28,5 @@ pub use provider::{
 };
 pub use registry::ProviderRegistry;
 pub use schemas::*;
+// Export both names for compatibility
+pub use sdk_provider::{AgentSdkProvider, AnthropicProvider};

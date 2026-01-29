@@ -66,6 +66,9 @@ serde_yaml = "0.9"
 # Shared CTO config types
 config = { path = "../config" }
 
+# Linear activity sink (shared with other crates)
+linear-sink = { path = "../linear-sync" }
+
 # URL encoding for OAuth URLs
 urlencoding = "2.1"
 
