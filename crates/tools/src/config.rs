@@ -56,8 +56,24 @@ pub struct ServerConfig {
     pub url: Option<String>,
     #[serde(default)]
     pub env: HashMap<String, String>,
-    /// For http: Custom headers to include in requests (e.g., Authorization)
-    /// Values support environment variable substitution: ${VAR} or ${VAR:-default}
+    /// Custom headers to include in HTTP/SSE requests.
+    /// Values support environment variable substitution: `${VAR}` or `${VAR:-default}`
+    ///
+    /// # Examples
+    ///
+    /// ```json
+    /// "headers": {
+    ///   "Authorization": "Bearer ${API_TOKEN}",
+    ///   "X-Custom-Header": "${CUSTOM_VALUE:-default}"
+    /// }
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// - Only applicable for `http` and `sse` transports (ignored for `stdio`)
+    /// - Sensitive headers (Authorization, X-API-Key, etc.) are masked in logs
+    /// - Header names are validated per RFC 7230
+    /// - Header values are validated to prevent injection attacks
     #[serde(default)]
     pub headers: HashMap<String, String>,
     /// Working directory for the server process (optional, defaults to project directory)

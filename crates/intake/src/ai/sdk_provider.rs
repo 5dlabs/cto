@@ -215,10 +215,13 @@ struct AgentErrorResponse {
 /// Token usage from agent.
 #[derive(Debug, Clone, Deserialize)]
 #[allow(clippy::struct_field_names)] // Matches TypeScript SDK naming
-struct AgentUsage {
-    input_tokens: u32,
-    output_tokens: u32,
-    total_tokens: u32,
+pub struct AgentUsage {
+    /// Number of input tokens.
+    pub input_tokens: u32,
+    /// Number of output tokens.
+    pub output_tokens: u32,
+    /// Total number of tokens.
+    pub total_tokens: u32,
 }
 
 // =============================================================================
@@ -667,17 +670,21 @@ impl AgentSdkProvider {
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
+        #[allow(clippy::items_after_statements)]
         #[derive(Deserialize)]
         struct ProviderStatusResponse {
+            #[allow(dead_code)] // Used for JSON parsing discrimination
             success: bool,
             data: ProviderStatusData,
         }
 
+        #[allow(clippy::items_after_statements)]
         #[derive(Deserialize)]
         struct ProviderStatusData {
             providers: std::collections::HashMap<String, ProviderInfo>,
         }
 
+        #[allow(clippy::items_after_statements)]
         #[derive(Deserialize)]
         struct ProviderInfo {
             available: bool,

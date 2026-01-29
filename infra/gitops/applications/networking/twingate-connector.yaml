@@ -28,22 +28,11 @@ spec:
         connector:
           # Twingate network subdomain
           network: turquoiseelephant631
+          # Use existing secret for tokens
+          existingSecret: twingate-connector-tokens
         
         # Replica count for HA
         replicaCount: 2
-        
-        # Environment variables from existing secret
-        extraEnv:
-          - name: TWINGATE_ACCESS_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: twingate-connector-tokens
-                key: accessToken
-          - name: TWINGATE_REFRESH_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: twingate-connector-tokens
-                key: refreshToken
 
         # Resource limits (reduced CPU request for scheduling)
         resources:
