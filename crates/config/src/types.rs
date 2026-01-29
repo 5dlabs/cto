@@ -482,6 +482,96 @@ impl IntakeModels {
     }
 }
 
+/// Default max refinements for multi-model critic/validator pattern.
+fn default_max_refinements() -> u32 {
+    2
+}
+
+/// Default critic threshold (0.0-1.0).
+fn default_critic_threshold() -> f32 {
+    0.8
+}
+
+/// Default generator provider.
+fn default_generator() -> String {
+    "claude".to_string()
+}
+
+/// Default critic provider.
+fn default_critic() -> String {
+    "minimax".to_string()
+}
+
+/// Multi-model configuration for critic/validator collaboration pattern.
+///
+/// When enabled, intake uses a two-model approach:
+/// - Generator (optimistic planner): Creates initial content
+/// - Critic (pessimistic validator): Reviews and identifies issues
+///
+/// The generator refines content based on critic feedback until approved
+/// or max refinements is reached.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MultiModelConfig {
+    /// Enable multi-model collaboration.
+    /// When false, uses single-model generation (default Claude).
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Generator provider name (claude, minimax, codex).
+    /// The optimistic model that produces initial content.
+    #[serde(default = "default_generator")]
+    pub generator: String,
+
+    /// Critic provider name (claude, minimax, codex).
+    /// The pessimistic model that reviews and validates content.
+    #[serde(default = "default_critic")]
+    pub critic: String,
+
+    /// Maximum refinement iterations.
+    /// After this many rounds, output is returned even if critic hasn't approved.
+    #[serde(default = "default_max_refinements", rename = "maxRefinements")]
+    pub max_refinements: u32,
+
+    /// Critic confidence threshold (0.0-1.0).
+    /// Content is approved when critic confidence exceeds this threshold.
+    #[serde(default = "default_critic_threshold", rename = "criticThreshold")]
+    pub critic_threshold: f32,
+}
+
+impl Default for MultiModelConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            generator: default_generator(),
+            critic: default_critic(),
+            max_refinements: default_max_refinements(),
+            critic_threshold: default_critic_threshold(),
+        }
+    }
+}
+
+impl MultiModelConfig {
+    /// Create an enabled multi-model config with default settings.
+    #[must_use]
+    pub fn enabled() -> Self {
+        Self {
+            enabled: true,
+            ..Self::default()
+        }
+    }
+
+    /// Create an enabled config with custom generator and critic.
+    #[must_use]
+    pub fn with_providers(generator: impl Into<String>, critic: impl Into<String>) -> Self {
+        Self {
+            enabled: true,
+            generator: generator.into(),
+            critic: critic.into(),
+            ..Self::default()
+        }
+    }
+}
+
 /// Intake workflow defaults.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IntakeDefaults {
@@ -509,6 +599,11 @@ pub struct IntakeDefaults {
     /// Default: false.
     #[serde(rename = "autoAppendDeployTask", default)]
     pub auto_append_deploy_task: bool,
+
+    /// Multi-model critic/validator configuration.
+    /// When enabled, uses a generator-critic pattern for higher quality output.
+    #[serde(rename = "multiModel", default)]
+    pub multi_model: MultiModelConfig,
 }
 
 fn default_source_branch() -> String {
@@ -529,6 +624,7 @@ impl Default for IntakeDefaults {
                 cli_models: HashMap::new(), // Will be populated from config
             },
             auto_append_deploy_task: false,
+            multi_model: MultiModelConfig::default(),
         }
     }
 }
@@ -976,5 +1072,73 @@ mod tests {
         assert!(watcher.enabled);
         assert_eq!(watcher.cli, "droid");
         assert_eq!(watcher.check_interval_secs, 90);
+    }
+
+    #[test]
+    fn test_multi_model_config_default() {
+        let config = MultiModelConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.generator, "claude");
+        assert_eq!(config.critic, "minimax");
+        assert_eq!(config.max_refinements, 2);
+        assert!((config.critic_threshold - 0.8).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_multi_model_config_enabled() {
+        let config = MultiModelConfig::enabled();
+        assert!(config.enabled);
+        assert_eq!(config.generator, "claude");
+        assert_eq!(config.critic, "minimax");
+    }
+
+    #[test]
+    fn test_multi_model_config_with_providers() {
+        let config = MultiModelConfig::with_providers("codex", "claude");
+        assert!(config.enabled);
+        assert_eq!(config.generator, "codex");
+        assert_eq!(config.critic, "claude");
+    }
+
+    #[test]
+    fn test_multi_model_config_from_json() {
+        let json = r#"{
+            "enabled": true,
+            "generator": "claude",
+            "critic": "minimax",
+            "maxRefinements": 3,
+            "criticThreshold": 0.9
+        }"#;
+        let config: MultiModelConfig = serde_json::from_str(json).unwrap();
+        assert!(config.enabled);
+        assert_eq!(config.generator, "claude");
+        assert_eq!(config.critic, "minimax");
+        assert_eq!(config.max_refinements, 3);
+        assert!((config.critic_threshold - 0.9).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_intake_defaults_with_multi_model() {
+        let json = r#"{
+            "githubApp": "5DLabs-Morgan",
+            "cli": "claude",
+            "sourceBranch": "main",
+            "models": {
+                "primary": "claude-opus-4-5-20251101",
+                "research": "claude-opus-4-5-20251101",
+                "fallback": "claude-opus-4-5-20251101"
+            },
+            "multiModel": {
+                "enabled": true,
+                "generator": "claude",
+                "critic": "minimax",
+                "maxRefinements": 2,
+                "criticThreshold": 0.8
+            }
+        }"#;
+        let defaults: IntakeDefaults = serde_json::from_str(json).unwrap();
+        assert!(defaults.multi_model.enabled);
+        assert_eq!(defaults.multi_model.generator, "claude");
+        assert_eq!(defaults.multi_model.critic, "minimax");
     }
 }

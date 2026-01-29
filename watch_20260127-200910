@@ -1,0 +1,50 @@
+Every 2.0s: ls -la alerthub-e2e-test/.tasks/tasks/ 2>/dev/nul… Jonathons-Mac-mini-3.local: 20:09:10
+                                                                                      in 0.008s (0)
+total 8                                                                                            
+drwxr-xr-x@ 3 jonathonfritz  staff   96 Jan 27 13:02 .                                             
+drwxr-xr-x@ 5 jonathonfritz  staff  160 Jan 27 13:02 ..                                            
+-rw-r--r--@ 1 jonathonfritz  staff  155 Jan 27 13:02 tasks.json                                    
+                                                                                                   
+{                                                                                                  
+  "metadata": {                                                                                    
+    "created": "2026-01-27T21:02:13.878617Z",                                                      
+    "updatedAt": "2026-01-27T21:02:13.878626Z",                                                    
+    "version": "1.0.0"                                                                             
+  },                                                                                               
+  "tasks": []                                                                                      
+}                                                                                                  
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   
+                                                                                                   

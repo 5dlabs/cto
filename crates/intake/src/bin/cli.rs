@@ -56,6 +56,23 @@ struct Cli {
         default_value = "claude"
     )]
     provider: String,
+
+    /// Enable verbose output (debug level logging)
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
+    /// Enable multi-model collaboration (critic/validator pattern).
+    /// When enabled, uses one model for generation and another for critique.
+    #[arg(long = "multi-model", global = true, env = "TASKS_MULTI_MODEL")]
+    multi_model: bool,
+
+    /// Generator provider for multi-model mode (claude, minimax, codex).
+    #[arg(long = "generator", global = true, env = "MULTI_MODEL_GENERATOR", default_value = "claude")]
+    generator: String,
+
+    /// Critic provider for multi-model mode (claude, minimax, codex).
+    #[arg(long = "critic", global = true, env = "MULTI_MODEL_CRITIC", default_value = "minimax")]
+    critic: String,
 }
 
 #[derive(Subcommand)]
@@ -451,20 +468,26 @@ fn get_project_path(cli_path: Option<PathBuf>) -> PathBuf {
 
 #[tokio::main]
 async fn main() {
-    // Initialize tracing with INFO level by default for progress visibility
-    // RUST_LOG env var can override this (e.g., RUST_LOG=debug for verbose output)
+    // Parse CLI args first so we can use --verbose flag
+    let cli = Cli::parse();
+
+    // Initialize tracing based on --verbose flag or RUST_LOG env var
     // Use compact format without timestamps/targets to match ui::print_info style
+    let default_level = if cli.verbose {
+        tracing::Level::DEBUG
+    } else {
+        tracing::Level::INFO
+    };
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
+                .add_directive(default_level.into()),
         )
         .without_time()
-        .with_target(false)
-        .with_level(false)
+        .with_target(cli.verbose) // Show target module when verbose
+        .with_level(cli.verbose) // Show log level when verbose
         .init();
-
-    let cli = Cli::parse();
 
     if let Err(e) = run(cli).await {
         ui::print_error(&e.to_string());
@@ -515,6 +538,49 @@ fn load_cli_model_from_config(project_path: &std::path::Path, cli_type: &str) ->
     None
 }
 
+/// Load multi-model configuration from cto-config.json.
+///
+/// If multiModel is enabled in the config, sets the appropriate environment variables.
+/// This allows enabling multi-model via config without CLI flags.
+fn load_multi_model_from_config(project_path: &std::path::Path) {
+    // Search for cto-config.json in project path and its parents
+    let config_paths = [
+        project_path.join("cto-config.json"),
+        project_path.join(".tasks/cto-config.json"),
+    ];
+
+    for config_path in &config_paths {
+        if config_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(config_path) {
+                if let Ok(config) = CtoConfig::from_json(&content) {
+                    let mm = &config.defaults.intake.multi_model;
+                    if mm.enabled {
+                        std::env::set_var("TASKS_MULTI_MODEL", "true");
+                        std::env::set_var("MULTI_MODEL_GENERATOR", &mm.generator);
+                        std::env::set_var("MULTI_MODEL_CRITIC", &mm.critic);
+                        std::env::set_var(
+                            "MULTI_MODEL_MAX_REFINEMENTS",
+                            mm.max_refinements.to_string(),
+                        );
+                        std::env::set_var(
+                            "MULTI_MODEL_CRITIC_THRESHOLD",
+                            mm.critic_threshold.to_string(),
+                        );
+                        tracing::info!(
+                            generator = %mm.generator,
+                            critic = %mm.critic,
+                            max_refinements = mm.max_refinements,
+                            critic_threshold = mm.critic_threshold,
+                            "Multi-model collaboration enabled (cto-config.json)"
+                        );
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
 async fn run(cli: Cli) -> Result<(), TasksError> {
     // Apply CLI flags to environment variables so they're picked up by the provider registry
     // The registry checks TASKS_USE_CLI and TASKS_CLI when creating default providers
@@ -524,6 +590,22 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
     std::env::set_var("TASKS_CLI", &cli.provider);
 
     let project_path = get_project_path(cli.project.clone());
+
+    // Apply multi-model configuration
+    // Priority: CLI flags > cto-config.json
+    if cli.multi_model {
+        std::env::set_var("TASKS_MULTI_MODEL", "true");
+        std::env::set_var("MULTI_MODEL_GENERATOR", &cli.generator);
+        std::env::set_var("MULTI_MODEL_CRITIC", &cli.critic);
+        tracing::info!(
+            generator = %cli.generator,
+            critic = %cli.critic,
+            "Multi-model collaboration enabled (CLI)"
+        );
+    } else {
+        // Try loading from cto-config.json
+        load_multi_model_from_config(&project_path);
+    }
 
     // Load cto-config.json to get CLI-specific model configuration
     let config_model = load_cli_model_from_config(&project_path, &cli.provider);

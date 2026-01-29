@@ -44,5 +44,5 @@ pub use tools::{
 };
 pub use types::{
     AgentConfig, AgentTools, CtoConfig, Defaults, IntakeDefaults, IntakeModels, LinearDefaults,
-    LinearIntakeSettings, PlayDefaults, SubagentConfig, CTO_CONFIG_VERSION,
+    LinearIntakeSettings, MultiModelConfig, PlayDefaults, SubagentConfig, CTO_CONFIG_VERSION,
 };
