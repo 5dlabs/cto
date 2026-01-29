@@ -836,8 +836,7 @@ impl ServerConnectionPool {
                     .header("Accept", "application/json,text/event-stream");
 
                 // Add custom headers from config (e.g., Authorization)
-                request_builder =
-                    add_custom_headers(request_builder, &custom_headers, server_name);
+                request_builder = add_custom_headers(request_builder, &custom_headers, server_name);
 
                 if let Some(ref sid) = session_id {
                     tracing::info!("🔑 [{}] Including Mcp-Session-Id in request", server_name);
@@ -1725,8 +1724,7 @@ impl BridgeState {
                     .header("Accept", "application/json,text/event-stream");
 
                 // Add custom headers from config (e.g., Authorization)
-                request_builder =
-                    add_custom_headers(request_builder, &config.headers, server_name);
+                request_builder = add_custom_headers(request_builder, &config.headers, server_name);
 
                 if let Some(ref sid) = mcp_session_id {
                     request_builder = request_builder.header("Mcp-Session-Id", sid);

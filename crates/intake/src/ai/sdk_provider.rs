@@ -573,7 +573,10 @@ impl AgentSdkProvider {
 
         let request = AgentRequest {
             operation: "generate_with_critic",
-            model: config.generator_model.as_deref().unwrap_or(&self.default_model),
+            model: config
+                .generator_model
+                .as_deref()
+                .unwrap_or(&self.default_model),
             options: None,
             payload: AgentPayload::MultiModelGeneration {
                 system_prompt,
@@ -590,7 +593,9 @@ impl AgentSdkProvider {
             AgentResponse::Success(success) => {
                 // Parse the multi-model response
                 let multi_response: MultiModelResponse = serde_json::from_value(success.data)
-                    .map_err(|e| TasksError::Ai(format!("Failed to parse multi-model response: {e}")))?;
+                    .map_err(|e| {
+                        TasksError::Ai(format!("Failed to parse multi-model response: {e}"))
+                    })?;
 
                 let usage = TokenUsage {
                     input_tokens: success.usage.input_tokens,
@@ -623,7 +628,9 @@ impl AgentSdkProvider {
     /// Check provider availability status.
     ///
     /// Returns information about which providers (Claude, Minimax, Codex) are available.
-    pub async fn get_provider_status(&self) -> TasksResult<std::collections::HashMap<String, bool>> {
+    pub async fn get_provider_status(
+        &self,
+    ) -> TasksResult<std::collections::HashMap<String, bool>> {
         let request_json = r#"{"operation":"provider_status","payload":{}}"#;
 
         tracing::debug!("Checking provider status");

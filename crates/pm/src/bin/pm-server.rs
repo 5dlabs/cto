@@ -8,7 +8,7 @@ use tokio::net::TcpListener;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-use pm::{config::Config, server, LinearClient};
+use pm::{config::Config, server, state::TokenHealthManager, LinearClient};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -50,6 +50,13 @@ async fn main() -> Result<()> {
         info!("No LINEAR_OAUTH_TOKEN configured - API calls will be disabled");
         None
     };
+
+    // Start background token health manager
+    if config.enabled {
+        let token_manager = TokenHealthManager::new(config.clone(), kube_client.clone());
+        tokio::spawn(token_manager.run());
+        info!("Token health manager started");
+    }
 
     // Build application state
     let state = server::AppState {

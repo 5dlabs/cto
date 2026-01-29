@@ -67,11 +67,21 @@ struct Cli {
     multi_model: bool,
 
     /// Generator provider for multi-model mode (claude, minimax, codex).
-    #[arg(long = "generator", global = true, env = "MULTI_MODEL_GENERATOR", default_value = "claude")]
+    #[arg(
+        long = "generator",
+        global = true,
+        env = "MULTI_MODEL_GENERATOR",
+        default_value = "claude"
+    )]
     generator: String,
 
     /// Critic provider for multi-model mode (claude, minimax, codex).
-    #[arg(long = "critic", global = true, env = "MULTI_MODEL_CRITIC", default_value = "minimax")]
+    #[arg(
+        long = "critic",
+        global = true,
+        env = "MULTI_MODEL_CRITIC",
+        default_value = "minimax"
+    )]
     critic: String,
 }
 
@@ -481,8 +491,7 @@ async fn main() {
 
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(default_level.into()),
+            tracing_subscriber::EnvFilter::from_default_env().add_directive(default_level.into()),
         )
         .without_time()
         .with_target(cli.verbose) // Show target module when verbose

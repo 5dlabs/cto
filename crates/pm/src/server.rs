@@ -8,6 +8,7 @@ use axum::{
     routing::post,
     Router,
 };
+use chrono::Utc;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fmt::Write as _;
@@ -30,49 +31,6 @@ use crate::webhooks::{
 };
 use crate::LinearClient;
 
-/// Get an agent-specific Linear client using the agent's OAuth access token.
-///
-/// For agent activities, Linear requires the OAuth token obtained when the agent
-/// app was installed, not a personal API key. This function creates a new client
-/// with the agent's access token if available.
-///
-/// Returns `None` if:
-/// - The agent is not configured
-/// - The agent doesn't have an access token (OAuth not completed)
-/// - Failed to create the client
-fn get_agent_client(config: &Config, agent_name: &str) -> Option<LinearClient> {
-    let linear_config = config.linear.read().ok()?;
-    let app = linear_config.get_app(agent_name)?;
-
-    // Check if token is expired
-    if app.is_token_expired() {
-        warn!(
-            agent = %agent_name,
-            expires_at = ?app.expires_at,
-            can_refresh = app.can_refresh(),
-            "Agent token is expired or near expiration"
-        );
-        // Token is expired - caller should trigger refresh via /oauth/refresh endpoint
-        // For now, still try to use the token as it might still work
-    }
-
-    let token = app.access_token.as_deref()?;
-    match LinearClient::new(token) {
-        Ok(client) => {
-            debug!(agent = %agent_name, "Created agent-specific Linear client");
-            Some(client)
-        }
-        Err(e) => {
-            warn!(
-                agent = %agent_name,
-                error = %e,
-                "Failed to create agent-specific Linear client"
-            );
-            None
-        }
-    }
-}
-
 /// Get an agent-specific Linear client, refreshing the token if expired.
 ///
 /// This async version attempts to refresh expired tokens before returning a client.
@@ -84,7 +42,6 @@ fn get_agent_client(config: &Config, agent_name: &str) -> Option<LinearClient> {
 ///
 /// This ensures subsequent calls see the fresh token data and don't attempt
 /// to refresh again using stale (potentially rotated) refresh tokens.
-#[allow(dead_code)]
 async fn get_agent_client_with_refresh(
     config: &Config,
     kube_client: &kube::Client,
@@ -288,6 +245,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         // Health check
         .route("/health", axum::routing::get(health_check))
+        .route("/health/tokens", axum::routing::get(token_health))
         .route("/ready", axum::routing::get(readiness_check))
         .with_state(state)
 }
@@ -543,13 +501,16 @@ async fn handle_intake_setup(
         "Intake setup requested"
     );
 
-    let Some(client) = &state.linear_client else {
-        error!("Linear client not configured");
+    // Use Morgan's OAuth token for intake operations (not the static workspace client)
+    let Some(client) =
+        get_agent_client_with_refresh(&state.config, &state.kube_client, "morgan").await
+    else {
+        error!("Morgan's Linear client not available - ensure OAuth is configured");
         return Err((
             StatusCode::SERVICE_UNAVAILABLE,
             Json(json!({
                 "status": "error",
-                "error": "Linear client not configured on server"
+                "error": "Morgan's Linear OAuth token not configured. Complete OAuth at /oauth/start?agent=morgan"
             })),
         ));
     };
@@ -594,7 +555,7 @@ async fn handle_intake_setup(
     };
 
     // Ensure play workflow states exist for the team's board view
-    if let Err(e) = crate::handlers::intake::ensure_play_workflow_states(client, &team_id).await {
+    if let Err(e) = crate::handlers::intake::ensure_play_workflow_states(&client, &team_id).await {
         warn!(
             error = %e,
             "Failed to ensure play workflow states (continuing with project creation)"
@@ -941,6 +902,65 @@ async fn health_check() -> Json<Value> {
     Json(json!({ "status": "healthy" }))
 }
 
+/// Token health check endpoint.
+async fn token_health(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
+    let now = Utc::now().timestamp();
+    let linear_config = state.config.linear.read().map_err(|e| {
+        error!("Failed to acquire read lock on linear config: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let mut agents = Vec::new();
+    let mut expired = 0;
+    let mut expiring = 0;
+    let mut installed = 0;
+
+    for (agent, app) in &linear_config.apps {
+        let expires_in = app.expires_at.map(|exp| exp - now);
+        let is_expired = app.is_token_expired();
+        let status = if app.access_token.is_none() {
+            "not_installed"
+        } else if is_expired {
+            "expired"
+        } else if expires_in.is_some_and(|ttl| ttl < 3600) {
+            "expiring"
+        } else {
+            "healthy"
+        };
+
+        if app.access_token.is_some() {
+            installed += 1;
+        }
+        if status == "expired" {
+            expired += 1;
+        }
+        if status == "expiring" {
+            expiring += 1;
+        }
+
+        agents.push(json!({
+            "agent": agent,
+            "configured": app.is_configured(),
+            "installed": app.is_installed(),
+            "can_refresh": app.can_refresh(),
+            "expires_at": app.expires_at,
+            "expires_in_seconds": expires_in,
+            "status": status
+        }));
+    }
+
+    Ok(Json(json!({
+        "status": "ok",
+        "counts": {
+            "configured": linear_config.apps.len(),
+            "installed": installed,
+            "expiring": expiring,
+            "expired": expired
+        },
+        "agents": agents
+    })))
+}
+
 /// Readiness check endpoint.
 async fn readiness_check(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
     if !state.config.enabled {
@@ -1173,7 +1193,8 @@ async fn handle_session_created(
 
         // Create emitter for activity emission using agent's OAuth token
         // (not the workspace API key, which Linear rejects for agent activities)
-        let agent_client = get_agent_client(&state.config, agent_name);
+        let agent_client =
+            get_agent_client_with_refresh(&state.config, &state.kube_client, agent_name).await;
         let emitter = agent_client
             .as_ref()
             .map(|client| LinearAgentEmitter::new(client.clone(), session_id));
@@ -1333,7 +1354,8 @@ async fn handle_session_created(
         );
 
         // Create emitter for activity emission using agent's OAuth token
-        let agent_client = get_agent_client(&state.config, agent_name);
+        let agent_client =
+            get_agent_client_with_refresh(&state.config, &state.kube_client, agent_name).await;
         let emitter = agent_client
             .as_ref()
             .map(|client| LinearAgentEmitter::new(client.clone(), session_id));
@@ -1488,7 +1510,9 @@ async fn handle_session_created(
         );
 
         // Provide helpful guidance using agent's client
-        if let Some(client) = &get_agent_client(&state.config, agent_name) {
+        if let Some(client) =
+            get_agent_client_with_refresh(&state.config, &state.kube_client, agent_name).await
+        {
             let _ = client
                 .emit_response(
                     session_id,
@@ -1528,7 +1552,8 @@ async fn handle_session_prompted(
     let issue_identifier = payload.get_issue().map(|i| i.identifier.clone());
 
     // Get agent-specific client for activities
-    let agent_client = get_agent_client(&state.config, agent_name);
+    let agent_client =
+        get_agent_client_with_refresh(&state.config, &state.kube_client, agent_name).await;
 
     // Check for stop signal
     if payload.has_stop_signal() {

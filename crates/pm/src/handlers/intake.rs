@@ -1048,9 +1048,7 @@ pub async fn submit_intake_coderun(
         .and_then(|c| c.morgan_tools.as_ref());
 
     // Extract multi-model config if enabled
-    let multi_model = project_config
-        .as_ref()
-        .and_then(|c| c.multi_model.as_ref());
+    let multi_model = project_config.as_ref().and_then(|c| c.multi_model.as_ref());
 
     info!(
         cli = %cli,
