@@ -79,6 +79,48 @@ fn get_current_namespace() -> String {
     }
 }
 
+/// Checks if a header name contains sensitive credentials that should be masked in logs.
+fn is_sensitive_header(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    lower.contains("authorization")
+        || lower.contains("api-key")
+        || lower.contains("api_key")
+        || lower.contains("apikey")
+        || lower.contains("auth-token")
+        || lower.contains("auth_token")
+        || lower.contains("x-api-key")
+        || lower.contains("x-auth-token")
+        || lower.contains("cookie")
+        || lower.contains("secret")
+        || lower.contains("bearer")
+        || lower.contains("password")
+}
+
+/// Validates that a header name is valid per RFC 7230.
+/// Header names must be tokens: 1*tchar where tchar is any visible ASCII char except delimiters.
+fn is_valid_header_name(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    // RFC 7230: token = 1*tchar
+    // tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
+    //         "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
+    name.chars().all(|c| {
+        c.is_ascii_alphanumeric()
+            || matches!(
+                c,
+                '!' | '#' | '$' | '%' | '&' | '\'' | '*' | '+' | '-' | '.' | '^' | '_' | '`' | '|'
+                    | '~'
+            )
+    })
+}
+
+/// Validates that a header value doesn't contain characters that could enable header injection.
+fn is_valid_header_value(value: &str) -> bool {
+    // Header values must not contain CR or LF (prevents header injection)
+    !value.contains('\n') && !value.contains('\r')
+}
+
 /// Add custom headers from server config to a request builder
 /// Headers support environment variable substitution: ${VAR} or ${VAR:-default}
 fn add_custom_headers(
@@ -96,16 +138,49 @@ fn add_custom_headers(
     );
 
     for (key, value) in headers {
+        // Validate header name (RFC 7230)
+        if !is_valid_header_name(key) {
+            tracing::warn!(
+                "⚠️ [{}] Skipping invalid header name: {}",
+                server_name,
+                key
+            );
+            continue;
+        }
+
         // Substitute environment variables in header values
         let processed_value = substitute_template_variables(value, &context);
-        if !processed_value.is_empty() {
-            // Use char-based truncation to avoid panicking on multi-byte UTF-8 characters
-            let truncated: String = processed_value.chars().take(20).collect();
+
+        // Validate header value (prevent header injection)
+        if !is_valid_header_value(&processed_value) {
+            tracing::warn!(
+                "⚠️ [{}] Skipping header {} with invalid value (contains newline)",
+                server_name,
+                key
+            );
+            continue;
+        }
+
+        if processed_value.is_empty() {
             tracing::debug!(
-                "🔐 [{}] Adding custom header: {}={}...",
+                "⏭️ [{}] Skipping header {} (empty value after substitution)",
+                server_name,
+                key
+            );
+        } else {
+            // Mask sensitive headers entirely, truncate others for logging
+            let display_value = if is_sensitive_header(key) {
+                "***".to_string()
+            } else {
+                // Use char-based truncation to avoid panicking on multi-byte UTF-8 characters
+                let truncated: String = processed_value.chars().take(20).collect();
+                format!("{truncated}...")
+            };
+            tracing::debug!(
+                "🔐 [{}] Adding custom header: {}={}",
                 server_name,
                 key,
-                truncated
+                display_value
             );
             request_builder = request_builder.header(key.as_str(), processed_value);
         }
