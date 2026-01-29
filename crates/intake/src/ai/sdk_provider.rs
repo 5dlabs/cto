@@ -215,10 +215,13 @@ struct AgentErrorResponse {
 /// Token usage from agent.
 #[derive(Debug, Clone, Deserialize)]
 #[allow(clippy::struct_field_names)] // Matches TypeScript SDK naming
-struct AgentUsage {
-    input_tokens: u32,
-    output_tokens: u32,
-    total_tokens: u32,
+pub struct AgentUsage {
+    /// Number of input tokens.
+    pub input_tokens: u32,
+    /// Number of output tokens.
+    pub output_tokens: u32,
+    /// Total number of tokens.
+    pub total_tokens: u32,
 }
 
 // =============================================================================
@@ -573,7 +576,10 @@ impl AgentSdkProvider {
 
         let request = AgentRequest {
             operation: "generate_with_critic",
-            model: config.generator_model.as_deref().unwrap_or(&self.default_model),
+            model: config
+                .generator_model
+                .as_deref()
+                .unwrap_or(&self.default_model),
             options: None,
             payload: AgentPayload::MultiModelGeneration {
                 system_prompt,
@@ -590,7 +596,9 @@ impl AgentSdkProvider {
             AgentResponse::Success(success) => {
                 // Parse the multi-model response
                 let multi_response: MultiModelResponse = serde_json::from_value(success.data)
-                    .map_err(|e| TasksError::Ai(format!("Failed to parse multi-model response: {e}")))?;
+                    .map_err(|e| {
+                        TasksError::Ai(format!("Failed to parse multi-model response: {e}"))
+                    })?;
 
                 let usage = TokenUsage {
                     input_tokens: success.usage.input_tokens,
@@ -623,7 +631,9 @@ impl AgentSdkProvider {
     /// Check provider availability status.
     ///
     /// Returns information about which providers (Claude, Minimax, Codex) are available.
-    pub async fn get_provider_status(&self) -> TasksResult<std::collections::HashMap<String, bool>> {
+    pub async fn get_provider_status(
+        &self,
+    ) -> TasksResult<std::collections::HashMap<String, bool>> {
         let request_json = r#"{"operation":"provider_status","payload":{}}"#;
 
         tracing::debug!("Checking provider status");
@@ -660,17 +670,21 @@ impl AgentSdkProvider {
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
+        #[allow(clippy::items_after_statements)]
         #[derive(Deserialize)]
         struct ProviderStatusResponse {
+            #[allow(dead_code)] // Used for JSON parsing discrimination
             success: bool,
             data: ProviderStatusData,
         }
 
+        #[allow(clippy::items_after_statements)]
         #[derive(Deserialize)]
         struct ProviderStatusData {
             providers: std::collections::HashMap<String, ProviderInfo>,
         }
 
+        #[allow(clippy::items_after_statements)]
         #[derive(Deserialize)]
         struct ProviderInfo {
             available: bool,

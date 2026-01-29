@@ -28,5 +28,6 @@ pub use provider::{
 };
 pub use registry::ProviderRegistry;
 pub use schemas::*;
+pub use sdk_provider::AgentUsage;
 // Export both names for compatibility
 pub use sdk_provider::{AgentSdkProvider, AnthropicProvider};

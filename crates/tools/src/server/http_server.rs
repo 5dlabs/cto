@@ -109,7 +109,19 @@ fn is_valid_header_name(name: &str) -> bool {
         c.is_ascii_alphanumeric()
             || matches!(
                 c,
-                '!' | '#' | '$' | '%' | '&' | '\'' | '*' | '+' | '-' | '.' | '^' | '_' | '`' | '|'
+                '!' | '#'
+                    | '$'
+                    | '%'
+                    | '&'
+                    | '\''
+                    | '*'
+                    | '+'
+                    | '-'
+                    | '.'
+                    | '^'
+                    | '_'
+                    | '`'
+                    | '|'
                     | '~'
             )
     })
@@ -140,11 +152,7 @@ fn add_custom_headers(
     for (key, value) in headers {
         // Validate header name (RFC 7230)
         if !is_valid_header_name(key) {
-            tracing::warn!(
-                "⚠️ [{}] Skipping invalid header name: {}",
-                server_name,
-                key
-            );
+            tracing::warn!("⚠️ [{}] Skipping invalid header name: {}", server_name, key);
             continue;
         }
 
@@ -920,8 +928,7 @@ impl ServerConnectionPool {
                     .header("Accept", "application/json,text/event-stream");
 
                 // Add custom headers from config (e.g., Authorization)
-                request_builder =
-                    add_custom_headers(request_builder, &custom_headers, server_name);
+                request_builder = add_custom_headers(request_builder, &custom_headers, server_name);
 
                 if let Some(ref sid) = session_id {
                     tracing::info!("🔑 [{}] Including Mcp-Session-Id in request", server_name);
@@ -1639,8 +1646,7 @@ impl BridgeState {
                         server_name
                     );
                     // Add custom headers (e.g., Authorization) to SSE connection
-                    let mut request_builder =
-                        client.get(url).header("Accept", "text/event-stream");
+                    let mut request_builder = client.get(url).header("Accept", "text/event-stream");
                     request_builder =
                         add_custom_headers(request_builder, &config.headers, server_name);
                     let sse_response = request_builder.send().await;
@@ -1817,8 +1823,7 @@ impl BridgeState {
                     .header("Accept", "application/json,text/event-stream");
 
                 // Add custom headers from config (e.g., Authorization)
-                request_builder =
-                    add_custom_headers(request_builder, &config.headers, server_name);
+                request_builder = add_custom_headers(request_builder, &config.headers, server_name);
 
                 if let Some(ref sid) = mcp_session_id {
                     request_builder = request_builder.header("Mcp-Session-Id", sid);
