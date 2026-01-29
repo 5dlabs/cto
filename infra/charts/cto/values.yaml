@@ -615,6 +615,7 @@ tools:
         url: "https://bindings.mcp.cloudflare.com/mcp"
         workingDirectory: "/tmp"
         headers:
+          # Token is loaded from cto-secrets and substituted at runtime by add_custom_headers()
           Authorization: "Bearer ${CLOUDFLARE_API_TOKEN}"
 
       # --- AI Generation ---

@@ -99,11 +99,13 @@ fn add_custom_headers(
         // Substitute environment variables in header values
         let processed_value = substitute_template_variables(value, &context);
         if !processed_value.is_empty() {
+            // Use char-based truncation to avoid panicking on multi-byte UTF-8 characters
+            let truncated: String = processed_value.chars().take(20).collect();
             tracing::debug!(
                 "🔐 [{}] Adding custom header: {}={}...",
                 server_name,
                 key,
-                &processed_value[..processed_value.len().min(20)]
+                truncated
             );
             request_builder = request_builder.header(key.as_str(), processed_value);
         }
@@ -810,8 +812,15 @@ impl ServerConnectionPool {
                 // Use transport type to determine communication method
                 if transport == "sse" {
                     // Use SSE bidirectional communication
-                    return call_tool_via_sse(&client, server_name, &url, tool_name, arguments)
-                        .await;
+                    return call_tool_via_sse(
+                        &client,
+                        server_name,
+                        &url,
+                        tool_name,
+                        arguments,
+                        &custom_headers,
+                    )
+                    .await;
                 }
                 // Direct HTTP endpoint (like Solana)
                 let request_body = json!({
@@ -1554,11 +1563,12 @@ impl BridgeState {
                         "🔄 [{}] Detected SSE endpoint, starting SSE handshake",
                         server_name
                     );
-                    let sse_response = client
-                        .get(url)
-                        .header("Accept", "text/event-stream")
-                        .send()
-                        .await;
+                    // Add custom headers (e.g., Authorization) to SSE connection
+                    let mut request_builder =
+                        client.get(url).header("Accept", "text/event-stream");
+                    request_builder =
+                        add_custom_headers(request_builder, &config.headers, server_name);
+                    let sse_response = request_builder.send().await;
 
                     if let Ok(response) = sse_response {
                         let content_type = response
@@ -1644,7 +1654,14 @@ impl BridgeState {
 
                     // For SSE endpoints, we need to handle the full MCP handshake
                     // with responses coming through the SSE stream
-                    return discover_tools_via_sse(&client, server_name, url, &session_id).await;
+                    return discover_tools_via_sse(
+                        &client,
+                        server_name,
+                        url,
+                        &session_id,
+                        &config.headers,
+                    )
+                    .await;
                 }
 
                 // Non-SSE HTTP endpoint handling
@@ -2370,6 +2387,7 @@ async fn discover_tools_via_sse(
     server_name: &str,
     sse_url: &str,
     _existing_session_id: &str, // Not used, we'll get a fresh one
+    headers: &HashMap<String, String>,
 ) -> anyhow::Result<Vec<Tool>> {
     use futures::StreamExt;
     use tokio::time::{timeout, Duration};
@@ -2377,9 +2395,10 @@ async fn discover_tools_via_sse(
     tracing::info!("🚀 [{}] Starting SSE tool discovery", server_name);
 
     // Step 1: Open SSE connection and get session ID
-    let sse_response = client
-        .get(sse_url)
-        .header("Accept", "text/event-stream")
+    let mut request_builder = client.get(sse_url).header("Accept", "text/event-stream");
+    // Add custom headers (e.g., Authorization) to SSE connection
+    request_builder = add_custom_headers(request_builder, headers, server_name);
+    let sse_response = request_builder
         .send()
         .await
         .map_err(|e| anyhow::anyhow!("Failed to connect to SSE endpoint: {e}"))?;
@@ -2604,9 +2623,11 @@ async fn discover_tools_via_sse(
         }
     });
 
-    client
+    let init_request_builder = client
         .post(&message_url)
-        .header("Content-Type", "application/json")
+        .header("Content-Type", "application/json");
+    let init_request_builder = add_custom_headers(init_request_builder, headers, server_name);
+    init_request_builder
         .json(&init_request)
         .send()
         .await
@@ -2627,9 +2648,11 @@ async fn discover_tools_via_sse(
         "method": "notifications/initialized"
     });
 
-    client
+    let notif_request_builder = client
         .post(&message_url)
-        .header("Content-Type", "application/json")
+        .header("Content-Type", "application/json");
+    let notif_request_builder = add_custom_headers(notif_request_builder, headers, server_name);
+    notif_request_builder
         .json(&initialized_notification)
         .send()
         .await
@@ -2644,9 +2667,11 @@ async fn discover_tools_via_sse(
         "params": {}
     });
 
-    client
+    let tools_request_builder = client
         .post(&message_url)
-        .header("Content-Type", "application/json")
+        .header("Content-Type", "application/json");
+    let tools_request_builder = add_custom_headers(tools_request_builder, headers, server_name);
+    tools_request_builder
         .json(&tools_request)
         .send()
         .await
@@ -3367,6 +3392,7 @@ async fn call_tool_via_sse(
     sse_url: &str,
     tool_name: &str,
     arguments: Value,
+    headers: &HashMap<String, String>,
 ) -> anyhow::Result<Value> {
     use futures::StreamExt;
     use tokio::time::{timeout, Duration};
@@ -3374,9 +3400,10 @@ async fn call_tool_via_sse(
     tracing::info!("🚀 [{}] Starting SSE tool call: {}", server_name, tool_name);
 
     // Step 1: Open SSE connection and get session ID
-    let sse_response = client
-        .get(sse_url)
-        .header("Accept", "text/event-stream")
+    let mut request_builder = client.get(sse_url).header("Accept", "text/event-stream");
+    // Add custom headers (e.g., Authorization) to SSE connection
+    request_builder = add_custom_headers(request_builder, headers, server_name);
+    let sse_response = request_builder
         .send()
         .await
         .map_err(|e| anyhow::anyhow!("Failed to connect to SSE endpoint: {e}"))?;
@@ -3600,8 +3627,9 @@ async fn call_tool_via_sse(
         }
     });
 
-    let init_response = client
-        .post(&message_url)
+    let init_request_builder = client.post(&message_url);
+    let init_request_builder = add_custom_headers(init_request_builder, headers, server_name);
+    let init_response = init_request_builder
         .json(&initialize_request)
         .send()
         .await
@@ -3630,8 +3658,9 @@ async fn call_tool_via_sse(
         "params": {}
     });
 
-    let notif_response = client
-        .post(&message_url)
+    let notif_request_builder = client.post(&message_url);
+    let notif_request_builder = add_custom_headers(notif_request_builder, headers, server_name);
+    let notif_response = notif_request_builder
         .json(&initialized_notification)
         .send()
         .await
@@ -3659,8 +3688,9 @@ async fn call_tool_via_sse(
 
     tracing::info!("🔧 [{}] Sending tool call: {}", server_name, tool_name);
 
-    let call_response = client
-        .post(&message_url)
+    let call_request_builder = client.post(&message_url);
+    let call_request_builder = add_custom_headers(call_request_builder, headers, server_name);
+    let call_response = call_request_builder
         .json(&tool_call_request)
         .send()
         .await
