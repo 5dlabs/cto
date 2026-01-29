@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CTO_ROOT="${SCRIPT_DIR}/../.."
 CTO_CONFIG="${CTO_ROOT}/cto-config.json"
 SKILLS_SOURCE="${CTO_ROOT}/templates/skills"
-SKILLS_DIR="${SCRIPT_DIR}/config/skills"
+FLAT_SKILLS_DIR="${SCRIPT_DIR}/config/flat-skills"
 
 AGENT="${1:-rex}"
 JOB_TYPE="${2:-coder}"
@@ -27,11 +27,11 @@ JOB_TYPE="${2:-coder}"
 echo "Setting up skills for agent '${AGENT}' with job type '${JOB_TYPE}'"
 echo "  Config: ${CTO_CONFIG}"
 echo "  Source: ${SKILLS_SOURCE}"
-echo "  Output: ${SKILLS_DIR}"
+echo "  Output: ${FLAT_SKILLS_DIR}"
 
-# Clear and recreate skills directory
-rm -rf "${SKILLS_DIR}"
-mkdir -p "${SKILLS_DIR}"
+# Clear and recreate flat-skills directory
+rm -rf "${FLAT_SKILLS_DIR}"
+mkdir -p "${FLAT_SKILLS_DIR}"
 
 # Extract skills from cto-config.json using jq
 # Get default skills + job-type-specific skills
@@ -69,9 +69,8 @@ for skill in ${ALL_SKILLS}; do
     SKILL_FILE=$(find "${SKILLS_SOURCE}" -type f -name "SKILL.md" -path "*/${skill}/*" 2>/dev/null | head -1)
     
     if [ -n "${SKILL_FILE}" ]; then
-        # Controller expects: skills/<skill-name>/SKILL.md
-        mkdir -p "${SKILLS_DIR}/${skill}"
-        cp "${SKILL_FILE}" "${SKILLS_DIR}/${skill}/SKILL.md"
+        # Claude expects flat files: skill-name.md
+        cp "${SKILL_FILE}" "${FLAT_SKILLS_DIR}/${skill}.md"
         echo "  ✓ ${skill}"
         ((COPIED++))
     else
@@ -84,6 +83,6 @@ echo ""
 echo "Summary: ${COPIED} skills copied, ${MISSING} not found"
 echo ""
 
-# List the skills directory
-echo "Contents of ${SKILLS_DIR}:"
-ls -la "${SKILLS_DIR}" | tail -n +2
+# List the flat-skills directory
+echo "Contents of ${FLAT_SKILLS_DIR}:"
+ls -la "${FLAT_SKILLS_DIR}" | tail -n +2

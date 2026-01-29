@@ -13,7 +13,7 @@
 #   ./setup.sh blaze coder
 #
 # This runs:
-#   1. setup-skills.sh - Copies skill files to config/skills/<name>/SKILL.md (mirrors controller)
+#   1. setup-skills.sh - Copies skill SKILL.md files to config/flat-skills/
 #   2. setup-tools.sh  - Generates client-config-{agent}.json for MCP tool filtering
 #
 # =============================================================================
@@ -46,7 +46,7 @@ echo "=============================================="
 echo "Setup complete!"
 echo ""
 echo "To run the tests:"
-echo "  1. Create .env file: cp .env.example .env"
-echo "  2. Fill in secrets in .env"
-echo "  3. Run: docker compose up claude claude-sidecar"
+echo "  export LINEAR_OAUTH_TOKEN=\$(op read \"op://Automation/Linear Morgan OAuth/developer_token\")"
+echo "  export LINEAR_ISSUE_IDENTIFIER=CTOPA-XXXX"
+echo "  docker compose up claude claude-sidecar"
 echo "=============================================="
