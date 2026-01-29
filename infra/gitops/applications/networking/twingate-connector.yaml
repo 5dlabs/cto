@@ -30,7 +30,7 @@ spec:
           network: turquoiseelephant631
           # Use existing secret for tokens
           existingSecret: twingate-connector-tokens
-        
+
         # Replica count for HA
         replicaCount: 2
 
