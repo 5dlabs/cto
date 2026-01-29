@@ -103,7 +103,7 @@ impl LinearAppConfig {
     /// Check if the access token has expired.
     ///
     /// Returns true if:
-    /// - There is an `expires_at` timestamp and it's in the past (or within 5 min buffer)
+    /// - There is an `expires_at` timestamp and it's in the past (or within 1 hour buffer)
     /// - There is no `expires_at` (assume expired to be safe)
     ///
     /// Returns false if there's no access token at all.
@@ -116,8 +116,8 @@ impl LinearAppConfig {
         match self.expires_at {
             Some(expires_at) => {
                 let now = Utc::now().timestamp();
-                // Consider expired if less than 5 minutes remaining
-                expires_at - now < 300
+                // Consider expired if less than 1 hour remaining
+                expires_at - now < 3600
             }
             None => true, // No expiration info, assume expired to be safe
         }
@@ -277,7 +277,7 @@ impl LinearConfig {
     pub fn oauth_url(&self, agent: &str) -> Option<String> {
         self.get_app(agent).map(|app| {
             format!(
-                "https://linear.app/oauth/authorize?client_id={}&redirect_uri={}&response_type=code&scope=read,write,app:assignable,app:mentionable&actor=app&prompt=consent",
+                "https://linear.app/oauth/authorize?client_id={}&redirect_uri={}&response_type=code&scope=read,write&prompt=consent",
                 app.client_id,
                 urlencoding::encode(&self.redirect_uri)
             )
@@ -845,9 +845,8 @@ mod tests {
         let url = config.oauth_url("rex").unwrap();
         assert!(url.contains("client_id=client123"));
         assert!(url.contains("redirect_uri="));
-        assert!(url.contains("actor=app"));
-        assert!(url.contains("app:assignable"));
-        assert!(url.contains("app:mentionable"));
+        assert!(url.contains("scope=read,write"));
+        assert!(url.contains("prompt=consent"));
     }
 
     #[test]
