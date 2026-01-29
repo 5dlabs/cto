@@ -80,6 +80,7 @@ struct AgentTools {
 struct ServerConfig {
     #[allow(dead_code)]
     enabled: bool,
+    #[serde(default)]
     #[allow(dead_code)]
     tools: Vec<String>,
 }
