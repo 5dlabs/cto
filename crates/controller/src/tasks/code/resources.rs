@@ -943,6 +943,15 @@ impl<'a> CodeResourceManager<'a> {
                 }
             }),
             json!({
+                "name": "GITHUB_APP_INSTALLATION_ID",
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": github_app_secret_name(github_app),
+                        "key": "installation-id"
+                    }
+                }
+            }),
+            json!({
                 "name": api_env_var,
                 "valueFrom": {
                     "secretKeyRef": {
