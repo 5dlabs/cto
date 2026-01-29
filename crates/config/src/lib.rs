@@ -43,6 +43,7 @@ pub use tools::{
     analyze_task_for_tools, ToolAnalyzable, TECH_TOOL_MAPPINGS,
 };
 pub use types::{
-    AgentConfig, AgentTools, CtoConfig, Defaults, IntakeDefaults, IntakeModels, LinearDefaults,
-    LinearIntakeSettings, MultiModelConfig, PlayDefaults, SubagentConfig, CTO_CONFIG_VERSION,
+    AgentConfig, AgentSkills, AgentTools, CtoConfig, Defaults, IntakeDefaults, IntakeModels,
+    LinearDefaults, LinearIntakeSettings, MultiModelConfig, PlayDefaults, SubagentConfig,
+    CTO_CONFIG_VERSION,
 };

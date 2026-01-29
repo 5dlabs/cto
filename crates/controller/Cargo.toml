@@ -75,6 +75,9 @@ uuid = { version = "1.20", features = ["v4", "serde"] }
 # Notifications
 notify = { path = "../notify" }
 
+# CTO config types
+cto-config = { path = "../config", package = "config" }
+
 # Binary configurations with proper naming
 [[bin]]
 name = "agent-controller"  # Kebab-case binary name (good for K8s/CLI)

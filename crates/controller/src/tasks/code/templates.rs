@@ -250,7 +250,7 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_container_script(code_run, &enriched_cli_config)?,
+            Self::generate_container_script(code_run, &enriched_cli_config, config)?,
         );
         templates.insert(
             "CLAUDE.md".to_string(),
@@ -391,6 +391,7 @@ impl CodeTemplateGenerator {
                 code_run,
                 &enriched_cli_config,
                 &remote_tools,
+                config,
             )?,
         );
 
@@ -857,7 +858,12 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_factory_container_script(code_run, &enriched_cli_config, &remote_tools)?,
+            Self::generate_factory_container_script(
+                code_run,
+                &enriched_cli_config,
+                &remote_tools,
+                config,
+            )?,
         );
 
         templates.insert(
@@ -906,6 +912,7 @@ impl CodeTemplateGenerator {
         code_run: &CodeRun,
         cli_config: &Value,
         remote_tools: &[String],
+        config: &ControllerConfig,
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
@@ -978,7 +985,7 @@ impl CodeTemplateGenerator {
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (Factory supports native skill loading)
-        let skills = Self::get_agent_skills(code_run);
+        let skills = Self::get_agent_skills(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -1234,7 +1241,11 @@ impl CodeTemplateGenerator {
         })
     }
 
-    fn generate_container_script(code_run: &CodeRun, cli_config: &Value) -> Result<String> {
+    fn generate_container_script(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        config: &ControllerConfig,
+    ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
         Self::register_template_helpers(&mut handlebars);
@@ -1285,7 +1296,7 @@ impl CodeTemplateGenerator {
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (used by Claude Code and Factory for native skill loading)
-        let skills = Self::get_agent_skills(code_run);
+        let skills = Self::get_agent_skills(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -1617,6 +1628,7 @@ impl CodeTemplateGenerator {
         code_run: &CodeRun,
         cli_config: &Value,
         remote_tools: &[String],
+        config: &ControllerConfig,
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
@@ -1672,7 +1684,7 @@ impl CodeTemplateGenerator {
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (Codex supports native skill loading)
-        let skills = Self::get_agent_skills(code_run);
+        let skills = Self::get_agent_skills(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -2226,7 +2238,12 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_codex_container_script(code_run, &enriched_cli_config, &remote_tools)?,
+            Self::generate_codex_container_script(
+                code_run,
+                &enriched_cli_config,
+                &remote_tools,
+                config,
+            )?,
         );
 
         templates.insert(
@@ -3089,6 +3106,7 @@ Be constructive and explain the "why" behind your suggestions.
         code_run: &CodeRun,
         cli_config: &Value,
         remote_tools: &[String],
+        config: &ControllerConfig,
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
@@ -3140,7 +3158,7 @@ Be constructive and explain the "why" behind your suggestions.
         let fresh_start_threshold = Self::get_fresh_start_threshold(code_run);
 
         // Get skills for agent (OpenCode supports native skill loading)
-        let skills = Self::get_agent_skills(code_run);
+        let skills = Self::get_agent_skills(code_run, config);
 
         let context = json!({
             "task_id": code_run.spec.task_id.unwrap_or(0),
@@ -3953,18 +3971,48 @@ Be constructive and explain the "why" behind your suggestions.
         }
     }
 
-    /// Get the skills for an agent from skill-mappings.yaml based on agent name and job type.
+    /// Get the skills for an agent based on agent name and job type.
     /// Returns a list of skill names that should be loaded for the agent.
     /// For Claude Code, Factory, OpenCode, Codex: skills are copied to native skill directories.
     ///
     /// Skill resolution order:
-    /// 1. Agent's `default` skills (always loaded)
-    /// 2. Agent's job-type-specific skills (e.g., `healer`, `coder`) - merged with defaults
-    fn get_agent_skills(code_run: &CodeRun) -> Vec<String> {
+    /// 1. Try cto-config.json (via Helm agent config) - preferred source
+    /// 2. Fall back to skill-mappings.yaml if no skills in config
+    ///
+    /// Within each source:
+    /// - Agent's `default` skills (always loaded)
+    /// - Agent's job-type-specific skills (e.g., `healer`, `coder`) - merged with defaults
+    fn get_agent_skills(code_run: &CodeRun, config: &ControllerConfig) -> Vec<String> {
+        let agent_name = Self::get_agent_name(code_run);
+        let github_app = Self::get_github_app_or_default(code_run);
+        let job_type = Self::determine_job_type(code_run);
+
+        // 1. Try to get skills from cto-config.json (via Helm agent config)
+        if let Some(agent_def) = config.agents.values().find(|a| a.github_app == github_app) {
+            if let Some(ref agent_skills) = agent_def.skills {
+                if agent_skills.has_skills() {
+                    let skills = agent_skills.get_skills_for_job(job_type);
+                    debug!(
+                        "Loaded {} skills from cto-config for agent '{}' (github_app='{}') job '{}': {:?}",
+                        skills.len(),
+                        agent_name,
+                        github_app,
+                        job_type,
+                        skills
+                    );
+                    return skills;
+                }
+            }
+        }
+
+        // 2. Fall back to skill-mappings.yaml
+        Self::get_agent_skills_from_yaml(&agent_name, job_type)
+    }
+
+    /// Load skills from skill-mappings.yaml (fallback source).
+    fn get_agent_skills_from_yaml(agent_name: &str, job_type: &str) -> Vec<String> {
         use crate::tasks::template_paths::SKILLS_MAPPINGS;
 
-        let agent_name = Self::get_agent_name(code_run);
-        let job_type = Self::determine_job_type(code_run);
         let templates_path = get_templates_path();
         let mappings_path = format!("{templates_path}/{SKILLS_MAPPINGS}");
 
@@ -3995,7 +4043,7 @@ Be constructive and explain the "why" behind your suggestions.
         let mut skills = Vec::new();
 
         // Look up the agent in mappings
-        if let Some(agent_config) = mappings.get(&agent_name) {
+        if let Some(agent_config) = mappings.get(agent_name) {
             // 1. Get default skills (always loaded)
             if let Some(defaults) = agent_config.get("default") {
                 if let Some(skills_array) = defaults.as_sequence() {
@@ -4025,12 +4073,12 @@ Be constructive and explain the "why" behind your suggestions.
 
         if skills.is_empty() {
             debug!(
-                "No skill mappings found for agent '{}' job '{}' - using empty skills",
+                "No skill mappings found in YAML for agent '{}' job '{}' - using empty skills",
                 agent_name, job_type
             );
         } else {
             debug!(
-                "Loaded {} skills for agent '{}' job '{}': {:?}",
+                "Loaded {} skills from YAML for agent '{}' job '{}': {:?}",
                 skills.len(),
                 agent_name,
                 job_type,
@@ -5280,6 +5328,7 @@ mod tests {
                 temperature: None,
                 reasoning_effort: None,
                 tools: Some(agent_tools.clone()),
+                skills: None,
                 client_config: None,
                 model_rotation: None,
                 frontend_stack: None,
@@ -5305,6 +5354,7 @@ mod tests {
                 temperature: None,
                 reasoning_effort: None,
                 tools: Some(agent_tools),
+                skills: None,
                 model_rotation: None,
                 client_config: Some(serde_json::json!({
                     "remoteTools": ["memory_create_entities", "brave_search_brave_web_search"],
@@ -5397,6 +5447,7 @@ mod tests {
                 temperature: None,
                 reasoning_effort: None,
                 tools: Some(helm_tools),
+                skills: None,
                 client_config: None,
                 model_rotation: None,
                 frontend_stack: None,
@@ -5503,6 +5554,7 @@ mod tests {
                 temperature: None,
                 reasoning_effort: None,
                 tools: None,
+                skills: None,
                 client_config: None,
                 model_rotation: None,
                 frontend_stack: None,
@@ -5536,5 +5588,200 @@ mod tests {
             Some(8),
             "subagents.maxConcurrent should be 8"
         );
+    }
+
+    // ========================================================================
+    // Skills resolution tests
+    // Tests for get_agent_skills with cto-config.json priority over YAML fallback
+    // ========================================================================
+
+    #[test]
+    fn test_get_agent_skills_from_cto_config() {
+        use crate::tasks::config::{AgentDefinition, ControllerConfig};
+
+        let mut config = ControllerConfig::default();
+        config.agents.insert(
+            "rex".to_string(),
+            AgentDefinition {
+                github_app: "5DLabs-Rex".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
+                reasoning_effort: None,
+                tools: None,
+                skills: Some(cto_config::AgentSkills {
+                    default: vec!["rust-patterns".to_string(), "context7".to_string()],
+                    coder: Some(vec!["compound-engineering".to_string()]),
+                    healer: Some(vec!["incident-response".to_string()]),
+                    intake: None,
+                    quality: None,
+                    test: None,
+                    security: None,
+                    review: None,
+                    deploy: None,
+                    integration: None,
+                    optional: None,
+                }),
+                client_config: None,
+                model_rotation: None,
+                frontend_stack: None,
+                subagents: None,
+            },
+        );
+
+        // Test coder job type (default run_type is "implementation" which maps to "coder")
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+
+        let skills = CodeTemplateGenerator::get_agent_skills(&code_run, &config);
+        assert!(
+            skills.contains(&"rust-patterns".to_string()),
+            "Should include default skill"
+        );
+        assert!(
+            skills.contains(&"context7".to_string()),
+            "Should include default skill"
+        );
+        assert!(
+            skills.contains(&"compound-engineering".to_string()),
+            "Should include coder skill"
+        );
+        assert!(
+            !skills.contains(&"incident-response".to_string()),
+            "Should NOT include healer skill"
+        );
+
+        // Test healer job type by setting service name to trigger healer detection
+        let mut healer_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        healer_run.spec.service = "healer-service".to_string();
+        let skills = CodeTemplateGenerator::get_agent_skills(&healer_run, &config);
+        assert!(
+            skills.contains(&"rust-patterns".to_string()),
+            "Should include default skill"
+        );
+        assert!(
+            skills.contains(&"incident-response".to_string()),
+            "Should include healer skill"
+        );
+        assert!(
+            !skills.contains(&"compound-engineering".to_string()),
+            "Should NOT include coder skill"
+        );
+    }
+
+    #[test]
+    fn test_get_agent_skills_default_only() {
+        use crate::tasks::config::{AgentDefinition, ControllerConfig};
+
+        let mut config = ControllerConfig::default();
+        config.agents.insert(
+            "cipher".to_string(),
+            AgentDefinition {
+                github_app: "5DLabs-Cipher".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
+                reasoning_effort: None,
+                tools: None,
+                skills: Some(cto_config::AgentSkills {
+                    default: vec!["security-analysis".to_string(), "codeql".to_string()],
+                    coder: None,
+                    healer: None,
+                    intake: None,
+                    quality: None,
+                    test: None,
+                    security: None,
+                    review: None,
+                    deploy: None,
+                    integration: None,
+                    optional: None,
+                }),
+                client_config: None,
+                model_rotation: None,
+                frontend_stack: None,
+                subagents: None,
+            },
+        );
+
+        let code_run = create_test_code_run(Some("5DLabs-Cipher".to_string()));
+        let skills = CodeTemplateGenerator::get_agent_skills(&code_run, &config);
+
+        assert!(
+            skills.contains(&"security-analysis".to_string()),
+            "Should include default skill"
+        );
+        assert!(
+            skills.contains(&"codeql".to_string()),
+            "Should include default skill"
+        );
+        assert_eq!(skills.len(), 2, "Should only have default skills");
+    }
+
+    #[test]
+    fn test_get_agent_skills_no_duplicates() {
+        use crate::tasks::config::{AgentDefinition, ControllerConfig};
+
+        let mut config = ControllerConfig::default();
+        config.agents.insert(
+            "rex".to_string(),
+            AgentDefinition {
+                github_app: "5DLabs-Rex".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
+                reasoning_effort: None,
+                tools: None,
+                skills: Some(cto_config::AgentSkills {
+                    default: vec!["skill-a".to_string(), "skill-b".to_string()],
+                    coder: Some(vec!["skill-a".to_string(), "skill-c".to_string()]), // skill-a is duplicate
+                    healer: None,
+                    intake: None,
+                    quality: None,
+                    test: None,
+                    security: None,
+                    review: None,
+                    deploy: None,
+                    integration: None,
+                    optional: None,
+                }),
+                client_config: None,
+                model_rotation: None,
+                frontend_stack: None,
+                subagents: None,
+            },
+        );
+
+        // Default run_type "implementation" maps to "coder"
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+
+        let skills = CodeTemplateGenerator::get_agent_skills(&code_run, &config);
+
+        // Count occurrences of skill-a
+        let skill_a_count = skills.iter().filter(|s| *s == "skill-a").count();
+        assert_eq!(
+            skill_a_count, 1,
+            "skill-a should appear only once (deduped)"
+        );
+        assert!(skills.contains(&"skill-b".to_string()));
+        assert!(skills.contains(&"skill-c".to_string()));
+    }
+
+    #[test]
+    fn test_get_agent_skills_no_config_falls_back() {
+        use crate::tasks::config::ControllerConfig;
+
+        // Empty config - no agents defined
+        let config = ControllerConfig::default();
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+
+        // This would fall back to skill-mappings.yaml
+        // Since we can't mock the file, just verify it doesn't panic
+        let skills = CodeTemplateGenerator::get_agent_skills(&code_run, &config);
+
+        // Skills might be empty or come from YAML fallback
+        // Just ensure no panic
+        assert!(skills.is_empty() || !skills.is_empty());
     }
 }

@@ -20,6 +20,107 @@ pub struct AgentTools {
     pub local_servers: HashMap<String, serde_json::Value>,
 }
 
+/// Agent skills configuration.
+///
+/// Skills are organized by job type. The `default` skills are always included,
+/// and job-type-specific skills are merged when the agent performs that job type.
+///
+/// This replaces the legacy `skill-mappings.yaml` file with a unified config.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct AgentSkills {
+    /// Default skills always loaded for this agent.
+    #[serde(default)]
+    pub default: Vec<String>,
+
+    /// Skills for coder job type (implementation tasks).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coder: Option<Vec<String>>,
+
+    /// Skills for healer job type (incident response, remediation).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub healer: Option<Vec<String>>,
+
+    /// Skills for intake job type (PRD processing).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intake: Option<Vec<String>>,
+
+    /// Skills for quality job type (code review).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quality: Option<Vec<String>>,
+
+    /// Skills for test job type (testing tasks).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub test: Option<Vec<String>>,
+
+    /// Skills for security job type (security analysis).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub security: Option<Vec<String>>,
+
+    /// Skills for review job type (PR review).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review: Option<Vec<String>>,
+
+    /// Skills for deploy job type (infrastructure deployment).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deploy: Option<Vec<String>>,
+
+    /// Skills for integration job type (CI/merge tasks).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integration: Option<Vec<String>>,
+
+    /// Optional skills that can be enabled on-demand.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional: Option<Vec<String>>,
+}
+
+impl AgentSkills {
+    /// Get skills for a specific job type, merged with defaults.
+    ///
+    /// Returns default skills + job-type-specific skills (if any).
+    #[must_use]
+    pub fn get_skills_for_job(&self, job_type: &str) -> Vec<String> {
+        let mut skills = self.default.clone();
+
+        let job_skills = match job_type {
+            "coder" => self.coder.as_ref(),
+            "healer" => self.healer.as_ref(),
+            "intake" => self.intake.as_ref(),
+            "quality" => self.quality.as_ref(),
+            "test" => self.test.as_ref(),
+            "security" => self.security.as_ref(),
+            "review" => self.review.as_ref(),
+            "deploy" => self.deploy.as_ref(),
+            "integration" => self.integration.as_ref(),
+            _ => None,
+        };
+
+        if let Some(job_skills) = job_skills {
+            for skill in job_skills {
+                if !skills.contains(skill) {
+                    skills.push(skill.clone());
+                }
+            }
+        }
+
+        skills
+    }
+
+    /// Check if this agent has any skills configured.
+    #[must_use]
+    pub fn has_skills(&self) -> bool {
+        !self.default.is_empty()
+            || self.coder.is_some()
+            || self.healer.is_some()
+            || self.intake.is_some()
+            || self.quality.is_some()
+            || self.test.is_some()
+            || self.security.is_some()
+            || self.review.is_some()
+            || self.deploy.is_some()
+            || self.integration.is_some()
+    }
+}
+
 /// Default max concurrent subagents (Claude supports up to 10).
 fn default_max_concurrent() -> u8 {
     5
@@ -200,6 +301,11 @@ pub struct AgentConfig {
     /// MCP tools configuration.
     #[serde(default)]
     pub tools: AgentTools,
+
+    /// Skills configuration by job type.
+    /// When present, these skills are used instead of skill-mappings.yaml.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skills: Option<AgentSkills>,
 
     /// Frontend stack (for Blaze only).
     #[serde(skip_serializing_if = "Option::is_none", rename = "frontendStack")]
@@ -1140,5 +1246,115 @@ mod tests {
         assert!(defaults.multi_model.enabled);
         assert_eq!(defaults.multi_model.generator, "claude");
         assert_eq!(defaults.multi_model.critic, "minimax");
+    }
+
+    #[test]
+    fn test_agent_skills_default() {
+        let skills = AgentSkills::default();
+        assert!(skills.default.is_empty());
+        assert!(skills.coder.is_none());
+        assert!(skills.healer.is_none());
+        assert!(!skills.has_skills());
+    }
+
+    #[test]
+    fn test_agent_skills_get_skills_for_job() {
+        let skills = AgentSkills {
+            default: vec![
+                "context-fundamentals".to_string(),
+                "rust-patterns".to_string(),
+            ],
+            coder: Some(vec![
+                "tool-design".to_string(),
+                "compound-engineering".to_string(),
+            ]),
+            healer: Some(vec!["incident-response".to_string()]),
+            ..Default::default()
+        };
+
+        // Default skills only for unknown job type
+        let unknown = skills.get_skills_for_job("unknown");
+        assert_eq!(unknown.len(), 2);
+        assert!(unknown.contains(&"context-fundamentals".to_string()));
+        assert!(unknown.contains(&"rust-patterns".to_string()));
+
+        // Coder job type merges with defaults
+        let coder = skills.get_skills_for_job("coder");
+        assert_eq!(coder.len(), 4);
+        assert!(coder.contains(&"context-fundamentals".to_string()));
+        assert!(coder.contains(&"rust-patterns".to_string()));
+        assert!(coder.contains(&"tool-design".to_string()));
+        assert!(coder.contains(&"compound-engineering".to_string()));
+
+        // Healer job type merges with defaults
+        let healer = skills.get_skills_for_job("healer");
+        assert_eq!(healer.len(), 3);
+        assert!(healer.contains(&"context-fundamentals".to_string()));
+        assert!(healer.contains(&"incident-response".to_string()));
+    }
+
+    #[test]
+    fn test_agent_skills_has_skills() {
+        // Empty skills
+        let empty = AgentSkills::default();
+        assert!(!empty.has_skills());
+
+        // With default skills
+        let with_default = AgentSkills {
+            default: vec!["some-skill".to_string()],
+            ..Default::default()
+        };
+        assert!(with_default.has_skills());
+
+        // With only job-type skills
+        let with_coder = AgentSkills {
+            coder: Some(vec!["coder-skill".to_string()]),
+            ..Default::default()
+        };
+        assert!(with_coder.has_skills());
+    }
+
+    #[test]
+    fn test_agent_skills_from_json() {
+        let json = r#"{
+            "default": ["context-fundamentals", "rust-patterns"],
+            "coder": ["tool-design", "compound-engineering"],
+            "healer": ["incident-response", "observability"]
+        }"#;
+        let skills: AgentSkills = serde_json::from_str(json).unwrap();
+        assert_eq!(skills.default.len(), 2);
+        assert!(skills.coder.is_some());
+        assert_eq!(skills.coder.as_ref().unwrap().len(), 2);
+        assert!(skills.healer.is_some());
+        assert!(skills.quality.is_none());
+    }
+
+    #[test]
+    fn test_agent_config_with_skills() {
+        let json = r#"{
+            "githubApp": "5DLabs-Rex",
+            "cli": "claude",
+            "model": "claude-opus-4-5-20251101",
+            "skills": {
+                "default": ["context-fundamentals", "rust-patterns"],
+                "coder": ["tool-design"]
+            }
+        }"#;
+        let config: AgentConfig = serde_json::from_str(json).unwrap();
+        assert!(config.skills.is_some());
+        let skills = config.skills.unwrap();
+        assert_eq!(skills.default.len(), 2);
+        assert!(skills.coder.is_some());
+    }
+
+    #[test]
+    fn test_agent_config_without_skills() {
+        let json = r#"{
+            "githubApp": "5DLabs-Rex",
+            "cli": "claude",
+            "model": "claude-opus-4-5-20251101"
+        }"#;
+        let config: AgentConfig = serde_json::from_str(json).unwrap();
+        assert!(config.skills.is_none());
     }
 }

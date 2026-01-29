@@ -118,6 +118,34 @@
           "repomix_read_repomix_output"
         ],
         "localServers": {}
+      },
+      "skills": {
+        "default": [
+          "context-fundamentals",
+          "context-degradation",
+          "context-optimization",
+          "openmemory",
+          "context7",
+          "octocode",
+          "llm-docs",
+          "firecrawl",
+          "repomix",
+          "project-development",
+          "skill-authoring",
+          "ask-questions",
+          "brainstorming",
+          "writing-plans"
+        ],
+        "intake": [
+          "prd-analysis",
+          "multi-agent-patterns",
+          "frontend-stack-selection",
+          "doc-coauthoring",
+          "deep-research"
+        ],
+        "healer": [
+          "incident-response"
+        ]
       }
     },
     "rex": {
@@ -157,6 +185,36 @@
           "github_get_file_contents"
         ],
         "localServers": {}
+      },
+      "skills": {
+        "default": [
+          "context-fundamentals",
+          "context-degradation",
+          "context-optimization",
+          "openmemory",
+          "context7",
+          "octocode",
+          "llm-docs",
+          "github-mcp",
+          "rust-patterns",
+          "mcp-development",
+          "rust-error-handling"
+        ],
+        "coder": [
+          "tool-design",
+          "firecrawl",
+          "compound-engineering",
+          "verification-before-completion",
+          "systematic-debugging",
+          "subagent-driven-development",
+          "requesting-code-review",
+          "receiving-code-review"
+        ],
+        "healer": [
+          "incident-response",
+          "observability",
+          "kubernetes-mcp"
+        ]
       }
     },
     "cleo": {
@@ -190,6 +248,29 @@
           "github_get_file_contents"
         ],
         "localServers": {}
+      },
+      "skills": {
+        "default": [
+          "context-fundamentals",
+          "context-degradation",
+          "context-optimization",
+          "openmemory",
+          "context7",
+          "octocode",
+          "llm-docs",
+          "github-mcp",
+          "code-review",
+          "evaluation",
+          "advanced-evaluation",
+          "repomix",
+          "firecrawl",
+          "code-maturity",
+          "ask-questions"
+        ],
+        "quality": [
+          "tool-design",
+          "systematic-debugging"
+        ]
       }
     },
     "tess": {
@@ -278,6 +359,40 @@
             "tools": []
           }
         }
+      },
+      "skills": {
+        "default": [
+          "context-fundamentals",
+          "context-degradation",
+          "context-optimization",
+          "openmemory",
+          "context7",
+          "octocode",
+          "llm-docs",
+          "github-mcp",
+          "shadcn-stack",
+          "anime-js",
+          "effect-frontend-patterns",
+          "frontend-excellence",
+          "frontend-design",
+          "react-best-practices",
+          "web-design-guidelines"
+        ],
+        "coder": [
+          "tool-design",
+          "firecrawl",
+          "compound-engineering",
+          "verification-before-completion",
+          "systematic-debugging",
+          "subagent-driven-development",
+          "requesting-code-review",
+          "receiving-code-review"
+        ],
+        "healer": [
+          "incident-response",
+          "observability",
+          "kubernetes-mcp"
+        ]
       }
     },
     "cipher": {
