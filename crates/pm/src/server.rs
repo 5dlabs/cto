@@ -502,7 +502,9 @@ async fn handle_intake_setup(
     );
 
     // Use Morgan's OAuth token for intake operations (not the static workspace client)
-    let Some(client) = get_agent_client_with_refresh(&state.config, &state.kube_client, "morgan").await else {
+    let Some(client) =
+        get_agent_client_with_refresh(&state.config, &state.kube_client, "morgan").await
+    else {
         error!("Morgan's Linear client not available - ensure OAuth is configured");
         return Err((
             StatusCode::SERVICE_UNAVAILABLE,
@@ -920,7 +922,7 @@ async fn token_health(State(state): State<AppState>) -> Result<Json<Value>, Stat
             "not_installed"
         } else if is_expired {
             "expired"
-        } else if expires_in.map_or(false, |ttl| ttl < 3600) {
+        } else if expires_in.is_some_and(|ttl| ttl < 3600) {
             "expiring"
         } else {
             "healthy"

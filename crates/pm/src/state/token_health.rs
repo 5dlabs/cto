@@ -62,9 +62,7 @@ impl TokenHealthManager {
                 .apps
                 .iter()
                 .filter_map(|(agent_name, app)| {
-                    if app.access_token.is_none() {
-                        return None;
-                    }
+                    app.access_token.as_ref()?;
                     if !app.can_refresh() {
                         return None;
                     }
@@ -96,7 +94,10 @@ impl TokenHealthManager {
             return Ok(());
         }
 
-        info!(count = candidates.len(), "Refreshing expiring Linear tokens");
+        info!(
+            count = candidates.len(),
+            "Refreshing expiring Linear tokens"
+        );
 
         let mut join_set = JoinSet::new();
         for (agent_name, refresh_token, client_id, client_secret, expires_at) in candidates {
