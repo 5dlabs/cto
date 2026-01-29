@@ -1,0 +1,366 @@
+# =============================================================================
+# CLI Integration Test - Docker Compose (Linear Agent Dialog)
+# =============================================================================
+#
+# Runs all CLIs in parallel, each creating its own agent session on a Linear issue.
+# Each CLI's output is piped to a sidecar that streams to Linear.
+#
+# Prerequisites:
+#   ./build-images.sh all   # Build all images first
+#   ./setup.sh rex coder    # Setup skills + tools from cto-config.json
+#
+# The setup.sh script reads cto-config.json and:
+#   1. Copies skill files to config/flat-skills/ (mirrors controller's get_agent_skills)
+#   2. Generates client-config-{agent}.json (mirrors controller's client-config.json)
+#
+# Required Environment:
+#   LINEAR_OAUTH_TOKEN       - Morgan's OAuth token from 1Password
+#   LINEAR_ISSUE_IDENTIFIER  - e.g., CTOPA-2620
+#
+# Usage:
+#   export LINEAR_OAUTH_TOKEN=$(op read "op://Automation/Linear Morgan OAuth/developer_token")
+#   export LINEAR_ISSUE_IDENTIFIER=CTOPA-2620
+#   ./setup.sh rex coder         # Setup skills + tools from cto-config.json
+#   docker compose up            # Run all CLIs with Linear integration
+#
+# =============================================================================
+
+x-sidecar-env: &sidecar-env
+  LINEAR_OAUTH_TOKEN: ${LINEAR_OAUTH_TOKEN}
+  LINEAR_ISSUE_IDENTIFIER: ${LINEAR_ISSUE_IDENTIFIER}
+  RUST_LOG: info
+  CTO_SKILLS_DIR: /cto-skills
+  CTO_CONFIG_PATH: /cto-config.json
+
+# Common sidecar volume mounts for CTO config
+x-sidecar-volumes: &sidecar-volumes
+  - ../../templates/skills:/cto-skills:ro
+  - ../../cto-config.json:/cto-config.json:ro
+
+x-local-image: &local-image
+  pull_policy: never
+
+services:
+  # ===========================================================================
+  # Claude CLI + Sidecar
+  # ===========================================================================
+  claude:
+    pull_policy: never
+    image: cto-claude:local
+    network_mode: host
+    volumes:
+      - ./workspaces/claude:/workspace
+      # Mount to actual $HOME in container (verified: /home/node)
+      - ./config/claude-settings.json:/home/node/.claude/settings.json:ro
+      # Try flat skills (skill-name.md files directly in skills dir)
+      - ./config/flat-skills:/home/node/.claude/skills:ro
+      # Tool filtering config (mirrors controller's client-config.json)
+      - ./config/client-config-rex.json:/workspace/client-config.json:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CLI_WORK_DIR=/workspace
+      - MCP_CLIENT_CONFIG=/workspace/client-config.json
+    working_dir: /workspace
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "=== Claude CLI Integration Test ===" >&2
+        
+        # 1. Configure CTO tools MCP server with tool filtering FIRST
+        # The tools binary reads /workspace/client-config.json for filtering
+        claude mcp add cto-tools -- tools http://tools.fra.5dlabs.ai/mcp /workspace >&2 2>&1
+        echo "MCP server configured" >&2
+        
+        # 2. Run claude doctor and save output (for sidecar diagnostics)
+        echo "Running claude doctor..." >&2
+        claude doctor > /workspace/claude-doctor.txt 2>&1 || true
+        cat /workspace/claude-doctor.txt >&2
+        
+        # 3. Run claude mcp get tools to verify filtering (shows actual tool list)
+        echo "" >&2
+        echo "Checking MCP tools..." >&2
+        claude mcp get tools > /workspace/mcp-tools.txt 2>&1 || true
+        # Show tool count in logs
+        TOOL_COUNT=$(wc -l < /workspace/mcp-tools.txt 2>/dev/null || echo "0")
+        echo "MCP tools available: $TOOL_COUNT" >&2
+        # Show first few tools as preview
+        head -20 /workspace/mcp-tools.txt >&2 || true
+        
+        # 4. Run Claude and save stream for sidecar
+        (echo "n" | claude --print --output-format stream-json --verbose \
+          --dangerously-skip-permissions \
+          "Build a small Python project in /workspace with the following structure:
+
+          1. First, explore what files exist in /workspace using Glob
+          2. Create a project structure:
+             - /workspace/src/calculator.py - A Calculator class with add, subtract, multiply, divide methods
+             - /workspace/src/__init__.py - Package init  
+             - /workspace/tests/test_calculator.py - Unit tests using unittest
+             - /workspace/README.md - Documentation with usage examples
+          
+          3. Run the tests using: python3 -m pytest tests/ -v (or unittest if pytest not available)
+          4. Show me the test results and a summary of what you created
+          
+          Make sure to:
+          - Add proper docstrings to all functions
+          - Handle division by zero gracefully
+          - Include at least 5 test cases" 2>&1) | tee /workspace/stream.jsonl
+        echo "✅ Claude test complete" >&2
+
+  claude-sidecar:
+    pull_policy: never
+    image: cto-linear-sidecar:local
+    network_mode: host
+    depends_on:
+      claude:
+        condition: service_completed_successfully
+    volumes:
+      - ./workspaces/claude:/workspace  # writable for debug log
+      - ../../templates/skills:/cto-skills:ro  # CTO skills for discovery
+      - ../../cto-config.json:/cto-config.json:ro  # CTO tools config
+    environment:
+      <<: *sidecar-env
+      CLI_TYPE: claude
+      STREAM_FILE: /workspace/stream.jsonl
+      DEBUG_JSONL_PATH: /workspace/debug.jsonl
+      DOCTOR_OUTPUT: /workspace/claude-doctor.txt  # Read doctor output from file
+      MCP_TOOLS_OUTPUT: /workspace/mcp-tools.txt   # Read mcp tools list from file
+      CTO_SKILLS_DIR: /cto-skills
+      CTO_CONFIG_PATH: /cto-config.json
+      CTO_AGENT_NAME: rex  # Use rex agent's tool configuration
+
+  # ===========================================================================
+  # Codex CLI + Sidecar
+  # ===========================================================================
+  codex:
+    pull_policy: never
+    image: cto-codex:local
+    network_mode: host
+    volumes:
+      - ./workspaces/codex:/workspace
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CLI_WORK_DIR=/workspace
+    working_dir: /workspace
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "=== Codex CLI Integration Test ===" >&2
+        codex --help > /workspace/stream.jsonl 2>&1 || echo '{"type":"error","message":"Codex requires API key"}' > /workspace/stream.jsonl
+        echo "✅ Codex test complete" >&2
+
+  codex-sidecar:
+    pull_policy: never
+    image: cto-linear-sidecar:local
+    network_mode: host
+    depends_on:
+      codex:
+        condition: service_completed_successfully
+    volumes:
+      - ./workspaces/codex:/workspace:ro
+    environment:
+      <<: *sidecar-env
+      CLI_TYPE: codex
+      STREAM_FILE: /workspace/stream.jsonl
+
+  # ===========================================================================
+  # Every Code CLI + Sidecar
+  # ===========================================================================
+  code:
+    pull_policy: never
+    image: cto-code:local
+    network_mode: host
+    volumes:
+      - ./workspaces/code:/workspace
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - CLI_WORK_DIR=/workspace
+    working_dir: /workspace
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "=== Every Code CLI Integration Test ===" >&2
+        code --help > /workspace/stream.jsonl 2>&1 || echo '{"type":"init","cli":"code","status":"ready"}' > /workspace/stream.jsonl
+        echo "✅ Code test complete" >&2
+
+  code-sidecar:
+    pull_policy: never
+    image: cto-linear-sidecar:local
+    network_mode: host
+    depends_on:
+      code:
+        condition: service_completed_successfully
+    volumes:
+      - ./workspaces/code:/workspace:ro
+    environment:
+      <<: *sidecar-env
+      CLI_TYPE: code
+      STREAM_FILE: /workspace/stream.jsonl
+
+  # ===========================================================================
+  # Cursor CLI + Sidecar
+  # ===========================================================================
+  cursor:
+    pull_policy: never
+    image: cto-cursor:local
+    network_mode: host
+    volumes:
+      - ./workspaces/cursor:/workspace
+    environment:
+      - CLI_WORK_DIR=/workspace
+    working_dir: /workspace
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "=== Cursor CLI Integration Test ===" >&2
+        cursor --help > /workspace/stream.jsonl 2>&1 || echo '{"type":"init","cli":"cursor","status":"ready"}' > /workspace/stream.jsonl
+        echo "✅ Cursor test complete" >&2
+
+  cursor-sidecar:
+    pull_policy: never
+    image: cto-linear-sidecar:local
+    network_mode: host
+    depends_on:
+      cursor:
+        condition: service_completed_successfully
+    volumes:
+      - ./workspaces/cursor:/workspace:ro
+    environment:
+      <<: *sidecar-env
+      CLI_TYPE: cursor
+      STREAM_FILE: /workspace/stream.jsonl
+
+  # ===========================================================================
+  # OpenCode CLI + Sidecar
+  # ===========================================================================
+  opencode:
+    pull_policy: never
+    image: cto-opencode:local
+    network_mode: host
+    volumes:
+      - ./workspaces/opencode:/workspace
+    environment:
+      - CLI_WORK_DIR=/workspace
+    working_dir: /workspace
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "=== OpenCode CLI Integration Test ===" >&2
+        opencode --help > /workspace/stream.jsonl 2>&1 || echo '{"type":"init","cli":"opencode","status":"ready"}' > /workspace/stream.jsonl
+        echo "✅ OpenCode test complete" >&2
+
+  opencode-sidecar:
+    pull_policy: never
+    image: cto-linear-sidecar:local
+    network_mode: host
+    depends_on:
+      opencode:
+        condition: service_completed_successfully
+    volumes:
+      - ./workspaces/opencode:/workspace:ro
+    environment:
+      <<: *sidecar-env
+      CLI_TYPE: opencode
+      STREAM_FILE: /workspace/stream.jsonl
+
+  # ===========================================================================
+  # Gemini CLI + Sidecar
+  # ===========================================================================
+  gemini:
+    pull_policy: never
+    image: cto-gemini:local
+    network_mode: host
+    volumes:
+      - ./workspaces/gemini:/workspace
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - CLI_WORK_DIR=/workspace
+    working_dir: /workspace
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "=== Gemini CLI Integration Test ===" >&2
+        gemini --help > /workspace/stream.jsonl 2>&1 || echo '{"type":"init","cli":"gemini","status":"ready"}' > /workspace/stream.jsonl
+        echo "✅ Gemini test complete" >&2
+
+  gemini-sidecar:
+    pull_policy: never
+    image: cto-linear-sidecar:local
+    network_mode: host
+    depends_on:
+      gemini:
+        condition: service_completed_successfully
+    volumes:
+      - ./workspaces/gemini:/workspace:ro
+    environment:
+      <<: *sidecar-env
+      CLI_TYPE: gemini
+      STREAM_FILE: /workspace/stream.jsonl
+
+  # ===========================================================================
+  # Factory (Droid) CLI + Sidecar
+  # ===========================================================================
+  factory:
+    pull_policy: never
+    image: cto-factory:local
+    network_mode: host
+    volumes:
+      - ./workspaces/factory:/workspace
+    environment:
+      - CLI_WORK_DIR=/workspace
+    working_dir: /workspace
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "=== Factory CLI Integration Test ===" >&2
+        droid --help > /workspace/stream.jsonl 2>&1 || echo '{"type":"init","cli":"factory","status":"ready"}' > /workspace/stream.jsonl
+        echo "✅ Factory test complete" >&2
+
+  factory-sidecar:
+    pull_policy: never
+    image: cto-linear-sidecar:local
+    network_mode: host
+    depends_on:
+      factory:
+        condition: service_completed_successfully
+    volumes:
+      - ./workspaces/factory:/workspace:ro
+    environment:
+      <<: *sidecar-env
+      CLI_TYPE: factory
+      STREAM_FILE: /workspace/stream.jsonl
+
+  # ===========================================================================
+  # Dexter CLI + Sidecar
+  # ===========================================================================
+  dexter:
+    pull_policy: never
+    image: cto-dexter:local
+    network_mode: host
+    volumes:
+      - ./workspaces/dexter:/workspace
+    environment:
+      - CLI_WORK_DIR=/workspace
+    working_dir: /workspace
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "=== Dexter CLI Integration Test ===" >&2
+        bun --version > /workspace/stream.jsonl 2>&1
+        echo '{"type":"init","cli":"dexter","runtime":"bun","status":"ready"}' >> /workspace/stream.jsonl
+        echo "✅ Dexter test complete" >&2
+
+  dexter-sidecar:
+    pull_policy: never
+    image: cto-linear-sidecar:local
+    network_mode: host
+    depends_on:
+      dexter:
+        condition: service_completed_successfully
+    volumes:
+      - ./workspaces/dexter:/workspace:ro
+    environment:
+      <<: *sidecar-env
+      CLI_TYPE: dexter
+      STREAM_FILE: /workspace/stream.jsonl
