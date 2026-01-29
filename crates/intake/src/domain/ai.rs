@@ -5,6 +5,18 @@
 //! - Expand tasks into subtasks
 //! - Analyze task complexity
 //! - Update tasks with AI assistance
+//!
+//! # Multi-Model Support
+//!
+//! When enabled via `TASKS_MULTI_MODEL=true`, the domain uses a critic/validator
+//! pattern where a generator model creates content and a critic model validates it:
+//! - Generator (optimistic planner): Creates initial content
+//! - Critic (pessimistic validator): Reviews and identifies issues
+//!
+//! Configure via environment variables:
+//! - `TASKS_MULTI_MODEL`: Enable multi-model mode
+//! - `MULTI_MODEL_GENERATOR`: Generator provider (claude, minimax, codex)
+//! - `MULTI_MODEL_CRITIC`: Critic provider (claude, minimax, codex)
 
 use std::sync::Arc;
 
@@ -15,6 +27,7 @@ use crate::ai::{
         AnalyzeComplexityResponse, ComplexityReport, ExpandTaskResponse, GeneratedDecisionPoint,
         GeneratedSubtask, GeneratedTask, ParsePrdResponse,
     },
+    sdk_provider::{AgentSdkProvider, MultiModelConfig as SdkMultiModelConfig},
     validate_json_continuation, AIMessage, AIProvider, GenerateOptions, PromptManager,
     ProviderRegistry, TokenUsage,
 };
@@ -65,6 +78,134 @@ impl AIDomain {
         }
     }
 
+    /// Check if multi-model collaboration is enabled.
+    ///
+    /// Reads from `TASKS_MULTI_MODEL` environment variable.
+    fn is_multi_model_enabled() -> bool {
+        std::env::var("TASKS_MULTI_MODEL")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false)
+    }
+
+    /// Get multi-model configuration from environment variables.
+    ///
+    /// Returns None if multi-model is not enabled.
+    fn get_multi_model_config() -> Option<SdkMultiModelConfig> {
+        if !Self::is_multi_model_enabled() {
+            return None;
+        }
+
+        let generator = std::env::var("MULTI_MODEL_GENERATOR").unwrap_or_else(|_| "claude".into());
+        let critic = std::env::var("MULTI_MODEL_CRITIC").unwrap_or_else(|_| "minimax".into());
+        let max_refinements = std::env::var("MULTI_MODEL_MAX_REFINEMENTS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(2);
+        let critic_threshold = std::env::var("MULTI_MODEL_CRITIC_THRESHOLD")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0.8);
+
+        tracing::info!(
+            generator = %generator,
+            critic = %critic,
+            max_refinements = max_refinements,
+            critic_threshold = critic_threshold,
+            "Multi-model collaboration enabled"
+        );
+
+        Some(SdkMultiModelConfig {
+            generator,
+            critic,
+            max_refinements,
+            critic_threshold,
+            generator_model: None,
+            critic_model: None,
+        })
+    }
+
+    /// Parse PRD using multi-model collaboration.
+    ///
+    /// Uses a generator to create tasks and a critic to validate them.
+    /// The critic provides feedback that the generator uses to refine output.
+    async fn parse_prd_with_multi_model(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        config: SdkMultiModelConfig,
+    ) -> TasksResult<(Vec<Task>, TokenUsage)> {
+        tracing::info!(
+            generator = %config.generator,
+            critic = %config.critic,
+            "Using multi-model collaboration for PRD parsing"
+        );
+
+        // Create SDK provider directly for multi-model operations
+        let sdk_provider = AgentSdkProvider::from_env()?;
+
+        // Prepare the user prompt with explicit JSON format instructions
+        let enhanced_user_prompt = format!(
+            "{user_prompt}\n\n\
+            IMPORTANT: Output ONLY valid JSON with this exact structure:\n\
+            {{\"tasks\": [{{\"id\": 1, \"title\": \"...\", \"description\": \"...\", \
+            \"dependencies\": [], \"priority\": \"medium\", \"details\": \"...\", \
+            \"test_strategy\": \"...\", \"subtasks\": [], \"decision_points\": []}}]}}\n\n\
+            Do not include any explanation or text outside the JSON."
+        );
+
+        // Use generate_with_critic for multi-model collaboration
+        let (text, critic_result, usage) = sdk_provider
+            .generate_with_critic(
+                system_prompt,
+                &enhanced_user_prompt,
+                Some(config),
+                Some("Validate the generated tasks for completeness, clear descriptions, and proper dependencies."),
+            )
+            .await?;
+
+        tracing::info!(
+            approved = critic_result.approved,
+            issues = critic_result.issues.len(),
+            refinements = usage.total_tokens,
+            "Multi-model generation complete"
+        );
+
+        // Log critic feedback
+        if !critic_result.issues.is_empty() {
+            for issue in &critic_result.issues {
+                tracing::debug!(
+                    severity = %issue.severity,
+                    location = %issue.location,
+                    description = %issue.description,
+                    "Critic issue"
+                );
+            }
+        }
+
+        // Parse the generated JSON
+        let parsed: ParsePrdResponse = serde_json::from_str(&text).map_err(|e| {
+            TasksError::Ai(format!(
+                "Failed to parse multi-model response as JSON: {e}. Output: {}",
+                &text[..text.len().min(500)]
+            ))
+        })?;
+
+        // Convert generated tasks to Task entities
+        let tasks: Vec<Task> = parsed
+            .tasks
+            .into_iter()
+            .map(Self::generated_task_to_task)
+            .collect();
+
+        let token_usage = TokenUsage {
+            input_tokens: usage.input_tokens,
+            output_tokens: usage.output_tokens,
+            total_tokens: usage.total_tokens,
+        };
+
+        Ok((tasks, token_usage))
+    }
+
     /// Get the default model for a provider.
     ///
     /// Model selection priority:
@@ -81,8 +222,10 @@ impl AIDomain {
         // Fallback to hard-coded defaults when config is not available
         let name = provider.name();
         let model = match name {
-            // Anthropic API and Claude CLI
-            "anthropic" | "cli-claude" | "cli-dexter" => "claude-opus-4-5-20251101",
+            // Anthropic API, Claude CLI, and Claude Agent SDK
+            "anthropic" | "cli-claude" | "cli-dexter" | "claude-agent-sdk" => {
+                "claude-sonnet-4-20250514"
+            }
             // Cursor uses short model names
             "cli-cursor" => "opus-4.5",
             // Gemini CLI
@@ -131,6 +274,13 @@ impl AIDomain {
             .ok_or_else(|| TasksError::Ai("parse-prd template not found".to_string()))?;
 
         let (system, user) = template.render(&context)?;
+
+        // Check for multi-model collaboration mode
+        if let Some(multi_model_config) = Self::get_multi_model_config() {
+            return self
+                .parse_prd_with_multi_model(&system, &user, multi_model_config)
+                .await;
+        }
 
         // Use prefill technique: add an assistant message starting with JSON opening
         // This forces the model to continue in JSON format rather than explaining

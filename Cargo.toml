@@ -9,6 +9,7 @@ members = [
     "crates/gpu",
     "crates/healer",
     "crates/intake",
+    "crates/linear-sync",
     "crates/metal",
     "crates/notify",
     "crates/pm",

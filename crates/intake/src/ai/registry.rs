@@ -1,17 +1,15 @@
 //! Provider Registry - Manages AI provider instances.
 //!
-//! Provides a singleton registry for dynamically registering and
-//! retrieving AI providers.
+//! Simplified to use ONLY the Anthropic provider - no fallbacks.
+//! Fallbacks mask issues and make debugging harder.
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use crate::errors::{TasksError, TasksResult};
 
-use super::anthropic::AnthropicProvider;
-use super::cli_provider::CLITextGenerator;
-use super::openai::OpenAIProvider;
 use super::provider::AIProvider;
+use super::sdk_provider::AgentSdkProvider;
 
 /// Singleton registry for AI providers.
 pub struct ProviderRegistry {
@@ -20,57 +18,34 @@ pub struct ProviderRegistry {
 
 impl ProviderRegistry {
     /// Create a new provider registry.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             providers: RwLock::new(HashMap::new()),
         }
     }
 
-    /// Create a registry with default providers registered.
+    /// Create a registry with the Claude Agent SDK provider registered.
     ///
-    /// Provider selection is controlled by `TASKS_USE_CLI` env var:
-    /// - `TASKS_USE_CLI=true` or `TASKS_USE_CLI=1`: Use CLI provider (claude, codex, etc.)
-    /// - Otherwise: Use API providers (Anthropic, OpenAI)
-    ///
-    /// When CLI mode is enabled, the specific CLI is selected via `TASKS_CLI` env var
-    /// (defaults to "claude"). Supported values: claude, codex, cursor, factory, opencode, gemini, dexter
+    /// No fallbacks - fail fast to surface issues immediately.
+    #[must_use]
     pub fn with_defaults() -> Self {
         let registry = Self::new();
 
-        // Check if CLI mode is enabled
-        let use_cli = std::env::var("TASKS_USE_CLI")
-            .map(|v| v == "1" || v.to_lowercase() == "true")
-            .unwrap_or(false);
-
-        let mut cli_provider_registered = false;
-
-        if use_cli {
-            // Register CLI provider (uses TASKS_CLI env var for CLI type selection)
-            match CLITextGenerator::from_env() {
-                Ok(provider) => {
-                    tracing::info!(
-                        cli_type = %provider.cli_type(),
-                        "Using CLI provider for AI operations"
-                    );
-                    registry.register(Arc::new(provider));
-                    cli_provider_registered = true;
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to create CLI provider: {e}, falling back to API providers"
-                    );
-                }
-            }
-        }
-
-        // Only register API providers if CLI mode is not enabled OR CLI provider failed
-        if !cli_provider_registered {
-            if let Ok(provider) = AnthropicProvider::from_env() {
+        // Register Claude Agent SDK provider ONLY - no fallbacks
+        match AgentSdkProvider::from_env() {
+            Ok(provider) => {
+                tracing::info!(
+                    "Using Claude Agent SDK provider (TypeScript binary with MCP support)"
+                );
                 registry.register(Arc::new(provider));
             }
-
-            if let Ok(provider) = OpenAIProvider::from_env() {
-                registry.register(Arc::new(provider));
+            Err(e) => {
+                // Don't silently fallback - log the error clearly
+                tracing::error!(
+                    error = %e,
+                    "Claude Agent SDK provider initialization failed. Build intake-agent: cd tools/intake-agent && bun run build"
+                );
             }
         }
 
@@ -79,25 +54,28 @@ impl ProviderRegistry {
 
     /// Register a provider.
     pub fn register(&self, provider: Arc<dyn AIProvider>) {
-        let mut providers = self.providers.write().unwrap();
+        let mut providers = self.providers.write().expect("lock poisoned");
         providers.insert(provider.name().to_string(), provider);
     }
 
     /// Get a provider by name.
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<Arc<dyn AIProvider>> {
-        let providers = self.providers.read().unwrap();
+        let providers = self.providers.read().expect("lock poisoned");
         providers.get(name).cloned()
     }
 
     /// Get the first configured provider.
+    #[must_use]
     pub fn get_configured(&self) -> Option<Arc<dyn AIProvider>> {
-        let providers = self.providers.read().unwrap();
+        let providers = self.providers.read().expect("lock poisoned");
         providers.values().find(|p| p.is_configured()).cloned()
     }
 
     /// Get a provider that supports a specific model.
+    #[must_use]
     pub fn get_for_model(&self, model: &str) -> Option<Arc<dyn AIProvider>> {
-        let providers = self.providers.read().unwrap();
+        let providers = self.providers.read().expect("lock poisoned");
         providers
             .values()
             .find(|p| p.supports_model(model))
@@ -105,20 +83,23 @@ impl ProviderRegistry {
     }
 
     /// Check if a provider is registered.
+    #[must_use]
     pub fn has_provider(&self, name: &str) -> bool {
-        let providers = self.providers.read().unwrap();
+        let providers = self.providers.read().expect("lock poisoned");
         providers.contains_key(name)
     }
 
     /// Get all registered provider names.
+    #[must_use]
     pub fn provider_names(&self) -> Vec<String> {
-        let providers = self.providers.read().unwrap();
+        let providers = self.providers.read().expect("lock poisoned");
         providers.keys().cloned().collect()
     }
 
     /// Get all configured providers.
+    #[must_use]
     pub fn configured_providers(&self) -> Vec<Arc<dyn AIProvider>> {
-        let providers = self.providers.read().unwrap();
+        let providers = self.providers.read().expect("lock poisoned");
         providers
             .values()
             .filter(|p| p.is_configured())
@@ -128,28 +109,37 @@ impl ProviderRegistry {
 
     /// Remove a provider.
     pub fn unregister(&self, name: &str) -> bool {
-        let mut providers = self.providers.write().unwrap();
+        let mut providers = self.providers.write().expect("lock poisoned");
         providers.remove(name).is_some()
     }
 
     /// Clear all providers.
     pub fn clear(&self) {
-        let mut providers = self.providers.write().unwrap();
+        let mut providers = self.providers.write().expect("lock poisoned");
         providers.clear();
     }
 
     /// Get a provider, returning an error if not found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provider is not registered.
     pub fn require(&self, name: &str) -> TasksResult<Arc<dyn AIProvider>> {
         self.get(name)
             .ok_or_else(|| TasksError::Ai(format!("Provider '{name}' not found")))
     }
 
     /// Get any configured provider, returning an error if none available.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no provider is configured.
     pub fn require_any(&self) -> TasksResult<Arc<dyn AIProvider>> {
         self.get_configured().ok_or_else(|| {
             TasksError::Ai(
-                "No AI provider is configured. Set TASKS_USE_CLI=true to use CLI mode, \
-                 or set ANTHROPIC_API_KEY/OPENAI_API_KEY for API mode"
+                "No AI provider is configured. Ensure:\n\
+                 1. ANTHROPIC_API_KEY is set\n\
+                 2. intake-agent binary is built: cd tools/intake-agent && bun run build"
                     .to_string(),
             )
         })
@@ -183,9 +173,6 @@ mod tests {
     #[test]
     fn test_provider_registration() {
         let registry = ProviderRegistry::new();
-
-        // Create a mock provider (in real tests, we'd use a mock)
-        // For now, just test the registry structure works
         assert!(!registry.has_provider("test"));
     }
 }

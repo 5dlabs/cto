@@ -9,6 +9,12 @@
 //! - HTTP server for webhook handling (standalone service)
 //! - Handlers for intake and play workflows
 //! - Onboarding state machine for tenant setup
+//!
+//! # Note on Activity Types
+//!
+//! For new code requiring CLI-agnostic Linear activity emission, prefer using
+//! the `linear-sink` crate directly. This crate maintains its own activity types
+//! for backwards compatibility with existing binaries.
 
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
@@ -25,6 +31,7 @@ pub mod server;
 pub mod state;
 pub mod webhooks;
 
+// Re-export types from local modules (backwards compatible)
 pub use activities::{ActivityContent, ActivitySignal, PlanStep, PlanStepStatus};
 pub use client::LinearClient;
 pub use config::Config;
@@ -34,3 +41,6 @@ pub use webhooks::{
     identify_agent_from_signature, identify_agent_or_legacy, verify_webhook_signature,
     AgentIdentification, WebhookPayload,
 };
+
+// Also expose linear-sink types for gradual migration
+pub use linear_sink;

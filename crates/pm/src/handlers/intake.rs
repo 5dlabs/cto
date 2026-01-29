@@ -837,6 +837,23 @@ pub struct ProjectConfig {
     pub source_branch: Option<String>,
     /// Morgan's tools configuration from cto-config.json agents.morgan.tools
     pub morgan_tools: Option<config::AgentTools>,
+    /// Multi-model collaboration config from cto-config.json defaults.intake.multiModel
+    pub multi_model: Option<MultiModelSettings>,
+}
+
+/// Multi-model collaboration settings.
+#[derive(Debug, Clone, Default)]
+pub struct MultiModelSettings {
+    /// Whether multi-model is enabled.
+    pub enabled: bool,
+    /// Generator provider (claude, minimax, codex).
+    pub generator: String,
+    /// Critic provider (claude, minimax, codex).
+    pub critic: String,
+    /// Maximum refinement iterations.
+    pub max_refinements: u32,
+    /// Critic threshold (0.0-1.0).
+    pub critic_threshold: f32,
 }
 
 /// Read project-specific configuration from the Kubernetes `ConfigMap`.
@@ -878,11 +895,32 @@ pub async fn read_project_config(
                 agent.tools.clone()
             });
 
+            // Extract multi-model configuration if enabled
+            let multi_model = if config.defaults.intake.multi_model.enabled {
+                let mm = &config.defaults.intake.multi_model;
+                info!(
+                    generator = %mm.generator,
+                    critic = %mm.critic,
+                    max_refinements = mm.max_refinements,
+                    "Multi-model collaboration enabled in project config"
+                );
+                Some(MultiModelSettings {
+                    enabled: true,
+                    generator: mm.generator.clone(),
+                    critic: mm.critic.clone(),
+                    max_refinements: mm.max_refinements,
+                    critic_threshold: mm.critic_threshold,
+                })
+            } else {
+                None
+            };
+
             info!(
                 configmap_name = %configmap_name,
                 cli = ?config.defaults.intake.cli,
                 model = ?config.defaults.intake.models.primary,
                 has_morgan_tools = morgan_tools.is_some(),
+                has_multi_model = multi_model.is_some(),
                 "Loaded project config from ConfigMap"
             );
 
@@ -902,6 +940,7 @@ pub async fn read_project_config(
                 },
                 source_branch: Some(config.defaults.intake.source_branch),
                 morgan_tools,
+                multi_model,
             })
         }
         Err(e) => {
@@ -1008,6 +1047,11 @@ pub async fn submit_intake_coderun(
         .as_ref()
         .and_then(|c| c.morgan_tools.as_ref());
 
+    // Extract multi-model config if enabled
+    let multi_model = project_config
+        .as_ref()
+        .and_then(|c| c.multi_model.as_ref());
+
     info!(
         cli = %cli,
         model = %primary_model,
@@ -1015,6 +1059,7 @@ pub async fn submit_intake_coderun(
         repository_url = %repository_url,
         service = %service_name,
         has_morgan_tools = morgan_tools.is_some(),
+        has_multi_model = multi_model.is_some(),
         "Using intake configuration"
     );
 
@@ -1165,7 +1210,13 @@ pub async fn submit_intake_coderun(
                 "WEBHOOK_CALLBACK_URL": config.webhook_callback_url.as_deref().unwrap_or(""),
                 // Extended thinking configuration for task generation
                 "TASKS_EXTENDED_THINKING": config.extended_thinking.to_string(),
-                "TASKS_THINKING_BUDGET": config.thinking_budget.map_or(String::new(), |b| b.to_string())
+                "TASKS_THINKING_BUDGET": config.thinking_budget.map_or(String::new(), |b| b.to_string()),
+                // Multi-model collaboration configuration
+                "TASKS_MULTI_MODEL": multi_model.map_or("false".to_string(), |_| "true".to_string()),
+                "MULTI_MODEL_GENERATOR": multi_model.map_or(String::new(), |m| m.generator.clone()),
+                "MULTI_MODEL_CRITIC": multi_model.map_or(String::new(), |m| m.critic.clone()),
+                "MULTI_MODEL_MAX_REFINEMENTS": multi_model.map_or(String::new(), |m| m.max_refinements.to_string()),
+                "MULTI_MODEL_CRITIC_THRESHOLD": multi_model.map_or(String::new(), |m| m.critic_threshold.to_string())
             },
             "linearIntegration": {
                 "enabled": true,

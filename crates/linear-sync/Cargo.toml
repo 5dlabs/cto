@@ -1,0 +1,37 @@
+[package]
+name = "linear-sink"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Linear Agent Activity sink for CTO platform - CLI-agnostic stream parsing and activity emission"
+
+[[bin]]
+name = "linear-sidecar"
+path = "src/bin/linear-sidecar.rs"
+
+[dependencies]
+# Async trait for parser and emitter abstractions
+async-trait.workspace = true
+
+# Workspace dependencies
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+reqwest.workspace = true
+chrono.workspace = true
+
+# HTTP server for sidecar endpoints
+axum.workspace = true
+
+# Regex for log parsing
+regex.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+wiremock.workspace = true

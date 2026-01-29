@@ -274,6 +274,7 @@
         ],
         "localServers": {
           "remotion-documentation": {
+            "enabled": true,
             "command": "npx",
             "args": [
               "@remotion/mcp@latest"
@@ -592,5 +593,9 @@
         "localServers": {}
       }
     }
+  },
+  "tools": {
+    "remote": [],
+    "localServers": {}
   }
 }
