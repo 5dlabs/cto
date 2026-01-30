@@ -346,14 +346,14 @@ async fn post_completion_summary(
         }
     }
     
-    // Skills with usage indicators (skills don't have a "used" tracking yet, so show all as available)
+    // Skills - show all as loaded (skills are context, not callable like tools)
     if !skills.is_empty() {
-        sections.push(format!("**Skills ({}):**", skills.len()));
-        for skill in skills.iter().take(10) {
-            sections.push(format!("  ⬜ {}", skill));
-        }
-        if skills.len() > 10 {
-            sections.push(format!("  ... and {} more", skills.len() - 10));
+        sections.push(format!("**Skills ({} loaded):** {}", 
+            skills.len(),
+            skills.iter().take(8).cloned().collect::<Vec<_>>().join(", ")
+        ));
+        if skills.len() > 8 {
+            sections.push(format!("  (+{} more)", skills.len() - 8));
         }
     }
     
