@@ -97,6 +97,36 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             subagents: None,
             watcher: None,
         },
+        // Stitch - Code Review Agent
+        // NOTE: Explicitly excludes github_create_pull_request_review and
+        // github_add_pull_request_review_comment to force using gh CLI,
+        // which ensures reviews are posted as the correct GitHub App identity.
+        "stitch" => AgentConfig {
+            github_app: "5DLabs-Stitch".to_string(),
+            cli: DEFAULT_CLI.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            tools: AgentTools {
+                remote: {
+                    let mut tools = default_remote_tools();
+                    tools.extend([
+                        // Read-only PR access for analysis
+                        "github_get_pull_request".to_string(),
+                        "github_get_pull_request_files".to_string(),
+                        "github_list_pull_requests".to_string(),
+                        "github_get_file_contents".to_string(),
+                        // NO github_create_pull_request_review - must use gh CLI
+                        // NO github_add_pull_request_review_comment - must use gh CLI
+                    ]);
+                    tools
+                },
+                local_servers: HashMap::new(),
+            },
+            skills: None,
+            frontend_stack: None,
+            features: None,
+            subagents: None,
+            watcher: None,
+        },
         "nova" => AgentConfig {
             github_app: "5DLabs-Nova".to_string(),
             cli: DEFAULT_CLI.to_string(),
@@ -339,8 +369,8 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
 #[must_use]
 pub fn all_agent_names() -> Vec<&'static str> {
     vec![
-        "morgan", "rex", "grizz", "nova", "blaze", "tap", "spark", "cleo", "cipher", "tess",
-        "atlas", "bolt",
+        "morgan", "rex", "grizz", "stitch", "nova", "blaze", "tap", "spark", "cleo", "cipher",
+        "tess", "atlas", "bolt",
     ]
 }
 

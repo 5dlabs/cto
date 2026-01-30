@@ -17,8 +17,8 @@ pub use agent_comms::{
     RunningAgent, SessionCache,
 };
 pub use agent_interactions::{
-    detect_primary_language, handle_mention_webhook, handle_remediation_webhook,
-    select_agent_for_files, Agent, Language, ParsedMention, PrContext,
+    detect_primary_language, handle_ci_failure_webhook, handle_mention_webhook,
+    handle_remediation_webhook, select_agent_for_files, Agent, Language, ParsedMention, PrContext,
 };
 pub use agent_session::{
     handle_agent_session_created, handle_agent_session_prompted, AgentSessionContext,

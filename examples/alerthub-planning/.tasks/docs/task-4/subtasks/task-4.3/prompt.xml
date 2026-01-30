@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subtask id="4.3" parent="4" agent="grizz">
+    <meta>
+        <title>Build authentication and authorization system</title>
+        <dependencies>task-4.2</dependencies>
+    </meta>
+
+    <role>You are a Go Engineer specializing in APIs and backend services. Implement subtask 4.3.</role>
+
+    <context>
+        <overview>Implement comprehensive JWT-based authentication with refresh tokens and role-based access control (RBAC) system for securing API endpoints.</overview>
+        <parent_task>Develop Admin API Service (Grizz - Go/gRPC)</parent_task>
+    </context>
+
+    <requirements>
+        <description>Create JWT token generation and validation middleware. Implement refresh token mechanism with secure storage. Build RBAC system with role definitions, permission mappings, and authorization middleware. Add user registration, login, and session management endpoints. Implement password hashing and security best practices.</description>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>Subtask requirements implemented</criterion>
+        <criterion>Parent task requirements still satisfied</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>go test ./...</command>
+        <command>golangci-lint run</command>
+        <command>go build ./...</command>
+    </validation>
+</subtask>
