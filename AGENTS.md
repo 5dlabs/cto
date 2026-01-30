@@ -6,15 +6,14 @@ This document provides essential context for AI agents working on the CTO platfo
 
 | Setting | Value | Notes |
 |---------|-------|-------|
-| **Base Branch** | `develop` | All PRs should target `develop`, not `main` |
-| **Release Branch** | `main` | Protected, releases only |
-| **Feature Branches** | `feat/<name>` | Branch from `develop` |
-| **Bugfix Branches** | `fix/<name>` | Branch from `develop` |
+| **Base Branch** | `main` | All PRs target `main` |
+| **Feature Branches** | `feat/<name>` | Branch from `main` |
+| **Bugfix Branches** | `fix/<name>` | Branch from `main` |
 
-**Important:** Always create new branches from `develop`:
+**Important:** Always create new branches from `main`:
 ```bash
-git checkout develop
-git pull origin develop
+git checkout main
+git pull origin main
 git checkout -b feat/my-feature
 ```
 
