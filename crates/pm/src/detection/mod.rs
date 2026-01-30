@@ -11,10 +11,6 @@
 //! - Electron desktop → Spark
 //! - Elysia/Effect backend → Nova
 
-// Allow pedantic lints that are too noisy for this detection module
-#![allow(clippy::must_use_candidate)]
-#![allow(clippy::cast_precision_loss)]
-
 mod language;
 mod framework;
 mod agent;

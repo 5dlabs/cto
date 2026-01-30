@@ -1,9 +1,5 @@
 //! Agent selection based on detection results.
 
-// Allow match arms with identical bodies - intentional for clarity in agent mapping
-#![allow(clippy::match_same_arms)]
-#![allow(clippy::must_use_candidate)]
-
 use super::{DetectionResult, Framework, Language};
 use serde::{Deserialize, Serialize};
 
