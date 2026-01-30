@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
 import { RuntimeStep } from '@/components/setup/RuntimeStep'
-import { ClusterStep } from '@/components/setup/ClusterStep'
+import { InstallStep } from '@/components/setup/InstallStep'
+import { Download } from 'lucide-react'
 import { 
   CheckCircle2,
   Container, 
@@ -17,7 +18,6 @@ import {
   Key, 
   Settings2,
   Loader2,
-  Server,
   ExternalLink
 } from 'lucide-react'
 
@@ -32,7 +32,7 @@ const STEPS = [
   { id: 2, name: 'api_keys', title: 'API Keys', icon: Key },
   { id: 3, name: 'github', title: 'GitHub Connection', icon: Github },
   { id: 4, name: 'cloudflare', title: 'Cloudflare Tunnel', icon: Cloud },
-  { id: 5, name: 'cluster', title: 'Kubernetes Cluster', icon: Server },
+  { id: 5, name: 'install', title: 'Install CTO Lite', icon: Download },
 ]
 
 export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
@@ -359,9 +359,9 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
         )
 
       case 5:
-        // Kubernetes cluster setup with detection
+        // Installation - create cluster and deploy services
         return (
-          <ClusterStep 
+          <InstallStep 
             onComplete={() => {
               handleComplete()
             }}
