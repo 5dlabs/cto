@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="1" project="alert-management">
+  <title>Setup Infrastructure and Databases</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Deploy PostgreSQL and Redis instances with proper configuration for alert management service persistence and real-time state management
+  </description>
+  
+  <dependencies>
+    
+  </dependencies>
+  
+  <implementation>
+    <details>1. Deploy PostgreSQL StatefulSet with persistent volumes for alert data, escalation policies, and on-call schedules
+2. Deploy Redis cluster for real-time alert state, notification queues, and session management
+3. Configure network policies and security contexts
+4. Set up monitoring and backup strategies for both databases
+5. Create ConfigMaps for database connection strings and Redis configuration
+6. Deploy database migration jobs for schema initialization</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d1" category="architecture" constraint="soft" requires_approval="false">
+      <description>Redis deployment mode - single instance vs cluster for high availability</description>
+      <options>
+        <option>single-instance</option>
+        <option>redis-cluster</option>
+      </options>
+    </decision>
+    <decision id="d2" category="performance" constraint="open" requires_approval="false">
+      <description>PostgreSQL storage class and size allocation</description>
+      <options>
+        <option>standard-ssd-10gb</option>
+        <option>premium-ssd-20gb</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Verify PostgreSQL and Redis are accessible from within cluster, database schemas are created, Redis can handle pub/sub operations, persistent volumes are properly mounted, and health checks pass
+  </acceptance_criteria>
+</task>
