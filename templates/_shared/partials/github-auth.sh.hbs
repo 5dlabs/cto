@@ -51,6 +51,9 @@ if [ -z "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_A
   
   JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
   
+  # Retry configuration for curl calls
+  CURL_MAX_RETRIES=5
+  
   # Use installation ID from environment if available (faster, more reliable)
   # Otherwise, fetch from API (fallback for backwards compatibility)
   if [ -n "${GITHUB_APP_INSTALLATION_ID:-}" ]; then
@@ -59,7 +62,6 @@ if [ -z "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_A
   else
     # Get installation ID with retry logic
     CURL_RETRIES=0
-    CURL_MAX_RETRIES=5
     INSTALLATIONS=""
     while [ $CURL_RETRIES -lt $CURL_MAX_RETRIES ]; do
       INSTALLATIONS=$(curl -s --connect-timeout 10 --max-time 30 -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations" 2>&1)
