@@ -168,7 +168,7 @@ secrets:
   # Tools MCP server secrets
   tools:
     github:
-      enabled: true
+      enabled: false  # Disabled - agents should use gh CLI for correct identity
       baoKey: tools-github
     firecrawl:
       enabled: true
@@ -469,15 +469,16 @@ tools:
         workingDirectory: "/tmp"
 
       # --- Development Tools ---
-      github:
-        name: "GitHub"
-        description: "GitHub API operations for repositories, issues, and pull requests"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@modelcontextprotocol/server-github"]
-        workingDirectory: "/tmp"
-        env:
-          GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      # NOTE: GitHub MCP server REMOVED - agents should use `gh` CLI for correct identity
+      # github:
+      #   name: "GitHub"
+      #   description: "GitHub API operations for repositories, issues, and pull requests"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "@modelcontextprotocol/server-github"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 
       # --- UI Components ---
       shadcn:
