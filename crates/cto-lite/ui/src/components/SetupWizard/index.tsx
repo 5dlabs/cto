@@ -9,7 +9,8 @@ import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
 import { RuntimeStep } from '@/components/setup/RuntimeStep'
 import { InstallStep } from '@/components/setup/InstallStep'
-import { Download } from 'lucide-react'
+import { DeployStep } from '@/components/setup/DeployStep'
+import { Download, Rocket } from 'lucide-react'
 import { 
   CheckCircle2,
   Container, 
@@ -32,7 +33,8 @@ const STEPS = [
   { id: 2, name: 'api_keys', title: 'API Keys', icon: Key },
   { id: 3, name: 'github', title: 'GitHub Connection', icon: Github },
   { id: 4, name: 'cloudflare', title: 'Cloudflare Tunnel', icon: Cloud },
-  { id: 5, name: 'install', title: 'Install CTO Lite', icon: Download },
+  { id: 5, name: 'install', title: 'Create Cluster', icon: Download },
+  { id: 6, name: 'deploy', title: 'Deploy CTO Lite', icon: Rocket },
 ]
 
 export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
@@ -359,9 +361,20 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
         )
 
       case 5:
-        // Installation - create cluster and deploy services
+        // Installation - create cluster
         return (
           <InstallStep 
+            onComplete={() => {
+              nextStep()
+            }}
+            onBack={prevStep}
+          />
+        )
+
+      case 6:
+        // Deploy - deploy Helm chart
+        return (
+          <DeployStep 
             onComplete={() => {
               handleComplete()
             }}
@@ -375,7 +388,7 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
   }
 
   // For steps with custom components, we render them differently
-  const isCustomStep = currentStep === 0 || currentStep === 5
+  const isCustomStep = currentStep === 0 || currentStep === 5 || currentStep === 6
 
   return (
     <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-background to-muted/20">
