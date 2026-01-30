@@ -35,14 +35,23 @@ use tracing::{debug, error, info, warn};
 // =============================================================================
 
 /// Log entry from FluentD or JSONL file
+/// Supports Claude CLI stream-json format:
+///   - Init: {"type":"system","subtype":"init","model":"...","tools":[...],"skills":[...]}
+///   - Assistant: {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
+///   - Tool use: {"type":"assistant","message":{"content":[{"type":"tool_use","name":"...","input":{}}]}}
+///   - User: {"type":"user","message":{"content":[{"type":"tool_result","content":"..."}]}}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct LogEntry {
     #[serde(rename = "type", default)]
     entry_type: Option<String>,
     
+    // Claude-specific: subtype for system events
+    #[serde(default)]
+    subtype: Option<String>,
+    
     // Common fields
     #[serde(default)]
-    message: Option<String>,
+    message: Option<serde_json::Value>,  // Can be string or object (Claude uses object)
     #[serde(default)]
     content: Option<String>,
     
@@ -64,7 +73,13 @@ struct LogEntry {
     #[serde(default)]
     skills: Option<Vec<String>>,
     #[serde(default)]
-    mcp_servers: Option<Vec<String>>,
+    mcp_servers: Option<serde_json::Value>,  // Can be array of objects or strings
+    
+    // Session tracking
+    #[serde(default)]
+    session_id: Option<String>,
+    #[serde(default)]
+    uuid: Option<String>,
     
     // FluentD metadata
     #[serde(default)]
@@ -79,6 +94,38 @@ struct LogEntry {
     // Catch-all for other fields
     #[serde(flatten)]
     extra: HashMap<String, serde_json::Value>,
+}
+
+/// Helper to check if this is a Claude init event
+fn is_claude_init(entry: &LogEntry) -> bool {
+    // Claude format: {"type":"system","subtype":"init",...}
+    entry.entry_type.as_deref() == Some("system") && entry.subtype.as_deref() == Some("init")
+}
+
+/// Helper to extract text content from Claude assistant message
+fn extract_claude_text(entry: &LogEntry) -> Option<String> {
+    let msg = entry.message.as_ref()?;
+    let content = msg.get("content")?.as_array()?;
+    for item in content {
+        if item.get("type")?.as_str()? == "text" {
+            return item.get("text")?.as_str().map(|s| s.to_string());
+        }
+    }
+    None
+}
+
+/// Helper to extract tool use from Claude assistant message
+fn extract_claude_tool_use(entry: &LogEntry) -> Option<(String, serde_json::Value)> {
+    let msg = entry.message.as_ref()?;
+    let content = msg.get("content")?.as_array()?;
+    for item in content {
+        if item.get("type")?.as_str()? == "tool_use" {
+            let name = item.get("name")?.as_str()?.to_string();
+            let input = item.get("input").cloned().unwrap_or(serde_json::json!({}));
+            return Some((name, input));
+        }
+    }
+    None
 }
 
 /// Agent session state
@@ -177,7 +224,9 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
     "#;
     
     // Determine activity type and content
+    // Handle Claude CLI's nested message format
     let (activity_type, content) = match entry.entry_type.as_deref() {
+        // Direct tool_use events (non-Claude)
         Some("tool_use") | Some("tool") => {
             let tool_name = entry.tool_name.as_ref()
                 .or(entry.name.as_ref())
@@ -189,27 +238,49 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
                 .unwrap_or_default();
             ("tool_call", format!("**{}**\n```json\n{}\n```", tool_name, input))
         }
-        Some("assistant") | Some("text") => {
-            let msg = entry.message.as_ref()
-                .or(entry.content.as_ref())
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            ("message", msg.to_string())
+        // Claude assistant messages (may contain text or tool_use)
+        Some("assistant") => {
+            // Check for tool_use in Claude's nested format
+            if let Some((tool_name, tool_input)) = extract_claude_tool_use(entry) {
+                let input_str = serde_json::to_string_pretty(&tool_input).unwrap_or_default();
+                ("tool_call", format!("**{}**\n```json\n{}\n```", tool_name, input_str))
+            } else if let Some(text) = extract_claude_text(entry) {
+                ("message", text)
+            } else {
+                // Fallback: try to extract any content
+                let content = entry.content.clone().unwrap_or_default();
+                ("message", content)
+            }
+        }
+        Some("text") => {
+            let msg = extract_claude_text(entry)
+                .or_else(|| entry.content.clone())
+                .unwrap_or_default();
+            ("message", msg)
+        }
+        Some("user") => {
+            // User events typically contain tool results - skip for now
+            // (they're acknowledgments, not interesting for display)
+            return Ok(());
+        }
+        Some("system") => {
+            // System events (like init) are handled elsewhere
+            return Ok(());
         }
         Some("error") => {
-            let msg = entry.message.as_ref()
-                .or(entry.content.as_ref())
-                .map(|s| s.as_str())
-                .unwrap_or("Unknown error");
+            let msg = extract_claude_text(entry)
+                .or_else(|| entry.content.clone())
+                .unwrap_or_else(|| "Unknown error".to_string());
             ("error", format!("❌ {}", msg))
         }
+        Some("result") => {
+            // Final result event - could include stats
+            ("log", "✅ Session completed".to_string())
+        }
         _ => {
-            // Raw log line
-            let msg = entry.message.as_ref()
-                .or(entry.content.as_ref())
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| serde_json::to_string(entry).unwrap_or_default());
-            ("log", msg)
+            // Raw log line - skip unknown types to reduce noise
+            debug!("Skipping unknown event type: {:?}", entry.entry_type);
+            return Ok(());
         }
     };
     
@@ -259,7 +330,11 @@ async fn ingest(
     session.total_entries += 1;
     
     // Handle init message - create Linear session
-    if entry.entry_type.as_deref() == Some("init") {
+    // Claude format: {"type":"system","subtype":"init",...}
+    // Generic format: {"type":"init",...}
+    let is_init = is_claude_init(&entry) || entry.entry_type.as_deref() == Some("init");
+    
+    if is_init {
         let model = entry.model.clone().unwrap_or_else(|| "unknown".to_string());
         let tools = entry.tools.clone().unwrap_or_default();
         let skills = entry.skills.clone().unwrap_or_default();
@@ -268,16 +343,19 @@ async fn ingest(
         session.tools = tools.clone();
         session.skills = skills.clone();
         
+        info!("🚀 Init event received: model={}, tools={}, skills={}", 
+              model, tools.len(), skills.len());
+        
         drop(session); // Release lock before async call
         
         match create_linear_session(&state, &model, &tools, &skills).await {
             Ok(session_id) => {
                 let mut session = state.session.write().await;
-                session.session_id = Some(session_id);
-                info!("Session initialized with model: {}", model);
+                session.session_id = Some(session_id.clone());
+                info!("✅ Linear session created: {}", session_id);
             }
             Err(e) => {
-                error!("Failed to create Linear session: {}", e);
+                error!("❌ Failed to create Linear session: {}", e);
                 return StatusCode::INTERNAL_SERVER_ERROR;
             }
         }
@@ -285,11 +363,20 @@ async fn ingest(
         return StatusCode::OK;
     }
     
-    // Track tool usage
+    // Track tool usage - Claude embeds tool_use in assistant messages
     if entry.entry_type.as_deref() == Some("tool_use") || entry.entry_type.as_deref() == Some("tool") {
         if let Some(tool_name) = entry.tool_name.as_ref().or(entry.name.as_ref()) {
             if !session.tools_used.contains(tool_name) {
                 session.tools_used.push(tool_name.clone());
+                debug!("Tool used: {}", tool_name);
+            }
+        }
+    } else if entry.entry_type.as_deref() == Some("assistant") {
+        // Check for tool_use in Claude's nested format
+        if let Some((tool_name, _)) = extract_claude_tool_use(&entry) {
+            if !session.tools_used.contains(&tool_name) {
+                session.tools_used.push(tool_name.clone());
+                debug!("Tool used (Claude): {}", tool_name);
             }
         }
     }
