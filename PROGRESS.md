@@ -38,21 +38,29 @@ Delivered:
 - [x] pm-lite (`crates/cto-lite/pm-lite/`)
 - [x] Workflow template (`templates/workflows/play-workflow-lite.yaml`)
 
-### 🔄 Phase 3 In Progress
+### ✅ Phase 3 Complete (07:15 PST)
 **MCP + Dashboard**
 
-Status: In Progress
+Delivered:
 - [x] mcp-lite (`crates/cto-lite/mcp-lite/`)
   - JSON-RPC 2.0 over stdio
   - Tools: `cto_trigger`, `cto_status`, `cto_logs`, `cto_jobs`
   - K8s client for workflow management
-  - Compiles ✅
 - [x] MCP Tauri integration
   - `start_mcp_server`, `stop_mcp_server`, `get_mcp_status`
   - `get_mcp_config` for IDE setup
-  - Compiles ✅
-- [ ] Dashboard log streaming
-- [ ] Workflow status UI
+- [x] Dashboard improvements
+  - MCP server status card
+  - WorkflowDetail component with log streaming
+  - Auto-refresh logs while workflow running
+  - Clickable workflow list
+
+### 🔄 Phase 4 Queue
+**Distribution**
+- [ ] Set up CI workflow for Tauri builds
+- [ ] Configure code signing (Apple/Windows)
+- [ ] Bundle kind/kubectl/helm/cloudflared
+- [ ] Create download page
 
 ---
 

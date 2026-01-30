@@ -19,15 +19,16 @@
 - [x] Create play-workflow-lite.yaml template
 
 ## Active Task
-- [ ] **Create `mcp-lite` crate** - MCP server for IDE integration
+- [x] **Create `mcp-lite` crate** ✅
+- [x] **Dashboard improvements** ✅
 
-## Phase 3 Queue (In Progress)
-- [ ] Create `crates/cto-lite/mcp-lite/`
-- [ ] Implement curated tool set (cto_trigger, cto_status, cto_logs)
-- [ ] Add MCP background service to Tauri
-- [ ] Complete OAuth callback handlers
-- [ ] Add log streaming to dashboard
-- [ ] Connect workflow status to dashboard
+## Phase 3 Complete ✅
+- [x] Create `crates/cto-lite/mcp-lite/`
+- [x] Implement curated tool set (cto_trigger, cto_status, cto_logs, cto_jobs)
+- [x] Add MCP background service to Tauri
+- [x] Add log streaming to dashboard (WorkflowDetail component)
+- [x] Connect workflow status to dashboard
+- [ ] Complete OAuth callback handlers (deferred - already scaffolded)
 
 ## Phase 4 Queue (Distribution)
 - [ ] Set up CI workflow for Tauri builds

@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import { WorkflowDetail } from './WorkflowDetail'
 import {
   Activity,
   CheckCircle2,
@@ -15,6 +16,7 @@ import {
   Settings,
   XCircle,
   Loader2,
+  Terminal,
 } from 'lucide-react'
 
 interface WorkflowInfo {
@@ -41,10 +43,18 @@ interface TunnelStatus {
   url: string | null
 }
 
+interface McpStatus {
+  running: boolean
+  pid: number | null
+  socket_path: string
+}
+
 export function Dashboard() {
   const [workflows, setWorkflows] = useState<WorkflowInfo[]>([])
   const [clusterStatus, setClusterStatus] = useState<ClusterStatus | null>(null)
   const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus | null>(null)
+  const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null)
+  const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const { toast } = useToast()
@@ -57,18 +67,40 @@ export function Dashboard() {
 
   async function loadStatus() {
     try {
-      const [cluster, tunnel, workflowList] = await Promise.all([
+      const [cluster, tunnel, mcp, workflowList] = await Promise.all([
         invoke<ClusterStatus>('get_cluster_status'),
         invoke<TunnelStatus>('get_tunnel_status'),
+        invoke<McpStatus>('get_mcp_status').catch(() => null),
         invoke<WorkflowInfo[]>('list_workflows').catch(() => []),
       ])
       setClusterStatus(cluster)
       setTunnelStatus(tunnel)
+      setMcpStatus(mcp)
       setWorkflows(workflowList)
     } catch (error) {
       console.error('Failed to load status:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleStartMcp() {
+    try {
+      await invoke('start_mcp_server')
+      await loadStatus()
+      toast({ title: 'MCP Server Started', description: 'IDEs can now connect to CTO Lite' })
+    } catch (error) {
+      toast({ title: 'Failed to start MCP server', description: String(error), variant: 'destructive' })
+    }
+  }
+
+  async function handleStopMcp() {
+    try {
+      await invoke('stop_mcp_server')
+      await loadStatus()
+      toast({ title: 'MCP Server Stopped' })
+    } catch (error) {
+      toast({ title: 'Failed to stop MCP server', description: String(error), variant: 'destructive' })
     }
   }
 
@@ -126,6 +158,18 @@ export function Dashboard() {
     )
   }
 
+  // Show workflow detail view
+  if (selectedWorkflow) {
+    return (
+      <div className="min-h-screen p-8">
+        <WorkflowDetail 
+          workflowName={selectedWorkflow} 
+          onBack={() => setSelectedWorkflow(null)} 
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen p-8">
       {/* Header */}
@@ -147,7 +191,7 @@ export function Dashboard() {
       </div>
 
       {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Cluster Status */}
         <Card>
           <CardHeader className="pb-2">
@@ -239,6 +283,42 @@ export function Dashboard() {
             </p>
           </CardContent>
         </Card>
+
+        {/* MCP Status */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Terminal className="h-4 w-4" />
+              MCP Server
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mcpStatus?.running ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-green-500 font-medium">Running</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  PID: {mcpStatus.pid}
+                </p>
+                <Button variant="outline" size="sm" onClick={handleStopMcp}>
+                  Stop
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-muted-foreground" />
+                  <span className="text-muted-foreground font-medium">Stopped</span>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleStartMcp}>
+                  Start
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Workflows List */}
@@ -266,7 +346,8 @@ export function Dashboard() {
               {workflows.map((workflow) => (
                 <div
                   key={workflow.name}
-                  className="flex items-center justify-between p-4 rounded-lg border"
+                  className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/50 cursor-pointer transition-colors"
+                  onClick={() => setSelectedWorkflow(workflow.name)}
                 >
                   <div className="flex items-center gap-4">
                     {getPhaseIcon(workflow.phase)}
@@ -293,7 +374,14 @@ export function Dashboard() {
                     >
                       {workflow.phase}
                     </span>
-                    <Button variant="ghost" size="sm">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedWorkflow(workflow.name)
+                      }}
+                    >
                       View Logs
                     </Button>
                   </div>
