@@ -12,14 +12,19 @@
  */
 export type Operation = 
   | 'parse_prd' 
+  | 'parse_prd_iterative'
   | 'expand_task' 
   | 'analyze_complexity' 
   | 'generate' 
+  | 'generate_prompts'
   | 'research'
   | 'research_capabilities'
   | 'generate_with_critic'
   | 'validate_content'
   | 'provider_status'
+  | 'generate_plan_with_debate'
+  | 'adversarial_debate'
+  | 'list_agents'
   | 'ping';
 
 /**
@@ -336,6 +341,8 @@ export function validateRequest(request: unknown): request is AgentRequest {
       'validate_content',
       'provider_status',
       'generate_plan_with_debate',
+      'adversarial_debate',
+      'list_agents',
       'ping',
     ].includes(req['operation'] as string)
   );

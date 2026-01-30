@@ -25,3 +25,16 @@ export {
   type DebateRole,
   type RoleProviderConfig,
 } from './debate-planning';
+
+// New: Adversarial Three-Agent Model (Advocate-Adversary-Arbiter)
+export {
+  runAdversarialDebate,
+  DEFAULT_ADVERSARIAL_CONFIG,
+  AGENT_MANIFESTS,
+  type AdversarialDebateConfig,
+  type AdversarialDebateResult,
+  type OpeningArgument,
+  type Rebuttal,
+  type DebateExchange,
+  type ArbiterDecision,
+} from './adversarial-debate';

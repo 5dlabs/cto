@@ -35,6 +35,7 @@ import {
 } from './operations/generate-with-critic';
 import type { GenerateWithCriticPayload, ProviderName } from './providers/types';
 import { generatePlanWithDebate, type DebatePlanningConfig } from './orchestration/debate-planning';
+import { runAdversarialDebate, type AdversarialDebateConfig, AGENT_MANIFESTS } from './orchestration/adversarial-debate';
 
 /**
  * Package version - read from package.json at build time.
@@ -196,6 +197,38 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
         model: model,
         provider: 'debate-planning',
         ...(result.error ? { error: result.error, error_type: 'api_error' as ErrorType } : {}),
+      };
+    }
+
+    case 'adversarial_debate': {
+      const payload = request.payload as {
+        prd_content: string;
+        config?: Partial<AdversarialDebateConfig>;
+      };
+      if (!payload?.prd_content) {
+        return errorResponse('Missing prd_content in payload', 'validation_error');
+      }
+      const result = await runAdversarialDebate(payload.prd_content, payload.config);
+      return {
+        success: result.success,
+        data: result,
+        usage: result.usage,
+        model: model,
+        provider: 'adversarial-debate',
+        ...(result.error ? { error: result.error, error_type: 'api_error' as ErrorType } : {}),
+      };
+    }
+
+    case 'list_agents': {
+      // ACP-style agent discovery
+      return {
+        success: true,
+        data: {
+          agents: Object.values(AGENT_MANIFESTS),
+        },
+        usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+        model: 'none',
+        provider: 'intake-agent',
       };
     }
 
