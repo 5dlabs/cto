@@ -268,9 +268,73 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
     "#;
     
     // Build activity content based on entry type
-    // Handle Claude CLI's nested message format
+    // Handle both Claude CLI and Droid/Factory formats
     let content: Option<serde_json::Value> = match entry.entry_type.as_deref() {
-        // Direct tool_use events (non-Claude)
+        // =========================================================================
+        // Droid/Factory format: direct tool_call events
+        // {"type":"tool_call","toolName":"LS","parameters":{"directory_path":"..."}}
+        // =========================================================================
+        Some("tool_call") => {
+            let tool_name = entry.extra.get("toolName")
+                .and_then(|v| v.as_str())
+                .or_else(|| entry.extra.get("toolId").and_then(|v| v.as_str()))
+                .or_else(|| entry.name.as_deref())
+                .unwrap_or("unknown");
+            let params = entry.extra.get("parameters")
+                .map(|v| serde_json::to_string(v).unwrap_or_default())
+                .unwrap_or_default();
+            Some(serde_json::json!({
+                "type": "action",
+                "action": tool_name,
+                "parameter": params
+            }))
+        }
+        
+        // =========================================================================
+        // Droid/Factory format: tool_result events
+        // {"type":"tool_result","toolId":"LS","value":"...","isError":false}
+        // =========================================================================
+        Some("tool_result") => {
+            // Skip tool results - they're contextual, not activities
+            // The Linear agent dialog shows action+response, not raw results
+            None
+        }
+        
+        // =========================================================================
+        // Droid/Factory format: message events with role
+        // {"type":"message","role":"assistant","text":"..."}
+        // {"type":"message","role":"user","text":"..."}
+        // =========================================================================
+        Some("message") => {
+            let role = entry.extra.get("role").and_then(|v| v.as_str());
+            match role {
+                Some("assistant") => {
+                    let text = entry.extra.get("text")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if !text.is_empty() {
+                        Some(serde_json::json!({
+                            "type": "response",
+                            "body": text
+                        }))
+                    } else {
+                        None
+                    }
+                }
+                Some("user") => {
+                    // Skip user messages - not needed in agent activity
+                    None
+                }
+                _ => {
+                    debug!("Skipping message with unknown role: {:?}", role);
+                    None
+                }
+            }
+        }
+        
+        // =========================================================================
+        // Claude format: direct tool_use events (legacy/non-Claude CLIs)
+        // =========================================================================
         Some("tool_use") | Some("tool") => {
             let tool_name = entry.tool_name.as_ref()
                 .or(entry.name.as_ref())
@@ -286,7 +350,12 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
                 "parameter": input
             }))
         }
-        // Claude assistant messages (may contain text or tool_use)
+        
+        // =========================================================================
+        // Claude format: assistant messages (may contain text or tool_use)
+        // {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
+        // {"type":"assistant","message":{"content":[{"type":"tool_use","name":"..."}]}}
+        // =========================================================================
         Some("assistant") => {
             // Check for tool_use in Claude's nested format
             if let Some((tool_name, tool_input)) = extract_claude_tool_use(entry) {
@@ -305,6 +374,10 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
                 None // Skip empty assistant messages
             }
         }
+        
+        // =========================================================================
+        // Other event types
+        // =========================================================================
         Some("text") => {
             let msg = extract_claude_text(entry)
                 .or_else(|| entry.content.clone())
@@ -329,6 +402,7 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
         Some("error") => {
             let msg = extract_claude_text(entry)
                 .or_else(|| entry.content.clone())
+                .or_else(|| entry.extra.get("message").and_then(|v| v.as_str()).map(|s| s.to_string()))
                 .unwrap_or_else(|| "Unknown error".to_string());
             Some(serde_json::json!({
                 "type": "error",
@@ -342,6 +416,25 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
                 "body": "✅ Session completed"
             }))
         }
+        
+        // =========================================================================
+        // Codex format events (for future support)
+        // =========================================================================
+        Some("thread.started") | Some("turn.started") | Some("turn.completed") => {
+            // Codex lifecycle events - skip
+            None
+        }
+        Some("turn.failed") => {
+            let msg = entry.extra.get("error")
+                .and_then(|e| e.get("message"))
+                .and_then(|m| m.as_str())
+                .unwrap_or("Turn failed");
+            Some(serde_json::json!({
+                "type": "error",
+                "body": msg
+            }))
+        }
+        
         _ => {
             // Skip unknown types
             debug!("Skipping unknown event type: {:?}", entry.entry_type);
@@ -435,22 +528,40 @@ async fn ingest(
         return StatusCode::OK;
     }
     
-    // Track tool usage - Claude embeds tool_use in assistant messages
-    if entry.entry_type.as_deref() == Some("tool_use") || entry.entry_type.as_deref() == Some("tool") {
-        if let Some(tool_name) = entry.tool_name.as_ref().or(entry.name.as_ref()) {
-            if !session.tools_used.contains(tool_name) {
-                session.tools_used.push(tool_name.clone());
-                debug!("Tool used: {}", tool_name);
+    // Track tool usage - handles both Claude and Droid formats
+    match entry.entry_type.as_deref() {
+        // Droid format: {"type":"tool_call","toolName":"LS",...}
+        Some("tool_call") => {
+            let tool_name = entry.extra.get("toolName")
+                .and_then(|v| v.as_str())
+                .or_else(|| entry.extra.get("toolId").and_then(|v| v.as_str()))
+                .or_else(|| entry.name.as_deref());
+            if let Some(name) = tool_name {
+                if !session.tools_used.contains(&name.to_string()) {
+                    session.tools_used.push(name.to_string());
+                    debug!("Tool used (Droid): {}", name);
+                }
             }
         }
-    } else if entry.entry_type.as_deref() == Some("assistant") {
-        // Check for tool_use in Claude's nested format
-        if let Some((tool_name, _)) = extract_claude_tool_use(&entry) {
-            if !session.tools_used.contains(&tool_name) {
-                session.tools_used.push(tool_name.clone());
-                debug!("Tool used (Claude): {}", tool_name);
+        // Legacy format: {"type":"tool_use"} or {"type":"tool"}
+        Some("tool_use") | Some("tool") => {
+            if let Some(tool_name) = entry.tool_name.as_ref().or(entry.name.as_ref()) {
+                if !session.tools_used.contains(tool_name) {
+                    session.tools_used.push(tool_name.clone());
+                    debug!("Tool used: {}", tool_name);
+                }
             }
         }
+        // Claude format: {"type":"assistant","message":{"content":[{"type":"tool_use"}]}}
+        Some("assistant") => {
+            if let Some((tool_name, _)) = extract_claude_tool_use(&entry) {
+                if !session.tools_used.contains(&tool_name) {
+                    session.tools_used.push(tool_name.clone());
+                    debug!("Tool used (Claude): {}", tool_name);
+                }
+            }
+        }
+        _ => {}
     }
     
     // Track errors
