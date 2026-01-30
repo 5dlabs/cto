@@ -148,7 +148,7 @@ async fn process_stream_file(path: &str, emitter: &LinearAgentEmitter) -> Result
 
     // Track state
     let mut mcp_tools: HashSet<String> = HashSet::new();
-    let skills: HashSet<String> = HashSet::new();
+    let mut skills: HashSet<String> = HashSet::new();
     let mut model: Option<String> = None;
     let mut init_emitted = false;
     let mut line_count = 0;
@@ -182,6 +182,13 @@ async fn process_stream_file(path: &str, emitter: &LinearAgentEmitter) -> Result
             if let Some(init_info) = extract_init_info(&line) {
                 model = init_info.model.clone();
                 mcp_tools.extend(init_info.tool_names.iter().cloned());
+                
+                // Extract skills from mcp_servers (stored with "skill:" prefix)
+                for server in &init_info.mcp_servers {
+                    if let Some(skill_name) = server.strip_prefix("skill:") {
+                        skills.insert(skill_name.to_string());
+                    }
+                }
                 
                 // Emit initialization activity
                 emit_init_activity(emitter, &init_info).await?;
@@ -254,19 +261,19 @@ fn extract_init_info(line: &str) -> Option<InitInfo> {
                 .collect();
         }
 
-        // Extract skills if present
+        // Extract skills if present - skills can be strings or objects
         if let Some(agent_skills) = value.get("skills").and_then(|v| v.as_array()) {
-            // Skills are typically objects with name/path
             let skill_names: Vec<String> = agent_skills
                 .iter()
                 .filter_map(|s| {
-                    s.get("name")
-                        .and_then(|n| n.as_str())
+                    // Handle both string skills and object skills with name field
+                    s.as_str()
                         .map(String::from)
+                        .or_else(|| s.get("name").and_then(|n| n.as_str()).map(String::from))
                 })
                 .collect();
             
-            // Store in mcp_servers for now (we can add a dedicated field later)
+            // Store in mcp_servers with "skill:" prefix for display
             if !skill_names.is_empty() {
                 info.mcp_servers.extend(skill_names.iter().map(|s| format!("skill:{s}")));
             }
