@@ -15,8 +15,9 @@ const OPENAI_API_BASE = 'https://api.openai.com/v1';
 
 /**
  * Default model for OpenAI provider.
+ * Updated to latest GPT-5.2 (Dec 2025).
  */
-const DEFAULT_MODEL = 'gpt-4o';
+const DEFAULT_MODEL = 'gpt-5.2';
 
 /**
  * Environment variable for OpenAI API key.
@@ -38,11 +39,13 @@ interface OpenAIMessage {
 
 /**
  * OpenAI chat completion request body.
+ * Note: Newer models (GPT-4.1+, GPT-5.x, o-series) use max_completion_tokens.
  */
 interface OpenAIRequest {
   model: string;
   messages: OpenAIMessage[];
   max_tokens?: number;
+  max_completion_tokens?: number;
   temperature?: number;
   stop?: string[];
   response_format?: { type: 'json_object' | 'text' };
@@ -149,8 +152,14 @@ export class CodexProvider implements ModelProvider {
       };
       
       // Add optional parameters
+      // Newer models (GPT-4.1+, GPT-5.x, o-series) use max_completion_tokens
       if (options?.maxTokens) {
-        requestBody.max_tokens = options.maxTokens;
+        const isNewerModel = /^(gpt-(4\.1|5)|o[0-9])/.test(actualModel);
+        if (isNewerModel) {
+          requestBody.max_completion_tokens = options.maxTokens;
+        } else {
+          requestBody.max_tokens = options.maxTokens;
+        }
       }
       if (options?.temperature !== undefined) {
         requestBody.temperature = options.temperature;
