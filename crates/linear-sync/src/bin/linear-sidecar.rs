@@ -197,6 +197,78 @@ async fn resolve_issue_id(token: &str, identifier: &str) -> Result<String> {
 /// Create agent session on Linear issue
 /// Note: Linear's AgentSessionCreateOnIssue now only accepts issueId
 /// Model, tools, skills are added via activities
+/// Post initialization activity showing model, tools, skills
+async fn post_init_activity(state: &AppState, session_id: &str, model: &str, tools: &[String], skills: &[String]) -> Result<()> {
+    let client = reqwest::Client::new();
+    
+    let query = r#"
+        mutation AddAgentActivity($input: AgentActivityCreateInput!) {
+            agentActivityCreate(input: $input) {
+                success
+            }
+        }
+    "#;
+    
+    // Build init summary
+    let mut sections = Vec::new();
+    
+    // Model section
+    sections.push(format!("**Model:** {}", model));
+    
+    // MCP Tools section  
+    if !tools.is_empty() {
+        let tool_preview: Vec<_> = tools.iter().take(10).cloned().collect();
+        let tools_str = if tool_preview.len() < tools.len() {
+            format!("{} (+{} more)", tool_preview.join(", "), tools.len() - tool_preview.len())
+        } else {
+            tool_preview.join(", ")
+        };
+        sections.push(format!("**MCP Tools ({}):** {}", tools.len(), tools_str));
+    }
+    
+    // Skills section
+    if !skills.is_empty() {
+        let skills_str = skills.join(", ");
+        sections.push(format!("**Skills ({}):** {}", skills.len(), skills_str));
+    }
+    
+    let body = format!("🚀 **Agent Initialized**\n\n{}", sections.join("\n"));
+    
+    // Use "response" type so it appears as a visible message in the agent dialog
+    let content = serde_json::json!({
+        "type": "response",
+        "body": body
+    });
+    
+    let variables = serde_json::json!({
+        "input": {
+            "agentSessionId": session_id,
+            "content": content
+        }
+    });
+    
+    let response = client
+        .post(LINEAR_API_URL)
+        .header("Authorization", &state.linear_token)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "query": query,
+            "variables": variables
+        }))
+        .send()
+        .await?;
+    
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        warn!("Failed to post init activity ({}): {}", status, body);
+    } else {
+        info!("📋 Posted init activity to Linear");
+    }
+    
+    Ok(())
+}
+
 async fn create_linear_session(state: &AppState, _model: &str, _tools: &[String], _skills: &[String]) -> Result<String> {
     let client = reqwest::Client::new();
     
@@ -515,6 +587,11 @@ async fn ingest(
         
         match create_linear_session(&state, &model, &tools, &skills).await {
             Ok(session_id) => {
+                // Post init activity with model/tools/skills summary
+                if let Err(e) = post_init_activity(&state, &session_id, &model, &tools, &skills).await {
+                    warn!("Failed to post init activity: {}", e);
+                }
+                
                 let mut session = state.session.write().await;
                 session.session_id = Some(session_id.clone());
                 info!("✅ Linear session created: {}", session_id);
