@@ -2,10 +2,18 @@
   "project": "alerthub",
   "version": "1.0.0",
   "created_at": "2026-01-30T05:48:00Z",
-  "updated_at": "2026-01-30T05:48:00Z",
+  "updated_at": "2026-01-30T05:56:00Z",
   "phase": "intake",
-  "task_count": 15,
+  "task_count": 50,
   "completed_count": 0,
   "current_task": null,
-  "agents_used": ["bolt", "rex", "nova", "grizz", "blaze", "tap", "spark"]
+  "agents_used": ["bolt", "rex", "nova", "grizz", "blaze", "tap", "spark"],
+  "features": {
+    "decision_points": true,
+    "acceptance_criteria": true,
+    "agent_hints": true,
+    "constraint_types": true,
+    "subagent_types": true,
+    "parallelizable": true
+  }
 }
