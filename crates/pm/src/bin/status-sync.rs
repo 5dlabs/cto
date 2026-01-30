@@ -319,6 +319,67 @@ impl LinearApiClient {
         })
     }
 
+    /// Resolve an issue identifier (e.g., "CTOPA-123") to a UUID.
+    ///
+    /// Linear's session creation API now requires the issue UUID, not the identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the issue is not found or the request fails.
+    async fn resolve_issue_id(&self, identifier: &str) -> Result<String> {
+        #[derive(Serialize)]
+        struct Variables {
+            identifier: String,
+        }
+
+        #[derive(Serialize)]
+        struct Request {
+            query: &'static str,
+            variables: Variables,
+        }
+
+        const QUERY: &str = r#"
+            query GetIssue($identifier: String!) {
+                issue(id: $identifier) {
+                    id
+                }
+            }
+        "#;
+
+        let request = Request {
+            query: QUERY,
+            variables: Variables {
+                identifier: identifier.to_string(),
+            },
+        };
+
+        debug!(identifier = %identifier, "Resolving issue identifier to UUID");
+
+        let response = self
+            .client
+            .post(&self.api_url)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to resolve issue ID")?;
+
+        let body = response.text().await.unwrap_or_default();
+        let json: serde_json::Value =
+            serde_json::from_str(&body).context("Failed to parse issue resolution response")?;
+
+        if let Some(errors) = json.get("errors") {
+            anyhow::bail!("Failed to resolve issue: {}", errors);
+        }
+
+        let issue_id = json["data"]["issue"]["id"]
+            .as_str()
+            .context("Issue not found")?
+            .to_string();
+
+        info!(identifier = %identifier, issue_id = %issue_id, "Resolved issue identifier");
+        Ok(issue_id)
+    }
+
     /// Create a new agent session on a Linear issue.
     ///
     /// This is used when running in standalone mode (e.g., docker-compose)
@@ -341,9 +402,7 @@ impl LinearApiClient {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct SessionCreateInput {
-            issue_identifier: String,
-            model: String,
-            provider: String,
+            issue_id: String,
         }
 
         #[derive(Serialize)]
@@ -351,6 +410,9 @@ impl LinearApiClient {
             query: &'static str,
             variables: Variables,
         }
+
+        // First, resolve issue identifier to UUID
+        let issue_id = self.resolve_issue_id(issue_identifier).await?;
 
         const MUTATION: &str = r#"
             mutation CreateAgentSession($input: AgentSessionCreateOnIssue!) {
@@ -367,12 +429,13 @@ impl LinearApiClient {
             query: MUTATION,
             variables: Variables {
                 input: SessionCreateInput {
-                    issue_identifier: issue_identifier.to_string(),
-                    model: model.to_string(),
-                    provider: provider.to_string(),
+                    issue_id,
                 },
             },
         };
+        
+        // Log model/provider for debugging (no longer sent to Linear)
+        debug!(model = %model, provider = %provider, "Session metadata (for reference)");
 
         info!(
             issue = %issue_identifier,
