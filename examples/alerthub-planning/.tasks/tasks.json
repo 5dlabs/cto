@@ -1,0 +1,107 @@
+{
+  "version": "1.0.0",
+  "project": "AlertHub",
+  "generated": "2026-01-30T15:52:13.395Z",
+  "source": "intake-agent debate planning",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "API Contract Definition",
+      "status": "pending",
+      "priority": "high",
+      "dependencies": [],
+      "path": "docs/task-1"
+    },
+    {
+      "id": 2,
+      "title": "Core Monolith with Service Boundaries",
+      "status": "pending",
+      "priority": "high",
+      "dependencies": [
+        1
+      ],
+      "path": "docs/task-2"
+    },
+    {
+      "id": 3,
+      "title": "Monitoring and Observability Setup",
+      "status": "pending",
+      "priority": "high",
+      "dependencies": [],
+      "path": "docs/task-3"
+    },
+    {
+      "id": 4,
+      "title": "Frontend Architecture Foundation",
+      "status": "pending",
+      "priority": "high",
+      "dependencies": [
+        1
+      ],
+      "path": "docs/task-4"
+    },
+    {
+      "id": 5,
+      "title": "Effect TypeScript Evaluation",
+      "status": "pending",
+      "priority": "medium",
+      "dependencies": [
+        2
+      ],
+      "path": "docs/task-5"
+    },
+    {
+      "id": 6,
+      "title": "WebSocket with Graceful Degradation",
+      "status": "pending",
+      "priority": "medium",
+      "dependencies": [
+        4
+      ],
+      "path": "docs/task-6"
+    },
+    {
+      "id": 7,
+      "title": "Database Layer with Backup Strategy",
+      "status": "pending",
+      "priority": "medium",
+      "dependencies": [
+        3
+      ],
+      "path": "docs/task-7"
+    },
+    {
+      "id": 8,
+      "title": "Rate Limiting and Circuit Breakers",
+      "status": "pending",
+      "priority": "medium",
+      "dependencies": [
+        2
+      ],
+      "path": "docs/task-8"
+    },
+    {
+      "id": 9,
+      "title": "Mobile and Desktop Client MVP",
+      "status": "pending",
+      "priority": "low",
+      "dependencies": [
+        4,
+        6
+      ],
+      "path": "docs/task-9"
+    },
+    {
+      "id": 10,
+      "title": "Service Extraction Planning",
+      "status": "pending",
+      "priority": "low",
+      "dependencies": [
+        2,
+        3,
+        7
+      ],
+      "path": "docs/task-10"
+    }
+  ]
+}
