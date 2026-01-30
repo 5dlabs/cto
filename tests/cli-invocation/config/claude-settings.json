@@ -1,4 +1,1 @@
-{
-  "mcpServers": {},
-  "customInstructions": "You have access to CTO platform skills. These provide specialized knowledge for various tasks."
-}
+{"version": "1.0", "permissions": {"allow_all": true}, "mcp": {"servers": {}}}
