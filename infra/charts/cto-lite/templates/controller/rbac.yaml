@@ -7,6 +7,15 @@ metadata:
   labels:
     {{- include "cto-lite.labels" . | nindent 4 }}
 ---
+# Service account for workflow pods
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflow
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -16,6 +25,9 @@ metadata:
 rules:
   # CodeRun CRD management
   - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["coderuns", "coderuns/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["agents.platform"]
     resources: ["coderuns", "coderuns/status"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Pod management for agents
@@ -30,7 +42,7 @@ rules:
     verbs: ["create", "patch"]
   # Workflow management
   - apiGroups: ["argoproj.io"]
-    resources: ["workflows", "workflowtemplates"]
+    resources: ["workflows", "workflowtemplates", "workflowtaskresults"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -46,5 +58,11 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "cto-lite.serviceAccountName" . }}
+    namespace: {{ .Values.namespace }}
+  - kind: ServiceAccount
+    name: argo-workflow
+    namespace: {{ .Values.namespace }}
+  - kind: ServiceAccount
+    name: default
     namespace: {{ .Values.namespace }}
 {{- end }}
