@@ -1307,6 +1307,7 @@ pub enum ClaudeStreamEvent {
         subtype: Option<String>,
         model: Option<String>,
         tools: Option<Vec<String>>,
+        skills: Option<Vec<String>>,
         session_id: Option<String>,
     },
     /// Assistant message (may contain text or `tool_use`)
@@ -1852,11 +1853,54 @@ async fn process_stream_event(
     artifact_trail: &mut ArtifactTrail,
 ) -> Result<()> {
     match event {
-        ClaudeStreamEvent::System { model, tools, .. } => {
+        ClaudeStreamEvent::System { model, tools, skills, .. } => {
             // System init - emit as thought (it's informational, not an action)
             let tool_count = tools.as_ref().map_or(0, Vec::len);
+            let skill_count = skills.as_ref().map_or(0, Vec::len);
             let model_name = model.as_deref().unwrap_or("unknown");
-            let msg = format!("🚀 Starting with **{model_name}** | {tool_count} tools available");
+            
+            // Build sections for verbose init message
+            let mut sections = vec![format!("**Model:** {model_name}")];
+            
+            // MCP Tools section (show first few names if available)
+            if tool_count > 0 {
+                if let Some(tool_list) = tools {
+                    // Separate MCP tools from native tools
+                    let mcp_tools: Vec<_> = tool_list.iter()
+                        .filter(|t| t.starts_with("mcp__") || t.contains("__"))
+                        .take(10)
+                        .cloned()
+                        .collect();
+                    let native_count = tool_count - mcp_tools.len();
+                    
+                    if !mcp_tools.is_empty() {
+                        let mcp_preview = mcp_tools.iter()
+                            .map(|t| t.replace("mcp__cto-tools__", ""))
+                            .take(5)
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        sections.push(format!("**MCP Tools ({}):** {} (+{} more)", mcp_tools.len(), mcp_preview, mcp_tools.len().saturating_sub(5)));
+                    }
+                    sections.push(format!("**Native Tools:** {native_count}"));
+                } else {
+                    sections.push(format!("**Tools:** {tool_count}"));
+                }
+            }
+            
+            // Skills section
+            if skill_count > 0 {
+                if let Some(skill_list) = skills {
+                    let skill_preview: Vec<_> = skill_list.iter().take(10).cloned().collect();
+                    let skill_str = if skill_preview.len() < skill_count {
+                        format!("{} (+{} more)", skill_preview.join(", "), skill_count - skill_preview.len())
+                    } else {
+                        skill_preview.join(", ")
+                    };
+                    sections.push(format!("**Skills ({skill_count}):** {skill_str}"));
+                }
+            }
+            
+            let msg = format!("🚀 **Agent Initialized**\n\n{}", sections.join("\n"));
             client.emit_thought(session_id, &msg).await?;
         }
 
