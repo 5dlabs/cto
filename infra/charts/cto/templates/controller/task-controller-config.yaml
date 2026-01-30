@@ -70,6 +70,10 @@ data:
         githubApp: "5DLabs-Atlas"
         cli: "claude"
         model: "claude-opus-4-5-20251101"
+      stitch:
+        githubApp: "5DLabs-Stitch"
+        cli: "claude"
+        model: "claude-opus-4-5-20251101"
     
     secrets:
       apiKeySecretName: cto-secrets
