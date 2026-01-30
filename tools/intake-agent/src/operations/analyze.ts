@@ -32,40 +32,55 @@ function extractAssistantText(message: SDKAssistantMessage): string {
 }
 
 /**
- * Generate minimal system prompt for complexity analysis.
+ * Generate system prompt for complexity analysis.
  */
-function getMinimalSystemPrompt(): string {
-  return `You are a task complexity analyzer. Evaluate tasks and recommend subtask counts.
+function getSystemPrompt(): string {
+  return `You are a task complexity analyzer. Evaluate tasks and recommend subtask counts for parallel subagent execution.
 
-## Output Format
-For each task, output:
+## Output Schema
+For each task, provide:
 {
   "taskId": number,
   "taskTitle": "task title",
   "complexityScore": 1-10,
   "recommendedSubtasks": number (0 if no expansion needed),
-  "expansionPrompt": "guidance for subtask generation",
-  "reasoning": "brief explanation"
+  "expansionPrompt": "detailed guidance for subtask generation",
+  "reasoning": "explanation of complexity factors"
 }
 
 ## Scoring Guide
-- 1-3: Simple, single-file changes
-- 4-6: Moderate, multiple files/components
-- 7-10: Complex, architectural changes or integrations
+- 1-3: Simple, single-file changes, isolated scope
+- 4-6: Moderate, multiple files/components, some integration
+- 7-10: Complex, architectural changes, multiple services, significant integration
 
-Output ONLY the JSON, no explanations.`;
+## Expansion Guidance
+For tasks scoring 5+, the expansionPrompt should provide:
+- Key areas to break down
+- Suggested parallel work streams
+- Critical dependencies to consider
+- Subagent types needed (implementer, tester, reviewer)
+
+CRITICAL OUTPUT FORMAT:
+- The JSON structure \`{"complexityAnalysis":[\` has already been started for you
+- You must CONTINUE by outputting analysis objects directly as array elements
+- Do NOT repeat the opening structure - just output the analysis objects
+- No markdown formatting, no explanatory text before or after`;
 }
 
 /**
- * Generate minimal user prompt for complexity analysis.
+ * Generate user prompt for complexity analysis.
  */
-function getMinimalUserPrompt(tasks: Array<{ id: number; title: string; description: string; details?: string }>): string {
+function getUserPrompt(tasks: Array<{ id: string; title: string; description: string; details?: string }>, threshold: number): string {
   const taskList = tasks.map(t => `- ID ${t.id}: ${t.title}`).join('\n');
-  return `Analyze these tasks:
+  return `Analyze these tasks for complexity:
 ${taskList}
 
 Tasks data:
-${JSON.stringify(tasks, null, 2)}`;
+${JSON.stringify(tasks, null, 2)}
+
+Threshold: ${threshold} (recommend subtasks for tasks scoring >= ${threshold})
+
+OUTPUT: Continue the JSON array by outputting analysis objects directly. Start with the first analysis object's opening brace { - do NOT output {"complexityAnalysis":[ again as that is already provided. End with ]} to close the array and object.`;
 }
 
 /**
@@ -77,9 +92,10 @@ export async function analyzeComplexity(
   _options: GenerateOptions
 ): Promise<AgentResponse<AnalyzeComplexityData>> {
   const tasks = payload.tasks;
+  const threshold = payload.threshold ?? 5;
 
-  const systemPrompt = getMinimalSystemPrompt();
-  const userPrompt = getMinimalUserPrompt(tasks);
+  const systemPrompt = getSystemPrompt();
+  const userPrompt = getUserPrompt(tasks, threshold);
 
   try {
     const cliPath = getClaudeCliOrThrow();
@@ -114,8 +130,11 @@ export async function analyzeComplexity(
       }
     }
 
+    // Prepend the JSON structure that the prompt tells the model is "already provided"
+    const wrappedResponse = '{"complexityAnalysis":[' + responseText.trim();
+    
     // Parse with robust JSON parser
-    const result = parseJsonResponse<TaskComplexityAnalysis>(responseText, 'complexityAnalysis', isValidComplexityAnalysis);
+    const result = parseJsonResponse<TaskComplexityAnalysis>(wrappedResponse, 'complexityAnalysis', isValidComplexityAnalysis);
 
     if (!result.success) {
       return {
