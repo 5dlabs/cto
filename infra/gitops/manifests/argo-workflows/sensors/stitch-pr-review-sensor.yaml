@@ -10,6 +10,9 @@
 #   - excludeLabels: Skip PRs with "skip-review" or "bot" labels
 #   - excludeAuthors: Bot accounts filtered via user.type == "User" check
 #
+# Deduplication: Uses deterministic names (pr{number}-{sha7}) to prevent
+# duplicate CodeRuns when multiple webhooks deliver the same event.
+#
 # Currently hardcoded here for simplicity; can be made dynamic via ConfigMap.
 # =============================================================================
 apiVersion: argoproj.io/v1alpha1
@@ -70,11 +73,11 @@ spec:
         k8s:
           operation: create
           parameters:
-            # Generate unique name with PR number
-            - dest: metadata.generateName
-              operation: append
+            # Deterministic name for deduplication: review-pr{number}-{sha7}
+            # If duplicate webhook triggers, second create fails with "already exists"
+            - dest: metadata.name
               src:
-                dataTemplate: "{{ .Input.body.pull_request.number }}-"
+                dataTemplate: "review-pr{{ .Input.body.pull_request.number }}-{{ .Input.body.pull_request.head.sha | substr 0 7 }}"
                 dependencyName: github-pr-opened
             # Labels for tracking
             - dest: metadata.labels.pr-number
@@ -148,7 +151,8 @@ spec:
               apiVersion: agents.platform/v1
               kind: CodeRun
               metadata:
-                generateName: "review-pr"
+                # Name is set via parameters for deduplication
+                name: ""
                 namespace: cto
                 labels:
                   workflow-type: stitch-review
