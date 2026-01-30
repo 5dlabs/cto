@@ -18,9 +18,12 @@
 - [x] Add GitHub webhook handler to pm-lite
 - [x] Create play-workflow-lite.yaml template
 
-## Phase 3 Queue (Next)
+## Active Task
+- [ ] **Create `mcp-lite` crate** - MCP server for IDE integration
+
+## Phase 3 Queue (In Progress)
 - [ ] Create `crates/cto-lite/mcp-lite/`
-- [ ] Implement curated tool set
+- [ ] Implement curated tool set (cto_trigger, cto_status, cto_logs)
 - [ ] Add MCP background service to Tauri
 - [ ] Complete OAuth callback handlers
 - [ ] Add log streaming to dashboard

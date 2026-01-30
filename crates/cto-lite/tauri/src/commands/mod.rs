@@ -7,6 +7,7 @@ pub mod cluster;
 pub mod config;
 pub mod credentials;
 pub mod github;
+pub mod mcp;
 pub mod runtime;
 pub mod tunnel;
 pub mod workflow;

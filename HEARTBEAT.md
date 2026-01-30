@@ -1,17 +1,20 @@
 # CTO Lite Heartbeat
 
-## Active Work
-Check TASKS.md for current task queue.
-Check PROGRESS.md for session updates.
-
-## On Heartbeat
-1. Check if current task is complete
-2. If complete, move to next task in queue
-3. Update PROGRESS.md with status
-4. Continue working autonomously
+## Ralph Loop Active 🔄
+Working autonomously until blocked or complete.
 
 ## Current Focus
-Phase 2: Core Infrastructure
-- Helm chart for Kind deployment
-- pm-lite (GitHub webhooks, no Linear)
-- play-workflow-lite.yaml
+**Phase 3: MCP + Dashboard**
+- mcp-lite background service
+- Dashboard log streaming
+- Workflow status display
+
+## On Heartbeat
+1. Check current task progress
+2. If complete → next task
+3. If blocked → report and wait
+4. Update PROGRESS.md
+
+## Completed
+- Phase 1: Tauri app foundation ✅
+- Phase 2: Core infrastructure ✅

@@ -28,23 +28,31 @@ cd crates/cto-lite/ui && npm install
 cd ../tauri && cargo tauri dev
 ```
 
-### 🔄 Phase 2 In Progress
+### ✅ Phase 2 Complete (07:04 PST)
 **Core Infrastructure**
 
-Status: In Progress
+Committed: `57f7a8b`
+
+Delivered:
 - [x] Helm chart (`infra/charts/cto-lite/`)
-  - Chart.yaml, values.yaml
-  - ServiceAccount + RBAC
-  - Controller deployment
-  - PM-Lite deployment + service
 - [x] pm-lite (`crates/cto-lite/pm-lite/`)
-  - GitHub webhook handling
-  - Workflow triggering via Argo
-  - Compiles ✅
 - [x] Workflow template (`templates/workflows/play-workflow-lite.yaml`)
-  - DAG: Morgan → Backend/Frontend → Tess → Cleo → Cipher → Bolt
-  - No Atlas (user reviews PRs)
-  - User-selectable stack (grizz/nova)
+
+### 🔄 Phase 3 In Progress
+**MCP + Dashboard**
+
+Status: In Progress
+- [x] mcp-lite (`crates/cto-lite/mcp-lite/`)
+  - JSON-RPC 2.0 over stdio
+  - Tools: `cto_trigger`, `cto_status`, `cto_logs`, `cto_jobs`
+  - K8s client for workflow management
+  - Compiles ✅
+- [x] MCP Tauri integration
+  - `start_mcp_server`, `stop_mcp_server`, `get_mcp_status`
+  - `get_mcp_config` for IDE setup
+  - Compiles ✅
+- [ ] Dashboard log streaming
+- [ ] Workflow status UI
 
 ---
 

@@ -45,6 +45,9 @@ fn main() {
             
             app.manage(db);
             
+            // Initialize MCP state
+            app.manage(commands::mcp::McpState::new());
+            
             tracing::info!("Database initialized at {:?}", db_path);
             Ok(())
         })
@@ -94,6 +97,12 @@ fn main() {
             commands::workflow::get_workflow_status,
             commands::workflow::get_workflow_logs,
             commands::workflow::cancel_workflow,
+            
+            // MCP server management
+            commands::mcp::start_mcp_server,
+            commands::mcp::stop_mcp_server,
+            commands::mcp::get_mcp_status,
+            commands::mcp::get_mcp_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
