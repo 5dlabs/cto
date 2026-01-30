@@ -515,22 +515,29 @@ async fn watch_file(state: Arc<AppState>, path: PathBuf) -> Result<()> {
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
     
-    while let Some(line) = lines.next_line().await? {
-        if line.trim().is_empty() {
-            continue;
-        }
-        
-        match serde_json::from_str::<LogEntry>(&line) {
-            Ok(entry) => {
-                let _ = ingest(State(state.clone()), Json(entry)).await;
+    // Continuously watch for new content (tail -f style)
+    loop {
+        match lines.next_line().await? {
+            Some(line) => {
+                if line.trim().is_empty() {
+                    continue;
+                }
+                
+                match serde_json::from_str::<LogEntry>(&line) {
+                    Ok(entry) => {
+                        let _ = ingest(State(state.clone()), Json(entry)).await;
+                    }
+                    Err(e) => {
+                        debug!("Failed to parse line: {} - {}", e, line);
+                    }
+                }
             }
-            Err(e) => {
-                debug!("Failed to parse line: {} - {}", e, line);
+            None => {
+                // No new data - wait and check again (poll for new content)
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
         }
     }
-    
-    Ok(())
 }
 
 // =============================================================================
