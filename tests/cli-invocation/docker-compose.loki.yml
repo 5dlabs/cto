@@ -1,0 +1,84 @@
+# =============================================================================
+# Loki Logging Stack - Docker Compose Override
+# =============================================================================
+#
+# Adds Loki for centralized log collection from non-JSONL CLIs.
+# Use with: docker compose -f docker-compose.yml -f docker-compose.loki.yml up
+#
+# Prerequisites:
+#   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+#
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Loki - Log Aggregation
+  # ===========================================================================
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Grafana - Log Visualization (optional)
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:10.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    depends_on:
+      loki:
+        condition: service_healthy
+
+  # ===========================================================================
+  # Factory CLI - Logs to Loki
+  # ===========================================================================
+  factory:
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        loki-batch-size: "100"
+        loki-retries: "2"
+        loki-timeout: "2s"
+        labels: "cli=factory,agent=rex"
+
+  # ===========================================================================
+  # Codex CLI - Logs to Loki
+  # ===========================================================================
+  codex:
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        labels: "cli=codex"
+
+  # ===========================================================================
+  # Factory Sidecar - Query Loki instead of JSONL
+  # ===========================================================================
+  factory-sidecar:
+    environment:
+      LOG_SOURCE: loki
+      LOKI_URL: http://localhost:3100
+      LOKI_QUERY: '{cli="factory"}'
+      # Still fall back to stream file if Loki unavailable
+      STREAM_FILE: /workspace/stream.jsonl
+
+volumes:
+  loki-data:
+  grafana-data:
