@@ -1,6 +1,7 @@
 /**
  * Expand Task operation - breaks down a task into subtasks.
  * Uses minimal prompts based on "Ralph Wiggum technique".
+ * Includes robust JSON parsing with fallback.
  */
 
 import { query, type Options, type SDKResultMessage, type SDKAssistantMessage } from '@anthropic-ai/claude-code';
@@ -13,80 +14,7 @@ import type {
   GeneratedSubtask,
 } from '../types';
 import { getClaudeCliOrThrow } from '../cli-finder';
-
-/**
- * JSON prefill to force structured output.
- */
-const JSON_PREFILL = '{"subtasks":[';
-
-/**
- * Extract JSON from response, handling markdown code blocks and various formats.
- */
-function extractJson(text: string): string {
-  let content = text.trim();
-
-  // Handle markdown code blocks
-  const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-  if (jsonBlockMatch?.[1]) {
-    content = jsonBlockMatch[1].trim();
-  } else {
-    const codeBlockMatch = content.match(/```\s*([\s\S]*?)\s*```/);
-    if (codeBlockMatch?.[1] && (codeBlockMatch[1].startsWith('{') || codeBlockMatch[1].startsWith('['))) {
-      content = codeBlockMatch[1].trim();
-    }
-  }
-
-  // If it's already a valid JSON object with subtasks, return as-is
-  if (content.startsWith('{"subtasks"')) {
-    return content;
-  }
-
-  // Strip echoed prefill if present and re-wrap
-  if (content.startsWith(JSON_PREFILL)) {
-    return content;
-  }
-
-  // If starts with [ (array), wrap it
-  if (content.startsWith('[')) {
-    return '{"subtasks":' + content + '}';
-  }
-
-  // Look for {"id": to find start of subtask array content
-  const idMatch = content.indexOf('{"id":');
-  if (idMatch >= 0) {
-    return JSON_PREFILL + content.slice(idMatch);
-  }
-
-  return content;
-}
-
-/**
- * Parse and validate subtasks JSON.
- */
-function parseSubtasksJson(content: string): { success: true; subtasks: GeneratedSubtask[] } | { success: false; error: string } {
-  const trimmed = content.trim();
-
-  if (!trimmed) {
-    return { success: false, error: 'AI returned empty response' };
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed);
-    
-    if (parsed.subtasks && Array.isArray(parsed.subtasks)) {
-      return { success: true, subtasks: parsed.subtasks };
-    }
-    
-    if (Array.isArray(parsed)) {
-      return { success: true, subtasks: parsed };
-    }
-
-    return { success: false, error: `Parsed JSON does not contain subtasks array` };
-  } catch (e) {
-    const parseError = e instanceof Error ? e.message : 'Unknown parse error';
-    return { success: false, error: `JSON parse failed: ${parseError}` };
-  }
-}
+import { parseJsonResponse, isValidSubtask } from '../utils/json-parser';
 
 /**
  * Extract text from assistant message content.
@@ -173,10 +101,8 @@ export async function expandTask(
     let responseText = '';
     let usage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
 
-    const promptWithPrefill = `${userPrompt}\n\n${JSON_PREFILL}`;
-
     for await (const message of query({
-      prompt: promptWithPrefill,
+      prompt: userPrompt,
       options: sdkOptions,
     })) {
       if (message.type === 'assistant') {
@@ -193,22 +119,21 @@ export async function expandTask(
       }
     }
 
-    // Extract and parse JSON
-    const jsonContent = extractJson(responseText);
-    const result = parseSubtasksJson(jsonContent);
+    // Parse with robust JSON parser
+    const result = parseJsonResponse<GeneratedSubtask>(responseText, 'subtasks', isValidSubtask);
 
     if (!result.success) {
       return {
         success: false,
         error: result.error,
         error_type: 'parse_error',
-        details: jsonContent.slice(0, 500),
+        details: responseText.slice(0, 500),
       };
     }
 
     return {
       success: true,
-      data: { subtasks: result.subtasks },
+      data: { subtasks: result.items },
       usage,
       model,
       provider: 'claude-agent-sdk',

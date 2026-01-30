@@ -3,6 +3,8 @@
  * 
  * Uses minimal prompts based on the "Ralph Wiggum technique" - simpler prompts
  * (~40 lines) often outperform verbose prompts (~1,500 words).
+ * 
+ * Includes robust JSON parsing with streaming support and fallback.
  */
 
 import { query, type Options, type SDKResultMessage, type SDKAssistantMessage } from '@anthropic-ai/claude-code';
@@ -15,109 +17,12 @@ import type {
   GeneratedTask,
 } from '../types';
 import { getClaudeCliOrThrow } from '../cli-finder';
+import { parseJsonResponse, isValidTask } from '../utils/json-parser';
 
 /**
  * Maximum retry attempts for PRD parsing when AI returns invalid responses.
  */
 const MAX_RETRIES = 3;
-
-/**
- * JSON prefill to force structured output.
- */
-const JSON_PREFILL = '{"tasks":[';
-
-/**
- * Extract JSON from response, handling markdown code blocks and various formats.
- */
-function extractJson(text: string): string {
-  let content = text.trim();
-
-  // Handle markdown code blocks (```json ... ``` or ``` ... ```)
-  const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-  if (jsonBlockMatch?.[1]) {
-    content = jsonBlockMatch[1].trim();
-  } else {
-    const codeBlockMatch = content.match(/```\s*([\s\S]*?)\s*```/);
-    if (codeBlockMatch?.[1] && (codeBlockMatch[1].startsWith('{') || codeBlockMatch[1].startsWith('['))) {
-      content = codeBlockMatch[1].trim();
-    }
-  }
-
-  // Strip echoed prefill if present
-  if (content.startsWith(JSON_PREFILL)) {
-    content = content.slice(JSON_PREFILL.length).trim();
-    // Need to wrap it back
-    content = JSON_PREFILL + content;
-  }
-
-  // If it's already a valid JSON object with tasks, return as-is
-  if (content.startsWith('{"tasks"')) {
-    return content;
-  }
-
-  // If starts with {" but not tasks, look for {"tasks" or {"id"
-  if (content.startsWith('{')) {
-    // Check if it's the full object
-    if (content.includes('"tasks"')) {
-      return content;
-    }
-    // Check if it starts with task objects (continuation format)
-    const afterBrace = content.slice(1).trim();
-    if (afterBrace.startsWith('"id"')) {
-      return JSON_PREFILL + content;
-    }
-  }
-
-  // If starts with [, it's an array - wrap it
-  if (content.startsWith('[')) {
-    return '{"tasks":' + content + '}';
-  }
-
-  // Look for {"id": to find start of task array content
-  const idMatch = content.indexOf('{"id":');
-  if (idMatch >= 0) {
-    return JSON_PREFILL + content.slice(idMatch);
-  }
-
-  return content;
-}
-
-/**
- * Validate and parse JSON response into tasks.
- */
-function parseTasksJson(content: string): { success: true; tasks: GeneratedTask[] } | { success: false; error: string } {
-  const trimmed = content.trim();
-
-  if (!trimmed) {
-    return { success: false, error: 'AI returned empty response - no task JSON generated' };
-  }
-
-  // Try to parse as JSON
-  try {
-    const parsed = JSON.parse(trimmed);
-    
-    // Check if it has tasks array
-    if (parsed.tasks && Array.isArray(parsed.tasks)) {
-      return { success: true, tasks: parsed.tasks };
-    }
-    
-    // If it's an array directly, wrap it
-    if (Array.isArray(parsed)) {
-      return { success: true, tasks: parsed };
-    }
-
-    return { 
-      success: false, 
-      error: `Parsed JSON does not contain tasks array. Got keys: ${Object.keys(parsed).join(', ')}` 
-    };
-  } catch (e) {
-    const parseError = e instanceof Error ? e.message : 'Unknown parse error';
-    return { 
-      success: false, 
-      error: `JSON parse failed: ${parseError}. Content preview: ${trimmed.slice(0, 300)}...` 
-    };
-  }
-}
 
 /**
  * Extract text from assistant message content.
@@ -220,12 +125,9 @@ export async function parsePrd(
       let responseText = '';
       let usage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
 
-      // Use prefill technique by including it in the prompt
-      const promptWithPrefill = `${userPrompt}\n\n${JSON_PREFILL}`;
-
       // Query Claude with the prompt
       for await (const message of query({
-        prompt: promptWithPrefill,
+        prompt: userPrompt,
         options: sdkOptions,
       })) {
         // Handle assistant messages
@@ -249,11 +151,8 @@ export async function parsePrd(
       totalUsage.output_tokens += usage.output_tokens;
       totalUsage.total_tokens += usage.total_tokens;
 
-      // Extract JSON from response (handles code blocks, prefill, etc.)
-      const jsonContent = extractJson(responseText);
-      
-      // Parse and validate
-      const result = parseTasksJson(jsonContent);
+      // Parse and validate with robust JSON parser
+      const result = parseJsonResponse<GeneratedTask>(responseText, 'tasks', isValidTask);
 
       if (!result.success) {
         lastError = result.error;
@@ -264,7 +163,7 @@ export async function parsePrd(
       // Success!
       return {
         success: true,
-        data: { tasks: result.tasks },
+        data: { tasks: result.items },
         usage: totalUsage,
         model,
         provider: 'claude-agent-sdk',
