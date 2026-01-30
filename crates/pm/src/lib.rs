@@ -23,6 +23,7 @@
 pub mod activities;
 pub mod client;
 pub mod config;
+pub mod detection;
 pub mod emitter;
 pub mod handlers;
 pub mod models;
