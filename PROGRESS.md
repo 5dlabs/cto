@@ -79,7 +79,10 @@ Status: In Progress
 - [x] Setup wizard integrated with new detection
 - [x] UI compiles and builds ✅
 - [x] Backend compiles ✅
-- [ ] Test full app locally
+- [x] App launches locally ✅ (07:50 PST)
+  - Setup wizard displays
+  - Runtime detection working
+  - Database initializes
 - [ ] Create actual app icon (need design)
 - [ ] Test full release workflow
 - [ ] Configure code signing secrets
