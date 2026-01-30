@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."  # Go to repo root
 
 build_sidecar() {
-    echo "=== Building Linear Sidecar (status-sync) ==="
+    echo "=== Building Linear Sidecar (linear-sidecar from linear-sink) ==="
     docker build \
         --target local \
         -f infra/images/linear-sidecar/Dockerfile \

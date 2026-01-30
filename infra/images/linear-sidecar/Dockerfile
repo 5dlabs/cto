@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# Linear Sidecar (status-sync) - Unified Dockerfile
+# Linear Sidecar (linear-sidecar from linear-sink crate) - Unified Dockerfile
 # =============================================================================
 #
 # Supports both CI (pre-built binary) and local (from source) builds:
 #
 #   CI/GHCR build (default - expects pre-built binary in context):
-#     cargo build --release -p pm --bin status-sync
-#     cp target/release/status-sync status-sync
+#     cargo build --release -p linear-sink --bin linear-sidecar
+#     cp target/release/linear-sidecar linear-sidecar
 #     docker build -f infra/images/linear-sidecar/Dockerfile -t ghcr.io/5dlabs/linear-sidecar .
 #
 #   Local/Kind build (compiles from source):
@@ -28,9 +28,9 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 
-# Build the status-sync binary (enhanced sidecar v2)
+# Build the linear-sidecar binary (from linear-sync crate)
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
-    cargo build --release -p pm --bin status-sync
+    cargo build --release -p linear-sink --bin linear-sidecar
 
 # =============================================================================
 # RUNTIME BASE (shared by all targets)
@@ -69,13 +69,13 @@ EXPOSE 8080
 # =============================================================================
 FROM runtime-base AS local
 
-COPY --from=builder /build/target/release/status-sync /app/status-sync
+COPY --from=builder /build/target/release/linear-sidecar /app/linear-sidecar
 
-RUN chmod +x /app/status-sync && chown -R app:app /app
+RUN chmod +x /app/linear-sidecar && chown -R app:app /app
 
 USER app
 
-CMD ["./status-sync"]
+CMD ["./linear-sidecar"]
 
 # =============================================================================
 # PRODUCTION TARGET (default - uses pre-built binary from CI)
@@ -83,13 +83,13 @@ CMD ["./status-sync"]
 FROM runtime-base AS production
 
 # Copy pre-built binary (placed by CI workflow into build context)
-COPY status-sync /app/status-sync
+COPY linear-sidecar /app/linear-sidecar
 
-RUN chmod +x /app/status-sync && chown -R app:app /app
+RUN chmod +x /app/linear-sidecar && chown -R app:app /app
 
 USER app
 
-CMD ["./status-sync"]
+CMD ["./linear-sidecar"]
 
 # Default target for CI builds
 FROM production
