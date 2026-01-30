@@ -22,8 +22,8 @@ spec:
       serviceAccountName: {{ include "cto-lite.serviceAccountName" . }}
       containers:
         - name: controller
-          image: {{ .Values.global.imageRegistry }}/{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
           ports:
             - name: http
               containerPort: 8080
@@ -36,10 +36,12 @@ spec:
               value: {{ .Values.namespace }}
             - name: STACK
               value: {{ .Values.stack }}
-            - name: AGENT_IMAGE_REGISTRY
-              value: {{ .Values.agents.imageRegistry }}
             - name: RUST_LOG
               value: "info,controller=debug"
+            - name: CTO_LITE
+              value: "true"
+            - name: TOOLS_SERVER_URL
+              value: "http://{{ include "cto-lite.fullname" . }}-tools:8080"
           envFrom:
             {{- if .Values.secrets.anthropic.enabled }}
             - secretRef:
@@ -67,4 +69,30 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5
+          volumeMounts:
+            - name: cto-config
+              mountPath: /etc/cto
+      volumes:
+        - name: cto-config
+          configMap:
+            name: {{ include "cto-lite.fullname" . }}-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cto-lite.fullname" . }}-controller
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto-lite.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
 {{- end }}

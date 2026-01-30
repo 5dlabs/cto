@@ -3,6 +3,9 @@
 # This chart deploys a minimal CTO platform suitable for individual developers
 # running on their local machine with Kind.
 
+# Tier: free or pro (controls feature availability)
+tier: free
+
 # Global settings
 global:
   # Image pull policy (Always, IfNotPresent, Never)
@@ -17,8 +20,9 @@ namespace: cto-lite
 controller:
   enabled: true
   image:
-    repository: cto-lite-controller
-    tag: latest
+    repository: ghcr.io/5dlabs/controller
+    tag: main
+    pullPolicy: IfNotPresent
   resources:
     requests:
       memory: "50Mi"
@@ -35,8 +39,9 @@ controller:
 pm:
   enabled: true
   image:
-    repository: cto-lite-pm
+    repository: ghcr.io/5dlabs/pm-server
     tag: latest
+    pullPolicy: IfNotPresent
   resources:
     requests:
       memory: "30Mi"
@@ -52,6 +57,24 @@ pm:
     appId: ""
     privateKeySecret: ""
     webhookSecret: ""
+
+# Tools Server - MCP tool routing and filtering
+tools:
+  enabled: true
+  image:
+    repository: ghcr.io/5dlabs/tools
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "30Mi"
+      cpu: "25m"
+    limits:
+      memory: "128Mi"
+      cpu: "200m"
+  service:
+    type: ClusterIP
+    port: 8080
 
 # Cloudflared tunnel for webhook ingress
 cloudflared:
