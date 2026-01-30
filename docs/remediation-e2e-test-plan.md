@@ -124,15 +124,37 @@ curl -X POST http://cto-pm.cto.svc.cluster.local:8081/webhooks/github/remediatio
   }'
 ```
 
-## Gaps Identified
+## Gaps Identified & Fixes
 
-1. **PM Server was scaled to 0** - Fixed by scaling to 1
-2. **Need real failed check with buttons** - To test button rendering
-3. **Need to verify full webhook path** - sensor → PM → CodeRun
+### Fixed
+1. ✅ **PM Server was scaled to 0** - Scaled to 1
+2. ✅ **No sensor for CI failure → button creation** - Created `ci-failure-button-sensor.yaml`
+3. ✅ **No handler for CI failures** - Added `handle_ci_failure_webhook()` to PM Server
+
+### Remaining
+1. 🔄 **PM Server needs rebuild** - Push code, wait for CI to build new image
+2. 🔄 **Sensor needs EventSource** - The `github` EventSource may need to include `check_run` events
+3. 📋 **E2E test** - Once deployed, trigger a CI failure and verify full flow
 
 ## Next Steps
 
-1. Find or create a PR with failed CI
-2. Verify buttons appear on the check run
-3. Click button and trace the full flow
-4. Document any issues found
+1. Create PR from `stitch/implementation` branch
+2. Wait for CI to build new PM Server image
+3. Redeploy PM Server with new image
+4. Test full flow:
+   - Trigger a CI failure (or wait for one)
+   - Verify "🔧 Remediation Available" check run appears
+   - Click "Fix with Rex" button
+   - Verify CodeRun is created
+   - Verify agent pushes fix
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `infra/gitops/.../ci-failure-button-sensor.yaml` | New sensor to catch CI failures |
+| `crates/pm/src/handlers/agent_interactions.rs` | Added `handle_ci_failure_webhook()` |
+| `crates/pm/src/handlers/mod.rs` | Export new handler |
+| `crates/pm/src/server.rs` | Route `/webhooks/github/ci-failure` |
+| `docs/remediation-e2e-test-plan.md` | This document |
+| `docs/stitch-mentions-and-remediation-plan.md` | Updated status |
