@@ -18,6 +18,10 @@ import type {
 } from '../types';
 import { getClaudeCliOrThrow } from '../cli-finder';
 import { parseJsonResponse, isValidTask } from '../utils/json-parser';
+import { createLogger } from '../utils/logger';
+import { withTimeout, Timeouts } from '../utils/timeout';
+
+const logger = createLogger('parse-prd');
 
 /**
  * Maximum retry attempts for PRD parsing when AI returns invalid responses.
@@ -100,6 +104,15 @@ export async function parsePrd(
   const numTasks = payload.num_tasks ?? 10;
   const nextId = payload.next_id ?? 1;
   const prdContent = payload.prd_content;
+  const timeout = Timeouts.parsePrd(numTasks);
+
+  logger.info('Starting PRD parsing', { 
+    numTasks, 
+    nextId, 
+    model, 
+    prdLength: prdContent.length,
+    timeoutMs: timeout 
+  });
 
   const systemPrompt = getMinimalSystemPrompt(numTasks, nextId);
   const userPrompt = getMinimalUserPrompt(prdContent, numTasks, nextId);
@@ -109,8 +122,12 @@ export async function parsePrd(
 
   // Find Claude CLI executable once
   const cliPath = getClaudeCliOrThrow();
+  logger.debug('Using Claude CLI', { path: cliPath });
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    logger.info(`Attempt ${attempt + 1}/${MAX_RETRIES}`);
+    const attemptStart = Date.now();
+
     try {
       // Configure Claude Agent SDK options
       const sdkOptions: Options = {
@@ -124,27 +141,48 @@ export async function parsePrd(
 
       let responseText = '';
       let usage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
+      let chunkCount = 0;
 
-      // Query Claude with the prompt
-      for await (const message of query({
-        prompt: userPrompt,
-        options: sdkOptions,
-      })) {
-        // Handle assistant messages
-        if (message.type === 'assistant') {
-          responseText += extractAssistantText(message);
-        }
-        
-        // Extract usage from result message
-        if (message.type === 'result') {
-          const resultMsg = message as SDKResultMessage;
-          if ('usage' in resultMsg) {
-            usage.input_tokens = resultMsg.usage.input_tokens;
-            usage.output_tokens = resultMsg.usage.output_tokens;
-            usage.total_tokens = usage.input_tokens + usage.output_tokens;
+      // Query Claude with the prompt (with timeout)
+      const queryPromise = (async () => {
+        for await (const message of query({
+          prompt: userPrompt,
+          options: sdkOptions,
+        })) {
+          // Handle assistant messages
+          if (message.type === 'assistant') {
+            const text = extractAssistantText(message);
+            responseText += text;
+            chunkCount++;
+            if (chunkCount % 10 === 0) {
+              logger.debug(`Received ${chunkCount} chunks`, { textLength: responseText.length });
+            }
+          }
+          
+          // Extract usage from result message
+          if (message.type === 'result') {
+            const resultMsg = message as SDKResultMessage;
+            if ('usage' in resultMsg) {
+              usage.input_tokens = resultMsg.usage.input_tokens;
+              usage.output_tokens = resultMsg.usage.output_tokens;
+              usage.total_tokens = usage.input_tokens + usage.output_tokens;
+            }
           }
         }
-      }
+        return { responseText, usage };
+      })();
+
+      const result = await withTimeout(queryPromise, timeout, `PRD parsing (${numTasks} tasks)`);
+      responseText = result.responseText;
+      usage = result.usage;
+
+      const attemptElapsed = Date.now() - attemptStart;
+      logger.info('Query completed', { 
+        elapsed_ms: attemptElapsed, 
+        responseLength: responseText.length,
+        chunks: chunkCount,
+        usage 
+      });
 
       // Accumulate total usage
       totalUsage.input_tokens += usage.input_tokens;
@@ -152,18 +190,24 @@ export async function parsePrd(
       totalUsage.total_tokens += usage.total_tokens;
 
       // Parse and validate with robust JSON parser
-      const result = parseJsonResponse<GeneratedTask>(responseText, 'tasks', isValidTask);
+      logger.debug('Parsing JSON response');
+      const parseResult = parseJsonResponse<GeneratedTask>(responseText, 'tasks', isValidTask);
 
-      if (!result.success) {
-        lastError = result.error;
-        console.error(`Attempt ${attempt + 1}/${MAX_RETRIES} failed: ${result.error}`);
+      if (!parseResult.success) {
+        lastError = parseResult.error;
+        logger.warn(`Parse failed`, { error: parseResult.error, preview: responseText.slice(0, 200) });
         continue;
       }
+
+      logger.info('PRD parsing successful', { 
+        taskCount: parseResult.items.length,
+        totalUsage 
+      });
 
       // Success!
       return {
         success: true,
-        data: { tasks: result.items },
+        data: { tasks: parseResult.items },
         usage: totalUsage,
         model,
         provider: 'claude-agent-sdk',
@@ -171,11 +215,12 @@ export async function parsePrd(
     } catch (e) {
       const error = e instanceof Error ? e.message : 'Unknown error';
       lastError = `API error: ${error}`;
-      console.error(`Attempt ${attempt + 1}/${MAX_RETRIES} failed with API error: ${error}`);
+      logger.error(`Attempt failed`, { attempt: attempt + 1, error });
     }
   }
 
   // All retries exhausted
+  logger.error('All retries exhausted', { lastError });
   return {
     success: false,
     error: lastError ?? 'Failed to generate tasks after multiple attempts',
