@@ -18,10 +18,17 @@ import type {
 } from '../types';
 import { getClaudeCliOrThrow } from '../cli-finder';
 import { parseJsonResponse, isValidTask } from '../utils/json-parser';
-import { createLogger } from '../utils/logger';
+import { createLogger, createTimer } from '../utils/logger';
 import { withTimeout, Timeouts } from '../utils/timeout';
 
 const logger = createLogger('parse-prd');
+
+// Debug helper to log prompts
+function logPrompts(system: string, user: string): void {
+  if (!logger.isDebug()) return;
+  logger.debug('System prompt', { length: system.length, preview: system.slice(0, 200) + '...' });
+  logger.debug('User prompt', { length: user.length, preview: user.slice(0, 200) + '...' });
+}
 
 /**
  * Maximum retry attempts for PRD parsing when AI returns invalid responses.
@@ -116,6 +123,9 @@ export async function parsePrd(
 
   const systemPrompt = getMinimalSystemPrompt(numTasks, nextId);
   const userPrompt = getMinimalUserPrompt(prdContent, numTasks, nextId);
+  
+  // Log prompts in debug mode
+  logPrompts(systemPrompt, userPrompt);
 
   let lastError: string | undefined;
   let totalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
@@ -123,6 +133,8 @@ export async function parsePrd(
   // Find Claude CLI executable once
   const cliPath = getClaudeCliOrThrow();
   logger.debug('Using Claude CLI', { path: cliPath });
+  
+  const timer = createTimer('parse-prd', logger);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     logger.info(`Attempt ${attempt + 1}/${MAX_RETRIES}`);
