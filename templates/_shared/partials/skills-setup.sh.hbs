@@ -35,7 +35,7 @@ SKILL_NAME="{{this}}"
 FOUND=0
 
 # Find skill in any category subdirectory
-for category in stacks auth context design languages llm-docs platforms quality workflow animations tools; do
+for category in stacks auth context design documents languages llm-docs platforms quality security workflow animations tools; do
     if [ -f "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" ]; then
         mkdir -p "$SKILLS_TARGET/$SKILL_NAME"
         cp "$SKILLS_SOURCE/$category/$SKILL_NAME/SKILL.md" "$SKILLS_TARGET/$SKILL_NAME/"
