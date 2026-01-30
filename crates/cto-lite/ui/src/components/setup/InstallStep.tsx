@@ -1,278 +1,263 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { 
   CheckCircle, 
   XCircle, 
   Loader2, 
-  Terminal,
-  Download,
   Server,
-  Settings
+  Play,
+  Trash2
 } from "lucide-react";
-
-interface BinaryCheck {
-  name: string;
-  found: boolean;
-  path: string | null;
-  version: string | null;
-}
-
-interface InstallStatus {
-  step: string;
-  message: string;
-  progress: number;
-  error: string | null;
-}
+import { useCluster, useSystemCheck } from "@/hooks/use-tauri";
 
 interface InstallStepProps {
   onComplete: () => void;
   onBack: () => void;
 }
 
+type InstallStage = 'idle' | 'creating' | 'complete' | 'failed';
+
 export function InstallStep({ onComplete, onBack }: InstallStepProps) {
-  const [checking, setChecking] = useState(true);
-  const [prerequisites, setPrerequisites] = useState<BinaryCheck[]>([]);
-  const [installing, setInstalling] = useState(false);
-  const [status, setStatus] = useState<InstallStatus | null>(null);
+  const cluster = useCluster();
+  const system = useSystemCheck();
+  const [stage, setStage] = useState<InstallStage>('idle');
   const [error, setError] = useState<string | null>(null);
 
+  // Check if cluster already exists and is running
   useEffect(() => {
-    checkPrerequisites();
-    
-    // Listen for installation progress
-    const unlisten = listen<InstallStatus>("install-progress", (event) => {
-      setStatus(event.payload);
-      if (event.payload.step === "Complete") {
-        setTimeout(() => onComplete(), 1000);
-      }
-    });
+    if (cluster.data?.exists && cluster.data?.running) {
+      setStage('complete');
+    }
+  }, [cluster.data]);
 
-    return () => {
-      unlisten.then(fn => fn());
-    };
-  }, []);
-
-  const checkPrerequisites = async () => {
-    setChecking(true);
+  const handleCreate = async () => {
+    setStage('creating');
     setError(null);
     try {
-      const result = await invoke<BinaryCheck[]>("check_prerequisites");
-      setPrerequisites(result);
+      await cluster.create();
+      setStage('complete');
     } catch (err: any) {
-      setError(err.message || "Failed to check prerequisites");
-    } finally {
-      setChecking(false);
+      setError(err.message || 'Failed to create cluster');
+      setStage('failed');
     }
   };
 
-  const startInstallation = async () => {
-    setInstalling(true);
+  const handleDelete = async () => {
     setError(null);
-    setStatus({
-      step: "CheckingPrerequisites",
-      message: "Starting installation...",
-      progress: 0,
-      error: null,
-    });
-    
     try {
-      await invoke("run_installation");
+      await cluster.remove();
+      setStage('idle');
     } catch (err: any) {
-      setError(err.message || "Installation failed");
-      setStatus(prev => prev ? { ...prev, step: "Failed", error: err.message } : null);
-    } finally {
-      setInstalling(false);
+      setError(err.message || 'Failed to delete cluster');
     }
   };
 
-  const resetInstallation = async () => {
-    try {
-      await invoke("reset_installation");
-      setStatus(null);
-      await checkPrerequisites();
-    } catch (err: any) {
-      setError(err.message || "Failed to reset");
+  const getProgress = () => {
+    switch (stage) {
+      case 'idle': return 0;
+      case 'creating': return 50;
+      case 'complete': return 100;
+      case 'failed': return 0;
     }
   };
 
-  // Only Docker is required - other tools will be auto-installed
-  const dockerInstalled = prerequisites.find(p => p.name === "docker")?.found ?? false;
-  const missingPrereqs = prerequisites.filter(p => !p.found);
-
-  const stepIcons: Record<string, React.ReactNode> = {
-    CheckingPrerequisites: <Settings className="h-4 w-4" />,
-    InstallingBinaries: <Download className="h-4 w-4" />,
-    CreatingCluster: <Server className="h-4 w-4" />,
-    PullingImages: <Download className="h-4 w-4" />,
-    DeployingServices: <Server className="h-4 w-4" />,
-    ConfiguringIngress: <Settings className="h-4 w-4" />,
-    Complete: <CheckCircle className="h-4 w-4 text-green-500" />,
-    Failed: <XCircle className="h-4 w-4 text-red-500" />,
+  const getMessage = () => {
+    if (cluster.creating) return 'Creating Kind cluster (this may take a few minutes)...';
+    if (cluster.deleting) return 'Deleting cluster...';
+    switch (stage) {
+      case 'idle': return 'Ready to create local Kubernetes cluster';
+      case 'creating': return 'Setting up Kind cluster...';
+      case 'complete': return 'Cluster is running and ready!';
+      case 'failed': return error || 'Failed to create cluster';
+    }
   };
+
+  const isLoading = cluster.loading || cluster.creating || cluster.deleting;
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Install CTO Lite</h2>
+        <h2 className="text-2xl font-bold">Create Local Cluster</h2>
         <p className="text-muted-foreground mt-2">
-          Set up the local Kubernetes cluster and deploy CTO Lite services.
+          CTO Lite will create a local Kubernetes cluster using Kind.
         </p>
       </div>
 
-      {/* Prerequisites Check */}
+      {/* System Check */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Terminal className="h-4 w-4" />
-            Prerequisites
+            <Server className="h-4 w-4" />
+            System Status
           </CardTitle>
-          <CardDescription>
-            Required tools for CTO Lite
-          </CardDescription>
         </CardHeader>
         <CardContent>
-          {checking ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Checking prerequisites...
+          <div className="space-y-2">
+            <div className="flex items-center justify-between p-2 rounded bg-muted/50">
+              <div className="flex items-center gap-2">
+                {system.docker?.running ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-500" />
+                )}
+                <span>Docker</span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {system.docker?.running ? `Running (${system.docker.runtime})` : 'Not running'}
+              </span>
             </div>
-          ) : (
+            <div className="flex items-center justify-between p-2 rounded bg-muted/50">
+              <div className="flex items-center gap-2">
+                {system.kind?.installed ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-500" />
+                )}
+                <span>Kind</span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {system.kind?.installed ? system.kind.version || 'Installed' : 'Not installed'}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cluster Status */}
+      <Card className={stage === 'complete' 
+        ? "border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/20"
+        : stage === 'failed'
+          ? "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20"
+          : ""
+      }>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            {stage === 'complete' ? (
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            ) : stage === 'failed' ? (
+              <XCircle className="h-4 w-4 text-red-500" />
+            ) : isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Server className="h-4 w-4" />
+            )}
+            Kind Cluster
+          </CardTitle>
+          <CardDescription>
+            {cluster.data?.exists 
+              ? `Cluster "${cluster.data.name}" ${cluster.data.running ? 'is running' : 'exists but not running'}`
+              : 'No cluster created yet'
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Progress bar during creation */}
+          {(cluster.creating || stage === 'creating') && (
             <div className="space-y-2">
-              {prerequisites.map((prereq) => (
+              <Progress value={getProgress()} className="h-2" />
+              <p className="text-sm text-muted-foreground text-center">
+                {getMessage()}
+              </p>
+            </div>
+          )}
+
+          {/* Cluster nodes */}
+          {cluster.data?.nodes && cluster.data.nodes.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Nodes:</p>
+              {cluster.data.nodes.map((node) => (
                 <div 
-                  key={prereq.name}
-                  className="flex items-center justify-between p-2 rounded bg-muted/50"
+                  key={node.name}
+                  className="flex items-center justify-between p-2 rounded bg-muted/50 text-sm"
                 >
+                  <span>{node.name}</span>
                   <div className="flex items-center gap-2">
-                    {prereq.found ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-500" />
-                    )}
-                    <span className="font-medium">{prereq.name}</span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {prereq.found ? (
-                      prereq.version || prereq.path || "Found"
-                    ) : (
-                      <Badge variant="destructive">Not found</Badge>
-                    )}
+                    <span className="text-muted-foreground">{node.role}</span>
+                    <span className={node.status === 'Ready' ? 'text-green-500' : 'text-yellow-500'}>
+                      {node.status}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {!checking && missingPrereqs.length > 0 && (
-            <div className="mt-4 p-3 rounded bg-blue-500/10 border border-blue-500/20">
-              <div className="flex items-start gap-2">
-                <Download className="h-4 w-4 text-blue-500 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-medium text-blue-600 dark:text-blue-400">
-                    Will install: {missingPrereqs.filter(p => p.name !== "docker").map(p => p.name).join(", ")}
-                  </p>
-                  <p className="text-muted-foreground mt-1">
-                    These tools will be installed automatically via Homebrew when you click Install.
-                  </p>
-                  {missingPrereqs.some(p => p.name === "docker") && (
-                    <p className="text-yellow-600 dark:text-yellow-400 mt-2">
-                      ⚠️ Docker is required. Please install Docker Desktop or OrbStack first.
-                    </p>
-                  )}
-                </div>
-              </div>
+          {/* Success message */}
+          {stage === 'complete' && !cluster.creating && (
+            <div className="flex items-center gap-2 p-3 rounded bg-green-500/10 border border-green-500/20">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              <span className="text-green-600 dark:text-green-400 font-medium">
+                Cluster is ready!
+              </span>
+            </div>
+          )}
+
+          {/* Error message */}
+          {stage === 'failed' && (
+            <div className="flex items-center gap-2 p-3 rounded bg-red-500/10 border border-red-500/20">
+              <XCircle className="h-5 w-5 text-red-500" />
+              <span className="text-red-600 dark:text-red-400">
+                {error}
+              </span>
+            </div>
+          )}
+
+          {/* Actions for existing cluster */}
+          {cluster.data?.exists && !cluster.creating && (
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleDelete}
+                disabled={isLoading}
+              >
+                {cluster.deleting ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-1" />
+                )}
+                Delete Cluster
+              </Button>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Installation Progress */}
-      {(installing || status) && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              {status?.step && stepIcons[status.step]}
-              Installation Progress
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Progress value={status?.progress || 0} className="h-2" />
-            
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {status?.message || "Preparing..."}
-              </span>
-              <span className="font-medium">{status?.progress || 0}%</span>
-            </div>
-
-            {status?.step === "Complete" && (
-              <div className="flex items-center gap-2 p-3 rounded bg-green-500/10 border border-green-500/20">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <span className="text-green-600 dark:text-green-400 font-medium">
-                  Installation complete!
-                </span>
-              </div>
-            )}
-
-            {status?.step === "Failed" && (
-              <div className="flex items-center gap-2 p-3 rounded bg-red-500/10 border border-red-500/20">
-                <XCircle className="h-5 w-5 text-red-500" />
-                <span className="text-red-600 dark:text-red-400">
-                  {status.error || "Installation failed"}
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {error && !status?.error && (
-        <Card className="border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20">
-          <CardContent className="pt-4">
-            <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
-              <XCircle className="h-4 w-4" />
-              {error}
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Actions */}
       <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onBack} disabled={installing}>
+        <Button variant="outline" onClick={onBack} disabled={isLoading}>
           Back
         </Button>
         <div className="flex gap-2">
-          {status?.step === "Complete" ? (
+          {stage === 'complete' ? (
+            <Button onClick={onComplete}>
+              Complete Setup
+            </Button>
+          ) : stage === 'failed' ? (
+            <Button onClick={handleCreate}>
+              Retry
+            </Button>
+          ) : cluster.data?.exists ? (
             <Button onClick={onComplete}>
               Continue
             </Button>
-          ) : status?.step === "Failed" ? (
-            <>
-              <Button variant="outline" onClick={resetInstallation}>
-                Reset
-              </Button>
-              <Button onClick={startInstallation}>
-                Retry
-              </Button>
-            </>
           ) : (
             <Button 
-              onClick={startInstallation} 
-              disabled={!dockerInstalled || installing || checking}
+              onClick={handleCreate} 
+              disabled={!system.allReady || isLoading}
             >
-              {installing ? (
+              {cluster.creating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Installing...
+                  Creating...
                 </>
               ) : (
-                "Install"
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Create Cluster
+                </>
               )}
             </Button>
           )}
