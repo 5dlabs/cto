@@ -1,27 +1,53 @@
 # =============================================================================
-# Loki Logging Stack - Docker Compose Override
+# FluentD + Loki Logging Stack - Docker Compose Override
 # =============================================================================
 #
-# Unified log collection for ALL CLIs via Loki.
-# Use with: docker compose -f docker-compose.yml -f docker-compose.loki.yml up
+# Unified log collection for ALL CLIs via FluentD.
+# FluentD tees logs to:
+#   1. Loki - dashboards, querying, retention
+#   2. Sidecar - real-time Linear agent dialog updates
 #
-# Prerequisites:
-#   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+# Use with: docker compose -f docker-compose.yml -f docker-compose.loki.yml up
 #
 # =============================================================================
 
-# Common Loki logging config
-x-loki-logging: &loki-logging
-  driver: loki
+# Common FluentD logging config for all CLIs
+x-fluentd-logging: &fluentd-logging
+  driver: fluentd
   options:
-    loki-url: "http://localhost:3100/loki/api/v1/push"
-    loki-batch-size: "100"
-    loki-retries: "2"
-    loki-timeout: "2s"
+    fluentd-address: "localhost:24224"
+    fluentd-async: "true"
+    fluentd-retry-wait: "1s"
+    fluentd-max-retries: "3"
+    tag: "agent.{{.Name}}"
 
 services:
   # ===========================================================================
-  # Loki - Log Aggregation
+  # FluentD - Log Router (receives from Docker, forwards to Loki + Sidecar)
+  # ===========================================================================
+  fluentd:
+    image: fluent/fluentd:v1.16-1
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./config/fluent.conf:/fluentd/etc/fluent.conf:ro
+      - ./config/fluent-plugins.sh:/docker-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Install required plugins
+        gem install fluent-plugin-loki --no-document
+        # Start fluentd
+        fluentd -c /fluentd/etc/fluent.conf
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "24224"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Loki - Log Storage & Querying
   # ===========================================================================
   loki:
     image: grafana/loki:2.9.0
@@ -55,132 +81,167 @@ services:
         condition: service_healthy
 
   # ===========================================================================
-  # Claude CLI - Logs to Loki
+  # Sidecar - Receives logs from FluentD, posts to Linear
+  # ===========================================================================
+  sidecar:
+    image: cto-linear-sidecar:local
+    pull_policy: never
+    ports:
+      - "8080:8080"
+    environment:
+      LINEAR_OAUTH_TOKEN: ${LINEAR_OAUTH_TOKEN}
+      LINEAR_ISSUE_IDENTIFIER: ${LINEAR_ISSUE_IDENTIFIER}
+      RUST_LOG: info
+      # HTTP ingest mode (receives from FluentD)
+      LOG_SOURCE: http
+      HTTP_PORT: 8080
+      # CTO config for skills/tools discovery
+      CTO_SKILLS_DIR: /cto-skills
+      CTO_CONFIG_PATH: /cto-config.json
+      CTO_AGENT_NAME: rex
+    volumes:
+      - ../../templates/skills:/cto-skills:ro
+      - ../../cto-config.json:/cto-config.json:ro
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  # ===========================================================================
+  # Claude CLI - Logs to FluentD
   # ===========================================================================
   claude:
     logging:
-      <<: *loki-logging
+      <<: *fluentd-logging
       options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+        fluentd-address: "localhost:24224"
+        tag: "agent.claude"
         labels: "cli=claude,agent=rex"
+    depends_on:
+      fluentd:
+        condition: service_healthy
 
+  # Remove individual sidecars - using unified sidecar now
   claude-sidecar:
-    environment:
-      LOG_SOURCE: loki
-      LOKI_URL: http://localhost:3100
-      LOKI_QUERY: '{cli="claude"}'
+    profiles: ["disabled"]
 
   # ===========================================================================
-  # Factory CLI - Logs to Loki
+  # Factory CLI - Logs to FluentD
   # ===========================================================================
   factory:
     logging:
-      <<: *loki-logging
+      <<: *fluentd-logging
       options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+        fluentd-address: "localhost:24224"
+        tag: "agent.factory"
         labels: "cli=factory,agent=rex"
+    depends_on:
+      fluentd:
+        condition: service_healthy
 
   factory-sidecar:
-    environment:
-      LOG_SOURCE: loki
-      LOKI_URL: http://localhost:3100
-      LOKI_QUERY: '{cli="factory"}'
+    profiles: ["disabled"]
 
   # ===========================================================================
-  # Codex CLI - Logs to Loki
+  # Codex CLI - Logs to FluentD
   # ===========================================================================
   codex:
     logging:
-      <<: *loki-logging
+      <<: *fluentd-logging
       options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+        fluentd-address: "localhost:24224"
+        tag: "agent.codex"
         labels: "cli=codex"
+    depends_on:
+      fluentd:
+        condition: service_healthy
 
   codex-sidecar:
-    environment:
-      LOG_SOURCE: loki
-      LOKI_URL: http://localhost:3100
-      LOKI_QUERY: '{cli="codex"}'
+    profiles: ["disabled"]
 
   # ===========================================================================
-  # Code CLI - Logs to Loki
+  # Code CLI - Logs to FluentD
   # ===========================================================================
   code:
     logging:
-      <<: *loki-logging
+      <<: *fluentd-logging
       options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+        fluentd-address: "localhost:24224"
+        tag: "agent.code"
         labels: "cli=code"
+    depends_on:
+      fluentd:
+        condition: service_healthy
 
   code-sidecar:
-    environment:
-      LOG_SOURCE: loki
-      LOKI_URL: http://localhost:3100
-      LOKI_QUERY: '{cli="code"}'
+    profiles: ["disabled"]
 
   # ===========================================================================
-  # Cursor CLI - Logs to Loki
+  # Cursor CLI - Logs to FluentD
   # ===========================================================================
   cursor:
     logging:
-      <<: *loki-logging
+      <<: *fluentd-logging
       options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+        fluentd-address: "localhost:24224"
+        tag: "agent.cursor"
         labels: "cli=cursor"
+    depends_on:
+      fluentd:
+        condition: service_healthy
 
   cursor-sidecar:
-    environment:
-      LOG_SOURCE: loki
-      LOKI_URL: http://localhost:3100
-      LOKI_QUERY: '{cli="cursor"}'
+    profiles: ["disabled"]
 
   # ===========================================================================
-  # OpenCode CLI - Logs to Loki
+  # OpenCode CLI - Logs to FluentD
   # ===========================================================================
   opencode:
     logging:
-      <<: *loki-logging
+      <<: *fluentd-logging
       options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+        fluentd-address: "localhost:24224"
+        tag: "agent.opencode"
         labels: "cli=opencode"
+    depends_on:
+      fluentd:
+        condition: service_healthy
 
   opencode-sidecar:
-    environment:
-      LOG_SOURCE: loki
-      LOKI_URL: http://localhost:3100
-      LOKI_QUERY: '{cli="opencode"}'
+    profiles: ["disabled"]
 
   # ===========================================================================
-  # Gemini CLI - Logs to Loki
+  # Gemini CLI - Logs to FluentD
   # ===========================================================================
   gemini:
     logging:
-      <<: *loki-logging
+      <<: *fluentd-logging
       options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+        fluentd-address: "localhost:24224"
+        tag: "agent.gemini"
         labels: "cli=gemini"
+    depends_on:
+      fluentd:
+        condition: service_healthy
 
   gemini-sidecar:
-    environment:
-      LOG_SOURCE: loki
-      LOKI_URL: http://localhost:3100
-      LOKI_QUERY: '{cli="gemini"}'
+    profiles: ["disabled"]
 
   # ===========================================================================
-  # Dexter CLI - Logs to Loki
+  # Dexter CLI - Logs to FluentD
   # ===========================================================================
   dexter:
     logging:
-      <<: *loki-logging
+      <<: *fluentd-logging
       options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
+        fluentd-address: "localhost:24224"
+        tag: "agent.dexter"
         labels: "cli=dexter"
+    depends_on:
+      fluentd:
+        condition: service_healthy
 
   dexter-sidecar:
-    environment:
-      LOG_SOURCE: loki
-      LOKI_URL: http://localhost:3100
-      LOKI_QUERY: '{cli="dexter"}'
+    profiles: ["disabled"]
 
 volumes:
   loki-data:
