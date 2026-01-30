@@ -33,14 +33,58 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::time::sleep;
 use tracing::{debug, info, warn};
 
+// =============================================================================
+// MCP Tool Detection
+// =============================================================================
+// 
+// Native Claude tools (IGNORE these):
+//   Read, Write, Edit, Bash, Glob, Grep, LS, WebSearch, WebFetch, 
+//   MultiEdit, TodoRead, TodoWrite, Task, AskFollowupQuestion, etc.
+//
+// MCP Tools (TRACK these) - from CTO tools server:
+//   context7_*, octocode_*, firecrawl_*, openmemory_*, github_*
+//   Also any tool called via mcp__cto-tools__*
+// =============================================================================
+
+/// Known MCP tool prefixes from the CTO tools server
+const MCP_TOOL_PREFIXES: &[&str] = &[
+    "context7_",
+    "octocode_",
+    "firecrawl_",
+    "openmemory_",
+    "github_",
+    "mcp__",  // Generic MCP tool call prefix
+];
+
+/// Check if a tool name is an MCP tool (not a native Claude tool)
+fn is_mcp_tool(name: &str) -> bool {
+    MCP_TOOL_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
+}
+
+/// Extract the base MCP tool name from a full tool call name
+/// e.g., "mcp__cto-tools__context7_resolve_library_id" -> "context7_resolve_library_id"
+fn normalize_mcp_tool_name(name: &str) -> String {
+    if let Some(suffix) = name.strip_prefix("mcp__cto-tools__") {
+        suffix.to_string()
+    } else if let Some(suffix) = name.strip_prefix("mcp__cto__") {
+        suffix.to_string()
+    } else {
+        name.to_string()
+    }
+}
+
 /// Stream processing result
 struct StreamResult {
     /// Stats from parsing
     stats: StreamStats,
-    /// MCP tools detected
-    mcp_tools: Vec<String>,
-    /// Skills detected
-    skills: Vec<String>,
+    /// MCP tools available (from init)
+    available_mcp_tools: Vec<String>,
+    /// MCP tools actually used during session
+    used_mcp_tools: HashSet<String>,
+    /// Skills available (from init)
+    available_skills: Vec<String>,
+    /// Skills referenced/used during session (by name in tool calls or responses)
+    used_skills: HashSet<String>,
     /// Model name
     model: Option<String>,
 }
@@ -147,8 +191,10 @@ async fn process_stream_file(path: &str, emitter: &LinearAgentEmitter) -> Result
     let mut parser: Option<Box<dyn StreamParser>> = registry.from_env_or_detect(None);
 
     // Track state
-    let mut mcp_tools: HashSet<String> = HashSet::new();
-    let mut skills: HashSet<String> = HashSet::new();
+    let mut available_mcp_tools: Vec<String> = Vec::new();
+    let mut used_mcp_tools: HashSet<String> = HashSet::new();
+    let mut available_skills: Vec<String> = Vec::new();
+    let used_skills: HashSet<String> = HashSet::new(); // TODO: Skill usage detection is complex - leave empty for now
     let mut model: Option<String> = None;
     let mut init_emitted = false;
     let mut line_count = 0;
@@ -181,12 +227,19 @@ async fn process_stream_file(path: &str, emitter: &LinearAgentEmitter) -> Result
         if !init_emitted && line_count <= 5 {
             if let Some(init_info) = extract_init_info(&line) {
                 model = init_info.model.clone();
-                mcp_tools.extend(init_info.tool_names.iter().cloned());
+                
+                // Extract MCP tools (filter out native tools by checking for known patterns)
+                // MCP tools typically have prefixes like mcp__, context7_, octocode_, firecrawl_, etc.
+                for tool in &init_info.tool_names {
+                    if is_mcp_tool(tool) {
+                        available_mcp_tools.push(tool.clone());
+                    }
+                }
                 
                 // Extract skills from mcp_servers (stored with "skill:" prefix)
                 for server in &init_info.mcp_servers {
                     if let Some(skill_name) = server.strip_prefix("skill:") {
-                        skills.insert(skill_name.to_string());
+                        available_skills.push(skill_name.to_string());
                     }
                 }
                 
@@ -203,10 +256,12 @@ async fn process_stream_file(path: &str, emitter: &LinearAgentEmitter) -> Result
         for activity in result.activities {
             emit_activity(emitter, &activity).await?;
 
-            // Track tool usage
+            // Track MCP tool usage (ignore native Claude tools)
             if let ParsedActivity::Action { ref name, .. } = activity {
-                if name.starts_with("mcp__") {
-                    mcp_tools.insert(name.clone());
+                if is_mcp_tool(name) {
+                    // Normalize the tool name for matching with available tools
+                    let normalized = normalize_mcp_tool_name(name);
+                    used_mcp_tools.insert(normalized);
                 }
             }
         }
@@ -220,8 +275,10 @@ async fn process_stream_file(path: &str, emitter: &LinearAgentEmitter) -> Result
 
     Ok(StreamResult {
         stats,
-        mcp_tools: mcp_tools.into_iter().collect(),
-        skills: skills.into_iter().collect(),
+        available_mcp_tools,
+        used_mcp_tools,
+        available_skills,
+        used_skills,
         model,
     })
 }
@@ -242,13 +299,18 @@ fn extract_init_info(line: &str) -> Option<InitInfo> {
             info.model = Some(model.to_string());
         }
 
-        // Extract tools from various possible locations
+        // Extract tools - handle both string arrays and object arrays
         if let Some(tools) = value.get("tools").and_then(|v| v.as_array()) {
             info.tool_count = tools.len();
             info.tool_names = tools
                 .iter()
-                .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
-                .map(String::from)
+                .filter_map(|t| {
+                    // Handle string tools (Claude format: ["Read", "Write", "mcp__..."])
+                    t.as_str()
+                        .map(String::from)
+                        // Handle object tools (other formats: [{"name": "tool"}])
+                        .or_else(|| t.get("name").and_then(|n| n.as_str()).map(String::from))
+                })
                 .collect();
         }
 
@@ -371,26 +433,62 @@ async fn emit_completion_summary(emitter: &LinearAgentEmitter, result: &StreamRe
         sections.push(format!("**Model:** {model}"));
     }
 
-    // MCP Tools Used
-    if !result.mcp_tools.is_empty() {
-        let tools: Vec<_> = result.mcp_tools.iter().take(20).cloned().collect();
-        let tools_str = if tools.len() < result.mcp_tools.len() {
-            format!("{} (+{} more)", tools.join(", "), result.mcp_tools.len() - tools.len())
-        } else {
-            tools.join(", ")
-        };
-        sections.push(format!("**MCP Tools Used ({}):** {}", result.mcp_tools.len(), tools_str));
+    // MCP Tools - show available vs used with visual indicators
+    if !result.available_mcp_tools.is_empty() {
+        let used_count = result.used_mcp_tools.len();
+        let total_count = result.available_mcp_tools.len();
+        
+        // Build list with used/unused indicators
+        let tools_with_status: Vec<String> = result
+            .available_mcp_tools
+            .iter()
+            .map(|tool| {
+                if result.used_mcp_tools.contains(tool) {
+                    format!("✅ {tool}")
+                } else {
+                    format!("⬜ {tool}")
+                }
+            })
+            .collect();
+        
+        sections.push(format!(
+            "**MCP Tools ({}/{} used):**\n{}",
+            used_count,
+            total_count,
+            tools_with_status.join("\n")
+        ));
     }
 
-    // Skills
-    if !result.skills.is_empty() {
-        sections.push(format!("**Skills ({}):** {}", result.skills.len(), result.skills.join(", ")));
+    // Skills - show available vs used with visual indicators
+    if !result.available_skills.is_empty() {
+        let used_count = result.used_skills.len();
+        let total_count = result.available_skills.len();
+        
+        // Build list with used/unused indicators
+        let skills_with_status: Vec<String> = result
+            .available_skills
+            .iter()
+            .map(|skill| {
+                if result.used_skills.contains(skill) {
+                    format!("✅ {skill}")
+                } else {
+                    format!("⬜ {skill}")
+                }
+            })
+            .collect();
+        
+        sections.push(format!(
+            "**Skills ({}/{} used):**\n{}",
+            used_count,
+            total_count,
+            skills_with_status.join("\n")
+        ));
     }
 
     let body = if sections.is_empty() {
         "✅ **Claude Session Complete**".to_string()
     } else {
-        format!("✅ **Claude Session Complete**\n\n{}", sections.join("\n"))
+        format!("✅ **Claude Session Complete**\n\n{}", sections.join("\n\n"))
     };
 
     emitter.emit_response(&body).await?;
