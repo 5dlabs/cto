@@ -78,13 +78,13 @@ Make sure to:
 - Handle division by zero gracefully
 - Include at least 5 test cases}"
 
-# Run Droid with JSON output for sidecar parsing
-# Use --auto medium for development operations (create files, run tests)
+# Run Droid with stream-json output for sidecar parsing
+# This gives us streaming JSONL events: system, message, tool_call, tool_result, completion
 # Use --skip-permissions-unsafe in container environment for full access
 droid exec \
   --skip-permissions-unsafe \
   --cwd "${WORKSPACE}" \
-  -o json \
+  -o stream-json \
   "${PROMPT}" 2>&1 | tee "${WORKSPACE}/stream.jsonl"
 
 echo "" >&2
