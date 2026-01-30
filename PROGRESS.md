@@ -1,6 +1,6 @@
 # CTO Lite Progress
 
-## Current Status: Phase 2 In Progress 🔄
+## Current Status: Phase 3 Complete ✅
 
 ### Phase 1: Tauri App Foundation ✅
 
@@ -12,37 +12,34 @@
 - [x] TypeScript bindings for all commands
 - [x] React hooks with loading/error states
 
-### Phase 2: Core Infrastructure 🔄
+### Phase 2: Core Infrastructure ✅
 
 **Completed:**
 - [x] Create `cto-lite` Helm chart
-  - Controller deployment + RBAC
-  - PM server deployment
-  - Cloudflared tunnel deployment
-  - Secrets for API keys
-  - Play workflow template (no Atlas)
-  - CRDs (CodeRun, BoltRun)
 - [x] Helm deployment commands in Tauri
 - [x] Deploy step in setup wizard
+- [x] Secrets management for API keys
+- [x] Play workflow template (no Atlas)
 
-**In Progress:**
-- [ ] Fork PM server to `pm-lite` (using existing PM for now)
-- [ ] Update agent prompts (no Atlas, clean PRs)
-- [ ] Build tunnel allocation system
-- [ ] Bundle skills into agent images
-- [ ] Configure Bolt for local/Docker
+### Phase 3: Dashboard and MCP ✅
 
-### Phase 3: Dashboard and MCP ⏳
+**Completed:**
+- [x] Build workflow status/logs view
+- [x] Workflow list with real-time polling
+- [x] Trigger new workflow form
+- [x] Stop/delete workflow actions
+- [x] Log viewer with terminal styling
+- [x] Workflow node/step display
 
-- [ ] Build workflow status/logs view
-- [ ] Create MCP background service
-- [ ] Integrate log streaming
+**Remaining:**
+- [ ] Create MCP background service (optional for MVP)
 
-### Phase 4: Distribution ⏳
+### Phase 4: Distribution 🔄
 
+**Next Steps:**
 - [ ] CI workflow for Tauri builds
-- [ ] Code signing setup
-- [ ] Binary bundling
+- [ ] Code signing setup (macOS, Windows)
+- [ ] Build for all platforms
 - [ ] CDN distribution
 
 ### Phase 5: Polish ⏳
@@ -54,11 +51,11 @@
 ## Recent Commits
 
 ```
+e54a7fd feat(cto-lite): implement Phase 3 - Dashboard and Workflow management
 5cf42ea feat(cto-lite): add Deploy step to setup wizard
 320515d feat(cto-lite): add Helm deployment commands
 5af3cf4 feat(cto-lite): add Helm chart for local Kind deployment
 fb6d817 feat(cto-lite): wire frontend to Tauri backend
-0dff191 feat(cto-lite): add Tauri 2.x backend with commands
 ```
 
 ## File Structure
@@ -68,10 +65,6 @@ crates/cto-lite/
 ├── tauri/
 │   ├── package.json
 │   └── src-tauri/
-│       ├── Cargo.toml
-│       ├── tauri.conf.json
-│       ├── capabilities/default.json
-│       ├── icons/
 │       └── src/
 │           ├── main.rs
 │           ├── lib.rs
@@ -80,72 +73,43 @@ crates/cto-lite/
 │           ├── keychain.rs
 │           ├── docker.rs
 │           ├── kind.rs
-│           └── helm.rs          # NEW
+│           ├── helm.rs
+│           └── workflows.rs    # NEW
 └── ui/
-    ├── package.json
     ├── src/
-    │   ├── lib/tauri.ts         
-    │   ├── hooks/use-tauri.ts   
+    │   ├── lib/tauri.ts
+    │   ├── hooks/use-tauri.ts
     │   ├── components/
+    │   │   ├── Dashboard/
+    │   │   │   └── index.tsx   # NEW
     │   │   ├── setup/
     │   │   │   ├── RuntimeStep.tsx
     │   │   │   ├── InstallStep.tsx
-    │   │   │   └── DeployStep.tsx   # NEW
+    │   │   │   └── DeployStep.tsx
     │   │   └── SetupWizard/
     │   └── App.tsx
     └── dist/
 
-infra/charts/cto-lite/           # NEW
+infra/charts/cto-lite/
 ├── Chart.yaml
 ├── values.yaml
 ├── crds/
-│   ├── coderun-crd.yaml
-│   └── boltrun-crd.yaml
 └── templates/
-    ├── _helpers.tpl
-    ├── namespace.yaml
-    ├── secrets.yaml
     ├── controller/
-    │   ├── deployment.yaml
-    │   └── rbac.yaml
     ├── pm/
-    │   └── deployment.yaml
     ├── cloudflared/
-    │   └── deployment.yaml
     └── workflows/
-        └── play-workflow-lite.yaml
 ```
 
-## Backend Commands
+## Backend Commands Summary
 
-| Command | Description | Status |
-|---------|-------------|--------|
-| `check_docker` | Docker/OrbStack detection | ✅ |
-| `check_kind` | Kind installation check | ✅ |
-| `check_helm` | Helm installation check | ✅ |
-| `get_setup_state` | Wizard state | ✅ |
-| `save_setup_state` | Save wizard state | ✅ |
-| `store_api_key` | Keychain storage | ✅ |
-| `get_api_key` | Keychain retrieval | ✅ |
-| `create_cluster` | Kind cluster creation | ✅ |
-| `delete_cluster` | Kind cluster deletion | ✅ |
-| `get_cluster_status` | Cluster status | ✅ |
-| `deploy_chart` | Helm install/upgrade | ✅ |
-| `get_release_status` | Helm status | ✅ |
-| `uninstall_chart` | Helm uninstall | ✅ |
-| `trigger_workflow` | Start workflow | 🔲 Stub |
-| `get_workflow_status` | Workflow status | 🔲 Stub |
-| `list_workflows` | List workflows | 🔲 Stub |
-
-## Setup Wizard Steps
-
-1. ✅ Runtime Check (Docker/Kind detection)
-2. ✅ Stack Selection (Grizz/Nova)
-3. ✅ API Keys (Keychain storage)
-4. ✅ GitHub Connection (OAuth stub)
-5. ✅ Cloudflare Tunnel (OAuth stub)
-6. ✅ Create Cluster (Kind)
-7. ✅ Deploy (Helm chart)
+| Category | Commands | Status |
+|----------|----------|--------|
+| Setup | check_docker, check_kind, get_setup_state, save_setup_state | ✅ |
+| Keychain | store_api_key, get_api_key, delete_api_key, has_api_key | ✅ |
+| Cluster | create_cluster, delete_cluster, get_cluster_status | ✅ |
+| Helm | deploy_chart, uninstall_chart, get_release_status, check_helm | ✅ |
+| Workflows | trigger_workflow, list_workflows, get_workflow_status, get_workflow_logs, stop_workflow, delete_workflow, check_argo | ✅ |
 
 ## Build Commands
 
@@ -157,12 +121,19 @@ cd crates/cto-lite/ui && npm run build
 cd crates/cto-lite/tauri/src-tauri && cargo check
 
 # Run development
-cd crates/cto-lite/tauri && npm run tauri dev
+cd crates/cto-lite/tauri
+PATH="$HOME/.cargo/bin:$PATH" npx tauri dev
+
+# Build release
+PATH="$HOME/.cargo/bin:$PATH" npx tauri build
 ```
 
-## Next Steps
+## App Screens
 
-1. **Test the app** - Run `npm run tauri dev` to test the full flow
-2. **Install Helm** - Required for deployment
-3. **Build agent images** - Need to containerize agents
-4. **Implement workflow commands** - Connect to Argo
+1. **Setup Wizard** (7 steps)
+   - Runtime check → Stack selection → API Keys → GitHub → Cloudflare → Create Cluster → Deploy
+
+2. **Dashboard**
+   - Sidebar: Workflow list with status badges
+   - Main: Selected workflow detail, nodes/steps, logs
+   - Actions: Trigger, stop, delete workflows

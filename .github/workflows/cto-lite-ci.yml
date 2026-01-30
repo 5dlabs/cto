@@ -1,0 +1,139 @@
+name: CTO Lite CI
+
+on:
+  push:
+    branches:
+      - 'ctolite/*'
+    paths:
+      - 'crates/cto-lite/**'
+      - 'infra/charts/cto-lite/**'
+      - '.github/workflows/cto-lite-*.yml'
+  pull_request:
+    paths:
+      - 'crates/cto-lite/**'
+      - 'infra/charts/cto-lite/**'
+
+jobs:
+  check-rust:
+    name: Check Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          components: clippy, rustfmt
+      
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libgtk-3-dev
+
+      - name: Check formatting
+        working-directory: crates/cto-lite/tauri/src-tauri
+        run: cargo fmt --check
+
+      - name: Check clippy
+        working-directory: crates/cto-lite/tauri/src-tauri
+        run: cargo clippy -- -D warnings
+
+      - name: Build
+        working-directory: crates/cto-lite/tauri/src-tauri
+        run: cargo build --release
+
+  check-frontend:
+    name: Check Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: crates/cto-lite/ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: crates/cto-lite/ui
+        run: npm ci
+
+      - name: Type check
+        working-directory: crates/cto-lite/ui
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: crates/cto-lite/ui
+        run: npm run build
+
+  check-helm:
+    name: Check Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.14.0'
+
+      - name: Lint chart
+        run: helm lint infra/charts/cto-lite
+
+      - name: Template chart
+        run: helm template cto-lite infra/charts/cto-lite --debug
+
+  test-build:
+    name: Test Build (${{ matrix.os }})
+    needs: [check-rust, check-frontend]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libgtk-3-dev
+
+      - name: Install UI dependencies
+        working-directory: crates/cto-lite/ui
+        run: npm ci
+
+      - name: Build UI
+        working-directory: crates/cto-lite/ui
+        run: npm run build
+
+      - name: Install Tauri CLI
+        working-directory: crates/cto-lite/tauri
+        run: npm ci
+
+      - name: Build Tauri (check only)
+        working-directory: crates/cto-lite/tauri
+        run: npx tauri build --debug
+        continue-on-error: true  # Allow failure for now until signing is set up
