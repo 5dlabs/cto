@@ -54,3 +54,7 @@ pub use webhooks::{
 
 // Also expose linear-sink types for gradual migration
 pub use linear_sink;
+
+// Test comment for Stitch review validation
+// This comment is intentionally added to trigger a Stitch review
+// and verify gh CLI is being used correctly.
