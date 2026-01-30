@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="47" project="alerthub">
+  <title>Deploy services to Kubernetes</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create Kubernetes deployments, services, and ingress for all backend services
+  </description>
+  
+  <dependencies>
+    <dependency task_id="12" />
+    <dependency task_id="21" />
+    <dependency task_id="30" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create Kubernetes manifests for all services, implement HPA, configure ingress routing, setup service discovery, and implement health checks.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d47" category="architecture" constraint="open" requires_approval="false">
+      <description>Service deployment strategy</description>
+      <options>
+        <option>Blue-green deployment</option>
+        <option>Rolling updates</option>
+        <option>Canary deployment</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    All services deploy successfully, health checks pass, services can communicate, ingress routing works, HPA scales appropriately
+  </acceptance_criteria>
+</task>

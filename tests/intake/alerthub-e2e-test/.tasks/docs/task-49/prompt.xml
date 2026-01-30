@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="49" project="alerthub">
+  <title>Setup CI/CD pipeline for all services</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create GitHub Actions workflows for building, testing, and deploying all services
+  </description>
+  
+  <dependencies>
+    <dependency task_id="48" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup GitHub Actions for each service, implement automated testing, container building, security scanning, and automated deployment to Kubernetes.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d49" category="architecture" constraint="hard" requires_approval="true">
+      <description>Deployment approval process</description>
+      <options>
+        <option>Automatic deployment</option>
+        <option>Manual approval for production</option>
+        <option>Staged deployment with checks</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    All services build automatically on changes, tests run and must pass, container images build and scan successfully, deployments trigger correctly
+  </acceptance_criteria>
+</task>

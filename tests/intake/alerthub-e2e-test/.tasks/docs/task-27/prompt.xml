@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="27" project="alerthub">
+  <title>Implement UserService with RBAC</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create user management service with role-based access control and preferences management
+  </description>
+  
+  <dependencies>
+    <dependency task_id="26" />
+  </dependencies>
+  
+  <implementation>
+    <details>Implement UserService gRPC methods with RBAC (owner, admin, member, viewer), user preferences, and password management.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d27" category="security" constraint="hard" requires_approval="false">
+      <description>Password hashing algorithm</description>
+      <options>
+        <option>bcrypt</option>
+        <option>Argon2</option>
+        <option>scrypt</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    User CRUD operations work, RBAC enforces access control, user preferences persist correctly, password operations secure
+  </acceptance_criteria>
+</task>

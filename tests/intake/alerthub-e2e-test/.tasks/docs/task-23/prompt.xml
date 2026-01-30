@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="23" project="alerthub">
+  <title>Define protobuf schemas for all services</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create comprehensive protobuf definitions for TenantService, UserService, RuleService, and AnalyticsService
+  </description>
+  
+  <dependencies>
+    <dependency task_id="22" />
+  </dependencies>
+  
+  <implementation>
+    <details>Define all gRPC services, messages, and enums in protobuf files. Include proper field validation, pagination, and error handling patterns.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d23" category="api-design" constraint="open" requires_approval="false">
+      <description>Pagination strategy for list endpoints</description>
+      <options>
+        <option>Offset-based pagination</option>
+        <option>Cursor-based pagination</option>
+        <option>Hybrid approach</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Protobuf compiles successfully, generates Go code, grpc-gateway annotations create REST endpoints, validation rules work
+  </acceptance_criteria>
+</task>

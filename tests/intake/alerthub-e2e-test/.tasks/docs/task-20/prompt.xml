@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="20" project="alerthub">
+  <title>Implement webhook delivery service</title>
+  <agent name="nova" stack="Bun/Elysia" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Create WebhookService for custom HTTP endpoint delivery with signature verification
+  </description>
+  
+  <dependencies>
+    <dependency task_id="19" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create WebhookService with Effect HttpClient, implement signature verification, custom headers support, and webhook retry logic.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d20" category="security" constraint="open" requires_approval="false">
+      <description>Webhook signature algorithm</description>
+      <options>
+        <option>HMAC-SHA256</option>
+        <option>HMAC-SHA1</option>
+        <option>Configurable algorithm</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Webhooks deliver to custom endpoints, signatures verify correctly, custom headers included, retries work on failures
+  </acceptance_criteria>
+</task>

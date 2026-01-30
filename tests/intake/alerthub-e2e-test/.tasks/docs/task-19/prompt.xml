@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="19" project="alerthub">
+  <title>Setup Kafka consumer for notification events</title>
+  <agent name="nova" stack="Bun/Elysia" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement Effect Stream based Kafka consumer to process notification events from router service
+  </description>
+  
+  <dependencies>
+    <dependency task_id="18" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create Kafka consumer using Effect Stream, implement event processing pipeline, handle deserialization and routing to appropriate delivery services.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d19" category="error-handling" constraint="soft" requires_approval="true">
+      <description>Kafka consumer failure handling</description>
+      <options>
+        <option>Retry with exponential backoff</option>
+        <option>Dead letter topic</option>
+        <option>Circuit breaker with alerting</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Kafka messages consumed successfully, events routed to correct delivery services, consumer handles connection failures gracefully
+  </acceptance_criteria>
+</task>

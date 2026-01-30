@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="34" project="alerthub">
+  <title>Implement WebSocket integration with Effect Stream</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Setup WebSocket connection using Effect Stream for real-time notification updates
+  </description>
+  
+  <dependencies>
+    <dependency task_id="33" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create WebSocket client using Effect Stream, handle connection management, implement reconnection logic, and integrate with React components.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d34" category="error-handling" constraint="open" requires_approval="false">
+      <description>WebSocket reconnection strategy</description>
+      <options>
+        <option>Exponential backoff</option>
+        <option>Fixed interval retry</option>
+        <option>User-triggered reconnect</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    WebSocket connects successfully, receives real-time updates, handles disconnections gracefully, integrates properly with React state
+  </acceptance_criteria>
+</task>

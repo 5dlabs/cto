@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="16" project="alerthub">
+  <title>Create Slack integration service with Effect</title>
+  <agent name="nova" stack="Bun/Elysia" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement SlackService using Effect for webhook and Bot API delivery with retry logic
+  </description>
+  
+  <dependencies>
+    <dependency task_id="15" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create SlackService with Effect.Layer, implement webhook and Bot API delivery, add Effect.retry with exponential backoff, handle rate limiting.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d16" category="error-handling" constraint="open" requires_approval="false">
+      <description>Slack API failure retry strategy</description>
+      <options>
+        <option>Exponential backoff with jitter</option>
+        <option>Linear retry with delay</option>
+        <option>Circuit breaker pattern</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Slack messages deliver successfully, retry logic works on failures, rate limiting is respected, Effect errors are properly typed
+  </acceptance_criteria>
+</task>

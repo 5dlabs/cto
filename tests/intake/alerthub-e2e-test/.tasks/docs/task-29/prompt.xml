@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="29" project="alerthub">
+  <title>Implement AnalyticsService for metrics</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Create analytics service for notification statistics and delivery metrics aggregation
+  </description>
+  
+  <dependencies>
+    <dependency task_id="28" />
+  </dependencies>
+  
+  <implementation>
+    <details>Implement analytics data aggregation, time-series metrics calculation, dashboard data preparation, and report generation.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d29" category="performance" constraint="open" requires_approval="false">
+      <description>Analytics data aggregation strategy</description>
+      <options>
+        <option>Real-time aggregation</option>
+        <option>Batch processing</option>
+        <option>Pre-aggregated materialized views</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Analytics data aggregates correctly, time-series queries perform well, dashboard APIs return expected metrics, reports generate successfully
+  </acceptance_criteria>
+</task>

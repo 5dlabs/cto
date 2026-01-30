@@ -26,6 +26,7 @@ import { parsePrdIterative } from './operations/parse-prd-iterative';
 import { expandTask } from './operations/expand-task';
 import { analyzeComplexity } from './operations/analyze';
 import { generate, type GeneratePayload } from './operations/generate';
+import { generatePrompts, type GeneratePromptsPayload } from './operations/generate-prompts';
 import { research, getResearchCapabilities, type ResearchPayload } from './operations/research';
 import {
   generateWithCriticOperation,
@@ -131,6 +132,14 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
         return errorResponse('Missing user_prompt in payload', 'validation_error');
       }
       return generate(payload, model, options);
+    }
+
+    case 'generate_prompts': {
+      const payload = request.payload as GeneratePromptsPayload;
+      if (!payload?.tasks || !Array.isArray(payload.tasks)) {
+        return errorResponse('Missing tasks array in payload', 'validation_error');
+      }
+      return generatePrompts(payload);
     }
 
     case 'research': {

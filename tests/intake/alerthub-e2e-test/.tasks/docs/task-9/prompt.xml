@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="9" project="alerthub">
+  <title>Implement Kafka producer for event streaming</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Setup Kafka producer to publish notification events to integration service
+  </description>
+  
+  <dependencies>
+    <dependency task_id="8" />
+  </dependencies>
+  
+  <implementation>
+    <details>Integrate rdkafka crate, implement async Kafka producer, publish notification events with proper serialization and error handling.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d9" category="error-handling" constraint="soft" requires_approval="true">
+      <description>Kafka publish failure handling</description>
+      <options>
+        <option>Retry with exponential backoff</option>
+        <option>Dead letter queue</option>
+        <option>Fail notification</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Events successfully published to Kafka, producer handles connection failures gracefully, messages are properly formatted
+  </acceptance_criteria>
+</task>

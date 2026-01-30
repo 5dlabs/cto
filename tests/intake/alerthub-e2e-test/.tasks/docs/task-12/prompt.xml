@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="12" project="alerthub">
+  <title>Add Prometheus metrics endpoint</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement /metrics endpoint with custom metrics for notifications, rate limits, and performance
+  </description>
+  
+  <dependencies>
+    <dependency task_id="11" />
+  </dependencies>
+  
+  <implementation>
+    <details>Integrate prometheus crate, implement custom metrics collection for notification counts, latency histograms, rate limiting, and system health.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d12" category="performance" constraint="open" requires_approval="false">
+      <description>Metrics collection granularity</description>
+      <options>
+        <option>High detail with labels</option>
+        <option>Aggregated metrics only</option>
+        <option>Configurable detail level</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Metrics endpoint returns valid Prometheus format, custom metrics track notification flow, Grafana can scrape metrics
+  </acceptance_criteria>
+</task>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="45" project="alerthub">
+  <title>Implement native desktop notifications</title>
+  <agent name="spark" stack="Electron" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Add native desktop notification support with action buttons and system integration
+  </description>
+  
+  <dependencies>
+    <dependency task_id="44" />
+  </dependencies>
+  
+  <implementation>
+    <details>Implement native notification API, add action buttons, handle notification clicks, integrate with system notification center, and manage notification permissions.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d45" category="ux-behavior" constraint="soft" requires_approval="true">
+      <description>Desktop notification persistence</description>
+      <options>
+        <option>Auto-dismiss after timeout</option>
+        <option>Persist until clicked</option>
+        <option>User configurable</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Native notifications display correctly, action buttons work, notification clicks navigate appropriately, system integration functions properly
+  </acceptance_criteria>
+</task>

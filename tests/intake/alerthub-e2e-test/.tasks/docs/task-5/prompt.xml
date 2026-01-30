@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="5" project="alerthub">
+  <title>Implement notification data models</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Define Rust structs for Notification, NotificationStatus, and related domain models with serialization
+  </description>
+  
+  <dependencies>
+    <dependency task_id="4" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create notification.rs with Notification struct, NotificationStatus enum, Priority enum, Channel enum. Implement Serialize/Deserialize traits and database mapping.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d5" category="data-model" constraint="soft" requires_approval="true">
+      <description>Notification payload flexibility</description>
+      <options>
+        <option>Strict typed payload</option>
+        <option>JSON blob payload</option>
+        <option>Hybrid approach</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Models compile, serialize/deserialize correctly, database migrations create expected schema
+  </acceptance_criteria>
+</task>
