@@ -2378,7 +2378,14 @@ async fn progress_monitor_task(
 async fn main_exit_watch_task(config: Arc<Config>, shutdown: Arc<AtomicBool>) {
     if !config.main_exit_watch_enabled {
         info!("Main exit watch disabled");
-        return;
+        // When disabled, block forever instead of returning immediately.
+        // Returning would cause the select! to trigger shutdown.
+        loop {
+            if shutdown.load(Ordering::Relaxed) {
+                return;
+            }
+            sleep(Duration::from_secs(3600)).await; // Check hourly for shutdown
+        }
     }
 
     info!(
