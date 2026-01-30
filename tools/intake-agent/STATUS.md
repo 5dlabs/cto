@@ -76,6 +76,36 @@ echo '{"operation":"expand_task","payload":{"task":{"id":1,"title":"...","descri
 echo '{"operation":"generate_with_critic","payload":{"system_prompt":"...","user_prompt":"...","config":{"generator":"claude","critic":"claude"}}}' | ./dist/intake-agent
 ```
 
+## Debug Mode
+
+Enable granular logging with environment variables:
+
+```bash
+# Standard debug logging
+LOG_LEVEL=debug ./dist/intake-agent
+
+# Trace level (most granular - message by message)
+LOG_LEVEL=trace ./dist/intake-agent
+
+# Shorthand for debug mode
+DEBUG=1 ./dist/intake-agent
+
+# Disable colors
+NO_COLOR=1 LOG_LEVEL=debug ./dist/intake-agent
+```
+
+**Log Levels:**
+- `trace` - Message-by-message, MCP tool calls, prompts
+- `debug` - Operation steps, timing, configurations
+- `info` - Key events (default)
+- `warn` - Potential issues
+- `error` - Failures
+
+**Output:**
+- Logs go to stderr (colored)
+- JSON response goes to stdout
+- Safe for piping: `cat input.json | ./dist/intake-agent 2>debug.log`
+
 ## Known Issues
 
 1. **Research operation**: MCP tools (context7, exa) connected but not returning structured findings
