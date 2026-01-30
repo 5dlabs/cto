@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use crate::error::AppError;
-use crate::runtime::{self as rt, ContainerRuntime, RuntimeStatus};
+use crate::runtime::{self as rt, ContainerRuntime, RuntimeStatus, RuntimeEnvironment};
 
 /// Result of runtime detection
 #[derive(Debug, Serialize, Deserialize)]
@@ -13,6 +13,18 @@ pub struct RuntimeDetectionResult {
     pub available: Vec<RuntimeStatus>,
     /// Error message if no runtime is available
     pub error: Option<String>,
+}
+
+/// Scan the complete runtime environment
+#[tauri::command]
+pub async fn scan_runtime_environment() -> Result<RuntimeEnvironment, AppError> {
+    Ok(rt::scan_runtime_environment())
+}
+
+/// Start a container runtime
+#[tauri::command]
+pub async fn start_container_runtime(runtime: ContainerRuntime) -> Result<(), AppError> {
+    rt::start_runtime(runtime)
 }
 
 /// Detect the container runtime

@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
+import { RuntimeStep } from '@/components/setup/RuntimeStep'
+import { ClusterStep } from '@/components/setup/ClusterStep'
 import { 
   CheckCircle2,
   Container, 
@@ -29,8 +31,8 @@ const STEPS = [
   { id: 1, name: 'stack', title: 'Choose Your Stack', icon: Settings2 },
   { id: 2, name: 'api_keys', title: 'API Keys', icon: Key },
   { id: 3, name: 'github', title: 'GitHub Connection', icon: Github },
-  { id: 4, name: 'cloudflare', title: 'Cloudflare Connection', icon: Cloud },
-  { id: 5, name: 'cluster', title: 'Create Cluster', icon: Server },
+  { id: 4, name: 'cloudflare', title: 'Cloudflare Tunnel', icon: Cloud },
+  { id: 5, name: 'cluster', title: 'Kubernetes Cluster', icon: Server },
 ]
 
 export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
@@ -39,48 +41,13 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
   const { toast } = useToast()
 
   // Step-specific state
-  const [runtimeDetected, setRuntimeDetected] = useState<string | null>(null)
   const [backendStack, setBackendStack] = useState<'go' | 'node'>('go')
   const [cli, setCli] = useState<'claude' | 'factory' | 'codex'>('claude')
   const [apiKey, setApiKey] = useState('')
   const [githubConnected, setGithubConnected] = useState(false)
   const [cloudflareConnected, setCloudflareConnected] = useState(false)
-  const [clusterCreated, setClusterCreated] = useState(false)
 
   const progress = ((currentStep + 1) / STEPS.length) * 100
-
-  async function handleRuntimeDetection() {
-    setLoading(true)
-    try {
-      const result = await invoke<{
-        detected: string | null
-        available: Array<{ runtime: string; installed: boolean; running: boolean }>
-        error: string | null
-      }>('detect_container_runtime')
-
-      if (result.detected) {
-        setRuntimeDetected(result.detected)
-        toast({
-          title: 'Runtime Detected',
-          description: `Found ${result.detected} running`,
-        })
-      } else {
-        toast({
-          title: 'No Runtime Found',
-          description: result.error || 'Please install Docker, Colima, or Podman',
-          variant: 'destructive',
-        })
-      }
-    } catch (error) {
-      toast({
-        title: 'Detection Failed',
-        description: String(error),
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function handleSaveStack() {
     setLoading(true)
@@ -156,20 +123,6 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
     }
   }
 
-  async function handleCreateCluster() {
-    setLoading(true)
-    try {
-      toast({ title: 'Creating Cluster', description: 'This may take a few minutes...' })
-      await invoke('create_cluster')
-      setClusterCreated(true)
-      toast({ title: 'Cluster Created', description: 'CTO Lite is ready!' })
-    } catch (error) {
-      toast({ title: 'Cluster Creation Failed', description: String(error), variant: 'destructive' })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   async function handleComplete() {
     try {
       await invoke('mark_setup_complete')
@@ -195,31 +148,13 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
   function renderStepContent() {
     switch (currentStep) {
       case 0:
+        // Container Runtime detection
         return (
-          <div className="space-y-6">
-            <p className="text-muted-foreground">
-              CTO Lite needs a container runtime to run Kubernetes locally.
-              We support Docker Desktop, Colima, and Podman.
-            </p>
-            {runtimeDetected ? (
-              <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <span className="text-green-500 font-medium">
-                  Detected: {runtimeDetected}
-                </span>
-              </div>
-            ) : (
-              <Button onClick={handleRuntimeDetection} disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Detect Runtime
-              </Button>
-            )}
-            {runtimeDetected && (
-              <Button onClick={nextStep} className="w-full">
-                Continue
-              </Button>
-            )}
-          </div>
+          <RuntimeStep 
+            onComplete={() => {
+              nextStep()
+            }}
+          />
         )
 
       case 1:
@@ -227,6 +162,9 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
           <div className="space-y-6">
             <div className="space-y-4">
               <Label>Backend Stack</Label>
+              <p className="text-sm text-muted-foreground">
+                Choose your preferred backend technology. This determines which AI agent handles backend tasks.
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <button
                   className={`p-4 rounded-lg border-2 text-left transition-colors ${
@@ -254,7 +192,10 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
             </div>
 
             <div className="space-y-4">
-              <Label>CLI Tool</Label>
+              <Label>Coding CLI</Label>
+              <p className="text-sm text-muted-foreground">
+                Which AI coding assistant do you want to use?
+              </p>
               <div className="grid grid-cols-3 gap-4">
                 {(['claude', 'factory', 'codex'] as const).map((option) => (
                   <button
@@ -266,16 +207,28 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
                     }`}
                     onClick={() => setCli(option)}
                   >
-                    <div className="font-semibold capitalize">{option}</div>
+                    <div className="font-semibold capitalize">
+                      {option === 'claude' ? 'Claude Code' : 
+                       option === 'factory' ? 'Factory' : 'Codex'}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {option === 'claude' ? 'Anthropic' : 
+                       option === 'factory' ? 'Anthropic' : 'OpenAI'}
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
 
-            <Button onClick={handleSaveStack} disabled={loading} className="w-full">
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Continue
-            </Button>
+            <div className="flex justify-between pt-4">
+              <Button variant="outline" onClick={prevStep}>
+                Back
+              </Button>
+              <Button onClick={handleSaveStack} disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Continue
+              </Button>
+            </div>
           </div>
         )
 
@@ -297,11 +250,26 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                Get your API key from{' '}
+                <a 
+                  href={cli === 'codex' ? 'https://platform.openai.com/api-keys' : 'https://console.anthropic.com/'}
+                  target="_blank"
+                  className="text-primary hover:underline"
+                >
+                  {cli === 'codex' ? 'OpenAI' : 'Anthropic Console'}
+                </a>
+              </p>
             </div>
-            <Button onClick={handleSaveApiKey} disabled={loading || !apiKey.trim()} className="w-full">
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save & Continue
-            </Button>
+            <div className="flex justify-between pt-4">
+              <Button variant="outline" onClick={prevStep}>
+                Back
+              </Button>
+              <Button onClick={handleSaveApiKey} disabled={loading || !apiKey.trim()}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save & Continue
+              </Button>
+            </div>
           </div>
         )
 
@@ -312,22 +280,37 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
               Connect your GitHub account to allow CTO Lite to create branches and pull requests.
             </p>
             {githubConnected ? (
-              <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <span className="text-green-500 font-medium">GitHub Connected</span>
-              </div>
+              <>
+                <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  <span className="text-green-500 font-medium">GitHub Connected</span>
+                </div>
+                <div className="flex justify-between pt-4">
+                  <Button variant="outline" onClick={prevStep}>
+                    Back
+                  </Button>
+                  <Button onClick={nextStep}>
+                    Continue
+                  </Button>
+                </div>
+              </>
             ) : (
-              <Button onClick={handleGitHubConnect} disabled={loading} className="w-full">
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <Github className="mr-2 h-4 w-4" />
-                Connect GitHub
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </Button>
-            )}
-            {githubConnected && (
-              <Button onClick={nextStep} className="w-full">
-                Continue
-              </Button>
+              <>
+                <Button onClick={handleGitHubConnect} disabled={loading} className="w-full">
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <Github className="mr-2 h-4 w-4" />
+                  Connect GitHub
+                  <ExternalLink className="ml-2 h-4 w-4" />
+                </Button>
+                <div className="flex justify-between pt-4">
+                  <Button variant="outline" onClick={prevStep}>
+                    Back
+                  </Button>
+                  <Button variant="ghost" onClick={nextStep}>
+                    Skip for now
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         )
@@ -340,57 +323,59 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
               This allows GitHub to send events to your local CTO Lite instance.
             </p>
             {cloudflareConnected ? (
-              <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <span className="text-green-500 font-medium">Cloudflare Connected</span>
-              </div>
+              <>
+                <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  <span className="text-green-500 font-medium">Cloudflare Connected</span>
+                </div>
+                <div className="flex justify-between pt-4">
+                  <Button variant="outline" onClick={prevStep}>
+                    Back
+                  </Button>
+                  <Button onClick={nextStep}>
+                    Continue
+                  </Button>
+                </div>
+              </>
             ) : (
-              <Button onClick={handleCloudflareConnect} disabled={loading} className="w-full">
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <Cloud className="mr-2 h-4 w-4" />
-                Connect Cloudflare
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </Button>
-            )}
-            {cloudflareConnected && (
-              <Button onClick={nextStep} className="w-full">
-                Continue
-              </Button>
+              <>
+                <Button onClick={handleCloudflareConnect} disabled={loading} className="w-full">
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <Cloud className="mr-2 h-4 w-4" />
+                  Connect Cloudflare
+                  <ExternalLink className="ml-2 h-4 w-4" />
+                </Button>
+                <div className="flex justify-between pt-4">
+                  <Button variant="outline" onClick={prevStep}>
+                    Back
+                  </Button>
+                  <Button variant="ghost" onClick={nextStep}>
+                    Skip for now
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         )
 
       case 5:
+        // Kubernetes cluster setup with detection
         return (
-          <div className="space-y-6">
-            <p className="text-muted-foreground">
-              Create a local Kubernetes cluster to run CTO Lite.
-              This uses Kind to spin up a lightweight cluster in your container runtime.
-            </p>
-            {clusterCreated ? (
-              <>
-                <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span className="text-green-500 font-medium">Cluster Created</span>
-                </div>
-                <Button onClick={handleComplete} className="w-full">
-                  🚀 Launch CTO Lite
-                </Button>
-              </>
-            ) : (
-              <Button onClick={handleCreateCluster} disabled={loading} className="w-full">
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <Server className="mr-2 h-4 w-4" />
-                Create Cluster
-              </Button>
-            )}
-          </div>
+          <ClusterStep 
+            onComplete={() => {
+              handleComplete()
+            }}
+            onBack={prevStep}
+          />
         )
 
       default:
         return null
     }
   }
+
+  // For steps with custom components, we render them differently
+  const isCustomStep = currentStep === 0 || currentStep === 5
 
   return (
     <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-background to-muted/20">
@@ -439,40 +424,27 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
           })}
         </div>
 
-        {/* Main Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {(() => {
-                const Icon = STEPS[currentStep].icon
-                return <Icon className="h-5 w-5" />
-              })()}
-              {STEPS[currentStep].title}
-            </CardTitle>
-            <CardDescription>
-              Step {currentStep + 1} of {STEPS.length}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>{renderStepContent()}</CardContent>
-        </Card>
-
-        {/* Navigation */}
-        <div className="flex justify-between">
-          <Button
-            variant="ghost"
-            onClick={prevStep}
-            disabled={currentStep === 0}
-          >
-            ← Back
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={nextStep}
-            disabled={currentStep === STEPS.length - 1}
-          >
-            Skip →
-          </Button>
-        </div>
+        {/* Main Content */}
+        {isCustomStep ? (
+          <Card>
+            <CardContent className="pt-6">
+              {renderStepContent()}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {(() => {
+                  const Icon = STEPS[currentStep].icon
+                  return <Icon className="h-5 w-5" />
+                })()}
+                {STEPS[currentStep].title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>{renderStepContent()}</CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

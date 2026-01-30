@@ -57,8 +57,11 @@ fn main() {
             commands::runtime::detect_container_runtime,
             commands::runtime::get_runtime_status,
             commands::runtime::check_docker_running,
+            commands::runtime::scan_runtime_environment,
+            commands::runtime::start_container_runtime,
             
             // Cluster management
+            commands::cluster::scan_environment,
             commands::cluster::detect_existing_clusters,
             commands::cluster::create_cluster,
             commands::cluster::delete_cluster,
