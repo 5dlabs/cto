@@ -127,6 +127,10 @@ ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
 # Setup workspace
 RUN mkdir -p /workspace && chown -R node:node /workspace
 
+# Copy GitHub App authentication script
+COPY scripts/github-app-auth.sh /usr/local/bin/github-app-auth
+RUN chmod +x /usr/local/bin/github-app-auth
+
 USER node
 WORKDIR /workspace
 ENV DEVCONTAINER=true

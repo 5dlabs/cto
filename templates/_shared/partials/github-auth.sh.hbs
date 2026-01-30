@@ -51,27 +51,34 @@ if [ -z "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_A
   
   JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
   
-  # Get installation ID with retry logic
-  CURL_RETRIES=0
-  CURL_MAX_RETRIES=5
-  INSTALLATIONS=""
-  while [ $CURL_RETRIES -lt $CURL_MAX_RETRIES ]; do
-    INSTALLATIONS=$(curl -s --connect-timeout 10 --max-time 30 -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations" 2>&1)
-    CURL_EXIT=$?
-    if [ $CURL_EXIT -eq 0 ] && [ -n "$INSTALLATIONS" ] && echo "$INSTALLATIONS" | jq -e '.' >/dev/null 2>&1; then
-      break
-    fi
-    CURL_RETRIES=$((CURL_RETRIES + 1))
-    if [ $CURL_RETRIES -eq $CURL_MAX_RETRIES ]; then
-      echo "❌ Failed to fetch GitHub App installations after ${CURL_MAX_RETRIES} attempts"
-      INSTALLATIONS=""
-      break
-    fi
-    echo "  ⏳ API call failed (exit: $CURL_EXIT), retrying in 5s... (attempt $CURL_RETRIES/$CURL_MAX_RETRIES)"
-    sleep 5
-  done
-  
-  INSTALLATION_ID=$(echo "$INSTALLATIONS" | jq -r '.[0].id' 2>/dev/null)
+  # Use installation ID from environment if available (faster, more reliable)
+  # Otherwise, fetch from API (fallback for backwards compatibility)
+  if [ -n "${GITHUB_APP_INSTALLATION_ID:-}" ]; then
+    INSTALLATION_ID="$GITHUB_APP_INSTALLATION_ID"
+    echo "📌 Using installation ID from environment: $INSTALLATION_ID"
+  else
+    # Get installation ID with retry logic
+    CURL_RETRIES=0
+    CURL_MAX_RETRIES=5
+    INSTALLATIONS=""
+    while [ $CURL_RETRIES -lt $CURL_MAX_RETRIES ]; do
+      INSTALLATIONS=$(curl -s --connect-timeout 10 --max-time 30 -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations" 2>&1)
+      CURL_EXIT=$?
+      if [ $CURL_EXIT -eq 0 ] && [ -n "$INSTALLATIONS" ] && echo "$INSTALLATIONS" | jq -e '.' >/dev/null 2>&1; then
+        break
+      fi
+      CURL_RETRIES=$((CURL_RETRIES + 1))
+      if [ $CURL_RETRIES -eq $CURL_MAX_RETRIES ]; then
+        echo "❌ Failed to fetch GitHub App installations after ${CURL_MAX_RETRIES} attempts"
+        INSTALLATIONS=""
+        break
+      fi
+      echo "  ⏳ API call failed (exit: $CURL_EXIT), retrying in 5s... (attempt $CURL_RETRIES/$CURL_MAX_RETRIES)"
+      sleep 5
+    done
+    
+    INSTALLATION_ID=$(echo "$INSTALLATIONS" | jq -r '.[0].id' 2>/dev/null)
+  fi
   
   if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
     # Get access token with retry logic
