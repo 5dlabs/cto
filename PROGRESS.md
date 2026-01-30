@@ -31,10 +31,20 @@ cd ../tauri && cargo tauri dev
 ### 🔄 Phase 2 In Progress
 **Core Infrastructure**
 
-Status: Starting
-- [ ] Helm chart
-- [ ] pm-lite
-- [ ] Workflow template
+Status: In Progress
+- [x] Helm chart (`infra/charts/cto-lite/`)
+  - Chart.yaml, values.yaml
+  - ServiceAccount + RBAC
+  - Controller deployment
+  - PM-Lite deployment + service
+- [x] pm-lite (`crates/cto-lite/pm-lite/`)
+  - GitHub webhook handling
+  - Workflow triggering via Argo
+  - Compiles ✅
+- [x] Workflow template (`templates/workflows/play-workflow-lite.yaml`)
+  - DAG: Morgan → Backend/Frontend → Tess → Cleo → Cipher → Bolt
+  - No Atlas (user reviews PRs)
+  - User-selectable stack (grizz/nova)
 
 ---
 
