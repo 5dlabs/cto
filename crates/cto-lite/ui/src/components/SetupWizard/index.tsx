@@ -8,8 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
 import { 
-  CheckCircle2, 
-  Circle, 
+  CheckCircle2,
   Container, 
   Github, 
   Cloud, 

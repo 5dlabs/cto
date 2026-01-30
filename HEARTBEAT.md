@@ -4,10 +4,10 @@
 Working autonomously until blocked or complete.
 
 ## Current Focus
-**Phase 3: MCP + Dashboard**
-- mcp-lite background service
-- Dashboard log streaming
-- Workflow status display
+**Phase 4: Distribution**
+- CI workflow for Tauri builds
+- Code signing
+- Binary bundling
 
 ## On Heartbeat
 1. Check current task progress
@@ -18,3 +18,4 @@ Working autonomously until blocked or complete.
 ## Completed
 - Phase 1: Tauri app foundation ✅
 - Phase 2: Core infrastructure ✅
+- Phase 3: MCP + Dashboard ✅
