@@ -49,9 +49,15 @@ claude mcp list >&2 2>&1 || true
 echo "" >&2
 echo "--- Executing Claude CLI ---" >&2
 
-# The prompt - can be overridden via CLAUDE_PROMPT env var
-# Default prompt is designed to exercise MCP tools (context7, firecrawl, etc.)
-PROMPT="${CLAUDE_PROMPT:-You have access to CTO MCP tools. Please complete these tasks to verify the tools work:
+# Load prompt from file if it exists (mirrors controller's prompt handling)
+if [[ -f "${WORKSPACE}/task/prompt.md" ]]; then
+  echo "Loading prompt from ${WORKSPACE}/task/prompt.md" >&2
+  PROMPT="$(cat "${WORKSPACE}/task/prompt.md")"
+elif [[ -n "${CLAUDE_PROMPT:-}" ]]; then
+  PROMPT="${CLAUDE_PROMPT}"
+else
+  # Default prompt for testing MCP tools
+  PROMPT="You have access to CTO MCP tools. Please complete these tasks to verify the tools work:
 
 ## Task 1: Use Context7 to look up documentation
 Use the context7 MCP tools to:
@@ -69,7 +75,8 @@ Create a file at /workspace/mcp-test-results.md that summarizes:
 - What results you got from each
 - Any errors encountered
 
-Be explicit about which tools you're calling so we can verify the MCP integration is working.}"
+Be explicit about which tools you're calling so we can verify the MCP integration is working."
+fi
 
 # Run Claude with streaming output for sidecar parsing
 # The init message in stream-json contains tools, skills, and mcp_servers
