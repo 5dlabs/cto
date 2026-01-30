@@ -1046,7 +1046,7 @@ mod tests {
         let (agent, pr, check) = parsed.unwrap();
         assert_eq!(agent, Agent::Rex);
         assert_eq!(pr, 123);
-        assert_eq!(check, 456789);
+        assert_eq!(check, 456_789);
 
         let invalid = "invalid-format";
         assert!(parse_button_identifier(invalid).is_none());

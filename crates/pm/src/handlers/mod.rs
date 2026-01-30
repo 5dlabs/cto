@@ -31,7 +31,3 @@ pub use play::{PlayRequest, PlayResult};
 pub use play_state::{
     determine_bolt_stage, get_state_for_agent, mark_task_done, update_play_stage, BoltStage,
 };
-pub use agent_interactions::{
-    handle_mention_webhook, handle_remediation_webhook, Agent, Language, ParsedMention,
-    PrContext, detect_primary_language, select_agent_for_files,
-};
