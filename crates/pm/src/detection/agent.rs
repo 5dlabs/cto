@@ -159,8 +159,8 @@ fn agent_for_framework(framework: Framework) -> Option<Agent> {
         Framework::Unreal | Framework::Qt => Agent::Forge,
         Framework::Godot => Agent::Forge,
 
-        // Python - Backend
-        Framework::FastApi | Framework::Django | Framework::Flask => Agent::Nova,
+        // Python - Backend (no dedicated agent yet, falls back to Generic/Rex)
+        Framework::FastApi | Framework::Django | Framework::Flask => Agent::Generic,
 
         Framework::Unknown => return None,
     })
@@ -174,10 +174,10 @@ fn agent_for_language(language: Language) -> Agent {
         Language::TypeScript | Language::JavaScript => Agent::Blaze, // Default TS to web
         Language::CSharp => Agent::Vex,
         Language::Cpp => Agent::Forge,
-        Language::Python => Agent::Nova,
+        Language::Python => Agent::Generic, // No dedicated Python agent yet
         Language::Swift | Language::Kotlin => Agent::Tap, // Mobile languages
-        Language::Java => Agent::Nova,                    // Java backend
-        Language::Ruby | Language::Php => Agent::Nova,    // Web backend
+        Language::Java => Agent::Generic,   // No dedicated Java agent yet
+        Language::Ruby | Language::Php => Agent::Generic, // No dedicated Ruby/PHP agent yet
         Language::Shell | Language::Yaml | Language::Json | Language::Markdown | Language::Other => {
             Agent::Rex // Infra/config goes to Rex
         }
