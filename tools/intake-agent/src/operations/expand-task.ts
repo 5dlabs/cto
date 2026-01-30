@@ -178,9 +178,25 @@ export async function expandTask(
       }
     }
 
-    // Prepend the JSON structure that the prompt tells the model is "already provided"
-    // The model outputs array contents directly, we wrap it
-    const wrappedResponse = '{"subtasks":[' + responseText.trim();
+    // Handle both cases:
+    // 1. Model outputs array contents directly (needs wrapping)
+    // 2. Model outputs full JSON with {"subtasks":[...]} (use as-is)
+    const trimmed = responseText.trim();
+    let wrappedResponse: string;
+    
+    if (trimmed.startsWith('{"subtasks"') || trimmed.startsWith('{ "subtasks"')) {
+      // Model gave us full JSON, use as-is
+      wrappedResponse = trimmed;
+    } else if (trimmed.startsWith('[')) {
+      // Model gave us just the array, wrap it
+      wrappedResponse = '{"subtasks":' + trimmed + '}';
+    } else if (trimmed.startsWith('{')) {
+      // Model started with first object, wrap in array
+      wrappedResponse = '{"subtasks":[' + trimmed;
+    } else {
+      // Unexpected format, try wrapping anyway
+      wrappedResponse = '{"subtasks":[' + trimmed;
+    }
     
     // Parse with robust JSON parser
     const result = parseJsonResponse<GeneratedSubtask>(wrappedResponse, 'subtasks', isValidSubtask);

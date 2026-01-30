@@ -131,7 +131,21 @@ export async function analyzeComplexity(
     }
 
     // Prepend the JSON structure that the prompt tells the model is "already provided"
-    const wrappedResponse = '{"complexityAnalysis":[' + responseText.trim();
+    // Handle both cases:
+    // 1. Model outputs array contents directly (needs wrapping)
+    // 2. Model outputs full JSON (use as-is)
+    const trimmed = responseText.trim();
+    let wrappedResponse: string;
+    
+    if (trimmed.startsWith('{"complexityAnalysis"') || trimmed.startsWith('{ "complexityAnalysis"')) {
+      wrappedResponse = trimmed;
+    } else if (trimmed.startsWith('[')) {
+      wrappedResponse = '{"complexityAnalysis":' + trimmed + '}';
+    } else if (trimmed.startsWith('{')) {
+      wrappedResponse = '{"complexityAnalysis":[' + trimmed;
+    } else {
+      wrappedResponse = '{"complexityAnalysis":[' + trimmed;
+    }
     
     // Parse with robust JSON parser
     const result = parseJsonResponse<TaskComplexityAnalysis>(wrappedResponse, 'complexityAnalysis', isValidComplexityAnalysis);
