@@ -1,18 +1,7 @@
 ---
-# =============================================================================
 # Agent @Mention Sensor
-# =============================================================================
-# Triggers agent actions when @mentioned in PR comments or review comments.
-# Supports all implementation agents: Rex, Grizz, Nova, Blaze, Tap, Spark, Vex, Forge
-# Plus support agents: Stitch (review), Cleo (quality), Cipher (security), Tess (testing)
-#
-# Examples:
-#   "@5DLabs-Stitch please re-review the error handling"
-#   "@5DLabs-Rex fix the clippy warnings"
-#   "@5DLabs-Blaze update the component styling"
-#
-# Webhook: Org-level GitHub webhook → github-webhooks.5dlabs.ai
-# =============================================================================
+# Triggers on PR comments and review comments containing @5DLabs-{agent}
+# Filtering for @mention pattern is done in the handler
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -20,109 +9,39 @@ metadata:
   namespace: automation
   labels:
     app.kubernetes.io/name: agent-mention
-    app.kubernetes.io/component: sensor
-    platform.5dlabs.io/log-collection: enabled
 spec:
   dependencies:
-    # PR comment mentions (issue_comment on PRs)
-    - name: pr-comment-mention
+    # All comment events (issue_comment and pull_request_review_comment)
+    - name: comment-event
       eventSourceName: github
       eventName: org
       filters:
         data:
-          # issue_comment events (PRs are issues in GitHub's model)
+          # Accept both comment event types
           - path: body.X-GitHub-Event
             type: string
             value:
               - issue_comment
+              - pull_request_review_comment
           # Only on created comments (not edited/deleted)
           - path: body.action
             type: string
             value:
               - created
-          # Must be on a PR (has pull_request key)
-          - path: body.issue.pull_request
-            type: string
-            comparator: "!="
-            value:
-              - ""
-          # Only from human users (not bots)
-          - path: body.comment.user.type
-            type: string
-            value:
-              - User
-        # Must mention one of our agents
-        exprs:
-          - expr: >-
-              body =~ "(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)"
-            fields:
-              - name: body
-                path: body.comment.body
-
-    # Review comment mentions (pull_request_review_comment)
-    - name: review-comment-mention
-      eventSourceName: github
-      eventName: org
-      filters:
-        data:
-          - path: body.X-GitHub-Event
-            type: string
-            value:
-              - pull_request_review_comment
-          - path: body.action
-            type: string
-            value:
-              - created
-          - path: body.comment.user.type
-            type: string
-            value:
-              - User
-        exprs:
-          - expr: >-
-              body =~ "(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)"
-            fields:
-              - name: body
-                path: body.comment.body
-
   template:
     serviceAccountName: argo-events-sa
-    metadata:
-      labels:
-        platform.5dlabs.io/log-collection: enabled
-
   triggers:
-    # Trigger for PR comment mentions
     - template:
-        name: handle-pr-comment-mention
-        conditions: pr-comment-mention
+        name: handle-comment-mention
+        conditions: comment-event
         http:
           url: http://cto-pm.cto.svc.cluster.local:8081/webhooks/github/mention
           method: POST
           headers:
             Content-Type: application/json
-            X-Mention-Source: issue_comment
           payload:
             - src:
-                dependencyName: pr-comment-mention
-                dataKey: body
-              dest: payload
-      retryStrategy:
-        steps: 3
-        duration: 5s
-
-    # Trigger for review comment mentions
-    - template:
-        name: handle-review-comment-mention
-        conditions: review-comment-mention
-        http:
-          url: http://cto-pm.cto.svc.cluster.local:8081/webhooks/github/mention
-          method: POST
-          headers:
-            Content-Type: application/json
-            X-Mention-Source: pull_request_review_comment
-          payload:
-            - src:
-                dependencyName: review-comment-mention
+                dependencyName: comment-event
                 dataKey: body
               dest: payload
       retryStrategy:
