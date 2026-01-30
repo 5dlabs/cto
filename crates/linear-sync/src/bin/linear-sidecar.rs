@@ -154,9 +154,54 @@ struct AppState {
 
 const LINEAR_API_URL: &str = "https://api.linear.app/graphql";
 
-/// Create agent session on Linear issue
-async fn create_linear_session(state: &AppState, model: &str, tools: &[String], skills: &[String]) -> Result<String> {
+/// Resolve issue identifier (e.g., "CTOPA-123") to issue UUID
+async fn resolve_issue_id(token: &str, identifier: &str) -> Result<String> {
     let client = reqwest::Client::new();
+    
+    let query = r#"
+        query GetIssue($identifier: String!) {
+            issue(id: $identifier) {
+                id
+            }
+        }
+    "#;
+    
+    let response = client
+        .post(LINEAR_API_URL)
+        .header("Authorization", token)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "query": query,
+            "variables": { "identifier": identifier }
+        }))
+        .send()
+        .await
+        .context("Failed to resolve issue ID")?;
+    
+    let body: serde_json::Value = response.json().await?;
+    
+    if let Some(errors) = body.get("errors") {
+        error!("Linear API errors resolving issue: {:?}", errors);
+        anyhow::bail!("Failed to resolve issue: {:?}", errors);
+    }
+    
+    let issue_id = body["data"]["issue"]["id"]
+        .as_str()
+        .context("Issue not found")?
+        .to_string();
+    
+    info!("Resolved {} to {}", identifier, issue_id);
+    Ok(issue_id)
+}
+
+/// Create agent session on Linear issue
+/// Note: Linear's AgentSessionCreateOnIssue now only accepts issueId
+/// Model, tools, skills are added via activities
+async fn create_linear_session(state: &AppState, _model: &str, _tools: &[String], _skills: &[String]) -> Result<String> {
+    let client = reqwest::Client::new();
+    
+    // First resolve the issue identifier to UUID
+    let issue_id = resolve_issue_id(&state.linear_token, &state.issue_identifier).await?;
     
     let query = r#"
         mutation CreateAgentSession($input: AgentSessionCreateOnIssue!) {
@@ -164,22 +209,15 @@ async fn create_linear_session(state: &AppState, model: &str, tools: &[String], 
                 success
                 agentSession {
                     id
+                    status
                 }
             }
         }
     "#;
     
-    let tools_json: Vec<serde_json::Value> = tools.iter()
-        .map(|t| serde_json::json!({ "name": t, "used": false }))
-        .collect();
-    
     let variables = serde_json::json!({
         "input": {
-            "issueIdentifier": state.issue_identifier,
-            "provider": "anthropic",
-            "model": model,
-            "agentTools": tools_json,
-            "agentSkills": skills
+            "issueId": issue_id
         }
     });
     
@@ -212,20 +250,26 @@ async fn create_linear_session(state: &AppState, model: &str, tools: &[String], 
 }
 
 /// Add activity to Linear session
+/// Linear activity types: action, error, thought, response, elicitation
+/// Content structure varies by type:
+///   - response: {"type": "response", "body": "..."}
+///   - thought: {"type": "thought", "body": "..."}
+///   - action: {"type": "action", "action": "ToolName", "parameter": "..."}
+///   - error: {"type": "error", "body": "..."}
 async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntry) -> Result<()> {
     let client = reqwest::Client::new();
     
     let query = r#"
-        mutation AddAgentActivity($sessionId: String!, $input: AgentActivityCreateInput!) {
-            agentActivityCreate(sessionId: $sessionId, input: $input) {
+        mutation AddAgentActivity($input: AgentActivityCreateInput!) {
+            agentActivityCreate(input: $input) {
                 success
             }
         }
     "#;
     
-    // Determine activity type and content
+    // Build activity content based on entry type
     // Handle Claude CLI's nested message format
-    let (activity_type, content) = match entry.entry_type.as_deref() {
+    let content: Option<serde_json::Value> = match entry.entry_type.as_deref() {
         // Direct tool_use events (non-Claude)
         Some("tool_use") | Some("tool") => {
             let tool_name = entry.tool_name.as_ref()
@@ -234,60 +278,86 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
                 .unwrap_or("unknown");
             let input = entry.tool_input.as_ref()
                 .or(entry.input.as_ref())
-                .map(|v| serde_json::to_string_pretty(v).unwrap_or_default())
+                .map(|v| serde_json::to_string(v).unwrap_or_default())
                 .unwrap_or_default();
-            ("tool_call", format!("**{}**\n```json\n{}\n```", tool_name, input))
+            Some(serde_json::json!({
+                "type": "action",
+                "action": tool_name,
+                "parameter": input
+            }))
         }
         // Claude assistant messages (may contain text or tool_use)
         Some("assistant") => {
             // Check for tool_use in Claude's nested format
             if let Some((tool_name, tool_input)) = extract_claude_tool_use(entry) {
-                let input_str = serde_json::to_string_pretty(&tool_input).unwrap_or_default();
-                ("tool_call", format!("**{}**\n```json\n{}\n```", tool_name, input_str))
+                let input_str = serde_json::to_string(&tool_input).unwrap_or_default();
+                Some(serde_json::json!({
+                    "type": "action",
+                    "action": tool_name,
+                    "parameter": input_str
+                }))
             } else if let Some(text) = extract_claude_text(entry) {
-                ("message", text)
+                Some(serde_json::json!({
+                    "type": "response",
+                    "body": text
+                }))
             } else {
-                // Fallback: try to extract any content
-                let content = entry.content.clone().unwrap_or_default();
-                ("message", content)
+                None // Skip empty assistant messages
             }
         }
         Some("text") => {
             let msg = extract_claude_text(entry)
                 .or_else(|| entry.content.clone())
                 .unwrap_or_default();
-            ("message", msg)
+            if msg.is_empty() {
+                None
+            } else {
+                Some(serde_json::json!({
+                    "type": "response",
+                    "body": msg
+                }))
+            }
         }
         Some("user") => {
-            // User events typically contain tool results - skip for now
-            // (they're acknowledgments, not interesting for display)
-            return Ok(());
+            // User events contain tool results - skip
+            None
         }
         Some("system") => {
             // System events (like init) are handled elsewhere
-            return Ok(());
+            None
         }
         Some("error") => {
             let msg = extract_claude_text(entry)
                 .or_else(|| entry.content.clone())
                 .unwrap_or_else(|| "Unknown error".to_string());
-            ("error", format!("❌ {}", msg))
+            Some(serde_json::json!({
+                "type": "error",
+                "body": msg
+            }))
         }
         Some("result") => {
-            // Final result event - could include stats
-            ("log", "✅ Session completed".to_string())
+            // Final result event
+            Some(serde_json::json!({
+                "type": "thought",
+                "body": "✅ Session completed"
+            }))
         }
         _ => {
-            // Raw log line - skip unknown types to reduce noise
+            // Skip unknown types
             debug!("Skipping unknown event type: {:?}", entry.entry_type);
-            return Ok(());
+            None
         }
     };
     
+    // Skip if no content to post
+    let content = match content {
+        Some(c) => c,
+        None => return Ok(()),
+    };
+    
     let variables = serde_json::json!({
-        "sessionId": session_id,
         "input": {
-            "type": activity_type,
+            "agentSessionId": session_id,
             "content": content
         }
     });
@@ -303,8 +373,10 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
         .send()
         .await?;
     
-    if !response.status().is_success() {
-        warn!("Failed to add activity: {}", response.status());
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        warn!("Failed to add activity ({}): {}", status, body);
     }
     
     Ok(())
