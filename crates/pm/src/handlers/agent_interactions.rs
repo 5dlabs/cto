@@ -832,6 +832,7 @@ pub fn select_agent_for_files(files: &[String]) -> Agent {
 // =============================================================================
 
 /// Handle CI failure webhook - creates a check run with remediation buttons
+#[allow(clippy::too_many_lines)]
 pub async fn handle_ci_failure_webhook(
     State(_state): State<Arc<CallbackState>>,
     _headers: HeaderMap,
