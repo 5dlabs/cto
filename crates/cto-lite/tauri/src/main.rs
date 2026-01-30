@@ -115,6 +115,12 @@ fn main() {
             commands::updates::pull_updates,
             commands::updates::apply_updates,
             commands::updates::get_component_versions,
+            
+            // Installation
+            commands::install::check_prerequisites,
+            commands::install::run_installation,
+            commands::install::get_install_status,
+            commands::install::reset_installation,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
