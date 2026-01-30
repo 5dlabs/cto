@@ -1,0 +1,11 @@
+{
+  "name": "stitch-test-nova",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run server/index.ts"
+  },
+  "dependencies": {
+    "elysia": "^1.0.0",
+    "drizzle-orm": "^0.30.0"
+  }
+}
