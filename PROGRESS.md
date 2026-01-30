@@ -60,39 +60,26 @@ Delivered:
 
 Status: In Progress
 - [x] Packaging layout documented (`docs/packaging-layout.md`)
-  - macOS/Windows/Linux paths defined
-  - Binary resolution strategy
-  - MCP configuration for IDEs
 - [x] Resources directory structure created
-  - `resources/bin/` - bundled binaries
-  - `resources/charts/` - Helm charts
-  - `resources/templates/` - workflow templates
 - [x] Paths module (`src/paths.rs`)
-  - Binary resolution (dev vs production)
-  - Chart/template path resolution
-  - Cross-platform data directories
 - [x] Build script (`scripts/build-release.sh`)
-  - Downloads kind/kubectl/helm/cloudflared
-  - Builds mcp-lite
-  - Copies resources
-- [x] Enhanced `tauri.conf.json`
-  - Native installer configs for macOS/Windows/Linux
-  - DMG with drag-to-Applications layout
-  - NSIS wizard for Windows
-  - AppImage + DEB + RPM for Linux
-  - System tray icon
-  - Updater plugin configured
-- [x] CI workflow (`cto-lite-release.yaml`)
-  - Matrix builds: macOS arm64/x64, Windows x64, Linux x64
-  - Code signing setup (macOS + Windows)
-  - GitHub Release creation with all artifacts
-  - CDN upload to Cloudflare R2
-- [x] CI workflow (`cto-lite-ci.yaml`)
-  - PR validation for frontend/backend
-  - Multi-platform build tests
-  - MCP server checks
-  - PM Lite checks
+- [x] Enhanced `tauri.conf.json` with native installer configs
+- [x] CI workflows (`cto-lite-release.yaml`, `cto-lite-ci.yaml`)
 - [x] Icon README with generation instructions
+- [x] Docker-based update system (`updates.rs`, `Updates.tsx`)
+- [x] Enhanced runtime detection (07:44 PST)
+  - Docker Desktop, OrbStack, Colima, Podman, Lima, Rancher Desktop
+  - macOS version check for Apple Virtualization
+  - Docker compatibility & K8s-included flags
+  - RuntimeStep UI with start buttons
+- [x] Enhanced cluster detection
+  - Multi-kubeconfig file scanning
+  - K8s version retrieval
+  - ClusterStep UI with radio selection
+- [x] Setup wizard integrated with new detection
+- [x] UI compiles and builds ✅
+- [x] Backend compiles ✅
+- [ ] Test full app locally
 - [ ] Create actual app icon (need design)
 - [ ] Test full release workflow
 - [ ] Configure code signing secrets

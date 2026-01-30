@@ -4,9 +4,9 @@
   "identifier": "ai.5dlabs.cto-lite",
   "version": "0.1.0",
   "build": {
-    "beforeDevCommand": "cd ../ui && npm run dev",
+    "beforeDevCommand": "",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "cd ../ui && npm run build",
+    "beforeBuildCommand": "npm --prefix ../ui run build",
     "frontendDist": "../ui/dist"
   },
   "app": {
@@ -64,29 +64,7 @@
   },
   "plugins": {
     "shell": {
-      "open": true,
-      "scope": [
-        {
-          "name": "docker",
-          "cmd": "docker",
-          "args": true
-        },
-        {
-          "name": "kind",
-          "cmd": "kind",
-          "args": true
-        },
-        {
-          "name": "kubectl",
-          "cmd": "kubectl",
-          "args": true
-        },
-        {
-          "name": "helm",
-          "cmd": "helm",
-          "args": true
-        }
-      ]
+      "open": true
     }
   }
 }
