@@ -14,6 +14,9 @@
 //!   CTO_AGENT_NAME: Agent name for config lookup
 //!   CTO_CONFIG_PATH: Path to cto-config.json
 //!   CTO_SKILLS_DIR: Path to skills directory
+//!   WORKSPACE_PATH: Path to agent workspace (for reading task context)
+//!   TASK_PROMPT_PATH: Path to task prompt file (default: $WORKSPACE_PATH/prompt.md)
+//!   TASK_ACCEPTANCE_PATH: Path to acceptance criteria (default: $WORKSPACE_PATH/acceptance-criteria.md)
 
 use anyhow::{Context, Result};
 use axum::{
@@ -128,6 +131,84 @@ fn extract_claude_tool_use(entry: &LogEntry) -> Option<(String, serde_json::Valu
     None
 }
 
+/// Parsed task context from prompt.md
+#[derive(Debug, Clone, Default)]
+struct TaskContext {
+    title: Option<String>,
+    goal: Option<String>,
+    role: Option<String>,
+    agent: Option<String>,
+    language: Option<String>,
+}
+
+/// Parse task context from prompt.md content
+fn parse_task_context(content: &str) -> TaskContext {
+    let mut ctx = TaskContext::default();
+    let lines: Vec<&str> = content.lines().collect();
+    
+    // Extract title from first # heading
+    for line in &lines {
+        if line.starts_with("# ") {
+            ctx.title = Some(line[2..].trim().to_string());
+            break;
+        }
+    }
+    
+    // Extract metadata from **Agent**: bolt | **Language**: yaml pattern
+    for line in &lines {
+        if line.contains("**Agent**:") {
+            if let Some(agent_part) = line.split("**Agent**:").nth(1) {
+                let agent = agent_part.split('|').next()
+                    .map(|s| s.trim().to_string());
+                ctx.agent = agent;
+            }
+        }
+        if line.contains("**Language**:") {
+            if let Some(lang_part) = line.split("**Language**:").nth(1) {
+                let lang = lang_part.split('|').next()
+                    .map(|s| s.trim().to_string());
+                ctx.language = lang;
+            }
+        }
+    }
+    
+    // Extract sections (## Role, ## Goal)
+    let mut current_section: Option<&str> = None;
+    let mut section_content = String::new();
+    
+    for line in &lines {
+        if line.starts_with("## ") {
+            // Save previous section
+            if let Some(section) = current_section {
+                let content = section_content.trim().to_string();
+                match section {
+                    "Role" => ctx.role = Some(content),
+                    "Goal" => ctx.goal = Some(content),
+                    _ => {}
+                }
+            }
+            // Start new section
+            current_section = Some(line[3..].trim());
+            section_content = String::new();
+        } else if current_section.is_some() {
+            section_content.push_str(line);
+            section_content.push('\n');
+        }
+    }
+    
+    // Save final section
+    if let Some(section) = current_section {
+        let content = section_content.trim().to_string();
+        match section {
+            "Role" => ctx.role = Some(content),
+            "Goal" => ctx.goal = Some(content),
+            _ => {}
+        }
+    }
+    
+    ctx
+}
+
 /// Agent session state
 #[derive(Debug, Default)]
 struct SessionState {
@@ -138,6 +219,11 @@ struct SessionState {
     tools_used: Vec<String>,
     total_entries: u64,
     errors: u64,
+    // Work tracking
+    files_created: Vec<String>,
+    files_modified: Vec<String>,
+    subagents_spawned: Vec<String>,
+    start_time: Option<std::time::Instant>,
 }
 
 /// Shared application state
@@ -146,6 +232,9 @@ struct AppState {
     linear_token: String,
     issue_identifier: String,
     agent_name: String,
+    // Task context
+    task_context: TaskContext,
+    workspace_path: Option<PathBuf>,
 }
 
 // =============================================================================
@@ -197,7 +286,7 @@ async fn resolve_issue_id(token: &str, identifier: &str) -> Result<String> {
 /// Create agent session on Linear issue
 /// Note: Linear's AgentSessionCreateOnIssue now only accepts issueId
 /// Model, tools, skills are added via activities
-/// Post initialization activity showing model, tools, skills
+/// Post initialization activity showing task context, model, tools, skills
 async fn post_init_activity(state: &AppState, session_id: &str, model: &str, tools: &[String], skills: &[String]) -> Result<()> {
     let client = reqwest::Client::new();
     
@@ -211,6 +300,27 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
     
     // Build init summary
     let mut sections = Vec::new();
+    
+    // Task context - what we're working on (most important, shown first)
+    let task = &state.task_context;
+    if let Some(ref title) = task.title {
+        sections.push(format!("📋 **Task:** {}", title));
+    }
+    if let Some(ref goal) = task.goal {
+        // Truncate long goals
+        let goal_preview = if goal.len() > 200 {
+            format!("{}...", &goal[..200])
+        } else {
+            goal.clone()
+        };
+        sections.push(format!("🎯 **Goal:** {}", goal_preview));
+    }
+    if let Some(ref agent) = task.agent {
+        let lang = task.language.as_deref().unwrap_or("general");
+        sections.push(format!("🤖 **Agent:** {} ({})", agent, lang));
+    }
+    
+    sections.push(String::new()); // Spacer
     
     // Model section
     sections.push(format!("**Model:** {}", model));
@@ -281,7 +391,7 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
     Ok(())
 }
 
-/// Post completion summary showing MCP tools and skills with usage indicators
+/// Post completion summary showing work accomplished, MCP tools and skills
 async fn post_completion_summary(
     state: &AppState,
     session_id: &str,
@@ -289,6 +399,9 @@ async fn post_completion_summary(
     tools: &[String],
     tools_used: &[String],
     skills: &[String],
+    files_created: &[String],
+    files_modified: &[String],
+    subagents_spawned: &[String],
     duration_ms: Option<u64>,
     cost_usd: Option<f64>,
     num_turns: Option<u64>,
@@ -305,21 +418,73 @@ async fn post_completion_summary(
     
     let mut sections = Vec::new();
     
+    // Task context reminder
+    let task = &state.task_context;
+    if let Some(ref title) = task.title {
+        sections.push(format!("📋 **Task:** {}", title));
+    }
+    
     // Stats line
     let mut stats_parts = Vec::new();
     if let Some(ms) = duration_ms {
         let secs = ms as f64 / 1000.0;
-        stats_parts.push(format!("{:.1}s", secs));
+        if secs >= 60.0 {
+            let mins = (secs / 60.0).floor();
+            let remaining_secs = secs % 60.0;
+            stats_parts.push(format!("{:.0}m {:.0}s", mins, remaining_secs));
+        } else {
+            stats_parts.push(format!("{:.1}s", secs));
+        }
     }
     if let Some(cost) = cost_usd {
-        stats_parts.push(format!("${:.4}", cost));
+        stats_parts.push(format!("${:.2}", cost));
     }
     if let Some(turns) = num_turns {
         stats_parts.push(format!("{} turns", turns));
     }
     if !stats_parts.is_empty() {
-        sections.push(format!("**Stats:** {}", stats_parts.join(" | ")));
+        sections.push(format!("⏱️ **Stats:** {}", stats_parts.join(" | ")));
     }
+    
+    sections.push(String::new()); // Spacer
+    
+    // Work Summary - what was actually built/accomplished
+    let total_files = files_created.len() + files_modified.len();
+    if total_files > 0 || !subagents_spawned.is_empty() {
+        sections.push("📁 **Work Summary:**".to_string());
+        
+        if !files_created.is_empty() {
+            sections.push(format!("  Created {} files:", files_created.len()));
+            for file in files_created.iter().take(10) {
+                // Show just filename, not full path
+                let filename = file.rsplit('/').next().unwrap_or(file);
+                sections.push(format!("    • {}", filename));
+            }
+            if files_created.len() > 10 {
+                sections.push(format!("    ... and {} more", files_created.len() - 10));
+            }
+        }
+        
+        if !files_modified.is_empty() {
+            sections.push(format!("  Modified {} files:", files_modified.len()));
+            for file in files_modified.iter().take(5) {
+                let filename = file.rsplit('/').next().unwrap_or(file);
+                sections.push(format!("    • {}", filename));
+            }
+            if files_modified.len() > 5 {
+                sections.push(format!("    ... and {} more", files_modified.len() - 5));
+            }
+        }
+        
+        if !subagents_spawned.is_empty() {
+            sections.push(format!("  Spawned {} subagent(s): {}", 
+                subagents_spawned.len(),
+                subagents_spawned.join(", ")
+            ));
+        }
+    }
+    
+    sections.push(String::new()); // Spacer
     
     // Model
     sections.push(format!("**Model:** {}", model));
@@ -729,7 +894,7 @@ async fn ingest(
         return StatusCode::OK;
     }
     
-    // Track tool usage - handles both Claude and Droid formats
+    // Track tool usage and file operations - handles both Claude and Droid formats
     match entry.entry_type.as_deref() {
         // Droid format: {"type":"tool_call","toolName":"LS",...}
         Some("tool_call") => {
@@ -741,6 +906,35 @@ async fn ingest(
                 if !session.tools_used.contains(&name.to_string()) {
                     session.tools_used.push(name.to_string());
                     debug!("Tool used (Droid): {}", name);
+                }
+                
+                // Track file operations
+                let params = entry.extra.get("parameters");
+                match name {
+                    "Write" | "write" => {
+                        if let Some(file) = params.and_then(|p| p.get("file_path").or(p.get("path"))).and_then(|v| v.as_str()) {
+                            if !session.files_created.contains(&file.to_string()) {
+                                session.files_created.push(file.to_string());
+                                debug!("File created: {}", file);
+                            }
+                        }
+                    }
+                    "Edit" | "edit" => {
+                        if let Some(file) = params.and_then(|p| p.get("file_path").or(p.get("path"))).and_then(|v| v.as_str()) {
+                            if !session.files_modified.contains(&file.to_string()) {
+                                session.files_modified.push(file.to_string());
+                                debug!("File modified: {}", file);
+                            }
+                        }
+                    }
+                    "Task" | "task" => {
+                        if let Some(desc) = params.and_then(|p| p.get("description")).and_then(|v| v.as_str()) {
+                            let short_desc = if desc.len() > 50 { format!("{}...", &desc[..50]) } else { desc.to_string() };
+                            session.subagents_spawned.push(short_desc);
+                            debug!("Subagent spawned");
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -755,10 +949,38 @@ async fn ingest(
         }
         // Claude format: {"type":"assistant","message":{"content":[{"type":"tool_use"}]}}
         Some("assistant") => {
-            if let Some((tool_name, _)) = extract_claude_tool_use(&entry) {
+            if let Some((tool_name, tool_input)) = extract_claude_tool_use(&entry) {
                 if !session.tools_used.contains(&tool_name) {
                     session.tools_used.push(tool_name.clone());
                     debug!("Tool used (Claude): {}", tool_name);
+                }
+                
+                // Track file operations from Claude tool use
+                match tool_name.as_str() {
+                    "Write" | "write" => {
+                        if let Some(file) = tool_input.get("file_path").or(tool_input.get("path")).and_then(|v| v.as_str()) {
+                            if !session.files_created.contains(&file.to_string()) {
+                                session.files_created.push(file.to_string());
+                                debug!("File created (Claude): {}", file);
+                            }
+                        }
+                    }
+                    "Edit" | "edit" => {
+                        if let Some(file) = tool_input.get("file_path").or(tool_input.get("path")).and_then(|v| v.as_str()) {
+                            if !session.files_modified.contains(&file.to_string()) {
+                                session.files_modified.push(file.to_string());
+                                debug!("File modified (Claude): {}", file);
+                            }
+                        }
+                    }
+                    "Task" | "task" => {
+                        if let Some(desc) = tool_input.get("description").and_then(|v| v.as_str()) {
+                            let short_desc = if desc.len() > 50 { format!("{}...", &desc[..50]) } else { desc.to_string() };
+                            session.subagents_spawned.push(short_desc);
+                            debug!("Subagent spawned (Claude)");
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -778,6 +1000,9 @@ async fn ingest(
             let tools = session.tools.clone();
             let tools_used = session.tools_used.clone();
             let skills = session.skills.clone();
+            let files_created = session.files_created.clone();
+            let files_modified = session.files_modified.clone();
+            let subagents_spawned = session.subagents_spawned.clone();
             
             // Extract stats from result event
             let duration_ms = entry.extra.get("duration_ms")
@@ -791,6 +1016,7 @@ async fn ingest(
             
             if let Err(e) = post_completion_summary(
                 &state, &session_id, &model, &tools, &tools_used, &skills,
+                &files_created, &files_modified, &subagents_spawned,
                 duration_ms, cost_usd, num_turns
             ).await {
                 warn!("Failed to post completion summary: {}", e);
@@ -908,6 +1134,37 @@ async fn main() -> Result<()> {
     let log_source = env::var("LOG_SOURCE")
         .unwrap_or_else(|_| "file".to_string());
     
+    // Load workspace path and task context
+    let workspace_path = env::var("WORKSPACE_PATH")
+        .map(PathBuf::from)
+        .ok();
+    
+    // Try to load task context from prompt.md
+    let task_context = if let Some(ref ws_path) = workspace_path {
+        let prompt_path = env::var("TASK_PROMPT_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| ws_path.join("prompt.md"));
+        
+        if prompt_path.exists() {
+            match std::fs::read_to_string(&prompt_path) {
+                Ok(content) => {
+                    let ctx = parse_task_context(&content);
+                    info!("📋 Loaded task context: {:?}", ctx.title);
+                    ctx
+                }
+                Err(e) => {
+                    warn!("Failed to read prompt.md: {}", e);
+                    TaskContext::default()
+                }
+            }
+        } else {
+            info!("No prompt.md found at {:?}", prompt_path);
+            TaskContext::default()
+        }
+    } else {
+        TaskContext::default()
+    };
+    
     info!("Issue: {}, Agent: {}, Source: {}", issue_identifier, agent_name, log_source);
     
     // Create shared state
@@ -916,6 +1173,8 @@ async fn main() -> Result<()> {
         linear_token,
         issue_identifier,
         agent_name,
+        task_context,
+        workspace_path,
     });
     
     match log_source.as_str() {

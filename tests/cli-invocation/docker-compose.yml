@@ -88,6 +88,8 @@ services:
       CTO_SKILLS_DIR: /cto-skills
       CTO_CONFIG_PATH: /cto-config.json
       CTO_AGENT_NAME: rex  # Use rex agent's tool configuration
+      # Task context for richer Linear dialog
+      WORKSPACE_PATH: /workspace
       # Disable exit watch for docker-compose (can't see Claude container's processes)
       MAIN_EXIT_WATCH_ENABLED: "false"
       # Enable whip cracking with long interval (prevents premature shutdown)
@@ -382,6 +384,8 @@ services:
       CTO_SKILLS_DIR: /cto-skills
       CTO_CONFIG_PATH: /cto-config.json
       CTO_AGENT_NAME: bolt
+      # Task context for richer Linear dialog
+      WORKSPACE_PATH: /workspace
       MAIN_EXIT_WATCH_ENABLED: "false"
       WHIP_CRACK_ENABLED: "true"
       WHIP_CRACK_INITIAL_DELAY_MS: "3600000"
