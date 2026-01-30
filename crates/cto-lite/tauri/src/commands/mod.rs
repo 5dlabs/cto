@@ -10,4 +10,5 @@ pub mod github;
 pub mod mcp;
 pub mod runtime;
 pub mod tunnel;
+pub mod updates;
 pub mod workflow;

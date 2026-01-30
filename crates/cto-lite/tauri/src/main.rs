@@ -104,6 +104,12 @@ fn main() {
             commands::mcp::stop_mcp_server,
             commands::mcp::get_mcp_status,
             commands::mcp::get_mcp_config,
+            
+            // Updates
+            commands::updates::check_updates,
+            commands::updates::pull_updates,
+            commands::updates::apply_updates,
+            commands::updates::get_component_versions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
