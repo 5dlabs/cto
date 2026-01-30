@@ -17,8 +17,9 @@ global:
 namespace: cto-lite
 
 # Controller - Manages CodeRun CRDs
+# Note: Disabled for MVP - Argo Workflows handles orchestration
 controller:
-  enabled: true
+  enabled: false
   image:
     repository: ghcr.io/5dlabs/controller
     tag: main
@@ -37,11 +38,11 @@ controller:
 
 # PM Server - GitHub webhook handler
 pm:
-  enabled: true
+  enabled: false  # Disable for now until we have the image
   image:
-    repository: ghcr.io/5dlabs/pm-server
-    tag: latest
-    pullPolicy: IfNotPresent
+    repository: cto-claude
+    tag: local
+    pullPolicy: Never
   resources:
     requests:
       memory: "30Mi"
@@ -60,11 +61,11 @@ pm:
 
 # Tools Server - MCP tool routing and filtering
 tools:
-  enabled: true
+  enabled: false  # Disable for now until we have the image
   image:
-    repository: ghcr.io/5dlabs/tools
-    tag: latest
-    pullPolicy: IfNotPresent
+    repository: cto-claude
+    tag: local
+    pullPolicy: Never
   resources:
     requests:
       memory: "30Mi"
