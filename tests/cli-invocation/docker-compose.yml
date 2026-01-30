@@ -25,7 +25,7 @@ x-sidecar-env: &sidecar-env
   LINEAR_ISSUE_IDENTIFIER: ${LINEAR_ISSUE_IDENTIFIER}
   LINEAR_SESSION_ID: ${LINEAR_SESSION_ID:-}
   LINEAR_API_URL: https://api.linear.app/graphql
-  RUST_LOG: info
+  RUST_LOG: debug
   CTO_SKILLS_DIR: /cto-skills
   CTO_CONFIG_PATH: /cto-config.json
 
