@@ -1,0 +1,82 @@
+---
+# =============================================================================
+# CI Failure Remediation Button Sensor
+# =============================================================================
+# Watches for GitHub Actions check_run failures and creates a new check run
+# with "Fix with <Agent>" remediation buttons.
+#
+# This enables user-initiated remediation (vs Healer's auto-remediation).
+#
+# Flow:
+# 1. CI job fails (check_run with conclusion: failure)
+# 2. This sensor triggers
+# 3. PM Server creates a new check run with remediation buttons
+# 4. User clicks button → remediation-button-sensor handles it
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ci-failure-button
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: ci-failure-button
+    app.kubernetes.io/component: sensor
+    platform.5dlabs.io/log-collection: enabled
+spec:
+  dependencies:
+    - name: check-run-failure
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # check_run events only
+          - path: body.X-GitHub-Event
+            type: string
+            value:
+              - check_run
+          # completed status
+          - path: body.action
+            type: string
+            value:
+              - completed
+          # failure conclusion
+          - path: body.check_run.conclusion
+            type: string
+            value:
+              - failure
+        # Only trigger for PRs (not direct pushes)
+        exprs:
+          - expr: len(pull_requests) > 0
+            fields:
+              - name: pull_requests
+                path: body.check_run.pull_requests
+          # Skip check runs from our own apps (avoid loops)
+          - expr: app_slug != "5dlabs-stitch" && app_slug != "5dlabs-rex" && app_slug != "5dlabs-blaze" && app_slug != "5dlabs-grizz"
+            fields:
+              - name: app_slug
+                path: body.check_run.app.slug
+
+  template:
+    serviceAccountName: argo-events-sa
+    metadata:
+      labels:
+        platform.5dlabs.io/log-collection: enabled
+
+  triggers:
+    - template:
+        name: create-remediation-check
+        conditions: check-run-failure
+        http:
+          url: http://cto-pm.cto.svc.cluster.local:8081/webhooks/github/ci-failure
+          method: POST
+          headers:
+            Content-Type: application/json
+            X-Trigger-Source: ci_failure
+          payload:
+            - src:
+                dependencyName: check-run-failure
+                dataKey: body
+              dest: payload
+      retryStrategy:
+        steps: 3
+        duration: 5s
