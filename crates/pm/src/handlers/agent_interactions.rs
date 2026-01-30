@@ -148,6 +148,7 @@ pub enum Language {
 impl Language {
     /// Detect language from file path
     #[must_use]
+    #[allow(clippy::case_sensitive_file_extension_comparisons)]
     pub fn from_path(path: &str) -> Self {
         let lower = path.to_lowercase();
 
