@@ -9,7 +9,6 @@ import {
   CheckCircle, 
   XCircle, 
   Loader2, 
-  AlertTriangle,
   Terminal,
   Download,
   Server,
@@ -101,7 +100,8 @@ export function InstallStep({ onComplete, onBack }: InstallStepProps) {
     }
   };
 
-  const allPrereqsMet = prerequisites.every(p => p.found);
+  // Only Docker is required - other tools will be auto-installed
+  const dockerInstalled = prerequisites.find(p => p.name === "docker")?.found ?? false;
   const missingPrereqs = prerequisites.filter(p => !p.found);
 
   const stepIcons: Record<string, React.ReactNode> = {
@@ -169,19 +169,21 @@ export function InstallStep({ onComplete, onBack }: InstallStepProps) {
           )}
 
           {!checking && missingPrereqs.length > 0 && (
-            <div className="mt-4 p-3 rounded bg-yellow-500/10 border border-yellow-500/20">
+            <div className="mt-4 p-3 rounded bg-blue-500/10 border border-blue-500/20">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5" />
+                <Download className="h-4 w-4 text-blue-500 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium text-yellow-600 dark:text-yellow-400">
-                    Missing: {missingPrereqs.map(p => p.name).join(", ")}
+                  <p className="font-medium text-blue-600 dark:text-blue-400">
+                    Will install: {missingPrereqs.filter(p => p.name !== "docker").map(p => p.name).join(", ")}
                   </p>
                   <p className="text-muted-foreground mt-1">
-                    Install these tools before continuing. 
-                    {missingPrereqs.some(p => p.name === "kind") && (
-                      <> Try: <code className="text-xs bg-muted px-1 rounded">brew install kind</code></>
-                    )}
+                    These tools will be installed automatically via Homebrew when you click Install.
                   </p>
+                  {missingPrereqs.some(p => p.name === "docker") && (
+                    <p className="text-yellow-600 dark:text-yellow-400 mt-2">
+                      ⚠️ Docker is required. Please install Docker Desktop or OrbStack first.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -262,7 +264,7 @@ export function InstallStep({ onComplete, onBack }: InstallStepProps) {
           ) : (
             <Button 
               onClick={startInstallation} 
-              disabled={!allPrereqsMet || installing || checking}
+              disabled={!dockerInstalled || installing || checking}
             >
               {installing ? (
                 <>
