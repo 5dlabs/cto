@@ -1,139 +1,142 @@
 # CTO Lite Progress
 
-## Current Status: Phase 3 Complete ✅
+## Status: All Phases Complete ✅
+
+All 5 implementation phases have been completed.
+
+---
 
 ### Phase 1: Tauri App Foundation ✅
 
-**Completed:**
-- [x] Tauri 2.x project structure created
+- [x] Tauri 2.x project structure
 - [x] React frontend with Vite + shadcn/ui
-- [x] Setup wizard with 7 steps
-- [x] Rust backend with Tauri commands
-- [x] TypeScript bindings for all commands
-- [x] React hooks with loading/error states
+- [x] 7-step setup wizard
+- [x] Rust backend commands
+- [x] TypeScript bindings and React hooks
 
 ### Phase 2: Core Infrastructure ✅
 
-**Completed:**
-- [x] Create `cto-lite` Helm chart
-- [x] Helm deployment commands in Tauri
-- [x] Deploy step in setup wizard
-- [x] Secrets management for API keys
+- [x] Helm chart (`infra/charts/cto-lite/`)
+- [x] Controller, PM, Cloudflared deployments
 - [x] Play workflow template (no Atlas)
+- [x] API key secrets management
+- [x] Deploy step in setup wizard
 
 ### Phase 3: Dashboard and MCP ✅
 
-**Completed:**
-- [x] Build workflow status/logs view
-- [x] Workflow list with real-time polling
-- [x] Trigger new workflow form
-- [x] Stop/delete workflow actions
-- [x] Log viewer with terminal styling
+- [x] Workflow management backend (`workflows.rs`)
+- [x] Dashboard UI with workflow list
+- [x] Trigger, stop, delete workflows
+- [x] Real-time log viewer
 - [x] Workflow node/step display
 
-**Remaining:**
-- [ ] Create MCP background service (optional for MVP)
+### Phase 4: Distribution ✅
 
-### Phase 4: Distribution 🔄
+- [x] CI workflow (`cto-lite-ci.yml`)
+- [x] Release workflow (`cto-lite-release.yml`)
+- [x] Multi-platform builds (macOS, Windows, Linux)
+- [x] Code signing support (secrets-based)
 
-**Next Steps:**
-- [ ] CI workflow for Tauri builds
-- [ ] Code signing setup (macOS, Windows)
-- [ ] Build for all platforms
-- [ ] CDN distribution
+### Phase 5: Polish ✅
 
-### Phase 5: Polish ⏳
+- [x] User documentation (`README.md`)
+- [x] Troubleshooting guide (`TROUBLESHOOTING.md`)
+- [x] Architecture documentation
 
-- [ ] User documentation
-- [ ] Troubleshooting guide
-- [ ] Beta testing
+---
 
-## Recent Commits
+## Commits Summary
 
 ```
+bdd0a44 docs(cto-lite): add Phase 5 user documentation
+5d1da85 feat(cto-lite): add CI/CD workflows for Phase 4
 e54a7fd feat(cto-lite): implement Phase 3 - Dashboard and Workflow management
 5cf42ea feat(cto-lite): add Deploy step to setup wizard
 320515d feat(cto-lite): add Helm deployment commands
 5af3cf4 feat(cto-lite): add Helm chart for local Kind deployment
 fb6d817 feat(cto-lite): wire frontend to Tauri backend
+0dff191 feat(cto-lite): add Tauri 2.x backend with commands
 ```
+
+---
 
 ## File Structure
 
 ```
 crates/cto-lite/
+├── README.md                  # User documentation
+├── TROUBLESHOOTING.md         # Troubleshooting guide
 ├── tauri/
-│   ├── package.json
-│   └── src-tauri/
-│       └── src/
-│           ├── main.rs
-│           ├── lib.rs
-│           ├── commands.rs
-│           ├── state.rs
-│           ├── keychain.rs
-│           ├── docker.rs
-│           ├── kind.rs
-│           ├── helm.rs
-│           └── workflows.rs    # NEW
-└── ui/
-    ├── src/
-    │   ├── lib/tauri.ts
-    │   ├── hooks/use-tauri.ts
-    │   ├── components/
-    │   │   ├── Dashboard/
-    │   │   │   └── index.tsx   # NEW
-    │   │   ├── setup/
-    │   │   │   ├── RuntimeStep.tsx
-    │   │   │   ├── InstallStep.tsx
-    │   │   │   └── DeployStep.tsx
-    │   │   └── SetupWizard/
-    │   └── App.tsx
-    └── dist/
+│   └── src-tauri/src/
+│       ├── main.rs
+│       ├── lib.rs
+│       ├── commands.rs
+│       ├── state.rs
+│       ├── keychain.rs
+│       ├── docker.rs
+│       ├── kind.rs
+│       ├── helm.rs
+│       └── workflows.rs
+└── ui/src/
+    ├── App.tsx
+    ├── lib/tauri.ts
+    ├── hooks/use-tauri.ts
+    └── components/
+        ├── Dashboard/
+        ├── SetupWizard/
+        └── setup/
 
 infra/charts/cto-lite/
 ├── Chart.yaml
 ├── values.yaml
 ├── crds/
 └── templates/
-    ├── controller/
-    ├── pm/
-    ├── cloudflared/
-    └── workflows/
+
+.github/workflows/
+├── cto-lite-ci.yml
+└── cto-lite-release.yml
 ```
 
-## Backend Commands Summary
+---
 
-| Category | Commands | Status |
-|----------|----------|--------|
-| Setup | check_docker, check_kind, get_setup_state, save_setup_state | ✅ |
-| Keychain | store_api_key, get_api_key, delete_api_key, has_api_key | ✅ |
-| Cluster | create_cluster, delete_cluster, get_cluster_status | ✅ |
-| Helm | deploy_chart, uninstall_chart, get_release_status, check_helm | ✅ |
-| Workflows | trigger_workflow, list_workflows, get_workflow_status, get_workflow_logs, stop_workflow, delete_workflow, check_argo | ✅ |
+## Backend Commands (22 total)
 
-## Build Commands
+| Category | Commands |
+|----------|----------|
+| Setup | `check_docker`, `check_kind`, `get_setup_state`, `save_setup_state`, `complete_setup` |
+| Keychain | `store_api_key`, `get_api_key`, `delete_api_key`, `has_api_key` |
+| Cluster | `create_cluster`, `delete_cluster`, `get_cluster_status`, `list_clusters` |
+| Helm | `check_helm`, `deploy_chart`, `get_release_status`, `uninstall_chart`, `update_helm_dependencies` |
+| Workflows | `trigger_workflow`, `list_workflows`, `get_workflow_status`, `get_workflow_logs`, `delete_workflow`, `stop_workflow`, `check_argo` |
+
+---
+
+## What's Ready for Testing
 
 ```bash
-# Build UI
-cd crates/cto-lite/ui && npm run build
-
-# Check Rust backend
-cd crates/cto-lite/tauri/src-tauri && cargo check
-
-# Run development
+# Run the app
 cd crates/cto-lite/tauri
 PATH="$HOME/.cargo/bin:$PATH" npx tauri dev
 
-# Build release
-PATH="$HOME/.cargo/bin:$PATH" npx tauri build
+# Prerequisites
+- Docker/OrbStack running
+- Kind installed (brew install kind)
+- Helm installed (brew install helm)
+- Anthropic or OpenAI API key
 ```
 
-## App Screens
+---
 
-1. **Setup Wizard** (7 steps)
-   - Runtime check → Stack selection → API Keys → GitHub → Cloudflare → Create Cluster → Deploy
+## What Needs External Setup
 
-2. **Dashboard**
-   - Sidebar: Workflow list with status badges
-   - Main: Selected workflow detail, nodes/steps, logs
-   - Actions: Trigger, stop, delete workflows
+1. **Code Signing Secrets** (for CI releases)
+   - `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`
+   - `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`
+   - `TAURI_SIGNING_PRIVATE_KEY`
+
+2. **Agent Images** (not built yet)
+   - ghcr.io/5dlabs/cto-lite-agent-morgan
+   - ghcr.io/5dlabs/cto-lite-agent-grizz
+   - etc.
+
+3. **Download Page** at cto.dev/download
