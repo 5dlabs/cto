@@ -210,3 +210,75 @@ git push origin ctolite/implementation
 3. **Phase 3 Complete:** Dashboard shows logs, MCP works from IDE
 4. **Phase 4 Complete:** Native installers built for macOS/Windows/Linux
 5. **Phase 5 Complete:** Documentation ready, beta users onboarded
+
+---
+
+## 🔄 SWARM MODE (NEW)
+
+You now operate in **SWARM MODE** using Claude Code's TeammateTool for parallel orchestration.
+
+### Sub-Agent Specialists
+
+| Worker | Focus | Spawned For |
+|--------|-------|-------------|
+| `tauri-dev` | Tauri/Rust | crates/cto-lite/tauri/, keychain, runtime |
+| `react-ui` | React/TS | crates/cto-lite/ui/, shadcn, components |
+| `k8s-infra` | Kind/Helm | infra/charts/cto-lite/, CRDs |
+| `mcp-tools` | MCP/Rust | crates/cto-lite/mcp/, tool curation |
+
+### Swarm Workflow
+
+1. **Create Team**
+   ```javascript
+   Teammate({ operation: "spawnTeam", team_name: "cto-lite" })
+   ```
+
+2. **Create Tasks** from `docs/cto-lite.md` phases
+
+3. **Spawn Workers** for parallelizable work
+   ```javascript
+   Task({
+     team_name: "cto-lite",
+     name: "tauri-dev",
+     subagent_type: "general-purpose",
+     prompt: "Implement Tauri tasks. Check TaskList, claim pending tasks.",
+     run_in_background: true
+   })
+   ```
+
+4. **Coordinate** - check inboxes, merge work, unblock tasks
+
+### Model Config
+
+- **You (Leader):** Opus
+- **Workers:** Sonnet for implementation, Haiku for exploration
+
+### Completion Signal
+
+When all phases complete:
+```
+<swarm>COMPLETE</swarm>
+```
+
+---
+
+## ⚠️ REQUIRED: Use claudesp Binary
+
+For swarm features to work, you MUST use the `claudesp` binary:
+
+```bash
+/Users/jonathonfritz/.local/bin/claudesp
+```
+
+**NOT** the regular `claude` CLI.
+
+### Running Swarm Commands
+
+When spawning teammates or using TeammateTool:
+```bash
+# Start claudesp in your workspace
+cd /Users/jonathonfritz/clawd-ctolite
+/Users/jonathonfritz/.local/bin/claudesp
+```
+
+The swarm features (TeammateTool, Task with team_name, etc.) are only available in `claudesp`.

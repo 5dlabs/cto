@@ -1,0 +1,50 @@
+{{- if .Values.controller.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "cto-lite.serviceAccountName" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cto-lite.fullname" . }}-controller
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+rules:
+  # CodeRun CRD management
+  - apiGroups: ["cto.5dlabs.ai"]
+    resources: ["coderuns", "coderuns/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Pod management for agents
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # Workflow management
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cto-lite.fullname" . }}-controller
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cto-lite.fullname" . }}-controller
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "cto-lite.serviceAccountName" . }}
+    namespace: {{ .Values.namespace }}
+{{- end }}

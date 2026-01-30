@@ -1,8 +1,4 @@
 {{/*
-CTO Lite Helm Template Helpers
-*/}}
-
-{{/*
 Expand the name of the chart.
 */}}
 {{- define "cto-lite.name" -}}
@@ -53,33 +49,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Controller labels
+Create the name of the service account to use
 */}}
-{{- define "cto-lite.controller.labels" -}}
-{{ include "cto-lite.labels" . }}
-app.kubernetes.io/component: controller
+{{- define "cto-lite.serviceAccountName" -}}
+{{- if .Values.controller.serviceAccount.create }}
+{{- default (include "cto-lite.fullname" .) .Values.controller.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.controller.serviceAccount.name }}
+{{- end }}
 {{- end }}
 
 {{/*
-Controller selector labels
+Image name helper
 */}}
-{{- define "cto-lite.controller.selectorLabels" -}}
-{{ include "cto-lite.selectorLabels" . }}
-app.kubernetes.io/component: controller
-{{- end }}
-
-{{/*
-PM Lite labels
-*/}}
-{{- define "cto-lite.pm.labels" -}}
-{{ include "cto-lite.labels" . }}
-app.kubernetes.io/component: pm-lite
-{{- end }}
-
-{{/*
-PM Lite selector labels
-*/}}
-{{- define "cto-lite.pm.selectorLabels" -}}
-{{ include "cto-lite.selectorLabels" . }}
-app.kubernetes.io/component: pm-lite
+{{- define "cto-lite.image" -}}
+{{- $registry := .Values.global.imageRegistry -}}
+{{- $repo := .image.repository -}}
+{{- $tag := .image.tag | default "latest" -}}
+{{- printf "%s/%s:%s" $registry $repo $tag -}}
 {{- end }}

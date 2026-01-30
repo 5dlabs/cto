@@ -1,21 +1,31 @@
-# CTO Lite Heartbeat
+# HEARTBEAT.md - Swarm Coordination
 
-## Ralph Loop Active 🔄
-Working autonomously until blocked or complete.
+## On Each Heartbeat
 
-## Current Focus
-**Phase 4: Distribution**
-- CI workflow for Tauri builds
-- Code signing
-- Binary bundling
+1. **Check worker inboxes** for completed work
+2. **Review TaskList()** for task statuses
+3. **Spawn workers** if tasks are unblocked and no worker assigned
+4. **Merge completed work** — review and commit
+5. **Unblock downstream tasks** as dependencies complete
 
-## On Heartbeat
-1. Check current task progress
-2. If complete → next task
-3. If blocked → report and wait
-4. Update PROGRESS.md
+## Swarm Health Commands
 
-## Completed
-- Phase 1: Tauri app foundation ✅
-- Phase 2: Core infrastructure ✅
-- Phase 3: MCP + Dashboard ✅
+```javascript
+TaskList()  // See all tasks
+Teammate({ operation: "write", target_agent_id: "worker-name", value: "status?" })
+```
+
+## Never HEARTBEAT_OK While
+
+- Workers are still running
+- Tasks remain pending or in_progress
+- Any phase is incomplete
+
+## Completion
+
+When ALL tasks in ALL phases are `completed`:
+```
+<swarm>COMPLETE</swarm>
+```
+
+Then you may reply HEARTBEAT_OK.

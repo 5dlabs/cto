@@ -1,30 +1,19 @@
-# CTO Lite Helm Chart
-# Simplified deployment for Kind clusters (local development)
-
 apiVersion: v2
 name: cto-lite
-description: AI-powered development workflow for individual developers
+description: CTO Lite - AI Development for Individual Developers
 type: application
 version: 0.1.0
-appVersion: "1.0.0"
-
+appVersion: 0.1.0
 keywords:
   - ai
-  - development
-  - workflow
-  - mcp
+  - agents
   - local
-
-home: https://cto.dev
-sources:
-  - https://github.com/5dlabs/cto
-
+  - kind
 maintainers:
   - name: 5D Labs
-    email: support@5dlabs.io
-
+    url: https://5dlabs.ai
 dependencies:
   - name: argo-workflows
-    version: "0.45.x"
+    version: 0.45.12
     repository: https://argoproj.github.io/argo-helm
     condition: argo-workflows.enabled
