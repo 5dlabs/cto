@@ -324,7 +324,8 @@ export function validateRequest(request: unknown): request is AgentRequest {
   return (
     typeof req['operation'] === 'string' &&
     [
-      'parse_prd', 
+      'parse_prd',
+      'parse_prd_iterative',
       'expand_task', 
       'analyze_complexity', 
       'generate', 
