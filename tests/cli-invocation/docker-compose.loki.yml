@@ -2,13 +2,22 @@
 # Loki Logging Stack - Docker Compose Override
 # =============================================================================
 #
-# Adds Loki for centralized log collection from non-JSONL CLIs.
+# Unified log collection for ALL CLIs via Loki.
 # Use with: docker compose -f docker-compose.yml -f docker-compose.loki.yml up
 #
 # Prerequisites:
 #   docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
 #
 # =============================================================================
+
+# Common Loki logging config
+x-loki-logging: &loki-logging
+  driver: loki
+  options:
+    loki-url: "http://localhost:3100/loki/api/v1/push"
+    loki-batch-size: "100"
+    loki-retries: "2"
+    loki-timeout: "2s"
 
 services:
   # ===========================================================================
@@ -29,7 +38,7 @@ services:
       retries: 5
 
   # ===========================================================================
-  # Grafana - Log Visualization (optional)
+  # Grafana - Log Visualization
   # ===========================================================================
   grafana:
     image: grafana/grafana:10.0.0
@@ -46,38 +55,132 @@ services:
         condition: service_healthy
 
   # ===========================================================================
+  # Claude CLI - Logs to Loki
+  # ===========================================================================
+  claude:
+    logging:
+      <<: *loki-logging
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        labels: "cli=claude,agent=rex"
+
+  claude-sidecar:
+    environment:
+      LOG_SOURCE: loki
+      LOKI_URL: http://localhost:3100
+      LOKI_QUERY: '{cli="claude"}'
+
+  # ===========================================================================
   # Factory CLI - Logs to Loki
   # ===========================================================================
   factory:
     logging:
-      driver: loki
+      <<: *loki-logging
       options:
         loki-url: "http://localhost:3100/loki/api/v1/push"
-        loki-batch-size: "100"
-        loki-retries: "2"
-        loki-timeout: "2s"
         labels: "cli=factory,agent=rex"
+
+  factory-sidecar:
+    environment:
+      LOG_SOURCE: loki
+      LOKI_URL: http://localhost:3100
+      LOKI_QUERY: '{cli="factory"}'
 
   # ===========================================================================
   # Codex CLI - Logs to Loki
   # ===========================================================================
   codex:
     logging:
-      driver: loki
+      <<: *loki-logging
       options:
         loki-url: "http://localhost:3100/loki/api/v1/push"
         labels: "cli=codex"
 
-  # ===========================================================================
-  # Factory Sidecar - Query Loki instead of JSONL
-  # ===========================================================================
-  factory-sidecar:
+  codex-sidecar:
     environment:
       LOG_SOURCE: loki
       LOKI_URL: http://localhost:3100
-      LOKI_QUERY: '{cli="factory"}'
-      # Still fall back to stream file if Loki unavailable
-      STREAM_FILE: /workspace/stream.jsonl
+      LOKI_QUERY: '{cli="codex"}'
+
+  # ===========================================================================
+  # Code CLI - Logs to Loki
+  # ===========================================================================
+  code:
+    logging:
+      <<: *loki-logging
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        labels: "cli=code"
+
+  code-sidecar:
+    environment:
+      LOG_SOURCE: loki
+      LOKI_URL: http://localhost:3100
+      LOKI_QUERY: '{cli="code"}'
+
+  # ===========================================================================
+  # Cursor CLI - Logs to Loki
+  # ===========================================================================
+  cursor:
+    logging:
+      <<: *loki-logging
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        labels: "cli=cursor"
+
+  cursor-sidecar:
+    environment:
+      LOG_SOURCE: loki
+      LOKI_URL: http://localhost:3100
+      LOKI_QUERY: '{cli="cursor"}'
+
+  # ===========================================================================
+  # OpenCode CLI - Logs to Loki
+  # ===========================================================================
+  opencode:
+    logging:
+      <<: *loki-logging
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        labels: "cli=opencode"
+
+  opencode-sidecar:
+    environment:
+      LOG_SOURCE: loki
+      LOKI_URL: http://localhost:3100
+      LOKI_QUERY: '{cli="opencode"}'
+
+  # ===========================================================================
+  # Gemini CLI - Logs to Loki
+  # ===========================================================================
+  gemini:
+    logging:
+      <<: *loki-logging
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        labels: "cli=gemini"
+
+  gemini-sidecar:
+    environment:
+      LOG_SOURCE: loki
+      LOKI_URL: http://localhost:3100
+      LOKI_QUERY: '{cli="gemini"}'
+
+  # ===========================================================================
+  # Dexter CLI - Logs to Loki
+  # ===========================================================================
+  dexter:
+    logging:
+      <<: *loki-logging
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        labels: "cli=dexter"
+
+  dexter-sidecar:
+    environment:
+      LOG_SOURCE: loki
+      LOKI_URL: http://localhost:3100
+      LOKI_QUERY: '{cli="dexter"}'
 
 volumes:
   loki-data:
