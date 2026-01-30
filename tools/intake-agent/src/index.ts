@@ -34,6 +34,7 @@ import {
   getProviderStatus,
 } from './operations/generate-with-critic';
 import type { GenerateWithCriticPayload, ProviderName } from './providers/types';
+import { generatePlanWithDebate, type DebatePlanningConfig } from './orchestration/debate-planning';
 
 /**
  * Package version - read from package.json at build time.
@@ -178,6 +179,25 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
 
     case 'provider_status':
       return getProviderStatus();
+
+    case 'generate_plan_with_debate': {
+      const payload = request.payload as {
+        prd_content: string;
+        config?: Partial<DebatePlanningConfig>;
+      };
+      if (!payload?.prd_content) {
+        return errorResponse('Missing prd_content in payload', 'validation_error');
+      }
+      const result = await generatePlanWithDebate(payload.prd_content, payload.config);
+      return {
+        success: result.success,
+        data: result,
+        usage: result.usage,
+        model: model,
+        provider: 'debate-planning',
+        ...(result.error ? { error: result.error, error_type: 'api_error' as ErrorType } : {}),
+      };
+    }
 
     default:
       return errorResponse(`Unknown operation: ${request.operation}`, 'validation_error');

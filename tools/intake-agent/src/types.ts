@@ -335,6 +335,7 @@ export function validateRequest(request: unknown): request is AgentRequest {
       'generate_with_critic',
       'validate_content',
       'provider_status',
+      'generate_plan_with_debate',
       'ping',
     ].includes(req['operation'] as string)
   );
