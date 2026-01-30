@@ -1,38 +1,36 @@
 # CTO Lite Progress
 
-## Current Status: Phase 1 Complete ✅
+## Current Status: Phase 2 In Progress 🔄
 
 ### Phase 1: Tauri App Foundation ✅
 
 **Completed:**
 - [x] Tauri 2.x project structure created
 - [x] React frontend with Vite + shadcn/ui
-- [x] Setup wizard with 6 steps
+- [x] Setup wizard with 7 steps
 - [x] Rust backend with Tauri commands
 - [x] TypeScript bindings for all commands
 - [x] React hooks with loading/error states
 
-**Backend Commands Implemented:**
-- `check_docker` - Docker/OrbStack/Colima detection
-- `check_kind` - Kind installation check
-- `get_setup_state` / `save_setup_state` - Wizard state management
-- `store_api_key` / `get_api_key` / `delete_api_key` - Keychain integration
-- `create_cluster` / `delete_cluster` / `get_cluster_status` - Kind management
-- `trigger_workflow` / `get_workflow_status` / `list_workflows` - Workflow stubs
-
-**Frontend Components:**
-- `RuntimeStep` - Docker/Kind detection with installation links
-- `InstallStep` - Kind cluster creation
-- `SetupWizard` - 6-step wizard flow
-- `Dashboard` - Workflow management (basic)
-
 ### Phase 2: Core Infrastructure 🔄
 
-**Next Steps:**
-- [ ] Create `cto-lite` Helm chart
-- [ ] Fork PM server to `pm-lite`
+**Completed:**
+- [x] Create `cto-lite` Helm chart
+  - Controller deployment + RBAC
+  - PM server deployment
+  - Cloudflared tunnel deployment
+  - Secrets for API keys
+  - Play workflow template (no Atlas)
+  - CRDs (CodeRun, BoltRun)
+- [x] Helm deployment commands in Tauri
+- [x] Deploy step in setup wizard
+
+**In Progress:**
+- [ ] Fork PM server to `pm-lite` (using existing PM for now)
+- [ ] Update agent prompts (no Atlas, clean PRs)
+- [ ] Build tunnel allocation system
 - [ ] Bundle skills into agent images
-- [ ] Configure webhook tunnel system
+- [ ] Configure Bolt for local/Docker
 
 ### Phase 3: Dashboard and MCP ⏳
 
@@ -56,6 +54,9 @@
 ## Recent Commits
 
 ```
+5cf42ea feat(cto-lite): add Deploy step to setup wizard
+320515d feat(cto-lite): add Helm deployment commands
+5af3cf4 feat(cto-lite): add Helm chart for local Kind deployment
 fb6d817 feat(cto-lite): wire frontend to Tauri backend
 0dff191 feat(cto-lite): add Tauri 2.x backend with commands
 ```
@@ -78,20 +79,73 @@ crates/cto-lite/
 │           ├── state.rs
 │           ├── keychain.rs
 │           ├── docker.rs
-│           └── kind.rs
+│           ├── kind.rs
+│           └── helm.rs          # NEW
 └── ui/
     ├── package.json
     ├── src/
-    │   ├── lib/tauri.ts         # Tauri command bindings
-    │   ├── hooks/use-tauri.ts   # React hooks
+    │   ├── lib/tauri.ts         
+    │   ├── hooks/use-tauri.ts   
     │   ├── components/
     │   │   ├── setup/
     │   │   │   ├── RuntimeStep.tsx
-    │   │   │   └── InstallStep.tsx
+    │   │   │   ├── InstallStep.tsx
+    │   │   │   └── DeployStep.tsx   # NEW
     │   │   └── SetupWizard/
     │   └── App.tsx
-    └── dist/                    # Built frontend
+    └── dist/
+
+infra/charts/cto-lite/           # NEW
+├── Chart.yaml
+├── values.yaml
+├── crds/
+│   ├── coderun-crd.yaml
+│   └── boltrun-crd.yaml
+└── templates/
+    ├── _helpers.tpl
+    ├── namespace.yaml
+    ├── secrets.yaml
+    ├── controller/
+    │   ├── deployment.yaml
+    │   └── rbac.yaml
+    ├── pm/
+    │   └── deployment.yaml
+    ├── cloudflared/
+    │   └── deployment.yaml
+    └── workflows/
+        └── play-workflow-lite.yaml
 ```
+
+## Backend Commands
+
+| Command | Description | Status |
+|---------|-------------|--------|
+| `check_docker` | Docker/OrbStack detection | ✅ |
+| `check_kind` | Kind installation check | ✅ |
+| `check_helm` | Helm installation check | ✅ |
+| `get_setup_state` | Wizard state | ✅ |
+| `save_setup_state` | Save wizard state | ✅ |
+| `store_api_key` | Keychain storage | ✅ |
+| `get_api_key` | Keychain retrieval | ✅ |
+| `create_cluster` | Kind cluster creation | ✅ |
+| `delete_cluster` | Kind cluster deletion | ✅ |
+| `get_cluster_status` | Cluster status | ✅ |
+| `deploy_chart` | Helm install/upgrade | ✅ |
+| `get_release_status` | Helm status | ✅ |
+| `uninstall_chart` | Helm uninstall | ✅ |
+| `trigger_workflow` | Start workflow | 🔲 Stub |
+| `get_workflow_status` | Workflow status | 🔲 Stub |
+| `list_workflows` | List workflows | 🔲 Stub |
+
+## Setup Wizard Steps
+
+1. ✅ Runtime Check (Docker/Kind detection)
+2. ✅ Stack Selection (Grizz/Nova)
+3. ✅ API Keys (Keychain storage)
+4. ✅ GitHub Connection (OAuth stub)
+5. ✅ Cloudflare Tunnel (OAuth stub)
+6. ✅ Create Cluster (Kind)
+7. ✅ Deploy (Helm chart)
 
 ## Build Commands
 
@@ -102,6 +156,13 @@ cd crates/cto-lite/ui && npm run build
 # Check Rust backend
 cd crates/cto-lite/tauri/src-tauri && cargo check
 
-# Run development (once both are ready)
+# Run development
 cd crates/cto-lite/tauri && npm run tauri dev
 ```
+
+## Next Steps
+
+1. **Test the app** - Run `npm run tauri dev` to test the full flow
+2. **Install Helm** - Required for deployment
+3. **Build agent images** - Need to containerize agents
+4. **Implement workflow commands** - Connect to Argo
