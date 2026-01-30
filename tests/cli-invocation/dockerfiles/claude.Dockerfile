@@ -1,7 +1,21 @@
 # =============================================================================
 # Local Claude Image - For Testing
+#
+# Build args (passed by build-images.sh):
+#   GIT_COMMIT - Short commit hash
+#   GIT_BRANCH - Branch name
 # =============================================================================
 FROM cto-runtime:local
+
+# Build args for labels
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+
+# OCI image labels for traceability
+LABEL org.opencontainers.image.source="https://github.com/5dlabs/cto"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
+LABEL org.opencontainers.image.ref.name="${GIT_BRANCH}"
+LABEL ai.5dlabs.cto.component="claude"
 
 USER root
 
