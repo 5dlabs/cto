@@ -382,10 +382,21 @@ export async function generateWithCritic(
       dialogHistory.push(dialogEntry);
       logDialogEntry(dialogEntry);
       
-      // Check if approved or meets confidence threshold
-      if (criticResult.approved || criticResult.confidence >= config.criticThreshold) {
-        console.error(`[MULTI-MODEL] Content approved (approved=${criticResult.approved}, confidence=${criticResult.confidence.toFixed(2)} >= threshold=${config.criticThreshold})`);
+      // Check if approved - only stop if critic actually approves
+      // High confidence with approved=false means critic is sure content needs work
+      if (criticResult.approved) {
+        console.error(`[MULTI-MODEL] Content approved (confidence=${criticResult.confidence.toFixed(2)})`);
         break;
+      }
+      
+      // If not approved but very high confidence, critic is certain issues exist
+      // Only stop if we've hit max refinements (checked in loop condition)
+      console.error(`[MULTI-MODEL] Content not approved (confidence=${criticResult.confidence.toFixed(2)}, threshold=${config.criticThreshold})`);
+      
+      // Check for critical issues that might not be fixable
+      const criticalCount = criticResult.issues.filter(i => i.severity === 'critical').length;
+      if (criticalCount > 0 && criticResult.confidence >= 0.9) {
+        console.error(`[MULTI-MODEL] ${criticalCount} critical issues with high confidence - attempting refinement`);
       }
       
       // Check for critical issues that can't be refined

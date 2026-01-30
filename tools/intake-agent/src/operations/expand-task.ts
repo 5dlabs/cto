@@ -46,16 +46,27 @@ Generate ${subtaskCount} subtasks starting from ID ${nextId}. Each subtask:
   "status": "pending",
   "dependencies": [subtask_ids],
   "details": "Implementation steps",
-  "testStrategy": "How to verify"
+  "testStrategy": "How to verify",
+  "subagentType": "implementer" | "reviewer" | "tester" | "researcher" | "documenter",
+  "parallelizable": boolean
 }
+
+## Subagent Types (agent hints)
+- implementer: Writing code, creating features
+- reviewer: Code review, architecture review
+- tester: Writing tests, QA validation
+- researcher: Research, spikes, investigations
+- documenter: Documentation, comments, READMEs
 
 ## Rules
 1. Each subtask should be completable in 1-4 hours
 2. Dependencies only reference lower subtask IDs
 3. Include clear implementation details
-4. All string fields must be valid JSON (escape quotes and newlines)
+4. Assign appropriate subagent_type based on work type
+5. Mark parallelizable=true if no dependencies on same-level subtasks
+6. All string fields must be valid JSON (escape quotes and newlines)
 
-Output ONLY the JSON, no explanations.`;
+Output ONLY the JSON array, no explanations.`;
 }
 
 /**
