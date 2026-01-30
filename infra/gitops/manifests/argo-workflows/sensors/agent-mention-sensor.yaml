@@ -40,24 +40,20 @@ spec:
             type: string
             value:
               - created
-          # Must be on a PR (has pull_request key)
-          - path: body.issue.pull_request
-            type: string
-            comparator: "!="
-            value:
-              - ""
           # Only from human users (not bots)
           - path: body.comment.user.type
             type: string
             value:
               - User
-        # Must mention one of our agents
+        # Must mention one of our agents AND be on a PR (check pull_request.url exists)
         exprs:
           - expr: >-
-              body =~ "(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)"
+              body =~ "(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)" && prUrl != ""
             fields:
               - name: body
                 path: body.comment.body
+              - name: prUrl
+                path: body.issue.pull_request.url
 
     # Review comment mentions (pull_request_review_comment)
     - name: review-comment-mention
