@@ -21,35 +21,117 @@
         "fullscreen": false,
         "center": true,
         "decorations": true,
-        "transparent": false
+        "transparent": false,
+        "visible": true,
+        "focus": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'"
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": [],
-    "resources": [],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "resources/helm/**/*",
+      "resources/kind-config.yaml"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "AI-powered development assistant",
+    "longDescription": "CTO Lite brings AI-powered development workflows to your desktop. Configure once, then use MCP from your IDE to create features, fix bugs, and ship code faster.",
+    "copyright": "© 2025 5D Labs",
+    "licenseFile": "../../../LICENSE",
+    "publisher": "5D Labs",
+    "homepage": "https://cto.dev",
     "macOS": {
       "entitlements": null,
       "exceptionDomain": "",
       "frameworks": [],
-      "providerShortName": null,
-      "signingIdentity": null,
-      "minimumSystemVersion": "10.15"
+      "providerShortName": "5DLabs",
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0",
+      "dmg": {
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 },
+        "windowSize": { "width": 660, "height": 400 }
+      }
     },
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "http://timestamp.digicert.com",
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "license": "../../../LICENSE",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/nsis-header.bmp",
+        "sidebarImage": "icons/nsis-sidebar.bmp",
+        "installMode": "currentUser",
+        "languages": ["English"],
+        "displayLanguageSelector": false
+      },
+      "wix": null
     },
     "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
       "deb": {
-        "depends": []
+        "depends": ["docker.io | docker-ce"],
+        "section": "devel",
+        "priority": "optional"
+      },
+      "rpm": {
+        "license": "MIT",
+        "depends": ["docker-ce"]
       }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "shell": {
+      "open": true,
+      "scope": [
+        {
+          "name": "docker",
+          "cmd": "docker",
+          "args": true
+        },
+        {
+          "name": "kind",
+          "cmd": "kind",
+          "args": true
+        },
+        {
+          "name": "kubectl",
+          "cmd": "kubectl",
+          "args": true
+        },
+        {
+          "name": "helm",
+          "cmd": "helm",
+          "args": true
+        }
+      ]
+    },
+    "updater": {
+      "endpoints": ["https://releases.cto.dev/{{target}}/{{arch}}/{{current_version}}"],
+      "pubkey": ""
     }
   }
 }

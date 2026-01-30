@@ -75,9 +75,27 @@ Status: In Progress
   - Downloads kind/kubectl/helm/cloudflared
   - Builds mcp-lite
   - Copies resources
-- [ ] Test full binary bundling
-- [ ] CI workflow for multi-platform builds
-- [ ] Code signing
+- [x] Enhanced `tauri.conf.json`
+  - Native installer configs for macOS/Windows/Linux
+  - DMG with drag-to-Applications layout
+  - NSIS wizard for Windows
+  - AppImage + DEB + RPM for Linux
+  - System tray icon
+  - Updater plugin configured
+- [x] CI workflow (`cto-lite-release.yaml`)
+  - Matrix builds: macOS arm64/x64, Windows x64, Linux x64
+  - Code signing setup (macOS + Windows)
+  - GitHub Release creation with all artifacts
+  - CDN upload to Cloudflare R2
+- [x] CI workflow (`cto-lite-ci.yaml`)
+  - PR validation for frontend/backend
+  - Multi-platform build tests
+  - MCP server checks
+  - PM Lite checks
+- [x] Icon README with generation instructions
+- [ ] Create actual app icon (need design)
+- [ ] Test full release workflow
+- [ ] Configure code signing secrets
 
 ---
 
