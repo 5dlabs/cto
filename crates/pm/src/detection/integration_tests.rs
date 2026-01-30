@@ -232,6 +232,9 @@ mod agent_routing_tests {
 
     // ===== COMPREHENSIVE VERIFICATION =====
     #[test]
+    #[allow(clippy::disallowed_macros)]
+    #[allow(clippy::uninlined_format_args)]
+    #[allow(clippy::if_not_else)]
     fn verify_all_detections() {
         let test_cases: Vec<(&str, &str, Option<&str>)> = vec![
             // Rex
