@@ -256,7 +256,7 @@ pub struct ReviewCommentPayload {
     pub repository: Repository,
 }
 
-/// GitHub check_run payload for button clicks
+/// GitHub `check_run` payload for button clicks
 #[derive(Debug, Clone, Deserialize)]
 pub struct CheckRunPayload {
     pub action: String,
@@ -354,6 +354,10 @@ pub struct RequestedAction {
 // =============================================================================
 
 /// Parse @mentions from a comment body
+///
+/// # Panics
+///
+/// Panics if the regex pattern is invalid (this is a compile-time constant).
 #[must_use]
 pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
     let re = Regex::new(r"(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)\s*(.*)").unwrap();
