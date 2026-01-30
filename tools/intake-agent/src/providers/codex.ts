@@ -1,17 +1,17 @@
 /**
- * OpenAI/Codex Provider - Uses OpenAI's Chat Completions API.
+ * OpenAI/Codex Provider - Uses official OpenAI SDK.
  * 
- * Supports GPT-4o, GPT-4-turbo, o1-preview, and other OpenAI models.
+ * Supports GPT-4o, GPT-4.1, GPT-5.x, o1, o3, o4-mini and other OpenAI models.
+ * Uses official SDK for automatic handling of API differences.
  * 
  * API Docs: https://platform.openai.com/docs/api-reference/chat
  */
 
+import OpenAI from 'openai';
 import type { ModelProvider, ProviderOptions, ProviderResponse, ProviderName } from './types';
+import { createLogger } from '../utils/logger';
 
-/**
- * OpenAI API base URL.
- */
-const OPENAI_API_BASE = 'https://api.openai.com/v1';
+const logger = createLogger('codex-provider');
 
 /**
  * Default model for OpenAI provider.
@@ -30,85 +30,43 @@ const API_KEY_ENV = 'OPENAI_API_KEY';
 const DEFAULT_TIMEOUT_MS = 300_000;
 
 /**
- * OpenAI chat message format.
- */
-interface OpenAIMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
-
-/**
- * OpenAI chat completion request body.
- * Note: Newer models (GPT-4.1+, GPT-5.x, o-series) use max_completion_tokens.
- */
-interface OpenAIRequest {
-  model: string;
-  messages: OpenAIMessage[];
-  max_tokens?: number;
-  max_completion_tokens?: number;
-  temperature?: number;
-  stop?: string[];
-  response_format?: { type: 'json_object' | 'text' };
-}
-
-/**
- * OpenAI chat completion response.
- */
-interface OpenAIResponse {
-  id: string;
-  object: 'chat.completion';
-  created: number;
-  model: string;
-  choices: Array<{
-    index: number;
-    message: {
-      role: 'assistant';
-      content: string;
-    };
-    finish_reason: string;
-  }>;
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
-
-/**
- * Error response from OpenAI API.
- */
-interface ApiError {
-  error: {
-    message: string;
-    type: string;
-    code: string | null;
-  };
-}
-
-/**
- * OpenAI/Codex model provider implementation.
+ * OpenAI/Codex model provider implementation using official SDK.
  */
 export class CodexProvider implements ModelProvider {
   readonly name: ProviderName = 'codex';
   readonly defaultModel: string = DEFAULT_MODEL;
   
-  private apiKey: string | null = null;
+  private client: OpenAI | null = null;
   
   /**
-   * Get the API key from environment.
+   * Get or create the OpenAI client.
    */
-  private getApiKey(): string | null {
-    if (this.apiKey === null) {
-      this.apiKey = process.env[API_KEY_ENV] || null;
+  private getClient(): OpenAI | null {
+    if (this.client === null) {
+      const apiKey = process.env[API_KEY_ENV];
+      if (!apiKey) {
+        return null;
+      }
+      this.client = new OpenAI({
+        apiKey,
+        timeout: DEFAULT_TIMEOUT_MS,
+      });
     }
-    return this.apiKey;
+    return this.client;
   }
   
   /**
    * Check if OpenAI API key is configured.
    */
   isAvailable(): boolean {
-    return this.getApiKey() !== null;
+    return !!process.env[API_KEY_ENV];
+  }
+  
+  /**
+   * Check if model is a newer model that uses max_completion_tokens.
+   */
+  private isNewerModel(model: string): boolean {
+    return /^(gpt-(4\.1|5)|o[0-9])/.test(model);
   }
   
   /**
@@ -123,8 +81,11 @@ export class CodexProvider implements ModelProvider {
     const startTime = Date.now();
     const actualModel = model || this.defaultModel;
     
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
+    logger.debug('Starting generation', { model: actualModel, promptLength: prompt.length });
+    
+    const client = this.getClient();
+    if (!client) {
+      logger.error('API key not configured');
       return {
         success: false,
         error: `OpenAI API key not configured. Set ${API_KEY_ENV} environment variable.`,
@@ -136,7 +97,7 @@ export class CodexProvider implements ModelProvider {
     }
     
     try {
-      const messages: OpenAIMessage[] = [];
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
       
       // Add system message if provided
       if (systemPrompt) {
@@ -145,77 +106,68 @@ export class CodexProvider implements ModelProvider {
       
       // Add user message
       messages.push({ role: 'user', content: prompt });
-      
-      const requestBody: OpenAIRequest = {
+
+      logger.debug('Sending request', { 
+        model: actualModel, 
+        messageCount: messages.length,
+        isNewerModel: this.isNewerModel(actualModel),
+      });
+
+      // Build request params
+      const requestParams: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
         model: actualModel,
         messages,
       };
-      
-      // Add optional parameters
-      // Newer models (GPT-4.1+, GPT-5.x, o-series) use max_completion_tokens
+
+      // Handle max tokens based on model version
       if (options?.maxTokens) {
-        const isNewerModel = /^(gpt-(4\.1|5)|o[0-9])/.test(actualModel);
-        if (isNewerModel) {
-          requestBody.max_completion_tokens = options.maxTokens;
+        if (this.isNewerModel(actualModel)) {
+          // Newer models use max_completion_tokens
+          (requestParams as any).max_completion_tokens = options.maxTokens;
+          logger.debug('Using max_completion_tokens', { value: options.maxTokens });
         } else {
-          requestBody.max_tokens = options.maxTokens;
+          // Older models use max_tokens
+          requestParams.max_tokens = options.maxTokens;
+          logger.debug('Using max_tokens', { value: options.maxTokens });
         }
       }
+
+      // Add optional parameters
       if (options?.temperature !== undefined) {
-        requestBody.temperature = options.temperature;
+        requestParams.temperature = options.temperature;
       }
       if (options?.stopSequences) {
-        requestBody.stop = options.stopSequences;
+        requestParams.stop = options.stopSequences;
       }
       if (options?.jsonMode) {
-        requestBody.response_format = { type: 'json_object' };
+        requestParams.response_format = { type: 'json_object' };
       }
-      
-      const timeout = options?.timeout || DEFAULT_TIMEOUT_MS;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-      
-      const response = await fetch(`${OPENAI_API_BASE}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
+
+      const response = await client.chat.completions.create(requestParams);
       
       const latencyMs = Date.now() - startTime;
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: { message: response.statusText } })) as ApiError;
-        return {
-          success: false,
-          error: `OpenAI API error (${response.status}): ${errorData.error?.message || response.statusText}`,
-          usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
-          model: actualModel,
-          provider: 'codex',
-          latencyMs,
-        };
-      }
-      
-      const data = await response.json() as OpenAIResponse;
-      
-      // Extract text from first choice
-      const text = data.choices[0]?.message?.content || '';
+      logger.debug('Response received', { 
+        latencyMs, 
+        model: response.model,
+        finishReason: response.choices[0]?.finish_reason,
+        usage: response.usage,
+      });
+
+      // Extract text from response
+      const text = response.choices[0]?.message?.content || '';
       
       if (!text) {
+        logger.warn('Empty response from OpenAI');
         return {
           success: false,
           error: 'OpenAI returned empty response',
           usage: {
-            input_tokens: data.usage.prompt_tokens,
-            output_tokens: data.usage.completion_tokens,
-            total_tokens: data.usage.total_tokens,
+            input_tokens: response.usage?.prompt_tokens || 0,
+            output_tokens: response.usage?.completion_tokens || 0,
+            total_tokens: response.usage?.total_tokens || 0,
           },
-          model: data.model || actualModel,
+          model: response.model || actualModel,
           provider: 'codex',
           latencyMs,
         };
@@ -225,17 +177,38 @@ export class CodexProvider implements ModelProvider {
         success: true,
         text,
         usage: {
-          input_tokens: data.usage.prompt_tokens,
-          output_tokens: data.usage.completion_tokens,
-          total_tokens: data.usage.total_tokens,
+          input_tokens: response.usage?.prompt_tokens || 0,
+          output_tokens: response.usage?.completion_tokens || 0,
+          total_tokens: response.usage?.total_tokens || 0,
         },
-        model: data.model || actualModel,
+        model: response.model || actualModel,
         provider: 'codex',
         latencyMs,
       };
     } catch (e) {
+      const latencyMs = Date.now() - startTime;
+      
+      if (e instanceof OpenAI.APIError) {
+        logger.error('OpenAI API error', { 
+          status: e.status, 
+          code: e.code,
+          message: e.message,
+          type: e.type,
+        });
+        return {
+          success: false,
+          error: `OpenAI API error (${e.status}): ${e.message}`,
+          usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+          model: actualModel,
+          provider: 'codex',
+          latencyMs,
+        };
+      }
+      
       const error = e instanceof Error ? e.message : 'Unknown error';
-      const isTimeout = error.includes('abort');
+      const isTimeout = error.includes('timeout') || error.includes('ETIMEDOUT');
+      
+      logger.error('Request failed', { error, isTimeout });
       
       return {
         success: false,
@@ -243,13 +216,13 @@ export class CodexProvider implements ModelProvider {
         usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
         model: actualModel,
         provider: 'codex',
-        latencyMs: Date.now() - startTime,
+        latencyMs,
       };
     }
   }
 }
 
 /**
- * Singleton instance of the OpenAI/Codex provider.
+ * Singleton instance of the OpenAI provider.
  */
 export const codexProvider = new CodexProvider();

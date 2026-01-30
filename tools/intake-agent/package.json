@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.0",
+    "@anthropic-ai/sdk": "^0.72.1",
     "@streamparser/json": "^0.0.22",
-    "handlebars": "^4.7.8"
+    "handlebars": "^4.7.8",
+    "openai": "^6.17.0"
   },
   "devDependencies": {
     "@types/bun": "latest",

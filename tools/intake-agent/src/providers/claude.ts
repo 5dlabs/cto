@@ -1,12 +1,14 @@
 /**
- * Claude Provider - Wraps the official Claude Agent SDK.
+ * Claude Provider - Uses official Anthropic SDK for direct API calls.
  * 
- * Uses @anthropic-ai/claude-code for generation with full MCP support.
+ * Provides simple generation without agentic features for debate planning.
  */
 
-import { query, type Options, type SDKResultMessage, type SDKAssistantMessage } from '@anthropic-ai/claude-code';
+import Anthropic from '@anthropic-ai/sdk';
 import type { ModelProvider, ProviderOptions, ProviderResponse, ProviderName } from './types';
-import { getClaudeCliOrThrow, isClaudeCliAvailable } from '../cli-finder';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('claude-provider');
 
 /**
  * Default model for Claude provider.
@@ -14,45 +16,50 @@ import { getClaudeCliOrThrow, isClaudeCliAvailable } from '../cli-finder';
 const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 
 /**
- * Extract text content from Claude SDK assistant message.
+ * Environment variable for Anthropic API key.
  */
-function extractAssistantText(message: SDKAssistantMessage): string {
-  const content = message.message.content;
-  if (!Array.isArray(content)) {
-    return '';
-  }
-  
-  return content
-    .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
-    .map((block) => block.text)
-    .join('');
-}
+const API_KEY_ENV = 'ANTHROPIC_API_KEY';
 
 /**
- * Claude model provider implementation.
+ * Default timeout for API requests (5 minutes).
+ */
+const DEFAULT_TIMEOUT_MS = 300_000;
+
+/**
+ * Claude model provider implementation using official Anthropic SDK.
  */
 export class ClaudeProvider implements ModelProvider {
   readonly name: ProviderName = 'claude';
   readonly defaultModel: string = DEFAULT_MODEL;
   
-  private cliPath: string | null = null;
+  private client: Anthropic | null = null;
   
   /**
-   * Check if Claude CLI is available.
+   * Get or create the Anthropic client.
    */
-  isAvailable(): boolean {
-    try {
-      if (this.cliPath === null) {
-        this.cliPath = isClaudeCliAvailable() ? getClaudeCliOrThrow() : null;
+  private getClient(): Anthropic | null {
+    if (this.client === null) {
+      const apiKey = process.env[API_KEY_ENV];
+      if (!apiKey) {
+        return null;
       }
-      return this.cliPath !== null;
-    } catch {
-      return false;
+      this.client = new Anthropic({
+        apiKey,
+        timeout: DEFAULT_TIMEOUT_MS,
+      });
     }
+    return this.client;
   }
   
   /**
-   * Generate text using Claude Agent SDK.
+   * Check if Anthropic API key is configured.
+   */
+  isAvailable(): boolean {
+    return !!process.env[API_KEY_ENV];
+  }
+  
+  /**
+   * Generate text using Anthropic's Messages API.
    */
   async generate(
     prompt: string,
@@ -63,55 +70,61 @@ export class ClaudeProvider implements ModelProvider {
     const startTime = Date.now();
     const actualModel = model || this.defaultModel;
     
-    try {
-      // Ensure CLI is available
-      const cliPath = this.cliPath || getClaudeCliOrThrow();
-      this.cliPath = cliPath;
-      
-      const sdkOptions: Options = {
-        customSystemPrompt: systemPrompt,
+    logger.debug('Starting generation', { model: actualModel, promptLength: prompt.length });
+    
+    const client = this.getClient();
+    if (!client) {
+      logger.error('API key not configured');
+      return {
+        success: false,
+        error: `Anthropic API key not configured. Set ${API_KEY_ENV} environment variable.`,
+        usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
         model: actualModel,
-        maxTurns: 1,
-        allowedTools: [],
-        permissionMode: 'bypassPermissions',
-        pathToClaudeCodeExecutable: cliPath,
+        provider: 'claude',
+        latencyMs: Date.now() - startTime,
       };
-      
-      // Apply additional options
-      if (options?.maxTokens) {
-        // Note: Claude SDK uses different option naming
-        // We pass it through customSystemPrompt or let it use defaults
-      }
-      
-      let responseText = '';
-      let inputTokens = 0;
-      let outputTokens = 0;
-      
-      for await (const message of query({
-        prompt,
-        options: sdkOptions,
-      })) {
-        if (message.type === 'assistant') {
-          responseText += extractAssistantText(message);
-        }
-        
-        if (message.type === 'result') {
-          const resultMsg = message as SDKResultMessage;
-          if ('usage' in resultMsg) {
-            inputTokens = resultMsg.usage.input_tokens;
-            outputTokens = resultMsg.usage.output_tokens;
-          }
-        }
-      }
+    }
+    
+    try {
+      logger.debug('Sending request', { model: actualModel });
+
+      const response = await client.messages.create({
+        model: actualModel,
+        max_tokens: options?.maxTokens || 8192,
+        system: systemPrompt || undefined,
+        messages: [
+          { role: 'user', content: prompt }
+        ],
+        temperature: options?.temperature,
+        stop_sequences: options?.stopSequences,
+      });
       
       const latencyMs = Date.now() - startTime;
       
-      if (!responseText) {
+      logger.debug('Response received', { 
+        latencyMs, 
+        model: response.model,
+        stopReason: response.stop_reason,
+        usage: response.usage,
+      });
+
+      // Extract text from response
+      const text = response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+        .map((block) => block.text)
+        .join('');
+      
+      if (!text) {
+        logger.warn('Empty response from Anthropic');
         return {
           success: false,
-          error: 'Claude returned empty response',
-          usage: { input_tokens: inputTokens, output_tokens: outputTokens, total_tokens: inputTokens + outputTokens },
-          model: actualModel,
+          error: 'Anthropic returned empty response',
+          usage: {
+            input_tokens: response.usage.input_tokens,
+            output_tokens: response.usage.output_tokens,
+            total_tokens: response.usage.input_tokens + response.usage.output_tokens,
+          },
+          model: response.model || actualModel,
           provider: 'claude',
           latencyMs,
         };
@@ -119,25 +132,46 @@ export class ClaudeProvider implements ModelProvider {
       
       return {
         success: true,
-        text: responseText,
+        text,
         usage: {
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-          total_tokens: inputTokens + outputTokens,
+          input_tokens: response.usage.input_tokens,
+          output_tokens: response.usage.output_tokens,
+          total_tokens: response.usage.input_tokens + response.usage.output_tokens,
         },
-        model: actualModel,
+        model: response.model || actualModel,
         provider: 'claude',
         latencyMs,
       };
     } catch (e) {
+      const latencyMs = Date.now() - startTime;
+      
+      if (e instanceof Anthropic.APIError) {
+        logger.error('Anthropic API error', { 
+          status: e.status, 
+          message: e.message,
+        });
+        return {
+          success: false,
+          error: `Anthropic API error (${e.status}): ${e.message}`,
+          usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+          model: actualModel,
+          provider: 'claude',
+          latencyMs,
+        };
+      }
+      
       const error = e instanceof Error ? e.message : 'Unknown error';
+      const isTimeout = error.includes('timeout') || error.includes('ETIMEDOUT');
+      
+      logger.error('Request failed', { error, isTimeout });
+      
       return {
         success: false,
-        error: `Claude API error: ${error}`,
+        error: isTimeout ? 'Anthropic API request timed out' : `Anthropic API error: ${error}`,
         usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
         model: actualModel,
         provider: 'claude',
-        latencyMs: Date.now() - startTime,
+        latencyMs,
       };
     }
   }
