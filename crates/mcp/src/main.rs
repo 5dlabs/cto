@@ -4982,7 +4982,7 @@ You MUST complete ALL of these steps before finishing:
 
 1. [ ] **Repository analyzed** - Found all SKILL.md files in the source repository
 2. [ ] **Skills copied** - Each skill copied to `templates/skills/{{category}}/{{skill-name}}/SKILL.md`
-3. [ ] **cto-config.json updated** - Added skill names to the `skills` array for agents: {agents_str}
+3. [ ] **cto-config.json updated** - Added skill names to `skills.default` array for agents: {agents_str}
 4. [ ] **Valid JSON** - cto-config.json parses without errors
 5. [ ] **PR created** - Pull request targeting `develop` branch
 6. [ ] **CI passes** - Wait for CI checks to complete successfully
@@ -5001,7 +5001,7 @@ You MUST complete ALL of these steps before finishing:
 
 1. [ ] **Repository analyzed** - Found all SKILL.md files in the source repository
 2. [ ] **Skills copied** - Each skill copied to `templates/skills/{{category}}/{{skill-name}}/SKILL.md`
-3. [ ] **cto-config.json updated** - Added skill names to the `skills` array for agents: {agents_str}
+3. [ ] **cto-config.json updated** - Added skill names to `skills.default` array for agents: {agents_str}
 4. [ ] **Valid JSON** - cto-config.json parses without errors
 5. [ ] **PR created** - Pull request targeting `develop` branch
 6. [ ] **CI passes** - Wait for CI checks to complete successfully
@@ -5043,8 +5043,9 @@ Add skills from the repository at `{github_url}` to the platform and assign them
    - Copy the SKILL.md file to that directory
 
 3. **Update cto-config.json:**
-   - Add the skill name (directory name, not full path) to the `skills` array for each agent: {agents_str}
-   - Skills should be added to the agent's existing skills array
+   - Add the skill name (directory name, not full path) to `skills.default` array for each agent: {agents_str}
+   - If the agent doesn't have a `skills` object, create one with `default: []`
+   - Skills should be added to the `default` array (loaded for all job types)
    - Do NOT add duplicates if the skill already exists
 
 4. **Create a PR** with all changes
@@ -5083,27 +5084,36 @@ templates/skills/
 
 ## cto-config.json Structure
 
-Skills are configured per-agent:
+Skills are configured per-agent with job-type-based arrays:
 
 ```json
 {{
   "agents": {{
     "rex": {{
-      "skills": [
-        "rust-patterns",
-        "existing-skill",
-        "new-skill-to-add"
-      ]
+      "skills": {{
+        "default": [
+          "rust-patterns",
+          "existing-skill",
+          "new-skill-to-add"
+        ],
+        "coder": ["tool-design"],
+        "healer": ["incident-response"]
+      }}
     }},
     "blaze": {{
-      "skills": [
-        "react-best-practices",
-        "new-skill-to-add"
-      ]
+      "skills": {{
+        "default": [
+          "react-best-practices",
+          "new-skill-to-add"
+        ],
+        "coder": ["compound-engineering"]
+      }}
     }}
   }}
 }}
 ```
+
+**IMPORTANT:** Add new skills to the `default` array (skills loaded for all job types). Only add to job-specific arrays (coder, healer, intake, quality, test, security, review, deploy, integration) if the skill is only relevant to that job type.
 
 ## Available MCP Tools
 

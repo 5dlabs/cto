@@ -387,6 +387,11 @@ pub struct AgentDefinition {
     #[serde(default)]
     pub tools: Option<AgentTools>,
 
+    /// Skills configuration for this agent by job type
+    /// When present, these skills are used instead of skill-mappings.yaml
+    #[serde(default)]
+    pub skills: Option<cto_config::AgentSkills>,
+
     /// Optional fully-formed client-config.json content for this agent
     /// If provided, controller will embed it verbatim (no server/tool inference in code)
     #[serde(default, rename = "clientConfig")]
@@ -795,6 +800,7 @@ cleanup:
                 temperature: Some(0.65),
                 reasoning_effort: Some("high".to_string()),
                 tools: None,
+                skills: None,
                 client_config: None,
                 model_rotation: None,
                 frontend_stack: None,

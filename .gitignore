@@ -10159,3 +10159,6 @@ target/debug/deps/cto-194166ecea56f79c.d
 **/ralph-report.html
 **/.ralph-failures/
 !.claude/skills/
+
+# CLI test secrets
+tests/cli-invocation/.env
