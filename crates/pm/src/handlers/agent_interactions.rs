@@ -828,6 +828,199 @@ pub fn select_agent_for_files(files: &[String]) -> Agent {
 }
 
 // =============================================================================
+// CI Failure Button Creation
+// =============================================================================
+
+/// Handle CI failure webhook - creates a check run with remediation buttons
+pub async fn handle_ci_failure_webhook(
+    State(_state): State<Arc<CallbackState>>,
+    _headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Value>, StatusCode> {
+    info!("Received CI failure webhook");
+
+    // Parse the payload
+    let payload: Value = serde_json::from_slice(&body).map_err(|e| {
+        error!("Failed to parse CI failure payload: {}", e);
+        StatusCode::BAD_REQUEST
+    })?;
+
+    // Extract nested payload (from Argo Events sensor)
+    let inner_payload = payload.get("payload").unwrap_or(&payload);
+
+    let event: CheckRunPayload = serde_json::from_value(inner_payload.clone()).map_err(|e| {
+        error!("Failed to parse check_run payload: {}", e);
+        StatusCode::BAD_REQUEST
+    })?;
+
+    // Get PR info
+    let pr = event.check_run.pull_requests.first().ok_or_else(|| {
+        warn!("No PR associated with check_run");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    let pr_number = pr.number;
+    let repo_full_name = &event.repository.full_name;
+    let check_run_id = event.check_run.id;
+    let check_name = &event.check_run.name;
+
+    info!(
+        pr = %pr_number,
+        repo = %repo_full_name,
+        check_name = %check_name,
+        check_run_id = %check_run_id,
+        "Processing CI failure for remediation buttons"
+    );
+
+    // Get changed files from PR using gh CLI
+    let files_output = tokio::process::Command::new("gh")
+        .args([
+            "pr",
+            "view",
+            &pr_number.to_string(),
+            "--repo",
+            repo_full_name,
+            "--json",
+            "files",
+            "--jq",
+            ".files[].path",
+        ])
+        .output()
+        .await
+        .map_err(|e| {
+            error!("Failed to get PR files: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let files_str = String::from_utf8_lossy(&files_output.stdout);
+    let files: Vec<String> = files_str.lines().map(String::from).collect();
+
+    if files.is_empty() {
+        warn!("No files found for PR #{}", pr_number);
+        return Ok(Json(json!({
+            "status": "skipped",
+            "reason": "no files in PR"
+        })));
+    }
+
+    // Detect language and select agent
+    let agent = select_agent_for_files(&files);
+    let agent_name = agent.as_str();
+
+    info!(
+        agent = %agent_name,
+        files_count = %files.len(),
+        "Detected agent for remediation"
+    );
+
+    // Build remediation button action
+    let identifier = format!("fix-{agent_name}-pr{pr_number}-{check_run_id}");
+    let label = match agent {
+        Agent::Rex => "🛠️ Fix with Rex",
+        Agent::Grizz => "🐻 Fix with Grizz",
+        Agent::Blaze => "⚡ Fix with Blaze",
+        Agent::Nova => "✨ Fix with Nova",
+        Agent::Tap => "📱 Fix with Tap",
+        Agent::Spark => "💻 Fix with Spark",
+        Agent::Vex => "🎮 Fix with Vex",
+        Agent::Forge => "🔥 Fix with Forge",
+        _ => "🤖 Fix with Agent",
+    };
+    let description = match agent {
+        Agent::Rex => "Rex will analyze and fix Rust issues",
+        Agent::Grizz => "Grizz will analyze and fix Go issues",
+        Agent::Blaze => "Blaze will analyze and fix TypeScript/React issues",
+        Agent::Nova => "Nova will analyze and fix Node.js issues",
+        Agent::Tap => "Tap will analyze and fix React Native issues",
+        Agent::Spark => "Spark will analyze and fix Electron issues",
+        Agent::Vex => "Vex will analyze and fix Unity/C# issues",
+        Agent::Forge => "Forge will analyze and fix Unreal/C++ issues",
+        _ => "Agent will analyze and fix issues",
+    };
+
+    // Create a new check run with remediation button
+    let check_run_name = format!("🔧 Remediation Available - {check_name}");
+    let head_sha = &event.check_run.head_sha;
+
+    let check_payload = json!({
+        "name": check_run_name,
+        "head_sha": head_sha,
+        "status": "completed",
+        "conclusion": "action_required",
+        "output": {
+            "title": "AI Agent Ready to Fix",
+            "summary": format!("The **{}** check failed. Click the button below to launch **{}** to automatically fix the issue.", check_name, label),
+            "text": format!(
+                "## Detected Language\n\nBased on the PR files, the primary language is **{}**.\n\n## Available Agent\n\n**{}** is ready to analyze the failure and push a fix.\n\n## How It Works\n\n1. Click the \"{}\" button\n2. {} will clone the repo and analyze the failure\n3. The agent will push a fix commit to this PR\n4. CI will re-run automatically",
+                agent.primary_language().unwrap_or("unknown"),
+                label,
+                label,
+                label
+            )
+        },
+        "actions": [{
+            "label": label,
+            "description": description,
+            "identifier": identifier
+        }]
+    });
+
+    // Create the check run using gh CLI
+    let gh_output = tokio::process::Command::new("gh")
+        .args([
+            "api",
+            "--method",
+            "POST",
+            "-H",
+            "Accept: application/vnd.github+json",
+            &format!("/repos/{repo_full_name}/check-runs"),
+            "--input",
+            "-",
+        ])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            error!("Failed to spawn gh: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let mut child = gh_output;
+    if let Some(mut stdin) = child.stdin.take() {
+        use tokio::io::AsyncWriteExt;
+        let payload_str = serde_json::to_string(&check_payload).unwrap_or_default();
+        stdin.write_all(payload_str.as_bytes()).await.ok();
+    }
+
+    let output = child.wait_with_output().await.map_err(|e| {
+        error!("Failed to wait for gh: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        error!("Failed to create check run: {}", stderr);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    info!(
+        pr = %pr_number,
+        check_name = %check_run_name,
+        agent = %agent_name,
+        "Created remediation check run with button"
+    );
+
+    Ok(Json(json!({
+        "status": "ok",
+        "check_run_created": check_run_name,
+        "agent": agent_name,
+        "pr": pr_number,
+        "repo": repo_full_name
+    })))
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
