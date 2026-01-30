@@ -1,4 +1,4 @@
-# Subtask 3.3: Escalation Policies and On-Call Schedule Management
+# Subtask 3.3: Implement Slack and Webhook Channel Handlers with Template System
 
 ## Parent Task
 Task 3
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Implement escalation policy CRUD interface and on-call schedule calendar view with drag-drop scheduling capabilities
+Build Slack API integration, webhook delivery system, and notification template engine for different alert types across all channels
 
 ## Dependencies
 - Subtask 3.1
 
 ## Implementation Details
-Build escalation policy creation/editing forms with rule configuration, implement policy listing with search/filter, create on-call schedule calendar component with drag-drop support, add schedule conflict detection, implement notification channel configuration UI with multiple channel types (email, SMS, Slack, etc.)
+Implement Slack API integration using official SDK, build generic webhook delivery with configurable endpoints and authentication, create template system supporting different alert types (critical, warning, info) with channel-specific formatting, implement template rendering engine, and add rate limiting mechanisms to prevent notification spam. Include webhook signature validation and Slack-specific formatting.
 
 ## Test Strategy
-Verify CRUD operations for policies and schedules, test drag-drop functionality and conflict detection
+Mock Slack API tests, webhook delivery validation, template rendering correctness, and rate limiting effectiveness
 
 ---
 *Project: alert-management*

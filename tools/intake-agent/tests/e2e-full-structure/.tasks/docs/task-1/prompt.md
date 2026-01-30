@@ -1,11 +1,11 @@
-# Task 1: Infrastructure Setup
+# Task 1: Setup Infrastructure and Databases
 
 ## Agent
 - **Name**: Bolt
 - **Stack**: Kubernetes
 
 ## Overview
-Set up PostgreSQL and Redis infrastructure with proper networking, storage, and monitoring for the alert management system
+Deploy PostgreSQL and Redis instances with proper configuration for alert management service persistence and real-time state management
 
 ## Priority
 high
@@ -14,28 +14,28 @@ high
 None
 
 ## Implementation Details
-1. Deploy PostgreSQL cluster with persistent storage
-2. Deploy Redis cluster for caching and real-time state
-3. Configure networking between services
-4. Set up monitoring and health checks
-5. Create namespaces and RBAC policies
-6. Configure backup strategies for PostgreSQL
+1. Deploy PostgreSQL StatefulSet with persistent volumes for alert data, escalation policies, and on-call schedules
+2. Deploy Redis cluster for real-time alert state, notification queues, and session management
+3. Configure network policies and security contexts
+4. Set up monitoring and backup strategies for both databases
+5. Create ConfigMaps for database connection strings and Redis configuration
+6. Deploy database migration jobs for schema initialization
 
 ## Decision Points
-### d1: PostgreSQL deployment strategy - single instance vs cluster
+### d1: Redis deployment mode - single instance vs cluster for high availability
 - **Category**: architecture
 - **Constraint**: soft
-- **Options**: single instance with backup, primary-replica cluster
+- **Options**: single-instance, redis-cluster
 
 
-### d2: Redis deployment configuration
+### d2: PostgreSQL storage class and size allocation
 - **Category**: performance
 - **Constraint**: open
-- **Options**: single node, cluster mode
+- **Options**: standard-ssd-10gb, premium-ssd-20gb
 
 
 ## Acceptance Criteria
-Verify PostgreSQL accepts connections and can create databases. Confirm Redis cluster is operational with basic set/get operations. Validate persistent storage is properly mounted and accessible.
+Verify PostgreSQL and Redis are accessible from within cluster, database schemas are created, Redis can handle pub/sub operations, persistent volumes are properly mounted, and health checks pass
 
 ---
 *Project: alert-management*

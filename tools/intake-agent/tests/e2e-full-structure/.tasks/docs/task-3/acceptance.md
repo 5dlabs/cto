@@ -1,18 +1,22 @@
 # Acceptance Criteria - Task 3
 
 ## Task
-Admin Dashboard Frontend (Blaze - React/Next.js)
+Implement Multi-Channel Notification System (Grizz - Go/gRPC)
 
 ## Criteria
-1. Verify all CRUD operations work for escalation policies and schedules. Confirm alert dashboard displays real-time updates. Test notification channel configuration saves and applies correctly. Validate user can acknowledge and resolve alerts through UI.
+1. All notification channels successfully deliver test messages
+2. failed deliveries are retried according to policy
+3. delivery status is accurately tracked
+4. rate limiting prevents spam
+5. templates render correctly for different alert types
+6. and notification history is maintained
 
 ## Decision Points Requiring Resolution
-### Requires Human Approval
-- **d7**: Alert acknowledgment workflow (ux-behavior)
+All decisions can be made by the agent.
 
 ## Definition of Done
 - [ ] All acceptance criteria met
 - [ ] Tests passing
 - [ ] Code reviewed
 - [ ] Documentation updated
-- [ ] Decision "d7" approved: Alert acknowledgment workflow
+

@@ -1,11 +1,11 @@
-# Task 3: Admin Dashboard Frontend
+# Task 3: Implement Multi-Channel Notification System
 
 ## Agent
-- **Name**: Blaze
-- **Stack**: React/Next.js
+- **Name**: Grizz
+- **Stack**: Go/gRPC
 
 ## Overview
-Build React-based admin dashboard for managing alerts, escalation policies, on-call schedules, and monitoring system health
+Build notification delivery system supporting email, SMS, Slack, and webhook channels with delivery tracking and failure handling
 
 ## Priority
 medium
@@ -14,30 +14,31 @@ medium
 - Task 2
 
 ## Implementation Details
-1. Set up Next.js project with TypeScript
-2. Create alert dashboard with filtering and search
-3. Build escalation policy management interface
-4. Implement on-call schedule calendar view
-5. Add alert acknowledgment/resolution UI
-6. Create notification channel configuration
-7. Build system health and metrics dashboard
-8. Implement real-time updates via WebSocket/SSE
+1. Create notification channel interfaces and implementations for email, SMS, Slack, and webhooks
+2. Implement delivery tracking with status updates (sent, delivered, failed)
+3. Add retry logic with exponential backoff for failed deliveries
+4. Build notification template system for different alert types
+5. Implement rate limiting to prevent notification spam
+6. Add delivery preference management per user/team
+7. Create notification history and audit logging
+8. Integrate with external services (SMTP, Twilio, Slack API)
+9. Add circuit breaker pattern for external service failures
 
 ## Decision Points
-### d6: Real-time update mechanism for dashboard
-- **Category**: ux-behavior
-- **Constraint**: open
-- **Options**: WebSocket connection, Server-Sent Events, polling
-
-
-### d7: Alert acknowledgment workflow
-- **Category**: ux-behavior
+### d6: Notification failure escalation - retry indefinitely vs give up after N attempts
+- **Category**: error-handling
 - **Constraint**: soft
-- **Options**: one-click acknowledge, require comment/reason
-⚠️ **Requires Approval**
+- **Options**: infinite-retry, max-attempts
+
+
+### d7: Notification delivery method - synchronous vs asynchronous processing
+- **Category**: performance
+- **Constraint**: open
+- **Options**: synchronous, async-queue
+
 
 ## Acceptance Criteria
-Verify all CRUD operations work for escalation policies and schedules. Confirm alert dashboard displays real-time updates. Test notification channel configuration saves and applies correctly. Validate user can acknowledge and resolve alerts through UI.
+All notification channels successfully deliver test messages, failed deliveries are retried according to policy, delivery status is accurately tracked, rate limiting prevents spam, templates render correctly for different alert types, and notification history is maintained
 
 ---
 *Project: alert-management*

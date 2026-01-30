@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <task id="2" project="alert-management">
-  <title>Alert Management Backend Service</title>
+  <title>Build Alert Management Backend Service</title>
   <agent name="grizz" stack="Go/gRPC" />
   <priority>high</priority>
   <status>pending</status>
   
   <description>
-    Build the core alert management service with webhook ingestion, notification routing, escalation policies, and on-call scheduling
+    Implement core alert management service with webhook ingestion, notification routing, escalation policies, and on-call scheduling
   </description>
   
   <dependencies>
@@ -14,41 +14,42 @@
   </dependencies>
   
   <implementation>
-    <details>1. Set up Go service with gRPC endpoints
-2. Implement webhook endpoints for alert ingestion
-3. Create PostgreSQL schema for alerts, policies, schedules
-4. Build notification routing engine based on severity/tags
-5. Implement escalation policy engine with timeouts
-6. Create on-call schedule management
-7. Add alert acknowledgment and resolution tracking
-8. Integrate Redis for real-time state management</details>
+    <details>1. Create gRPC service definitions for alert operations, escalation policies, and on-call management
+2. Implement webhook endpoints for alert ingestion with validation and deduplication
+3. Build notification routing engine based on severity levels and tag matching
+4. Develop escalation policy engine with timeout-based escalation logic
+5. Create on-call schedule management with rotation support
+6. Implement alert state tracking (open, acknowledged, resolved)
+7. Add database models and repository layer for PostgreSQL
+8. Integrate Redis for real-time notifications and caching
+9. Add comprehensive logging and metrics collection</details>
   </implementation>
   
   <decision_points>
     <decision id="d3" category="api-design" constraint="escalation" requires_approval="true">
-      <description>Alert ingestion format standardization</description>
+      <description>Alert ingestion format - custom schema vs industry standard like PagerDuty</description>
       <options>
-        <option>custom JSON schema</option>
-        <option>adopt existing standard like PagerDuty/Prometheus</option>
+        <option>custom-schema</option>
+        <option>pagerduty-compatible</option>
       </options>
     </decision>
-    <decision id="d4" category="architecture" constraint="soft" requires_approval="false">
-      <description>Notification delivery mechanism</description>
+    <decision id="d4" category="error-handling" constraint="soft" requires_approval="false">
+      <description>Failed notification handling strategy</description>
       <options>
-        <option>synchronous delivery</option>
-        <option>asynchronous queue-based</option>
+        <option>retry-with-backoff</option>
+        <option>dead-letter-queue</option>
       </options>
     </decision>
-    <decision id="d5" category="data-model" constraint="hard" requires_approval="true">
-      <description>Escalation policy structure</description>
+    <decision id="d5" category="architecture" constraint="open" requires_approval="false">
+      <description>Notification channel abstraction - unified interface vs channel-specific implementations</description>
       <options>
-        <option>simple linear escalation</option>
-        <option>complex branching policies</option>
+        <option>unified-interface</option>
+        <option>channel-specific</option>
       </options>
     </decision>
   </decision_points>
   
   <acceptance_criteria>
-    Verify webhook endpoints accept and process alerts correctly. Confirm notification routing works based on configured rules. Test escalation policies trigger after specified timeouts. Validate on-call schedules determine correct recipients. Ensure alert state transitions work properly.
+    Webhook endpoints accept valid alerts and reject invalid ones, alerts are routed to correct channels based on rules, escalation policies trigger after configured timeouts, on-call schedules return correct personnel, alert state transitions work correctly, and all CRUD operations persist to database
   </acceptance_criteria>
 </task>

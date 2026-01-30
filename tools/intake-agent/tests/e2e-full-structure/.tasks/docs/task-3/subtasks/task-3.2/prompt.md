@@ -1,4 +1,4 @@
-# Subtask 3.2: Alert Management and System Health Dashboards
+# Subtask 3.2: Implement Email and SMS Channel Handlers with External Service Integration
 
 ## Parent Task
 Task 3
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Build alert dashboard with filtering/search capabilities and system health metrics dashboard with real-time data visualization
+Build concrete implementations for email (SMTP) and SMS (Twilio) notification channels with external service integration and circuit breaker patterns
 
 ## Dependencies
 - Subtask 3.1
 
 ## Implementation Details
-Create alert list view with filtering by status/severity/time, implement search functionality, build alert acknowledgment/resolution UI, develop system health dashboard with metrics visualization (CPU, memory, response times), add alert detail modal with timeline and actions
+Implement SMTP email delivery with configurable providers, integrate Twilio SDK for SMS delivery, implement circuit breaker pattern for external service failures, add channel-specific error handling and status mapping, and create configuration structures for service credentials and endpoints. Include connection pooling and timeout handling.
 
 ## Test Strategy
-Test alert filtering, search functionality, and acknowledgment workflows
+Integration tests with mock SMTP/Twilio services, circuit breaker behavior validation, and error handling scenarios
 
 ---
 *Project: alert-management*

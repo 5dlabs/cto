@@ -1,23 +1,23 @@
 # Acceptance Criteria - Task 2
 
 ## Task
-Alert Management Backend Service (Grizz - Go/gRPC)
+Build Alert Management Backend Service (Grizz - Go/gRPC)
 
 ## Criteria
-1. Verify webhook endpoints accept and process alerts correctly. Confirm notification routing works based on configured rules. Test escalation policies trigger after specified timeouts. Validate on-call schedules determine correct recipients. Ensure alert state transitions work properly.
+1. Webhook endpoints accept valid alerts and reject invalid ones
+2. alerts are routed to correct channels based on rules
+3. escalation policies trigger after configured timeouts
+4. on-call schedules return correct personnel
+5. alert state transitions work correctly
+6. and all CRUD operations persist to database
 
 ## Decision Points Requiring Resolution
-### Hard Constraints (Must Follow)
-- **d5**: Escalation policy structure
-
 ### Requires Human Approval
-- **d3**: Alert ingestion format standardization (api-design)
-- **d5**: Escalation policy structure (data-model)
+- **d3**: Alert ingestion format - custom schema vs industry standard like PagerDuty (api-design)
 
 ## Definition of Done
 - [ ] All acceptance criteria met
 - [ ] Tests passing
 - [ ] Code reviewed
 - [ ] Documentation updated
-- [ ] Decision "d3" approved: Alert ingestion format standardization
-- [ ] Decision "d5" approved: Escalation policy structure
+- [ ] Decision "d3" approved: Alert ingestion format - custom schema vs industry standard like PagerDuty

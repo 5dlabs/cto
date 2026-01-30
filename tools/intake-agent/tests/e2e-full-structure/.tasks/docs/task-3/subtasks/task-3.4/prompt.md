@@ -1,26 +1,26 @@
-# Subtask 3.4: Real-time Updates and WebSocket Integration
+# Subtask 3.4: Implement User Preferences, History Tracking, and System Integration Testing
 
 ## Parent Task
 Task 3
 
 ## Subagent Type
-implementer
+tester
 
 ## Parallelizable
 No - must wait for dependencies
 
 ## Description
-Implement WebSocket or SSE integration for real-time dashboard updates and coordinate final testing and code review
+Build delivery preference management, notification history/audit logging, and comprehensive end-to-end testing of the complete notification system
 
 ## Dependencies
 - Subtask 3.2
 - Subtask 3.3
 
 ## Implementation Details
-Set up WebSocket or SSE client connection for real-time alert updates, implement event handlers for live data updates across all dashboard components, add connection status indicators, handle reconnection logic, perform comprehensive testing of all CRUD operations and real-time features, conduct code review for performance and best practices
+Implement user/team delivery preference storage and retrieval, create notification history database schema and logging, build audit trail for all notification activities, implement preference-based channel selection logic, create comprehensive integration tests covering all channels and failure scenarios, and validate complete delivery pipeline including retry mechanisms and status tracking.
 
 ## Test Strategy
-Test real-time updates, connection handling, and end-to-end dashboard functionality
+End-to-end tests covering all notification channels, delivery tracking accuracy, preference management, history logging, and failure recovery scenarios
 
 ---
 *Project: alert-management*

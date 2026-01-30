@@ -1,10 +1,14 @@
 # Acceptance Criteria - Task 1
 
 ## Task
-Infrastructure Setup (Bolt - Kubernetes)
+Setup Infrastructure and Databases (Bolt - Kubernetes)
 
 ## Criteria
-1. Verify PostgreSQL accepts connections and can create databases. Confirm Redis cluster is operational with basic set/get operations. Validate persistent storage is properly mounted and accessible.
+1. Verify PostgreSQL and Redis are accessible from within cluster
+2. database schemas are created
+3. Redis can handle pub/sub operations
+4. persistent volumes are properly mounted
+5. and health checks pass
 
 ## Decision Points Requiring Resolution
 All decisions can be made by the agent.

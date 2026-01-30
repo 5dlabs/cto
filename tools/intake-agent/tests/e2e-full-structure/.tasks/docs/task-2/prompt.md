@@ -1,11 +1,11 @@
-# Task 2: Alert Management Backend Service
+# Task 2: Build Alert Management Backend Service
 
 ## Agent
 - **Name**: Grizz
 - **Stack**: Go/gRPC
 
 ## Overview
-Build the core alert management service with webhook ingestion, notification routing, escalation policies, and on-call scheduling
+Implement core alert management service with webhook ingestion, notification routing, escalation policies, and on-call scheduling
 
 ## Priority
 high
@@ -14,36 +14,37 @@ high
 - Task 1
 
 ## Implementation Details
-1. Set up Go service with gRPC endpoints
-2. Implement webhook endpoints for alert ingestion
-3. Create PostgreSQL schema for alerts, policies, schedules
-4. Build notification routing engine based on severity/tags
-5. Implement escalation policy engine with timeouts
-6. Create on-call schedule management
-7. Add alert acknowledgment and resolution tracking
-8. Integrate Redis for real-time state management
+1. Create gRPC service definitions for alert operations, escalation policies, and on-call management
+2. Implement webhook endpoints for alert ingestion with validation and deduplication
+3. Build notification routing engine based on severity levels and tag matching
+4. Develop escalation policy engine with timeout-based escalation logic
+5. Create on-call schedule management with rotation support
+6. Implement alert state tracking (open, acknowledged, resolved)
+7. Add database models and repository layer for PostgreSQL
+8. Integrate Redis for real-time notifications and caching
+9. Add comprehensive logging and metrics collection
 
 ## Decision Points
-### d3: Alert ingestion format standardization
+### d3: Alert ingestion format - custom schema vs industry standard like PagerDuty
 - **Category**: api-design
 - **Constraint**: escalation
-- **Options**: custom JSON schema, adopt existing standard like PagerDuty/Prometheus
+- **Options**: custom-schema, pagerduty-compatible
 ⚠️ **Requires Approval**
 
-### d4: Notification delivery mechanism
-- **Category**: architecture
+### d4: Failed notification handling strategy
+- **Category**: error-handling
 - **Constraint**: soft
-- **Options**: synchronous delivery, asynchronous queue-based
+- **Options**: retry-with-backoff, dead-letter-queue
 
 
-### d5: Escalation policy structure
-- **Category**: data-model
-- **Constraint**: hard
-- **Options**: simple linear escalation, complex branching policies
-⚠️ **Requires Approval**
+### d5: Notification channel abstraction - unified interface vs channel-specific implementations
+- **Category**: architecture
+- **Constraint**: open
+- **Options**: unified-interface, channel-specific
+
 
 ## Acceptance Criteria
-Verify webhook endpoints accept and process alerts correctly. Confirm notification routing works based on configured rules. Test escalation policies trigger after specified timeouts. Validate on-call schedules determine correct recipients. Ensure alert state transitions work properly.
+Webhook endpoints accept valid alerts and reject invalid ones, alerts are routed to correct channels based on rules, escalation policies trigger after configured timeouts, on-call schedules return correct personnel, alert state transitions work correctly, and all CRUD operations persist to database
 
 ---
 *Project: alert-management*

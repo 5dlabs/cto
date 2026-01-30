@@ -1,21 +1,24 @@
 # Acceptance Criteria - Task 4
 
 ## Task
-Integration Testing & API Documentation (Grizz - Go/gRPC)
+Create Admin Dashboard for Alert Management (Blaze - React/Next.js)
 
 ## Criteria
-1. All integration tests pass including edge cases like overlapping schedules and complex escalation scenarios. API documentation is complete and accurate. Load tests demonstrate system can handle expected alert volume without degradation.
+1. Dashboard loads and displays current alerts
+2. users can acknowledge and resolve alerts
+3. escalation policies can be created and modified
+4. on-call schedules display correctly and allow modifications
+5. notification channels can be configured and tested
+6. real-time updates work without page refresh
+7. and interface is usable on mobile devices
 
 ## Decision Points Requiring Resolution
-### Hard Constraints (Must Follow)
-- **d8**: Load testing targets and thresholds
-
 ### Requires Human Approval
-- **d8**: Load testing targets and thresholds (performance)
+- **d10**: On-call schedule complexity - simple rotation vs complex scheduling rules (ux-behavior)
 
 ## Definition of Done
 - [ ] All acceptance criteria met
 - [ ] Tests passing
 - [ ] Code reviewed
 - [ ] Documentation updated
-- [ ] Decision "d8" approved: Load testing targets and thresholds
+- [ ] Decision "d10" approved: On-call schedule complexity - simple rotation vs complex scheduling rules

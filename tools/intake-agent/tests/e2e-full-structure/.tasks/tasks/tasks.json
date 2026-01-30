@@ -1,21 +1,21 @@
 [
   {
     "id": 1,
-    "title": "Infrastructure Setup (Bolt - Kubernetes)",
-    "description": "Set up PostgreSQL and Redis infrastructure with proper networking, storage, and monitoring for the alert management system",
+    "title": "Setup Infrastructure and Databases (Bolt - Kubernetes)",
+    "description": "Deploy PostgreSQL and Redis instances with proper configuration for alert management service persistence and real-time state management",
     "status": "pending",
     "dependencies": [],
     "priority": "high",
-    "details": "1. Deploy PostgreSQL cluster with persistent storage\n2. Deploy Redis cluster for caching and real-time state\n3. Configure networking between services\n4. Set up monitoring and health checks\n5. Create namespaces and RBAC policies\n6. Configure backup strategies for PostgreSQL",
-    "testStrategy": "Verify PostgreSQL accepts connections and can create databases. Confirm Redis cluster is operational with basic set/get operations. Validate persistent storage is properly mounted and accessible.",
+    "details": "1. Deploy PostgreSQL StatefulSet with persistent volumes for alert data, escalation policies, and on-call schedules\n2. Deploy Redis cluster for real-time alert state, notification queues, and session management\n3. Configure network policies and security contexts\n4. Set up monitoring and backup strategies for both databases\n5. Create ConfigMaps for database connection strings and Redis configuration\n6. Deploy database migration jobs for schema initialization",
+    "testStrategy": "Verify PostgreSQL and Redis are accessible from within cluster, database schemas are created, Redis can handle pub/sub operations, persistent volumes are properly mounted, and health checks pass",
     "decisionPoints": [
       {
         "id": "d1",
         "category": "architecture",
-        "description": "PostgreSQL deployment strategy - single instance vs cluster",
+        "description": "Redis deployment mode - single instance vs cluster for high availability",
         "options": [
-          "single instance with backup",
-          "primary-replica cluster"
+          "single-instance",
+          "redis-cluster"
         ],
         "requiresApproval": false,
         "constraintType": "soft"
@@ -23,191 +23,351 @@
       {
         "id": "d2",
         "category": "performance",
-        "description": "Redis deployment configuration",
+        "description": "PostgreSQL storage class and size allocation",
         "options": [
-          "single node",
-          "cluster mode"
+          "standard-ssd-10gb",
+          "premium-ssd-20gb"
         ],
         "requiresApproval": false,
         "constraintType": "open"
       }
     ],
-    "subtasks": []
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Deploy PostgreSQL StatefulSet with Persistent Storage",
+        "description": "Set up PostgreSQL database with StatefulSet configuration, persistent volumes, and schema initialization for alert management data persistence",
+        "dependencies": [],
+        "details": "Create PostgreSQL StatefulSet with persistent volume claims for alert data, escalation policies, and on-call schedules. Include proper resource limits, storage class configuration, and database initialization scripts. Set up secrets for database credentials and configure readiness/liveness probes.",
+        "status": "pending",
+        "testStrategy": "Verify PostgreSQL pods start successfully, persistent volumes are mounted, database is accessible, and schema tables are created",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Deploy Redis Cluster for Real-time State Management",
+        "description": "Set up Redis cluster deployment for handling real-time alert state, notification queues, and session management with high availability configuration",
+        "dependencies": [],
+        "details": "Deploy Redis cluster with master-replica configuration, configure persistent volumes for data durability, set up Redis configuration for pub/sub operations and memory optimization. Include Redis Sentinel for high availability and automatic failover. Create ConfigMaps for Redis configuration parameters.",
+        "status": "pending",
+        "testStrategy": "Verify Redis cluster is operational, pub/sub functionality works, data persistence is enabled, and cluster can handle failover scenarios",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 3,
+        "title": "Configure Security and Network Policies",
+        "description": "Implement network policies, security contexts, and RBAC configurations for database access control and secure inter-service communication",
+        "dependencies": [
+          1,
+          2
+        ],
+        "details": "Create network policies to restrict database access to authorized services only, configure security contexts with non-root users and read-only filesystems where possible, set up RBAC for service accounts, and implement pod security standards. Configure TLS encryption for database connections.",
+        "status": "pending",
+        "testStrategy": "Verify network policies block unauthorized access, security contexts are properly applied, TLS connections work, and RBAC permissions are correctly enforced",
+        "subagentType": "implementer",
+        "parallelizable": false
+      },
+      {
+        "id": 4,
+        "title": "Review Infrastructure Configuration and Test Deployment",
+        "description": "Comprehensive review of database deployments, security configurations, and end-to-end testing of the complete infrastructure setup",
+        "dependencies": [
+          1,
+          2,
+          3
+        ],
+        "details": "Review all Kubernetes manifests for best practices, validate database configurations, test database connectivity and performance, verify backup and monitoring strategies are in place, and conduct security audit of network policies and access controls. Test disaster recovery procedures and data persistence across pod restarts.",
+        "status": "pending",
+        "testStrategy": "Execute comprehensive test suite including database performance tests, security penetration testing, backup/restore validation, and infrastructure resilience testing under various failure scenarios",
+        "subagentType": "tester",
+        "parallelizable": false
+      }
+    ]
   },
   {
     "id": 2,
-    "title": "Alert Management Backend Service (Grizz - Go/gRPC)",
-    "description": "Build the core alert management service with webhook ingestion, notification routing, escalation policies, and on-call scheduling",
+    "title": "Build Alert Management Backend Service (Grizz - Go/gRPC)",
+    "description": "Implement core alert management service with webhook ingestion, notification routing, escalation policies, and on-call scheduling",
     "status": "pending",
     "dependencies": [
       1
     ],
     "priority": "high",
-    "details": "1. Set up Go service with gRPC endpoints\n2. Implement webhook endpoints for alert ingestion\n3. Create PostgreSQL schema for alerts, policies, schedules\n4. Build notification routing engine based on severity/tags\n5. Implement escalation policy engine with timeouts\n6. Create on-call schedule management\n7. Add alert acknowledgment and resolution tracking\n8. Integrate Redis for real-time state management",
-    "testStrategy": "Verify webhook endpoints accept and process alerts correctly. Confirm notification routing works based on configured rules. Test escalation policies trigger after specified timeouts. Validate on-call schedules determine correct recipients. Ensure alert state transitions work properly.",
+    "details": "1. Create gRPC service definitions for alert operations, escalation policies, and on-call management\n2. Implement webhook endpoints for alert ingestion with validation and deduplication\n3. Build notification routing engine based on severity levels and tag matching\n4. Develop escalation policy engine with timeout-based escalation logic\n5. Create on-call schedule management with rotation support\n6. Implement alert state tracking (open, acknowledged, resolved)\n7. Add database models and repository layer for PostgreSQL\n8. Integrate Redis for real-time notifications and caching\n9. Add comprehensive logging and metrics collection",
+    "testStrategy": "Webhook endpoints accept valid alerts and reject invalid ones, alerts are routed to correct channels based on rules, escalation policies trigger after configured timeouts, on-call schedules return correct personnel, alert state transitions work correctly, and all CRUD operations persist to database",
     "decisionPoints": [
       {
         "id": "d3",
         "category": "api-design",
-        "description": "Alert ingestion format standardization",
+        "description": "Alert ingestion format - custom schema vs industry standard like PagerDuty",
         "options": [
-          "custom JSON schema",
-          "adopt existing standard like PagerDuty/Prometheus"
+          "custom-schema",
+          "pagerduty-compatible"
         ],
         "requiresApproval": true,
         "constraintType": "escalation"
       },
       {
         "id": "d4",
-        "category": "architecture",
-        "description": "Notification delivery mechanism",
+        "category": "error-handling",
+        "description": "Failed notification handling strategy",
         "options": [
-          "synchronous delivery",
-          "asynchronous queue-based"
+          "retry-with-backoff",
+          "dead-letter-queue"
         ],
         "requiresApproval": false,
         "constraintType": "soft"
       },
       {
         "id": "d5",
-        "category": "data-model",
-        "description": "Escalation policy structure",
+        "category": "architecture",
+        "description": "Notification channel abstraction - unified interface vs channel-specific implementations",
         "options": [
-          "simple linear escalation",
-          "complex branching policies"
-        ],
-        "requiresApproval": true,
-        "constraintType": "hard"
-      }
-    ],
-    "subtasks": []
-  },
-  {
-    "id": 3,
-    "title": "Admin Dashboard Frontend (Blaze - React/Next.js)",
-    "description": "Build React-based admin dashboard for managing alerts, escalation policies, on-call schedules, and monitoring system health",
-    "status": "pending",
-    "dependencies": [
-      2
-    ],
-    "priority": "medium",
-    "details": "1. Set up Next.js project with TypeScript\n2. Create alert dashboard with filtering and search\n3. Build escalation policy management interface\n4. Implement on-call schedule calendar view\n5. Add alert acknowledgment/resolution UI\n6. Create notification channel configuration\n7. Build system health and metrics dashboard\n8. Implement real-time updates via WebSocket/SSE",
-    "testStrategy": "Verify all CRUD operations work for escalation policies and schedules. Confirm alert dashboard displays real-time updates. Test notification channel configuration saves and applies correctly. Validate user can acknowledge and resolve alerts through UI.",
-    "decisionPoints": [
-      {
-        "id": "d6",
-        "category": "ux-behavior",
-        "description": "Real-time update mechanism for dashboard",
-        "options": [
-          "WebSocket connection",
-          "Server-Sent Events",
-          "polling"
+          "unified-interface",
+          "channel-specific"
         ],
         "requiresApproval": false,
         "constraintType": "open"
-      },
-      {
-        "id": "d7",
-        "category": "ux-behavior",
-        "description": "Alert acknowledgment workflow",
-        "options": [
-          "one-click acknowledge",
-          "require comment/reason"
-        ],
-        "requiresApproval": true,
-        "constraintType": "soft"
       }
     ],
     "subtasks": [
       {
         "id": 1,
-        "title": "Setup Next.js Project and Core Dashboard Components",
-        "description": "Initialize Next.js project with TypeScript, configure routing, and create foundational dashboard layout with navigation and core UI components",
+        "title": "Implement gRPC Service Definitions and Core Data Models",
+        "description": "Create gRPC protobuf definitions for alert management operations, escalation policies, and on-call scheduling, along with Go structs and database models for PostgreSQL",
         "dependencies": [],
-        "details": "Set up Next.js 13+ with TypeScript, configure ESLint/Prettier, create main layout component with sidebar navigation, implement routing structure for different dashboard sections, add basic UI components (buttons, forms, modals), and configure Tailwind CSS or preferred styling solution",
+        "details": "Define protobuf schemas for AlertService, EscalationService, and OnCallService with all CRUD operations. Generate Go code from protobufs. Create database models for alerts, escalation_policies, on_call_schedules, and alert_states tables with appropriate indexes. Implement repository interfaces and PostgreSQL implementations with proper error handling and transactions.",
         "status": "pending",
-        "testStrategy": "Unit tests for core components and integration tests for routing",
+        "testStrategy": "Unit tests for model validation, repository CRUD operations, and protobuf serialization/deserialization",
         "subagentType": "implementer",
         "parallelizable": true
       },
       {
         "id": 2,
-        "title": "Alert Management and System Health Dashboards",
-        "description": "Build alert dashboard with filtering/search capabilities and system health metrics dashboard with real-time data visualization",
-        "dependencies": [
-          1
-        ],
-        "details": "Create alert list view with filtering by status/severity/time, implement search functionality, build alert acknowledgment/resolution UI, develop system health dashboard with metrics visualization (CPU, memory, response times), add alert detail modal with timeline and actions",
+        "title": "Build Webhook Ingestion and Alert Processing Engine",
+        "description": "Implement webhook endpoints for alert ingestion with validation, deduplication, and alert state tracking functionality",
+        "dependencies": [],
+        "details": "Create HTTP handlers for webhook ingestion with JSON schema validation. Implement alert deduplication logic using fingerprinting based on alert metadata. Build alert state machine for tracking open/acknowledged/resolved states with proper state transitions. Add Redis integration for caching recent alerts and deduplication tracking. Include comprehensive error handling and request logging.",
         "status": "pending",
-        "testStrategy": "Test alert filtering, search functionality, and acknowledgment workflows",
+        "testStrategy": "Integration tests for webhook endpoints accepting valid alerts, rejecting invalid ones, deduplication working correctly, and state transitions functioning properly",
         "subagentType": "implementer",
         "parallelizable": true
       },
       {
         "id": 3,
-        "title": "Escalation Policies and On-Call Schedule Management",
-        "description": "Implement escalation policy CRUD interface and on-call schedule calendar view with drag-drop scheduling capabilities",
-        "dependencies": [
-          1
-        ],
-        "details": "Build escalation policy creation/editing forms with rule configuration, implement policy listing with search/filter, create on-call schedule calendar component with drag-drop support, add schedule conflict detection, implement notification channel configuration UI with multiple channel types (email, SMS, Slack, etc.)",
+        "title": "Implement Notification Routing and Escalation Policy Engine",
+        "description": "Build the notification routing engine with severity-based rules and tag matching, plus escalation policy engine with timeout-based escalation logic",
+        "dependencies": [],
+        "details": "Create notification routing engine that matches alerts to channels based on severity levels, tags, and custom rules. Implement escalation policy engine with configurable timeout intervals and escalation steps. Build on-call schedule management with rotation support and current personnel resolution. Integrate Redis for real-time notification queuing and escalation timer tracking. Add metrics collection for routing decisions and escalation triggers.",
         "status": "pending",
-        "testStrategy": "Verify CRUD operations for policies and schedules, test drag-drop functionality and conflict detection",
+        "testStrategy": "Unit tests for routing rules evaluation, escalation timeout logic, on-call schedule resolution, and integration tests for end-to-end notification flows",
         "subagentType": "implementer",
         "parallelizable": true
       },
       {
         "id": 4,
-        "title": "Real-time Updates and WebSocket Integration",
-        "description": "Implement WebSocket or SSE integration for real-time dashboard updates and coordinate final testing and code review",
+        "title": "Review Implementation and Validate System Integration",
+        "description": "Conduct comprehensive code review of all implemented components and validate the complete alert management system integration",
+        "dependencies": [
+          1,
+          2,
+          3
+        ],
+        "details": "Review gRPC service implementations for proper error handling, security, and performance. Validate database schema design and repository patterns. Ensure webhook ingestion follows best practices for validation and deduplication. Review notification routing logic for correctness and efficiency. Verify escalation policy engine handles edge cases properly. Check Redis integration for proper connection handling and error recovery. Validate logging and metrics coverage across all components.",
+        "status": "pending",
+        "testStrategy": "End-to-end integration tests covering complete alert lifecycle from ingestion through resolution, load testing for webhook endpoints, and system resilience testing",
+        "subagentType": "reviewer",
+        "parallelizable": false
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "title": "Implement Multi-Channel Notification System (Grizz - Go/gRPC)",
+    "description": "Build notification delivery system supporting email, SMS, Slack, and webhook channels with delivery tracking and failure handling",
+    "status": "pending",
+    "dependencies": [
+      2
+    ],
+    "priority": "medium",
+    "details": "1. Create notification channel interfaces and implementations for email, SMS, Slack, and webhooks\n2. Implement delivery tracking with status updates (sent, delivered, failed)\n3. Add retry logic with exponential backoff for failed deliveries\n4. Build notification template system for different alert types\n5. Implement rate limiting to prevent notification spam\n6. Add delivery preference management per user/team\n7. Create notification history and audit logging\n8. Integrate with external services (SMTP, Twilio, Slack API)\n9. Add circuit breaker pattern for external service failures",
+    "testStrategy": "All notification channels successfully deliver test messages, failed deliveries are retried according to policy, delivery status is accurately tracked, rate limiting prevents spam, templates render correctly for different alert types, and notification history is maintained",
+    "decisionPoints": [
+      {
+        "id": "d6",
+        "category": "error-handling",
+        "description": "Notification failure escalation - retry indefinitely vs give up after N attempts",
+        "options": [
+          "infinite-retry",
+          "max-attempts"
+        ],
+        "requiresApproval": false,
+        "constraintType": "soft"
+      },
+      {
+        "id": "d7",
+        "category": "performance",
+        "description": "Notification delivery method - synchronous vs asynchronous processing",
+        "options": [
+          "synchronous",
+          "async-queue"
+        ],
+        "requiresApproval": false,
+        "constraintType": "open"
+      }
+    ],
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Implement Core Notification Infrastructure and Channel Interfaces",
+        "description": "Build the foundational notification system architecture including channel interfaces, base delivery tracking, and core gRPC service definitions",
+        "dependencies": [],
+        "details": "Create notification service gRPC definitions, implement channel interface abstractions, build core delivery tracking structures, implement basic retry logic with exponential backoff, and create the main notification service handler. This includes defining proto files for notification requests/responses, channel status enums, and delivery tracking messages.",
+        "status": "pending",
+        "testStrategy": "Unit tests for interface contracts, gRPC service method validation, and retry logic correctness",
+        "subagentType": "implementer",
+        "parallelizable": false
+      },
+      {
+        "id": 2,
+        "title": "Implement Email and SMS Channel Handlers with External Service Integration",
+        "description": "Build concrete implementations for email (SMTP) and SMS (Twilio) notification channels with external service integration and circuit breaker patterns",
+        "dependencies": [
+          1
+        ],
+        "details": "Implement SMTP email delivery with configurable providers, integrate Twilio SDK for SMS delivery, implement circuit breaker pattern for external service failures, add channel-specific error handling and status mapping, and create configuration structures for service credentials and endpoints. Include connection pooling and timeout handling.",
+        "status": "pending",
+        "testStrategy": "Integration tests with mock SMTP/Twilio services, circuit breaker behavior validation, and error handling scenarios",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 3,
+        "title": "Implement Slack and Webhook Channel Handlers with Template System",
+        "description": "Build Slack API integration, webhook delivery system, and notification template engine for different alert types across all channels",
+        "dependencies": [
+          1
+        ],
+        "details": "Implement Slack API integration using official SDK, build generic webhook delivery with configurable endpoints and authentication, create template system supporting different alert types (critical, warning, info) with channel-specific formatting, implement template rendering engine, and add rate limiting mechanisms to prevent notification spam. Include webhook signature validation and Slack-specific formatting.",
+        "status": "pending",
+        "testStrategy": "Mock Slack API tests, webhook delivery validation, template rendering correctness, and rate limiting effectiveness",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 4,
+        "title": "Implement User Preferences, History Tracking, and System Integration Testing",
+        "description": "Build delivery preference management, notification history/audit logging, and comprehensive end-to-end testing of the complete notification system",
         "dependencies": [
           2,
           3
         ],
-        "details": "Set up WebSocket or SSE client connection for real-time alert updates, implement event handlers for live data updates across all dashboard components, add connection status indicators, handle reconnection logic, perform comprehensive testing of all CRUD operations and real-time features, conduct code review for performance and best practices",
+        "details": "Implement user/team delivery preference storage and retrieval, create notification history database schema and logging, build audit trail for all notification activities, implement preference-based channel selection logic, create comprehensive integration tests covering all channels and failure scenarios, and validate complete delivery pipeline including retry mechanisms and status tracking.",
         "status": "pending",
-        "testStrategy": "Test real-time updates, connection handling, and end-to-end dashboard functionality",
-        "subagentType": "implementer",
+        "testStrategy": "End-to-end tests covering all notification channels, delivery tracking accuracy, preference management, history logging, and failure recovery scenarios",
+        "subagentType": "tester",
         "parallelizable": false
       }
     ]
   },
   {
     "id": 4,
-    "title": "Integration Testing & API Documentation (Grizz - Go/gRPC)",
-    "description": "Implement comprehensive integration tests and generate API documentation for the alert management system",
+    "title": "Create Admin Dashboard for Alert Management (Blaze - React/Next.js)",
+    "description": "Build responsive admin interface for managing alerts, escalation policies, on-call schedules, and monitoring notification delivery",
     "status": "pending",
     "dependencies": [
       2,
       3
     ],
     "priority": "medium",
-    "details": "1. Create integration test suite covering end-to-end workflows\n2. Test webhook ingestion to notification delivery flow\n3. Validate escalation policy execution under various scenarios\n4. Test on-call schedule rotation and coverage\n5. Generate gRPC API documentation\n6. Create webhook API documentation\n7. Set up automated testing pipeline\n8. Add performance and load testing",
-    "testStrategy": "All integration tests pass including edge cases like overlapping schedules and complex escalation scenarios. API documentation is complete and accurate. Load tests demonstrate system can handle expected alert volume without degradation.",
+    "details": "1. Create responsive dashboard layout with navigation and user authentication\n2. Build alert list view with filtering, sorting, and real-time updates\n3. Implement alert detail view with timeline, acknowledgment, and resolution actions\n4. Create escalation policy management interface with rule builder\n5. Build on-call schedule calendar view with rotation management\n6. Add notification channel configuration and testing interface\n7. Implement team and user management with role-based access\n8. Create analytics dashboard with alert metrics and SLA tracking\n9. Add real-time notifications using WebSocket connection\n10. Implement mobile-responsive design for on-call personnel",
+    "testStrategy": "Dashboard loads and displays current alerts, users can acknowledge and resolve alerts, escalation policies can be created and modified, on-call schedules display correctly and allow modifications, notification channels can be configured and tested, real-time updates work without page refresh, and interface is usable on mobile devices",
     "decisionPoints": [
       {
         "id": "d8",
-        "category": "performance",
-        "description": "Load testing targets and thresholds",
+        "category": "ux-behavior",
+        "description": "Alert acknowledgment workflow - single click vs confirmation dialog",
         "options": [
-          "1000 alerts/minute",
-          "10000 alerts/minute"
-        ],
-        "requiresApproval": true,
-        "constraintType": "hard"
-      },
-      {
-        "id": "d9",
-        "category": "error-handling",
-        "description": "Notification delivery failure handling",
-        "options": [
-          "retry with exponential backoff",
-          "dead letter queue with manual retry"
+          "single-click",
+          "confirmation-dialog"
         ],
         "requiresApproval": false,
         "constraintType": "soft"
+      },
+      {
+        "id": "d9",
+        "category": "architecture",
+        "description": "Real-time updates implementation - WebSocket vs Server-Sent Events",
+        "options": [
+          "websocket",
+          "server-sent-events"
+        ],
+        "requiresApproval": false,
+        "constraintType": "open"
+      },
+      {
+        "id": "d10",
+        "category": "ux-behavior",
+        "description": "On-call schedule complexity - simple rotation vs complex scheduling rules",
+        "options": [
+          "simple-rotation",
+          "complex-rules"
+        ],
+        "requiresApproval": true,
+        "constraintType": "escalation"
       }
     ],
-    "subtasks": []
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Build Core Dashboard Layout and Authentication Components",
+        "description": "Create the foundational dashboard structure with responsive layout, navigation system, and user authentication components. This includes the main layout wrapper, sidebar navigation, header with user controls, and authentication guards.",
+        "dependencies": [],
+        "details": "Implement responsive dashboard shell using React/Next.js with components for: main layout wrapper with sidebar and content areas, navigation menu with role-based visibility, header component with user profile and logout, authentication HOC/guards for protected routes, responsive breakpoints for mobile/tablet/desktop, and base styling system setup.",
+        "status": "pending",
+        "testStrategy": "Unit tests for layout components, authentication flow testing, responsive design verification across devices",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Implement Alert Management Interface Components",
+        "description": "Build comprehensive alert management components including list views, detail views, filtering, sorting, and action controls for alert acknowledgment and resolution.",
+        "dependencies": [],
+        "details": "Create React components for: alert list with data table including filtering/sorting controls, alert detail modal/page with timeline view, acknowledgment and resolution action buttons, real-time alert status updates, alert severity indicators and status badges, bulk action controls for multiple alerts, and search functionality across alert data.",
+        "status": "pending",
+        "testStrategy": "Component testing for alert interactions, integration tests for alert state management, real-time update verification",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 3,
+        "title": "Develop Escalation and Schedule Management Features",
+        "description": "Create interfaces for managing escalation policies, on-call schedules, team management, and notification channels with rule builders and calendar views.",
+        "dependencies": [],
+        "details": "Implement components for: escalation policy builder with drag-and-drop rules, on-call schedule calendar with rotation management, team and user management interfaces with role assignment, notification channel configuration forms, policy testing interface, schedule conflict detection and resolution, and notification delivery status tracking.",
+        "status": "pending",
+        "testStrategy": "Integration tests for policy execution, schedule validation testing, notification channel verification",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 4,
+        "title": "Integrate Real-time Features and Analytics Dashboard",
+        "description": "Implement WebSocket connections for real-time updates, analytics dashboard with metrics, mobile optimization, and comprehensive testing of the complete system.",
+        "dependencies": [
+          1,
+          2,
+          3
+        ],
+        "details": "Add WebSocket integration for real-time alert updates, analytics dashboard with SLA metrics and alert trends, mobile-responsive optimizations for on-call personnel, notification system for browser alerts, comprehensive end-to-end testing, performance optimization, and deployment preparation with environment configuration.",
+        "status": "pending",
+        "testStrategy": "End-to-end testing of complete dashboard functionality, real-time update verification, mobile responsiveness testing, performance testing under load",
+        "subagentType": "implementer",
+        "parallelizable": false
+      }
+    ]
   }
 ]

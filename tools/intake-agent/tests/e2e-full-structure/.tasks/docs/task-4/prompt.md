@@ -1,11 +1,11 @@
-# Task 4: Integration Testing & API Documentation
+# Task 4: Create Admin Dashboard for Alert Management
 
 ## Agent
-- **Name**: Grizz
-- **Stack**: Go/gRPC
+- **Name**: Blaze
+- **Stack**: React/Next.js
 
 ## Overview
-Implement comprehensive integration tests and generate API documentation for the alert management system
+Build responsive admin interface for managing alerts, escalation policies, on-call schedules, and monitoring notification delivery
 
 ## Priority
 medium
@@ -15,30 +15,38 @@ medium
 - Task 3
 
 ## Implementation Details
-1. Create integration test suite covering end-to-end workflows
-2. Test webhook ingestion to notification delivery flow
-3. Validate escalation policy execution under various scenarios
-4. Test on-call schedule rotation and coverage
-5. Generate gRPC API documentation
-6. Create webhook API documentation
-7. Set up automated testing pipeline
-8. Add performance and load testing
+1. Create responsive dashboard layout with navigation and user authentication
+2. Build alert list view with filtering, sorting, and real-time updates
+3. Implement alert detail view with timeline, acknowledgment, and resolution actions
+4. Create escalation policy management interface with rule builder
+5. Build on-call schedule calendar view with rotation management
+6. Add notification channel configuration and testing interface
+7. Implement team and user management with role-based access
+8. Create analytics dashboard with alert metrics and SLA tracking
+9. Add real-time notifications using WebSocket connection
+10. Implement mobile-responsive design for on-call personnel
 
 ## Decision Points
-### d8: Load testing targets and thresholds
-- **Category**: performance
-- **Constraint**: hard
-- **Options**: 1000 alerts/minute, 10000 alerts/minute
+### d8: Alert acknowledgment workflow - single click vs confirmation dialog
+- **Category**: ux-behavior
+- **Constraint**: soft
+- **Options**: single-click, confirmation-dialog
+
+
+### d9: Real-time updates implementation - WebSocket vs Server-Sent Events
+- **Category**: architecture
+- **Constraint**: open
+- **Options**: websocket, server-sent-events
+
+
+### d10: On-call schedule complexity - simple rotation vs complex scheduling rules
+- **Category**: ux-behavior
+- **Constraint**: escalation
+- **Options**: simple-rotation, complex-rules
 ⚠️ **Requires Approval**
 
-### d9: Notification delivery failure handling
-- **Category**: error-handling
-- **Constraint**: soft
-- **Options**: retry with exponential backoff, dead letter queue with manual retry
-
-
 ## Acceptance Criteria
-All integration tests pass including edge cases like overlapping schedules and complex escalation scenarios. API documentation is complete and accurate. Load tests demonstrate system can handle expected alert volume without degradation.
+Dashboard loads and displays current alerts, users can acknowledge and resolve alerts, escalation policies can be created and modified, on-call schedules display correctly and allow modifications, notification channels can be configured and tested, real-time updates work without page refresh, and interface is usable on mobile devices
 
 ---
 *Project: alert-management*
