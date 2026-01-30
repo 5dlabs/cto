@@ -59,10 +59,12 @@ fn main() {
             commands::runtime::check_docker_running,
             
             // Cluster management
+            commands::cluster::detect_existing_clusters,
             commands::cluster::create_cluster,
             commands::cluster::delete_cluster,
             commands::cluster::get_cluster_status,
             commands::cluster::list_clusters,
+            commands::cluster::use_existing_cluster,
             
             // Configuration
             commands::config::get_config,

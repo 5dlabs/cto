@@ -6,6 +6,53 @@ use crate::error::{AppError, AppResult};
 
 const CLUSTER_NAME: &str = "cto-lite";
 
+/// Types of Kubernetes clusters we can detect
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ClusterType {
+    /// Kind cluster (what we create)
+    Kind,
+    /// Docker Desktop's built-in Kubernetes
+    DockerDesktop,
+    /// Rancher Desktop
+    RancherDesktop,
+    /// Minikube
+    Minikube,
+    /// K3d (k3s in docker)
+    K3d,
+    /// OrbStack
+    OrbStack,
+    /// Unknown/other cluster
+    Other,
+}
+
+/// Detected existing cluster
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DetectedCluster {
+    pub name: String,
+    pub context: String,
+    pub cluster_type: ClusterType,
+    pub server: Option<String>,
+    pub is_running: bool,
+    pub is_current: bool,
+}
+
+/// Result of cluster detection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterDetectionResult {
+    pub clusters: Vec<DetectedCluster>,
+    pub has_existing: bool,
+    pub recommendation: ClusterRecommendation,
+}
+
+/// Recommendation for which cluster to use
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ClusterRecommendation {
+    /// Use an existing cluster
+    UseExisting { context: String, reason: String },
+    /// Create a new Kind cluster
+    CreateKind { reason: String },
+}
+
 /// Cluster status information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusterStatus {
@@ -104,6 +151,167 @@ fn get_node_status() -> AppResult<Vec<NodeStatus>> {
         .collect();
 
     Ok(nodes)
+}
+
+/// Detect the type of cluster from context name and server
+fn detect_cluster_type(context: &str, server: &str) -> ClusterType {
+    let ctx_lower = context.to_lowercase();
+    let server_lower = server.to_lowercase();
+    
+    if ctx_lower.starts_with("kind-") || ctx_lower.contains("kind") {
+        ClusterType::Kind
+    } else if ctx_lower == "docker-desktop" || server_lower.contains("docker.internal") {
+        ClusterType::DockerDesktop
+    } else if ctx_lower.contains("rancher") || server_lower.contains("rancher") {
+        ClusterType::RancherDesktop
+    } else if ctx_lower.contains("minikube") {
+        ClusterType::Minikube
+    } else if ctx_lower.starts_with("k3d-") {
+        ClusterType::K3d
+    } else if ctx_lower.contains("orbstack") || server_lower.contains("orbstack") || server_lower.contains("orb.local") {
+        ClusterType::OrbStack
+    } else {
+        ClusterType::Other
+    }
+}
+
+/// Check if a cluster context is reachable
+fn is_cluster_running(context: &str) -> bool {
+    let output = Command::new("kubectl")
+        .args(["--context", context, "cluster-info"])
+        .output();
+    
+    output.map(|o| o.status.success()).unwrap_or(false)
+}
+
+/// Detect existing Kubernetes clusters on the system
+#[tauri::command]
+pub async fn detect_existing_clusters() -> Result<ClusterDetectionResult, AppError> {
+    if !is_kubectl_installed() {
+        return Ok(ClusterDetectionResult {
+            clusters: vec![],
+            has_existing: false,
+            recommendation: ClusterRecommendation::CreateKind {
+                reason: "No kubectl found - will install Kind with kubectl".to_string(),
+            },
+        });
+    }
+
+    // Get all contexts from kubeconfig
+    let contexts_output = Command::new("kubectl")
+        .args(["config", "get-contexts", "-o", "name"])
+        .output();
+    
+    let contexts: Vec<String> = contexts_output
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(String::from)
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Get current context
+    let current_context = Command::new("kubectl")
+        .args(["config", "current-context"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+
+    let mut clusters = Vec::new();
+    let mut has_cto_lite = false;
+    let mut has_running_local = false;
+    let mut best_existing: Option<String> = None;
+
+    for context in contexts {
+        // Get cluster info for this context
+        let cluster_info = Command::new("kubectl")
+            .args(["config", "view", "-o", 
+                   &format!("jsonpath={{.contexts[?(@.name==\"{}\")].context.cluster}}", context)])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+
+        // Get server URL
+        let server = Command::new("kubectl")
+            .args(["config", "view", "-o",
+                   &format!("jsonpath={{.clusters[?(@.name==\"{}\")].cluster.server}}", cluster_info)])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+
+        let cluster_type = detect_cluster_type(&context, &server);
+        let is_running = is_cluster_running(&context);
+        let is_current = current_context.as_ref() == Some(&context);
+
+        // Track if we already have cto-lite
+        if context == format!("kind-{}", CLUSTER_NAME) {
+            has_cto_lite = true;
+        }
+
+        // Track if there's a running local cluster we could use
+        if is_running && cluster_type != ClusterType::Other {
+            has_running_local = true;
+            if best_existing.is_none() {
+                best_existing = Some(context.clone());
+            }
+        }
+
+        clusters.push(DetectedCluster {
+            name: cluster_info.clone(),
+            context: context.clone(),
+            cluster_type,
+            server: if server.is_empty() { None } else { Some(server) },
+            is_running,
+            is_current,
+        });
+    }
+
+    // Determine recommendation
+    let recommendation = if has_cto_lite {
+        ClusterRecommendation::UseExisting {
+            context: format!("kind-{}", CLUSTER_NAME),
+            reason: "CTO Lite cluster already exists".to_string(),
+        }
+    } else if let Some(ctx) = best_existing {
+        // Find the cluster type for better messaging
+        let cluster_type = clusters.iter()
+            .find(|c| c.context == ctx)
+            .map(|c| &c.cluster_type);
+        
+        let type_name = match cluster_type {
+            Some(ClusterType::DockerDesktop) => "Docker Desktop Kubernetes",
+            Some(ClusterType::RancherDesktop) => "Rancher Desktop",
+            Some(ClusterType::Minikube) => "Minikube",
+            Some(ClusterType::K3d) => "K3d",
+            Some(ClusterType::OrbStack) => "OrbStack",
+            Some(ClusterType::Kind) => "Kind cluster",
+            _ => "existing cluster",
+        };
+        
+        ClusterRecommendation::UseExisting {
+            context: ctx,
+            reason: format!("Found running {} - you can use this or create a dedicated CTO Lite cluster", type_name),
+        }
+    } else {
+        ClusterRecommendation::CreateKind {
+            reason: "No running local Kubernetes found - will create a Kind cluster".to_string(),
+        }
+    };
+
+    Ok(ClusterDetectionResult {
+        clusters,
+        has_existing: has_running_local,
+        recommendation,
+    })
 }
 
 /// Create the CTO Lite Kind cluster
@@ -241,4 +449,81 @@ pub async fn get_cluster_status() -> Result<ClusterStatus, AppError> {
 #[tauri::command]
 pub async fn list_clusters() -> Result<Vec<String>, AppError> {
     list_kind_clusters()
+}
+
+/// Use an existing cluster instead of creating a new Kind cluster
+#[tauri::command]
+pub async fn use_existing_cluster(
+    context: String,
+    db: tauri::State<'_, crate::db::Database>,
+) -> Result<ClusterStatus, AppError> {
+    // Verify the cluster is reachable
+    if !is_cluster_running(&context) {
+        return Err(AppError::ClusterError(format!(
+            "Cluster context '{}' is not reachable. Make sure it's running.",
+            context
+        )));
+    }
+
+    // Set as current context
+    let output = Command::new("kubectl")
+        .args(["config", "use-context", &context])
+        .output()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to switch context: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(AppError::ClusterError(format!("Failed to switch context: {}", stderr)));
+    }
+
+    // Save the chosen context to config
+    db.set_config("cluster_context", &context)?;
+    db.set_config("cluster_type", "existing")?;
+
+    tracing::info!("Using existing cluster context: {}", context);
+
+    // Get node status for this cluster
+    let nodes_output = Command::new("kubectl")
+        .args([
+            "--context", &context,
+            "get", "nodes",
+            "-o", "custom-columns=NAME:.metadata.name,ROLE:.metadata.labels.node-role\\.kubernetes\\.io/control-plane,STATUS:.status.conditions[-1].type",
+            "--no-headers",
+        ])
+        .output();
+
+    let nodes = nodes_output
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|line| !line.is_empty())
+                .map(|line| {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    NodeStatus {
+                        name: parts.first().unwrap_or(&"").to_string(),
+                        role: if parts.get(1).map(|s| !s.is_empty()).unwrap_or(false) {
+                            "control-plane".to_string()
+                        } else {
+                            "worker".to_string()
+                        },
+                        status: parts.get(2).unwrap_or(&"Unknown").to_string(),
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let kubeconfig = dirs::home_dir()
+        .map(|h| h.join(".kube").join("config"))
+        .and_then(|p| p.to_str().map(String::from));
+
+    Ok(ClusterStatus {
+        name: context,
+        exists: true,
+        running: true,
+        nodes,
+        kubeconfig_path: kubeconfig,
+    })
 }
