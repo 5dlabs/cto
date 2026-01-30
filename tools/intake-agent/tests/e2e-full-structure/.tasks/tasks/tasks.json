@@ -1,0 +1,213 @@
+[
+  {
+    "id": 1,
+    "title": "Infrastructure Setup (Bolt - Kubernetes)",
+    "description": "Set up PostgreSQL and Redis infrastructure with proper networking, storage, and monitoring for the alert management system",
+    "status": "pending",
+    "dependencies": [],
+    "priority": "high",
+    "details": "1. Deploy PostgreSQL cluster with persistent storage\n2. Deploy Redis cluster for caching and real-time state\n3. Configure networking between services\n4. Set up monitoring and health checks\n5. Create namespaces and RBAC policies\n6. Configure backup strategies for PostgreSQL",
+    "testStrategy": "Verify PostgreSQL accepts connections and can create databases. Confirm Redis cluster is operational with basic set/get operations. Validate persistent storage is properly mounted and accessible.",
+    "decisionPoints": [
+      {
+        "id": "d1",
+        "category": "architecture",
+        "description": "PostgreSQL deployment strategy - single instance vs cluster",
+        "options": [
+          "single instance with backup",
+          "primary-replica cluster"
+        ],
+        "requiresApproval": false,
+        "constraintType": "soft"
+      },
+      {
+        "id": "d2",
+        "category": "performance",
+        "description": "Redis deployment configuration",
+        "options": [
+          "single node",
+          "cluster mode"
+        ],
+        "requiresApproval": false,
+        "constraintType": "open"
+      }
+    ],
+    "subtasks": []
+  },
+  {
+    "id": 2,
+    "title": "Alert Management Backend Service (Grizz - Go/gRPC)",
+    "description": "Build the core alert management service with webhook ingestion, notification routing, escalation policies, and on-call scheduling",
+    "status": "pending",
+    "dependencies": [
+      1
+    ],
+    "priority": "high",
+    "details": "1. Set up Go service with gRPC endpoints\n2. Implement webhook endpoints for alert ingestion\n3. Create PostgreSQL schema for alerts, policies, schedules\n4. Build notification routing engine based on severity/tags\n5. Implement escalation policy engine with timeouts\n6. Create on-call schedule management\n7. Add alert acknowledgment and resolution tracking\n8. Integrate Redis for real-time state management",
+    "testStrategy": "Verify webhook endpoints accept and process alerts correctly. Confirm notification routing works based on configured rules. Test escalation policies trigger after specified timeouts. Validate on-call schedules determine correct recipients. Ensure alert state transitions work properly.",
+    "decisionPoints": [
+      {
+        "id": "d3",
+        "category": "api-design",
+        "description": "Alert ingestion format standardization",
+        "options": [
+          "custom JSON schema",
+          "adopt existing standard like PagerDuty/Prometheus"
+        ],
+        "requiresApproval": true,
+        "constraintType": "escalation"
+      },
+      {
+        "id": "d4",
+        "category": "architecture",
+        "description": "Notification delivery mechanism",
+        "options": [
+          "synchronous delivery",
+          "asynchronous queue-based"
+        ],
+        "requiresApproval": false,
+        "constraintType": "soft"
+      },
+      {
+        "id": "d5",
+        "category": "data-model",
+        "description": "Escalation policy structure",
+        "options": [
+          "simple linear escalation",
+          "complex branching policies"
+        ],
+        "requiresApproval": true,
+        "constraintType": "hard"
+      }
+    ],
+    "subtasks": []
+  },
+  {
+    "id": 3,
+    "title": "Admin Dashboard Frontend (Blaze - React/Next.js)",
+    "description": "Build React-based admin dashboard for managing alerts, escalation policies, on-call schedules, and monitoring system health",
+    "status": "pending",
+    "dependencies": [
+      2
+    ],
+    "priority": "medium",
+    "details": "1. Set up Next.js project with TypeScript\n2. Create alert dashboard with filtering and search\n3. Build escalation policy management interface\n4. Implement on-call schedule calendar view\n5. Add alert acknowledgment/resolution UI\n6. Create notification channel configuration\n7. Build system health and metrics dashboard\n8. Implement real-time updates via WebSocket/SSE",
+    "testStrategy": "Verify all CRUD operations work for escalation policies and schedules. Confirm alert dashboard displays real-time updates. Test notification channel configuration saves and applies correctly. Validate user can acknowledge and resolve alerts through UI.",
+    "decisionPoints": [
+      {
+        "id": "d6",
+        "category": "ux-behavior",
+        "description": "Real-time update mechanism for dashboard",
+        "options": [
+          "WebSocket connection",
+          "Server-Sent Events",
+          "polling"
+        ],
+        "requiresApproval": false,
+        "constraintType": "open"
+      },
+      {
+        "id": "d7",
+        "category": "ux-behavior",
+        "description": "Alert acknowledgment workflow",
+        "options": [
+          "one-click acknowledge",
+          "require comment/reason"
+        ],
+        "requiresApproval": true,
+        "constraintType": "soft"
+      }
+    ],
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Setup Next.js Project and Core Dashboard Components",
+        "description": "Initialize Next.js project with TypeScript, configure routing, and create foundational dashboard layout with navigation and core UI components",
+        "dependencies": [],
+        "details": "Set up Next.js 13+ with TypeScript, configure ESLint/Prettier, create main layout component with sidebar navigation, implement routing structure for different dashboard sections, add basic UI components (buttons, forms, modals), and configure Tailwind CSS or preferred styling solution",
+        "status": "pending",
+        "testStrategy": "Unit tests for core components and integration tests for routing",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Alert Management and System Health Dashboards",
+        "description": "Build alert dashboard with filtering/search capabilities and system health metrics dashboard with real-time data visualization",
+        "dependencies": [
+          1
+        ],
+        "details": "Create alert list view with filtering by status/severity/time, implement search functionality, build alert acknowledgment/resolution UI, develop system health dashboard with metrics visualization (CPU, memory, response times), add alert detail modal with timeline and actions",
+        "status": "pending",
+        "testStrategy": "Test alert filtering, search functionality, and acknowledgment workflows",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 3,
+        "title": "Escalation Policies and On-Call Schedule Management",
+        "description": "Implement escalation policy CRUD interface and on-call schedule calendar view with drag-drop scheduling capabilities",
+        "dependencies": [
+          1
+        ],
+        "details": "Build escalation policy creation/editing forms with rule configuration, implement policy listing with search/filter, create on-call schedule calendar component with drag-drop support, add schedule conflict detection, implement notification channel configuration UI with multiple channel types (email, SMS, Slack, etc.)",
+        "status": "pending",
+        "testStrategy": "Verify CRUD operations for policies and schedules, test drag-drop functionality and conflict detection",
+        "subagentType": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 4,
+        "title": "Real-time Updates and WebSocket Integration",
+        "description": "Implement WebSocket or SSE integration for real-time dashboard updates and coordinate final testing and code review",
+        "dependencies": [
+          2,
+          3
+        ],
+        "details": "Set up WebSocket or SSE client connection for real-time alert updates, implement event handlers for live data updates across all dashboard components, add connection status indicators, handle reconnection logic, perform comprehensive testing of all CRUD operations and real-time features, conduct code review for performance and best practices",
+        "status": "pending",
+        "testStrategy": "Test real-time updates, connection handling, and end-to-end dashboard functionality",
+        "subagentType": "implementer",
+        "parallelizable": false
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "title": "Integration Testing & API Documentation (Grizz - Go/gRPC)",
+    "description": "Implement comprehensive integration tests and generate API documentation for the alert management system",
+    "status": "pending",
+    "dependencies": [
+      2,
+      3
+    ],
+    "priority": "medium",
+    "details": "1. Create integration test suite covering end-to-end workflows\n2. Test webhook ingestion to notification delivery flow\n3. Validate escalation policy execution under various scenarios\n4. Test on-call schedule rotation and coverage\n5. Generate gRPC API documentation\n6. Create webhook API documentation\n7. Set up automated testing pipeline\n8. Add performance and load testing",
+    "testStrategy": "All integration tests pass including edge cases like overlapping schedules and complex escalation scenarios. API documentation is complete and accurate. Load tests demonstrate system can handle expected alert volume without degradation.",
+    "decisionPoints": [
+      {
+        "id": "d8",
+        "category": "performance",
+        "description": "Load testing targets and thresholds",
+        "options": [
+          "1000 alerts/minute",
+          "10000 alerts/minute"
+        ],
+        "requiresApproval": true,
+        "constraintType": "hard"
+      },
+      {
+        "id": "d9",
+        "category": "error-handling",
+        "description": "Notification delivery failure handling",
+        "options": [
+          "retry with exponential backoff",
+          "dead letter queue with manual retry"
+        ],
+        "requiresApproval": false,
+        "constraintType": "soft"
+      }
+    ],
+    "subtasks": []
+  }
+]

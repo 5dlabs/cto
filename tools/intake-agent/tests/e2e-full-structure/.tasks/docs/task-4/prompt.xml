@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="4" project="alert-management">
+  <title>Integration Testing &amp; API Documentation</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement comprehensive integration tests and generate API documentation for the alert management system
+  </description>
+  
+  <dependencies>
+    <dependency task_id="2" />
+    <dependency task_id="3" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Create integration test suite covering end-to-end workflows
+2. Test webhook ingestion to notification delivery flow
+3. Validate escalation policy execution under various scenarios
+4. Test on-call schedule rotation and coverage
+5. Generate gRPC API documentation
+6. Create webhook API documentation
+7. Set up automated testing pipeline
+8. Add performance and load testing</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d8" category="performance" constraint="hard" requires_approval="true">
+      <description>Load testing targets and thresholds</description>
+      <options>
+        <option>1000 alerts/minute</option>
+        <option>10000 alerts/minute</option>
+      </options>
+    </decision>
+    <decision id="d9" category="error-handling" constraint="soft" requires_approval="false">
+      <description>Notification delivery failure handling</description>
+      <options>
+        <option>retry with exponential backoff</option>
+        <option>dead letter queue with manual retry</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    All integration tests pass including edge cases like overlapping schedules and complex escalation scenarios. API documentation is complete and accurate. Load tests demonstrate system can handle expected alert volume without degradation.
+  </acceptance_criteria>
+</task>
