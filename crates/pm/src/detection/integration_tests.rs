@@ -91,7 +91,7 @@ mod agent_routing_tests {
         let files = vec![file("src/utils.ts")];
         let (result, agent) = detect_full(&files, None);
         assert_eq!(result.primary_language, Some(Language::TypeScript));
-        assert_eq!(agent, Agent::Blaze); // Default TS goes to Blaze (web)
+        assert_eq!(agent, Agent::Blaze);
     }
 
     // ===== 📱 TAP - Mobile =====
@@ -174,15 +174,13 @@ mod agent_routing_tests {
     }
 
     // ===== 🤖 GENERIC - Unsupported Languages =====
-    // These languages don't have dedicated agents yet, so they fall back to Generic/Rex
-
     #[test]
     fn generic_python() {
         let files = vec![file("app/main.py")];
         let (result, agent) = detect_full(&files, None);
         assert_eq!(result.primary_language, Some(Language::Python));
         assert_eq!(agent, Agent::Generic);
-        assert_eq!(agent.display_name(), "Rex"); // Generic falls back to Rex
+        assert_eq!(agent.display_name(), "Rex");
     }
 
     #[test]
@@ -227,5 +225,61 @@ mod agent_routing_tests {
             let parsed = Agent::from_id(agent.id());
             assert_eq!(parsed, Some(agent));
         }
+    }
+
+    // ===== COMPREHENSIVE VERIFICATION =====
+    #[test]
+    fn verify_all_detections() {
+        let test_cases: Vec<(&str, &str, Option<&str>)> = vec![
+            // Rex
+            ("Rex", "src/main.rs", None),
+            ("Rex", "scripts/deploy.sh", None),
+            ("Rex", ".github/workflows/ci.yaml", None),
+            // Grizz
+            ("Grizz", "cmd/server/main.go", None),
+            // Nova (TS backend)
+            ("Nova", "src/index.ts", Some(r#"{"dependencies":{"elysia":"1.0.0"}}"#)),
+            ("Nova", "src/app.ts", Some(r#"{"dependencies":{"express":"4.0.0"}}"#)),
+            ("Nova", "src/server.ts", Some(r#"{"dependencies":{"hono":"4.0.0"}}"#)),
+            // Blaze (TS web)
+            ("Blaze", "app/page.tsx", Some(r#"{"dependencies":{"next":"15.0.0"}}"#)),
+            ("Blaze", "src/utils.ts", None),
+            // Tap (mobile)
+            ("Tap", "app/(tabs)/home.tsx", Some(r#"{"dependencies":{"expo":"52.0.0"}}"#)),
+            ("Tap", "MyApp/ContentView.swift", None),
+            ("Tap", "app/src/main/MainActivity.kt", None),
+            // Spark (desktop)
+            ("Spark", "src/main/index.ts", Some(r#"{"dependencies":{"electron":"29.0.0"}}"#)),
+            ("Spark", "src-tauri/main.rs", Some(r#"{"dependencies":{"@tauri-apps/api":"2.0.0"}}"#)),
+            // Vex (Unity)
+            ("Vex", "Assets/Scripts/Player.cs", None),
+            // Forge (Unreal/C++)
+            ("Forge", "Source/Game/Character.cpp", None),
+            // Generic (no dedicated agent)
+            ("Rex", "app/main.py", None),  // Generic displays as Rex
+            ("Rex", "src/App.java", None),
+        ];
+        
+        println!("\n=== DETECTION VERIFICATION ===");
+        let mut failures = 0;
+        
+        let total = test_cases.len();
+        for (expected, path, pkg) in test_cases {
+            let files = vec![file(path)];
+            let (result, agent) = detect_full(&files, pkg);
+            let actual = agent.display_name();
+            let pass = actual == expected;
+            
+            if !pass {
+                failures += 1;
+                println!("❌ {} -> {} (expected {})", path, actual, expected);
+            } else {
+                println!("✅ {} -> {} [lang={:?}, fw={:?}]", 
+                    path, actual, result.primary_language, result.framework);
+            }
+        }
+        
+        println!("=== {} of {} passed ===\n", total - failures, total);
+        assert_eq!(failures, 0, "{} detection(s) failed!", failures);
     }
 }
