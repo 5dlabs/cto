@@ -3,9 +3,6 @@
 //! Tests all agent/language/framework combinations for remediation routing.
 
 #[cfg(test)]
-#[allow(clippy::disallowed_macros)] // println! is appropriate for test output
-#[allow(clippy::uninlined_format_args)] // clarity over brevity in tests
-#[allow(clippy::if_not_else)] // test logic reads better with failure case first
 mod agent_routing_tests {
     use crate::detection::{detect_full, Agent, ChangedFile, Framework, Language};
 
@@ -232,9 +229,6 @@ mod agent_routing_tests {
 
     // ===== COMPREHENSIVE VERIFICATION =====
     #[test]
-    #[allow(clippy::disallowed_macros)]
-    #[allow(clippy::uninlined_format_args)]
-    #[allow(clippy::if_not_else)]
     fn verify_all_detections() {
         let test_cases: Vec<(&str, &str, Option<&str>)> = vec![
             // Rex
@@ -266,26 +260,22 @@ mod agent_routing_tests {
             ("Rex", "src/App.java", None),
         ];
         
-        println!("\n=== DETECTION VERIFICATION ===");
-        let mut failures = 0;
+        let mut failures: Vec<String> = Vec::new();
         
-        let total = test_cases.len();
         for (expected, path, pkg) in test_cases {
             let files = vec![file(path)];
-            let (result, agent) = detect_full(&files, pkg);
+            let (_result, agent) = detect_full(&files, pkg);
             let actual = agent.display_name();
-            let pass = actual == expected;
             
-            if !pass {
-                failures += 1;
-                println!("❌ {} -> {} (expected {})", path, actual, expected);
-            } else {
-                println!("✅ {} -> {} [lang={:?}, fw={:?}]", 
-                    path, actual, result.primary_language, result.framework);
+            if actual != expected {
+                failures.push(format!("{path} -> {actual} (expected {expected})"));
             }
         }
         
-        println!("=== {} of {} passed ===\n", total - failures, total);
-        assert_eq!(failures, 0, "{} detection(s) failed!", failures);
+        assert!(
+            failures.is_empty(),
+            "Detection failures:\n{}",
+            failures.join("\n")
+        );
     }
 }
