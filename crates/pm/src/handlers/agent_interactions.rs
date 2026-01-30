@@ -16,6 +16,8 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
+use std::path::Path;
+
 use super::callbacks::CallbackState;
 
 // =============================================================================
@@ -150,13 +152,18 @@ impl Language {
     #[must_use]
     pub fn from_path(path: &str) -> Self {
         let lower = path.to_lowercase();
+        let p = Path::new(path);
+        let ext = p
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_lowercase);
 
         // Check for React/React Native patterns first
         if lower.contains("/components/")
             || lower.contains("/pages/")
             || lower.contains("/app/")
-            || lower.ends_with(".tsx")
-            || lower.ends_with(".jsx")
+            || ext.as_deref() == Some("tsx")
+            || ext.as_deref() == Some("jsx")
         {
             if lower.contains("native") || lower.contains("/ios/") || lower.contains("/android/") {
                 return Self::ReactNative;
@@ -165,27 +172,15 @@ impl Language {
         }
 
         // Check by extension
-        if lower.ends_with(".rs") {
-            Self::Rust
-        } else if lower.ends_with(".go") {
-            Self::Go
-        } else if lower.ends_with(".ts") || lower.ends_with(".tsx") {
-            Self::TypeScript
-        } else if lower.ends_with(".js") || lower.ends_with(".jsx") {
-            Self::JavaScript
-        } else if lower.ends_with(".py") {
-            Self::Python
-        } else if lower.ends_with(".cs") {
-            Self::CSharp
-        } else if lower.ends_with(".cpp")
-            || lower.ends_with(".cc")
-            || lower.ends_with(".cxx")
-            || lower.ends_with(".h")
-            || lower.ends_with(".hpp")
-        {
-            Self::Cpp
-        } else {
-            Self::Unknown
+        match ext.as_deref() {
+            Some("rs") => Self::Rust,
+            Some("go") => Self::Go,
+            Some("ts" | "tsx") => Self::TypeScript,
+            Some("js" | "jsx") => Self::JavaScript,
+            Some("py") => Self::Python,
+            Some("cs") => Self::CSharp,
+            Some("cpp" | "cc" | "cxx" | "h" | "hpp") => Self::Cpp,
+            _ => Self::Unknown,
         }
     }
 
@@ -193,14 +188,14 @@ impl Language {
     #[must_use]
     pub fn recommended_agent(&self) -> Agent {
         match self {
-            Self::Rust => Agent::Rex,
             Self::Go => Agent::Grizz,
             Self::TypeScript | Self::JavaScript | Self::React => Agent::Blaze,
             Self::ReactNative => Agent::Tap,
             Self::CSharp => Agent::Vex,
             Self::Cpp => Agent::Forge,
-            Self::Python => Agent::Nova, // Default to Nova for Python
-            Self::Unknown => Agent::Rex, // Default to Rex for unknown
+            Self::Python => Agent::Nova,
+            // Default to Rex for Rust and unknown languages
+            Self::Rust | Self::Unknown => Agent::Rex,
         }
     }
 }
@@ -255,7 +250,7 @@ pub struct ReviewCommentPayload {
     pub repository: Repository,
 }
 
-/// GitHub check_run payload for button clicks
+/// GitHub `check_run` payload for button clicks
 #[derive(Debug, Clone, Deserialize)]
 pub struct CheckRunPayload {
     pub action: String,
@@ -353,16 +348,23 @@ pub struct RequestedAction {
 // =============================================================================
 
 /// Parse @mentions from a comment body
+///
+/// # Panics
+///
+/// Panics if the internal regex pattern is invalid (should never happen).
 #[must_use]
 pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
-    let re = Regex::new(r"(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)\s*(.*)").unwrap();
-    
+    let re = Regex::new(
+        r"(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)\s*(.*)",
+    )
+    .expect("valid regex");
+
     let mut mentions = Vec::new();
-    
+
     for cap in re.captures_iter(comment) {
         let agent_name = cap.get(1).map_or("", |m| m.as_str());
         let instructions = cap.get(2).map_or("", |m| m.as_str()).trim().to_string();
-        
+
         if let Some(agent) = Agent::from_mention(agent_name) {
             mentions.push(ParsedMention {
                 agent,
@@ -371,25 +373,31 @@ pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
             });
         }
     }
-    
+
     mentions
 }
 
 /// Parse remediation button identifier
-/// Format: fix-<agent>-pr<number>-<check_run_id>
+///
+/// Format: `fix-<agent>-pr<number>-<check_run_id>`
+///
+/// # Panics
+///
+/// Panics if the internal regex pattern is invalid (should never happen).
 #[must_use]
 pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
-    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-pr(\d+)-(\d+)$").unwrap();
-    
+    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-pr(\d+)-(\d+)$")
+        .expect("valid regex");
+
     if let Some(cap) = re.captures(identifier) {
         let agent_name = cap.get(1)?.as_str();
         let pr_number: u64 = cap.get(2)?.as_str().parse().ok()?;
         let check_run_id: u64 = cap.get(3)?.as_str().parse().ok()?;
-        
+
         let agent = Agent::from_mention(agent_name)?;
         return Some((agent, pr_number, check_run_id));
     }
-    
+
     None
 }
 
@@ -423,8 +431,8 @@ pub async fn handle_mention_webhook(
     // Determine PR context based on event type
     let (pr_context, comment_body, comment_url) = match mention_source {
         "issue_comment" => {
-            let event: IssueCommentPayload =
-                serde_json::from_value(inner_payload.clone()).map_err(|e| {
+            let event: IssueCommentPayload = serde_json::from_value(inner_payload.clone())
+                .map_err(|e| {
                     error!("Failed to parse issue_comment payload: {}", e);
                     StatusCode::BAD_REQUEST
                 })?;
@@ -448,17 +456,14 @@ pub async fn handle_mention_webhook(
                 head_branch: String::new(), // Need to fetch from PR API
                 head_sha: String::new(),    // Need to fetch from PR API
                 base_branch: String::new(), // Need to fetch from PR API
-                html_url: format!(
-                    "{}/pull/{}",
-                    event.repository.html_url, event.issue.number
-                ),
+                html_url: format!("{}/pull/{}", event.repository.html_url, event.issue.number),
             };
 
             (pr_context, event.comment.body, event.comment.html_url)
         }
         "pull_request_review_comment" => {
-            let event: ReviewCommentPayload =
-                serde_json::from_value(inner_payload.clone()).map_err(|e| {
+            let event: ReviewCommentPayload = serde_json::from_value(inner_payload.clone())
+                .map_err(|e| {
                     error!("Failed to parse review_comment payload: {}", e);
                     StatusCode::BAD_REQUEST
                 })?;
@@ -552,8 +557,8 @@ pub async fn handle_remediation_webhook(
     })?;
 
     // Parse the button identifier
-    let (agent, pr_number, check_run_id) =
-        parse_button_identifier(&requested_action.identifier).ok_or_else(|| {
+    let (agent, pr_number, check_run_id) = parse_button_identifier(&requested_action.identifier)
+        .ok_or_else(|| {
             warn!(
                 identifier = %requested_action.identifier,
                 "Invalid button identifier format"
@@ -577,7 +582,7 @@ pub async fn handle_remediation_webhook(
 
     let pr_context = PrContext {
         number: pr_number,
-        title: format!("PR #{}", pr_number), // We don't have title in check_run payload
+        title: format!("PR #{pr_number}"), // We don't have title in check_run payload
         repo_full_name: event.repository.full_name.clone(),
         clone_url: event.repository.clone_url.clone(),
         head_branch: pr.head.ref_name.clone(),
@@ -615,7 +620,7 @@ pub async fn handle_remediation_webhook(
 // CodeRun Creation
 // =============================================================================
 
-/// Create a CodeRun CR for an @mention
+/// Create a `CodeRun` CR for an @mention
 async fn create_mention_coderun(
     _state: &CallbackState,
     mention: &ParsedMention,
@@ -645,7 +650,7 @@ async fn create_mention_coderun(
         },
         "spec": {
             "runType": mention.agent.default_run_type(),
-            "service": pr_context.repo_full_name.split('/').last().unwrap_or("unknown"),
+            "service": pr_context.repo_full_name.split('/').next_back().unwrap_or("unknown"),
             "repositoryUrl": pr_context.clone_url,
             "docsRepositoryUrl": pr_context.clone_url,
             "docsProjectDirectory": ".",
@@ -682,8 +687,8 @@ async fn create_mention_coderun(
         },
     );
 
-    let obj: kube::api::DynamicObject = serde_json::from_value(coderun)
-        .map_err(|e| format!("Failed to serialize CodeRun: {e}"))?;
+    let obj: kube::api::DynamicObject =
+        serde_json::from_value(coderun).map_err(|e| format!("Failed to serialize CodeRun: {e}"))?;
 
     api.create(&PostParams::default(), &obj)
         .await
@@ -692,7 +697,7 @@ async fn create_mention_coderun(
     Ok(run_name)
 }
 
-/// Create a CodeRun CR for a remediation button click
+/// Create a `CodeRun` CR for a remediation button click
 async fn create_remediation_coderun(
     _state: &CallbackState,
     agent: Agent,
@@ -724,7 +729,7 @@ async fn create_remediation_coderun(
         },
         "spec": {
             "runType": "remediation",
-            "service": pr_context.repo_full_name.split('/').last().unwrap_or("unknown"),
+            "service": pr_context.repo_full_name.split('/').next_back().unwrap_or("unknown"),
             "repositoryUrl": pr_context.clone_url,
             "docsRepositoryUrl": pr_context.clone_url,
             "docsProjectDirectory": ".",
@@ -760,8 +765,8 @@ async fn create_remediation_coderun(
         },
     );
 
-    let obj: kube::api::DynamicObject = serde_json::from_value(coderun)
-        .map_err(|e| format!("Failed to serialize CodeRun: {e}"))?;
+    let obj: kube::api::DynamicObject =
+        serde_json::from_value(coderun).map_err(|e| format!("Failed to serialize CodeRun: {e}"))?;
 
     api.create(&PostParams::default(), &obj)
         .await
@@ -852,7 +857,7 @@ mod tests {
         let (agent, pr, check) = parsed.unwrap();
         assert_eq!(agent, Agent::Rex);
         assert_eq!(pr, 123);
-        assert_eq!(check, 456789);
+        assert_eq!(check, 456_789);
 
         let invalid = "invalid-format";
         assert!(parse_button_identifier(invalid).is_none());

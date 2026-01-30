@@ -16,6 +16,10 @@ pub use agent_comms::{
     route_message_global, send_message_to_agent, AgentMessage, AgentRouter, CachedPodInfo,
     RunningAgent, SessionCache,
 };
+pub use agent_interactions::{
+    detect_primary_language, handle_mention_webhook, handle_remediation_webhook,
+    select_agent_for_files, Agent, Language, ParsedMention, PrContext,
+};
 pub use agent_session::{
     handle_agent_session_created, handle_agent_session_prompted, AgentSessionContext,
 };
@@ -26,8 +30,4 @@ pub use oauth::{handle_oauth_callback, handle_oauth_start};
 pub use play::{PlayRequest, PlayResult};
 pub use play_state::{
     determine_bolt_stage, get_state_for_agent, mark_task_done, update_play_stage, BoltStage,
-};
-pub use agent_interactions::{
-    handle_mention_webhook, handle_remediation_webhook, Agent, Language, ParsedMention,
-    PrContext, detect_primary_language, select_agent_for_files,
 };
