@@ -70,7 +70,7 @@ services:
     network_mode: host
     depends_on:
       claude:
-        condition: service_completed_successfully
+        condition: service_started
     volumes:
       - ./workspaces/claude:/workspace  # writable for debug log
       - ../../templates/skills:/cto-skills:ro  # CTO skills for discovery
@@ -112,7 +112,7 @@ services:
     network_mode: host
     depends_on:
       codex:
-        condition: service_completed_successfully
+        condition: service_started
     volumes:
       - ./workspaces/codex:/workspace:ro
     environment:
@@ -146,7 +146,7 @@ services:
     network_mode: host
     depends_on:
       code:
-        condition: service_completed_successfully
+        condition: service_started
     volumes:
       - ./workspaces/code:/workspace:ro
     environment:
@@ -179,7 +179,7 @@ services:
     network_mode: host
     depends_on:
       cursor:
-        condition: service_completed_successfully
+        condition: service_started
     volumes:
       - ./workspaces/cursor:/workspace:ro
     environment:
@@ -212,7 +212,7 @@ services:
     network_mode: host
     depends_on:
       opencode:
-        condition: service_completed_successfully
+        condition: service_started
     volumes:
       - ./workspaces/opencode:/workspace:ro
     environment:
@@ -246,7 +246,7 @@ services:
     network_mode: host
     depends_on:
       gemini:
-        condition: service_completed_successfully
+        condition: service_started
     volumes:
       - ./workspaces/gemini:/workspace:ro
     environment:
@@ -285,7 +285,7 @@ services:
     network_mode: host
     depends_on:
       factory:
-        condition: service_completed_successfully
+        condition: service_started
     volumes:
       - ./workspaces/factory:/workspace:ro
     environment:
@@ -319,7 +319,7 @@ services:
     network_mode: host
     depends_on:
       dexter:
-        condition: service_completed_successfully
+        condition: service_started
     volumes:
       - ./workspaces/dexter:/workspace:ro
     environment:

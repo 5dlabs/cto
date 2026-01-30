@@ -12,13 +12,15 @@
 # =============================================================================
 
 # Common FluentD logging config for all CLIs
+# Note: fluentd-async=true allows CLIs to start even if FluentD isn't ready yet
 x-fluentd-logging: &fluentd-logging
   driver: fluentd
   options:
     fluentd-address: "localhost:24224"
     fluentd-async: "true"
-    fluentd-retry-wait: "1s"
-    fluentd-max-retries: "3"
+    fluentd-retry-wait: "2s"
+    fluentd-max-retries: "10"
+    fluentd-sub-second-precision: "true"
     tag: "agent.{{.Name}}"
 
 services:
@@ -26,25 +28,20 @@ services:
   # FluentD - Log Router (receives from Docker, forwards to Loki + Sidecar)
   # ===========================================================================
   fluentd:
-    image: fluent/fluentd:v1.16-1
+    image: grafana/fluent-plugin-loki:main
     ports:
       - "24224:24224"
       - "24224:24224/udp"
     volumes:
       - ./config/fluent.conf:/fluentd/etc/fluent.conf:ro
-      - ./config/fluent-plugins.sh:/docker-entrypoint.sh:ro
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        # Install required plugins
-        gem install fluent-plugin-loki --no-document
-        # Start fluentd
-        fluentd -c /fluentd/etc/fluent.conf
+    environment:
+      - FLUENTD_CONF=fluent.conf
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "24224"]
+      test: ["CMD-SHELL", "ruby -e \"require 'socket'; TCPSocket.new('localhost', 24224).close\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
   # ===========================================================================
   # Loki - Log Storage & Querying
