@@ -1,5 +1,6 @@
 /**
  * Analyze Complexity operation - analyzes task complexity and recommends subtask counts.
+ * Uses minimal prompts based on "Ralph Wiggum technique".
  */
 
 import { query, type Options, type SDKResultMessage, type SDKAssistantMessage } from '@anthropic-ai/claude-code';
@@ -11,7 +12,6 @@ import type {
   TokenUsage,
   TaskComplexityAnalysis,
 } from '../types';
-import { renderTemplate, ANALYZE_COMPLEXITY_SYSTEM, ANALYZE_COMPLEXITY_USER } from '../prompts/templates';
 import { getClaudeCliOrThrow } from '../cli-finder';
 
 /**
@@ -20,34 +20,109 @@ import { getClaudeCliOrThrow } from '../cli-finder';
 const JSON_PREFILL = '{"complexityAnalysis":[';
 
 /**
- * Extract JSON continuation from response.
+ * Generate minimal system prompt for complexity analysis.
  */
-function extractJsonContinuation(text: string): string {
-  let content = text.trim();
+function getMinimalSystemPrompt(): string {
+  return `You are a task complexity analyzer. Evaluate tasks and recommend subtask counts.
 
-  // Strip echoed prefill if present
-  if (content.startsWith(JSON_PREFILL)) {
-    content = content.slice(JSON_PREFILL.length).trim();
-  }
+## Output Format
+For each task, output:
+{
+  "taskId": number,
+  "taskTitle": "task title",
+  "complexityScore": 1-10,
+  "recommendedSubtasks": number (0 if no expansion needed),
+  "expansionPrompt": "guidance for subtask generation",
+  "reasoning": "brief explanation"
+}
+
+## Scoring Guide
+- 1-3: Simple, single-file changes
+- 4-6: Moderate, multiple files/components
+- 7-10: Complex, architectural changes or integrations
+
+Output ONLY the JSON, no explanations.`;
+}
+
+/**
+ * Generate minimal user prompt for complexity analysis.
+ */
+function getMinimalUserPrompt(tasks: Array<{ id: number; title: string; description: string; details?: string }>): string {
+  const taskList = tasks.map(t => `- ID ${t.id}: ${t.title}`).join('\n');
+  return `Analyze these tasks:
+${taskList}
+
+Tasks data:
+${JSON.stringify(tasks, null, 2)}`;
+}
+
+/**
+ * Extract JSON from response, handling markdown code blocks.
+ */
+function extractJson(text: string): string {
+  let content = text.trim();
 
   // Handle markdown code blocks
   const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
   if (jsonBlockMatch?.[1]) {
-    return jsonBlockMatch[1].trim();
+    content = jsonBlockMatch[1].trim();
+  } else {
+    const codeBlockMatch = content.match(/```\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch?.[1] && (codeBlockMatch[1].startsWith('{') || codeBlockMatch[1].startsWith('['))) {
+      content = codeBlockMatch[1].trim();
+    }
   }
 
-  // Look for valid JSON start
-  if (content.startsWith('[') || content.startsWith('{')) {
+  // If already has complexityAnalysis key, return as-is
+  if (content.startsWith('{"complexityAnalysis"')) {
     return content;
   }
 
-  // Fallback
-  const firstBrace = content.indexOf('{');
-  if (firstBrace >= 0) {
-    return content.slice(firstBrace);
+  // Strip echoed prefill and re-wrap
+  if (content.startsWith(JSON_PREFILL)) {
+    return content;
+  }
+
+  // If starts with [ (array), wrap it
+  if (content.startsWith('[')) {
+    return '{"complexityAnalysis":' + content + '}';
+  }
+
+  // Look for {"taskId" to find start
+  const taskIdMatch = content.indexOf('{"taskId"');
+  if (taskIdMatch >= 0) {
+    return JSON_PREFILL + content.slice(taskIdMatch);
   }
 
   return content;
+}
+
+/**
+ * Parse and validate complexity analysis JSON.
+ */
+function parseAnalysisJson(content: string): { success: true; analysis: TaskComplexityAnalysis[] } | { success: false; error: string } {
+  const trimmed = content.trim();
+
+  if (!trimmed) {
+    return { success: false, error: 'AI returned empty response' };
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    
+    if (parsed.complexityAnalysis && Array.isArray(parsed.complexityAnalysis)) {
+      return { success: true, analysis: parsed.complexityAnalysis };
+    }
+    
+    if (Array.isArray(parsed)) {
+      return { success: true, analysis: parsed };
+    }
+
+    return { success: false, error: 'Parsed JSON does not contain complexityAnalysis array' };
+  } catch (e) {
+    const parseError = e instanceof Error ? e.message : 'Unknown parse error';
+    return { success: false, error: `JSON parse failed: ${parseError}` };
+  }
 }
 
 /**
@@ -73,16 +148,10 @@ export async function analyzeComplexity(
   model: string,
   _options: GenerateOptions
 ): Promise<AgentResponse<AnalyzeComplexityData>> {
-  const context = {
-    tasks: payload.tasks,
-    gathered_context: '',
-    threshold: payload.threshold ?? 5,
-    use_research: payload.use_research ?? false,
-    project_root: payload.project_root ?? '',
-  };
+  const tasks = payload.tasks;
 
-  const systemPrompt = renderTemplate(ANALYZE_COMPLEXITY_SYSTEM, context);
-  const userPrompt = renderTemplate(ANALYZE_COMPLEXITY_USER, context);
+  const systemPrompt = getMinimalSystemPrompt();
+  const userPrompt = getMinimalUserPrompt(tasks);
 
   try {
     const cliPath = getClaudeCliOrThrow();
@@ -120,33 +189,21 @@ export async function analyzeComplexity(
     }
 
     // Extract and parse JSON
-    const jsonContent = extractJsonContinuation(responseText);
-    const fullJson = `${JSON_PREFILL}${jsonContent}`;
+    const jsonContent = extractJson(responseText);
+    const result = parseAnalysisJson(jsonContent);
 
-    let parsed: { complexityAnalysis: TaskComplexityAnalysis[] };
-    try {
-      parsed = JSON.parse(fullJson);
-    } catch (e) {
-      const parseError = e instanceof Error ? e.message : 'Unknown parse error';
+    if (!result.success) {
       return {
         success: false,
-        error: `JSON parse failed: ${parseError}`,
+        error: result.error,
         error_type: 'parse_error',
-        details: fullJson.slice(0, 500),
-      };
-    }
-
-    if (!Array.isArray(parsed.complexityAnalysis)) {
-      return {
-        success: false,
-        error: 'Parsed JSON does not contain complexityAnalysis array',
-        error_type: 'parse_error',
+        details: jsonContent.slice(0, 500),
       };
     }
 
     return {
       success: true,
-      data: { complexity_analysis: parsed.complexityAnalysis },
+      data: { complexity_analysis: result.analysis },
       usage,
       model,
       provider: 'claude-agent-sdk',
