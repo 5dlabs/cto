@@ -1510,6 +1510,116 @@ Current progress: **$progress**
 # PHASE 3: GITHUB CHECKS API INTEGRATION
 # ============================================================================
 
+# =============================================================================
+# REMEDIATION BUTTON HELPERS
+# =============================================================================
+# Detect primary language from file extension
+detect_file_language() {
+  local file="$1"
+  case "$file" in
+    *.rs) echo "rust" ;;
+    *.go) echo "go" ;;
+    *.tsx|*.jsx) echo "react" ;;
+    *.ts|*.js) echo "typescript" ;;
+    *.py) echo "python" ;;
+    *.cs) echo "csharp" ;;
+    *.cpp|*.cc|*.cxx|*.h|*.hpp) echo "cpp" ;;
+    *) echo "" ;;
+  esac
+}
+
+# Map language to agent
+language_to_agent() {
+  local lang="$1"
+  case "$lang" in
+    rust) echo "rex" ;;
+    go) echo "grizz" ;;
+    react|typescript) echo "blaze" ;;
+    python) echo "nova" ;;
+    csharp) echo "vex" ;;
+    cpp) echo "forge" ;;
+    *) echo "rex" ;;
+  esac
+}
+
+# Get agent display with emoji (Cursor-inspired black/silver styling)
+get_agent_button_label() {
+  local agent="$1"
+  case "$agent" in
+    rex)   echo "🛠️ Fix with Rex" ;;
+    grizz) echo "🐻 Fix with Grizz" ;;
+    blaze) echo "⚡ Fix with Blaze" ;;
+    nova)  echo "✨ Fix with Nova" ;;
+    tap)   echo "📱 Fix with Tap" ;;
+    spark) echo "💻 Fix with Spark" ;;
+    vex)   echo "🎮 Fix with Vex" ;;
+    forge) echo "🔥 Fix with Forge" ;;
+    *)     echo "🤖 Fix with Agent" ;;
+  esac
+}
+
+# Get agent description for button
+get_agent_button_description() {
+  local agent="$1"
+  case "$agent" in
+    rex)   echo "Launch Rex to automatically fix Rust issues" ;;
+    grizz) echo "Launch Grizz to automatically fix Go issues" ;;
+    blaze) echo "Launch Blaze to automatically fix TypeScript/React issues" ;;
+    nova)  echo "Launch Nova to automatically fix Node.js issues" ;;
+    tap)   echo "Launch Tap to automatically fix React Native issues" ;;
+    spark) echo "Launch Spark to automatically fix Electron issues" ;;
+    vex)   echo "Launch Vex to automatically fix Unity/C# issues" ;;
+    forge) echo "Launch Forge to automatically fix Unreal/C++ issues" ;;
+    *)     echo "Launch an agent to automatically fix issues" ;;
+  esac
+}
+
+# Build remediation actions JSON for check run
+build_remediation_actions() {
+  local pr_number="$1"
+  local check_run_id="$2"
+  
+  # Get changed files from PR
+  local changed_files=$(gh pr view "$pr_number" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --json files \
+    --jq '.files[].path' 2>/dev/null || echo "")
+  
+  [[ -z "$changed_files" ]] && return
+  
+  # Detect languages and build unique agent list
+  local agents_seen=""
+  local actions="["
+  local first=true
+  
+  while IFS= read -r file; do
+    local lang=$(detect_file_language "$file")
+    [[ -z "$lang" ]] && continue
+    
+    local agent=$(language_to_agent "$lang")
+    
+    # Skip if we already added this agent
+    [[ "$agents_seen" == *"$agent"* ]] && continue
+    agents_seen="$agents_seen $agent"
+    
+    local label=$(get_agent_button_label "$agent")
+    local description=$(get_agent_button_description "$agent")
+    local identifier="fix-${agent}-pr${pr_number}-${check_run_id}"
+    
+    [[ "$first" != "true" ]] && actions="$actions,"
+    first=false
+    
+    actions="$actions{\"label\": \"$label\", \"description\": \"$description\", \"identifier\": \"$identifier\"}"
+  done <<< "$changed_files"
+  
+  actions="$actions]"
+  
+  # Return empty if no actions
+  [[ "$first" == "true" ]] && return
+  
+  echo "$actions"
+}
+
 create_or_update_github_check() {
   local task_id="$1"
   local pr_number="$2"
@@ -1568,6 +1678,15 @@ create_or_update_github_check() {
     
     if [[ -n "$check_conclusion" ]]; then
       update_payload="$update_payload,\"conclusion\": \"$check_conclusion\""
+      
+      # Add remediation buttons if check failed
+      if [[ "$check_conclusion" == "failure" ]]; then
+        local actions=$(build_remediation_actions "$pr_number" "$existing_check")
+        if [[ -n "$actions" ]]; then
+          update_payload="$update_payload,\"actions\": $actions"
+          log "🔧 Added remediation buttons to failed check"
+        fi
+      fi
     fi
     
     update_payload="$update_payload}"
@@ -1580,7 +1699,7 @@ create_or_update_github_check() {
     
     log "✅ Updated GitHub check for $agent_name on PR #$pr_number"
   else
-    # Create new check
+    # Create new check - we'll update with actions after getting the ID
     local create_payload="{
       \"name\": \"$check_name\",
       \"head_sha\": \"$pr_head_sha\",
@@ -1598,13 +1717,27 @@ create_or_update_github_check() {
     
     create_payload="$create_payload}"
     
-    gh api \
+    local created_check=$(gh api \
       --method POST \
       -H "Accept: application/vnd.github+json" \
       "/repos/$REPO_OWNER/$REPO_NAME/check-runs" \
-      --input - <<< "$create_payload" 2>/dev/null || true
+      --input - <<< "$create_payload" 2>/dev/null | jq -r '.id' || echo "")
     
     log "✅ Created GitHub check for $agent_name on PR #$pr_number"
+    
+    # If check failed, update with remediation buttons now that we have the ID
+    if [[ -n "$created_check" && "$check_conclusion" == "failure" ]]; then
+      local actions=$(build_remediation_actions "$pr_number" "$created_check")
+      if [[ -n "$actions" ]]; then
+        local actions_payload="{\"actions\": $actions}"
+        gh api \
+          --method PATCH \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/$REPO_OWNER/$REPO_NAME/check-runs/$created_check" \
+          --input - <<< "$actions_payload" 2>/dev/null || true
+        log "🔧 Added remediation buttons to failed check"
+      fi
+    fi
   fi
 }
 

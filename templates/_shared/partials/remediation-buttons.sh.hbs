@@ -1,0 +1,288 @@
+# =============================================================================
+# Remediation Button Helpers
+# =============================================================================
+# Adds "Fix with <Agent>" buttons to GitHub check runs when CI fails.
+# These buttons trigger the remediation workflow when clicked.
+#
+# Styling: Black/silver Cursor-inspired aesthetic using emoji and clean text.
+# =============================================================================
+
+# Detect primary language from a list of files
+# Usage: detect_language "file1.rs file2.rs file3.go"
+# Returns: rust, go, typescript, react, python, csharp, cpp, or unknown
+detect_language() {
+  local files="$1"
+  local rust_count=0 go_count=0 ts_count=0 react_count=0 python_count=0 csharp_count=0 cpp_count=0
+  
+  for file in $files; do
+    case "$file" in
+      *.rs) ((rust_count++)) ;;
+      *.go) ((go_count++)) ;;
+      *.tsx|*.jsx) ((react_count++)) ;;
+      *.ts) ((ts_count++)) ;;
+      *.js) ((ts_count++)) ;;
+      *.py) ((python_count++)) ;;
+      *.cs) ((csharp_count++)) ;;
+      *.cpp|*.cc|*.cxx|*.h|*.hpp) ((cpp_count++)) ;;
+    esac
+  done
+  
+  # Find max (with priority order for ties)
+  local max=0 winner="unknown"
+  
+  if [[ $rust_count -gt $max ]]; then max=$rust_count; winner="rust"; fi
+  if [[ $go_count -gt $max ]]; then max=$go_count; winner="go"; fi
+  if [[ $react_count -gt $max ]]; then max=$react_count; winner="react"; fi
+  if [[ $ts_count -gt $max ]]; then max=$ts_count; winner="typescript"; fi
+  if [[ $python_count -gt $max ]]; then max=$python_count; winner="python"; fi
+  if [[ $csharp_count -gt $max ]]; then max=$csharp_count; winner="csharp"; fi
+  if [[ $cpp_count -gt $max ]]; then max=$cpp_count; winner="cpp"; fi
+  
+  echo "$winner"
+}
+
+# Map language to agent name
+# Usage: language_to_agent "rust"
+# Returns: rex, grizz, blaze, nova, vex, forge
+language_to_agent() {
+  local lang="$1"
+  
+  case "$lang" in
+    rust) echo "rex" ;;
+    go) echo "grizz" ;;
+    typescript|react) echo "blaze" ;;
+    python) echo "nova" ;;
+    csharp) echo "vex" ;;
+    cpp) echo "forge" ;;
+    *) echo "rex" ;;  # Default to Rex for unknown
+  esac
+}
+
+# Get agent display name and emoji
+# Usage: get_agent_display "rex"
+# Returns: "🛠️ Rex"
+get_agent_display() {
+  local agent="$1"
+  
+  case "$agent" in
+    rex)   echo "🛠️ Rex" ;;
+    grizz) echo "🐻 Grizz" ;;
+    blaze) echo "⚡ Blaze" ;;
+    nova)  echo "✨ Nova" ;;
+    tap)   echo "📱 Tap" ;;
+    spark) echo "💻 Spark" ;;
+    vex)   echo "🎮 Vex" ;;
+    forge) echo "🔥 Forge" ;;
+    *)     echo "🤖 $agent" ;;
+  esac
+}
+
+# Get agent description for button
+# Usage: get_agent_description "rex" "lint-rust"
+# Returns: "Rex will analyze and fix Rust compilation errors"
+get_agent_description() {
+  local agent="$1"
+  local check_name="$2"
+  
+  case "$agent" in
+    rex)   echo "Rex will analyze and fix Rust compilation, clippy, and formatting issues" ;;
+    grizz) echo "Grizz will analyze and fix Go compilation, lint, and formatting issues" ;;
+    blaze) echo "Blaze will analyze and fix TypeScript, ESLint, and React issues" ;;
+    nova)  echo "Nova will analyze and fix TypeScript/Node.js issues" ;;
+    tap)   echo "Tap will analyze and fix React Native issues" ;;
+    spark) echo "Spark will analyze and fix Electron desktop app issues" ;;
+    vex)   echo "Vex will analyze and fix Unity/C# issues" ;;
+    forge) echo "Forge will analyze and fix Unreal/C++ issues" ;;
+    *)     echo "The agent will attempt to fix the failing checks" ;;
+  esac
+}
+
+# Build actions array for check run
+# Usage: build_remediation_actions "123" "456789" "rust go typescript"
+# Returns: JSON array of actions, or empty string if no actions
+build_remediation_actions() {
+  local pr_number="$1"
+  local check_run_id="$2"
+  local detected_languages="$3"
+  
+  if [[ -z "$detected_languages" || "$detected_languages" == "unknown" ]]; then
+    echo ""
+    return
+  fi
+  
+  local actions="["
+  local first=true
+  
+  # Build unique list of agents from detected languages
+  local agents_added=""
+  for lang in $detected_languages; do
+    local agent=$(language_to_agent "$lang")
+    
+    # Skip if we already added this agent
+    if [[ "$agents_added" == *"$agent"* ]]; then
+      continue
+    fi
+    agents_added="$agents_added $agent"
+    
+    local display=$(get_agent_display "$agent")
+    local description=$(get_agent_description "$agent" "")
+    local identifier="fix-${agent}-pr${pr_number}-${check_run_id}"
+    
+    if [[ "$first" != "true" ]]; then
+      actions="$actions,"
+    fi
+    first=false
+    
+    # Build action object (Cursor-inspired black/silver styling via clean text)
+    actions="$actions{
+      \"label\": \"${display} Fix\",
+      \"description\": \"${description}\",
+      \"identifier\": \"${identifier}\"
+    }"
+  done
+  
+  actions="$actions]"
+  
+  # Return empty if no actions were added
+  if [[ "$first" == "true" ]]; then
+    echo ""
+  else
+    echo "$actions"
+  fi
+}
+
+# Get changed files for a PR
+# Usage: get_pr_changed_files "123"
+# Returns: space-separated list of file paths
+get_pr_changed_files() {
+  local pr_number="$1"
+  
+  gh pr view "$pr_number" --json files --jq '.files[].path' 2>/dev/null | tr '\n' ' '
+}
+
+# Create check run with remediation buttons
+# Usage: create_check_with_remediation "$repo" "$sha" "$name" "$status" "$conclusion" "$pr_number" "$check_run_id" "$output_title" "$output_summary" "$output_text" "$details_url"
+create_check_with_remediation() {
+  local repo="$1"
+  local head_sha="$2"
+  local check_name="$3"
+  local status="$4"
+  local conclusion="$5"
+  local pr_number="$6"
+  local check_run_id="${7:-0}"  # 0 means we'll get it after creation
+  local output_title="$8"
+  local output_summary="$9"
+  local output_text="${10}"
+  local details_url="${11}"
+  
+  # Base payload
+  local payload="{
+    \"name\": \"$check_name\",
+    \"head_sha\": \"$head_sha\",
+    \"status\": \"$status\",
+    \"details_url\": \"$details_url\",
+    \"output\": {
+      \"title\": \"$output_title\",
+      \"summary\": \"$output_summary\",
+      \"text\": \"$output_text\"
+    }"
+  
+  # Add conclusion if status is completed
+  if [[ "$status" == "completed" && -n "$conclusion" ]]; then
+    payload="$payload,\"conclusion\": \"$conclusion\""
+    
+    # Add remediation buttons if check failed
+    if [[ "$conclusion" == "failure" || "$conclusion" == "action_required" ]]; then
+      local changed_files=$(get_pr_changed_files "$pr_number")
+      local detected_langs=""
+      
+      for file in $changed_files; do
+        local lang=$(detect_language "$file")
+        if [[ "$lang" != "unknown" && "$detected_langs" != *"$lang"* ]]; then
+          detected_langs="$detected_langs $lang"
+        fi
+      done
+      
+      local actions=$(build_remediation_actions "$pr_number" "$check_run_id" "$detected_langs")
+      if [[ -n "$actions" ]]; then
+        payload="$payload,\"actions\": $actions"
+      fi
+    fi
+  fi
+  
+  payload="$payload}"
+  
+  # Create the check run
+  gh api \
+    --method POST \
+    -H "Accept: application/vnd.github+json" \
+    "/repos/$repo/check-runs" \
+    --input - <<< "$payload"
+}
+
+# Update check run with remediation buttons
+# Usage: update_check_with_remediation "$repo" "$check_run_id" "$status" "$conclusion" "$pr_number" "$output_title" "$output_summary" "$output_text"
+update_check_with_remediation() {
+  local repo="$1"
+  local check_run_id="$2"
+  local status="$3"
+  local conclusion="$4"
+  local pr_number="$5"
+  local output_title="$6"
+  local output_summary="$7"
+  local output_text="$8"
+  
+  # Base payload
+  local payload="{
+    \"status\": \"$status\",
+    \"output\": {
+      \"title\": \"$output_title\",
+      \"summary\": \"$output_summary\",
+      \"text\": \"$output_text\"
+    }"
+  
+  # Add conclusion if status is completed
+  if [[ "$status" == "completed" && -n "$conclusion" ]]; then
+    payload="$payload,\"conclusion\": \"$conclusion\""
+    
+    # Add remediation buttons if check failed
+    if [[ "$conclusion" == "failure" || "$conclusion" == "action_required" ]]; then
+      local changed_files=$(get_pr_changed_files "$pr_number")
+      local detected_langs=""
+      
+      for file in $changed_files; do
+        local lang=$(detect_language "$file")
+        if [[ "$lang" != "unknown" && "$detected_langs" != *"$lang"* ]]; then
+          detected_langs="$detected_langs $lang"
+        fi
+      done
+      
+      local actions=$(build_remediation_actions "$pr_number" "$check_run_id" "$detected_langs")
+      if [[ -n "$actions" ]]; then
+        payload="$payload,\"actions\": $actions"
+      fi
+    fi
+  fi
+  
+  payload="$payload}"
+  
+  # Update the check run
+  gh api \
+    --method PATCH \
+    -H "Accept: application/vnd.github+json" \
+    "/repos/$repo/check-runs/$check_run_id" \
+    --input - <<< "$payload"
+}
+
+# Log with styling (for terminal output)
+log_styled() {
+  local level="$1"
+  local message="$2"
+  
+  case "$level" in
+    success) echo -e "\033[0;32m✓\033[0m $message" ;;  # Green check
+    error)   echo -e "\033[0;31m✗\033[0m $message" ;;  # Red X
+    info)    echo -e "\033[0;90m▸\033[0m $message" ;;  # Gray arrow (silver)
+    *)       echo "$message" ;;
+  esac
+}
