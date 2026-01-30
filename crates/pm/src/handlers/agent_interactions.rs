@@ -577,7 +577,7 @@ pub async fn handle_remediation_webhook(
 
     let pr_context = PrContext {
         number: pr_number,
-        title: format!("PR #{}", pr_number), // We don't have title in check_run payload
+        title: format!("PR #{pr_number}"), // We don't have title in check_run payload
         repo_full_name: event.repository.full_name.clone(),
         clone_url: event.repository.clone_url.clone(),
         head_branch: pr.head.ref_name.clone(),
@@ -615,7 +615,7 @@ pub async fn handle_remediation_webhook(
 // CodeRun Creation
 // =============================================================================
 
-/// Create a CodeRun CR for an @mention
+/// Create a `CodeRun` CR for an @mention
 async fn create_mention_coderun(
     _state: &CallbackState,
     mention: &ParsedMention,
@@ -645,7 +645,7 @@ async fn create_mention_coderun(
         },
         "spec": {
             "runType": mention.agent.default_run_type(),
-            "service": pr_context.repo_full_name.split('/').last().unwrap_or("unknown"),
+            "service": pr_context.repo_full_name.split('/').next_back().unwrap_or("unknown"),
             "repositoryUrl": pr_context.clone_url,
             "docsRepositoryUrl": pr_context.clone_url,
             "docsProjectDirectory": ".",
@@ -692,7 +692,7 @@ async fn create_mention_coderun(
     Ok(run_name)
 }
 
-/// Create a CodeRun CR for a remediation button click
+/// Create a `CodeRun` CR for a remediation button click
 async fn create_remediation_coderun(
     _state: &CallbackState,
     agent: Agent,
@@ -724,7 +724,7 @@ async fn create_remediation_coderun(
         },
         "spec": {
             "runType": "remediation",
-            "service": pr_context.repo_full_name.split('/').last().unwrap_or("unknown"),
+            "service": pr_context.repo_full_name.split('/').next_back().unwrap_or("unknown"),
             "repositoryUrl": pr_context.clone_url,
             "docsRepositoryUrl": pr_context.clone_url,
             "docsProjectDirectory": ".",
