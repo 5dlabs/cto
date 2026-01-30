@@ -613,6 +613,32 @@
           "github_get_file_contents"
         ],
         "localServers": {}
+      },
+      "skills": {
+        "default": [
+          "context-fundamentals",
+          "context-degradation",
+          "context-optimization",
+          "openmemory",
+          "context7",
+          "octocode",
+          "llm-docs",
+          "github-mcp",
+          "kubernetes-mcp",
+          "observability",
+          "kubernetes-operators",
+          "argocd-gitops",
+          "secrets-management",
+          "storage-operators",
+          "mcp-development"
+        ],
+        "coder": [
+          "tool-design",
+          "firecrawl",
+          "compound-engineering",
+          "verification-before-completion",
+          "systematic-debugging"
+        ]
       }
     },
     "atlas": {
