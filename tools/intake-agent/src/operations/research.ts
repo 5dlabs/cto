@@ -13,6 +13,9 @@ import type {
 } from '../types';
 import { getResearchMcpServers, hasResearchCapability, listAvailableMcpServers } from '../mcp/config';
 import { getClaudeCliOrThrow } from '../cli-finder';
+import { createLogger, createTimer } from '../utils/logger';
+
+const logger = createLogger('research');
 
 /**
  * Payload for research operation.
@@ -159,10 +162,20 @@ export async function research(
   model: string,
   _options: GenerateOptions
 ): Promise<AgentResponse<ResearchData>> {
+  const timer = createTimer('research', logger);
+  
+  logger.info('Starting research', {
+    topic: payload.topic.slice(0, 100),
+    focus_areas: payload.focus_areas,
+    max_turns: payload.max_turns ?? 5,
+    model,
+  });
+
   // Check research capability
   if (!hasResearchCapability()) {
     const servers = listAvailableMcpServers();
     const unavailable = servers.filter(s => !s.available);
+    logger.error('No MCP servers available', { unavailable });
     return {
       success: false,
       error: `No research MCP servers available. Configure at least one of: ${unavailable.map(s => `${s.name} (${s.reason})`).join(', ')}`,
@@ -173,10 +186,16 @@ export async function research(
   try {
     // Find Claude CLI executable
     const cliPath = getClaudeCliOrThrow();
+    logger.debug('Using Claude CLI', { path: cliPath });
 
     // Get MCP servers
     const mcpServers = getResearchMcpServers();
     const serverNames = Object.keys(mcpServers);
+    logger.info('MCP servers configured', { servers: serverNames });
+    
+    if (logger.isDebug()) {
+      logger.debug('MCP server configs', { mcpServers });
+    }
 
     // Configure Claude Agent SDK options with MCP servers
     const sdkOptions: Options = {
@@ -197,15 +216,41 @@ export async function research(
 
     let responseText = '';
     let usage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
+    let messageCount = 0;
+    let toolCalls = 0;
 
     const prompt = buildResearchPrompt(payload);
+    logger.debug('Research prompt', { length: prompt.length, preview: prompt.slice(0, 300) + '...' });
+    
+    timer.step('prompt-built');
 
     for await (const message of query({
       prompt,
       options: sdkOptions,
     })) {
+      messageCount++;
+      logger.trace(`Message ${messageCount}`, { type: message.type });
+      
       if (message.type === 'assistant') {
-        responseText += extractAssistantText(message);
+        const text = extractAssistantText(message);
+        responseText += text;
+        logger.debug(`Assistant message`, { length: text.length, preview: text.slice(0, 100) });
+      }
+      
+      // Log tool use for debugging
+      if (message.type === 'assistant' && 'message' in message) {
+        const content = (message as SDKAssistantMessage).message.content;
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'tool_use') {
+              toolCalls++;
+              logger.info(`Tool call`, { 
+                tool: (block as { name?: string }).name,
+                toolCalls,
+              });
+            }
+          }
+        }
       }
       
       if (message.type === 'result') {
@@ -215,12 +260,24 @@ export async function research(
           usage.output_tokens = resultMsg.usage.output_tokens;
           usage.total_tokens = usage.input_tokens + usage.output_tokens;
         }
+        logger.debug('Result received', { usage });
       }
     }
+    
+    timer.step('query-complete');
+    logger.info('Research query complete', { 
+      messageCount, 
+      toolCalls, 
+      responseLength: responseText.length,
+      usage,
+    });
 
     // Parse results
     const results = parseResearchResults(responseText);
     if (!results) {
+      logger.error('Failed to parse research results', { 
+        responsePreview: responseText.slice(0, 500) 
+      });
       return {
         success: false,
         error: 'Failed to parse research results',
@@ -231,6 +288,11 @@ export async function research(
 
     // Add servers used
     results.servers_used = serverNames;
+    
+    timer.done({ 
+      findings: results.findings.length, 
+      recommendations: results.recommendations.length 
+    });
 
     return {
       success: true,
