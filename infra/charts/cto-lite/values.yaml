@@ -4,9 +4,9 @@
 global:
   imageRegistry: ghcr.io/5dlabs
 
-# Controller - reuse existing controller image
+# Controller - disabled until image is published
 controller:
-  enabled: true
+  enabled: false
   image:
     repository: ghcr.io/5dlabs/cto-controller
     tag: latest
@@ -20,9 +20,9 @@ controller:
       cpu: 500m
       memory: 256Mi
 
-# PM Lite - GitHub webhooks, no Linear
+# PM Lite - disabled until image is published
 pmLite:
-  enabled: true
+  enabled: false
   image:
     repository: ghcr.io/5dlabs/cto-pm-lite
     tag: latest
@@ -36,13 +36,12 @@ pmLite:
     limits:
       cpu: 500m
       memory: 256Mi
-  # GitHub App config (populated at runtime)
   github:
     appId: ""
     privateKeySecret: ""
     webhookSecret: ""
 
-# Argo Workflows (subchart)
+# Argo Workflows (subchart) - this works out of the box
 argo-workflows:
   enabled: true
   controller:
@@ -51,43 +50,43 @@ argo-workflows:
       requests:
         cpu: 100m
         memory: 128Mi
+    workflowNamespaces:
+      - cto-lite
   server:
     enabled: true
     replicas: 1
-    # Local auth for simplicity
     extraArgs:
       - --auth-mode=server
+    serviceType: ClusterIP
 
-# Agent images - which stack agents are available
-agents:
-  # Frontend agent (always included)
-  blaze:
-    image: ghcr.io/5dlabs/cto-agent-blaze:latest
-  # Quality agent (always included)  
-  cleo:
-    image: ghcr.io/5dlabs/cto-agent-cleo:latest
-  # Security agent (always included)
-  cipher:
-    image: ghcr.io/5dlabs/cto-agent-cipher:latest
-  # Testing agent (always included)
-  tess:
-    image: ghcr.io/5dlabs/cto-agent-tess:latest
-  # Deployment agent (always included)
-  bolt:
-    image: ghcr.io/5dlabs/cto-agent-bolt:latest
-  # Backend agents - user picks one
-  grizz:  # Rust/Go
-    image: ghcr.io/5dlabs/cto-agent-grizz:latest
-  nova:   # TypeScript
-    image: ghcr.io/5dlabs/cto-agent-nova:latest
-
-# Cloudflare tunnel for webhook ingress
-tunnel:
+# Tool Server - use existing runtime image for now
+toolServer:
   enabled: true
-  # Token provided by user via Tauri UI
+  image:
+    repository: ghcr.io/5dlabs/runtime
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Agent images - these are pulled on-demand by workflows
+agents:
+  claude:
+    image: ghcr.io/5dlabs/claude:latest
+
+# Cloudflare tunnel - disabled by default
+tunnel:
+  enabled: false
   tokenSecret: cloudflare-tunnel-token
 
 # Storage - local path for Kind
 storage:
-  class: standard  # Kind default
+  class: standard
   size: 10Gi

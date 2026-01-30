@@ -45,7 +45,15 @@ pub struct BinaryCheck {
 }
 
 /// Required binaries for CTO Lite
-const REQUIRED_BINARIES: &[&str] = &["docker", "kind", "kubectl", "helm"];
+const REQUIRED_BINARIES: &[&str] = &["docker", "kind", "kubectl", "helm", "argo"];
+
+/// Binaries we can auto-install via brew
+const BREW_INSTALLABLE: &[(&str, &str)] = &[
+    ("kind", "kind"),
+    ("kubectl", "kubernetes-cli"),
+    ("helm", "helm"),
+    ("argo", "argo"),
+];
 
 /// Images to pull for initial deployment
 const CORE_IMAGES: &[&str] = &[
@@ -79,6 +87,84 @@ pub async fn check_prerequisites() -> Result<Vec<BinaryCheck>, AppError> {
     }
 
     Ok(results)
+}
+
+/// Check if Homebrew is installed
+fn is_brew_installed() -> bool {
+    which::which("brew").is_ok()
+}
+
+/// Install a binary via Homebrew
+fn brew_install(formula: &str) -> AppResult<()> {
+    tracing::info!("Installing {} via Homebrew...", formula);
+    
+    let output = Command::new("brew")
+        .args(["install", formula])
+        .output()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to run brew: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // Check if already installed
+        if stderr.contains("already installed") {
+            return Ok(());
+        }
+        return Err(AppError::CommandFailed(format!("brew install {} failed: {}", formula, stderr)));
+    }
+
+    Ok(())
+}
+
+/// Install missing dependencies automatically
+fn install_missing_dependencies(window: &tauri::Window) -> AppResult<()> {
+    let emit = |msg: &str| {
+        let _ = window.emit("install-progress", InstallStatus {
+            step: InstallStep::InstallingBinaries,
+            message: msg.to_string(),
+            progress: 10,
+            error: None,
+        });
+    };
+
+    // Check what's missing
+    let missing: Vec<_> = BREW_INSTALLABLE
+        .iter()
+        .filter(|(bin, _)| !which::which(bin).is_ok())
+        .collect();
+
+    if missing.is_empty() {
+        return Ok(());
+    }
+
+    // Check if we can use Homebrew
+    if !is_brew_installed() {
+        // On macOS without brew, we could try other methods
+        // For now, return an error with helpful message
+        #[cfg(target_os = "macos")]
+        {
+            return Err(AppError::CommandFailed(
+                "Homebrew is required to install dependencies. Install it from https://brew.sh".to_string()
+            ));
+        }
+        
+        #[cfg(not(target_os = "macos"))]
+        {
+            let names: Vec<_> = missing.iter().map(|(bin, _)| *bin).collect();
+            return Err(AppError::CommandFailed(format!(
+                "Missing required tools: {}. Please install them manually.",
+                names.join(", ")
+            )));
+        }
+    }
+
+    // Install each missing dependency
+    for (bin, formula) in missing {
+        emit(&format!("Installing {}...", bin));
+        brew_install(formula)?;
+        tracing::info!("Successfully installed {}", bin);
+    }
+
+    Ok(())
 }
 
 /// Get version of a binary
@@ -129,12 +215,28 @@ pub async fn run_installation(
     let prereqs = check_prerequisites().await?;
     let missing: Vec<_> = prereqs.iter().filter(|b| !b.found).collect();
     
+    // Docker must be present - we can't auto-install it
+    if prereqs.iter().any(|b| b.name == "docker" && !b.found) {
+        return Err(AppError::CommandFailed(
+            "Docker is required. Please install Docker Desktop, OrbStack, or Colima first.".to_string()
+        ));
+    }
+    
+    // Auto-install other missing dependencies
     if !missing.is_empty() {
-        let names: Vec<_> = missing.iter().map(|b| b.name.as_str()).collect();
-        return Err(AppError::CommandFailed(format!(
-            "Missing required binaries: {}. Please install them first.",
-            names.join(", ")
-        )));
+        let missing_names: Vec<_> = missing.iter()
+            .filter(|b| b.name != "docker")
+            .map(|b| b.name.as_str())
+            .collect();
+        
+        if !missing_names.is_empty() {
+            emit_progress(
+                InstallStep::InstallingBinaries, 
+                &format!("Installing {}...", missing_names.join(", ")),
+                10
+            );
+            install_missing_dependencies(&window)?;
+        }
     }
 
     // Step 2: Create Kind cluster
