@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="50" project="alerthub">
+  <title>End-to-end testing and integration validation</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create comprehensive end-to-end tests validating complete notification flow across all services
+  </description>
+  
+  <dependencies>
+    <dependency task_id="39" />
+    <dependency task_id="43" />
+    <dependency task_id="46" />
+    <dependency task_id="49" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup E2E testing framework, create tests for complete notification flow (submit -&gt; route -&gt; deliver -&gt; display), validate WebSocket updates, test mobile push notifications.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d50" category="architecture" constraint="hard" requires_approval="true">
+      <description>E2E testing environment strategy</description>
+      <options>
+        <option>Dedicated test cluster</option>
+        <option>Production-like staging</option>
+        <option>Shared development environment</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    E2E tests pass consistently, all notification channels deliver successfully, real-time updates work across clients, mobile push notifications received
+  </acceptance_criteria>
+</task>

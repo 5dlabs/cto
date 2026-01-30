@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="11" project="alerthub">
+  <title>Implement WebSocket endpoint for real-time updates</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create WS /api/v1/ws endpoint for real-time notification status updates to clients
+  </description>
+  
+  <dependencies>
+    <dependency task_id="10" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup WebSocket handler with connection management, tenant-based message filtering, connection cleanup, and heartbeat mechanism.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d11" category="performance" constraint="open" requires_approval="false">
+      <description>WebSocket connection scaling strategy</description>
+      <options>
+        <option>In-memory connection tracking</option>
+        <option>Redis-backed connection registry</option>
+        <option>Pub/sub pattern</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    WebSocket connections established, clients receive real-time updates for their notifications, connections handle disconnects gracefully
+  </acceptance_criteria>
+</task>

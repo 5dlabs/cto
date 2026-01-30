@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="32" project="alerthub">
+  <title>Setup Effect Schema for API validation</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create Effect Schema definitions for all API requests and responses with validation
+  </description>
+  
+  <dependencies>
+    <dependency task_id="31" />
+  </dependencies>
+  
+  <implementation>
+    <details>Define Effect Schema models for notifications, integrations, users, and rules. Setup validation and type generation for API interactions.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d32" category="error-handling" constraint="open" requires_approval="false">
+      <description>Client-side validation failure handling</description>
+      <options>
+        <option>Show inline errors</option>
+        <option>Toast notifications</option>
+        <option>Error boundary with retry</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Schemas validate API responses correctly, type inference works in components, validation errors are descriptive and handled properly
+  </acceptance_criteria>
+</task>

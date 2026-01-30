@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="24" project="alerthub">
+  <title>Setup PostgreSQL connection and GORM models</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Configure PostgreSQL connection with GORM and create Go models for tenants, users, and rules
+  </description>
+  
+  <dependencies>
+    <dependency task_id="23" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup GORM with PostgreSQL driver, create Go structs for domain models, implement database migrations, configure connection pooling.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d24" category="data-model" constraint="open" requires_approval="false">
+      <description>GORM migration strategy</description>
+      <options>
+        <option>Auto-migrate in code</option>
+        <option>Separate migration tool</option>
+        <option>Manual SQL migrations</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Database connection established, GORM models map correctly to tables, migrations create expected schema, connection pool works
+  </acceptance_criteria>
+</task>

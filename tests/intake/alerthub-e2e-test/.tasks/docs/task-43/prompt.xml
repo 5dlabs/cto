@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="43" project="alerthub">
+  <title>Implement biometric authentication</title>
+  <agent name="tap" stack="Expo" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Add Face ID/fingerprint authentication for app security
+  </description>
+  
+  <dependencies>
+    <dependency task_id="42" />
+  </dependencies>
+  
+  <implementation>
+    <details>Integrate Expo LocalAuthentication, implement biometric authentication flow, handle fallback authentication, and secure storage integration.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d43" category="security" constraint="hard" requires_approval="true">
+      <description>Biometric authentication fallback</description>
+      <options>
+        <option>PIN/password fallback</option>
+        <option>Device passcode only</option>
+        <option>Skip authentication</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Biometric authentication works on supported devices, fallback works when biometrics unavailable, authentication state persists correctly
+  </acceptance_criteria>
+</task>

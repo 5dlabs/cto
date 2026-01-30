@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="31" project="alerthub">
+  <title>Create Next.js web console project</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Initialize Next.js 15 project with App Router, shadcn/ui, TailwindCSS, and Effect setup
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup Next.js with App Router, install shadcn/ui components, configure TailwindCSS 4, setup Effect 3.x with TypeScript, create basic project structure.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d31" category="architecture" constraint="open" requires_approval="false">
+      <description>State management strategy for UI state</description>
+      <options>
+        <option>Zustand for UI state</option>
+        <option>React Context</option>
+        <option>Effect Layer state</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Next.js app builds and runs, shadcn/ui components work, TailwindCSS styles apply, Effect imports function correctly
+  </acceptance_criteria>
+</task>

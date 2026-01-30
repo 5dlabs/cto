@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="13" project="alerthub">
+  <title>Create Node.js integration service skeleton</title>
+  <agent name="nova" stack="Bun/Elysia" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Initialize Bun project with Elysia framework and Effect TypeScript setup
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup package.json with Bun runtime, Elysia 1.x, Effect 3.x dependencies. Create project structure with routes, services, and Effect layer patterns.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d13" category="architecture" constraint="open" requires_approval="false">
+      <description>Effect service organization pattern</description>
+      <options>
+        <option>Service per channel</option>
+        <option>Unified delivery service</option>
+        <option>Plugin-based architecture</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Service runs with Bun, Elysia server responds, Effect imports work correctly, Docker image builds
+  </acceptance_criteria>
+</task>

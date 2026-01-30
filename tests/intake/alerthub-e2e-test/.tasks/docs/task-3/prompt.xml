@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="3" project="alerthub">
+  <title>Setup observability stack</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Deploy Prometheus, Grafana, and logging infrastructure for monitoring and observability
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>Deploy Prometheus Operator, Grafana with AlertHub dashboards, ELK/Loki stack for centralized logging, and Jaeger for distributed tracing.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d3" category="architecture" constraint="open" requires_approval="false">
+      <description>Logging backend selection</description>
+      <options>
+        <option>ELK Stack (Elasticsearch)</option>
+        <option>Loki + Promtail</option>
+        <option>Cloud logging</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Metrics are scraped from all services, Grafana dashboards display data, logs are centralized and searchable, traces are collected
+  </acceptance_criteria>
+</task>

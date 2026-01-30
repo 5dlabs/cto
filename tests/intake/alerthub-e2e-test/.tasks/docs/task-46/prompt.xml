@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="46" project="alerthub">
+  <title>Add global keyboard shortcuts</title>
+  <agent name="spark" stack="Electron" />
+  <priority>low</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement global keyboard shortcuts for quick access and notification management
+  </description>
+  
+  <dependencies>
+    <dependency task_id="45" />
+  </dependencies>
+  
+  <implementation>
+    <details>Register global shortcuts for show/hide window, quick notification view, mute notifications, and other common actions.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d46" category="ux-behavior" constraint="open" requires_approval="false">
+      <description>Default keyboard shortcut scheme</description>
+      <options>
+        <option>Standard app shortcuts</option>
+        <option>Slack-like shortcuts</option>
+        <option>Customizable only</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Global shortcuts work system-wide, shortcuts don&apos;t conflict with other apps, shortcuts can be customized, shortcuts work across platforms
+  </acceptance_criteria>
+</task>

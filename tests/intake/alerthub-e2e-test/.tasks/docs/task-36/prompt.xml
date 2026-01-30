@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="36" project="alerthub">
+  <title>Implement integration management interface</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create integration management page with CRUD operations and OAuth flows
+  </description>
+  
+  <dependencies>
+    <dependency task_id="35" />
+  </dependencies>
+  
+  <implementation>
+    <details>Build integration management page with create/edit forms, OAuth connection flows, test integration functionality, and integration status monitoring.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d36" category="ux-behavior" constraint="soft" requires_approval="true">
+      <description>OAuth flow user experience</description>
+      <options>
+        <option>Popup window</option>
+        <option>Redirect flow</option>
+        <option>Embedded iframe</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Integration CRUD operations work, OAuth flows complete successfully, test functionality validates integrations, status updates in real-time
+  </acceptance_criteria>
+</task>

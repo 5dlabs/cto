@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="48" project="alerthub">
+  <title>Configure production monitoring and alerting</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Setup comprehensive monitoring, alerting, and log aggregation for production
+  </description>
+  
+  <dependencies>
+    <dependency task_id="47" />
+  </dependencies>
+  
+  <implementation>
+    <details>Configure Prometheus alerting rules, setup Grafana dashboards, implement log aggregation, create SLA monitoring, and setup incident response.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d48" category="performance" constraint="soft" requires_approval="true">
+      <description>Log retention and aggregation strategy</description>
+      <options>
+        <option>7 days local, archive to object storage</option>
+        <option>30 days local storage</option>
+        <option>Real-time streaming to external service</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Monitoring captures all critical metrics, alerts fire correctly, logs are searchable and retained, SLA dashboards show accurate data
+  </acceptance_criteria>
+</task>

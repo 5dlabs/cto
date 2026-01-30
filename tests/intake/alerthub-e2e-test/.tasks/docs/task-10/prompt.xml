@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="10" project="alerthub">
+  <title>Add batch notification endpoint</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement POST /api/v1/notifications/batch for submitting up to 100 notifications at once
+  </description>
+  
+  <dependencies>
+    <dependency task_id="9" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create batch submission handler with array validation, transaction processing, partial failure handling, and bulk database operations.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d10" category="error-handling" constraint="soft" requires_approval="true">
+      <description>Partial batch failure behavior</description>
+      <options>
+        <option>All-or-nothing transaction</option>
+        <option>Process successful ones</option>
+        <option>Return detailed failure report</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Batch endpoint processes multiple notifications, handles partial failures correctly, respects 100 notification limit
+  </acceptance_criteria>
+</task>

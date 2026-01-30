@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="1" project="alerthub">
+  <title>Setup Kubernetes infrastructure and databases</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Provision all required databases and infrastructure services including PostgreSQL, Redis/Valkey, Kafka, MongoDB, RabbitMQ, and SeaweedFS using CRDs
+  </description>
+  
+  <dependencies>
+    
+  </dependencies>
+  
+  <implementation>
+    <details>Deploy CloudNative-PG PostgreSQL cluster, Valkey Redis, Strimzi Kafka, Percona MongoDB, RabbitMQ cluster, and SeaweedFS for object storage. Configure namespaces, network policies, and resource quotas.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d1" category="architecture" constraint="open" requires_approval="true">
+      <description>Database sizing and resource allocation strategy</description>
+      <options>
+        <option>Conservative sizing with HPA</option>
+        <option>Over-provision for performance</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    All CRDs deploy successfully, databases are reachable from test pods, health checks pass, persistent storage is provisioned
+  </acceptance_criteria>
+</task>

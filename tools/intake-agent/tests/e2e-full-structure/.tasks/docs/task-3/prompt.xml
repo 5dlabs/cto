@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="3" project="alert-management">
+  <title>Admin Dashboard Frontend</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Build React-based admin dashboard for managing alerts, escalation policies, on-call schedules, and monitoring system health
+  </description>
+  
+  <dependencies>
+    <dependency task_id="2" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Set up Next.js project with TypeScript
+2. Create alert dashboard with filtering and search
+3. Build escalation policy management interface
+4. Implement on-call schedule calendar view
+5. Add alert acknowledgment/resolution UI
+6. Create notification channel configuration
+7. Build system health and metrics dashboard
+8. Implement real-time updates via WebSocket/SSE</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d6" category="ux-behavior" constraint="open" requires_approval="false">
+      <description>Real-time update mechanism for dashboard</description>
+      <options>
+        <option>WebSocket connection</option>
+        <option>Server-Sent Events</option>
+        <option>polling</option>
+      </options>
+    </decision>
+    <decision id="d7" category="ux-behavior" constraint="soft" requires_approval="true">
+      <description>Alert acknowledgment workflow</description>
+      <options>
+        <option>one-click acknowledge</option>
+        <option>require comment/reason</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Verify all CRUD operations work for escalation policies and schedules. Confirm alert dashboard displays real-time updates. Test notification channel configuration saves and applies correctly. Validate user can acknowledge and resolve alerts through UI.
+  </acceptance_criteria>
+</task>

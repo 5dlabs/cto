@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="25" project="alerthub">
+  <title>Implement TenantService CRUD operations</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create tenant management service with create, read, update, and list operations
+  </description>
+  
+  <dependencies>
+    <dependency task_id="24" />
+  </dependencies>
+  
+  <implementation>
+    <details>Implement TenantService gRPC methods with proper validation, database operations, and error handling. Include tenant settings management.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d25" category="data-model" constraint="soft" requires_approval="true">
+      <description>Tenant settings structure</description>
+      <options>
+        <option>Fixed schema with typed fields</option>
+        <option>JSON blob for flexibility</option>
+        <option>Key-value pairs</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    All tenant CRUD operations work via gRPC and REST, validation rejects invalid data, proper error responses returned
+  </acceptance_criteria>
+</task>

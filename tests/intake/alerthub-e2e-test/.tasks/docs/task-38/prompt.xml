@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="38" project="alerthub">
+  <title>Create analytics dashboard with charts</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Build analytics page with delivery metrics, performance charts, and reporting features
+  </description>
+  
+  <dependencies>
+    <dependency task_id="37" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create analytics dashboard using recharts for visualization, time range selection, metric comparison, and export functionality.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d38" category="ux-behavior" constraint="open" requires_approval="false">
+      <description>Chart interaction capabilities</description>
+      <options>
+        <option>Static charts with tooltips</option>
+        <option>Interactive zoom and pan</option>
+        <option>Drill-down capabilities</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Charts display metrics correctly, time range filtering works, chart interactions are responsive, export functionality generates reports
+  </acceptance_criteria>
+</task>

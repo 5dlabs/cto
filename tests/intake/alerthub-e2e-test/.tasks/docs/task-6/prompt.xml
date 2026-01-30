@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="6" project="alerthub">
+  <title>Setup PostgreSQL connection and migrations</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Configure sqlx database connection pool and create initial database migrations
+  </description>
+  
+  <dependencies>
+    <dependency task_id="5" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup sqlx connection pool with PostgreSQL, create migrations for notifications table, implement database configuration from environment variables.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d6" category="data-model" constraint="open" requires_approval="false">
+      <description>Database migration strategy</description>
+      <options>
+        <option>sqlx migrations</option>
+        <option>Custom migration tool</option>
+        <option>Diesel migrations</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Database connection established, migrations run successfully, connection pool handles concurrent requests
+  </acceptance_criteria>
+</task>

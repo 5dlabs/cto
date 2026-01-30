@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="18" project="alerthub">
+  <title>Create email integration service</title>
+  <agent name="nova" stack="Bun/Elysia" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement EmailService using Effect for SMTP delivery with template support
+  </description>
+  
+  <dependencies>
+    <dependency task_id="17" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create EmailService with Effect, integrate SMTP client, implement template rendering with Effect error handling, support SendGrid and AWS SES.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d18" category="architecture" constraint="open" requires_approval="false">
+      <description>Email template engine choice</description>
+      <options>
+        <option>Handlebars templates</option>
+        <option>React email components</option>
+        <option>Simple string replacement</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Emails deliver successfully via SMTP, templates render correctly, Effect error handling works for delivery failures
+  </acceptance_criteria>
+</task>

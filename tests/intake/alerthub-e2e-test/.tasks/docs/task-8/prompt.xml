@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="8" project="alerthub">
+  <title>Setup Redis integration for caching and rate limiting</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Integrate Redis client for rate limiting, deduplication cache, and session management
+  </description>
+  
+  <dependencies>
+    <dependency task_id="7" />
+  </dependencies>
+  
+  <implementation>
+    <details>Add redis crate, implement connection pool, create rate limiting middleware using sliding window, implement notification deduplication with TTL.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d8" category="performance" constraint="open" requires_approval="false">
+      <description>Rate limiting algorithm choice</description>
+      <options>
+        <option>Token bucket</option>
+        <option>Sliding window</option>
+        <option>Fixed window</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Redis connection established, rate limiting works correctly, deduplication prevents duplicate notifications within TTL window
+  </acceptance_criteria>
+</task>

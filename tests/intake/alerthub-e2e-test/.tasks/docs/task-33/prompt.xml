@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="33" project="alerthub">
+  <title>Create dashboard with notification overview</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Build main dashboard page with notification metrics, recent activity, and status overview
+  </description>
+  
+  <dependencies>
+    <dependency task_id="32" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create dashboard page with notification counters, recent notification feed, delivery status charts, and quick actions using shadcn/ui components.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d33" category="ux-behavior" constraint="soft" requires_approval="true">
+      <description>Dashboard real-time update frequency</description>
+      <options>
+        <option>WebSocket real-time</option>
+        <option>Polling every 30 seconds</option>
+        <option>Manual refresh</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Dashboard loads and displays metrics correctly, recent notifications update in real-time, charts render properly, responsive design works
+  </acceptance_criteria>
+</task>
