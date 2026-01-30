@@ -1,0 +1,339 @@
+{
+  "meta": {
+    "generatedAt": "2026-01-30T06:51:59.671Z",
+    "prd": "notification-service",
+    "taskCount": 4,
+    "subtaskCount": 12
+  },
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Infrastructure Setup (Bolt - Kubernetes)",
+      "description": "Set up PostgreSQL database, Redis cache/queue, and Kubernetes infrastructure for the notification service with horizontal scaling capabilities",
+      "status": "pending",
+      "dependencies": [],
+      "priority": "high",
+      "details": "1. Deploy PostgreSQL cluster with replication\n2. Set up Redis cluster for queuing and rate limiting\n3. Configure Kubernetes namespaces and resource quotas\n4. Set up persistent volumes for data storage\n5. Configure network policies and service discovery\n6. Set up monitoring and logging infrastructure",
+      "testStrategy": "PostgreSQL and Redis clusters are running and accessible. Database connections can be established. Redis queues can accept and process messages. Kubernetes pods can scale horizontally.",
+      "decisionPoints": [
+        {
+          "id": "d1",
+          "category": "architecture",
+          "description": "PostgreSQL deployment strategy - single instance vs cluster",
+          "options": [
+            "Single instance with backup",
+            "Multi-node cluster with replication"
+          ],
+          "requiresApproval": false,
+          "constraintType": "soft"
+        },
+        {
+          "id": "d2",
+          "category": "performance",
+          "description": "Redis cluster configuration for high availability",
+          "options": [
+            "Redis Sentinel setup",
+            "Redis Cluster mode"
+          ],
+          "requiresApproval": false,
+          "constraintType": "open"
+        }
+      ],
+      "subtasks": []
+    },
+    {
+      "id": 2,
+      "title": "Core Notification API (Grizz - Go/gRPC)",
+      "description": "Build the main notification service with message queuing, rate limiting, user preferences, and delivery status tracking",
+      "status": "pending",
+      "dependencies": [
+        1
+      ],
+      "priority": "high",
+      "details": "1. Create database schema for users, preferences, notifications, delivery_status\n2. Implement gRPC service definitions for notification operations\n3. Build message queue producer for reliable delivery\n4. Implement rate limiting logic using Redis\n5. Create user preference management endpoints\n6. Build delivery status tracking with webhook support\n7. Implement retry logic for failed deliveries",
+      "testStrategy": "gRPC endpoints accept notification requests and return success responses. Messages are queued in Redis. Rate limiting prevents excessive requests. User preferences can be set and retrieved. Delivery status is tracked and webhooks fire correctly.",
+      "decisionPoints": [
+        {
+          "id": "d3",
+          "category": "data-model",
+          "description": "User preference storage structure",
+          "options": [
+            "Separate table per channel",
+            "JSON column with all preferences"
+          ],
+          "requiresApproval": false,
+          "constraintType": "open"
+        },
+        {
+          "id": "d4",
+          "category": "error-handling",
+          "description": "Retry strategy for failed deliveries",
+          "options": [
+            "Exponential backoff with max attempts",
+            "Linear retry with dead letter queue"
+          ],
+          "requiresApproval": false,
+          "constraintType": "soft"
+        },
+        {
+          "id": "d5",
+          "category": "api-design",
+          "description": "Rate limiting scope and thresholds",
+          "options": [
+            "Per-user and global limits",
+            "Channel-specific rate limits"
+          ],
+          "requiresApproval": true,
+          "constraintType": "escalation"
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Database Schema and Core Data Models",
+          "description": "Design and implement the database schema for users, preferences, notifications, and delivery_status tables with proper indexes and relationships",
+          "dependencies": [],
+          "details": "Create SQL migration files for users table (id, email, created_at), preferences table (user_id, channel, enabled, settings), notifications table (id, user_id, type, content, created_at, scheduled_for), and delivery_status table (notification_id, channel, status, attempts, last_attempt, webhook_url). Include proper foreign key constraints, indexes for performance, and seed data for testing.",
+          "status": "pending",
+          "testStrategy": "Unit tests for model validation, integration tests for database operations, and performance tests for queries with large datasets",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 2,
+          "title": "gRPC Service Definitions and Message Queue Producer",
+          "description": "Implement gRPC service definitions for notification operations and build Redis-based message queue producer for reliable delivery",
+          "dependencies": [],
+          "details": "Define protobuf files for NotificationService with methods like SendNotification, GetNotificationStatus, UpdatePreferences. Implement gRPC server handlers that validate requests, store notifications in database, and queue messages to Redis. Include proper error handling, request validation, and structured logging. Set up Redis connection pool and implement queue operations with proper serialization.",
+          "status": "pending",
+          "testStrategy": "gRPC client tests for all endpoints, Redis queue integration tests, and load testing for concurrent requests",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 3,
+          "title": "Rate Limiting and User Preference Management",
+          "description": "Implement Redis-based rate limiting logic and create user preference management endpoints with validation",
+          "dependencies": [],
+          "details": "Build rate limiting middleware using Redis with sliding window algorithm supporting per-user and global limits. Implement CRUD operations for user preferences with validation rules for notification channels (email, SMS, push), frequency settings, and quiet hours. Include preference inheritance and default handling. Add metrics collection for rate limiting events.",
+          "status": "pending",
+          "testStrategy": "Rate limiting tests with concurrent requests, preference validation tests, and edge case testing for limit boundaries",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 4,
+          "title": "Delivery Tracking, Webhooks, and Retry Logic",
+          "description": "Build delivery status tracking system with webhook support and implement retry logic for failed deliveries",
+          "dependencies": [
+            1,
+            2
+          ],
+          "details": "Implement delivery status updates in database, webhook firing mechanism with configurable endpoints, and exponential backoff retry logic. Create background workers for processing queued messages, updating delivery status, and handling failures. Include webhook payload signing, timeout handling, and dead letter queue for permanently failed messages. Add monitoring and alerting for delivery metrics.",
+          "status": "pending",
+          "testStrategy": "End-to-end delivery tests, webhook integration tests, retry logic validation, and failure scenario testing",
+          "subagentType": "implementer",
+          "parallelizable": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Delivery Workers & Template Engine (Rex - Rust/Axum)",
+      "description": "Build scalable workers for push, email, and SMS delivery with template processing and variable substitution",
+      "status": "pending",
+      "dependencies": [
+        1,
+        2
+      ],
+      "priority": "high",
+      "details": "1. Create worker processes that consume from Redis queues\n2. Implement push notification delivery via FCM/APNS\n3. Build email delivery integration with SMTP/SendGrid\n4. Implement SMS delivery via Twilio/AWS SNS\n5. Create template engine with variable substitution\n6. Handle delivery failures and update status in database\n7. Implement worker scaling based on queue depth",
+      "testStrategy": "Workers successfully consume messages from queues. Push notifications are delivered to test devices. Emails are sent and received. SMS messages are delivered. Templates render correctly with variables. Failed deliveries are retried and status updated.",
+      "decisionPoints": [
+        {
+          "id": "d6",
+          "category": "architecture",
+          "description": "Worker deployment strategy",
+          "options": [
+            "Single worker handling all channels",
+            "Separate workers per delivery channel"
+          ],
+          "requiresApproval": false,
+          "constraintType": "soft"
+        },
+        {
+          "id": "d7",
+          "category": "performance",
+          "description": "Template engine choice and caching strategy",
+          "options": [
+            "Handlebars with Redis cache",
+            "Custom engine with in-memory cache"
+          ],
+          "requiresApproval": false,
+          "constraintType": "open"
+        },
+        {
+          "id": "d8",
+          "category": "error-handling",
+          "description": "Third-party service failure handling",
+          "options": [
+            "Circuit breaker pattern",
+            "Retry with exponential backoff"
+          ],
+          "requiresApproval": false,
+          "constraintType": "soft"
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Implement Core Worker Infrastructure & Queue Management",
+          "description": "Create the foundational worker processes that consume from Redis queues, implement worker scaling based on queue depth, and establish the core message processing pipeline with failure handling and status updates.",
+          "dependencies": [],
+          "details": "Build the main worker struct in Rust using Axum framework. Implement Redis queue consumer logic with connection pooling. Create worker scaling mechanism that monitors queue depth and spawns/terminates workers accordingly. Implement message acknowledgment and failure retry logic. Create database models and functions for updating delivery status. Set up logging and monitoring for worker processes.",
+          "status": "pending",
+          "testStrategy": "Unit tests for worker lifecycle, queue consumption, and scaling logic. Integration tests with Redis to verify message processing flow.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 2,
+          "title": "Build Template Engine with Variable Substitution",
+          "description": "Create a flexible template engine that supports variable substitution for push notifications, emails, and SMS messages with proper escaping and validation.",
+          "dependencies": [],
+          "details": "Implement a template parser that can handle variable placeholders (e.g., {{user_name}}, {{order_id}}). Support different template types for push, email (HTML/text), and SMS formats. Add template validation to ensure required variables are present. Implement proper escaping for different message formats. Create template storage and retrieval mechanisms. Add support for conditional logic and basic formatting functions.",
+          "status": "pending",
+          "testStrategy": "Unit tests for template parsing, variable substitution, and validation. Test with various template formats and edge cases.",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 3,
+          "title": "Implement Multi-Channel Delivery Services",
+          "description": "Build the delivery services for push notifications (FCM/APNS), email (SMTP/SendGrid), and SMS (Twilio/AWS SNS) with proper error handling and retry mechanisms.",
+          "dependencies": [
+            1
+          ],
+          "details": "Create push notification service with FCM for Android and APNS for iOS. Implement email delivery service supporting both SMTP and SendGrid APIs with fallback mechanisms. Build SMS delivery service using Twilio and AWS SNS with provider switching. Add comprehensive error handling for each delivery channel including network timeouts, authentication failures, and rate limiting. Implement exponential backoff retry strategies. Create delivery status tracking and callback handling.",
+          "status": "pending",
+          "testStrategy": "Integration tests with actual delivery providers in test mode. Mock tests for error scenarios and retry logic. End-to-end delivery tests.",
+          "subagentType": "implementer",
+          "parallelizable": false
+        },
+        {
+          "id": 4,
+          "title": "Code Review and Integration Testing",
+          "description": "Conduct comprehensive code review of all delivery worker components, template engine, and integration testing to ensure system reliability and performance.",
+          "dependencies": [
+            1,
+            2,
+            3
+          ],
+          "details": "Review code quality, error handling patterns, and Rust best practices across all worker components. Validate template engine security and performance. Test integration between workers, template engine, and delivery services. Verify worker scaling behavior under load. Conduct end-to-end testing of the complete delivery pipeline from queue consumption to final delivery status updates. Review logging, monitoring, and observability implementation.",
+          "status": "pending",
+          "testStrategy": "Full integration test suite covering all delivery channels. Load testing for worker scaling. Security review of template processing. Performance benchmarking.",
+          "subagentType": "reviewer",
+          "parallelizable": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Admin Dashboard & Client API (Blaze - React/Next.js)",
+      "description": "Build admin dashboard for monitoring notifications and REST API endpoints for client applications to send notifications",
+      "status": "pending",
+      "dependencies": [
+        2,
+        3
+      ],
+      "priority": "medium",
+      "details": "1. Create REST API wrapper around gRPC service\n2. Build authentication and authorization middleware\n3. Implement admin dashboard with notification metrics\n4. Create delivery status monitoring and alerting\n5. Build user preference management UI\n6. Implement template management interface\n7. Add rate limiting visualization and controls",
+      "testStrategy": "REST API endpoints are accessible and return proper responses. Admin can log in and view notification statistics. Delivery status is displayed in real-time. User preferences can be managed through the UI. Templates can be created and edited. Rate limiting status is visible.",
+      "decisionPoints": [
+        {
+          "id": "d9",
+          "category": "security",
+          "description": "Authentication mechanism for admin dashboard",
+          "options": [
+            "JWT with refresh tokens",
+            "Session-based authentication"
+          ],
+          "requiresApproval": false,
+          "constraintType": "open"
+        },
+        {
+          "id": "d10",
+          "category": "ux-behavior",
+          "description": "Real-time updates implementation",
+          "options": [
+            "WebSocket connections",
+            "Server-sent events"
+          ],
+          "requiresApproval": false,
+          "constraintType": "open"
+        },
+        {
+          "id": "d11",
+          "category": "api-design",
+          "description": "Client API authentication method",
+          "options": [
+            "API keys with rate limiting",
+            "OAuth 2.0 client credentials"
+          ],
+          "requiresApproval": true,
+          "constraintType": "escalation"
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1,
+          "title": "Build REST API wrapper and authentication middleware",
+          "description": "Create REST API endpoints that wrap the gRPC notification service and implement authentication/authorization middleware for secure access",
+          "dependencies": [],
+          "details": "Implement REST API controllers that interface with the existing gRPC notification service. Build JWT-based authentication middleware and role-based authorization system. Create endpoints for sending notifications, retrieving delivery status, and managing user preferences. Include proper error handling, request validation, and API documentation.",
+          "status": "pending",
+          "testStrategy": "Unit tests for API endpoints, authentication middleware tests, integration tests with gRPC service",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 2,
+          "title": "Implement admin dashboard with metrics and monitoring",
+          "description": "Build React/Next.js admin dashboard with notification metrics, delivery status monitoring, and real-time alerting capabilities",
+          "dependencies": [],
+          "details": "Create responsive admin dashboard using React/Next.js with components for notification statistics, delivery status visualization, real-time monitoring with WebSocket connections, and alerting system. Implement charts and graphs for metrics display, notification history views, and system health monitoring.",
+          "status": "pending",
+          "testStrategy": "Component tests for dashboard UI, integration tests for real-time updates, accessibility testing",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 3,
+          "title": "Build user preference and template management interfaces",
+          "description": "Create UI components for managing user notification preferences, template creation/editing, and rate limiting controls",
+          "dependencies": [],
+          "details": "Develop React components for user preference management (notification types, delivery channels, schedules), template management interface with WYSIWYG editor for creating/editing notification templates, and rate limiting visualization with controls for administrators. Include form validation, preview functionality, and bulk operations.",
+          "status": "pending",
+          "testStrategy": "Component unit tests, form validation tests, template preview functionality tests",
+          "subagentType": "implementer",
+          "parallelizable": true
+        },
+        {
+          "id": 4,
+          "title": "Review and test complete admin dashboard system",
+          "description": "Conduct comprehensive code review and testing of the entire admin dashboard and API system to ensure quality, security, and performance standards",
+          "dependencies": [
+            1,
+            2,
+            3
+          ],
+          "details": "Perform thorough code review of all implemented components, API endpoints, and authentication systems. Execute end-to-end testing scenarios covering admin login, notification sending, metrics viewing, user preference management, template operations, and rate limiting controls. Verify security measures, performance optimization, and proper error handling across the entire system.",
+          "status": "pending",
+          "testStrategy": "End-to-end tests for complete user workflows, security penetration testing, performance load testing, code quality review",
+          "subagentType": "reviewer",
+          "parallelizable": false
+        }
+      ]
+    }
+  ]
+}
