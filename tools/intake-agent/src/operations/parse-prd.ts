@@ -1,5 +1,8 @@
 /**
  * Parse PRD operation - generates tasks from a Product Requirements Document.
+ * 
+ * Uses minimal prompts based on the "Ralph Wiggum technique" - simpler prompts
+ * (~40 lines) often outperform verbose prompts (~1,500 words).
  */
 
 import { query, type Options, type SDKResultMessage, type SDKAssistantMessage } from '@anthropic-ai/claude-code';
@@ -11,7 +14,6 @@ import type {
   TokenUsage,
   GeneratedTask,
 } from '../types';
-import { renderTemplate, PARSE_PRD_SYSTEM, PARSE_PRD_USER } from '../prompts/templates';
 import { getClaudeCliOrThrow } from '../cli-finder';
 
 /**
@@ -25,96 +27,96 @@ const MAX_RETRIES = 3;
 const JSON_PREFILL = '{"tasks":[';
 
 /**
- * Extract JSON continuation from response, handling various edge cases.
+ * Extract JSON from response, handling markdown code blocks and various formats.
  */
-function extractJsonContinuation(text: string): string {
+function extractJson(text: string): string {
   let content = text.trim();
+
+  // Handle markdown code blocks (```json ... ``` or ``` ... ```)
+  const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+  if (jsonBlockMatch?.[1]) {
+    content = jsonBlockMatch[1].trim();
+  } else {
+    const codeBlockMatch = content.match(/```\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch?.[1] && (codeBlockMatch[1].startsWith('{') || codeBlockMatch[1].startsWith('['))) {
+      content = codeBlockMatch[1].trim();
+    }
+  }
 
   // Strip echoed prefill if present
   if (content.startsWith(JSON_PREFILL)) {
     content = content.slice(JSON_PREFILL.length).trim();
+    // Need to wrap it back
+    content = JSON_PREFILL + content;
   }
 
-  // Handle markdown code blocks
-  const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-  if (jsonBlockMatch?.[1]) {
-    return jsonBlockMatch[1].trim();
-  }
-
-  const codeBlockMatch = content.match(/```\s*([\s\S]*?)\s*```/);
-  if (codeBlockMatch?.[1] && (codeBlockMatch[1].startsWith('{') || codeBlockMatch[1].startsWith('['))) {
-    return codeBlockMatch[1].trim();
-  }
-
-  // If starts with [, it's an array - return as-is
-  if (content.startsWith('[')) {
+  // If it's already a valid JSON object with tasks, return as-is
+  if (content.startsWith('{"tasks"')) {
     return content;
   }
 
-  // Look for {"id": to find start of valid task JSON
-  const idMatch = content.indexOf('{"id":');
-  if (idMatch > 0) {
-    return content.slice(idMatch);
-  } else if (idMatch === 0) {
-    return content;
-  }
-
-  // Check if content starts with { but has wrong structure
+  // If starts with {" but not tasks, look for {"tasks" or {"id"
   if (content.startsWith('{')) {
-    const afterBrace = content.slice(1).trim();
-    if (afterBrace.startsWith('"id"')) {
+    // Check if it's the full object
+    if (content.includes('"tasks"')) {
       return content;
     }
-    // Look for {"id": in the content
-    const nestedIdMatch = content.indexOf('{"id":');
-    if (nestedIdMatch > 0) {
-      return content.slice(nestedIdMatch);
+    // Check if it starts with task objects (continuation format)
+    const afterBrace = content.slice(1).trim();
+    if (afterBrace.startsWith('"id"')) {
+      return JSON_PREFILL + content;
     }
   }
 
-  // Fallback: find first {
-  const firstBrace = content.indexOf('{');
-  if (firstBrace >= 0) {
-    return content.slice(firstBrace);
+  // If starts with [, it's an array - wrap it
+  if (content.startsWith('[')) {
+    return '{"tasks":' + content + '}';
+  }
+
+  // Look for {"id": to find start of task array content
+  const idMatch = content.indexOf('{"id":');
+  if (idMatch >= 0) {
+    return JSON_PREFILL + content.slice(idMatch);
   }
 
   return content;
 }
 
 /**
- * Validate that extracted JSON is valid task content.
+ * Validate and parse JSON response into tasks.
  */
-function validateJsonContinuation(content: string): { valid: boolean; error?: string } {
+function parseTasksJson(content: string): { success: true; tasks: GeneratedTask[] } | { success: false; error: string } {
   const trimmed = content.trim();
 
   if (!trimmed) {
-    return { valid: false, error: 'AI returned empty response - no task JSON generated' };
+    return { success: false, error: 'AI returned empty response - no task JSON generated' };
   }
 
-  const firstChar = trimmed[0];
-
-  if (firstChar === '{') {
-    const afterBrace = trimmed.slice(1).trim();
-    if (!afterBrace.startsWith('"id"')) {
-      return {
-        valid: false,
-        error: `AI response does not contain valid task objects. Expected 'id' as first field. Got: ${trimmed.slice(0, 200)}...`,
-      };
+  // Try to parse as JSON
+  try {
+    const parsed = JSON.parse(trimmed);
+    
+    // Check if it has tasks array
+    if (parsed.tasks && Array.isArray(parsed.tasks)) {
+      return { success: true, tasks: parsed.tasks };
     }
-    return { valid: true };
-  }
-
-  if (firstChar === ']') {
-    if (trimmed !== ']}') {
-      return { valid: false, error: `Incomplete JSON structure. Expected ']}', got: ${trimmed.slice(0, 50)}...` };
+    
+    // If it's an array directly, wrap it
+    if (Array.isArray(parsed)) {
+      return { success: true, tasks: parsed };
     }
-    return { valid: true };
-  }
 
-  return {
-    valid: false,
-    error: `AI returned prose instead of JSON. First 200 chars: ${trimmed.slice(0, 200)}...`,
-  };
+    return { 
+      success: false, 
+      error: `Parsed JSON does not contain tasks array. Got keys: ${Object.keys(parsed).join(', ')}` 
+    };
+  } catch (e) {
+    const parseError = e instanceof Error ? e.message : 'Unknown parse error';
+    return { 
+      success: false, 
+      error: `JSON parse failed: ${parseError}. Content preview: ${trimmed.slice(0, 300)}...` 
+    };
+  }
 }
 
 /**
@@ -133,6 +135,56 @@ function extractAssistantText(message: SDKAssistantMessage): string {
 }
 
 /**
+ * Generate minimal system prompt for task generation.
+ * Based on "Ralph Wiggum technique" - simpler prompts work better.
+ */
+function getMinimalSystemPrompt(numTasks: number, nextId: number): string {
+  return `You are a task generator. Given a PRD, output development tasks as JSON.
+
+## Output Format
+Generate ${numTasks} tasks starting from ID ${nextId}. Each task:
+{
+  "id": number,
+  "title": "Action (Agent - Stack)",
+  "description": "Brief description",
+  "status": "pending",
+  "dependencies": [task_ids],
+  "priority": "high" | "medium" | "low",
+  "details": "Implementation steps as escaped string",
+  "testStrategy": "How to test"
+}
+
+## Agent Mapping
+- Infrastructure: (Bolt - Kubernetes)
+- Rust backend: (Rex - Rust/Axum)
+- Go backend: (Grizz - Go/gRPC)
+- Node.js backend: (Nova - Bun/Elysia)
+- React frontend: (Blaze - React/Next.js)
+- Mobile: (Tap - Expo)
+- Desktop: (Spark - Electron)
+
+## Rules
+1. Task 1 must be infrastructure setup
+2. Then backend services, then frontend apps
+3. Dependencies only reference lower IDs
+4. All string fields must be valid JSON (escape quotes and newlines)
+
+Output ONLY the JSON array contents, no markdown, no explanations.`;
+}
+
+/**
+ * Generate minimal user prompt for task generation.
+ */
+function getMinimalUserPrompt(prdContent: string, numTasks: number, nextId: number): string {
+  return `PRD:
+---
+${prdContent}
+---
+
+Generate ${numTasks} tasks starting from ID ${nextId}.`;
+}
+
+/**
  * Parse PRD into tasks using Claude Agent SDK.
  */
 export async function parsePrd(
@@ -140,18 +192,12 @@ export async function parsePrd(
   model: string,
   _options: GenerateOptions
 ): Promise<AgentResponse<ParsePrdData>> {
-  const context = {
-    num_tasks: payload.num_tasks ?? 10,
-    next_id: payload.next_id ?? 1,
-    research: payload.research ?? false,
-    prd_content: payload.prd_content,
-    prd_path: payload.prd_path ?? '',
-    default_task_priority: payload.default_task_priority ?? 'medium',
-    project_root: payload.project_root ?? '',
-  };
+  const numTasks = payload.num_tasks ?? 10;
+  const nextId = payload.next_id ?? 1;
+  const prdContent = payload.prd_content;
 
-  const systemPrompt = renderTemplate(PARSE_PRD_SYSTEM, context);
-  const userPrompt = renderTemplate(PARSE_PRD_USER, context);
+  const systemPrompt = getMinimalSystemPrompt(numTasks, nextId);
+  const userPrompt = getMinimalUserPrompt(prdContent, numTasks, nextId);
 
   let lastError: string | undefined;
   let totalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
@@ -203,39 +249,22 @@ export async function parsePrd(
       totalUsage.output_tokens += usage.output_tokens;
       totalUsage.total_tokens += usage.total_tokens;
 
-      // Extract and validate JSON
-      const jsonContent = extractJsonContinuation(responseText);
-      const validation = validateJsonContinuation(jsonContent);
+      // Extract JSON from response (handles code blocks, prefill, etc.)
+      const jsonContent = extractJson(responseText);
+      
+      // Parse and validate
+      const result = parseTasksJson(jsonContent);
 
-      if (!validation.valid) {
-        lastError = validation.error;
-        console.error(`Attempt ${attempt + 1}/${MAX_RETRIES} failed: ${validation.error}`);
-        continue;
-      }
-
-      // Reconstruct full JSON and parse
-      const fullJson = `${JSON_PREFILL}${jsonContent}`;
-
-      let parsed: { tasks: GeneratedTask[] };
-      try {
-        parsed = JSON.parse(fullJson);
-      } catch (e) {
-        const parseError = e instanceof Error ? e.message : 'Unknown parse error';
-        lastError = `JSON parse failed: ${parseError}. Content: ${fullJson.slice(0, 500)}...`;
-        console.error(`Attempt ${attempt + 1}/${MAX_RETRIES} failed: ${lastError}`);
-        continue;
-      }
-
-      // Validate tasks array
-      if (!Array.isArray(parsed.tasks)) {
-        lastError = 'Parsed JSON does not contain tasks array';
+      if (!result.success) {
+        lastError = result.error;
+        console.error(`Attempt ${attempt + 1}/${MAX_RETRIES} failed: ${result.error}`);
         continue;
       }
 
       // Success!
       return {
         success: true,
-        data: { tasks: parsed.tasks },
+        data: { tasks: result.tasks },
         usage: totalUsage,
         model,
         provider: 'claude-agent-sdk',
