@@ -81,7 +81,7 @@ services:
         condition: service_healthy
 
   # ===========================================================================
-  # Sidecar - Receives logs from FluentD, posts to Linear
+  # Sidecar - Receives logs from FluentD, posts to Linear (status-sync binary)
   # ===========================================================================
   sidecar:
     image: cto-linear-sidecar:local
@@ -89,16 +89,22 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # Linear session (from .env or pre-created)
+      LINEAR_SESSION_ID: ${LINEAR_SESSION_ID:-}
+      LINEAR_ISSUE_ID: ${LINEAR_ISSUE_ID:-}
+      LINEAR_TEAM_ID: ${LINEAR_TEAM_ID:-}
       LINEAR_OAUTH_TOKEN: ${LINEAR_OAUTH_TOKEN}
-      LINEAR_ISSUE_IDENTIFIER: ${LINEAR_ISSUE_IDENTIFIER}
-      RUST_LOG: info
-      # HTTP ingest mode (receives from FluentD)
-      LOG_SOURCE: http
+      LINEAR_API_URL: https://api.linear.app/graphql
+      # Workflow info
+      WORKFLOW_NAME: docker-compose-test
+      # HTTP server port (FluentD forwards here)
       HTTP_PORT: 8080
-      # CTO config for skills/tools discovery
-      CTO_SKILLS_DIR: /cto-skills
-      CTO_CONFIG_PATH: /cto-config.json
-      CTO_AGENT_NAME: rex
+      # Logging
+      RUST_LOG: info,status_sync=debug
+      # Disable file-based streaming (using FluentD ingest)
+      STATUS_FILE: /dev/null
+      LOG_FILE_PATH: /dev/null
+      CLAUDE_STREAM_FILE: /dev/null
     volumes:
       - ../../templates/skills:/cto-skills:ro
       - ../../cto-config.json:/cto-config.json:ro

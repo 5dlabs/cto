@@ -2416,6 +2416,121 @@ async fn handle_stop(State(state): State<AppState>) -> impl IntoResponse {
     (StatusCode::OK, "Agent stopped")
 }
 
+// =============================================================================
+// FluentD Ingest Endpoint
+// =============================================================================
+
+/// Ingest request body from FluentD.
+/// Supports both raw log lines and structured JSON.
+#[derive(Debug, Deserialize)]
+struct IngestRequest {
+    /// Raw log line (if not structured)
+    #[serde(default)]
+    log: Option<String>,
+    /// Structured event type
+    #[serde(rename = "type", default)]
+    event_type: Option<String>,
+    /// Container/CLI name from FluentD labels
+    #[serde(default)]
+    cli: Option<String>,
+    /// Agent name from FluentD labels
+    #[serde(default)]
+    agent: Option<String>,
+    /// Catch-all for other fields (full event data)
+    #[serde(flatten)]
+    extra: serde_json::Value,
+}
+
+/// Ingest endpoint - receives logs from FluentD and emits to Linear.
+///
+/// FluentD sends logs to this endpoint which are then parsed and
+/// emitted to the Linear agent dialog in real-time.
+async fn handle_ingest(
+    State(state): State<AppState>,
+    Json(payload): Json<IngestRequest>,
+) -> impl IntoResponse {
+    debug!(?payload, "Received ingest from FluentD");
+
+    let Some(ref client) = state.linear_client else {
+        return (StatusCode::OK, "No Linear client configured");
+    };
+
+    if !state.config.has_linear_session() {
+        return (StatusCode::OK, "No Linear session configured");
+    }
+
+    let session_id = &state.config.linear_session_id;
+
+    // Try to parse as ClaudeStreamEvent
+    let event_json = if let Some(log) = &payload.log {
+        // FluentD wraps the log line in a "log" field
+        log.clone()
+    } else {
+        // Direct JSON structure
+        serde_json::to_string(&payload.extra).unwrap_or_default()
+    };
+
+    // Attempt to parse as Claude stream event
+    match serde_json::from_str::<ClaudeStreamEvent>(&event_json) {
+        Ok(event) => {
+            // Use a static tool state for ingest (stateless per-request)
+            // In production, this should be shared state
+            let mut tool_state = ToolState::default();
+            let mut total_cost = 0.0;
+            let mut artifact_trail = ArtifactTrail::default();
+
+            if let Err(e) = process_stream_event(
+                client,
+                session_id,
+                &event,
+                &mut tool_state,
+                &mut total_cost,
+                &mut artifact_trail,
+            )
+            .await
+            {
+                warn!(error = %e, "Failed to process stream event");
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to process event");
+            }
+        }
+        Err(_) => {
+            // Not a structured Claude event - emit as raw thought
+            let msg = payload
+                .log
+                .as_ref()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| event_json.trim());
+
+            // Skip empty or boilerplate messages
+            if msg.is_empty() || msg.len() < 10 {
+                return (StatusCode::OK, "Skipped empty message");
+            }
+
+            // Emit as thought
+            if let Err(e) = client.emit_thought(session_id, msg).await {
+                warn!(error = %e, "Failed to emit thought from ingest");
+            }
+        }
+    }
+
+    (StatusCode::OK, "Ingested")
+}
+
+/// Batch ingest endpoint - receives array of logs from FluentD.
+async fn handle_ingest_batch(
+    State(state): State<AppState>,
+    Json(payloads): Json<Vec<IngestRequest>>,
+) -> impl IntoResponse {
+    debug!(count = payloads.len(), "Received batch ingest from FluentD");
+
+    for payload in payloads {
+        let _ = handle_ingest(State(state.clone()), Json(payload)).await;
+    }
+
+    (StatusCode::OK, "Batch ingested")
+}
+
 /// HTTP server task.
 async fn http_server_task(config: Arc<Config>, state: AppState) {
     let app = Router::new()
@@ -2423,6 +2538,9 @@ async fn http_server_task(config: Arc<Config>, state: AppState) {
         .route("/input", post(handle_input))
         .route("/stop", post(handle_stop))
         .route("/shutdown", post(handle_shutdown))
+        // FluentD ingest endpoints
+        .route("/ingest", post(handle_ingest))
+        .route("/ingest/batch", post(handle_ingest_batch))
         .with_state(state);
 
     let addr = format!("0.0.0.0:{}", config.http_port);
