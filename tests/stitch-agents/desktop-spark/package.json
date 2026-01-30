@@ -1,0 +1,13 @@
+{
+  "name": "stitch-test-spark",
+  "main": "src/main/index.ts",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^28.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.0.0"
+  }
+}
