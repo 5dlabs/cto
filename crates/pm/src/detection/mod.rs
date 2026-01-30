@@ -14,6 +14,8 @@
 mod language;
 mod framework;
 mod agent;
+#[cfg(test)]
+mod integration_tests;
 
 pub use agent::Agent;
 pub use framework::Framework;
