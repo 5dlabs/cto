@@ -30,10 +30,17 @@
 - [x] Connect workflow status to dashboard
 - [ ] Complete OAuth callback handlers (deferred - already scaffolded)
 
+## Active Task
+- [x] **Packaging & filesystem layout** ✅
+
 ## Phase 4 Queue (Distribution)
+- [x] Define packaging layout (`docs/packaging-layout.md`)
+- [x] Create resources directory structure
+- [x] Add paths module for binary/resource resolution
+- [x] Create build-release.sh script
+- [ ] Test binary bundling on macOS
 - [ ] Set up CI workflow for Tauri builds
 - [ ] Configure code signing (Apple/Windows)
-- [ ] Bundle kind/kubectl/helm/cloudflared
 - [ ] Create download page
 
 ## Phase 5 Queue (Polish)

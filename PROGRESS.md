@@ -55,12 +55,29 @@ Delivered:
   - Auto-refresh logs while workflow running
   - Clickable workflow list
 
-### 🔄 Phase 4 Queue
-**Distribution**
-- [ ] Set up CI workflow for Tauri builds
-- [ ] Configure code signing (Apple/Windows)
-- [ ] Bundle kind/kubectl/helm/cloudflared
-- [ ] Create download page
+### 🔄 Phase 4 In Progress (07:35 PST)
+**Distribution & Packaging**
+
+Status: In Progress
+- [x] Packaging layout documented (`docs/packaging-layout.md`)
+  - macOS/Windows/Linux paths defined
+  - Binary resolution strategy
+  - MCP configuration for IDEs
+- [x] Resources directory structure created
+  - `resources/bin/` - bundled binaries
+  - `resources/charts/` - Helm charts
+  - `resources/templates/` - workflow templates
+- [x] Paths module (`src/paths.rs`)
+  - Binary resolution (dev vs production)
+  - Chart/template path resolution
+  - Cross-platform data directories
+- [x] Build script (`scripts/build-release.sh`)
+  - Downloads kind/kubectl/helm/cloudflared
+  - Builds mcp-lite
+  - Copies resources
+- [ ] Test full binary bundling
+- [ ] CI workflow for multi-platform builds
+- [ ] Code signing
 
 ---
 

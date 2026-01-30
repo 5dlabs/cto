@@ -12,6 +12,7 @@ mod commands;
 mod db;
 mod error;
 mod keychain;
+mod paths;
 mod runtime;
 
 use tauri::Manager;
