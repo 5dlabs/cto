@@ -15,6 +15,27 @@ use crate::activities::{
     AGENT_SESSION_UPDATE_MUTATION,
 };
 
+/// GraphQL mutation to create an agent session on an issue
+const AGENT_SESSION_CREATE_ON_ISSUE_MUTATION: &str = r"
+    mutation AgentSessionCreateOnIssue($input: AgentSessionCreateOnIssueInput!) {
+        agentSessionCreateOnIssue(input: $input) {
+            success
+            agentSession {
+                id
+            }
+        }
+    }
+";
+
+/// GraphQL query to get issue ID by identifier
+const GET_ISSUE_BY_IDENTIFIER_QUERY: &str = r"
+    query GetIssueByIdentifier($id: String!) {
+        issue(id: $id) {
+            id
+        }
+    }
+";
+
 /// Linear API endpoint
 const LINEAR_API_URL: &str = "https://api.linear.app/graphql";
 
@@ -286,6 +307,109 @@ impl LinearClient {
             .execute(AGENT_SESSION_UPDATE_MUTATION, variables)
             .await?;
         Ok(response.agent_session_update.success)
+    }
+
+    // =========================================================================
+    // Session Creation Operations
+    // =========================================================================
+
+    /// Get issue ID by its identifier (e.g., "CTOPA-123")
+    #[instrument(skip(self))]
+    pub async fn get_issue_id_by_identifier(&self, identifier: &str) -> Result<String> {
+        #[derive(Serialize)]
+        struct Variables {
+            id: String,
+        }
+
+        #[derive(Deserialize)]
+        struct Issue {
+            id: String,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            issue: Issue,
+        }
+
+        let variables = Variables {
+            id: identifier.to_string(),
+        };
+
+        let response: Response = self
+            .execute(GET_ISSUE_BY_IDENTIFIER_QUERY, variables)
+            .await
+            .context("Failed to get issue by identifier")?;
+
+        Ok(response.issue.id)
+    }
+
+    /// Create an agent session on an issue.
+    ///
+    /// # Arguments
+    /// * `issue_id` - The Linear issue UUID (not the identifier like "CTOPA-123")
+    ///
+    /// # Returns
+    /// The created session ID
+    #[instrument(skip(self))]
+    pub async fn create_session_on_issue(&self, issue_id: &str) -> Result<String> {
+        #[derive(Serialize)]
+        struct Input {
+            #[serde(rename = "issueId")]
+            issue_id: String,
+        }
+
+        #[derive(Serialize)]
+        struct Variables {
+            input: Input,
+        }
+
+        #[derive(Deserialize)]
+        struct AgentSession {
+            id: String,
+        }
+
+        #[derive(Deserialize)]
+        struct SessionCreateResponse {
+            success: bool,
+            #[serde(rename = "agentSession")]
+            agent_session: Option<AgentSession>,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Response {
+            agent_session_create_on_issue: SessionCreateResponse,
+        }
+
+        let variables = Variables {
+            input: Input {
+                issue_id: issue_id.to_string(),
+            },
+        };
+
+        let response: Response = self
+            .execute(AGENT_SESSION_CREATE_ON_ISSUE_MUTATION, variables)
+            .await
+            .context("Failed to create session on issue")?;
+
+        if !response.agent_session_create_on_issue.success {
+            return Err(anyhow!("Failed to create agent session"));
+        }
+
+        response
+            .agent_session_create_on_issue
+            .agent_session
+            .map(|s| s.id)
+            .ok_or_else(|| anyhow!("Session ID not returned"))
+    }
+
+    /// Create a session on an issue by identifier (e.g., "CTOPA-123").
+    ///
+    /// Convenience method that looks up the issue ID first.
+    #[instrument(skip(self))]
+    pub async fn create_session_on_issue_by_identifier(&self, identifier: &str) -> Result<String> {
+        let issue_id = self.get_issue_id_by_identifier(identifier).await?;
+        self.create_session_on_issue(&issue_id).await
     }
 }
 
