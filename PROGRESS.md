@@ -1,103 +1,107 @@
-# CTO Lite Progress Log
+# CTO Lite Progress
 
-## Session: 2026-01-30
+## Current Status: Phase 1 Complete ✅
 
-### ✅ Phase 1 Complete (06:48 PST)
-**Tauri App Foundation**
+### Phase 1: Tauri App Foundation ✅
 
-Commits:
-- `1bf4746` - feat(cto-lite): Phase 1 - Tauri app foundation
-- `fb6a7fd` - docs: add strict file boundary rules
+**Completed:**
+- [x] Tauri 2.x project structure created
+- [x] React frontend with Vite + shadcn/ui
+- [x] Setup wizard with 6 steps
+- [x] Rust backend with Tauri commands
+- [x] TypeScript bindings for all commands
+- [x] React hooks with loading/error states
 
-Delivered:
-- Tauri 2.0 backend (Rust) - compiles ✅
-- SQLite database for local state
-- Container runtime detection (Docker/Colima/Podman)
-- Kind cluster management commands
-- Keychain integration for credentials
-- GitHub/Cloudflare OAuth flow structures
-- Tunnel management commands
-- Workflow management commands
-- React + shadcn/ui frontend scaffold
-- Setup wizard (6 steps)
-- Dashboard component
+**Backend Commands Implemented:**
+- `check_docker` - Docker/OrbStack/Colima detection
+- `check_kind` - Kind installation check
+- `get_setup_state` / `save_setup_state` - Wizard state management
+- `store_api_key` / `get_api_key` / `delete_api_key` - Keychain integration
+- `create_cluster` / `delete_cluster` / `get_cluster_status` - Kind management
+- `trigger_workflow` / `get_workflow_status` / `list_workflows` - Workflow stubs
 
-To run:
-```bash
-cd crates/cto-lite/ui && npm install
-cd ../tauri && cargo tauri dev
+**Frontend Components:**
+- `RuntimeStep` - Docker/Kind detection with installation links
+- `InstallStep` - Kind cluster creation
+- `SetupWizard` - 6-step wizard flow
+- `Dashboard` - Workflow management (basic)
+
+### Phase 2: Core Infrastructure 🔄
+
+**Next Steps:**
+- [ ] Create `cto-lite` Helm chart
+- [ ] Fork PM server to `pm-lite`
+- [ ] Bundle skills into agent images
+- [ ] Configure webhook tunnel system
+
+### Phase 3: Dashboard and MCP ⏳
+
+- [ ] Build workflow status/logs view
+- [ ] Create MCP background service
+- [ ] Integrate log streaming
+
+### Phase 4: Distribution ⏳
+
+- [ ] CI workflow for Tauri builds
+- [ ] Code signing setup
+- [ ] Binary bundling
+- [ ] CDN distribution
+
+### Phase 5: Polish ⏳
+
+- [ ] User documentation
+- [ ] Troubleshooting guide
+- [ ] Beta testing
+
+## Recent Commits
+
+```
+fb6d817 feat(cto-lite): wire frontend to Tauri backend
+0dff191 feat(cto-lite): add Tauri 2.x backend with commands
 ```
 
-### ✅ Phase 2 Complete (07:04 PST)
-**Core Infrastructure**
+## File Structure
 
-Committed: `57f7a8b`
+```
+crates/cto-lite/
+├── tauri/
+│   ├── package.json
+│   └── src-tauri/
+│       ├── Cargo.toml
+│       ├── tauri.conf.json
+│       ├── capabilities/default.json
+│       ├── icons/
+│       └── src/
+│           ├── main.rs
+│           ├── lib.rs
+│           ├── commands.rs
+│           ├── state.rs
+│           ├── keychain.rs
+│           ├── docker.rs
+│           └── kind.rs
+└── ui/
+    ├── package.json
+    ├── src/
+    │   ├── lib/tauri.ts         # Tauri command bindings
+    │   ├── hooks/use-tauri.ts   # React hooks
+    │   ├── components/
+    │   │   ├── setup/
+    │   │   │   ├── RuntimeStep.tsx
+    │   │   │   └── InstallStep.tsx
+    │   │   └── SetupWizard/
+    │   └── App.tsx
+    └── dist/                    # Built frontend
+```
 
-Delivered:
-- [x] Helm chart (`infra/charts/cto-lite/`)
-- [x] pm-lite (`crates/cto-lite/pm-lite/`)
-- [x] Workflow template (`templates/workflows/play-workflow-lite.yaml`)
+## Build Commands
 
-### ✅ Phase 3 Complete (07:15 PST)
-**MCP + Dashboard**
+```bash
+# Build UI
+cd crates/cto-lite/ui && npm run build
 
-Delivered:
-- [x] mcp-lite (`crates/cto-lite/mcp-lite/`)
-  - JSON-RPC 2.0 over stdio
-  - Tools: `cto_trigger`, `cto_status`, `cto_logs`, `cto_jobs`
-  - K8s client for workflow management
-- [x] MCP Tauri integration
-  - `start_mcp_server`, `stop_mcp_server`, `get_mcp_status`
-  - `get_mcp_config` for IDE setup
-- [x] Dashboard improvements
-  - MCP server status card
-  - WorkflowDetail component with log streaming
-  - Auto-refresh logs while workflow running
-  - Clickable workflow list
+# Check Rust backend
+cd crates/cto-lite/tauri/src-tauri && cargo check
 
-### 🔄 Phase 4 In Progress (07:35 PST)
-**Distribution & Packaging**
-
-Status: In Progress
-- [x] Packaging layout documented (`docs/packaging-layout.md`)
-- [x] Resources directory structure created
-- [x] Paths module (`src/paths.rs`)
-- [x] Build script (`scripts/build-release.sh`)
-- [x] Enhanced `tauri.conf.json` with native installer configs
-- [x] CI workflows (`cto-lite-release.yaml`, `cto-lite-ci.yaml`)
-- [x] Icon README with generation instructions
-- [x] Docker-based update system (`updates.rs`, `Updates.tsx`)
-- [x] Enhanced runtime detection (07:44 PST)
-  - Docker Desktop, OrbStack, Colima, Podman, Lima, Rancher Desktop
-  - macOS version check for Apple Virtualization
-  - Docker compatibility & K8s-included flags
-  - RuntimeStep UI with start buttons
-- [x] Enhanced cluster detection
-  - Multi-kubeconfig file scanning
-  - K8s version retrieval
-  - ClusterStep UI with radio selection
-- [x] Setup wizard integrated with new detection
-- [x] UI compiles and builds ✅
-- [x] Backend compiles ✅
-- [x] App launches locally ✅ (07:50 PST)
-  - Setup wizard displays
-  - Runtime detection working
-  - Database initializes
-- [ ] Create actual app icon (need design)
-- [ ] Test full release workflow
-- [ ] Configure code signing secrets
-
----
-
-## Blockers
-*None currently*
-
-## Decisions Made
-1. SQLite for local storage (not JSON files)
-2. MCP as host daemon (not in-cluster)
-3. User manages own Cloudflare account (OAuth)
-4. Fork pm/mcp rather than conditionals
-5. Reuse controller as-is (Linear is optional)
-
----
-*Auto-updated by Ralph loop*
+# Run development (once both are ready)
+cd crates/cto-lite/tauri && npm run tauri dev
+```
