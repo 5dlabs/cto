@@ -4,12 +4,11 @@
 # =============================================================================
 #
 # This script mirrors the controller's generated container script for Claude.
-# It sets up MCP tools, runs diagnostics, and executes the CLI with proper
-# output streaming for the sidecar to parse.
+# It sets up MCP tools and executes the CLI with proper output streaming.
 #
 # Environment:
 #   MCP_CLIENT_CONFIG  - Path to client-config.json for tool filtering
-#   TOOLS_URL          - URL of the CTO tools server (default: http://tools.fra.5dlabs.ai/mcp)
+#   TOOLS_URL          - URL of the CTO tools server
 #
 # =============================================================================
 
@@ -22,6 +21,7 @@ WORKSPACE="${CLI_WORK_DIR:-/workspace}"
 echo "=== Claude Container Script ===" >&2
 echo "  Workspace: ${WORKSPACE}" >&2
 echo "  Tools URL: ${TOOLS_URL}" >&2
+echo "  Client Config: ${MCP_CLIENT_CONFIG:-not set}" >&2
 
 # -----------------------------------------------------------------------------
 # 1. Configure MCP Server (tool filtering via client-config.json)
@@ -29,41 +29,22 @@ echo "  Tools URL: ${TOOLS_URL}" >&2
 echo "" >&2
 echo "--- Configuring MCP Server ---" >&2
 
+# Remove existing server if present (in case of re-run)
+claude mcp remove cto-tools >&2 2>&1 || true
+
 # The tools binary reads MCP_CLIENT_CONFIG for tool filtering
 claude mcp add cto-tools -- tools "${TOOLS_URL}" "${WORKSPACE}" >&2 2>&1
 echo "✓ MCP server configured" >&2
 
 # -----------------------------------------------------------------------------
-# 2. Run Diagnostics (claude doctor)
+# 2. Verify MCP Server Connection
 # -----------------------------------------------------------------------------
 echo "" >&2
-echo "--- Running Diagnostics ---" >&2
-
-claude doctor > "${WORKSPACE}/claude-doctor.txt" 2>&1 || true
-cat "${WORKSPACE}/claude-doctor.txt" >&2
+echo "--- Verifying MCP Server ---" >&2
+claude mcp list >&2 2>&1 || true
 
 # -----------------------------------------------------------------------------
-# 3. Verify MCP Tool Filtering
-# -----------------------------------------------------------------------------
-echo "" >&2
-echo "--- Verifying MCP Tools ---" >&2
-
-claude mcp get tools > "${WORKSPACE}/mcp-tools.txt" 2>&1 || true
-TOOL_COUNT=$(wc -l < "${WORKSPACE}/mcp-tools.txt" 2>/dev/null | tr -d ' ' || echo "0")
-echo "MCP tools available: ${TOOL_COUNT}" >&2
-
-# Check if filtering is working (should be < 100 tools if filtered)
-if [ "${TOOL_COUNT}" -gt 100 ]; then
-    echo "⚠️  Warning: Tool filtering may not be active (${TOOL_COUNT} tools)" >&2
-else
-    echo "✓ Tool filtering active (${TOOL_COUNT} tools)" >&2
-fi
-
-# Show preview
-head -20 "${WORKSPACE}/mcp-tools.txt" >&2 || true
-
-# -----------------------------------------------------------------------------
-# 4. Execute Claude CLI
+# 3. Execute Claude CLI
 # -----------------------------------------------------------------------------
 echo "" >&2
 echo "--- Executing Claude CLI ---" >&2
@@ -87,6 +68,7 @@ Make sure to:
 - Include at least 5 test cases}"
 
 # Run Claude with streaming output for sidecar parsing
+# The init message in stream-json contains tools, skills, and mcp_servers
 (echo "n" | claude --print --output-format stream-json --verbose \
   --dangerously-skip-permissions \
   "${PROMPT}" 2>&1) | tee "${WORKSPACE}/stream.jsonl"
