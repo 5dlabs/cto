@@ -17,7 +17,7 @@ use crate::activities::{
 
 /// GraphQL mutation to create an agent session on an issue
 const AGENT_SESSION_CREATE_ON_ISSUE_MUTATION: &str = r"
-    mutation AgentSessionCreateOnIssue($input: AgentSessionCreateOnIssueInput!) {
+    mutation AgentSessionCreateOnIssue($input: AgentSessionCreateOnIssue!) {
         agentSessionCreateOnIssue(input: $input) {
             success
             agentSession {
