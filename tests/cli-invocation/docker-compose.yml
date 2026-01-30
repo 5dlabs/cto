@@ -23,6 +23,8 @@
 x-sidecar-env: &sidecar-env
   LINEAR_OAUTH_TOKEN: ${LINEAR_OAUTH_TOKEN}
   LINEAR_ISSUE_IDENTIFIER: ${LINEAR_ISSUE_IDENTIFIER}
+  LINEAR_SESSION_ID: ${LINEAR_SESSION_ID:-}
+  LINEAR_API_URL: https://api.linear.app/graphql
   RUST_LOG: info
   CTO_SKILLS_DIR: /cto-skills
   CTO_CONFIG_PATH: /cto-config.json
@@ -79,12 +81,18 @@ services:
       <<: *sidecar-env
       CLI_TYPE: claude
       STREAM_FILE: /workspace/stream.jsonl
+      CLAUDE_STREAM_FILE: /workspace/stream.jsonl
       DEBUG_JSONL_PATH: /workspace/debug.jsonl
       DOCTOR_OUTPUT: /workspace/claude-doctor.txt  # Read doctor output from file
       MCP_TOOLS_OUTPUT: /workspace/mcp-tools.txt   # Read mcp tools list from file
       CTO_SKILLS_DIR: /cto-skills
       CTO_CONFIG_PATH: /cto-config.json
       CTO_AGENT_NAME: rex  # Use rex agent's tool configuration
+      # Disable exit watch for docker-compose (can't see Claude container's processes)
+      MAIN_EXIT_WATCH_ENABLED: "false"
+      # Enable whip cracking with long interval (prevents premature shutdown)
+      WHIP_CRACK_ENABLED: "true"
+      WHIP_CRACK_INITIAL_DELAY_MS: "3600000"  # 1 hour - effectively disabled
 
   # ===========================================================================
   # Codex CLI + Sidecar

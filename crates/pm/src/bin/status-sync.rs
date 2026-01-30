@@ -319,6 +319,98 @@ impl LinearApiClient {
         })
     }
 
+    /// Create a new agent session on a Linear issue.
+    ///
+    /// This is used when running in standalone mode (e.g., docker-compose)
+    /// where no session is pre-created by the controller.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session creation fails.
+    pub async fn create_session_on_issue(
+        &self,
+        issue_identifier: &str,
+        model: &str,
+        provider: &str,
+    ) -> Result<String> {
+        #[derive(Serialize)]
+        struct Variables {
+            input: SessionCreateInput,
+        }
+
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct SessionCreateInput {
+            issue_identifier: String,
+            model: String,
+            provider: String,
+        }
+
+        #[derive(Serialize)]
+        struct Request {
+            query: &'static str,
+            variables: Variables,
+        }
+
+        const MUTATION: &str = r#"
+            mutation CreateAgentSession($input: AgentSessionCreateOnIssue!) {
+                agentSessionCreateOnIssue(input: $input) {
+                    success
+                    agentSession {
+                        id
+                    }
+                }
+            }
+        "#;
+
+        let request = Request {
+            query: MUTATION,
+            variables: Variables {
+                input: SessionCreateInput {
+                    issue_identifier: issue_identifier.to_string(),
+                    model: model.to_string(),
+                    provider: provider.to_string(),
+                },
+            },
+        };
+
+        info!(
+            issue = %issue_identifier,
+            model = %model,
+            "Creating Linear agent session"
+        );
+
+        let response = self
+            .client
+            .post(&self.api_url)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to send session creation request")?;
+
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            anyhow::bail!("Session creation failed: {} - {}", status, body);
+        }
+
+        let json: serde_json::Value =
+            serde_json::from_str(&body).context("Failed to parse session creation response")?;
+
+        if let Some(errors) = json.get("errors") {
+            anyhow::bail!("GraphQL errors: {}", errors);
+        }
+
+        let session_id = json["data"]["agentSessionCreateOnIssue"]["agentSession"]["id"]
+            .as_str()
+            .context("Missing session ID in response")?
+            .to_string();
+
+        info!(session_id = %session_id, "Created Linear agent session");
+        Ok(session_id)
+    }
+
     /// Generic activity emission helper
     async fn emit_activity(
         &self,
@@ -2589,11 +2681,6 @@ async fn main() -> Result<()> {
         "Sidecar configured"
     );
 
-    // Skip if no Linear session configured
-    if !config.has_linear_session() {
-        info!("No Linear session configured, running in minimal mode (HTTP only)");
-    }
-
     // Create Linear API client if token available
     let linear_client = config.linear_oauth_token.as_ref().and_then(|token| {
         match LinearApiClient::new(token, &config.linear_api_url) {
@@ -2607,6 +2694,46 @@ async fn main() -> Result<()> {
             }
         }
     });
+
+    // Auto-create session if issue identifier provided but no session ID
+    // This enables standalone mode (docker-compose) without pre-created sessions
+    let config = if !config.has_linear_session() {
+        if let Some(ref client) = linear_client {
+            // Check for LINEAR_ISSUE_IDENTIFIER env var
+            if let Ok(issue_id) = std::env::var("LINEAR_ISSUE_IDENTIFIER") {
+                if !issue_id.is_empty() {
+                    info!(issue = %issue_id, "No session configured, attempting to create one");
+                    match client
+                        .create_session_on_issue(&issue_id, "claude-sonnet-4", "anthropic")
+                        .await
+                    {
+                        Ok(session_id) => {
+                            info!(session_id = %session_id, "Auto-created Linear session");
+                            // Create new config with the session ID
+                            let mut new_config = (*config).clone();
+                            new_config.linear_session_id = session_id;
+                            Arc::new(new_config)
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "Failed to auto-create session, running in minimal mode");
+                            config
+                        }
+                    }
+                } else {
+                    info!("No Linear session or issue configured, running in minimal mode (HTTP only)");
+                    config
+                }
+            } else {
+                info!("No Linear session or issue configured, running in minimal mode (HTTP only)");
+                config
+            }
+        } else {
+            info!("No Linear API client, running in minimal mode (HTTP only)");
+            config
+        }
+    } else {
+        config
+    };
 
     // Initialize session with external URL and plan (if Linear API available)
     if let Some(ref client) = linear_client {
