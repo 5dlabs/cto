@@ -34,11 +34,25 @@ Your task is to review the code changes in the specified PR and provide feedback
 - Distinguish between blocking issues and nice-to-haves
 - Approve if changes are good, request changes if blocking issues exist
 
+## Completion Criteria
+
+Your review is complete when ALL items in `task/acceptance-criteria.md` are checked off:
+
+- ✅ All changed files analyzed
+- ✅ Review comments posted to GitHub PR  
+- ✅ Overall review verdict submitted (APPROVED, CHANGES_REQUESTED, or COMMENTED)
+- ✅ Security/performance concerns documented (if any)
+
+**Update `task/acceptance-criteria.md` as you complete each criterion** by changing `[ ]` to `[x]`.
+
+The system will verify your work meets the 90% completion threshold before marking the task done.
+
 ## Task Context
 
 - Task ID: {{task_id}}
 - Service: {{service}}
 - Model: {{model}}
+- Attempt: {{attempt}} of {{max_retries}}
 
 Read `task/` directory for PR details to review.
 

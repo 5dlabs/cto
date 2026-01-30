@@ -78,11 +78,25 @@ ELSE:
 - ❌ Security issues (Cipher's job)
 - ❌ Implementation correctness (workers' job)
 
+## Completion Criteria
+
+Your task is complete when ALL items in `task/acceptance-criteria.md` are checked off:
+
+- ✅ PR state retrieved successfully
+- ✅ All CI status checks verified (green)
+- ✅ Merge operation executed successfully (or eligibility confirmed)
+- ✅ Status reported back
+
+**Update `task/acceptance-criteria.md` as you complete each criterion** by changing `[ ]` to `[x]`.
+
+The system will verify your work meets the 90% completion threshold before marking the task done.
+
 ## Task Context
 
 - Task ID: {{task_id}}
 - Service: {{service}}
 - Model: {{model}}
+- Attempt: {{attempt}} of {{max_retries}}
 
 Read `task/` directory for PR details.
 

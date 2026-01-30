@@ -643,7 +643,17 @@
           "github_get_file_contents"
         ],
         "localServers": {}
-      }
+      },
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-opus-4-5-20251101",
+          "claude-sonnet-4-20250514",
+          "claude-opus-4-5-20251101"
+        ]
+      },
+      "defaultRetries": 3,
+      "acceptanceThreshold": 90
     },
     "stitch": {
       "githubApp": "5DLabs-Stitch",
@@ -672,7 +682,17 @@
           "github_get_file_contents"
         ],
         "localServers": {}
-      }
+      },
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-opus-4-5-20251101",
+          "claude-sonnet-4-20250514",
+          "claude-opus-4-5-20251101"
+        ]
+      },
+      "defaultRetries": 3,
+      "acceptanceThreshold": 90
     },
     "vex": {
       "githubApp": "5DLabs-Vex",
