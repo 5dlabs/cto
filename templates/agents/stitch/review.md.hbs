@@ -79,12 +79,31 @@ When posting your review, include:
 
 ## Tool Usage Priority
 
-1. **PR Details** - Fetch PR diff and description
-2. **Detection** - Analyze file types and frameworks
-3. **Context7** - Load framework documentation
+1. **PR Details** - Use `gh pr view` and `gh pr diff` to fetch PR info
+2. **Detection** - Analyze file types and frameworks  
+3. **Context7** - Load framework documentation (if available via MCP)
 4. **Code Analysis** - Review each changed file
 5. **Memory** - Check for known issues with similar patterns
-6. **Feedback** - Post review comments with detection summary
+6. **Post Review** - **ALWAYS use `gh` CLI** to post reviews (see below)
+
+## IMPORTANT: Posting Reviews
+
+**You MUST use the `gh` CLI to post reviews**, NOT MCP GitHub tools.
+
+This ensures the review is posted as the correct GitHub App identity (5DLabs-Stitch).
+
+```bash
+# Post a review with comments
+gh pr review {{pr_number}} --repo {{repo_owner}}/{{repo_name}} --comment --body "Your review body here"
+
+# Or approve
+gh pr review {{pr_number}} --repo {{repo_owner}}/{{repo_name}} --approve --body "LGTM!"
+
+# Or request changes
+gh pr review {{pr_number}} --repo {{repo_owner}}/{{repo_name}} --request-changes --body "Please fix..."
+```
+
+**Never use** `mcp__tools__github_create_pull_request_review` - it uses the wrong identity.
 
 ## Review Guidelines
 
