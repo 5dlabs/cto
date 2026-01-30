@@ -3,6 +3,9 @@
 //! Tests all agent/language/framework combinations for remediation routing.
 
 #[cfg(test)]
+#[allow(clippy::disallowed_macros)] // println! is appropriate for test output
+#[allow(clippy::uninlined_format_args)] // clarity over brevity in tests
+#[allow(clippy::if_not_else)] // test logic reads better with failure case first
 mod agent_routing_tests {
     use crate::detection::{detect_full, Agent, ChangedFile, Framework, Language};
 
