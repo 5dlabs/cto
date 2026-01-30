@@ -22,4 +22,6 @@ export {
   type ResearchFindings,
   type DebateDepth,
   type DomainFocus,
+  type DebateRole,
+  type RoleProviderConfig,
 } from './debate-planning';
