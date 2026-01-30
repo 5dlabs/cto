@@ -1,0 +1,73 @@
+---
+# =============================================================================
+# Remediation Button Sensor
+# =============================================================================
+# Triggers agent remediation when "Fix with <Agent>" buttons are clicked on
+# GitHub Check Runs. Supports all implementation agents.
+#
+# Button identifiers format: fix-<agent>-pr<number>-<check_run_id>
+# Examples:
+#   fix-rex-pr123-456789
+#   fix-blaze-pr123-456789
+#   fix-grizz-pr123-456789
+#
+# The button is rendered by the controller when posting check_run status
+# with failed CI and detected language mapping to an agent.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: remediation-button
+  namespace: automation
+  labels:
+    app.kubernetes.io/name: remediation-button
+    app.kubernetes.io/component: sensor
+    platform.5dlabs.io/log-collection: enabled
+spec:
+  dependencies:
+    - name: check-run-action
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # check_run events only
+          - path: body.X-GitHub-Event
+            type: string
+            value:
+              - check_run
+          # requested_action = button was clicked
+          - path: body.action
+            type: string
+            value:
+              - requested_action
+        # Button identifier must start with "fix-"
+        exprs:
+          - expr: identifier =~ "^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-"
+            fields:
+              - name: identifier
+                path: body.requested_action.identifier
+
+  template:
+    serviceAccountName: argo-events-sa
+    metadata:
+      labels:
+        platform.5dlabs.io/log-collection: enabled
+
+  triggers:
+    - template:
+        name: handle-remediation-button
+        conditions: check-run-action
+        http:
+          url: http://cto-pm.cto.svc.cluster.local:8081/webhooks/github/remediation
+          method: POST
+          headers:
+            Content-Type: application/json
+            X-Trigger-Source: check_run_button
+          payload:
+            - src:
+                dependencyName: check-run-action
+                dataKey: body
+              dest: payload
+      retryStrategy:
+        steps: 3
+        duration: 5s

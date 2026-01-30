@@ -1,6 +1,7 @@
 //! Webhook handlers for PM integration.
 
 pub mod agent_comms;
+pub mod agent_interactions;
 pub mod agent_session;
 pub mod callbacks;
 pub mod document;
@@ -14,6 +15,10 @@ pub use agent_comms::{
     broadcast_to_session, find_agents_by_issue, find_running_agents, init_global_router,
     route_message_global, send_message_to_agent, AgentMessage, AgentRouter, CachedPodInfo,
     RunningAgent, SessionCache,
+};
+pub use agent_interactions::{
+    detect_primary_language, handle_mention_webhook, handle_remediation_webhook,
+    select_agent_for_files, Agent, Language, ParsedMention, PrContext,
 };
 pub use agent_session::{
     handle_agent_session_created, handle_agent_session_prompted, AgentSessionContext,
