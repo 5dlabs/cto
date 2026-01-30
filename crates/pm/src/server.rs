@@ -196,6 +196,17 @@ pub fn build_router(state: AppState) -> Router {
             "/webhooks/github",
             post(handle_github_webhook).with_state(callback_state.clone()),
         )
+        // Agent interaction webhooks (from Argo Events sensors)
+        .route(
+            "/webhooks/github/mention",
+            post(crate::handlers::agent_interactions::handle_mention_webhook)
+                .with_state(callback_state.clone()),
+        )
+        .route(
+            "/webhooks/github/remediation",
+            post(crate::handlers::agent_interactions::handle_remediation_webhook)
+                .with_state(callback_state.clone()),
+        )
         // Callback endpoints for Argo workflows
         .route(
             "/callbacks/intake-complete",

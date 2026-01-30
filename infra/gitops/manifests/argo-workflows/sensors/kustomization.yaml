@@ -5,3 +5,5 @@ kind: Kustomization
 resources:
   - play-workflow-pr-merged-sensor.yaml
   - stitch-pr-review-sensor.yaml
+  - agent-mention-sensor.yaml
+  - remediation-button-sensor.yaml
