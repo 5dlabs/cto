@@ -1,396 +1,376 @@
-import { useState, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/core'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { useToast } from '@/hooks/use-toast'
-import { WorkflowDetail } from './WorkflowDetail'
-import {
-  Activity,
-  CheckCircle2,
-  Circle,
+import { useState, useEffect, useCallback } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  Play, 
+  Square, 
+  Trash2, 
+  RefreshCw, 
+  Loader2,
+  CheckCircle,
+  XCircle,
   Clock,
   GitBranch,
-  Play,
-  RefreshCw,
-  Server,
-  Settings,
-  XCircle,
-  Loader2,
-  Terminal,
-} from 'lucide-react'
+  Terminal
+} from "lucide-react";
+import * as tauri from "@/lib/tauri";
 
-interface WorkflowInfo {
-  name: string
-  namespace: string
-  phase: string
-  started_at: string | null
-  finished_at: string | null
-  message: string | null
-}
-
-interface ClusterStatus {
-  name: string
-  exists: boolean
-  running: boolean
-  nodes: Array<{ name: string; role: string; status: string }>
-  kubeconfig_path: string | null
-}
-
-interface TunnelStatus {
-  exists: boolean
-  running: boolean
-  tunnel_id: string | null
-  url: string | null
-}
-
-interface McpStatus {
-  running: boolean
-  pid: number | null
-  socket_path: string
-}
+interface WorkflowListItem extends tauri.WorkflowStatus {}
 
 export function Dashboard() {
-  const [workflows, setWorkflows] = useState<WorkflowInfo[]>([])
-  const [clusterStatus, setClusterStatus] = useState<ClusterStatus | null>(null)
-  const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus | null>(null)
-  const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null)
-  const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const { toast } = useToast()
+  const [workflows, setWorkflows] = useState<WorkflowListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
+  const [workflowDetail, setWorkflowDetail] = useState<tauri.WorkflowDetail | null>(null);
+  const [logs, setLogs] = useState<string>("");
+  const [showNewWorkflow, setShowNewWorkflow] = useState(false);
+  
+  // New workflow form
+  const [repoUrl, setRepoUrl] = useState("");
+  const [branch, setBranch] = useState("main");
+  const [prompt, setPrompt] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const refreshWorkflows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await tauri.listWorkflows();
+      setWorkflows(list);
+    } catch (e) {
+      console.error("Failed to list workflows:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadWorkflowDetail = useCallback(async (name: string) => {
+    try {
+      const detail = await tauri.getWorkflowStatus(name);
+      setWorkflowDetail(detail);
+    } catch (e) {
+      console.error("Failed to load workflow detail:", e);
+    }
+  }, []);
+
+  const loadLogs = useCallback(async (workflowName: string, nodeName?: string) => {
+    try {
+      const logContent = await tauri.getWorkflowLogs(workflowName, nodeName);
+      setLogs(logContent);
+    } catch (e) {
+      console.error("Failed to load logs:", e);
+      setLogs("Failed to load logs");
+    }
+  }, []);
 
   useEffect(() => {
-    loadStatus()
-    const interval = setInterval(loadStatus, 30000) // Refresh every 30s
-    return () => clearInterval(interval)
-  }, [])
+    refreshWorkflows();
+    // Poll for updates every 10 seconds
+    const interval = setInterval(refreshWorkflows, 10000);
+    return () => clearInterval(interval);
+  }, [refreshWorkflows]);
 
-  async function loadStatus() {
+  useEffect(() => {
+    if (selectedWorkflow) {
+      loadWorkflowDetail(selectedWorkflow);
+      loadLogs(selectedWorkflow);
+      // Poll selected workflow every 5 seconds
+      const interval = setInterval(() => {
+        loadWorkflowDetail(selectedWorkflow);
+        loadLogs(selectedWorkflow);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedWorkflow, loadWorkflowDetail, loadLogs]);
+
+  const handleTrigger = async () => {
+    if (!repoUrl || !prompt) return;
+    
+    setSubmitting(true);
     try {
-      const [cluster, tunnel, mcp, workflowList] = await Promise.all([
-        invoke<ClusterStatus>('get_cluster_status'),
-        invoke<TunnelStatus>('get_tunnel_status'),
-        invoke<McpStatus>('get_mcp_status').catch(() => null),
-        invoke<WorkflowInfo[]>('list_workflows').catch(() => []),
-      ])
-      setClusterStatus(cluster)
-      setTunnelStatus(tunnel)
-      setMcpStatus(mcp)
-      setWorkflows(workflowList)
-    } catch (error) {
-      console.error('Failed to load status:', error)
+      const name = await tauri.triggerWorkflow(repoUrl, prompt, branch || undefined);
+      setShowNewWorkflow(false);
+      setRepoUrl("");
+      setBranch("main");
+      setPrompt("");
+      setSelectedWorkflow(name);
+      await refreshWorkflows();
+    } catch (e) {
+      console.error("Failed to trigger workflow:", e);
     } finally {
-      setLoading(false)
+      setSubmitting(false);
     }
-  }
+  };
 
-  async function handleStartMcp() {
+  const handleStop = async (name: string) => {
     try {
-      await invoke('start_mcp_server')
-      await loadStatus()
-      toast({ title: 'MCP Server Started', description: 'IDEs can now connect to CTO Lite' })
-    } catch (error) {
-      toast({ title: 'Failed to start MCP server', description: String(error), variant: 'destructive' })
+      await tauri.stopWorkflow(name);
+      await refreshWorkflows();
+    } catch (e) {
+      console.error("Failed to stop workflow:", e);
     }
-  }
+  };
 
-  async function handleStopMcp() {
+  const handleDelete = async (name: string) => {
     try {
-      await invoke('stop_mcp_server')
-      await loadStatus()
-      toast({ title: 'MCP Server Stopped' })
-    } catch (error) {
-      toast({ title: 'Failed to stop MCP server', description: String(error), variant: 'destructive' })
+      await tauri.deleteWorkflow(name);
+      if (selectedWorkflow === name) {
+        setSelectedWorkflow(null);
+        setWorkflowDetail(null);
+        setLogs("");
+      }
+      await refreshWorkflows();
+    } catch (e) {
+      console.error("Failed to delete workflow:", e);
     }
-  }
+  };
 
-  async function handleRefresh() {
-    setRefreshing(true)
-    await loadStatus()
-    setRefreshing(false)
-    toast({ title: 'Status Refreshed' })
-  }
-
-  async function handleStartTunnel() {
-    try {
-      await invoke('start_tunnel')
-      await loadStatus()
-      toast({ title: 'Tunnel Started' })
-    } catch (error) {
-      toast({ title: 'Failed to start tunnel', description: String(error), variant: 'destructive' })
-    }
-  }
-
-  async function handleStopTunnel() {
-    try {
-      await invoke('stop_tunnel')
-      await loadStatus()
-      toast({ title: 'Tunnel Stopped' })
-    } catch (error) {
-      toast({ title: 'Failed to stop tunnel', description: String(error), variant: 'destructive' })
-    }
-  }
-
-  function getPhaseIcon(phase: string) {
-    switch (phase) {
-      case 'Succeeded':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />
-      case 'Failed':
-      case 'Error':
-        return <XCircle className="h-4 w-4 text-red-500" />
-      case 'Running':
-        return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-      case 'Pending':
-        return <Clock className="h-4 w-4 text-yellow-500" />
+  const getPhaseIcon = (phase: string) => {
+    switch (phase.toLowerCase()) {
+      case "succeeded":
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case "failed":
+      case "error":
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      case "running":
+        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+      case "pending":
+        return <Clock className="h-4 w-4 text-yellow-500" />;
       default:
-        return <Circle className="h-4 w-4 text-muted-foreground" />
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
-  }
+  };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
+  const getPhaseBadge = (phase: string) => {
+    const variant = {
+      succeeded: "default" as const,
+      failed: "destructive" as const,
+      error: "destructive" as const,
+      running: "secondary" as const,
+      pending: "outline" as const,
+    }[phase.toLowerCase()] || "outline" as const;
 
-  // Show workflow detail view
-  if (selectedWorkflow) {
-    return (
-      <div className="min-h-screen p-8">
-        <WorkflowDetail 
-          workflowName={selectedWorkflow} 
-          onBack={() => setSelectedWorkflow(null)} 
-        />
-      </div>
-    )
-  }
+    return <Badge variant={variant}>{phase}</Badge>;
+  };
 
   return (
-    <div className="min-h-screen p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold">CTO Lite Dashboard</h1>
-          <p className="text-muted-foreground">Monitor your AI development workflows</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button variant="outline" size="sm">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Button>
-        </div>
-      </div>
-
-      {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Cluster Status */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Server className="h-4 w-4" />
-              Cluster
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {clusterStatus?.running ? (
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-green-500 font-medium">Running</span>
-              </div>
-            ) : clusterStatus?.exists ? (
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-yellow-500" />
-                <span className="text-yellow-500 font-medium">Stopped</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-red-500" />
-                <span className="text-red-500 font-medium">Not Created</span>
-              </div>
-            )}
-            {clusterStatus?.nodes && clusterStatus.nodes.length > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {clusterStatus.nodes.length} node(s)
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Tunnel Status */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Tunnel
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {tunnelStatus?.running ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-green-500 font-medium">Connected</span>
-                </div>
-                {tunnelStatus.url && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    {tunnelStatus.url}
-                  </p>
-                )}
-                <Button variant="outline" size="sm" onClick={handleStopTunnel}>
-                  Stop Tunnel
-                </Button>
-              </div>
-            ) : tunnelStatus?.exists ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-yellow-500" />
-                  <span className="text-yellow-500 font-medium">Disconnected</span>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleStartTunnel}>
-                  Start Tunnel
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-muted-foreground" />
-                <span className="text-muted-foreground">Not Configured</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Workflows Count */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <GitBranch className="h-4 w-4" />
-              Workflows
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{workflows.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {workflows.filter(w => w.phase === 'Running').length} running
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* MCP Status */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Terminal className="h-4 w-4" />
-              MCP Server
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {mcpStatus?.running ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-green-500 font-medium">Running</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  PID: {mcpStatus.pid}
-                </p>
-                <Button variant="outline" size="sm" onClick={handleStopMcp}>
-                  Stop
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-muted-foreground" />
-                  <span className="text-muted-foreground font-medium">Stopped</span>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleStartMcp}>
-                  Start
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Workflows List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Recent Workflows
-          </CardTitle>
-          <CardDescription>
-            Your development workflows and their status
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {workflows.length === 0 ? (
-            <div className="text-center py-12">
-              <Play className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No workflows yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Start a workflow from your IDE using MCP tools
-              </p>
+    <div className="flex h-screen bg-background">
+      {/* Sidebar - Workflow List */}
+      <div className="w-80 border-r flex flex-col">
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Workflows</h2>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={refreshWorkflows}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button 
+                size="icon"
+                onClick={() => setShowNewWorkflow(true)}
+              >
+                <Play className="h-4 w-4" />
+              </Button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {workflows.map((workflow) => (
-                <div
-                  key={workflow.name}
-                  className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/50 cursor-pointer transition-colors"
-                  onClick={() => setSelectedWorkflow(workflow.name)}
-                >
-                  <div className="flex items-center gap-4">
-                    {getPhaseIcon(workflow.phase)}
-                    <div>
-                      <div className="font-medium">{workflow.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {workflow.started_at
-                          ? new Date(workflow.started_at).toLocaleString()
-                          : 'Not started'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        workflow.phase === 'Succeeded'
-                          ? 'bg-green-500/10 text-green-500'
-                          : workflow.phase === 'Failed' || workflow.phase === 'Error'
-                          ? 'bg-red-500/10 text-red-500'
-                          : workflow.phase === 'Running'
-                          ? 'bg-blue-500/10 text-blue-500'
-                          : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {workflow.phase}
-                    </span>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedWorkflow(workflow.name)
-                      }}
-                    >
-                      View Logs
-                    </Button>
-                  </div>
-                </div>
-              ))}
+          </div>
+        </div>
+        
+        <ScrollArea className="flex-1">
+          {workflows.length === 0 && !loading && (
+            <div className="p-4 text-center text-muted-foreground">
+              No workflows yet. Click + to create one.
             </div>
           )}
-        </CardContent>
-      </Card>
+          {workflows.map((workflow) => (
+            <div
+              key={workflow.name}
+              className={`p-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+                selectedWorkflow === workflow.name ? 'bg-muted' : ''
+              }`}
+              onClick={() => setSelectedWorkflow(workflow.name)}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  {getPhaseIcon(workflow.phase)}
+                  <span className="font-medium text-sm truncate max-w-[150px]">
+                    {workflow.name}
+                  </span>
+                </div>
+                {getPhaseBadge(workflow.phase)}
+              </div>
+              {workflow.startedAt && (
+                <div className="text-xs text-muted-foreground">
+                  {new Date(workflow.startedAt).toLocaleString()}
+                </div>
+              )}
+              {workflow.progress && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Progress: {workflow.progress}
+                </div>
+              )}
+            </div>
+          ))}
+        </ScrollArea>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {showNewWorkflow ? (
+          <div className="p-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>New Workflow</CardTitle>
+                <CardDescription>
+                  Trigger a new AI development workflow
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="repo">Repository URL</Label>
+                  <Input
+                    id="repo"
+                    placeholder="https://github.com/owner/repo"
+                    value={repoUrl}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRepoUrl(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="branch">Branch</Label>
+                  <Input
+                    id="branch"
+                    placeholder="main"
+                    value={branch}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBranch(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="prompt">Development Request</Label>
+                  <Textarea
+                    id="prompt"
+                    placeholder="Describe what you want to build..."
+                    rows={4}
+                    value={prompt}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrompt(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleTrigger}
+                    disabled={!repoUrl || !prompt || submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" />
+                        Start Workflow
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowNewWorkflow(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : selectedWorkflow && workflowDetail ? (
+          <div className="flex-1 flex flex-col overflow-hidden p-4">
+            {/* Workflow Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  {getPhaseIcon(workflowDetail.status.phase)}
+                  <h2 className="text-xl font-semibold">{workflowDetail.status.name}</h2>
+                  {getPhaseBadge(workflowDetail.status.phase)}
+                </div>
+                {workflowDetail.status.message && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {workflowDetail.status.message}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {workflowDetail.status.phase === "Running" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStop(workflowDetail.status.name)}
+                  >
+                    <Square className="h-4 w-4 mr-1" />
+                    Stop
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDelete(workflowDetail.status.name)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+
+            {/* Workflow Nodes */}
+            <div className="mb-4">
+              <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                <GitBranch className="h-4 w-4" />
+                Steps
+              </h3>
+              <div className="space-y-1">
+                {workflowDetail.nodes.map((node) => (
+                  <div
+                    key={node.id}
+                    className="flex items-center gap-2 p-2 rounded bg-muted/50 text-sm"
+                  >
+                    {getPhaseIcon(node.phase)}
+                    <span className="flex-1">{node.displayName || node.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {node.nodeType}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Logs */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                <Terminal className="h-4 w-4" />
+                Logs
+              </h3>
+              <ScrollArea className="flex-1 bg-black rounded-lg p-3">
+                <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">
+                  {logs || "No logs available"}
+                </pre>
+              </ScrollArea>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <Terminal className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Select a workflow to view details</p>
+              <p className="text-sm">or click + to create a new one</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-  )
+  );
 }

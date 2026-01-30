@@ -5,6 +5,7 @@ use crate::helm::{self, HelmRelease, HelmValues};
 use crate::keychain::{self, ApiKeyType};
 use crate::kind::{self, ClusterInfo, KindInfo};
 use crate::state::{AppState, SetupState};
+use crate::workflows::{self, WorkflowDetail, WorkflowNode, WorkflowParams, WorkflowStatus};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -122,70 +123,74 @@ pub async fn list_clusters() -> Result<Vec<String>, String> {
 // Workflow Commands
 // ============================================================================
 
-/// Workflow trigger request
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkflowTriggerRequest {
-    pub repo_url: String,
-    pub branch: Option<String>,
-    pub prompt: String,
-}
-
-/// Workflow status response
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkflowStatus {
-    pub id: String,
-    pub name: String,
-    pub status: String,
-    pub started_at: Option<String>,
-    pub finished_at: Option<String>,
-    pub message: Option<String>,
-}
-
 /// Trigger a new workflow
 #[tauri::command]
-pub async fn trigger_workflow(request: WorkflowTriggerRequest) -> Result<String, String> {
-    // TODO: Implement workflow triggering via PM-Lite
-    tracing::info!("Triggering workflow for repo: {}", request.repo_url);
-    
-    // For now, return a placeholder
-    Ok("workflow-placeholder-id".to_string())
+pub async fn trigger_workflow(
+    repo_url: String,
+    branch: Option<String>,
+    prompt: String,
+    stack: Option<String>,
+) -> Result<String, String> {
+    let params = WorkflowParams {
+        repo_url,
+        branch,
+        prompt,
+        stack,
+    };
+    workflows::trigger_workflow(&params)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Get workflow status
 #[tauri::command]
-pub async fn get_workflow_status(workflow_id: String) -> Result<WorkflowStatus, String> {
-    // TODO: Implement workflow status retrieval
-    tracing::info!("Getting status for workflow: {}", workflow_id);
-    
-    Ok(WorkflowStatus {
-        id: workflow_id,
-        name: "placeholder-workflow".to_string(),
-        status: "Pending".to_string(),
-        started_at: None,
-        finished_at: None,
-        message: None,
-    })
+pub async fn get_workflow_status(workflow_name: String) -> Result<WorkflowDetail, String> {
+    workflows::get_workflow(&workflow_name)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// List all workflows
 #[tauri::command]
 pub async fn list_workflows() -> Result<Vec<WorkflowStatus>, String> {
-    // TODO: Implement workflow listing
-    Ok(vec![])
+    workflows::list_workflows()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Get workflow logs
 #[tauri::command]
 pub async fn get_workflow_logs(
-    workflow_id: String,
+    workflow_name: String,
     node_name: Option<String>,
 ) -> Result<String, String> {
-    // TODO: Implement log retrieval
-    tracing::info!("Getting logs for workflow: {}, node: {:?}", workflow_id, node_name);
-    
-    Ok("Workflow logs will appear here...".to_string())
+    workflows::get_workflow_logs(&workflow_name, node_name.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Delete a workflow
+#[tauri::command]
+pub async fn delete_workflow(workflow_name: String) -> Result<(), String> {
+    workflows::delete_workflow(&workflow_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Stop a running workflow
+#[tauri::command]
+pub async fn stop_workflow(workflow_name: String) -> Result<(), String> {
+    workflows::stop_workflow(&workflow_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Check if Argo Workflows is available
+#[tauri::command]
+pub async fn check_argo() -> Result<bool, String> {
+    workflows::check_argo()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // ============================================================================

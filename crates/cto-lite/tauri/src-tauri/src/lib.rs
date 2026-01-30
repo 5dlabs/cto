@@ -13,6 +13,7 @@ mod helm;
 mod keychain;
 mod kind;
 mod state;
+mod workflows;
 
 use tauri::Manager;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -75,6 +76,9 @@ pub fn run() {
             commands::get_workflow_status,
             commands::list_workflows,
             commands::get_workflow_logs,
+            commands::delete_workflow,
+            commands::stop_workflow,
+            commands::check_argo,
             // Helm commands
             commands::check_helm,
             commands::deploy_chart,

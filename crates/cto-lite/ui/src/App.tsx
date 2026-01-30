@@ -1,24 +1,13 @@
 import { useEffect, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { SetupWizard } from './components/SetupWizard'
 import { Dashboard } from './components/Dashboard'
 import { Toaster } from './components/ui/toaster'
-
-interface SetupStatus {
-  current_step: number
-  completed: boolean
-  steps: Array<{
-    id: number
-    name: string
-    description: string
-    completed: boolean
-  }>
-}
+import * as tauri from './lib/tauri'
 
 function App() {
   const [loading, setLoading] = useState(true)
   const [setupComplete, setSetupComplete] = useState(false)
-  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
+  const [currentStep, setCurrentStep] = useState(0)
 
   useEffect(() => {
     checkSetupStatus()
@@ -26,11 +15,13 @@ function App() {
 
   async function checkSetupStatus() {
     try {
-      const status = await invoke<SetupStatus>('get_setup_status')
-      setSetupStatus(status)
-      setSetupComplete(status.completed)
+      const state = await tauri.getSetupState()
+      setCurrentStep(state.currentStep)
+      setSetupComplete(state.completed)
     } catch (error) {
       console.error('Failed to get setup status:', error)
+      // Default to showing setup wizard
+      setSetupComplete(false)
     } finally {
       setLoading(false)
     }
@@ -55,7 +46,7 @@ function App() {
     <div className="min-h-screen">
       {!setupComplete ? (
         <SetupWizard 
-          initialStep={setupStatus?.current_step ?? 0}
+          initialStep={currentStep}
           onComplete={handleSetupComplete}
         />
       ) : (

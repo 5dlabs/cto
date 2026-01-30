@@ -208,11 +208,16 @@ export function useTriggerWorkflow() {
   const [error, setError] = useState<Error | null>(null);
   const [lastWorkflowId, setLastWorkflowId] = useState<string | null>(null);
 
-  const trigger = useCallback(async (request: tauri.WorkflowTriggerRequest) => {
+  const trigger = useCallback(async (
+    repoUrl: string,
+    prompt: string,
+    branch?: string,
+    stack?: 'grizz' | 'nova'
+  ) => {
     setTriggering(true);
     setError(null);
     try {
-      const workflowId = await tauri.triggerWorkflow(request);
+      const workflowId = await tauri.triggerWorkflow(repoUrl, prompt, branch, stack);
       setLastWorkflowId(workflowId);
       return workflowId;
     } catch (e) {

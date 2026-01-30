@@ -60,21 +60,33 @@ export interface SetupState {
   clusterCreated: boolean;
 }
 
-/** Workflow status */
+/** Workflow status from Argo */
 export interface WorkflowStatus {
+  name: string;
+  namespace: string;
+  phase: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  progress: string | null;
+  message: string | null;
+}
+
+/** Workflow node (step) status */
+export interface WorkflowNode {
   id: string;
   name: string;
-  status: string;
+  displayName: string;
+  nodeType: string;
+  phase: string;
   startedAt: string | null;
   finishedAt: string | null;
   message: string | null;
 }
 
-/** Workflow trigger request */
-export interface WorkflowTriggerRequest {
-  repoUrl: string;
-  branch?: string;
-  prompt: string;
+/** Workflow detail with nodes */
+export interface WorkflowDetail {
+  status: WorkflowStatus;
+  nodes: WorkflowNode[];
 }
 
 // ============================================================================
@@ -161,13 +173,18 @@ export async function listClusters(): Promise<string[]> {
 // ============================================================================
 
 /** Trigger a new workflow */
-export async function triggerWorkflow(request: WorkflowTriggerRequest): Promise<string> {
-  return invoke<string>('trigger_workflow', { request });
+export async function triggerWorkflow(
+  repoUrl: string,
+  prompt: string,
+  branch?: string,
+  stack?: 'grizz' | 'nova'
+): Promise<string> {
+  return invoke<string>('trigger_workflow', { repoUrl, prompt, branch, stack });
 }
 
 /** Get workflow status */
-export async function getWorkflowStatus(workflowId: string): Promise<WorkflowStatus> {
-  return invoke<WorkflowStatus>('get_workflow_status', { workflowId });
+export async function getWorkflowStatus(workflowName: string): Promise<WorkflowDetail> {
+  return invoke<WorkflowDetail>('get_workflow_status', { workflowName });
 }
 
 /** List all workflows */
@@ -176,8 +193,23 @@ export async function listWorkflows(): Promise<WorkflowStatus[]> {
 }
 
 /** Get workflow logs */
-export async function getWorkflowLogs(workflowId: string, nodeName?: string): Promise<string> {
-  return invoke<string>('get_workflow_logs', { workflowId, nodeName });
+export async function getWorkflowLogs(workflowName: string, nodeName?: string): Promise<string> {
+  return invoke<string>('get_workflow_logs', { workflowName, nodeName });
+}
+
+/** Delete a workflow */
+export async function deleteWorkflow(workflowName: string): Promise<void> {
+  return invoke('delete_workflow', { workflowName });
+}
+
+/** Stop a running workflow */
+export async function stopWorkflow(workflowName: string): Promise<void> {
+  return invoke('stop_workflow', { workflowName });
+}
+
+/** Check if Argo Workflows is available */
+export async function checkArgo(): Promise<boolean> {
+  return invoke<boolean>('check_argo');
 }
 
 // ============================================================================
