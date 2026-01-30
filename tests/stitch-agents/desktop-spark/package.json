@@ -1,0 +1,24 @@
+{
+  "name": "stitch-test-spark",
+  "version": "0.1.0",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "lint": "eslint . --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "electron": "^29.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "better-auth": "^0.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "electron-builder": "^24.0.0",
+    "electron-vite": "^2.0.0",
+    "typescript": "^5.4.0",
+    "eslint": "^9.0.0"
+  }
+}
