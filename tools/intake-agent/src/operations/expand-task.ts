@@ -1,6 +1,6 @@
 /**
  * Expand Task operation - breaks down a task into subtasks.
- * Uses minimal prompts based on "Ralph Wiggum technique".
+ * Full-featured prompts with subagent-aware expansion for parallel execution.
  * Includes robust JSON parsing with fallback.
  */
 
@@ -32,54 +32,92 @@ function extractAssistantText(message: SDKAssistantMessage): string {
 }
 
 /**
- * Generate minimal system prompt for subtask expansion.
+ * Generate system prompt for subtask expansion with full subagent support.
  */
-function getMinimalSystemPrompt(subtaskCount: number, nextId: number): string {
-  return `You are a subtask generator. Break down tasks into specific, actionable subtasks.
+function getSystemPrompt(subtaskCount: number, nextId: number, enableSubagents: boolean, useResearch: boolean): string {
+  const researchSection = useResearch ? `
 
-## Output Format
-Generate ${subtaskCount} subtasks starting from ID ${nextId}. Each subtask:
-{
-  "id": number,
-  "title": "Subtask title",
-  "description": "What to do",
-  "status": "pending",
-  "dependencies": [subtask_ids],
-  "details": "Implementation steps",
-  "testStrategy": "How to verify",
-  "subagentType": "implementer" | "reviewer" | "tester" | "researcher" | "documenter",
-  "parallelizable": boolean
-}
+You have access to current best practices and latest technical information to provide research-backed subtask generation.` : '';
 
-## Subagent Types (agent hints)
-- implementer: Writing code, creating features
-- reviewer: Code review, architecture review
-- tester: Writing tests, QA validation
-- researcher: Research, spikes, investigations
-- documenter: Documentation, comments, READMEs
+  const subagentSection = enableSubagents ? `
+- subagentType: The type of specialized subagent to handle this subtask. MUST be one of:
+  - "implementer": Write/implement code (default for most coding subtasks)
+  - "reviewer": Review code quality, patterns, and best practices
+  - "tester": Write and run tests
+  - "documenter": Write documentation
+  - "researcher": Research and exploration tasks
+  - "debugger": Debug issues and fix bugs
+- parallelizable: Boolean indicating if this subtask can run in parallel with others at the same dependency level (true for independent work, false for coordination-required tasks)` : '';
 
-## Rules
-1. Each subtask should be completable in 1-4 hours
-2. Dependencies only reference lower subtask IDs
-3. Include clear implementation details
-4. Assign appropriate subagent_type based on work type
-5. Mark parallelizable=true if no dependencies on same-level subtasks
-6. All string fields must be valid JSON (escape quotes and newlines)
+  const subagentGuidelines = enableSubagents ? `
 
-Output ONLY the JSON array, no explanations.`;
+## Subagent Optimization Guidelines
+
+When breaking down tasks for subagent execution:
+1. **Maximize parallelism**: Group independent work units that can run simultaneously
+2. **Minimize dependencies**: Only add dependencies when strictly necessary
+3. **Match subagent types to work**: Use implementer for coding, tester for tests, etc.
+4. **Consider context isolation**: Each subagent works in isolation, so subtasks should be self-contained
+5. **Plan review phases**: Include reviewer subtasks after implementation phases` : '';
+
+  return `You are an AI assistant helping with task breakdown for software development. Break down high-level tasks into specific, actionable subtasks that can be implemented${enableSubagents ? ' in parallel by specialized subagents' : ' sequentially'}.${researchSection}
+
+IMPORTANT: Each subtask object must include ALL of the following fields:
+- id: MUST be sequential integers starting EXACTLY from ${nextId}. First subtask id=${nextId}, second id=${nextId + 1}, etc. DO NOT use any other numbering pattern!
+- title: A clear, actionable title (5-200 characters)
+- description: A detailed description (minimum 10 characters)
+- dependencies: An array of subtask IDs this subtask depends on (can be empty [])
+- details: Implementation details (minimum 20 characters)
+- status: Must be "pending" for new subtasks
+- testStrategy: Testing approach (can be null)${subagentSection}
+
+CRITICAL OUTPUT FORMAT:
+- The JSON structure \`{"subtasks":[\` has already been started for you
+- You must CONTINUE by outputting subtask objects directly as array elements
+- Do NOT repeat the opening structure - just output the subtask objects
+- No markdown formatting, no explanatory text before or after
+- Do NOT explain your reasoning or summarize the subtasks${subagentGuidelines}`;
 }
 
 /**
- * Generate minimal user prompt for subtask expansion.
+ * Generate user prompt for subtask expansion with full context.
  */
-function getMinimalUserPrompt(task: { id: number; title: string; description: string; details?: string }, subtaskCount: number, nextId: number): string {
-  return `Task to expand:
-- ID: ${task.id}
-- Title: ${task.title}
-- Description: ${task.description}
-${task.details ? `- Details: ${task.details}` : ''}
+function getUserPrompt(
+  task: { id: string; title: string; description: string; details?: string; test_strategy?: string },
+  subtaskCount: number,
+  nextId: number,
+  enableSubagents: boolean,
+  expansionPrompt?: string,
+  additionalContext?: string,
+  complexityReasoning?: string
+): string {
+  const subagentRequirements = enableSubagents ? `
 
-Generate ${subtaskCount} subtasks starting from ID ${nextId}.`;
+SUBAGENT REQUIREMENTS:
+- Include subagentType for EVERY subtask (implementer, reviewer, tester, documenter, researcher, or debugger)
+- Set parallelizable=true for subtasks that can run concurrently with others at the same dependency level
+- Minimize dependencies to maximize parallel execution potential
+- Group related implementation work so multiple implementer subagents can work simultaneously
+- Include at least one reviewer subtask after implementation subtasks
+- Include tester subtasks for validation work` : '';
+
+  return `Break down this task into ${subtaskCount > 0 ? `exactly ${subtaskCount}` : 'an appropriate number of'} specific subtasks${enableSubagents ? ' optimized for parallel subagent execution' : ''}:
+
+Task ID: ${task.id}
+Title: ${task.title}
+Description: ${task.description}
+Current details: ${task.details || 'None'}${task.test_strategy ? `
+Test strategy: ${task.test_strategy}` : ''}${expansionPrompt ? `
+
+Expansion guidance: ${expansionPrompt}` : ''}${additionalContext ? `
+
+Additional context: ${additionalContext}` : ''}${complexityReasoning ? `
+
+Complexity Analysis Reasoning: ${complexityReasoning}` : ''}
+
+CRITICAL: You MUST use sequential IDs starting from ${nextId}. The first subtask MUST have id=${nextId}, the second MUST have id=${nextId + 1}, and so on. Do NOT use parent task ID in subtask numbering!${subagentRequirements}
+
+OUTPUT: Continue the JSON array by outputting subtask objects directly. Start with the first subtask's opening brace { - do NOT output {"subtasks":[ again as that is already provided. End with ]} to close the array and object.`;
 }
 
 /**
@@ -93,9 +131,19 @@ export async function expandTask(
   const subtaskCount = payload.subtask_count ?? 5;
   const nextId = payload.next_subtask_id ?? 1;
   const task = payload.task;
+  const enableSubagents = payload.enable_subagents ?? true; // Default to enabled
+  const useResearch = payload.use_research ?? false;
 
-  const systemPrompt = getMinimalSystemPrompt(subtaskCount, nextId);
-  const userPrompt = getMinimalUserPrompt(task, subtaskCount, nextId);
+  const systemPrompt = getSystemPrompt(subtaskCount, nextId, enableSubagents, useResearch);
+  const userPrompt = getUserPrompt(
+    task,
+    subtaskCount,
+    nextId,
+    enableSubagents,
+    payload.expansion_prompt,
+    payload.additional_context,
+    payload.complexity_reasoning_context
+  );
 
   try {
     const cliPath = getClaudeCliOrThrow();
@@ -130,8 +178,12 @@ export async function expandTask(
       }
     }
 
+    // Prepend the JSON structure that the prompt tells the model is "already provided"
+    // The model outputs array contents directly, we wrap it
+    const wrappedResponse = '{"subtasks":[' + responseText.trim();
+    
     // Parse with robust JSON parser
-    const result = parseJsonResponse<GeneratedSubtask>(responseText, 'subtasks', isValidSubtask);
+    const result = parseJsonResponse<GeneratedSubtask>(wrappedResponse, 'subtasks', isValidSubtask);
 
     if (!result.success) {
       return {
