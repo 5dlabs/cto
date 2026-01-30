@@ -167,6 +167,44 @@ cd crates/cto-lite/tauri
 npm run tauri dev
 ```
 
+## Security
+
+### API Key Storage
+
+CTO Lite uses your operating system's secure credential storage:
+
+| Platform | Storage | Encryption |
+|----------|---------|------------|
+| **macOS** | Keychain | Hardware-backed (Secure Enclave on Apple Silicon) |
+| **Windows** | Credential Manager | DPAPI (Data Protection API) |
+| **Linux** | Secret Service | GNOME Keyring or KWallet |
+
+**Key points:**
+- API keys are **never** stored in plain text files
+- Keys are encrypted at rest by the OS
+- On macOS, keys can be protected by Touch ID/Face ID
+- Keys are only accessible to the CTO Lite application
+
+### Kubernetes Secrets
+
+When deployed to Kind, API keys are stored as Kubernetes Secrets:
+- Secrets are base64 encoded (standard K8s)
+- Kind runs locally, so secrets stay on your machine
+- Secrets are deleted when the cluster is deleted
+
+### Best Practices
+
+1. **Rotate keys regularly** - Generate new API keys periodically
+2. **Use minimal scopes** - For GitHub, only grant necessary permissions
+3. **Delete when done** - Use `kind delete cluster --name cto-lite` to clean up
+
+### Viewing in Lens
+
+To inspect the cluster in Lens:
+1. Open Lens
+2. It should auto-detect `kind-cto-lite` from your kubeconfig
+3. Or manually add: `~/.kube/config`
+
 ## License
 
 Proprietary - 5D Labs
