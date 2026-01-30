@@ -3,11 +3,13 @@
 //! This is the Tauri backend that manages:
 //! - Setup wizard state
 //! - Docker/Kind cluster management
+//! - Helm chart deployment
 //! - API key storage (via system keychain)
 //! - Workflow triggering and monitoring
 
 mod commands;
 mod docker;
+mod helm;
 mod keychain;
 mod kind;
 mod state;
@@ -73,6 +75,12 @@ pub fn run() {
             commands::get_workflow_status,
             commands::list_workflows,
             commands::get_workflow_logs,
+            // Helm commands
+            commands::check_helm,
+            commands::deploy_chart,
+            commands::get_release_status,
+            commands::uninstall_chart,
+            commands::update_helm_dependencies,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

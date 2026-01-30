@@ -1,6 +1,7 @@
 //! Tauri commands exposed to the frontend
 
 use crate::docker::{self, DockerInfo};
+use crate::helm::{self, HelmRelease, HelmValues};
 use crate::keychain::{self, ApiKeyType};
 use crate::kind::{self, ClusterInfo, KindInfo};
 use crate::state::{AppState, SetupState};
@@ -185,4 +186,38 @@ pub async fn get_workflow_logs(
     tracing::info!("Getting logs for workflow: {}, node: {:?}", workflow_id, node_name);
     
     Ok("Workflow logs will appear here...".to_string())
+}
+
+// ============================================================================
+// Helm Commands
+// ============================================================================
+
+/// Check if Helm is installed
+#[tauri::command]
+pub async fn check_helm() -> Result<Option<String>, String> {
+    helm::check_helm().await.map_err(|e| e.to_string())
+}
+
+/// Deploy the CTO Lite Helm chart
+#[tauri::command]
+pub async fn deploy_chart(values: HelmValues) -> Result<(), String> {
+    helm::deploy_chart(&values).await.map_err(|e| e.to_string())
+}
+
+/// Get the status of the Helm release
+#[tauri::command]
+pub async fn get_release_status() -> Result<Option<HelmRelease>, String> {
+    helm::get_release_status().await.map_err(|e| e.to_string())
+}
+
+/// Uninstall the CTO Lite Helm chart
+#[tauri::command]
+pub async fn uninstall_chart() -> Result<(), String> {
+    helm::uninstall_chart().await.map_err(|e| e.to_string())
+}
+
+/// Update Helm dependencies
+#[tauri::command]
+pub async fn update_helm_dependencies() -> Result<(), String> {
+    helm::update_dependencies().await.map_err(|e| e.to_string())
 }

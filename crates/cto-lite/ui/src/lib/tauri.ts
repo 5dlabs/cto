@@ -179,3 +179,51 @@ export async function listWorkflows(): Promise<WorkflowStatus[]> {
 export async function getWorkflowLogs(workflowId: string, nodeName?: string): Promise<string> {
   return invoke<string>('get_workflow_logs', { workflowId, nodeName });
 }
+
+// ============================================================================
+// Helm Commands
+// ============================================================================
+
+/** Helm release information */
+export interface HelmRelease {
+  name: string;
+  namespace: string;
+  revision: number;
+  status: string;
+  chart: string;
+  appVersion: string;
+}
+
+/** Helm values for deployment */
+export interface HelmValues {
+  anthropicApiKey?: string;
+  openaiApiKey?: string;
+  githubToken?: string;
+  cloudflareTunnelToken?: string;
+  stack?: 'grizz' | 'nova';
+}
+
+/** Check if Helm is installed */
+export async function checkHelm(): Promise<string | null> {
+  return invoke<string | null>('check_helm');
+}
+
+/** Deploy the CTO Lite Helm chart */
+export async function deployChart(values: HelmValues): Promise<void> {
+  return invoke('deploy_chart', { values });
+}
+
+/** Get the status of the Helm release */
+export async function getReleaseStatus(): Promise<HelmRelease | null> {
+  return invoke<HelmRelease | null>('get_release_status');
+}
+
+/** Uninstall the CTO Lite Helm chart */
+export async function uninstallChart(): Promise<void> {
+  return invoke('uninstall_chart');
+}
+
+/** Update Helm dependencies */
+export async function updateHelmDependencies(): Promise<void> {
+  return invoke('update_helm_dependencies');
+}
