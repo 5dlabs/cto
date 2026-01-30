@@ -203,7 +203,7 @@ secrets:
 # =============================================================================
 controller:
   enabled: true
-  replicaCount: 0
+  replicaCount: 1
 
   image:
     repository: ghcr.io/5dlabs/controller
