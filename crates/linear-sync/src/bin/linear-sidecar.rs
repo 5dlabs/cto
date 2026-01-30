@@ -215,21 +215,33 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
     // Model section
     sections.push(format!("**Model:** {}", model));
     
-    // MCP Tools section  
-    if !tools.is_empty() {
-        let tool_preview: Vec<_> = tools.iter().take(10).cloned().collect();
-        let tools_str = if tool_preview.len() < tools.len() {
-            format!("{} (+{} more)", tool_preview.join(", "), tools.len() - tool_preview.len())
+    // MCP Tools section - ONLY show mcp__ prefixed tools, not native ones
+    let mcp_tools: Vec<_> = tools.iter()
+        .filter(|t| t.starts_with("mcp__"))
+        .cloned()
+        .collect();
+    
+    if !mcp_tools.is_empty() {
+        let tool_preview: Vec<_> = mcp_tools.iter()
+            .take(10)
+            .map(|t| t.strip_prefix("mcp__cto-tools__").unwrap_or(t).to_string())
+            .collect();
+        let tools_str = if tool_preview.len() < mcp_tools.len() {
+            format!("{} (+{} more)", tool_preview.join(", "), mcp_tools.len() - tool_preview.len())
         } else {
             tool_preview.join(", ")
         };
-        sections.push(format!("**MCP Tools ({}):** {}", tools.len(), tools_str));
+        sections.push(format!("**MCP Tools ({}):** {}", mcp_tools.len(), tools_str));
+    } else {
+        sections.push("**MCP Tools:** None configured".to_string());
     }
     
     // Skills section
     if !skills.is_empty() {
         let skills_str = skills.join(", ");
         sections.push(format!("**Skills ({}):** {}", skills.len(), skills_str));
+    } else {
+        sections.push("**Skills:** None configured".to_string());
     }
     
     let body = format!("🚀 **Agent Initialized**\n\n{}", sections.join("\n"));
@@ -264,6 +276,118 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
         warn!("Failed to post init activity ({}): {}", status, body);
     } else {
         info!("📋 Posted init activity to Linear");
+    }
+    
+    Ok(())
+}
+
+/// Post completion summary showing MCP tools and skills with usage indicators
+async fn post_completion_summary(
+    state: &AppState,
+    session_id: &str,
+    model: &str,
+    tools: &[String],
+    tools_used: &[String],
+    skills: &[String],
+    duration_ms: Option<u64>,
+    cost_usd: Option<f64>,
+    num_turns: Option<u64>,
+) -> Result<()> {
+    let client = reqwest::Client::new();
+    
+    let query = r#"
+        mutation AddAgentActivity($input: AgentActivityCreateInput!) {
+            agentActivityCreate(input: $input) {
+                success
+            }
+        }
+    "#;
+    
+    let mut sections = Vec::new();
+    
+    // Stats line
+    let mut stats_parts = Vec::new();
+    if let Some(ms) = duration_ms {
+        let secs = ms as f64 / 1000.0;
+        stats_parts.push(format!("{:.1}s", secs));
+    }
+    if let Some(cost) = cost_usd {
+        stats_parts.push(format!("${:.4}", cost));
+    }
+    if let Some(turns) = num_turns {
+        stats_parts.push(format!("{} turns", turns));
+    }
+    if !stats_parts.is_empty() {
+        sections.push(format!("**Stats:** {}", stats_parts.join(" | ")));
+    }
+    
+    // Model
+    sections.push(format!("**Model:** {}", model));
+    
+    // MCP Tools with usage indicators
+    let mcp_tools: Vec<_> = tools.iter()
+        .filter(|t| t.starts_with("mcp__"))
+        .collect();
+    
+    if !mcp_tools.is_empty() {
+        let mcp_used_count = tools_used.iter()
+            .filter(|t| t.starts_with("mcp__"))
+            .count();
+        
+        sections.push(format!("**MCP Tools ({}/{} used):**", mcp_used_count, mcp_tools.len()));
+        
+        for tool in mcp_tools.iter().take(15) {
+            let short_name = tool.strip_prefix("mcp__cto-tools__").unwrap_or(tool);
+            let indicator = if tools_used.contains(tool) { "✅" } else { "⬜" };
+            sections.push(format!("  {} {}", indicator, short_name));
+        }
+        if mcp_tools.len() > 15 {
+            sections.push(format!("  ... and {} more", mcp_tools.len() - 15));
+        }
+    }
+    
+    // Skills with usage indicators (skills don't have a "used" tracking yet, so show all as available)
+    if !skills.is_empty() {
+        sections.push(format!("**Skills ({}):**", skills.len()));
+        for skill in skills.iter().take(10) {
+            sections.push(format!("  ⬜ {}", skill));
+        }
+        if skills.len() > 10 {
+            sections.push(format!("  ... and {} more", skills.len() - 10));
+        }
+    }
+    
+    let body = format!("✅ **Session Complete**\n\n{}", sections.join("\n"));
+    
+    let content = serde_json::json!({
+        "type": "response",
+        "body": body
+    });
+    
+    let variables = serde_json::json!({
+        "input": {
+            "agentSessionId": session_id,
+            "content": content
+        }
+    });
+    
+    let response = client
+        .post(LINEAR_API_URL)
+        .header("Authorization", &state.linear_token)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "query": query,
+            "variables": variables
+        }))
+        .send()
+        .await?;
+    
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        warn!("Failed to post completion summary ({}): {}", status, body);
+    } else {
+        info!("📊 Posted completion summary to Linear");
     }
     
     Ok(())
@@ -644,6 +768,36 @@ async fn ingest(
     // Track errors
     if entry.entry_type.as_deref() == Some("error") {
         session.errors += 1;
+    }
+    
+    // Handle result event specially - post completion summary
+    if entry.entry_type.as_deref() == Some("result") {
+        if let Some(ref session_id) = session.session_id {
+            let session_id = session_id.clone();
+            let model = session.model.clone().unwrap_or_else(|| "unknown".to_string());
+            let tools = session.tools.clone();
+            let tools_used = session.tools_used.clone();
+            let skills = session.skills.clone();
+            
+            // Extract stats from result event
+            let duration_ms = entry.extra.get("duration_ms")
+                .and_then(|v| v.as_u64());
+            let cost_usd = entry.extra.get("total_cost_usd")
+                .and_then(|v| v.as_f64());
+            let num_turns = entry.extra.get("num_turns")
+                .and_then(|v| v.as_u64());
+            
+            drop(session); // Release lock before async call
+            
+            if let Err(e) = post_completion_summary(
+                &state, &session_id, &model, &tools, &tools_used, &skills,
+                duration_ms, cost_usd, num_turns
+            ).await {
+                warn!("Failed to post completion summary: {}", e);
+            }
+            
+            return StatusCode::OK;
+        }
     }
     
     // Add activity to Linear if session exists
