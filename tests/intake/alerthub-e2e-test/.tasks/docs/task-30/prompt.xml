@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="30" project="alerthub">
+  <title>Setup Redis for session management and caching</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Integrate Redis client for JWT session management and analytics caching
+  </description>
+  
+  <dependencies>
+    <dependency task_id="29" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup Redis client with connection pooling, implement session storage for JWT tokens, cache analytics results, and handle Redis connection failures.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d30" category="error-handling" constraint="soft" requires_approval="true">
+      <description>Redis failure handling strategy</description>
+      <options>
+        <option>Fail requests immediately</option>
+        <option>Fallback to database</option>
+        <option>Continue without caching</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Redis connection established, sessions persist correctly, analytics cache improves performance, graceful fallback when Redis unavailable
+  </acceptance_criteria>
+</task>

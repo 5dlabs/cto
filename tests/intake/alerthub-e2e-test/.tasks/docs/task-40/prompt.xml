@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="40" project="alerthub">
+  <title>Create Expo mobile app project</title>
+  <agent name="tap" stack="Expo" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Initialize Expo SDK 50 project with React Native, NativeWind, and navigation setup
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup Expo project with SDK 50, install NativeWind for styling, configure React Navigation with tab and stack navigators, setup basic project structure.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d40" category="ux-behavior" constraint="soft" requires_approval="true">
+      <description>Mobile navigation pattern</description>
+      <options>
+        <option>Bottom tabs with stack</option>
+        <option>Drawer navigation</option>
+        <option>Tab bar with nested stacks</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Expo app builds and runs on simulator/device, navigation works correctly, NativeWind styles apply, app compiles without errors
+  </acceptance_criteria>
+</task>

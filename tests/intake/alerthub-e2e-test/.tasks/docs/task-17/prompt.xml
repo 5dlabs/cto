@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="17" project="alerthub">
+  <title>Create Discord integration service</title>
+  <agent name="nova" stack="Bun/Elysia" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement DiscordService using Effect for webhook delivery to Discord channels
+  </description>
+  
+  <dependencies>
+    <dependency task_id="16" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create DiscordService with Effect patterns, implement webhook delivery, handle Discord-specific rate limiting and embed formatting.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d17" category="ux-behavior" constraint="soft" requires_approval="true">
+      <description>Discord message formatting approach</description>
+      <options>
+        <option>Rich embeds for all messages</option>
+        <option>Simple text with optional embeds</option>
+        <option>User configurable format</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Discord messages deliver successfully, embeds format correctly, rate limiting respected, service integrates with Effect layers
+  </acceptance_criteria>
+</task>

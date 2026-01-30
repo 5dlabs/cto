@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="21" project="alerthub">
+  <title>Add integration CRUD endpoints</title>
+  <agent name="nova" stack="Bun/Elysia" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement REST endpoints for creating, reading, updating, and deleting integrations
+  </description>
+  
+  <dependencies>
+    <dependency task_id="20" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create Elysia routes for integration CRUD operations with Effect validation, proper error handling, and tenant isolation.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d21" category="api-design" constraint="soft" requires_approval="true">
+      <description>Integration configuration exposure in API</description>
+      <options>
+        <option>Full config in responses</option>
+        <option>Masked sensitive fields</option>
+        <option>Separate config endpoints</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    All CRUD operations work correctly, validation rejects invalid data, tenant isolation enforced, Effect error types returned properly
+  </acceptance_criteria>
+</task>

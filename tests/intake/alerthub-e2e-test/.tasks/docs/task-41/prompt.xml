@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="41" project="alerthub">
+  <title>Implement push notification registration</title>
+  <agent name="tap" stack="Expo" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Setup FCM/APNs push notification registration and handling in mobile app
+  </description>
+  
+  <dependencies>
+    <dependency task_id="40" />
+  </dependencies>
+  
+  <implementation>
+    <details>Integrate Expo Notifications, setup FCM and APNs configuration, implement device token registration, handle notification permissions.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d41" category="ux-behavior" constraint="soft" requires_approval="true">
+      <description>Push notification permission timing</description>
+      <options>
+        <option>Request on app launch</option>
+        <option>Request when needed</option>
+        <option>Guided onboarding</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Push notifications register successfully, device tokens sent to backend, notification permissions handled correctly, test notifications received
+  </acceptance_criteria>
+</task>

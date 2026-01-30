@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="22" project="alerthub">
+  <title>Create Go admin API service skeleton</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Initialize Go project with gRPC server and grpc-gateway for REST API generation
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup Go module with gRPC dependencies, create protobuf definitions for services, implement basic gRPC server with grpc-gateway REST mapping.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d22" category="api-design" constraint="open" requires_approval="false">
+      <description>API versioning strategy</description>
+      <options>
+        <option>URL path versioning</option>
+        <option>Header versioning</option>
+        <option>Protobuf package versioning</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    gRPC server starts successfully, protobuf compiles, grpc-gateway generates REST endpoints, Docker image builds
+  </acceptance_criteria>
+</task>

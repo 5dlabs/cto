@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="39" project="alerthub">
+  <title>Implement dark/light theme support</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>low</priority>
+  <status>pending</status>
+  
+  <description>
+    Add theme switching functionality with system preference detection and persistence
+  </description>
+  
+  <dependencies>
+    <dependency task_id="38" />
+  </dependencies>
+  
+  <implementation>
+    <details>Implement theme context, update shadcn/ui components for theme support, add theme toggle, persist theme preference, and support system preference detection.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d39" category="ux-behavior" constraint="open" requires_approval="false">
+      <description>Theme persistence strategy</description>
+      <options>
+        <option>localStorage only</option>
+        <option>User profile preference</option>
+        <option>Both with sync</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Theme switching works across all components, preferences persist across sessions, system preference detection works, no visual glitches during theme changes
+  </acceptance_criteria>
+</task>

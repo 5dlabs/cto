@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="2" project="alerthub">
+  <title>Configure Kubernetes networking and ingress</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Setup ingress controllers, load balancers, and service mesh for inter-service communication
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>Deploy NGINX ingress controller, configure TLS termination, setup service mesh for secure service-to-service communication, and configure external LoadBalancer services.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d2" category="architecture" constraint="open" requires_approval="false">
+      <description>Service mesh implementation choice</description>
+      <options>
+        <option>Istio for full features</option>
+        <option>Linkerd for simplicity</option>
+        <option>No service mesh</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    External traffic reaches services through ingress, TLS certificates are valid, service mesh connectivity verified between namespaces
+  </acceptance_criteria>
+</task>

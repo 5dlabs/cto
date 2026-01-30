@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="28" project="alerthub">
+  <title>Implement notification rules engine</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create RuleService for managing notification filtering and routing rules
+  </description>
+  
+  <dependencies>
+    <dependency task_id="27" />
+  </dependencies>
+  
+  <implementation>
+    <details>Implement rule creation, evaluation engine with conditions and actions, rule priority handling, and rule testing functionality.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d28" category="architecture" constraint="open" requires_approval="false">
+      <description>Rule evaluation performance optimization</description>
+      <options>
+        <option>In-memory rule cache</option>
+        <option>Database query optimization</option>
+        <option>Rule compilation</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Rules evaluate correctly against notifications, priority ordering works, rule conditions support all operators, rule testing provides accurate results
+  </acceptance_criteria>
+</task>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="7" project="alerthub">
+  <title>Implement notification submission endpoint</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create POST /api/v1/notifications endpoint with validation, rate limiting, and database persistence
+  </description>
+  
+  <dependencies>
+    <dependency task_id="6" />
+  </dependencies>
+  
+  <implementation>
+    <details>Implement notification submission handler with request validation, tenant-based rate limiting using Redis, notification persistence, and JSON response.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d7" category="error-handling" constraint="soft" requires_approval="true">
+      <description>Rate limiting behavior when exceeded</description>
+      <options>
+        <option>Return 429 immediately</option>
+        <option>Queue with delay</option>
+        <option>Drop with logging</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Endpoint accepts valid notifications, rejects invalid payloads, applies rate limiting, persists to database
+  </acceptance_criteria>
+</task>

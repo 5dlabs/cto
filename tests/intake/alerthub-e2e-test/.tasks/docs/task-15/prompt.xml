@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="15" project="alerthub">
+  <title>Implement Effect Schema models for integrations</title>
+  <agent name="nova" stack="Bun/Elysia" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create Effect Schema definitions for Integration models and channel-specific configurations
+  </description>
+  
+  <dependencies>
+    <dependency task_id="14" />
+  </dependencies>
+  
+  <implementation>
+    <details>Define Integration schema with Effect Schema, create channel-specific config schemas (Slack, Discord, Email, Webhook), implement validation and serialization.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d15" category="data-model" constraint="open" requires_approval="false">
+      <description>Channel configuration validation strategy</description>
+      <options>
+        <option>Runtime validation only</option>
+        <option>Compile-time + runtime</option>
+        <option>Lazy validation</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Schemas validate correctly, type inference works, validation errors are descriptive, serialization roundtrip succeeds
+  </acceptance_criteria>
+</task>

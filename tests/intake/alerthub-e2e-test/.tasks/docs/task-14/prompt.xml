@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="14" project="alerthub">
+  <title>Setup MongoDB connection with Drizzle ORM</title>
+  <agent name="nova" stack="Bun/Elysia" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Configure MongoDB connection and Drizzle ORM for integration configuration storage
+  </description>
+  
+  <dependencies>
+    <dependency task_id="13" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup Drizzle ORM with MongoDB adapter, create integration schema, configure connection pooling and database configuration.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d14" category="data-model" constraint="open" requires_approval="false">
+      <description>Integration configuration schema flexibility</description>
+      <options>
+        <option>Strict typed schemas per channel</option>
+        <option>Flexible JSON schema</option>
+        <option>Union type approach</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    MongoDB connection established, Drizzle schemas work with MongoDB, connection pool handles concurrent requests
+  </acceptance_criteria>
+</task>

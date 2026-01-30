@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="26" project="alerthub">
+  <title>Implement JWT authentication middleware</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create JWT authentication and authorization middleware for gRPC services
+  </description>
+  
+  <dependencies>
+    <dependency task_id="25" />
+  </dependencies>
+  
+  <implementation>
+    <details>Implement JWT token validation, user authentication, role-based authorization, and token refresh logic with Redis for session management.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d26" category="security" constraint="hard" requires_approval="true">
+      <description>JWT token expiration strategy</description>
+      <options>
+        <option>Short-lived with refresh tokens</option>
+        <option>Long-lived tokens</option>
+        <option>Sliding expiration</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    JWT tokens validate correctly, unauthorized requests rejected, role-based access works, token refresh mechanism functional
+  </acceptance_criteria>
+</task>

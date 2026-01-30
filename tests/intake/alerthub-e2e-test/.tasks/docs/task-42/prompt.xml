@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="42" project="alerthub">
+  <title>Create notification feed screen</title>
+  <agent name="tap" stack="Expo" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Build main notification feed with pull-to-refresh and notification details
+  </description>
+  
+  <dependencies>
+    <dependency task_id="41" />
+  </dependencies>
+  
+  <implementation>
+    <details>Create notification feed screen with FlatList, pull-to-refresh functionality, notification detail navigation, and offline caching.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d42" category="performance" constraint="open" requires_approval="false">
+      <description>Notification feed loading strategy</description>
+      <options>
+        <option>Load all at once</option>
+        <option>Paginated loading</option>
+        <option>Virtual list with windowing</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Notification feed loads and displays correctly, pull-to-refresh works, detail navigation functions, offline caching provides good UX
+  </acceptance_criteria>
+</task>

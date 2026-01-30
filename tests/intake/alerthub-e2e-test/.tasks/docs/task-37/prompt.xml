@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="37" project="alerthub">
+  <title>Build visual notification rules builder</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Create drag-and-drop interface for building notification rules with conditions and actions
+  </description>
+  
+  <dependencies>
+    <dependency task_id="36" />
+  </dependencies>
+  
+  <implementation>
+    <details>Build visual rule builder with drag-and-drop conditions, action configuration, rule testing interface, and rule priority management.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d37" category="ux-behavior" constraint="soft" requires_approval="true">
+      <description>Rule builder complexity level</description>
+      <options>
+        <option>Simple form-based builder</option>
+        <option>Advanced visual editor</option>
+        <option>Code-based rule editor</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Rule builder creates valid rules, drag-and-drop works smoothly, rule testing provides accurate results, complex rules can be created easily
+  </acceptance_criteria>
+</task>

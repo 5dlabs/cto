@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="44" project="alerthub">
+  <title>Create Electron desktop app</title>
+  <agent name="spark" stack="Electron" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Initialize Electron 28 project with React and system tray integration
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>Setup Electron with React, implement main and renderer processes, create system tray integration, and basic window management.</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d44" category="ux-behavior" constraint="soft" requires_approval="true">
+      <description>Desktop app behavior on close</description>
+      <options>
+        <option>Minimize to tray</option>
+        <option>Close completely</option>
+        <option>Ask user preference</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Electron app builds and launches, system tray integration works, main/renderer IPC communication functional, app packages correctly
+  </acceptance_criteria>
+</task>
