@@ -3,6 +3,49 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.34](https://github.com/5dlabs/cto/compare/v0.2.33...v0.2.34) (2026-01-30)
+
+
+### ✨ Features
+
+* Add Twingate connector deployment via Argo CD ([#4082](https://github.com/5dlabs/cto/issues/4082)) ([f2f7f8a](https://github.com/5dlabs/cto/commit/f2f7f8ac5e1f81593777a93fcc70c92129b7544e))
+* **config:** add AgentSkills to cto-config.json with job-type-based resolution ([#4099](https://github.com/5dlabs/cto/issues/4099)) ([4bbf998](https://github.com/5dlabs/cto/commit/4bbf998466b1bdd721e1921a49d909f7c0e76f81))
+* **controller:** add GitHub App installation ID for faster auth ([#4100](https://github.com/5dlabs/cto/issues/4100)) ([23151ea](https://github.com/5dlabs/cto/commit/23151ea162150b2dec05c00a981424186d4617e7))
+* **ingress:** add DNS namespace separation for home and Frankfurt clusters ([66f8ba4](https://github.com/5dlabs/cto/commit/66f8ba40586e1b34c9c0d3b2c1bfd62489f97493))
+* intake SDK migration and linear-sync crate ([#4096](https://github.com/5dlabs/cto/issues/4096)) ([d674f94](https://github.com/5dlabs/cto/commit/d674f94c7de0ec44ed5803ecd6b41fdad1cdc0c4))
+* **tools:** add custom headers support and MiniMax/Cloudflare env vars ([#4092](https://github.com/5dlabs/cto/issues/4092)) ([27eeab2](https://github.com/5dlabs/cto/commit/27eeab27160516ce1263fe0f1908c06869d85901))
+
+
+### 🐛 Bug Fixes
+
+* Add extraEnv to explicitly set token env vars from secret ([d0f26a3](https://github.com/5dlabs/cto/commit/d0f26a38343a7386ea10116fa1a12b5878ad99ac))
+* **cilium:** enable hostNetwork and ClusterFirstWithHostNet DNS for Hubble Relay on Talos ([8bf67d2](https://github.com/5dlabs/cto/commit/8bf67d202dadea74592b0d8c406e188da565621f))
+* enable hostNetwork for Hubble Relay to access Cilium agents on Talos ([1136e87](https://github.com/5dlabs/cto/commit/1136e872c5e06451fe17e434b98c13f0d37c1a75))
+* **ingress:** enable external-dns for Frankfurt cluster ([ae44ca1](https://github.com/5dlabs/cto/commit/ae44ca196f8206147ca6c76048dc167ad53648a2))
+* Move existingSecret to top level ([ec996eb](https://github.com/5dlabs/cto/commit/ec996eb0048f55db97d4014c2bc77cd7cb9d770a))
+* **pm:** OAuth hardening - enable auto token refresh ([#4097](https://github.com/5dlabs/cto/issues/4097)) ([57ae4cc](https://github.com/5dlabs/cto/commit/57ae4ccd236eb06f84f24da15971a80b1f743177))
+* Reduce CPU request to 50m for scheduling ([891850f](https://github.com/5dlabs/cto/commit/891850fc35a9bff1c7b4bede168ba8748bf04b40))
+* **seaweedfs:** configure for single-node cluster ([#4084](https://github.com/5dlabs/cto/issues/4084)) ([c1819b1](https://github.com/5dlabs/cto/commit/c1819b1ed8508c876db79f639f27327a4a1d6ea0))
+* **templates:** add security and documents categories to skills-setup ([#4103](https://github.com/5dlabs/cto/issues/4103)) ([6fd0d36](https://github.com/5dlabs/cto/commit/6fd0d3609752b07c280db292036424a635069f15))
+* temporarily disable presync validation hook ([#4083](https://github.com/5dlabs/cto/issues/4083)) ([7f34191](https://github.com/5dlabs/cto/commit/7f34191f60dabc25fb8ff25ec9f1f4660692f631))
+* **tools:** add missing env vars for MCP servers ([#4091](https://github.com/5dlabs/cto/issues/4091)) ([552c9b6](https://github.com/5dlabs/cto/commit/552c9b6b6d91187d69796eced83c9e6d5335ecd6))
+* **tools:** use @iflow-mcp/firecrawl-mcp package ([5357882](https://github.com/5dlabs/cto/commit/53578829bbbf4ad3c6137d6fee6204ea6da2d0bd))
+* Use correct env var names for Twingate connector tokens ([753c725](https://github.com/5dlabs/cto/commit/753c72500dbd8ce8e64d7d251cac47d8cc5a3f48))
+* Use existingSecret as string (secret name only) ([147bd54](https://github.com/5dlabs/cto/commit/147bd54478123e54228b8ad64e482fcd1e4b500a))
+* Use existingSecret format for Twingate connector tokens ([7d1825b](https://github.com/5dlabs/cto/commit/7d1825b900401558926e58d43e9351f9832738a9))
+* Use valid semver constraint for Twingate connector chart ([d47be5f](https://github.com/5dlabs/cto/commit/d47be5f2459de53d906c25a09906f9dd0763f16c))
+
+
+### 📚 Documentation
+
+* add DNS configuration guide for multi-cluster setup ([6f93e80](https://github.com/5dlabs/cto/commit/6f93e8084631d8595da4f03253e4ded5e32470df))
+
+
+### 🔧 Maintenance
+
+* **deps:** bump kube-derive from 0.93.1 to 0.98.0 ([#3900](https://github.com/5dlabs/cto/issues/3900)) ([72c4dfc](https://github.com/5dlabs/cto/commit/72c4dfc17d1ecdb8e9524ad8142991dc6f08135a))
+* **infra:** enable controller with 1 replica ([#4104](https://github.com/5dlabs/cto/issues/4104)) ([ae5b1ac](https://github.com/5dlabs/cto/commit/ae5b1ac20e9f28a66534194c8b702b90d51a0f72))
+
 ## [0.2.33](https://github.com/5dlabs/cto/compare/v0.2.32...v0.2.33) (2026-01-27)
 
 
