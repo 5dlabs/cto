@@ -246,8 +246,8 @@ controller:
 # =============================================================================
 agent:
   image:
-    repository: ghcr.io/5dlabs/agent
-    tag: latest
+    repository: ghcr.io/5dlabs/claude
+    tag: dev
   serviceAccountName: ""
   # Each CLI type has its own dedicated image
   cliImages:
