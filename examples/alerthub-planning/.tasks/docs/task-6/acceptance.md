@@ -1,10 +1,10 @@
 # Acceptance Criteria: Task 6
 
-- [ ] Develop mobile application using Expo SDK 50+ for receiving push notifications and managing user preferences.
-- [ ] App builds successfully, push notifications are received and displayed, biometric auth works on supported devices, offline notifications are cached and sync when online, deep links navigate to correct screens, and pull-to-refresh updates data
+- [ ] Build the mobile app using Expo SDK 50+ and React Native with push notification support, offline caching, and biometric authentication for iOS and Android.
+- [ ] App builds for both iOS and Android, push notifications are received and displayed, biometric authentication works, offline cached notifications are available, navigation flows correctly, deep links open specific notifications, and app badge shows unread count.
 - [ ] All requirements implemented
-- [ ] Tests passing (`run tests` exits 0)
-- [ ] Lints passing (`run linter` exits 0)
-- [ ] Formatted (`run formatter` exits 0)
-- [ ] Build succeeds (`run build` exits 0)
+- [ ] Tests passing (`npm run test` exits 0)
+- [ ] Lints passing (`npm run lint` exits 0)
+- [ ] Formatted (`npm run format:check` exits 0)
+- [ ] Build succeeds (`npx expo export` exits 0)
 - [ ] PR created and ready for review

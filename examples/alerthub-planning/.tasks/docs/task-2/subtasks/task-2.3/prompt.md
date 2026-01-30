@@ -1,18 +1,26 @@
-# Subtask 2.3: Redis Rate Limiting and Priority Queue Processing
+# Subtask 2.3: Implement Kafka routing and real-time features
 
-## Context
-This is a subtask of Task 2. Complete this before moving to dependent subtasks.
+**Parent Task:** Implement Notification Router Service (Rex - Rust/Axum)
+**Agent:** rex | **Language:** rust
 
 ## Description
-Implement Redis-based rate limiting per recipient and priority queue system for notification processing with deduplication logic.
 
-## Implementation Details
-Integrate Redis client, implement sliding window rate limiting by recipient/channel, create priority queue data structures using Redis sorted sets. Build notification processor worker that polls queues by priority (high, medium, low), implements deduplication based on content hash and recipient, and processes notifications asynchronously. Add queue monitoring and dead letter queue handling.
+Set up Kafka producer for message routing, implement priority queue processing, add WebSocket support for real-time updates, and create monitoring endpoints.
+
+## Details
+
+Configure Kafka producer client for routing messages to integration service, implement priority queue processing system (critical, high, normal, low) with appropriate scheduling, create WebSocket endpoint for real-time notification status updates, add comprehensive health check endpoints, integrate Prometheus metrics collection for monitoring performance and system health.
 
 ## Dependencies
+
 task-2.2
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-2/prompt.md`
+- PRD: `.tasks/docs/prd.md`

@@ -1,4 +1,4 @@
-# Task 7: Desktop System Tray Client (Spark - Electron)
+# Task 7: Build Desktop Client (Spark - Electron)
 
 **Agent**: spark | **Language**: typescript
 
@@ -8,43 +8,53 @@ You are a Desktop Engineer specializing in Electron implementing Task 7.
 
 ## Goal
 
-Create desktop application using Electron 28+ that runs in system tray and displays native notifications with quick actions.
+Create the desktop system tray application using Electron 28+ with React for native desktop notifications, quick actions, and cross-platform support (Windows, macOS, Linux).
 
 ## Requirements
 
-Build Electron app with system tray integration, native desktop notifications, main window with notification feed, mini popup window, settings window, keyboard shortcuts, and auto-start functionality. Support Windows, macOS, and Linux.
+1. Initialize Electron project with React and TailwindCSS
+2. Set up system tray with notification count badge
+3. Implement native desktop notification system
+4. Build main window with full notification feed
+5. Create mini popup window for quick view
+6. Add tray context menu with recent notifications
+7. Implement keyboard shortcuts for common actions
+8. Add settings window for preferences
+9. Configure auto-start on system boot
+10. Package for Windows, macOS, and Linux distribution
 
 ## Acceptance Criteria
 
-App builds for all platforms, system tray icon appears with correct badge count, native notifications display, keyboard shortcuts work, auto-start functions correctly, and all windows open/close properly
+Application runs on all target platforms, system tray icon appears with correct badge count, native notifications display properly, main and mini windows function correctly, keyboard shortcuts work, tray menu shows recent notifications, and auto-start configuration persists.
 
 ## Constraints
 
-- Match existing codebase patterns and style
-- Create PR with atomic, well-described commits
-- Include unit tests for new functionality
-- PR title: `feat(task-7): Desktop System Tray Client (Spark - Electron)`
+- Match existing codebase patterns
+- Create PR with atomic commits
+- Include unit tests
+- PR title: `feat(task-7): Build Desktop Client (Spark - Electron)`
 
 ## Decision Points
 
-### d13: System tray notification display strategy
+### d13: How should the mini popup window be triggered?
 **Category**: ux-behavior | **Constraint**: soft
 
 Options:
-1. show last 5 notifications in tray menu
-2. show unread count only
-3. show preview of latest notification
+1. hover-tray-icon
+2. click-tray-icon
+3. keyboard-shortcut
+4. configurable
 
-### d14: WebSocket connection management for desktop app
-**Category**: performance | **Constraint**: open
+### d14: Should desktop client store authentication tokens securely in system keychain?
+**Category**: security | **Constraint**: hard | ⚠️ **Requires Approval**
 
 Options:
-1. persistent connection with auto-reconnect
-2. connect only when app is active
-3. configurable connection strategy
+1. system-keychain
+2. encrypted-local-storage
+3. session-only
 
 
 ## Resources
 
 - PRD: `.tasks/docs/prd.md`
-- Dependencies: task-2, task-4
+- Dependencies: task-2, task-3, task-4

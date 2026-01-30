@@ -1,4 +1,4 @@
-# Task 3: Integration Service with Effect (Nova - Bun/Elysia)
+# Task 3: Build Integration Service with Effect (Nova - Bun/Elysia)
 
 **Agent**: nova | **Language**: typescript
 
@@ -8,40 +8,49 @@ You are a TypeScript Engineer specializing in Effect and Bun/Elysia implementing
 
 ## Goal
 
-Create the notification delivery service using Bun/Elysia with Effect TypeScript for type-safe error handling and channel integrations (Slack, Discord, email, webhooks).
+Create the integration service using Bun, Elysia, and Effect TypeScript to handle delivery to external channels (Slack, Discord, email, webhooks). Uses Effect for type-safe error handling and composable services.
 
 ## Requirements
 
-Build Elysia server with Effect services for each channel type. Implement SlackService, DiscordService, EmailService, and WebhookService using Effect.retry patterns. Add MongoDB integration with Drizzle ORM, Kafka consumer with Effect Stream, and RabbitMQ task queue processing.
+1. Initialize Bun project with Elysia framework
+2. Set up Effect services architecture (SlackService, DiscordService, EmailService)
+3. Implement Effect Schema for request/response validation
+4. Create MongoDB connection with Drizzle ORM
+5. Build integration CRUD endpoints with Effect error handling
+6. Implement Kafka consumer with Effect Stream
+7. Add RabbitMQ task queue processing
+8. Build delivery services with Effect.retry and exponential backoff
+9. Add template rendering with Effect error handling
+10. Implement OAuth2 token refresh with Effect.cached
 
 ## Acceptance Criteria
 
-All integration endpoints respond correctly, Effect services handle errors gracefully, delivery retry logic works with exponential backoff, Kafka events are consumed successfully, and test deliveries reach external channels
+Service starts with Bun, Effect services initialize correctly, integration CRUD operations work, Kafka messages are consumed, deliveries succeed to test channels (Slack webhook, email), retry logic works on failures, and templates render correctly.
 
 ## Constraints
 
-- Match existing codebase patterns and style
-- Create PR with atomic, well-described commits
-- Include unit tests for new functionality
-- PR title: `feat(task-3): Integration Service with Effect (Nova - Bun/Elysia)`
+- Match existing codebase patterns
+- Create PR with atomic commits
+- Include unit tests
+- PR title: `feat(task-3): Build Integration Service with Effect (Nova - Bun/Elysia)`
 
 ## Decision Points
 
-### d5: Retry strategy for failed deliveries
-**Category**: error-handling | **Constraint**: soft
-
-Options:
-1. exponential backoff with 3 retries
-2. linear backoff with 5 retries
-3. configurable retry policy per channel
-
-### d6: OAuth2 token storage and refresh mechanism
+### d5: Should integration configs be stored as flexible JSON or strongly typed schemas?
 **Category**: api-design | **Constraint**: open
 
 Options:
-1. store in MongoDB with Effect.cached
-2. external token service
-3. Redis-based token cache
+1. flexible-json
+2. typed-schemas
+3. hybrid-approach
+
+### d6: How many retry attempts should be made for failed deliveries?
+**Category**: error-handling | **Constraint**: soft
+
+Options:
+1. 3-attempts
+2. 5-attempts
+3. configurable-per-channel
 
 
 ## Resources

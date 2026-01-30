@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subtask id="3.2" parent="3" agent="nova">
+    <meta>
+        <title>Implement data layer with MongoDB, Drizzle ORM and Effect Schema validation</title>
+        <dependencies>task-3.1</dependencies>
+    </meta>
+
+    <role>You are a TypeScript Engineer specializing in Effect and Bun/Elysia. Implement subtask 3.2.</role>
+
+    <context>
+        <overview>Create the data persistence layer with MongoDB connection using Drizzle ORM and implement Effect Schema for comprehensive request/response validation across all integration endpoints.</overview>
+        <parent_task>Build Integration Service with Effect (Nova - Bun/Elysia)</parent_task>
+    </context>
+
+    <requirements>
+        <description>Set up MongoDB connection with Drizzle ORM configuration, define database schemas for integrations, channels, and delivery logs, implement Effect Schema definitions for API request/response validation, create database service layer with Effect error handling for connection management, migrations, and CRUD operations</description>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>Subtask requirements implemented</criterion>
+        <criterion>Parent task requirements still satisfied</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>bun test</command>
+        <command>bun run lint</command>
+        <command>bun run typecheck</command>
+    </validation>
+</subtask>

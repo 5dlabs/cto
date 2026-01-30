@@ -1,18 +1,26 @@
-# Subtask 1.4: Deploy Object Storage and Finalize Infrastructure
+# Subtask 1.4: Configure Security, Networking, and Service Health Validation
 
-## Context
-This is a subtask of Task 1. Complete this before moving to dependent subtasks.
+**Parent Task:** Setup Infrastructure Components (Bolt - Kubernetes)
+**Agent:** bolt | **Language:** yaml
 
 ## Description
-Deploy SeaweedFS for distributed object storage and perform final infrastructure validation
 
-## Implementation Details
-Deploy SeaweedFS master, volume, and filer services with proper volume replication and erasure coding. Configure ingress controllers and load balancers for external access. Set up monitoring with Prometheus and Grafana for all components. Perform end-to-end connectivity tests and create infrastructure documentation.
+Implement security policies, network isolation, RBAC configurations, and perform comprehensive health checks to ensure all infrastructure components are properly configured and operational.
+
+## Details
+
+Create service accounts and RBAC policies for secure service access. Configure network policies for proper service isolation and communication rules. Set up persistent volume claims with appropriate storage classes. Implement monitoring and alerting for all deployed services. Perform end-to-end connectivity tests and validate that all operators are healthy and ready for application deployment.
 
 ## Dependencies
-task-1.2, task-1.3
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+task-1.1, task-1.2, task-1.3
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-1/prompt.md`
+- PRD: `.tasks/docs/prd.md`

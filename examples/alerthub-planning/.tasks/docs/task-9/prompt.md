@@ -1,4 +1,4 @@
-# Task 9: Monitoring and Observability Stack (Bolt - Kubernetes)
+# Task 9: Setup Observability Stack (Bolt - Kubernetes)
 
 **Agent**: bolt | **Language**: yaml
 
@@ -8,43 +8,52 @@ You are a DevOps Engineer specializing in Kubernetes implementing Task 9.
 
 ## Goal
 
-Deploy comprehensive monitoring with Prometheus, Grafana, and centralized logging to track system health, performance metrics, and troubleshoot issues.
+Deploy Prometheus, Grafana, and logging infrastructure for monitoring, metrics collection, and alerting across all AlertHub services. Include custom dashboards and alert rules.
 
 ## Requirements
 
-Install Prometheus for metrics collection, Grafana for visualization dashboards, Loki for log aggregation, configure service discovery for automatic target discovery, create alerting rules for critical issues, and set up distributed tracing if needed.
+1. Deploy Prometheus with service discovery for all services
+2. Set up Grafana with AlertHub-specific dashboards
+3. Configure structured logging collection (Fluentd/Fluent Bit)
+4. Create custom metrics for notification throughput and latency
+5. Set up alerting rules for service health and performance
+6. Implement distributed tracing with Jaeger
+7. Add log aggregation and search capabilities
+8. Create SLI/SLO dashboards for 99.9% uptime goal
+9. Set up notification delivery success rate monitoring
+10. Configure alert routing to operations team
 
 ## Acceptance Criteria
 
-Prometheus collects metrics from all services, Grafana dashboards display accurate data, logs are centralized and searchable, alerts fire for test conditions, and monitoring stack is highly available
+Prometheus collects metrics from all services, Grafana dashboards display accurate data, logs are aggregated and searchable, alerts fire correctly for test failures, traces show request flow across services, and SLI/SLO metrics track against targets.
 
 ## Constraints
 
-- Match existing codebase patterns and style
-- Create PR with atomic, well-described commits
-- Include unit tests for new functionality
-- PR title: `feat(task-9): Monitoring and Observability Stack (Bolt - Kubernetes)`
+- Match existing codebase patterns
+- Create PR with atomic commits
+- Include unit tests
+- PR title: `feat(task-9): Setup Observability Stack (Bolt - Kubernetes)`
 
 ## Decision Points
 
-### d17: Metrics retention and storage strategy
-**Category**: performance | **Constraint**: open
-
-Options:
-1. 15 days local storage
-2. long-term storage with Thanos
-3. cloud-based metrics storage
-
-### d18: Log aggregation approach
+### d17: Should we use a centralized logging solution like ELK stack or simpler log aggregation?
 **Category**: architecture | **Constraint**: open
 
 Options:
-1. Loki with Promtail
-2. Elasticsearch with Fluent Bit
-3. cloud provider logging service
+1. elk-stack
+2. loki-grafana
+3. simple-aggregation
+
+### d18: How long should metrics and logs be retained?
+**Category**: performance | **Constraint**: soft | ⚠️ **Requires Approval**
+
+Options:
+1. 7-days
+2. 30-days
+3. 90-days
 
 
 ## Resources
 
 - PRD: `.tasks/docs/prd.md`
-- Dependencies: task-1, task-2, task-3, task-4
+- Dependencies: task-8

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <task id="4" priority="high" agent="grizz">
     <meta>
-        <title>Admin API gRPC Service (Grizz - Go/gRPC)</title>
+        <title>Develop Admin API Service (Grizz - Go/gRPC)</title>
         <priority>high</priority>
         <dependencies>task-1</dependencies>
         <agent_hint>grizz</agent_hint>
@@ -10,39 +10,48 @@
     <role>You are a Go Engineer specializing in APIs and backend services. Implement Task 4 with production-quality code.</role>
 
     <context>
-        <overview>Implement the management API for tenants, users, rules, and analytics using Go gRPC with grpc-gateway for REST compatibility.</overview>
+        <overview>Build the gRPC-based admin API in Go for managing tenants, users, notification rules, and analytics. Includes grpc-gateway for REST endpoints and JWT authentication.</overview>
         <background>
-            This task is part of AlertHub notification platform. Key resources:
-            - PRD: .tasks/docs/prd.md (full requirements and architecture)
+            This task is part of AlertHub notification platform.
+            - PRD: .tasks/docs/prd.md
             - Related tasks: task-1
         </background>
     </context>
 
     <requirements>
-        <description>Generate Go code from protobuf definitions for TenantService, UserService, RuleService, and AnalyticsService. Implement JWT authentication, RBAC, PostgreSQL integration, Redis caching, and audit logging. Add grpc-gateway for REST API compatibility.</description>
+        <description>1. Set up Go project with gRPC and grpc-gateway
+2. Define protobuf schemas for all services (Tenant, User, Rule, Analytics)
+3. Implement gRPC server with service handlers
+4. Add PostgreSQL integration for data persistence
+5. Build JWT authentication with refresh tokens
+6. Implement role-based access control (RBAC)
+7. Create notification rules engine
+8. Add analytics aggregation logic
+9. Set up grpc-gateway for REST endpoints
+10. Add audit logging and health checks</description>
         <constraints>
-            <constraint>Match existing codebase patterns and conventions</constraint>
-            <constraint>Create PR with atomic, well-described commits</constraint>
-            <constraint>Include unit tests for new functionality</constraint>
-            <constraint>PR title format: feat(task-4): Admin API gRPC Service (Grizz - Go/gRPC)</constraint>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-4): Develop Admin API Service (Grizz - Go/gRPC)</constraint>
         </constraints>
     </requirements>
 
     <acceptance_criteria>
-        <criterion>All requirements from task description implemented</criterion>
+        <criterion>All requirements implemented</criterion>
         <criterion>Tests passing with adequate coverage</criterion>
-        <criterion>Code follows project conventions and style guide</criterion>
-        <criterion>All gRPC services respond correctly, REST endpoints work via grpc-gateway, JWT authentication validates tokens, RBAC enforces permissions, CRUD operations persist to PostgreSQL, and audit logs are created for sensitive operations</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>gRPC server starts successfully, all service methods work correctly, JWT authentication validates tokens, RBAC prevents unauthorized access, rules engine filters notifications correctly, analytics return accurate data, and REST endpoints via grpc-gateway function properly.</criterion>
     </acceptance_criteria>
 
     <decision_points>
-        <decision_point id="d7" category="security" constraint="soft" requires_approval="false">
-            <description>JWT token expiration and refresh strategy</description>
-            <options><option>15 minute access tokens with refresh tokens</option><option>1 hour access tokens with sliding refresh</option><option>configurable token lifetime per tenant</option></options>
+        <decision_point id="d7" category="security" constraint="soft" requires_approval="true">
+            <description>What JWT token expiration times should be used for access and refresh tokens?</description>
+            <options><option>15min-access-7day-refresh</option><option>1hour-access-30day-refresh</option><option>configurable-per-tenant</option></options>
         </decision_point>
         <decision_point id="d8" category="data-model" constraint="open" requires_approval="false">
-            <description>Analytics data aggregation frequency</description>
-            <options><option>real-time aggregation</option><option>hourly batch aggregation</option><option>daily aggregation with real-time approximations</option></options>
+            <description>How should notification rules be structured for maximum flexibility?</description>
+            <options><option>json-based-rules</option><option>sql-like-dsl</option><option>visual-builder-schema</option></options>
         </decision_point>
     </decision_points>
 
@@ -53,8 +62,8 @@
     </validation>
 
     <deliverables>
-        <deliverable>Working implementation of described functionality</deliverable>
-        <deliverable>Unit tests covering new code paths</deliverable>
-        <deliverable>Pull request with clear description</deliverable>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
     </deliverables>
 </task>

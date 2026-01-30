@@ -1,18 +1,26 @@
-# Subtask 10.2: Core Notification Flow Integration Tests
+# Subtask 10.2: Implement core notification flow and delivery verification tests
 
-## Context
-This is a subtask of Task 10. Complete this before moving to dependent subtasks.
+**Parent Task:** Implement End-to-End Integration Tests (Grizz - Go/Testing)
+**Agent:** grizz | **Language:** go
 
 ## Description
-Build comprehensive tests that validate the complete notification lifecycle from submission through final delivery across all supported channels.
 
-## Implementation Details
-Implement Go test suite that creates notifications of various types (email, SMS, push, WebSocket), submits them to the system, and verifies each step: routing decisions through Rex service, delivery attempts via Nova service, status updates, retry mechanisms, and final delivery confirmations. Test different notification priorities, user preferences, and fallback scenarios. Validate notification content transformation and channel-specific formatting.
+Create comprehensive tests for the complete notification submission, routing, and delivery process across all supported channels and platforms.
+
+## Details
+
+Implement notification submission and routing tests covering tenant-specific configurations. Add delivery verification for each channel (Slack, Discord, email) with actual API calls and response validation. Test WebSocket real-time updates across web and desktop clients. Verify mobile push notification delivery with proper device token handling. Include message formatting, attachment handling, and channel-specific feature validation.
 
 ## Dependencies
+
 task-10.1
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-10/prompt.md`
+- PRD: `.tasks/docs/prd.md`

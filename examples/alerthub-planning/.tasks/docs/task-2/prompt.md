@@ -1,4 +1,4 @@
-# Task 2: Notification Router Core Service (Rex - Rust/Axum)
+# Task 2: Implement Notification Router Service (Rex - Rust/Axum)
 
 **Agent**: rex | **Language**: rust
 
@@ -8,40 +8,49 @@ You are a Rust Engineer specializing in high-performance systems implementing Ta
 
 ## Goal
 
-Build the high-performance notification routing service that validates, processes, and routes notifications with rate limiting and priority queues.
+Build the high-performance core notification routing service in Rust using Axum. This service receives notifications, applies rate limiting, handles deduplication, and routes messages to the integration service via Kafka.
 
 ## Requirements
 
-Implement Axum web server with endpoints for notification submission, batch processing, status queries, and WebSocket support. Add PostgreSQL integration with sqlx, Redis rate limiting, Kafka event publishing, and Prometheus metrics. Include priority queue processing and deduplication logic.
+1. Set up Axum application structure with middleware
+2. Implement PostgreSQL connection pool with sqlx
+3. Create notification data models and database schema
+4. Build POST /api/v1/notifications endpoint with validation
+5. Implement rate limiting using Redis
+6. Add deduplication logic with configurable TTL
+7. Set up Kafka producer for routing to integration service
+8. Create priority queue processing (critical, high, normal, low)
+9. Add WebSocket endpoint for real-time updates
+10. Implement health checks and Prometheus metrics
 
 ## Acceptance Criteria
 
-API endpoints return correct responses, rate limiting blocks excess requests, notifications are persisted to PostgreSQL, events are published to Kafka, WebSocket connections receive real-time updates, and /metrics endpoint returns valid Prometheus format
+Service starts successfully, all endpoints return expected responses, notifications are persisted to PostgreSQL, rate limiting blocks excessive requests, messages are published to Kafka, WebSocket connections work, and health/metrics endpoints are accessible.
 
 ## Constraints
 
-- Match existing codebase patterns and style
-- Create PR with atomic, well-described commits
-- Include unit tests for new functionality
-- PR title: `feat(task-2): Notification Router Core Service (Rex - Rust/Axum)`
+- Match existing codebase patterns
+- Create PR with atomic commits
+- Include unit tests
+- PR title: `feat(task-2): Implement Notification Router Service (Rex - Rust/Axum)`
 
 ## Decision Points
 
-### d3: Dead letter queue implementation strategy
+### d3: How should we handle database connection failures and recovery?
 **Category**: error-handling | **Constraint**: open
 
 Options:
-1. Redis-based dead letter queue
-2. Kafka dead letter topic
-3. PostgreSQL table for failed notifications
+1. fail-fast
+2. circuit-breaker
+3. retry-with-backoff
 
-### d4: Deduplication TTL configuration
-**Category**: performance | **Constraint**: soft
+### d4: What should be the default rate limit per tenant?
+**Category**: performance | **Constraint**: soft | ⚠️ **Requires Approval**
 
 Options:
-1. 1 hour default TTL
-2. configurable per tenant
-3. 24 hour fixed TTL
+1. 100-per-minute
+2. 1000-per-minute
+3. configurable-per-tenant
 
 
 ## Resources

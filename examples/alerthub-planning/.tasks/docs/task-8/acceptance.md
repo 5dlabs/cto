@@ -1,7 +1,7 @@
 # Acceptance Criteria: Task 8
 
-- [ ] Configure Kubernetes ingress, service mesh networking, and cross-service communication with proper security policies and load balancing.
-- [ ] External endpoints are accessible via ingress, internal service communication works correctly, network policies block unauthorized traffic, load balancing distributes traffic evenly, and TLS certificates are valid and auto-renewing
+- [ ] Create Kubernetes deployment manifests for all services with proper scaling, health checks, secrets management, and network policies. Set up ingress and service mesh for external access.
+- [ ] All services deploy successfully to Kubernetes, pods scale up/down with HPA, health checks pass consistently, services can communicate internally, external traffic routes correctly through ingress, secrets are mounted securely, and network policies prevent unauthorized access.
 - [ ] All requirements implemented
 - [ ] Tests passing (`helm lint charts/*` exits 0)
 - [ ] Lints passing (`kubectl apply --dry-run=client -f . -R` exits 0)

@@ -1,7 +1,7 @@
 # Acceptance Criteria: Task 4
 
-- [ ] Implement the management API for tenants, users, rules, and analytics using Go gRPC with grpc-gateway for REST compatibility.
-- [ ] All gRPC services respond correctly, REST endpoints work via grpc-gateway, JWT authentication validates tokens, RBAC enforces permissions, CRUD operations persist to PostgreSQL, and audit logs are created for sensitive operations
+- [ ] Build the gRPC-based admin API in Go for managing tenants, users, notification rules, and analytics. Includes grpc-gateway for REST endpoints and JWT authentication.
+- [ ] gRPC server starts successfully, all service methods work correctly, JWT authentication validates tokens, RBAC prevents unauthorized access, rules engine filters notifications correctly, analytics return accurate data, and REST endpoints via grpc-gateway function properly.
 - [ ] All requirements implemented
 - [ ] Tests passing (`go test ./...` exits 0)
 - [ ] Lints passing (`golangci-lint run` exits 0)

@@ -1,18 +1,26 @@
-# Subtask 1.1: Setup Kubernetes Namespace Structure and Base Configuration
+# Subtask 1.1: Deploy Database Services (PostgreSQL and MongoDB)
 
-## Context
-This is a subtask of Task 1. Complete this before moving to dependent subtasks.
+**Parent Task:** Setup Infrastructure Components (Bolt - Kubernetes)
+**Agent:** bolt | **Language:** yaml
 
 ## Description
-Create organized namespace structure for infrastructure components with proper RBAC, network policies, and resource quotas
 
-## Implementation Details
-Create namespaces for each infrastructure component (postgresql, redis, kafka, mongodb, rabbitmq, seaweedfs). Set up ServiceAccounts, ClusterRoles, and RoleBindings. Configure default network policies for inter-namespace communication. Establish resource quotas and limit ranges for each namespace.
+Set up core database infrastructure including PostgreSQL cluster with CloudNative-PG operator for the alerthub database and Percona MongoDB cluster for integration configurations storage.
+
+## Details
+
+Deploy CloudNative-PG PostgreSQL cluster with alerthub database configuration, including proper backup policies and monitoring. Deploy Percona MongoDB operator and create cluster for storing integration configurations. Configure persistent storage, resource limits, and health checks for both database services.
 
 ## Dependencies
-None (can start immediately)
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+None
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-1/prompt.md`
+- PRD: `.tasks/docs/prd.md`

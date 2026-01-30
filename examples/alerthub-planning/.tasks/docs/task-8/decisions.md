@@ -4,63 +4,41 @@ This document tracks decisions made during implementation.
 
 ## Predicted Decision Points
 
-### D15: Service mesh technology choice
+### D15: Should we use a service mesh (Istio/Linkerd) for service-to-service communication? ⚠️ REQUIRES APPROVAL
 
 **Category:** architecture
-**Constraint:** open
+**Constraint:** escalation
 
-**Options to consider:**
-- [ ] Istio for full-featured service mesh
-- [ ] Linkerd for lightweight service mesh
-- [ ] no service mesh, use standard Kubernetes networking
+**Options:**
+- [ ] no-service-mesh
+- [ ] istio
+- [ ] linkerd
 
 **Your decision:** _________________
-
 **Rationale:** _________________
-
-**Alternatives considered:** _________________
-
 **Confidence (1-5):** ___
 
 ---
 
-### D16: TLS certificate management strategy
+### D16: What resource requests and limits should be set for each service?
 
-**Category:** security
-**Constraint:** soft
+**Category:** performance
+**Constraint:** open
 
-**Options to consider:**
-- [ ] cert-manager with Let's Encrypt
-- [ ] manual certificate management
-- [ ] cloud provider managed certificates
+**Options:**
+- [ ] minimal-resources
+- [ ] moderate-resources
+- [ ] resource-profiling-first
 
 **Your decision:** _________________
-
 **Rationale:** _________________
-
-**Alternatives considered:** _________________
-
 **Confidence (1-5):** ___
 
 ---
 
 ## Additional Decisions
 
-Document any other significant decisions made during implementation:
-
-### (Add decision title here)
-
+### (Add title here)
 **Category:** (architecture | error-handling | data-model | api-design | ux-behavior | performance | security)
 **Decision:** _________________
 **Rationale:** _________________
-**Alternatives considered:** _________________
-**Confidence (1-5):** ___
-
----
-
-## Summary
-
-| Decision ID | Choice Made | Confidence |
-|-------------|-------------|------------|
-| D15 | ___ | ___ |
-| D16 | ___ | ___ |

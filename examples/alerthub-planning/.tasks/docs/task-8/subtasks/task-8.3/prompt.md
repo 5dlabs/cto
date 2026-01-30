@@ -1,18 +1,26 @@
-# Subtask 8.3: Configure Network Policies and Service Isolation
+# Subtask 8.3: Implement Secrets Management and Monitoring
 
-## Context
-This is a subtask of Task 8. Complete this before moving to dependent subtasks.
+**Parent Task:** Configure Kubernetes Deployments (Bolt - Kubernetes)
+**Agent:** bolt | **Language:** yaml
 
 ## Description
-Implement Kubernetes network policies to enforce service isolation and security boundaries
 
-## Implementation Details
-Create namespace-based network policies, define ingress and egress rules for service communication, implement pod-to-pod communication restrictions, configure firewall rules at the network level, and set up monitoring for policy violations
+Configure Kubernetes secrets, service mesh integration, and observability stack for production readiness
+
+## Details
+
+Set up Kubernetes secrets for sensitive configuration data (API keys, database credentials). Configure service mesh (Istio/Linkerd) for advanced traffic management and security. Implement monitoring with Prometheus/Grafana and logging with ELK stack or similar. Create ConfigMaps for non-sensitive configuration.
 
 ## Dependencies
-task-8.2
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+task-8.1, task-8.2
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-8/prompt.md`
+- PRD: `.tasks/docs/prd.md`

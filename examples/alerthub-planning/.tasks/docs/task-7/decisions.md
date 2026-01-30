@@ -4,63 +4,42 @@ This document tracks decisions made during implementation.
 
 ## Predicted Decision Points
 
-### D13: System tray notification display strategy
+### D13: How should the mini popup window be triggered?
 
 **Category:** ux-behavior
 **Constraint:** soft
 
-**Options to consider:**
-- [ ] show last 5 notifications in tray menu
-- [ ] show unread count only
-- [ ] show preview of latest notification
+**Options:**
+- [ ] hover-tray-icon
+- [ ] click-tray-icon
+- [ ] keyboard-shortcut
+- [ ] configurable
 
 **Your decision:** _________________
-
 **Rationale:** _________________
-
-**Alternatives considered:** _________________
-
 **Confidence (1-5):** ___
 
 ---
 
-### D14: WebSocket connection management for desktop app
+### D14: Should desktop client store authentication tokens securely in system keychain? ⚠️ REQUIRES APPROVAL
 
-**Category:** performance
-**Constraint:** open
+**Category:** security
+**Constraint:** hard
 
-**Options to consider:**
-- [ ] persistent connection with auto-reconnect
-- [ ] connect only when app is active
-- [ ] configurable connection strategy
+**Options:**
+- [ ] system-keychain
+- [ ] encrypted-local-storage
+- [ ] session-only
 
 **Your decision:** _________________
-
 **Rationale:** _________________
-
-**Alternatives considered:** _________________
-
 **Confidence (1-5):** ___
 
 ---
 
 ## Additional Decisions
 
-Document any other significant decisions made during implementation:
-
-### (Add decision title here)
-
+### (Add title here)
 **Category:** (architecture | error-handling | data-model | api-design | ux-behavior | performance | security)
 **Decision:** _________________
 **Rationale:** _________________
-**Alternatives considered:** _________________
-**Confidence (1-5):** ___
-
----
-
-## Summary
-
-| Decision ID | Choice Made | Confidence |
-|-------------|-------------|------------|
-| D13 | ___ | ___ |
-| D14 | ___ | ___ |

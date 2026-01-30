@@ -1,18 +1,26 @@
-# Subtask 4.2: Implement JWT authentication and RBAC system
+# Subtask 4.2: Implement core gRPC services with PostgreSQL integration
 
-## Context
-This is a subtask of Task 4. Complete this before moving to dependent subtasks.
+**Parent Task:** Develop Admin API Service (Grizz - Go/gRPC)
+**Agent:** grizz | **Language:** go
 
 ## Description
-Build authentication middleware with JWT token validation and role-based access control for gRPC services
 
-## Implementation Details
-Create JWT middleware for gRPC interceptors, implement token validation, user role extraction, and permission checking. Design RBAC system with roles like admin, tenant-admin, user. Add authentication context propagation across service calls.
+Build the main gRPC service handlers for tenant, user, rule, and analytics management with full PostgreSQL database integration and data persistence layer.
+
+## Details
+
+Implement gRPC service handlers for all defined protobuf services. Create PostgreSQL database schema with proper indexing and constraints. Build data access layer with connection pooling, transaction management, and error handling. Implement CRUD operations for tenants, users, notification rules, and analytics data storage.
 
 ## Dependencies
+
 task-4.1
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-4/prompt.md`
+- PRD: `.tasks/docs/prd.md`

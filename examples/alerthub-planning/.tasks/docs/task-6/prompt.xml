@@ -1,58 +1,69 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <task id="6" priority="medium" agent="tap">
     <meta>
-        <title>Mobile Push Notification App (Tap - Expo)</title>
+        <title>Develop Mobile Application (Tap - Expo/React Native)</title>
         <priority>medium</priority>
-        <dependencies>task-3, task-4</dependencies>
+        <dependencies>task-2, task-3, task-4</dependencies>
         <agent_hint>tap</agent_hint>
     </meta>
 
     <role>You are a Mobile Engineer specializing in React Native and Expo. Implement Task 6 with production-quality code.</role>
 
     <context>
-        <overview>Develop mobile application using Expo SDK 50+ for receiving push notifications and managing user preferences.</overview>
+        <overview>Build the mobile app using Expo SDK 50+ and React Native with push notification support, offline caching, and biometric authentication for iOS and Android.</overview>
         <background>
-            This task is part of AlertHub notification platform. Key resources:
-            - PRD: .tasks/docs/prd.md (full requirements and architecture)
-            - Related tasks: task-3, task-4
+            This task is part of AlertHub notification platform.
+            - PRD: .tasks/docs/prd.md
+            - Related tasks: task-2, task-3, task-4
         </background>
     </context>
 
     <requirements>
-        <description>Create Expo app with screens for notification feed, detail view, integrations, settings, and profile. Implement FCM/APNs push registration, biometric authentication, offline caching, pull-to-refresh, deep linking, and NativeWind styling.</description>
+        <description>1. Initialize Expo project with React Native and NativeWind
+2. Set up navigation with bottom tabs and stack navigation
+3. Implement push notification registration (FCM/APNs)
+4. Build notification feed screen with pull-to-refresh
+5. Create notification detail screen with actions
+6. Add biometric authentication (Face ID, fingerprint)
+7. Implement offline notification caching with AsyncStorage
+8. Build integrations and settings screens
+9. Add deep linking for notification details
+10. Configure app badge count and background processing</description>
         <constraints>
-            <constraint>Match existing codebase patterns and conventions</constraint>
-            <constraint>Create PR with atomic, well-described commits</constraint>
-            <constraint>Include unit tests for new functionality</constraint>
-            <constraint>PR title format: feat(task-6): Mobile Push Notification App (Tap - Expo)</constraint>
+            <constraint>Match existing codebase patterns</constraint>
+            <constraint>Create PR with atomic commits</constraint>
+            <constraint>Include unit tests</constraint>
+            <constraint>PR title: feat(task-6): Develop Mobile Application (Tap - Expo/React Native)</constraint>
         </constraints>
     </requirements>
 
     <acceptance_criteria>
-        <criterion>All requirements from task description implemented</criterion>
+        <criterion>All requirements implemented</criterion>
         <criterion>Tests passing with adequate coverage</criterion>
-        <criterion>Code follows project conventions and style guide</criterion>
-        <criterion>App builds successfully, push notifications are received and displayed, biometric auth works on supported devices, offline notifications are cached and sync when online, deep links navigate to correct screens, and pull-to-refresh updates data</criterion>
+        <criterion>Code follows project conventions</criterion>
+        <criterion>App builds for both iOS and Android, push notifications are received and displayed, biometric authentication works, offline cached notifications are available, navigation flows correctly, deep links open specific notifications, and app badge shows unread count.</criterion>
     </acceptance_criteria>
 
     <decision_points>
-        <decision_point id="d11" category="ux-behavior" constraint="soft" requires_approval="false">
-            <description>Push notification interaction behavior</description>
-            <options><option>tap opens notification detail</option><option>tap opens main feed</option><option>show action buttons on notification</option></options>
+        <decision_point id="d11" category="ux-behavior" constraint="soft" requires_approval="true">
+            <description>How should push notifications be grouped when multiple arrive quickly?</description>
+            <options><option>individual-notifications</option><option>grouped-by-channel</option><option>summary-notification</option></options>
         </decision_point>
-        <decision_point id="d12" category="data-model" constraint="open" requires_approval="false">
-            <description>Offline notification storage strategy</description>
-            <options><option>SQLite for full offline support</option><option>AsyncStorage for simple caching</option><option>Expo SecureStore for sensitive data only</option></options>
+        <decision_point id="d12" category="performance" constraint="soft" requires_approval="false">
+            <description>How many notifications should be cached offline?</description>
+            <options><option>last-100</option><option>last-500</option><option>configurable-limit</option></options>
         </decision_point>
     </decision_points>
 
     <validation>
-        <command>run tests</command>
+        <command>npx expo-doctor</command>
+        <command>npm run lint</command>
+        <command>npm run test</command>
     </validation>
 
     <deliverables>
-        <deliverable>Working implementation of described functionality</deliverable>
-        <deliverable>Unit tests covering new code paths</deliverable>
-        <deliverable>Pull request with clear description</deliverable>
+        <deliverable>Working implementation</deliverable>
+        <deliverable>Unit tests</deliverable>
+        <deliverable>Pull request</deliverable>
     </deliverables>
 </task>

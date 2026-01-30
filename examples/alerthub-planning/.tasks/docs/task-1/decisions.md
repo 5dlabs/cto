@@ -4,61 +4,39 @@ This document tracks decisions made during implementation.
 
 ## Predicted Decision Points
 
-### D1: Single namespace vs multiple namespaces for different infrastructure types
+### D1: Should we use a single namespace or separate namespaces for different infrastructure types (databases, messaging, storage)?
 
 **Category:** architecture
-**Constraint:** open
+**Constraint:** soft
 
-**Options to consider:**
-- [ ] single alerthub namespace
-- [ ] separate namespaces by type (databases, messaging, storage)
+**Options:**
+- [ ] single-namespace
+- [ ] multi-namespace
 
 **Your decision:** _________________
-
 **Rationale:** _________________
-
-**Alternatives considered:** _________________
-
 **Confidence (1-5):** ___
 
 ---
 
-### D2: Storage class selection for persistent volumes
+### D2: What resource limits should be set for each infrastructure component in development vs production? ⚠️ REQUIRES APPROVAL
 
 **Category:** performance
-**Constraint:** soft
+**Constraint:** escalation
 
-**Options to consider:**
-- [ ] default storage class
-- [ ] fast SSD storage class for databases
+**Options:**
+- [ ] minimal-resources
+- [ ] production-like-resources
 
 **Your decision:** _________________
-
 **Rationale:** _________________
-
-**Alternatives considered:** _________________
-
 **Confidence (1-5):** ___
 
 ---
 
 ## Additional Decisions
 
-Document any other significant decisions made during implementation:
-
-### (Add decision title here)
-
+### (Add title here)
 **Category:** (architecture | error-handling | data-model | api-design | ux-behavior | performance | security)
 **Decision:** _________________
 **Rationale:** _________________
-**Alternatives considered:** _________________
-**Confidence (1-5):** ___
-
----
-
-## Summary
-
-| Decision ID | Choice Made | Confidence |
-|-------------|-------------|------------|
-| D1 | ___ | ___ |
-| D2 | ___ | ___ |

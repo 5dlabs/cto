@@ -1,4 +1,4 @@
-# Task 5: Web Console with Effect Integration (Blaze - React/Next.js)
+# Task 5: Create Web Console Application (Blaze - React/Next.js)
 
 **Agent**: blaze | **Language**: tsx
 
@@ -8,40 +8,50 @@ You are a Frontend Engineer specializing in React and Next.js implementing Task 
 
 ## Goal
 
-Build the web-based dashboard and management interface using Next.js 15 with Effect TypeScript for type-safe data fetching and form validation.
+Build the primary web interface using Next.js 15, React 19, and Effect TypeScript for type-safe data fetching and validation. Includes dashboard, notifications, integrations, rules, and analytics pages.
 
 ## Requirements
 
-Create Next.js app with pages for dashboard, notifications, integrations, rules, settings, and analytics. Implement Effect Schema for validation, TanStack Query with Effect for data fetching, WebSocket integration with Effect Stream, and shadcn/ui components with TailwindCSS styling.
+1. Initialize Next.js 15 project with App Router and TypeScript
+2. Set up shadcn/ui components and TailwindCSS styling
+3. Integrate Effect for schema validation and data fetching
+4. Build authentication flow with JWT tokens
+5. Create dashboard with notification overview
+6. Implement real-time notification feed with WebSocket Effect Stream
+7. Build integration management interface with OAuth flows
+8. Create visual rule builder with drag-and-drop
+9. Add analytics page with charts (recharts)
+10. Implement dark/light theme support
 
 ## Acceptance Criteria
 
-All pages load correctly, WebSocket receives real-time updates, forms validate with Effect Schema, API calls succeed with proper error handling, responsive design works on mobile, and dark/light theme switching functions
+Application builds and runs successfully, all pages render correctly, authentication works with backend APIs, real-time notifications appear in feed, integrations can be created and managed, rules can be built visually, analytics display accurate charts, and theme switching functions properly.
 
 ## Constraints
 
-- Match existing codebase patterns and style
-- Create PR with atomic, well-described commits
-- Include unit tests for new functionality
-- PR title: `feat(task-5): Web Console with Effect Integration (Blaze - React/Next.js)`
+- Match existing codebase patterns
+- Create PR with atomic commits
+- Include unit tests
+- PR title: `feat(task-5): Create Web Console Application (Blaze - React/Next.js)`
 
 ## Decision Points
 
-### d9: Real-time notification feed update strategy
-**Category**: ux-behavior | **Constraint**: soft
+### d9: How should real-time notifications be displayed to avoid overwhelming the user?
+**Category**: ux-behavior | **Constraint**: soft | ⚠️ **Requires Approval**
 
 Options:
-1. append new notifications to top
-2. show notification count with manual refresh
-3. auto-scroll to new notifications
+1. toast-notifications
+2. sidebar-feed
+3. modal-popups
+4. badge-indicators
 
-### d10: Notification history pagination approach
-**Category**: performance | **Constraint**: open
+### d10: Should we use Server Components or Client Components for data-heavy pages?
+**Category**: architecture | **Constraint**: open
 
 Options:
-1. cursor-based pagination
-2. offset-based pagination
-3. infinite scroll with virtual scrolling
+1. server-components
+2. client-components
+3. hybrid-approach
 
 
 ## Resources

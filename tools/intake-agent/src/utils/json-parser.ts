@@ -1,100 +1,226 @@
 /**
- * Robust JSON parsing utilities with streaming support and fallback.
- * Based on patterns from Taskmaster AI.
+ * Robust JSON parsing utilities with streaming support, repair, and fallback.
+ * Based on patterns from Taskmaster AI with enhanced error recovery.
  */
 
 import { JSONParser } from '@streamparser/json';
+import { jsonrepair } from 'jsonrepair';
 
 /**
- * Clean markdown code blocks from JSON text.
+ * Clean markdown code blocks and common formatting from JSON text.
  */
 export function cleanJsonText(text: string): string {
   return text
-    .replace(/^```(?:json)?\s*\n?/i, '')
-    .replace(/\n?```\s*$/i, '')
+    // Remove markdown code blocks
+    .replace(/^```(?:json)?\s*\n?/gim, '')
+    .replace(/\n?```\s*$/gim, '')
+    // Remove leading/trailing whitespace
     .trim();
 }
 
 /**
- * Extract JSON object from response text, handling various formats.
+ * Attempt to repair malformed JSON using jsonrepair library.
+ * Handles common issues like:
+ * - Missing closing brackets/braces
+ * - Trailing commas
+ * - Unquoted keys
+ * - Single quotes instead of double
  */
-export function extractJsonObject<T>(text: string, key: string): T | null {
-  const cleaned = cleanJsonText(text);
-  
+export function repairJson(text: string): string {
   try {
-    const parsed = JSON.parse(cleaned);
-    
-    // If it has the expected key, return the value
-    if (parsed && typeof parsed === 'object' && key in parsed) {
-      return parsed[key] as T;
-    }
-    
-    // If it's an array directly, return it
-    if (Array.isArray(parsed)) {
-      return parsed as T;
-    }
-    
-    return null;
+    return jsonrepair(text);
   } catch {
-    // Try to find and extract JSON from the text
-    return extractJsonFromText(cleaned, key);
+    // If repair fails, return original
+    return text;
   }
 }
 
 /**
- * Try to extract JSON from text that may contain prose.
+ * Extract JSON array from text, handling various edge cases.
+ * Tries multiple strategies in order of preference.
  */
-function extractJsonFromText<T>(text: string, key: string): T | null {
-  // Look for JSON object with the key
-  const keyPattern = new RegExp(`"${key}"\\s*:\\s*\\[`);
+export function extractJsonArray<T>(text: string, key?: string): T[] | null {
+  const cleaned = cleanJsonText(text);
+  
+  // Strategy 1: Direct parse (fastest path)
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (key && typeof parsed === 'object' && parsed !== null && key in parsed) {
+      const arr = parsed[key];
+      if (Array.isArray(arr)) return arr as T[];
+    }
+    if (Array.isArray(parsed)) return parsed as T[];
+  } catch {
+    // Continue to repair strategies
+  }
+
+  // Strategy 2: Repair and parse
+  try {
+    const repaired = repairJson(cleaned);
+    const parsed = JSON.parse(repaired);
+    if (key && typeof parsed === 'object' && parsed !== null && key in parsed) {
+      const arr = parsed[key];
+      if (Array.isArray(arr)) return arr as T[];
+    }
+    if (Array.isArray(parsed)) return parsed as T[];
+  } catch {
+    // Continue to extraction strategies
+  }
+
+  // Strategy 3: Find and extract JSON object with key
+  if (key) {
+    const extracted = extractJsonObjectWithKey<T[]>(cleaned, key);
+    if (extracted) return extracted;
+  }
+
+  // Strategy 4: Find array directly in text
+  const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    try {
+      const repaired = repairJson(arrayMatch[0]);
+      const parsed = JSON.parse(repaired);
+      if (Array.isArray(parsed)) return parsed as T[];
+    } catch {
+      // Continue to object extraction
+    }
+  }
+
+  // Strategy 5: Extract individual objects from malformed array
+  const objects = extractIndividualObjects<T>(cleaned);
+  if (objects.length > 0) return objects;
+
+  return null;
+}
+
+/**
+ * Extract JSON object that contains a specific key.
+ */
+function extractJsonObjectWithKey<T>(text: string, key: string): T | null {
+  // Find the key pattern
+  const keyPattern = new RegExp(`["']?${key}["']?\\s*:\\s*\\[`);
   const match = text.match(keyPattern);
   
   if (!match || match.index === undefined) {
     return null;
   }
-  
-  // Find the start of the JSON object
+
+  // Find the opening brace before the key
   let start = match.index;
-  while (start > 0 && text[start - 1] !== '{') {
+  while (start > 0 && text[start] !== '{') {
     start--;
   }
-  if (start > 0) start--; // Include the {
-  
-  // Try to parse from this position
+
+  // Extract from the opening brace to the end, then repair
   const substring = text.slice(start);
   
   try {
-    // Find matching braces
-    let depth = 0;
-    let end = 0;
-    for (let i = 0; i < substring.length; i++) {
-      if (substring[i] === '{') depth++;
-      if (substring[i] === '}') depth--;
-      if (depth === 0 && i > 0) {
-        end = i + 1;
-        break;
-      }
-    }
-    
-    if (end > 0) {
-      const jsonStr = substring.slice(0, end);
-      const parsed = JSON.parse(jsonStr);
-      if (parsed && key in parsed) {
-        return parsed[key] as T;
-      }
+    const repaired = repairJson(substring);
+    const parsed = JSON.parse(repaired);
+    if (parsed && typeof parsed === 'object' && key in parsed) {
+      return parsed[key] as T;
     }
   } catch {
-    // Continue to fallback
+    // Try finding the array directly after the key
+    const arrayStart = match.index + match[0].length - 1; // Position of [
+    const arraySubstring = text.slice(arrayStart);
+    
+    try {
+      const repaired = repairJson(arraySubstring);
+      const parsed = JSON.parse(repaired);
+      if (Array.isArray(parsed)) return parsed as T;
+    } catch {
+      // Fall through
+    }
   }
-  
+
   return null;
+}
+
+/**
+ * Extract individual JSON objects from text that may be a malformed array.
+ * Useful when the array is incomplete but individual objects are valid.
+ */
+function extractIndividualObjects<T>(text: string): T[] {
+  const objects: T[] = [];
+  let depth = 0;
+  let objectStart = -1;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\' && inString) {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === '{') {
+      if (depth === 0) {
+        objectStart = i;
+      }
+      depth++;
+    } else if (char === '}') {
+      depth--;
+      if (depth === 0 && objectStart !== -1) {
+        const objectStr = text.slice(objectStart, i + 1);
+        try {
+          const repaired = repairJson(objectStr);
+          const obj = JSON.parse(repaired);
+          if (obj && typeof obj === 'object') {
+            objects.push(obj as T);
+          }
+        } catch {
+          // Skip malformed object
+        }
+        objectStart = -1;
+      }
+    }
+  }
+
+  // Try to parse any remaining incomplete object
+  if (objectStart !== -1 && depth > 0) {
+    const incompleteObj = text.slice(objectStart);
+    try {
+      const repaired = repairJson(incompleteObj);
+      const obj = JSON.parse(repaired);
+      if (obj && typeof obj === 'object') {
+        objects.push(obj as T);
+      }
+    } catch {
+      // Can't recover this object
+    }
+  }
+
+  return objects;
+}
+
+/**
+ * Extract JSON object from response text, handling various formats.
+ * This is the main entry point for non-array JSON extraction.
+ */
+export function extractJsonObject<T>(text: string, key: string): T | null {
+  const result = extractJsonArray<T>(text, key);
+  return result as T | null;
 }
 
 /**
  * Streaming JSON parser configuration.
  */
 export interface StreamParserConfig<T> {
-  /** JSON path to extract items from (e.g., '$.tasks.*') */
+  /** JSON path to extract items from (e.g., '$.tasks.*' or '$.*') */
   jsonPath: string;
   /** Key name in the response (e.g., 'tasks') */
   key: string;
@@ -108,6 +234,7 @@ export interface StreamParserConfig<T> {
 
 /**
  * Parse streaming text response with progress tracking.
+ * Falls back to repair-based parsing if streaming fails.
  */
 export async function parseStreamingJson<T>(
   textStream: AsyncIterable<string>,
@@ -115,6 +242,7 @@ export async function parseStreamingJson<T>(
 ): Promise<{ items: T[]; rawText: string }> {
   const items: T[] = [];
   let rawText = '';
+  let streamError: Error | null = null;
   
   const parser = new JSONParser({ paths: [config.jsonPath] });
   
@@ -127,23 +255,37 @@ export async function parseStreamingJson<T>(
   };
   
   parser.onError = (error: Error) => {
+    streamError = error;
     config.onError?.(error);
   };
   
   try {
     for await (const chunk of textStream) {
       rawText += chunk;
-      parser.write(chunk);
+      try {
+        parser.write(chunk);
+      } catch {
+        // Streaming parse error, continue collecting text for fallback
+      }
     }
-    parser.end();
+    try {
+      parser.end();
+    } catch {
+      // End error, use fallback
+    }
   } catch (error) {
-    // Streaming failed, try fallback
-    config.onError?.(error instanceof Error ? error : new Error(String(error)));
+    streamError = error instanceof Error ? error : new Error(String(error));
+    config.onError?.(streamError);
   }
   
-  // If streaming didn't get all items, try fallback parsing
-  if (items.length === 0 && rawText) {
-    const fallbackItems = extractJsonObject<T[]>(rawText, config.key);
+  // If streaming got items, use them
+  if (items.length > 0) {
+    return { items, rawText };
+  }
+
+  // Fallback: Use repair-based extraction
+  if (rawText) {
+    const fallbackItems = extractJsonArray<T>(rawText, config.key);
     if (fallbackItems && Array.isArray(fallbackItems)) {
       for (const item of fallbackItems) {
         if (!config.itemValidator || config.itemValidator(item)) {
@@ -169,9 +311,22 @@ export function parseJsonResponse<T>(
     return { success: false, error: 'Empty response' };
   }
   
-  const items = extractJsonObject<T[]>(text, key);
+  const items = extractJsonArray<T>(text, key);
   
-  if (!items || !Array.isArray(items)) {
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    // Last resort: try to extract individual objects without key
+    const directObjects = extractIndividualObjects<T>(text);
+    if (directObjects.length > 0) {
+      if (validator) {
+        const validItems = directObjects.filter(validator);
+        if (validItems.length > 0) {
+          return { success: true, items: validItems };
+        }
+      } else {
+        return { success: true, items: directObjects };
+      }
+    }
+    
     return { 
       success: false, 
       error: `Failed to extract ${key} array from response. Preview: ${text.slice(0, 200)}...` 
@@ -183,6 +338,12 @@ export function parseJsonResponse<T>(
     const validItems = items.filter(validator);
     if (validItems.length !== items.length) {
       console.warn(`Filtered out ${items.length - validItems.length} invalid items`);
+    }
+    if (validItems.length === 0) {
+      return { 
+        success: false, 
+        error: `All ${items.length} items failed validation` 
+      };
     }
     return { success: true, items: validItems };
   }
@@ -198,7 +359,7 @@ export function isValidTask(item: unknown): item is { id: number; title: string 
     typeof item === 'object' &&
     item !== null &&
     'id' in item &&
-    typeof (item as { id: unknown }).id === 'number' &&
+    (typeof (item as { id: unknown }).id === 'number' || typeof (item as { id: unknown }).id === 'string') &&
     'title' in item &&
     typeof (item as { title: unknown }).title === 'string'
   );
@@ -219,6 +380,7 @@ export function isValidComplexityAnalysis(item: unknown): item is { taskId: numb
     typeof item === 'object' &&
     item !== null &&
     'taskId' in item &&
-    typeof (item as { taskId: unknown }).taskId === 'number'
+    (typeof (item as { taskId: unknown }).taskId === 'number' || 
+     typeof (item as { taskId: unknown }).taskId === 'string')
   );
 }

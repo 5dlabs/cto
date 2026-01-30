@@ -4,63 +4,41 @@ This document tracks decisions made during implementation.
 
 ## Predicted Decision Points
 
-### D11: Push notification interaction behavior
+### D11: How should push notifications be grouped when multiple arrive quickly? ⚠️ REQUIRES APPROVAL
 
 **Category:** ux-behavior
 **Constraint:** soft
 
-**Options to consider:**
-- [ ] tap opens notification detail
-- [ ] tap opens main feed
-- [ ] show action buttons on notification
+**Options:**
+- [ ] individual-notifications
+- [ ] grouped-by-channel
+- [ ] summary-notification
 
 **Your decision:** _________________
-
 **Rationale:** _________________
-
-**Alternatives considered:** _________________
-
 **Confidence (1-5):** ___
 
 ---
 
-### D12: Offline notification storage strategy
+### D12: How many notifications should be cached offline?
 
-**Category:** data-model
-**Constraint:** open
+**Category:** performance
+**Constraint:** soft
 
-**Options to consider:**
-- [ ] SQLite for full offline support
-- [ ] AsyncStorage for simple caching
-- [ ] Expo SecureStore for sensitive data only
+**Options:**
+- [ ] last-100
+- [ ] last-500
+- [ ] configurable-limit
 
 **Your decision:** _________________
-
 **Rationale:** _________________
-
-**Alternatives considered:** _________________
-
 **Confidence (1-5):** ___
 
 ---
 
 ## Additional Decisions
 
-Document any other significant decisions made during implementation:
-
-### (Add decision title here)
-
+### (Add title here)
 **Category:** (architecture | error-handling | data-model | api-design | ux-behavior | performance | security)
 **Decision:** _________________
 **Rationale:** _________________
-**Alternatives considered:** _________________
-**Confidence (1-5):** ___
-
----
-
-## Summary
-
-| Decision ID | Choice Made | Confidence |
-|-------------|-------------|------------|
-| D11 | ___ | ___ |
-| D12 | ___ | ___ |

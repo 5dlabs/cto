@@ -1,18 +1,26 @@
-# Subtask 8.1: Deploy and Configure Ingress Controller
+# Subtask 8.1: Create Core Kubernetes Deployment Manifests
 
-## Context
-This is a subtask of Task 8. Complete this before moving to dependent subtasks.
+**Parent Task:** Configure Kubernetes Deployments (Bolt - Kubernetes)
+**Agent:** bolt | **Language:** yaml
 
 ## Description
-Install and configure NGINX or Traefik ingress controller with TLS termination for external traffic routing
 
-## Implementation Details
-Deploy ingress controller using Helm charts, configure DNS routing rules, set up SSL/TLS certificates for HTTPS termination, create ingress resources for external service exposure, and implement rate limiting and security headers
+Create deployment manifests for all backend services including proper resource allocation, scaling configuration, and health checks
+
+## Details
+
+Create deployment YAML files for each backend service with proper resource requests/limits, replica counts, container specifications, environment variables, and liveness/readiness probes. Include HPA (Horizontal Pod Autoscaler) configurations for automatic scaling based on CPU/memory metrics. Set up service accounts and RBAC policies for each service.
 
 ## Dependencies
-None (can start immediately)
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+None
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-8/prompt.md`
+- PRD: `.tasks/docs/prd.md`

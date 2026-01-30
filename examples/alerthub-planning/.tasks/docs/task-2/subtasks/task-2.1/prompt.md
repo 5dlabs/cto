@@ -1,18 +1,26 @@
-# Subtask 2.1: Core Axum Web Server and API Endpoints
+# Subtask 2.1: Set up Axum application foundation with core infrastructure
 
-## Context
-This is a subtask of Task 2. Complete this before moving to dependent subtasks.
+**Parent Task:** Implement Notification Router Service (Rex - Rust/Axum)
+**Agent:** rex | **Language:** rust
 
 ## Description
-Set up the foundational Axum web server with REST endpoints for notification submission, batch processing, and status queries including request/response models and basic routing structure.
 
-## Implementation Details
-Initialize Rust project with Axum framework, create API endpoint handlers for POST /notifications (single submission), POST /notifications/batch (bulk submission), GET /notifications/{id}/status (status queries), and GET /health. Implement request validation, response serialization with serde, error handling middleware, and basic logging setup.
+Establish the basic Axum web server structure, database connections, and core middleware components needed for the notification routing service.
+
+## Details
+
+Create new Rust project with Axum framework, set up PostgreSQL connection pool using sqlx, implement basic middleware stack (logging, CORS, error handling), create notification data models and database schema migrations, establish project structure with proper module organization for handlers, models, and services.
 
 ## Dependencies
-None (can start immediately)
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+None
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-2/prompt.md`
+- PRD: `.tasks/docs/prd.md`

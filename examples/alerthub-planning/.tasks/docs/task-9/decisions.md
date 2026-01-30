@@ -4,63 +4,41 @@ This document tracks decisions made during implementation.
 
 ## Predicted Decision Points
 
-### D17: Metrics retention and storage strategy
-
-**Category:** performance
-**Constraint:** open
-
-**Options to consider:**
-- [ ] 15 days local storage
-- [ ] long-term storage with Thanos
-- [ ] cloud-based metrics storage
-
-**Your decision:** _________________
-
-**Rationale:** _________________
-
-**Alternatives considered:** _________________
-
-**Confidence (1-5):** ___
-
----
-
-### D18: Log aggregation approach
+### D17: Should we use a centralized logging solution like ELK stack or simpler log aggregation?
 
 **Category:** architecture
 **Constraint:** open
 
-**Options to consider:**
-- [ ] Loki with Promtail
-- [ ] Elasticsearch with Fluent Bit
-- [ ] cloud provider logging service
+**Options:**
+- [ ] elk-stack
+- [ ] loki-grafana
+- [ ] simple-aggregation
 
 **Your decision:** _________________
-
 **Rationale:** _________________
+**Confidence (1-5):** ___
 
-**Alternatives considered:** _________________
+---
 
+### D18: How long should metrics and logs be retained? ⚠️ REQUIRES APPROVAL
+
+**Category:** performance
+**Constraint:** soft
+
+**Options:**
+- [ ] 7-days
+- [ ] 30-days
+- [ ] 90-days
+
+**Your decision:** _________________
+**Rationale:** _________________
 **Confidence (1-5):** ___
 
 ---
 
 ## Additional Decisions
 
-Document any other significant decisions made during implementation:
-
-### (Add decision title here)
-
+### (Add title here)
 **Category:** (architecture | error-handling | data-model | api-design | ux-behavior | performance | security)
 **Decision:** _________________
 **Rationale:** _________________
-**Alternatives considered:** _________________
-**Confidence (1-5):** ___
-
----
-
-## Summary
-
-| Decision ID | Choice Made | Confidence |
-|-------------|-------------|------------|
-| D17 | ___ | ___ |
-| D18 | ___ | ___ |

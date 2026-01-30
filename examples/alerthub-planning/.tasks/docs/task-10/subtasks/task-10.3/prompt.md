@@ -1,18 +1,26 @@
-# Subtask 10.3: Multi-Channel Client Delivery Validation
+# Subtask 10.3: Implement advanced scenarios and performance validation tests
 
-## Context
-This is a subtask of Task 10. Complete this before moving to dependent subtasks.
+**Parent Task:** Implement End-to-End Integration Tests (Grizz - Go/Testing)
+**Agent:** grizz | **Language:** go
 
 ## Description
-Create tests that verify notifications reach all client types (web, mobile, desktop) with correct formatting and timing across different channels.
 
-## Implementation Details
-Build test scenarios that validate WebSocket message delivery to web clients, push notification delivery to mobile devices (iOS/Android simulators), and desktop notification display verification. Test notification deduplication across channels, user preference handling, and device-specific formatting. Include tests for offline scenarios, reconnection handling, and message persistence. Verify notification badges, sound settings, and interactive elements work correctly across all client types.
+Create tests for edge cases, failure scenarios, performance requirements, and system reliability under various conditions.
+
+## Details
+
+Test rate limiting and deduplication logic with high-volume scenarios. Add performance tests for throughput requirements and latency measurements. Create failure scenario tests including service outages, network issues, and partial system failures. Implement recovery validation and graceful degradation testing. Add load testing for concurrent users and notification bursts. Test cross-service communication resilience and message queue behavior under stress.
 
 ## Dependencies
+
 task-10.1, task-10.2
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-10/prompt.md`
+- PRD: `.tasks/docs/prd.md`

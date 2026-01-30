@@ -1,18 +1,26 @@
-# Subtask 1.2: Deploy Database Layer (PostgreSQL and MongoDB)
+# Subtask 1.2: Deploy Caching and Message Queue Services (Redis/Valkey and RabbitMQ)
 
-## Context
-This is a subtask of Task 1. Complete this before moving to dependent subtasks.
+**Parent Task:** Setup Infrastructure Components (Bolt - Kubernetes)
+**Agent:** bolt | **Language:** yaml
 
 ## Description
-Deploy and configure PostgreSQL using CloudNative-PG operator and MongoDB using Percona operator
 
-## Implementation Details
-Install CloudNative-PG operator and deploy PostgreSQL cluster with high availability, automated backups, and monitoring. Install Percona operator for MongoDB and deploy replica set with proper authentication and SSL/TLS. Configure persistent volumes with appropriate storage classes and backup strategies.
+Provision Redis/Valkey cluster for caching and rate limiting capabilities, and RabbitMQ cluster for reliable task queuing and message processing.
+
+## Details
+
+Deploy Valkey/Redis cluster with appropriate memory limits and persistence configuration for caching and rate limiting. Deploy RabbitMQ cluster operator with proper queue configurations, clustering setup, and management interface access. Configure high availability and failover mechanisms for both services.
 
 ## Dependencies
-task-1.1
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+None
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-1/prompt.md`
+- PRD: `.tasks/docs/prd.md`

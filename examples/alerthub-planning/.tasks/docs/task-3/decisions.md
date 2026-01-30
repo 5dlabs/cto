@@ -4,63 +4,41 @@ This document tracks decisions made during implementation.
 
 ## Predicted Decision Points
 
-### D5: Retry strategy for failed deliveries
-
-**Category:** error-handling
-**Constraint:** soft
-
-**Options to consider:**
-- [ ] exponential backoff with 3 retries
-- [ ] linear backoff with 5 retries
-- [ ] configurable retry policy per channel
-
-**Your decision:** _________________
-
-**Rationale:** _________________
-
-**Alternatives considered:** _________________
-
-**Confidence (1-5):** ___
-
----
-
-### D6: OAuth2 token storage and refresh mechanism
+### D5: Should integration configs be stored as flexible JSON or strongly typed schemas?
 
 **Category:** api-design
 **Constraint:** open
 
-**Options to consider:**
-- [ ] store in MongoDB with Effect.cached
-- [ ] external token service
-- [ ] Redis-based token cache
+**Options:**
+- [ ] flexible-json
+- [ ] typed-schemas
+- [ ] hybrid-approach
 
 **Your decision:** _________________
-
 **Rationale:** _________________
+**Confidence (1-5):** ___
 
-**Alternatives considered:** _________________
+---
 
+### D6: How many retry attempts should be made for failed deliveries?
+
+**Category:** error-handling
+**Constraint:** soft
+
+**Options:**
+- [ ] 3-attempts
+- [ ] 5-attempts
+- [ ] configurable-per-channel
+
+**Your decision:** _________________
+**Rationale:** _________________
 **Confidence (1-5):** ___
 
 ---
 
 ## Additional Decisions
 
-Document any other significant decisions made during implementation:
-
-### (Add decision title here)
-
+### (Add title here)
 **Category:** (architecture | error-handling | data-model | api-design | ux-behavior | performance | security)
 **Decision:** _________________
 **Rationale:** _________________
-**Alternatives considered:** _________________
-**Confidence (1-5):** ___
-
----
-
-## Summary
-
-| Decision ID | Choice Made | Confidence |
-|-------------|-------------|------------|
-| D5 | ___ | ___ |
-| D6 | ___ | ___ |

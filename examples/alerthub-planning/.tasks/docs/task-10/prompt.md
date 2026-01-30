@@ -1,4 +1,4 @@
-# Task 10: End-to-End Integration Testing (Grizz - Go)
+# Task 10: Implement End-to-End Integration Tests (Grizz - Go/Testing)
 
 **Agent**: grizz | **Language**: go
 
@@ -8,43 +8,52 @@ You are a Go Engineer specializing in APIs and backend services implementing Tas
 
 ## Goal
 
-Create comprehensive integration tests that validate the complete notification flow from submission through delivery across all channels and clients.
+Create comprehensive end-to-end tests that validate the complete notification flow from submission through delivery, including all services, WebSocket updates, and cross-platform client functionality.
 
 ## Requirements
 
-Build Go test suite that creates test notifications, verifies routing through Rex service, confirms delivery via Nova service, validates WebSocket updates reach web clients, checks push notifications on mobile, and ensures desktop notifications display. Include load testing for throughput requirements.
+1. Set up test environment with all services running
+2. Create test data fixtures for tenants, users, and integrations
+3. Implement notification submission and routing tests
+4. Add delivery verification for each channel (Slack, Discord, email)
+5. Test WebSocket real-time updates across web and desktop
+6. Verify mobile push notification delivery
+7. Test rate limiting and deduplication logic
+8. Add performance tests for throughput requirements
+9. Create failure scenario tests (service outages, network issues)
+10. Set up CI pipeline to run E2E tests on deployment
 
 ## Acceptance Criteria
 
-Complete notification flow works end-to-end, all channels deliver test notifications successfully, WebSocket updates reach all connected clients, load tests achieve 10,000 notifications/minute, API response times stay under 100ms p95, and error scenarios are handled gracefully
+Complete notification flow works end-to-end (submit → route → deliver → display), all clients receive real-time updates, delivery succeeds to configured channels, rate limiting prevents abuse, performance meets SLA requirements (< 100ms p95), and failure scenarios are handled gracefully.
 
 ## Constraints
 
-- Match existing codebase patterns and style
-- Create PR with atomic, well-described commits
-- Include unit tests for new functionality
-- PR title: `feat(task-10): End-to-End Integration Testing (Grizz - Go)`
+- Match existing codebase patterns
+- Create PR with atomic commits
+- Include unit tests
+- PR title: `feat(task-10): Implement End-to-End Integration Tests (Grizz - Go/Testing)`
 
 ## Decision Points
 
-### d19: Test environment strategy
+### d19: Should E2E tests run against production-like infrastructure or simplified test doubles?
 **Category**: architecture | **Constraint**: open
 
 Options:
-1. dedicated test cluster
-2. test namespace in main cluster
-3. local development environment
+1. production-like
+2. test-doubles
+3. hybrid-approach
 
-### d20: Load testing approach
-**Category**: performance | **Constraint**: open
+### d20: What should be the target for E2E test suite execution time?
+**Category**: performance | **Constraint**: soft
 
 Options:
-1. k6 for HTTP load testing
-2. custom Go load generator
-3. cloud-based load testing service
+1. under-5-minutes
+2. under-10-minutes
+3. under-30-minutes
 
 
 ## Resources
 
 - PRD: `.tasks/docs/prd.md`
-- Dependencies: task-2, task-3, task-4, task-5, task-6, task-7
+- Dependencies: task-5, task-6, task-7, task-8

@@ -1,18 +1,26 @@
-# Subtask 4.1: Generate Go code from protobuf definitions
+# Subtask 4.1: Set up Go project foundation with gRPC and protobuf schemas
 
-## Context
-This is a subtask of Task 4. Complete this before moving to dependent subtasks.
+**Parent Task:** Develop Admin API Service (Grizz - Go/gRPC)
+**Agent:** grizz | **Language:** go
 
 ## Description
-Create protobuf definitions for TenantService, UserService, RuleService, and AnalyticsService, then generate Go gRPC code using protoc compiler
 
-## Implementation Details
-Define .proto files for all four services with appropriate message types, RPC methods, and service definitions. Use protoc with Go plugins to generate server stubs, client code, and message types. Include grpc-gateway annotations for REST compatibility.
+Initialize the Go project structure with gRPC framework, define comprehensive protobuf schemas for all services, and set up the basic gRPC server infrastructure.
+
+## Details
+
+Create Go module with proper directory structure (cmd/, internal/, api/, proto/). Define protobuf schemas for Tenant, User, Rule, and Analytics services with all required message types and service definitions. Set up gRPC server boilerplate with proper middleware chain. Configure build tools and code generation for protobuf compilation.
 
 ## Dependencies
-None (can start immediately)
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+None
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-4/prompt.md`
+- PRD: `.tasks/docs/prd.md`

@@ -1,18 +1,26 @@
-# Subtask 3.2: Implement Channel Notification Services
+# Subtask 3.2: Implement data layer with MongoDB, Drizzle ORM and Effect Schema validation
 
-## Context
-This is a subtask of Task 3. Complete this before moving to dependent subtasks.
+**Parent Task:** Build Integration Service with Effect (Nova - Bun/Elysia)
+**Agent:** nova | **Language:** typescript
 
 ## Description
-Build SlackService, DiscordService, EmailService, and WebhookService using Effect patterns with retry mechanisms
 
-## Implementation Details
-Create Effect-based services for each notification channel. Implement SlackService with Slack API integration, DiscordService with Discord webhook/bot support, EmailService with SMTP/email provider integration, and WebhookService for generic HTTP webhooks. Add Effect.retry patterns for resilient delivery, proper error handling with Effect.catchAll, and configuration management for each service.
+Create the data persistence layer with MongoDB connection using Drizzle ORM and implement Effect Schema for comprehensive request/response validation across all integration endpoints.
+
+## Details
+
+Set up MongoDB connection with Drizzle ORM configuration, define database schemas for integrations, channels, and delivery logs, implement Effect Schema definitions for API request/response validation, create database service layer with Effect error handling for connection management, migrations, and CRUD operations
 
 ## Dependencies
+
 task-3.1
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-3/prompt.md`
+- PRD: `.tasks/docs/prd.md`

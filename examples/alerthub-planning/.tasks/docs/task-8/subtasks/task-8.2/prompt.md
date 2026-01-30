@@ -1,18 +1,26 @@
-# Subtask 8.2: Implement Service Mesh for Internal Communication
+# Subtask 8.2: Configure Service Discovery and Network Infrastructure
 
-## Context
-This is a subtask of Task 8. Complete this before moving to dependent subtasks.
+**Parent Task:** Configure Kubernetes Deployments (Bolt - Kubernetes)
+**Agent:** bolt | **Language:** yaml
 
 ## Description
-Deploy and configure service mesh (Istio/Linkerd) for secure inter-service communication with observability
 
-## Implementation Details
-Install service mesh control plane, configure automatic sidecar injection, implement mutual TLS (mTLS) for service-to-service communication, set up traffic routing policies, and enable distributed tracing and metrics collection
+Set up ClusterIP services, ingress controller, and network policies for secure service communication
+
+## Details
+
+Create ClusterIP service manifests for internal service discovery. Configure ingress controller (nginx/traefik) with proper routing rules for external access. Implement network policies to isolate services and control traffic flow between pods. Set up persistent volume claims for stateful components like databases.
 
 ## Dependencies
+
 task-8.1
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-8/prompt.md`
+- PRD: `.tasks/docs/prd.md`

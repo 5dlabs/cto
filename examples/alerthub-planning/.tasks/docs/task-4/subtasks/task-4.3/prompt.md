@@ -1,18 +1,26 @@
-# Subtask 4.3: Integrate PostgreSQL database and Redis caching
+# Subtask 4.3: Build authentication and authorization system
 
-## Context
-This is a subtask of Task 4. Complete this before moving to dependent subtasks.
+**Parent Task:** Develop Admin API Service (Grizz - Go/gRPC)
+**Agent:** grizz | **Language:** go
 
 ## Description
-Implement database layer with PostgreSQL for persistent storage and Redis for caching frequently accessed data
 
-## Implementation Details
-Set up database connection pools, implement repository pattern for data access, create database schemas for tenants, users, rules, and analytics. Add Redis caching layer for user sessions, tenant configurations, and frequently queried data with appropriate TTL strategies.
+Implement comprehensive JWT-based authentication with refresh tokens and role-based access control (RBAC) system for securing API endpoints.
+
+## Details
+
+Create JWT token generation and validation middleware. Implement refresh token mechanism with secure storage. Build RBAC system with role definitions, permission mappings, and authorization middleware. Add user registration, login, and session management endpoints. Implement password hashing and security best practices.
 
 ## Dependencies
-task-4.1
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+task-4.2
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-4/prompt.md`
+- PRD: `.tasks/docs/prd.md`

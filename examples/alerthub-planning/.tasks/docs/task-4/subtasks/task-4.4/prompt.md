@@ -1,18 +1,26 @@
-# Subtask 4.4: Add audit logging and grpc-gateway REST compatibility
+# Subtask 4.4: Add notification engine, analytics, and REST gateway
 
-## Context
-This is a subtask of Task 4. Complete this before moving to dependent subtasks.
+**Parent Task:** Develop Admin API Service (Grizz - Go/gRPC)
+**Agent:** grizz | **Language:** go
 
 ## Description
-Implement comprehensive audit logging system and configure grpc-gateway for REST API access to gRPC services
 
-## Implementation Details
-Create audit logging interceptors to track all admin operations with user context, timestamps, and operation details. Configure grpc-gateway reverse proxy to expose gRPC services as REST endpoints with proper HTTP methods, status codes, and error handling. Add OpenAPI documentation generation.
+Implement the notification rules engine, analytics aggregation logic, grpc-gateway for REST endpoints, audit logging, and health monitoring systems.
+
+## Details
+
+Build notification rules engine with configurable triggers and actions. Implement analytics aggregation with time-series data processing and reporting. Set up grpc-gateway for REST API exposure with proper HTTP mapping. Add comprehensive audit logging for all operations. Implement health checks, metrics collection, and monitoring endpoints. Add API documentation and OpenAPI specification.
 
 ## Dependencies
-task-4.1, task-4.2, task-4.3
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+task-4.3
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-4/prompt.md`
+- PRD: `.tasks/docs/prd.md`

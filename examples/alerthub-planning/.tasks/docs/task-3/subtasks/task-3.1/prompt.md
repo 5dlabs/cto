@@ -1,18 +1,26 @@
-# Subtask 3.1: Setup Bun/Elysia Server with Effect Foundation
+# Subtask 3.1: Initialize Bun project with Elysia and Effect architecture setup
 
-## Context
-This is a subtask of Task 3. Complete this before moving to dependent subtasks.
+**Parent Task:** Build Integration Service with Effect (Nova - Bun/Elysia)
+**Agent:** nova | **Language:** typescript
 
 ## Description
-Initialize the Bun/Elysia server with Effect TypeScript integration, basic routing, middleware, and project structure
 
-## Implementation Details
-Create new Bun project with Elysia framework. Set up Effect TypeScript with proper type definitions. Configure basic server structure with health check endpoints, error handling middleware, and logging. Establish project architecture with services, controllers, and utilities directories.
+Set up the foundational project structure with Bun runtime, Elysia web framework, and Effect TypeScript services architecture including basic service definitions.
+
+## Details
+
+Initialize Bun project with package.json, install Elysia and Effect dependencies, create project structure with src/services, src/schemas, src/routes directories, set up basic Effect services (SlackService, DiscordService, EmailService) with proper type definitions and error handling interfaces, configure TypeScript with Effect-specific settings
 
 ## Dependencies
-None (can start immediately)
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+None
+
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-3/prompt.md`
+- PRD: `.tasks/docs/prd.md`

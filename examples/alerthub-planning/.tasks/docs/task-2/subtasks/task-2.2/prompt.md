@@ -1,18 +1,26 @@
-# Subtask 2.2: PostgreSQL Integration and Data Models
+# Subtask 2.2: Implement core notification processing and rate limiting
 
-## Context
-This is a subtask of Task 2. Complete this before moving to dependent subtasks.
+**Parent Task:** Implement Notification Router Service (Rex - Rust/Axum)
+**Agent:** rex | **Language:** rust
 
 ## Description
-Implement PostgreSQL database integration using sqlx with notification data models, migrations, and repository patterns for persistent storage.
 
-## Implementation Details
-Set up sqlx connection pool, create database migrations for notifications table with fields for id, recipient, content, priority, status, created_at, scheduled_for. Implement repository layer with CRUD operations, notification status updates, and query methods for batch retrieval. Add database health checks and connection retry logic.
+Build the main notification endpoint with validation, rate limiting using Redis, and deduplication logic to handle incoming notification requests efficiently.
+
+## Details
+
+Create POST /api/v1/notifications endpoint with comprehensive input validation, implement Redis-based rate limiting middleware with configurable limits per user/IP, add deduplication logic using Redis with configurable TTL to prevent duplicate notifications, implement request parsing and validation using serde with proper error responses.
 
 ## Dependencies
+
 task-2.1
 
-## Deliverables
-1. Implementation code
-2. Unit tests
-3. Documentation updates
+## Acceptance Criteria
+
+- [ ] Subtask requirements implemented
+- [ ] Parent task requirements still satisfied
+
+## Resources
+
+- Parent task: `.tasks/docs/task-2/prompt.md`
+- PRD: `.tasks/docs/prd.md`
