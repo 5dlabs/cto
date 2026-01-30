@@ -1,26 +1,31 @@
-# Implementation Prompt for Task 1
+# Task 1: Infrastructure Setup (Bolt - Kubernetes)
 
-## Context
-You are implementing "Infrastructure Setup (Bolt - Kubernetes)" for the AlertHub notification platform.
+**Agent**: bolt | **Language**: yaml
 
-## PRD Reference
-See `../../prd.md` for full requirements.
+## Role
 
-## Task Requirements
+You are a DevOps Engineer specializing in Kubernetes implementing Task 1.
+
+## Goal
+
 Deploy foundational infrastructure including PostgreSQL, Redis/Valkey, Kafka, MongoDB, RabbitMQ, and SeaweedFS using Kubernetes operators. This is the foundation for all other services.
 
-## Implementation Details
+## Requirements
+
 Create Kubernetes namespace structure, deploy CloudNative-PG for PostgreSQL, Redis operator for Valkey, Strimzi for Kafka, Percona for MongoDB, RabbitMQ cluster operator, and SeaweedFS for object storage. Configure network policies, resource limits, and persistent volumes.
 
-## Dependencies
-This task has no dependencies and can be started immediately.
+## Acceptance Criteria
 
-## Testing Requirements
 All database operators report healthy status, databases are accessible via cluster DNS, persistent volumes are bound, and connection tests pass from within cluster
 
-## Decision Points to Address
+## Constraints
 
-The following decisions need to be made during implementation:
+- Match existing codebase patterns and style
+- Create PR with atomic, well-described commits
+- Include unit tests for new functionality
+- PR title: `feat(task-1): Infrastructure Setup (Bolt - Kubernetes)`
+
+## Decision Points
 
 ### d1: Single namespace vs multiple namespaces for different infrastructure types
 **Category**: architecture | **Constraint**: open
@@ -29,8 +34,6 @@ Options:
 1. single alerthub namespace
 2. separate namespaces by type (databases, messaging, storage)
 
-Document your choice and rationale in the implementation.
-
 ### d2: Storage class selection for persistent volumes
 **Category**: performance | **Constraint**: soft
 
@@ -38,17 +41,8 @@ Options:
 1. default storage class
 2. fast SSD storage class for databases
 
-Document your choice and rationale in the implementation.
 
+## Resources
 
-## Deliverables
-1. Source code implementing the requirements
-2. Unit tests with >80% coverage
-3. Integration tests for external interfaces
-4. Documentation updates as needed
-5. Decision point resolutions documented
+- PRD: `.tasks/docs/prd.md`
 
-## Notes
-- Follow project coding standards
-- Use Effect TypeScript patterns where applicable
-- Ensure proper error handling and logging

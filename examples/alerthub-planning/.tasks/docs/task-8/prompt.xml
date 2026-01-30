@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="8" priority="medium" agent="bolt">
+    <meta>
+        <title>Service Mesh and Ingress Configuration (Bolt - Kubernetes)</title>
+        <priority>medium</priority>
+        <dependencies>task-1, task-2, task-3, task-4</dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a DevOps Engineer specializing in Kubernetes. Implement Task 8 with production-quality code.</role>
+
+    <context>
+        <overview>Configure Kubernetes ingress, service mesh networking, and cross-service communication with proper security policies and load balancing.</overview>
+        <background>
+            This task is part of AlertHub notification platform. Key resources:
+            - PRD: .tasks/docs/prd.md (full requirements and architecture)
+            - Related tasks: task-1, task-2, task-3, task-4
+        </background>
+    </context>
+
+    <requirements>
+        <description>Deploy ingress controller (NGINX or Traefik), configure service mesh for internal communication, set up network policies for service isolation, implement load balancing for high availability, and configure TLS termination for external traffic.</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-8): Service Mesh and Ingress Configuration (Bolt - Kubernetes)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>External endpoints are accessible via ingress, internal service communication works correctly, network policies block unauthorized traffic, load balancing distributes traffic evenly, and TLS certificates are valid and auto-renewing</criterion>
+    </acceptance_criteria>
+
+    <decision_points>
+        <decision_point id="d15" category="architecture" constraint="open" requires_approval="false">
+            <description>Service mesh technology choice</description>
+            <options><option>Istio for full-featured service mesh</option><option>Linkerd for lightweight service mesh</option><option>no service mesh, use standard Kubernetes networking</option></options>
+        </decision_point>
+        <decision_point id="d16" category="security" constraint="soft" requires_approval="false">
+            <description>TLS certificate management strategy</description>
+            <options><option>cert-manager with Let&apos;s Encrypt</option><option>manual certificate management</option><option>cloud provider managed certificates</option></options>
+        </decision_point>
+    </decision_points>
+
+    <validation>
+        <command>kubectl apply --dry-run=client -f .</command>
+        <command>helm lint charts/*</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
+</task>

@@ -1,26 +1,31 @@
-# Implementation Prompt for Task 7
+# Task 7: Desktop System Tray Client (Spark - Electron)
 
-## Context
-You are implementing "Desktop System Tray Client (Spark - Electron)" for the AlertHub notification platform.
+**Agent**: spark | **Language**: typescript
 
-## PRD Reference
-See `../../prd.md` for full requirements.
+## Role
 
-## Task Requirements
+You are a Desktop Engineer specializing in Electron implementing Task 7.
+
+## Goal
+
 Create desktop application using Electron 28+ that runs in system tray and displays native notifications with quick actions.
 
-## Implementation Details
+## Requirements
+
 Build Electron app with system tray integration, native desktop notifications, main window with notification feed, mini popup window, settings window, keyboard shortcuts, and auto-start functionality. Support Windows, macOS, and Linux.
 
-## Dependencies
-This task depends on: task-2, task-4. Ensure those are complete before starting.
+## Acceptance Criteria
 
-## Testing Requirements
 App builds for all platforms, system tray icon appears with correct badge count, native notifications display, keyboard shortcuts work, auto-start functions correctly, and all windows open/close properly
 
-## Decision Points to Address
+## Constraints
 
-The following decisions need to be made during implementation:
+- Match existing codebase patterns and style
+- Create PR with atomic, well-described commits
+- Include unit tests for new functionality
+- PR title: `feat(task-7): Desktop System Tray Client (Spark - Electron)`
+
+## Decision Points
 
 ### d13: System tray notification display strategy
 **Category**: ux-behavior | **Constraint**: soft
@@ -30,8 +35,6 @@ Options:
 2. show unread count only
 3. show preview of latest notification
 
-Document your choice and rationale in the implementation.
-
 ### d14: WebSocket connection management for desktop app
 **Category**: performance | **Constraint**: open
 
@@ -40,17 +43,8 @@ Options:
 2. connect only when app is active
 3. configurable connection strategy
 
-Document your choice and rationale in the implementation.
 
+## Resources
 
-## Deliverables
-1. Source code implementing the requirements
-2. Unit tests with >80% coverage
-3. Integration tests for external interfaces
-4. Documentation updates as needed
-5. Decision point resolutions documented
-
-## Notes
-- Follow project coding standards
-- Use Effect TypeScript patterns where applicable
-- Ensure proper error handling and logging
+- PRD: `.tasks/docs/prd.md`
+- Dependencies: task-2, task-4

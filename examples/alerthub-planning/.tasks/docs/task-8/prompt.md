@@ -1,26 +1,31 @@
-# Implementation Prompt for Task 8
+# Task 8: Service Mesh and Ingress Configuration (Bolt - Kubernetes)
 
-## Context
-You are implementing "Service Mesh and Ingress Configuration (Bolt - Kubernetes)" for the AlertHub notification platform.
+**Agent**: bolt | **Language**: yaml
 
-## PRD Reference
-See `../../prd.md` for full requirements.
+## Role
 
-## Task Requirements
+You are a DevOps Engineer specializing in Kubernetes implementing Task 8.
+
+## Goal
+
 Configure Kubernetes ingress, service mesh networking, and cross-service communication with proper security policies and load balancing.
 
-## Implementation Details
+## Requirements
+
 Deploy ingress controller (NGINX or Traefik), configure service mesh for internal communication, set up network policies for service isolation, implement load balancing for high availability, and configure TLS termination for external traffic.
 
-## Dependencies
-This task depends on: task-1, task-2, task-3, task-4. Ensure those are complete before starting.
+## Acceptance Criteria
 
-## Testing Requirements
 External endpoints are accessible via ingress, internal service communication works correctly, network policies block unauthorized traffic, load balancing distributes traffic evenly, and TLS certificates are valid and auto-renewing
 
-## Decision Points to Address
+## Constraints
 
-The following decisions need to be made during implementation:
+- Match existing codebase patterns and style
+- Create PR with atomic, well-described commits
+- Include unit tests for new functionality
+- PR title: `feat(task-8): Service Mesh and Ingress Configuration (Bolt - Kubernetes)`
+
+## Decision Points
 
 ### d15: Service mesh technology choice
 **Category**: architecture | **Constraint**: open
@@ -30,8 +35,6 @@ Options:
 2. Linkerd for lightweight service mesh
 3. no service mesh, use standard Kubernetes networking
 
-Document your choice and rationale in the implementation.
-
 ### d16: TLS certificate management strategy
 **Category**: security | **Constraint**: soft
 
@@ -40,17 +43,8 @@ Options:
 2. manual certificate management
 3. cloud provider managed certificates
 
-Document your choice and rationale in the implementation.
 
+## Resources
 
-## Deliverables
-1. Source code implementing the requirements
-2. Unit tests with >80% coverage
-3. Integration tests for external interfaces
-4. Documentation updates as needed
-5. Decision point resolutions documented
-
-## Notes
-- Follow project coding standards
-- Use Effect TypeScript patterns where applicable
-- Ensure proper error handling and logging
+- PRD: `.tasks/docs/prd.md`
+- Dependencies: task-1, task-2, task-3, task-4

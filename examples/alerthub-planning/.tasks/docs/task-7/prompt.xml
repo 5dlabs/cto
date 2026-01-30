@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="7" priority="medium" agent="spark">
+    <meta>
+        <title>Desktop System Tray Client (Spark - Electron)</title>
+        <priority>medium</priority>
+        <dependencies>task-2, task-4</dependencies>
+        <agent_hint>spark</agent_hint>
+    </meta>
+
+    <role>You are a Desktop Engineer specializing in Electron. Implement Task 7 with production-quality code.</role>
+
+    <context>
+        <overview>Create desktop application using Electron 28+ that runs in system tray and displays native notifications with quick actions.</overview>
+        <background>
+            This task is part of AlertHub notification platform. Key resources:
+            - PRD: .tasks/docs/prd.md (full requirements and architecture)
+            - Related tasks: task-2, task-4
+        </background>
+    </context>
+
+    <requirements>
+        <description>Build Electron app with system tray integration, native desktop notifications, main window with notification feed, mini popup window, settings window, keyboard shortcuts, and auto-start functionality. Support Windows, macOS, and Linux.</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-7): Desktop System Tray Client (Spark - Electron)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>App builds for all platforms, system tray icon appears with correct badge count, native notifications display, keyboard shortcuts work, auto-start functions correctly, and all windows open/close properly</criterion>
+    </acceptance_criteria>
+
+    <decision_points>
+        <decision_point id="d13" category="ux-behavior" constraint="soft" requires_approval="false">
+            <description>System tray notification display strategy</description>
+            <options><option>show last 5 notifications in tray menu</option><option>show unread count only</option><option>show preview of latest notification</option></options>
+        </decision_point>
+        <decision_point id="d14" category="performance" constraint="open" requires_approval="false">
+            <description>WebSocket connection management for desktop app</description>
+            <options><option>persistent connection with auto-reconnect</option><option>connect only when app is active</option><option>configurable connection strategy</option></options>
+        </decision_point>
+    </decision_points>
+
+    <validation>
+        <command>run tests</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
+</task>
