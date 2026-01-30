@@ -353,11 +353,7 @@ services:
       - ./config/client-config-bolt.json:/config/client-config.json:ro
       # Container script for Bolt
       - ./scripts/run-bolt.sh:/run.sh:ro
-      # Task files (task-1 from alerthub-planning)
-      - ./config/task-bolt/prompt.md:/workspace/prompt.md:ro
-      - ./config/task-bolt/acceptance-criteria.md:/workspace/acceptance-criteria.md:ro
-      - ./config/task-bolt/CLAUDE.md:/workspace/CLAUDE.md:ro
-      - ./config/task-bolt/subtasks:/workspace/subtasks:ro
+      # Task files are pre-copied to workspace (see setup)
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - CLI_WORK_DIR=/workspace

@@ -33,23 +33,8 @@ cd "${CLI_WORK_DIR}"
 # =============================================================================
 echo "--- Configuring MCP Server ---" >&2
 
-if [ -f "${MCP_CLIENT_CONFIG}" ]; then
-    echo "Using tool filter config: ${MCP_CLIENT_CONFIG}" >&2
-    
-    # Add MCP server to Claude config with tools-client wrapper for filtering
-    claude mcp add cto-tools \
-        --command tools \
-        --args "${TOOLS_URL}" \
-        --args "${CLI_WORK_DIR}" \
-        -s local 2>&1 || echo "MCP config may already exist"
-else
-    echo "No tool filter config found, using direct connection" >&2
-    claude mcp add cto-tools \
-        --command tools \
-        --args "${TOOLS_URL}" \
-        --args "${CLI_WORK_DIR}" \
-        -s local 2>&1 || echo "MCP config may already exist"
-fi
+# Add MCP server to Claude config (correct syntax: -- separates command and args)
+claude mcp add cto-tools -- tools "${TOOLS_URL}" "${CLI_WORK_DIR}" 2>&1 || echo "MCP config may already exist"
 
 echo "✓ MCP server configured" >&2
 echo ""
