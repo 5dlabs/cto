@@ -1,32 +1,31 @@
-# Deploy PostgreSQL Cluster
+# Configure Network Policies
 
 <task>
-<agent>postgres-deployer</agent>
-<objective>Deploy a CloudNative-PG PostgreSQL cluster for the alerthub database</objective>
+<agent>network-agent</agent>
+<objective>Configure network policies for infrastructure components</objective>
 
 <context>
-The CloudNative-PG operator is already installed in the cluster. Your job is to create a PostgreSQL cluster instance using the operator's CRDs.
+Infrastructure components are deployed. Your job is to configure network policies to control traffic flow between services and ensure proper isolation.
 </context>
 
 <requirements>
-- Create a `Cluster` CR (CloudNative-PG custom resource)
-- Database name: `alerthub`
-- Configure persistent storage with appropriate PVC
-- Set resource limits (CPU/memory)
-- Enable monitoring annotations for Prometheus scraping
-- Configure backup policy using the operator's backup CRDs
+- Create NetworkPolicy resources for each namespace
+- Configure ingress rules for external access
+- Configure egress rules for outbound traffic
+- Set up service mesh policies if applicable
+- Ensure database services are only accessible from authorized pods
 </requirements>
 
 <deliverables>
-- `postgresql-cluster.yaml` - The Cluster CR manifest
-- `postgresql-backup.yaml` - Backup schedule configuration (if separate)
-- Applied to cluster and pods running
+- `networkpolicy-databases.yaml` - Database network policies
+- `networkpolicy-messaging.yaml` - Messaging network policies
+- `ingress.yaml` - Ingress configuration (if needed)
 </deliverables>
 
 <acceptance_criteria>
-- [ ] PostgreSQL cluster pods are Running
-- [ ] `alerthub` database exists and is accessible
-- [ ] PVC is bound with persistent storage
-- [ ] Backup policy is configured
+- [ ] Network policies are applied
+- [ ] Database services are properly isolated
+- [ ] Only authorized pods can access databases
+- [ ] Egress is restricted appropriately
 </acceptance_criteria>
 </task>
