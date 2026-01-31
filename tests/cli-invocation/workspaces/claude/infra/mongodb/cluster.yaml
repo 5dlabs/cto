@@ -1,0 +1,60 @@
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: mongodb-cluster
+  namespace: databases
+spec:
+  crVersion: 1.16.0
+  image: percona/percona-server-mongodb:7.0.4-2
+  imagePullPolicy: IfNotPresent
+
+  # Secrets for users
+  secrets:
+    users: mongodb-cluster-secrets
+
+  # 3-member replica set configuration
+  replsets:
+  - name: rs0
+    size: 3
+    affinity:
+      antiAffinityTopologyKey: "kubernetes.io/hostname"
+
+    podDisruptionBudget:
+      maxUnavailable: 1
+
+    expose:
+      enabled: false
+
+    resources:
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+      requests:
+        cpu: "100m"
+        memory: "512Mi"
+
+    volumeSpec:
+      persistentVolumeClaim:
+        resources:
+          requests:
+            storage: 5Gi
+
+    # WiredTiger storage engine configuration
+    mongod:
+      storage:
+        engine: wiredTiger
+        wiredTiger:
+          engineConfig:
+            cacheSizeRatio: 0.5
+
+  # PMM monitoring (disabled for minimal testing)
+  pmm:
+    enabled: false
+
+  # Backup configuration (disabled for minimal testing)
+  backup:
+    enabled: false
+
+  # Sharding disabled for replica set deployment
+  sharding:
+    enabled: false

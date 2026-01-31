@@ -1,0 +1,28 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-cluster
+spec:
+  # Production storage configuration
+  storage:
+    size: 100Gi
+    storageClass: fast-ssd  # Use high-performance storage class
+    pvcTemplate:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
+      volumeMode: Filesystem
+
+  walStorage:
+    size: 20Gi
+    storageClass: fast-ssd
+    pvcTemplate:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+      volumeMode: Filesystem

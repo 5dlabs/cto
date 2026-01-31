@@ -1,0 +1,50 @@
+---
+# ServiceAccount for RabbitMQ
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rabbitmq-cluster
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: serviceaccount
+
+---
+# Role for RabbitMQ peer discovery
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rabbitmq-cluster-peer-discovery
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+
+---
+# RoleBinding for peer discovery
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rabbitmq-cluster-peer-discovery
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: rbac
+subjects:
+  - kind: ServiceAccount
+    name: rabbitmq-cluster
+    namespace: messaging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rabbitmq-cluster-peer-discovery

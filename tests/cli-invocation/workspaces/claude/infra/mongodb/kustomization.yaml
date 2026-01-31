@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Metadata
+namespace: databases
+
+# Common labels applied to all resources
+commonLabels:
+  app: mongodb
+  managed-by: kustomize
+  environment: test
+
+# Resources to deploy
+resources:
+  - cluster.yaml
+
+# Images (can be used to override versions)
+images:
+  - name: percona/percona-server-mongodb
+    newTag: 7.0.4-2

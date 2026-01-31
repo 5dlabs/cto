@@ -1,0 +1,76 @@
+---
+# Headless service for replica set member discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-rs-rs0
+  namespace: databases
+  labels:
+    app: mongodb
+    app.kubernetes.io/name: percona-server-mongodb
+    app.kubernetes.io/instance: mongodb-rs
+    app.kubernetes.io/component: mongod
+    app.kubernetes.io/replset: rs0
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: percona-server-mongodb
+    app.kubernetes.io/instance: mongodb-rs
+    app.kubernetes.io/replset: rs0
+
+---
+# Primary service for application connections
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-rs
+  namespace: databases
+  labels:
+    app: mongodb
+    app.kubernetes.io/name: percona-server-mongodb
+    app.kubernetes.io/instance: mongodb-rs
+    app.kubernetes.io/component: mongod
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: percona-server-mongodb
+    app.kubernetes.io/instance: mongodb-rs
+    app.kubernetes.io/component: mongod
+
+---
+# Service for external access (optional - LoadBalancer)
+# Uncomment if external access is required
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: mongodb-rs-external
+#   namespace: databases
+#   labels:
+#     app: mongodb
+#     app.kubernetes.io/name: percona-server-mongodb
+#     app.kubernetes.io/instance: mongodb-rs
+# spec:
+#   type: LoadBalancer
+#   ports:
+#     - name: mongodb
+#       port: 27017
+#       targetPort: 27017
+#       protocol: TCP
+#   selector:
+#     app.kubernetes.io/name: percona-server-mongodb
+#     app.kubernetes.io/instance: mongodb-rs
+#     app.kubernetes.io/component: mongod

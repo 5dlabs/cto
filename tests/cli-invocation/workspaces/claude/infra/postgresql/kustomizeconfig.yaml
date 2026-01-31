@@ -1,0 +1,45 @@
+---
+# Kustomize configuration for CloudNative-PG resources
+nameReference:
+  - kind: Secret
+    version: v1
+    fieldSpecs:
+      - path: spec/superuserSecret/name
+        kind: Cluster
+      - path: spec/bootstrap/initdb/secret/name
+        kind: Cluster
+      - path: spec/backup/barmanObjectStore/s3Credentials/accessKeyId/name
+        kind: Cluster
+      - path: spec/backup/barmanObjectStore/s3Credentials/secretAccessKey/name
+        kind: Cluster
+      - path: spec/pgbouncer/authQuerySecret/name
+        kind: Pooler
+
+  - kind: ConfigMap
+    version: v1
+    fieldSpecs:
+      - path: spec/monitoring/customQueriesConfigMap/name
+        kind: Cluster
+
+  - kind: Cluster
+    group: postgresql.cnpg.io
+    version: v1
+    fieldSpecs:
+      - path: spec/cluster/name
+        kind: Pooler
+      - path: spec/cluster/name
+        kind: ScheduledBackup
+
+commonLabels:
+  - path: metadata/labels
+    create: true
+    group: postgresql.cnpg.io
+    kind: Cluster
+  - path: metadata/labels
+    create: true
+    group: postgresql.cnpg.io
+    kind: Pooler
+  - path: metadata/labels
+    create: true
+    group: postgresql.cnpg.io
+    kind: ScheduledBackup

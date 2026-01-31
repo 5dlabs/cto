@@ -1,0 +1,211 @@
+---
+# ServiceMonitor for Prometheus Operator (optional)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mongodb-rs-metrics
+  namespace: databases
+  labels:
+    app: mongodb
+    app.kubernetes.io/name: percona-server-mongodb
+    app.kubernetes.io/instance: mongodb-rs
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: percona-server-mongodb
+      app.kubernetes.io/instance: mongodb-rs
+  namespaceSelector:
+    matchNames:
+      - databases
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scheme: http
+
+---
+# PodMonitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: mongodb-rs-pods
+  namespace: databases
+  labels:
+    app: mongodb
+    app.kubernetes.io/name: percona-server-mongodb
+    app.kubernetes.io/instance: mongodb-rs
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: percona-server-mongodb
+      app.kubernetes.io/instance: mongodb-rs
+  namespaceSelector:
+    matchNames:
+      - databases
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+
+---
+# PrometheusRule for MongoDB Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mongodb-rs-alerts
+  namespace: databases
+  labels:
+    app: mongodb
+    app.kubernetes.io/name: percona-server-mongodb
+    app.kubernetes.io/instance: mongodb-rs
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: mongodb.rules
+      interval: 30s
+      rules:
+        # High CPU usage
+        - alert: MongoDBHighCPU
+          expr: |
+            rate(container_cpu_usage_seconds_total{namespace="databases",pod=~"mongodb-rs-rs0-.*"}[5m]) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            component: mongodb
+          annotations:
+            summary: "MongoDB pod {{ $labels.pod }} has high CPU usage"
+            description: "CPU usage is {{ $value | humanizePercentage }} on pod {{ $labels.pod }}"
+
+        # High memory usage
+        - alert: MongoDBHighMemory
+          expr: |
+            container_memory_usage_bytes{namespace="databases",pod=~"mongodb-rs-rs0-.*"} / container_spec_memory_limit_bytes{namespace="databases",pod=~"mongodb-rs-rs0-.*"} > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            component: mongodb
+          annotations:
+            summary: "MongoDB pod {{ $labels.pod }} has high memory usage"
+            description: "Memory usage is {{ $value | humanizePercentage }} on pod {{ $labels.pod }}"
+
+        # Pod not ready
+        - alert: MongoDBPodNotReady
+          expr: |
+            kube_pod_status_ready{namespace="databases",pod=~"mongodb-rs-rs0-.*",condition="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: mongodb
+          annotations:
+            summary: "MongoDB pod {{ $labels.pod }} is not ready"
+            description: "Pod {{ $labels.pod }} has been in non-ready state for more than 5 minutes"
+
+        # Replication lag
+        - alert: MongoDBReplicationLag
+          expr: |
+            mongodb_mongod_replset_member_replication_lag > 10
+          for: 5m
+          labels:
+            severity: warning
+            component: mongodb
+          annotations:
+            summary: "MongoDB replication lag detected"
+            description: "Replication lag is {{ $value }} seconds on {{ $labels.instance }}"
+
+        # Storage usage
+        - alert: MongoDBHighDiskUsage
+          expr: |
+            (kubelet_volume_stats_used_bytes{namespace="databases",persistentvolumeclaim=~"mongod-data-mongodb-rs-rs0-.*"} / kubelet_volume_stats_capacity_bytes{namespace="databases",persistentvolumeclaim=~"mongod-data-mongodb-rs-rs0-.*"}) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            component: mongodb
+          annotations:
+            summary: "MongoDB disk usage is high"
+            description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.persistentvolumeclaim }}"
+
+        # Backup failed
+        - alert: MongoDBBackupFailed
+          expr: |
+            psmdb_backup_status{status="error"} == 1
+          for: 1m
+          labels:
+            severity: critical
+            component: mongodb-backup
+          annotations:
+            summary: "MongoDB backup failed"
+            description: "Backup {{ $labels.backup_name }} failed for cluster {{ $labels.cluster }}"
+
+        # Connection pool exhausted
+        - alert: MongoDBConnectionPoolExhausted
+          expr: |
+            mongodb_ss_connections{conn_type="current"} / mongodb_ss_connections{conn_type="available"} > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            component: mongodb
+          annotations:
+            summary: "MongoDB connection pool nearly exhausted"
+            description: "Connection pool is {{ $value | humanizePercentage }} utilized on {{ $labels.instance }}"
+
+        # Too many connections
+        - alert: MongoDBTooManyConnections
+          expr: |
+            mongodb_ss_connections{conn_type="current"} > 1000
+          for: 5m
+          labels:
+            severity: warning
+            component: mongodb
+          annotations:
+            summary: "MongoDB has too many connections"
+            description: "Current connections: {{ $value }} on {{ $labels.instance }}"
+
+---
+# Grafana Dashboard ConfigMap (optional)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-grafana-dashboard
+  namespace: databases
+  labels:
+    grafana_dashboard: "1"
+    app: mongodb
+data:
+  mongodb-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "MongoDB Cluster Overview",
+        "tags": ["mongodb", "percona", "database"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "MongoDB Connections",
+            "targets": [
+              {
+                "expr": "mongodb_ss_connections{namespace=\"databases\"}",
+                "legendFormat": "{{pod}} - {{conn_type}}"
+              }
+            ]
+          },
+          {
+            "title": "Operations per Second",
+            "targets": [
+              {
+                "expr": "rate(mongodb_ss_opcounters[5m])",
+                "legendFormat": "{{pod}} - {{type}}"
+              }
+            ]
+          },
+          {
+            "title": "Replication Lag",
+            "targets": [
+              {
+                "expr": "mongodb_mongod_replset_member_replication_lag",
+                "legendFormat": "{{instance}}"
+              }
+            ]
+          }
+        ]
+      }
+    }

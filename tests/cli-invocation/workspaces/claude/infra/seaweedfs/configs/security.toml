@@ -1,0 +1,16 @@
+# Security configuration
+# JWT signing keys (generate with: weed jwt.generate.secret)
+
+[jwt.signing]
+key = ""
+expires_after_seconds = 10
+
+[jwt.filer_signing]
+key = ""
+expires_after_seconds = 10
+
+# To enable JWT authentication:
+# 1. Generate keys: weed jwt.generate.secret
+# 2. Fill in the keys above
+# 3. Add -jwt.signing.key flag to master
+# 4. Add -jwt.filer.signing.key flag to filer

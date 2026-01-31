@@ -1,0 +1,150 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-sentinel-config
+  namespace: databases
+data:
+  sentinel.conf: |
+    # Sentinel Configuration
+    port 26379
+
+    # Monitor the Redis masters
+    sentinel monitor redis-cluster redis-cluster-0.redis-cluster-headless.databases.svc.cluster.local 6379 2
+    sentinel down-after-milliseconds redis-cluster 5000
+    sentinel parallel-syncs redis-cluster 1
+    sentinel failover-timeout redis-cluster 10000
+
+    # Additional monitoring for redundancy
+    sentinel monitor redis-cluster-1 redis-cluster-1.redis-cluster-headless.databases.svc.cluster.local 6379 2
+    sentinel down-after-milliseconds redis-cluster-1 5000
+    sentinel parallel-syncs redis-cluster-1 1
+    sentinel failover-timeout redis-cluster-1 10000
+
+    sentinel monitor redis-cluster-2 redis-cluster-2.redis-cluster-headless.databases.svc.cluster.local 6379 2
+    sentinel down-after-milliseconds redis-cluster-2 5000
+    sentinel parallel-syncs redis-cluster-2 1
+    sentinel failover-timeout redis-cluster-2 10000
+
+    # Logging
+    loglevel notice
+
+    # Security
+    protected-mode no
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-sentinel
+  namespace: databases
+  labels:
+    app: redis-sentinel
+    component: sentinel
+spec:
+  serviceName: redis-sentinel-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: redis-sentinel
+      component: sentinel
+  template:
+    metadata:
+      labels:
+        app: redis-sentinel
+        component: sentinel
+    spec:
+      affinity:
+        # Spread sentinels across nodes
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - redis-sentinel
+              topologyKey: kubernetes.io/hostname
+      initContainers:
+      - name: config
+        image: redis:7.2-alpine
+        command:
+        - sh
+        - -c
+        - |
+          cp /config/sentinel.conf /etc/redis/sentinel.conf
+          echo "sentinel announce-ip $(POD_IP)" >> /etc/redis/sentinel.conf
+          echo "sentinel announce-port 26379" >> /etc/redis/sentinel.conf
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: sentinel-config
+          mountPath: /etc/redis
+      containers:
+      - name: sentinel
+        image: redis:7.2-alpine
+        ports:
+        - name: sentinel
+          containerPort: 26379
+          protocol: TCP
+        command:
+        - redis-sentinel
+        - /etc/redis/sentinel.conf
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          tcpSocket:
+            port: sentinel
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - redis-cli -p 26379 ping
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: sentinel-config
+          mountPath: /etc/redis
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: config
+        configMap:
+          name: redis-sentinel-config
+      - name: sentinel-config
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        app: redis-sentinel
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi

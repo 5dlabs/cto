@@ -44,31 +44,44 @@ echo "--- Verifying MCP Server ---" >&2
 claude mcp list >&2 2>&1 || true
 
 # -----------------------------------------------------------------------------
-# 3. Execute Claude CLI
+# 3. Check for Custom Agents (auto-discovered from ~/.claude/agents/)
+# -----------------------------------------------------------------------------
+echo "" >&2
+echo "--- Checking Custom Agents ---" >&2
+AGENTS_DIR="${HOME}/.claude/agents"
+
+if [[ -d "${AGENTS_DIR}" ]]; then
+  echo "📂 Agents directory: ${AGENTS_DIR}" >&2
+  for agent_file in "${AGENTS_DIR}"/*.md; do
+    if [[ -f "$agent_file" ]]; then
+      agent_name=$(basename "$agent_file" .md)
+      echo "  ✓ Found agent: ${agent_name}" >&2
+    fi
+  done
+else
+  echo "  No custom agents directory found" >&2
+fi
+
+# -----------------------------------------------------------------------------
+# 4. Execute Claude CLI
 # -----------------------------------------------------------------------------
 echo "" >&2
 echo "--- Executing Claude CLI ---" >&2
 
-# The prompt - can be overridden via CLAUDE_PROMPT env var
-PROMPT="${CLAUDE_PROMPT:-Build a small Python project in /workspace with the following structure:
-
-1. First, explore what files exist in /workspace using Glob
-2. Create a project structure:
-   - /workspace/src/calculator.py - A Calculator class with add, subtract, multiply, divide methods
-   - /workspace/src/__init__.py - Package init  
-   - /workspace/tests/test_calculator.py - Unit tests using unittest
-   - /workspace/README.md - Documentation with usage examples
-
-3. Run the tests using: python3 -m pytest tests/ -v (or unittest if pytest not available)
-4. Show me the test results and a summary of what you created
-
-Make sure to:
-- Add proper docstrings to all functions
-- Handle division by zero gracefully
-- Include at least 5 test cases}"
+# The prompt - read from prompt.md file or use CLAUDE_PROMPT env var
+if [[ -f "${WORKSPACE}/prompt.md" ]]; then
+  echo "📋 Reading prompt from ${WORKSPACE}/prompt.md" >&2
+  PROMPT="$(cat "${WORKSPACE}/prompt.md")"
+elif [[ -n "${CLAUDE_PROMPT:-}" ]]; then
+  PROMPT="${CLAUDE_PROMPT}"
+else
+  echo "❌ Error: No prompt found. Either create ${WORKSPACE}/prompt.md or set CLAUDE_PROMPT env var" >&2
+  exit 1
+fi
 
 # Run Claude with streaming output for sidecar parsing
-# The init message in stream-json contains tools, skills, and mcp_servers
+# Custom agents are auto-discovered from ~/.claude/agents/*.md
+# The init message in stream-json contains tools, skills, agents, and mcp_servers
 (echo "n" | claude --print --output-format stream-json --verbose \
   --dangerously-skip-permissions \
   "${PROMPT}" 2>&1) | tee "${WORKSPACE}/stream.jsonl"

@@ -1,0 +1,290 @@
+---
+# Example application deployment that uses the PostgreSQL cluster
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: databases
+data:
+  # Connection strings for the application
+  DATABASE_HOST_RW: "postgres-cluster-pooler-rw.databases.svc.cluster.local"
+  DATABASE_HOST_RO: "postgres-cluster-pooler-ro.databases.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "app"
+  DATABASE_USER: "app"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-db-credentials
+  namespace: databases
+type: Opaque
+stringData:
+  # Reference the same password as in postgres-cluster-app-user secret
+  DATABASE_PASSWORD: "change-me-app-password"
+
+  # Full connection strings
+  DATABASE_URL_RW: "postgresql://app:change-me-app-password@postgres-cluster-pooler-rw.databases.svc.cluster.local:5432/app"
+  DATABASE_URL_RO: "postgresql://app:change-me-app-password@postgres-cluster-pooler-ro.databases.svc.cluster.local:5432/app"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-app
+  namespace: databases
+  labels:
+    app: example-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: example-app
+  template:
+    metadata:
+      labels:
+        app: example-app
+    spec:
+      containers:
+        - name: app
+          image: postgres:16-alpine  # Replace with your app image
+          command:
+            - sleep
+            - infinity
+          env:
+            # Individual connection parameters
+            - name: DATABASE_HOST_RW
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DATABASE_HOST_RW
+            - name: DATABASE_HOST_RO
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DATABASE_HOST_RO
+            - name: DATABASE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DATABASE_PORT
+            - name: DATABASE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DATABASE_NAME
+            - name: DATABASE_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DATABASE_USER
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-credentials
+                  key: DATABASE_PASSWORD
+
+            # Full connection strings (preferred for most ORMs)
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-credentials
+                  key: DATABASE_URL_RW
+            - name: DATABASE_URL_READ
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-credentials
+                  key: DATABASE_URL_RO
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+
+      # Ensure app pods are scheduled on different nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - example-app
+                topologyKey: kubernetes.io/hostname
+
+---
+# Example of a Job that initializes the database schema
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  namespace: databases
+  annotations:
+    description: "Initialize database schema"
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: db-init
+          image: postgres:16-alpine
+          env:
+            - name: PGHOST
+              value: "postgres-cluster-pooler-rw.databases.svc.cluster.local"
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: "app"
+            - name: PGUSER
+              value: "app"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-credentials
+                  key: DATABASE_PASSWORD
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for PostgreSQL to be ready..."
+              until pg_isready; do
+                echo "PostgreSQL is unavailable - sleeping"
+                sleep 2
+              done
+
+              echo "PostgreSQL is up - creating tables"
+              psql <<-EOSQL
+                -- Create example tables
+                CREATE TABLE IF NOT EXISTS users (
+                  id SERIAL PRIMARY KEY,
+                  username VARCHAR(50) UNIQUE NOT NULL,
+                  email VARCHAR(100) UNIQUE NOT NULL,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS posts (
+                  id SERIAL PRIMARY KEY,
+                  user_id INTEGER REFERENCES users(id),
+                  title VARCHAR(200) NOT NULL,
+                  content TEXT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- Create indexes
+                CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+                CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
+                CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
+
+                -- Insert sample data
+                INSERT INTO users (username, email)
+                VALUES
+                  ('admin', 'admin@example.com'),
+                  ('user1', 'user1@example.com')
+                ON CONFLICT (username) DO NOTHING;
+
+                SELECT 'Database initialized successfully!' as status;
+              EOSQL
+
+---
+# Example CronJob for database maintenance
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-vacuum
+  namespace: databases
+spec:
+  schedule: "0 3 * * 0"  # Every Sunday at 3 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: vacuum
+              image: postgres:16-alpine
+              env:
+                - name: PGHOST
+                  value: "postgres-cluster-rw.databases.svc.cluster.local"  # Direct connection to primary
+                - name: PGPORT
+                  value: "5432"
+                - name: PGDATABASE
+                  value: "app"
+                - name: PGUSER
+                  value: "postgres"
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-cluster-superuser
+                      key: password
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "Running VACUUM ANALYZE on all databases..."
+                  psql -c "VACUUM ANALYZE;"
+                  echo "VACUUM ANALYZE completed successfully"
+
+---
+# NetworkPolicy to allow app to connect to PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-app-to-postgres
+  namespace: databases
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: postgres-cluster
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from poolers
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/poolerName: postgres-cluster-pooler-rw
+        - podSelector:
+            matchLabels:
+              cnpg.io/poolerName: postgres-cluster-pooler-ro
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow from example app
+    - from:
+        - podSelector:
+            matchLabels:
+              app: example-app
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# NetworkPolicy to allow poolers to connect to PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pooler-to-postgres
+  namespace: databases
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/pooler: postgres-cluster-pooler-rw
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: example-app
+      ports:
+        - protocol: TCP
+          port: 5432

@@ -1,0 +1,140 @@
+---
+# Network Policy for MongoDB Cluster
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongodb-rs-netpol
+  namespace: databases
+  labels:
+    app: mongodb
+    app.kubernetes.io/name: percona-server-mongodb
+    app.kubernetes.io/instance: mongodb-rs
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: percona-server-mongodb
+      app.kubernetes.io/instance: mongodb-rs
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # Ingress rules
+  ingress:
+    # Allow MongoDB traffic from application namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: applications
+        - podSelector:
+            matchLabels:
+              access-mongodb: "true"
+      ports:
+        - protocol: TCP
+          port: 27017
+
+    # Allow inter-replica communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: percona-server-mongodb
+              app.kubernetes.io/instance: mongodb-rs
+      ports:
+        - protocol: TCP
+          port: 27017
+
+    # Allow operator access
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: percona-server-mongodb-operator
+      ports:
+        - protocol: TCP
+          port: 27017
+
+    # Allow PMM monitoring
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 42000
+        - protocol: TCP
+          port: 42001
+        - protocol: TCP
+          port: 42002
+
+  # Egress rules
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # Allow inter-replica communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: percona-server-mongodb
+              app.kubernetes.io/instance: mongodb-rs
+      ports:
+        - protocol: TCP
+          port: 27017
+
+    # Allow backup to S3 (HTTPS)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Allow PMM server communication
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Allow version checking
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Network Policy for allowing specific applications to access MongoDB
+# Label your application pods with 'access-mongodb: "true"' to grant access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mongodb-access
+  namespace: applications
+spec:
+  podSelector:
+    matchLabels:
+      access-mongodb: "true"
+  policyTypes:
+    - Egress
+  egress:
+    # Allow access to MongoDB
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: databases
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: percona-server-mongodb
+              app.kubernetes.io/instance: mongodb-rs
+      ports:
+        - protocol: TCP
+          port: 27017
