@@ -3,6 +3,33 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.35](https://github.com/5dlabs/cto/compare/v0.2.34...v0.2.35) (2026-01-31)
+
+
+### ✨ Features
+
+* add Stitch agent config + detection-aware review template ([b0dd873](https://github.com/5dlabs/cto/commit/b0dd873b938fab78d062a324ce3e8333db94a7d1))
+* **examples:** AlertHub planning documents from intake-agent ([#4163](https://github.com/5dlabs/cto/issues/4163)) ([a3964f5](https://github.com/5dlabs/cto/commit/a3964f5385c35789436dca594165ce030e88cfd4))
+* remediation buttons Phase A + config fixes ([#4123](https://github.com/5dlabs/cto/issues/4123)) ([399aa40](https://github.com/5dlabs/cto/commit/399aa408961319294a83ac9fe7fee2aefb3d064d))
+* **stitch:** CI failure remediation buttons (webhook-based) ([#4166](https://github.com/5dlabs/cto/issues/4166)) ([3e3cc8d](https://github.com/5dlabs/cto/commit/3e3cc8d9e0372166fe18431e1a1e1d6a2dc9d3c9))
+
+
+### 🐛 Bug Fixes
+
+* define CURL_MAX_RETRIES before retry loops ([2ead8c3](https://github.com/5dlabs/cto/commit/2ead8c373073b2f2989743a75ba015f3ea328fdf))
+* **intake-agent:** Robust JSON parsing with jsonrepair ([#4164](https://github.com/5dlabs/cto/issues/4164)) ([4a8e899](https://github.com/5dlabs/cto/commit/4a8e89930932d1694787e6e15927307a76391fe1))
+* Stitch must use gh CLI for reviews to post as correct identity ([cb1d67d](https://github.com/5dlabs/cto/commit/cb1d67d20ce461a28c84784d2201aeb45c2211fc))
+* **stitch:** deduplicate CodeRuns using deterministic names ([#4143](https://github.com/5dlabs/cto/issues/4143)) ([dadc8a2](https://github.com/5dlabs/cto/commit/dadc8a248659b9d1f940993a40837629b3dc6491))
+* **stitch:** enforce gh CLI for reviews to use correct GitHub App identity ([#4157](https://github.com/5dlabs/cto/issues/4157)) ([015892a](https://github.com/5dlabs/cto/commit/015892a09560e658aa6996a37e732f881e18297b))
+* **tools:** bump memory limit 2Gi→4Gi to prevent OOM ([#4186](https://github.com/5dlabs/cto/issues/4186)) ([530fd5b](https://github.com/5dlabs/cto/commit/530fd5b295d913a1630825547346d950aa05d326))
+
+
+### 📚 Documentation
+
+* add CTO Lite freemium desktop application plan ([#4154](https://github.com/5dlabs/cto/issues/4154)) ([39a1e18](https://github.com/5dlabs/cto/commit/39a1e183032beb698dce43698052884ddc09fd83))
+* add remediation buttons implementation status ([#4131](https://github.com/5dlabs/cto/issues/4131)) ([bbcfbde](https://github.com/5dlabs/cto/commit/bbcfbde9afd9bf54b21dd563a01537a2b3005870))
+* AlertHub full task/subtask structure (50 tasks, 200 subtasks) ([#4145](https://github.com/5dlabs/cto/issues/4145)) ([cbf462b](https://github.com/5dlabs/cto/commit/cbf462b9de9587eff4968b52b88a450ed7c527ca))
+
 ## [0.2.34](https://github.com/5dlabs/cto/compare/v0.2.33...v0.2.34) (2026-01-30)
 
 
