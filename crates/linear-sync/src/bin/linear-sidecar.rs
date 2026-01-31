@@ -487,6 +487,115 @@ async fn resolve_issue_id(token: &str, identifier: &str) -> Result<String> {
     Ok(issue_id)
 }
 
+/// Post a milestone comment on the issue itself (permanent, not in agent dialog)
+/// Used for major events: task start, deployments, PR creation, task completion
+async fn post_milestone_comment(state: &AppState, milestone_type: MilestoneType, details: &str) -> Result<()> {
+    let client = reqwest::Client::new();
+    
+    // Resolve issue ID first
+    let issue_id = resolve_issue_id(&state.linear_token, &state.issue_identifier).await?;
+    
+    let query = r#"
+        mutation CreateComment($input: CommentCreateInput!) {
+            commentCreate(input: $input) {
+                success
+                comment {
+                    id
+                }
+            }
+        }
+    "#;
+    
+    // Format milestone message based on type
+    let task = &state.task_context;
+    let agent_name = task.agent.as_deref().unwrap_or("Agent");
+    let agent_emoji = match agent_name.to_lowercase().as_str() {
+        "bolt" => "⚡",
+        "rex" => "🦖",
+        "morgan" => "🧙",
+        "blaze" => "🔥",
+        _ => "🤖"
+    };
+    
+    let body = match milestone_type {
+        MilestoneType::TaskStarted => {
+            let title = task.title.as_deref().unwrap_or("Task");
+            format!(
+                "{} **{} started working**\n\n📋 {}\n\n{}",
+                agent_emoji, agent_name.to_uppercase(), title, details
+            )
+        }
+        MilestoneType::Deployment { ref url } => {
+            format!(
+                "✅ **Deployed!**\n\n🔗 {}\n\n{}",
+                url, details
+            )
+        }
+        MilestoneType::PullRequest { ref url, ref title } => {
+            format!(
+                "🔗 **Pull Request Ready**\n\n[{}]({})\n\n{}",
+                title, url, details
+            )
+        }
+        MilestoneType::TaskCompleted { duration_secs, cost_usd } => {
+            let title = task.title.as_deref().unwrap_or("Task");
+            let duration_str = if duration_secs >= 60.0 {
+                format!("{:.0}m {:.0}s", (duration_secs / 60.0).floor(), duration_secs % 60.0)
+            } else {
+                format!("{:.1}s", duration_secs)
+            };
+            format!(
+                "🎉 **{} completed {}!**\n\n⏱️ {} │ 💰 ${:.4}\n\n{}",
+                agent_name.to_uppercase(), title, duration_str, cost_usd, details
+            )
+        }
+        MilestoneType::Error { ref message } => {
+            format!(
+                "❌ **Error**\n\n{}\n\n{}",
+                message, details
+            )
+        }
+    };
+    
+    let variables = serde_json::json!({
+        "input": {
+            "issueId": issue_id,
+            "body": body
+        }
+    });
+    
+    let response = client
+        .post(LINEAR_API_URL)
+        .header("Authorization", &state.linear_token)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "query": query,
+            "variables": variables
+        }))
+        .send()
+        .await?;
+    
+    let status = response.status();
+    if !status.is_success() {
+        let response_body = response.text().await.unwrap_or_default();
+        warn!("Failed to post milestone comment ({}): {}", status, response_body);
+    } else {
+        info!("📌 Posted milestone comment to issue");
+    }
+    
+    Ok(())
+}
+
+/// Types of milestones that get posted as issue comments
+#[derive(Debug)]
+enum MilestoneType {
+    TaskStarted,
+    Deployment { url: String },
+    PullRequest { url: String, title: String },
+    TaskCompleted { duration_secs: f64, cost_usd: f64 },
+    Error { message: String },
+}
+
 /// Create agent session on Linear issue
 /// Note: Linear's AgentSessionCreateOnIssue now only accepts issueId
 /// Model, tools, skills are added via activities
@@ -1164,8 +1273,16 @@ async fn ingest(
                     warn!("Failed to post init activity: {}", e);
                 }
                 
+                // Post milestone comment on the issue itself
+                let goal = state.task_context.goal.as_deref().unwrap_or("");
+                let goal_preview = if goal.len() > 200 { format!("{}...", &goal[..200]) } else { goal.to_string() };
+                if let Err(e) = post_milestone_comment(&state, MilestoneType::TaskStarted, &goal_preview).await {
+                    warn!("Failed to post task started milestone: {}", e);
+                }
+                
                 let mut session = state.session.write().await;
                 session.session_id = Some(session_id.clone());
+                session.start_time = Some(std::time::Instant::now());
                 info!("✅ Linear session created: {}", session_id);
             }
             Err(e) => {
@@ -1303,6 +1420,23 @@ async fn ingest(
                 duration_ms, cost_usd, num_turns
             ).await {
                 warn!("Failed to post completion summary: {}", e);
+            }
+            
+            // Post task completed milestone to the issue itself
+            let duration_secs = duration_ms.map(|ms| ms as f64 / 1000.0).unwrap_or(0.0);
+            let cost = cost_usd.unwrap_or(0.0);
+            let deliverables = if !files_created.is_empty() {
+                format!("Created {} files: {}", files_created.len(), 
+                    files_created.iter().take(3).map(|f| f.rsplit('/').next().unwrap_or(f)).collect::<Vec<_>>().join(", "))
+            } else {
+                String::new()
+            };
+            if let Err(e) = post_milestone_comment(
+                &state, 
+                MilestoneType::TaskCompleted { duration_secs, cost_usd: cost },
+                &deliverables
+            ).await {
+                warn!("Failed to post task completed milestone: {}", e);
             }
             
             return StatusCode::OK;
