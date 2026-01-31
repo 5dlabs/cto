@@ -2768,14 +2768,18 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
+ "hex",
  "reqwest",
  "serde",
  "serde_json",
+ "serde_yaml",
+ "sha1",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
  "tracing-subscriber",
  "url",
+ "uuid",
  "wiremock",
 ]
 
