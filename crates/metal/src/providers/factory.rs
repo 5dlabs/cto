@@ -24,6 +24,7 @@ pub enum ProviderKind {
 }
 
 /// Configuration for creating a provider instance.
+#[derive(Clone)]
 pub struct ProviderConfig {
     pub kind: ProviderKind,
     // Latitude

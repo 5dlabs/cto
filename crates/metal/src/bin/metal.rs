@@ -7,52 +7,14 @@ use std::process::Command;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use metal::providers::latitude::Latitude;
-use metal::providers::{CreateServerRequest, Provider, ReinstallIpxeRequest};
-
-/// Supported infrastructure providers.
-#[derive(Clone, Debug, ValueEnum)]
-enum ProviderKind {
-    Latitude,
-    Hetzner,
-    Ovh,
-    Vultr,
-    Scaleway,
-    Cherry,
-    Onprem,
-}
-
-/// Aggregated provider configuration built from CLI flags.
-#[derive(Clone, Debug)]
-struct ProviderConfig {
-    kind: ProviderKind,
-    // Latitude
-    latitude_api_key: String,
-    latitude_project_id: String,
-    // Hetzner
-    hetzner_user: String,
-    hetzner_password: String,
-    // OVH
-    ovh_app_key: String,
-    ovh_app_secret: String,
-    ovh_consumer_key: String,
-    // Vultr
-    vultr_api_key: String,
-    // Scaleway
-    scaleway_secret_key: String,
-    scaleway_org_id: String,
-    scaleway_project_id: String,
-    scaleway_zone: String,
-    // Cherry Servers
-    cherry_api_key: String,
-    cherry_team_id: String,
-    // On-prem
-    onprem_inventory: String,
-}
+use metal::providers::{
+    create_provider, latitude::Latitude, CreateServerRequest, Provider, ProviderConfig,
+    ProviderKind, ReinstallIpxeRequest,
+};
 use metal::stack;
 use metal::state::{with_retry_async, ClusterState, ProvisionStep, RetryConfig};
 use metal::talos::{self, BootstrapConfig, TalosConfig};
@@ -608,30 +570,40 @@ async fn main() -> Result<()> {
         _ => (cli.api_key.clone(), cli.project_id.clone()),
     };
 
-    // Build provider config from CLI args
-    let provider_config = ProviderConfig {
-        kind: cli.provider.clone(),
-        latitude_api_key: api_key.clone(),
-        latitude_project_id: project_id.clone(),
-        hetzner_user: cli.hetzner_user.clone(),
-        hetzner_password: cli.hetzner_password.clone(),
-        ovh_app_key: cli.ovh_app_key.clone(),
-        ovh_app_secret: cli.ovh_app_secret.clone(),
-        ovh_consumer_key: cli.ovh_consumer_key.clone(),
-        vultr_api_key: cli.vultr_api_key.clone(),
-        scaleway_secret_key: cli.scaleway_secret_key.clone(),
-        scaleway_org_id: cli.scaleway_org_id.clone(),
-        scaleway_project_id: cli.scaleway_project_id.clone(),
-        scaleway_zone: cli.scaleway_zone.clone(),
-        cherry_api_key: cli.cherry_api_key.clone(),
-        cherry_team_id: cli.cherry_team_id.clone(),
-        onprem_inventory: cli.onprem_inventory.clone(),
+    // Helper to convert empty strings to None
+    let opt = |s: &str| -> Option<String> {
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
     };
 
-    // Create provider via factory (currently only Latitude is fully wired;
-    // other providers will be routed through create_provider() once the
-    // factory module lands on main).
-    let provider: Box<dyn Provider> = create_provider(provider_config.clone())?;
+    // Build provider config from CLI args using the factory's ProviderConfig
+    let provider_config = ProviderConfig {
+        kind: cli.provider.clone(),
+        latitude_api_key: opt(&api_key),
+        latitude_project_id: opt(&project_id),
+        hetzner_user: opt(&cli.hetzner_user),
+        hetzner_password: opt(&cli.hetzner_password),
+        ovh_app_key: opt(&cli.ovh_app_key),
+        ovh_app_secret: opt(&cli.ovh_app_secret),
+        ovh_consumer_key: opt(&cli.ovh_consumer_key),
+        ovh_subsidiary: None, // Not exposed via CLI yet
+        vultr_api_key: opt(&cli.vultr_api_key),
+        scaleway_secret_key: opt(&cli.scaleway_secret_key),
+        scaleway_org_id: opt(&cli.scaleway_org_id),
+        scaleway_project_id: opt(&cli.scaleway_project_id),
+        scaleway_zone: opt(&cli.scaleway_zone),
+        cherry_api_key: opt(&cli.cherry_api_key),
+        cherry_team_id: cli.cherry_team_id.trim().parse::<i64>().ok(),
+        onprem_inventory_path: opt(&cli.onprem_inventory).map(PathBuf::from),
+    };
+
+    // Create provider via the factory module
+    let provider: Box<dyn Provider> =
+        create_provider(provider_config.clone()).context("Failed to create provider")?;
 
     match cli.command {
         Commands::List => {
@@ -2101,28 +2073,6 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Create a provider instance from the aggregated config.
-///
-/// Once the factory module lands, this will delegate to `metal::providers::factory::create_provider`.
-/// For now only Latitude is fully wired; other variants are stubbed so the CLI compiles.
-fn create_provider(config: ProviderConfig) -> Result<Box<dyn Provider>> {
-    match config.kind {
-        ProviderKind::Latitude => {
-            let p = Latitude::new(&config.latitude_api_key, &config.latitude_project_id)
-                .context("Failed to create Latitude provider")?;
-            Ok(Box::new(p))
-        }
-        other => {
-            // TODO: wire up remaining providers once factory module is merged
-            anyhow::bail!(
-                "Provider {:?} is not yet wired in the CLI. \
-                 Supported today: latitude. Others coming soon.",
-                other
-            );
-        }
-    }
 }
 
 fn resolve_latitude_creds(cli: &Cli) -> Result<(String, String)> {

@@ -443,15 +443,15 @@ impl BareMetalOrchestrator {
                 Ok((vlan_id, vid))
             }
             // Other providers don't support VLAN creation via API
-            // Users must configure VLANs manually in their provider console
+            // Users must disable VLAN or configure it manually before installation
             _ => {
-                warn!("VLAN creation not supported for provider {:?}. Configure VLANs manually in provider console.", self.config.provider);
-                ui::print_warning(&format!(
-                    "VLAN creation not supported for {}. Using mock VLAN ID.",
+                anyhow::bail!(
+                    "VLAN creation is not supported for provider {}. \
+                     Either disable VLAN in your configuration (set enable_vlan: false) \
+                     or pre-configure a VLAN manually in your provider's console before installation. \
+                     Only Latitude supports automated VLAN provisioning.",
                     self.config.provider
-                ));
-                // Return a placeholder - user must configure VLAN manually
-                Ok(("manual-vlan".to_string(), 100))
+                );
             }
         }
     }
