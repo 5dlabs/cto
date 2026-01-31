@@ -657,7 +657,13 @@ async fn main() -> Result<()> {
             in_stock,
             gen4,
         } => {
-            let plans = provider.list_plans().await?;
+            // Plans discovery is currently Latitude-specific
+            if !matches!(cli.provider, ProviderKind::Latitude) {
+                anyhow::bail!("Plans command is currently only supported for Latitude provider. Use --provider latitude");
+            }
+            let latitude = Latitude::new(&api_key, &project_id)
+                .context("Failed to create Latitude provider for plans")?;
+            let plans = latitude.list_plans().await?;
 
             println!("\n📦 Available Plans");
             println!("{}", "=".repeat(100));
@@ -811,7 +817,13 @@ async fn main() -> Result<()> {
         }
 
         Commands::Regions => {
-            let regions = provider.list_regions().await?;
+            // Regions discovery is currently Latitude-specific
+            if !matches!(cli.provider, ProviderKind::Latitude) {
+                anyhow::bail!("Regions command is currently only supported for Latitude provider. Use --provider latitude");
+            }
+            let latitude = Latitude::new(&api_key, &project_id)
+                .context("Failed to create Latitude provider for regions")?;
+            let regions = latitude.list_regions().await?;
 
             println!("\n🌍 Available Regions");
             println!("{}", "=".repeat(60));
