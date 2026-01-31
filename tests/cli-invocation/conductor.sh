@@ -1,12 +1,12 @@
 #!/bin/bash
-# conductor.sh - Orchestrate sub-agents and post play-by-play to Linear
+# conductor.sh - Orchestrate ALL sub-agents and post play-by-play to Linear
 
 set -e
 
 source .env
 
 # Create a fresh issue for this test run
-echo "🎯 Creating Linear issue for orchestration test..."
+echo "🎯 Creating Linear issue for full orchestration test..."
 ISSUE_JSON=$(curl -s -X POST https://api.linear.app/graphql \
   -H "Authorization: ${LINEAR_OAUTH_TOKEN}" \
   -H "Content-Type: application/json" \
@@ -15,8 +15,8 @@ ISSUE_JSON=$(curl -s -X POST https://api.linear.app/graphql \
     "variables": {
       "input": {
         "teamId": "9cc787e5-3039-46b3-8fd6-4e0d0d381e74",
-        "title": "Full Orchestration Test - '"$(date +%H:%M)"'",
-        "description": "Testing conductor + parallel sub-agents + final summary"
+        "title": "Full Infrastructure Deployment - '"$(date +%H:%M)"'",
+        "description": "Complete orchestration: databases + storage + security + networking"
       }
     }
   }')
@@ -48,7 +48,7 @@ CONDUCTOR_SESSION=$(curl -s -X POST https://api.linear.app/graphql \
 
 echo "   Session: $CONDUCTOR_SESSION"
 
-# Post conductor init message
+# Post conductor message helper
 post_conductor() {
     local body="$1"
     curl -s -X POST https://api.linear.app/graphql \
@@ -69,17 +69,17 @@ post_conductor() {
 }
 
 echo ""
-post_conductor "# ⚡ **BOLT** — Mission Control\\n\\nOrchestrating infrastructure deployment across multiple agents...\\n\\n📋 **Mission:** Deploy complete infrastructure\\n\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+post_conductor "# ⚡ **BOLT** — Mission Control\\n\\nOrchestrating complete infrastructure deployment...\\n\\n📋 **Mission:** Deploy databases, storage, security, and networking\\n\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📋 Posted conductor init"
 
-# Define sub-agents
-AGENTS=("postgres-deployer" "mongo-deployer" "kafka-deployer")
-EMOJIS=("🐘" "🍃" "📨")
-TITLES=("Deploy PostgreSQL Cluster" "Deploy MongoDB Cluster" "Deploy Kafka Cluster")
+# Define ALL 6 sub-agents
+AGENTS=("postgres-deployer" "mongo-deployer" "kafka-deployer" "seaweedfs-deployer" "security-agent" "network-agent")
+EMOJIS=("🐘" "🍃" "📨" "🌊" "🔐" "🌐")
+TITLES=("Deploy PostgreSQL Cluster" "Deploy MongoDB Cluster" "Deploy Kafka Cluster" "Deploy SeaweedFS Storage" "Configure Security Policies" "Configure Network Policies")
 
 # Post delegation messages
 echo ""
-echo "🚀 Delegating to sub-agents..."
+echo "🚀 Delegating to ${#AGENTS[@]} sub-agents..."
 for i in "${!AGENTS[@]}"; do
     agent="${AGENTS[$i]}"
     emoji="${EMOJIS[$i]}"
@@ -87,29 +87,42 @@ for i in "${!AGENTS[@]}"; do
     
     post_conductor "${emoji} **Delegating** to ${agent} — ${title}"
     echo "   → ${emoji} ${agent}: ${title}"
-    sleep 0.5
+    sleep 0.3
 done
 
-# Start sub-agents in parallel (simulated for now)
+# Simulate sub-agent completions with varied timing (parallel execution)
 echo ""
-echo "⏳ Running sub-agents in parallel..."
-echo "   (In production, these would run as parallel containers)"
+echo "⏳ Sub-agents working in parallel..."
 
-# Simulate sub-agent completions with varied timing
+# Wave 1 - fast completions
 sleep 2
-post_conductor "✅ **Postgres Deployer** completed — 32s • \\$0.0614"
-echo "   ✅ postgres-deployer completed"
+post_conductor "✅ **Mongo Deployer** completed — 28s • \\$0.0512 • 3 turns"
+echo "   ✅ mongo-deployer completed (28s)"
 
 sleep 1
-post_conductor "✅ **Mongo Deployer** completed — 28s • \\$0.0512"
-echo "   ✅ mongo-deployer completed"
+post_conductor "✅ **Postgres Deployer** completed — 32s • \\$0.0614 • 4 turns"
+echo "   ✅ postgres-deployer completed (32s)"
 
-sleep 2
-post_conductor "✅ **Kafka Deployer** completed — 45s • \\$0.0723"
-echo "   ✅ kafka-deployer completed"
+# Wave 2 - medium
+sleep 1
+post_conductor "✅ **SeaweedFS Deployer** completed — 38s • \\$0.0589 • 4 turns"
+echo "   ✅ seaweedfs-deployer completed (38s)"
+
+sleep 1
+post_conductor "✅ **Security Agent** completed — 42s • \\$0.0678 • 5 turns"
+echo "   ✅ security-agent completed (42s)"
+
+# Wave 3 - longer tasks
+sleep 1
+post_conductor "✅ **Kafka Deployer** completed — 45s • \\$0.0723 • 5 turns"
+echo "   ✅ kafka-deployer completed (45s)"
+
+sleep 1
+post_conductor "✅ **Network Agent** completed — 48s • \\$0.0701 • 5 turns"
+echo "   ✅ network-agent completed (48s)"
 
 # Post all done message
-post_conductor "🎉 **All 3 sub-agents completed successfully!**"
+post_conductor "🎉 **All 6 sub-agents completed successfully!**"
 echo ""
 echo "🎉 All sub-agents done!"
 
@@ -119,28 +132,46 @@ echo "📊 Posting final summary..."
 SUMMARY=$(cat << 'EOF'
 🎉 **Infrastructure Deployment Complete!**
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⏱️ **Total:** 1m 45s │ 💰 **Total:** $0.1849 │ 🔄 **Turns:** 12
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏱️ **Total:** 48s (parallel) │ 💰 **Total:** $0.3817 │ 🔄 **Turns:** 26
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📦 **All Deliverables:**
   ✅ postgresql-cluster.yaml
-  ✅ mongodb-cluster.yaml
+  ✅ mongodb-cluster.yaml  
   ✅ kafka-cluster.yaml
+  ✅ seaweedfs-cluster.yaml
+  ✅ security-policies.yaml
+  ✅ network-policies.yaml
 
-🤖 **Sub-Agents (3):**
+🤖 **Sub-Agents (6):**
   • 🐘 Postgres Deployer — 32s, $0.0614, 4 turns
   • 🍃 Mongo Deployer — 28s, $0.0512, 3 turns
   • 📨 Kafka Deployer — 45s, $0.0723, 5 turns
+  • 🌊 SeaweedFS Deployer — 38s, $0.0589, 4 turns
+  • 🔐 Security Agent — 42s, $0.0678, 5 turns
+  • 🌐 Network Agent — 48s, $0.0701, 5 turns
 
-🔧 **Tools Used:** Write (6), Bash (12), Read (9)
-📚 **Skills:** kubernetes-operators, storage-operators, argocd-gitops
+🛠️ **Built-in Tools:** Write (12), Bash (18), Read (14), Glob (4)
+
+🔧 **MCP Tools Used:**
+  • github_push_files (6)
+  • kubectl_apply (6)
+  • grafana_query_prometheus (2)
+  • openmemory_store (3)
+
+📚 **Skills Leveraged:**
+  • kubernetes-operators
+  • storage-operators
+  • argocd-gitops
+  • secrets-management
+
 🧠 **Model:** claude-sonnet-4-5-20250929
 
 🔄 **Iterations:** 1/3 (completed on first attempt)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-*Mission accomplished! All infrastructure deployed.* ⚡
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+*Mission accomplished! Complete infrastructure stack deployed.* ⚡
 EOF
 )
 
@@ -164,4 +195,4 @@ echo "✅ Final summary posted!"
 echo ""
 echo "📋 View at: $ISSUE_URL"
 echo ""
-echo "Done! Check Linear to see the full orchestration flow."
+echo "Done! Check Linear to see the full orchestration flow with all 6 agents."
