@@ -1,6 +1,7 @@
 # Deploy MongoDB Cluster
 
 <task>
+<agent>mongo-deployer</agent>
 <objective>Deploy a Percona MongoDB cluster for storing integration configurations</objective>
 
 <context>
