@@ -1,26 +1,31 @@
-# Subtask 1.3: Deploy Event Streaming and Object Storage (Kafka and SeaweedFS)
+# Deploy Kafka Cluster
 
-**Parent Task:** Setup Infrastructure Components (Bolt - Kubernetes)
-**Agent:** bolt | **Language:** yaml
+<task>
+<agent>kafka-deployer</agent>
+<objective>Deploy a Strimzi Kafka cluster for event streaming</objective>
 
-## Description
+<context>
+The Strimzi Kafka operator is already installed in the cluster. Your job is to create a Kafka cluster instance using the operator's CRDs.
+</context>
 
-Set up Kafka cluster using Strimzi operator for event streaming and SeaweedFS for distributed object storage to support file handling and event-driven architecture.
+<requirements>
+- Create a `Kafka` CR (Strimzi custom resource)
+- Configure appropriate topic retention policies
+- Set replication factors for high availability
+- Configure persistent storage with appropriate PVC
+- Set resource limits (CPU/memory)
+- Enable monitoring for Prometheus scraping
+</requirements>
 
-## Details
+<deliverables>
+- `kafka-cluster.yaml` - The Kafka CR manifest
+- Applied to cluster and pods running
+</deliverables>
 
-Deploy Strimzi Kafka operator with appropriate topic configurations, retention policies, and replication factors. Configure Kafka Connect if needed for data integration. Deploy SeaweedFS cluster with master and volume servers for object storage, including proper data replication and load balancing configuration.
-
-## Dependencies
-
-None
-
-## Acceptance Criteria
-
-- [ ] Subtask requirements implemented
-- [ ] Parent task requirements still satisfied
-
-## Resources
-
-- Parent task: `.tasks/docs/task-1/prompt.md`
-- PRD: `.tasks/docs/prd.md`
+<acceptance_criteria>
+- [ ] Kafka broker pods are Running
+- [ ] Zookeeper pods are Running (if using ZK mode)
+- [ ] PVC is bound with persistent storage
+- [ ] Kafka is ready to accept connections
+</acceptance_criteria>
+</task>

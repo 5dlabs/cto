@@ -93,6 +93,9 @@ services:
       CTO_AGENT_NAME: rex  # Use rex agent's tool configuration
       # Task context for richer Linear dialog
       WORKSPACE_PATH: /workspace
+      # Subtask identity (set by run-all-subtasks.sh for multi-subtask runs)
+      SUBTASK_ID: ${SUBTASK_ID:-}
+      SUBTASK_NAME: ${SUBTASK_NAME:-}
       # Disable exit watch for docker-compose (can't see Claude container's processes)
       MAIN_EXIT_WATCH_ENABLED: "false"
       # Enable whip cracking with long interval (prevents premature shutdown)

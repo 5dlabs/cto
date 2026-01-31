@@ -1,26 +1,32 @@
-# Subtask 1.4: Configure Security, Networking, and Service Health Validation
+# Deploy SeaweedFS Cluster
 
-**Parent Task:** Setup Infrastructure Components (Bolt - Kubernetes)
-**Agent:** bolt | **Language:** yaml
+<task>
+<agent>seaweedfs-deployer</agent>
+<objective>Deploy a SeaweedFS cluster for distributed object storage</objective>
 
-## Description
+<context>
+SeaweedFS operator or Helm chart is available. Your job is to deploy a SeaweedFS cluster for object storage to support file handling.
+</context>
 
-Implement security policies, network isolation, RBAC configurations, and perform comprehensive health checks to ensure all infrastructure components are properly configured and operational.
+<requirements>
+- Deploy SeaweedFS master server(s)
+- Deploy SeaweedFS volume server(s)
+- Configure data replication for durability
+- Set up load balancing for volume servers
+- Configure persistent storage for volumes
+- Set resource limits (CPU/memory)
+</requirements>
 
-## Details
+<deliverables>
+- `seaweedfs-master.yaml` - Master server deployment
+- `seaweedfs-volume.yaml` - Volume server deployment
+- Applied to cluster and pods running
+</deliverables>
 
-Create service accounts and RBAC policies for secure service access. Configure network policies for proper service isolation and communication rules. Set up persistent volume claims with appropriate storage classes. Implement monitoring and alerting for all deployed services. Perform end-to-end connectivity tests and validate that all operators are healthy and ready for application deployment.
-
-## Dependencies
-
-task-1.1, task-1.2, task-1.3
-
-## Acceptance Criteria
-
-- [ ] Subtask requirements implemented
-- [ ] Parent task requirements still satisfied
-
-## Resources
-
-- Parent task: `.tasks/docs/task-1/prompt.md`
-- PRD: `.tasks/docs/prd.md`
+<acceptance_criteria>
+- [ ] SeaweedFS master pods are Running
+- [ ] SeaweedFS volume pods are Running
+- [ ] PVC is bound for volume storage
+- [ ] Object storage API is accessible
+</acceptance_criteria>
+</task>

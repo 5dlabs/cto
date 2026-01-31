@@ -144,6 +144,30 @@ struct TaskContext {
     completed_criteria: usize,
 }
 
+/// Get emoji for agent based on name
+fn get_agent_emoji(agent_name: &str) -> &'static str {
+    match agent_name.to_lowercase().as_str() {
+        // Primary CTO agents
+        "bolt" => "⚡",
+        "rex" => "🦖",
+        "morgan" => "🧙",
+        "blaze" => "🔥",
+        // Database deployers
+        "postgres-deployer" | "postgresql" | "postgres" => "🐘",
+        "mongo-deployer" | "mongodb" | "mongo" => "🍃",
+        "redis-deployer" | "redis" => "🔴",
+        // Infrastructure agents
+        "kafka-deployer" | "kafka" => "📨",
+        "seaweedfs-deployer" | "seaweedfs" => "🌊",
+        "rabbitmq-deployer" | "rabbitmq" => "🐰",
+        // Security & networking
+        "security-agent" | "security" => "🔐",
+        "network-agent" | "networking" => "🌐",
+        // Default
+        _ => "🤖"
+    }
+}
+
 /// Parse task context from prompt.md content
 fn parse_task_context(content: &str) -> TaskContext {
     let mut ctx = TaskContext::default();
@@ -157,7 +181,7 @@ fn parse_task_context(content: &str) -> TaskContext {
         }
     }
     
-    // Extract metadata from **Agent**: bolt | **Language**: yaml pattern
+    // Extract metadata from **Agent**: bolt | **Language**: yaml pattern (markdown format)
     for line in &lines {
         if line.contains("**Agent**:") {
             if let Some(agent_part) = line.split("**Agent**:").nth(1) {
@@ -171,6 +195,29 @@ fn parse_task_context(content: &str) -> TaskContext {
                 let lang = lang_part.split('|').next()
                     .map(|s| s.trim().to_string());
                 ctx.language = lang;
+            }
+        }
+    }
+    
+    // Extract metadata from XML tags (new format): <agent>, <objective>
+    // Parse <agent> tag
+    if let Some(start) = content.find("<agent>") {
+        if let Some(end) = content.find("</agent>") {
+            let agent = content[start + 7..end].trim().to_string();
+            if !agent.is_empty() {
+                ctx.agent = Some(agent);
+            }
+        }
+    }
+    
+    // Parse <objective> as goal if not already set
+    if ctx.goal.is_none() {
+        if let Some(start) = content.find("<objective>") {
+            if let Some(end) = content.find("</objective>") {
+                let objective = content[start + 11..end].trim().to_string();
+                if !objective.is_empty() {
+                    ctx.goal = Some(objective);
+                }
             }
         }
     }
@@ -533,13 +580,7 @@ async fn post_milestone_comment(state: &AppState, milestone_type: MilestoneType,
     // Format milestone message based on type
     let task = &state.task_context;
     let agent_name = task.agent.as_deref().unwrap_or("Agent");
-    let agent_emoji = match agent_name.to_lowercase().as_str() {
-        "bolt" => "⚡",
-        "rex" => "🦖",
-        "morgan" => "🧙",
-        "blaze" => "🔥",
-        _ => "🤖"
-    };
+    let agent_emoji = get_agent_emoji(agent_name);
     
     let body = match milestone_type {
         MilestoneType::TaskStarted => {
@@ -640,13 +681,7 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
     
     // Header with agent personality
     let agent_name = task.agent.as_deref().unwrap_or("Agent");
-    let agent_emoji = match agent_name.to_lowercase().as_str() {
-        "bolt" => "⚡",
-        "rex" => "🦖", 
-        "morgan" => "🧙",
-        "blaze" => "🔥",
-        _ => "🤖"
-    };
+    let agent_emoji = get_agent_emoji(agent_name);
     
     let mut body = format!("{} **{} clocked in!**\n\n", agent_emoji, agent_name.to_uppercase());
     
@@ -784,15 +819,9 @@ async fn post_completion_summary(
     
     // Agent personality
     let agent_name = task.agent.as_deref().unwrap_or("Agent");
-    let agent_emoji = match agent_name.to_lowercase().as_str() {
-        "bolt" => "⚡",
-        "rex" => "🦖",
-        "morgan" => "🧙",
-        "blaze" => "🔥",
-        _ => "🤖"
-    };
+    let agent_emoji = get_agent_emoji(agent_name);
     
-    let mut body = format!("🎉 **{} completed the mission!**\n\n", agent_name.to_uppercase());
+    let mut body = format!("{} **{} completed the mission!**\n\n", agent_emoji, agent_name.to_uppercase());
     
     // Task completed
     if let Some(ref title) = task.title {
