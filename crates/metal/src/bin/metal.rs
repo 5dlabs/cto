@@ -7,12 +7,52 @@ use std::process::Command;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use metal::providers::latitude::Latitude;
 use metal::providers::{CreateServerRequest, Provider, ReinstallIpxeRequest};
+
+/// Supported infrastructure providers.
+#[derive(Clone, Debug, ValueEnum)]
+enum ProviderKind {
+    Latitude,
+    Hetzner,
+    Ovh,
+    Vultr,
+    Scaleway,
+    Cherry,
+    Onprem,
+}
+
+/// Aggregated provider configuration built from CLI flags.
+#[derive(Clone, Debug)]
+struct ProviderConfig {
+    kind: ProviderKind,
+    // Latitude
+    latitude_api_key: String,
+    latitude_project_id: String,
+    // Hetzner
+    hetzner_user: String,
+    hetzner_password: String,
+    // OVH
+    ovh_app_key: String,
+    ovh_app_secret: String,
+    ovh_consumer_key: String,
+    // Vultr
+    vultr_api_key: String,
+    // Scaleway
+    scaleway_secret_key: String,
+    scaleway_org_id: String,
+    scaleway_project_id: String,
+    scaleway_zone: String,
+    // Cherry Servers
+    cherry_api_key: String,
+    cherry_team_id: String,
+    // On-prem
+    onprem_inventory: String,
+}
 use metal::stack;
 use metal::state::{with_retry_async, ClusterState, ProvisionStep, RetryConfig};
 use metal::talos::{self, BootstrapConfig, TalosConfig};
@@ -23,6 +63,10 @@ use tokio::task::JoinSet;
 #[command(name = "metal")]
 #[command(about = "Provision and manage bare metal servers")]
 struct Cli {
+    /// Infrastructure provider (latitude, hetzner, ovh, vultr, scaleway, cherry, onprem).
+    #[arg(long, env = "METAL_PROVIDER", default_value = "latitude", value_enum)]
+    provider: ProviderKind,
+
     /// Latitude.sh API key (or set `LATITUDE_API_KEY` env var).
     ///
     /// If omitted, `metal` can optionally fetch this from 1Password via `op`.
@@ -34,6 +78,64 @@ struct Cli {
     /// If omitted, `metal` can optionally fetch this from 1Password via `op`.
     #[arg(long, env = "LATITUDE_PROJECT_ID", default_value = "")]
     project_id: String,
+
+    // ── Hetzner Robot credentials ──────────────────────────────────────
+    /// Hetzner Robot API user.
+    #[arg(long, env = "HETZNER_ROBOT_USER", default_value = "")]
+    hetzner_user: String,
+
+    /// Hetzner Robot API password.
+    #[arg(long, env = "HETZNER_ROBOT_PASSWORD", default_value = "")]
+    hetzner_password: String,
+
+    // ── OVH credentials ────────────────────────────────────────────────
+    /// OVH application key.
+    #[arg(long, env = "OVH_APPLICATION_KEY", default_value = "")]
+    ovh_app_key: String,
+
+    /// OVH application secret.
+    #[arg(long, env = "OVH_APPLICATION_SECRET", default_value = "")]
+    ovh_app_secret: String,
+
+    /// OVH consumer key.
+    #[arg(long, env = "OVH_CONSUMER_KEY", default_value = "")]
+    ovh_consumer_key: String,
+
+    // ── Vultr credentials ──────────────────────────────────────────────
+    /// Vultr API key.
+    #[arg(long, env = "VULTR_API_KEY", default_value = "")]
+    vultr_api_key: String,
+
+    // ── Scaleway credentials ───────────────────────────────────────────
+    /// Scaleway secret key.
+    #[arg(long, env = "SCALEWAY_SECRET_KEY", default_value = "")]
+    scaleway_secret_key: String,
+
+    /// Scaleway organization ID.
+    #[arg(long, env = "SCALEWAY_ORGANIZATION_ID", default_value = "")]
+    scaleway_org_id: String,
+
+    /// Scaleway project ID.
+    #[arg(long, env = "SCALEWAY_PROJECT_ID", default_value = "")]
+    scaleway_project_id: String,
+
+    /// Scaleway zone (e.g., fr-par-2).
+    #[arg(long, env = "SCALEWAY_ZONE", default_value = "")]
+    scaleway_zone: String,
+
+    // ── Cherry Servers credentials ─────────────────────────────────────
+    /// Cherry Servers API key.
+    #[arg(long, env = "CHERRY_API_KEY", default_value = "")]
+    cherry_api_key: String,
+
+    /// Cherry Servers team ID.
+    #[arg(long, env = "CHERRY_TEAM_ID", default_value = "")]
+    cherry_team_id: String,
+
+    // ── On-prem inventory ──────────────────────────────────────────────
+    /// Path to on-prem inventory file.
+    #[arg(long, env = "ONPREM_INVENTORY_PATH", default_value = "")]
+    onprem_inventory: String,
 
     /// Fetch missing Latitude credentials from 1Password via the `op` CLI.
     ///
@@ -500,12 +602,36 @@ async fn main() -> Result<()> {
     };
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    // Resolve Latitude credentials (optionally via 1Password)
-    let (api_key, project_id) = resolve_latitude_creds(&cli)?;
+    // Resolve Latitude credentials (optionally via 1Password) when using Latitude provider
+    let (api_key, project_id) = match cli.provider {
+        ProviderKind::Latitude => resolve_latitude_creds(&cli)?,
+        _ => (cli.api_key.clone(), cli.project_id.clone()),
+    };
 
-    // Create provider
-    let provider =
-        Latitude::new(&api_key, &project_id).context("Failed to create Latitude provider")?;
+    // Build provider config from CLI args
+    let provider_config = ProviderConfig {
+        kind: cli.provider.clone(),
+        latitude_api_key: api_key.clone(),
+        latitude_project_id: project_id.clone(),
+        hetzner_user: cli.hetzner_user.clone(),
+        hetzner_password: cli.hetzner_password.clone(),
+        ovh_app_key: cli.ovh_app_key.clone(),
+        ovh_app_secret: cli.ovh_app_secret.clone(),
+        ovh_consumer_key: cli.ovh_consumer_key.clone(),
+        vultr_api_key: cli.vultr_api_key.clone(),
+        scaleway_secret_key: cli.scaleway_secret_key.clone(),
+        scaleway_org_id: cli.scaleway_org_id.clone(),
+        scaleway_project_id: cli.scaleway_project_id.clone(),
+        scaleway_zone: cli.scaleway_zone.clone(),
+        cherry_api_key: cli.cherry_api_key.clone(),
+        cherry_team_id: cli.cherry_team_id.clone(),
+        onprem_inventory: cli.onprem_inventory.clone(),
+    };
+
+    // Create provider via factory (currently only Latitude is fully wired;
+    // other providers will be routed through create_provider() once the
+    // factory module lands on main).
+    let provider: Box<dyn Provider> = create_provider(provider_config.clone())?;
 
     match cli.command {
         Commands::List => {
@@ -1040,8 +1166,8 @@ async fn main() -> Result<()> {
             };
 
             // Create second provider instance for parallel ops
-            let provider2 = Latitude::new(&api_key, &project_id)
-                .context("Failed to create second Latitude provider")?;
+            let provider2: Box<dyn Provider> = create_provider(provider_config.clone())
+                .context("Failed to create second provider")?;
 
             // Variables to track server state (may be restored from saved state)
             let (cp_id, worker_id, cp_addr, worker_addr) =
@@ -1717,10 +1843,10 @@ async fn main() -> Result<()> {
                 ssh_keys,
             };
 
-            let provider2 = Latitude::new(&api_key, &project_id)
-                .context("Failed to create second Latitude provider")?;
-            let provider3 = Latitude::new(&api_key, &project_id)
-                .context("Failed to create third Latitude provider")?;
+            let provider2: Box<dyn Provider> = create_provider(provider_config.clone())
+                .context("Failed to create second provider")?;
+            let provider3: Box<dyn Provider> = create_provider(provider_config.clone())
+                .context("Failed to create third provider")?;
 
             let (cp_server, w1_server, w2_server) =
                 with_retry_async(&retry_config, "Create 3 servers", || {
@@ -1963,6 +2089,28 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Create a provider instance from the aggregated config.
+///
+/// Once the factory module lands, this will delegate to `metal::providers::factory::create_provider`.
+/// For now only Latitude is fully wired; other variants are stubbed so the CLI compiles.
+fn create_provider(config: ProviderConfig) -> Result<Box<dyn Provider>> {
+    match config.kind {
+        ProviderKind::Latitude => {
+            let p = Latitude::new(&config.latitude_api_key, &config.latitude_project_id)
+                .context("Failed to create Latitude provider")?;
+            Ok(Box::new(p))
+        }
+        other => {
+            // TODO: wire up remaining providers once factory module is merged
+            anyhow::bail!(
+                "Provider {:?} is not yet wired in the CLI. \
+                 Supported today: latitude. Others coming soon.",
+                other
+            );
+        }
+    }
 }
 
 fn resolve_latitude_creds(cli: &Cli) -> Result<(String, String)> {
