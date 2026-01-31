@@ -12,6 +12,12 @@ use crate::ui;
 
 use metal::inventory::InventoryManager;
 use metal::providers::latitude::Latitude;
+use metal::providers::hetzner::Hetzner;
+use metal::providers::ovh::Ovh;
+use metal::providers::vultr::Vultr;
+use metal::providers::scaleway::Scaleway;
+use metal::providers::cherry::Cherry;
+use metal::providers::onprem::OnPrem;
 use metal::providers::{CreateServerRequest, Provider, ReinstallIpxeRequest};
 use metal::talos::{TalosVersion, DEFAULT_SCHEMATIC_ID};
 
@@ -47,6 +53,42 @@ impl BareMetalOrchestrator {
                 let latitude = Latitude::new(&api_key, &project_id)
                     .context("Failed to create Latitude provider")?;
                 Box::new(latitude)
+            }
+            BareMetalProvider::Hetzner => {
+                let (user, password) = get_hetzner_credentials()?;
+                let hetzner = Hetzner::new(&user, &password)
+                    .context("Failed to create Hetzner provider")?;
+                Box::new(hetzner)
+            }
+            BareMetalProvider::Ovh => {
+                let (app_key, app_secret, consumer_key) = get_ovh_credentials()?;
+                let ovh = Ovh::new(&app_key, &app_secret, &consumer_key)
+                    .context("Failed to create OVH provider")?;
+                Box::new(ovh)
+            }
+            BareMetalProvider::Vultr => {
+                let api_key = get_vultr_credentials()?;
+                let vultr = Vultr::new(&api_key)
+                    .context("Failed to create Vultr provider")?;
+                Box::new(vultr)
+            }
+            BareMetalProvider::Scaleway => {
+                let (secret_key, org_id, project_id, zone) = get_scaleway_credentials()?;
+                let scaleway = Scaleway::new(&secret_key, &org_id, &project_id, &zone)
+                    .context("Failed to create Scaleway provider")?;
+                Box::new(scaleway)
+            }
+            BareMetalProvider::Cherry => {
+                let (api_key, team_id) = get_cherry_credentials()?;
+                let cherry = Cherry::new(&api_key, team_id)
+                    .context("Failed to create Cherry provider")?;
+                Box::new(cherry)
+            }
+            BareMetalProvider::OnPrem => {
+                let inventory_path = get_onprem_inventory_path();
+                let onprem = OnPrem::new(inventory_path)
+                    .context("Failed to create OnPrem provider")?;
+                Box::new(onprem)
             }
         };
 
@@ -369,7 +411,7 @@ impl BareMetalOrchestrator {
     ///
     /// Returns an error if VLAN creation fails.
     pub async fn create_vlan(&self, region: &str) -> Result<(String, u16)> {
-        // Currently only Latitude supports VLANs
+        // Currently only Latitude supports VLANs via API
         match self.config.provider {
             BareMetalProvider::Latitude => {
                 let (api_key, project_id) = get_latitude_credentials()?;
@@ -400,6 +442,17 @@ impl BareMetalOrchestrator {
 
                 Ok((vlan_id, vid))
             }
+            // Other providers don't support VLAN creation via API
+            // Users must configure VLANs manually in their provider console
+            _ => {
+                warn!("VLAN creation not supported for provider {:?}. Configure VLANs manually in provider console.", self.config.provider);
+                ui::print_warning(&format!(
+                    "VLAN creation not supported for {}. Using mock VLAN ID.",
+                    self.config.provider
+                ));
+                // Return a placeholder - user must configure VLAN manually
+                Ok(("manual-vlan".to_string(), 100))
+            }
         }
     }
 
@@ -426,6 +479,14 @@ impl BareMetalOrchestrator {
 
                 ui::print_success(&format!("VLAN {vlan_id} deleted"));
 
+                Ok(())
+            }
+            // Other providers don't support VLAN deletion via API
+            _ => {
+                ui::print_warning(&format!(
+                    "VLAN deletion not supported for {}. Delete VLAN manually in provider console.",
+                    self.config.provider
+                ));
                 Ok(())
             }
         }
@@ -524,4 +585,78 @@ fn get_credentials_from_1password() -> Result<(String, String)> {
     }
 
     Ok((api_key, project_id))
+}
+
+/// Get Hetzner Robot API credentials from environment.
+fn get_hetzner_credentials() -> Result<(String, String)> {
+    let user = env::var("HETZNER_ROBOT_USER").context(
+        "HETZNER_ROBOT_USER not set. Get credentials from https://robot.hetzner.com/preferences/index"
+    )?;
+    let password = env::var("HETZNER_ROBOT_PASSWORD").context(
+        "HETZNER_ROBOT_PASSWORD not set"
+    )?;
+    info!("Using Hetzner credentials from environment variables");
+    Ok((user, password))
+}
+
+/// Get OVH API credentials from environment.
+fn get_ovh_credentials() -> Result<(String, String, String)> {
+    let app_key = env::var("OVH_APPLICATION_KEY").context(
+        "OVH_APPLICATION_KEY not set. Create keys at https://api.ovh.com/createToken/"
+    )?;
+    let app_secret = env::var("OVH_APPLICATION_SECRET").context(
+        "OVH_APPLICATION_SECRET not set"
+    )?;
+    let consumer_key = env::var("OVH_CONSUMER_KEY").context(
+        "OVH_CONSUMER_KEY not set"
+    )?;
+    info!("Using OVH credentials from environment variables");
+    Ok((app_key, app_secret, consumer_key))
+}
+
+/// Get Vultr API key from environment.
+fn get_vultr_credentials() -> Result<String> {
+    let api_key = env::var("VULTR_API_KEY").context(
+        "VULTR_API_KEY not set. Get your key from https://my.vultr.com/settings/#settingsapi"
+    )?;
+    info!("Using Vultr credentials from environment variables");
+    Ok(api_key)
+}
+
+/// Get Scaleway credentials from environment.
+fn get_scaleway_credentials() -> Result<(String, String, String, String)> {
+    let secret_key = env::var("SCALEWAY_SECRET_KEY").context(
+        "SCALEWAY_SECRET_KEY not set. Get credentials from https://console.scaleway.com/iam/api-keys"
+    )?;
+    let org_id = env::var("SCALEWAY_ORGANIZATION_ID").context(
+        "SCALEWAY_ORGANIZATION_ID not set"
+    )?;
+    let project_id = env::var("SCALEWAY_PROJECT_ID").context(
+        "SCALEWAY_PROJECT_ID not set"
+    )?;
+    let zone = env::var("SCALEWAY_ZONE").unwrap_or_else(|_| "fr-par-1".to_string());
+    info!("Using Scaleway credentials from environment variables");
+    Ok((secret_key, org_id, project_id, zone))
+}
+
+/// Get Cherry Servers credentials from environment.
+fn get_cherry_credentials() -> Result<(String, i64)> {
+    let api_key = env::var("CHERRY_API_KEY").context(
+        "CHERRY_API_KEY not set. Get your key from https://portal.cherryservers.com/settings/api-keys"
+    )?;
+    let team_id_str = env::var("CHERRY_TEAM_ID").context(
+        "CHERRY_TEAM_ID not set"
+    )?;
+    let team_id: i64 = team_id_str.parse().context(
+        "CHERRY_TEAM_ID must be a valid integer"
+    )?;
+    info!("Using Cherry Servers credentials from environment variables");
+    Ok((api_key, team_id))
+}
+
+/// Get on-premises inventory path from environment (optional).
+fn get_onprem_inventory_path() -> Option<std::path::PathBuf> {
+    env::var("ONPREM_INVENTORY_PATH")
+        .ok()
+        .map(std::path::PathBuf::from)
 }
