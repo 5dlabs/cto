@@ -37,6 +37,16 @@ chrono = { workspace = true }
 # URL handling
 url = "2.5"
 
+# YAML
+serde_yaml = { workspace = true }
+
+# UUID
+uuid = { workspace = true }
+
+# Cryptography
+sha1 = { workspace = true }
+hex = { workspace = true }
+
 # CLI
 clap = { workspace = true }
 
