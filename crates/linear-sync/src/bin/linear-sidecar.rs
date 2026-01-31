@@ -554,6 +554,12 @@ struct AppState {
     // Task context
     task_context: TaskContext,
     workspace_path: Option<PathBuf>,
+    // Iteration tracking (from env vars)
+    attempt_number: Option<u32>,
+    max_attempts: Option<u32>,
+    model_rotation: Vec<String>,
+    // Conductor mode
+    is_conductor: bool,
 }
 
 // =============================================================================
@@ -749,7 +755,15 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
     let agent_name = task.agent.as_deref().unwrap_or("Agent");
     let agent_emoji = get_agent_emoji(agent_name);
     
-    let mut body = format!("{} **{} clocked in!**\n\n", agent_emoji, capitalize_agent_name(agent_name));
+    // Conductor gets a more prominent header
+    let mut body = if state.is_conductor {
+        format!(
+            "# ⚡ **BOLT** — Mission Control\n\n{} Coordinating deployment across multiple agents...\n\n",
+            agent_emoji
+        )
+    } else {
+        format!("{} **{} clocked in!**\n\n", agent_emoji, capitalize_agent_name(agent_name))
+    };
     
     // Mission brief - the what
     if let Some(ref title) = task.title {
@@ -853,6 +867,71 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
     }
     
     Ok(())
+}
+
+/// Post a conductor play-by-play update (delegation or completion event)
+async fn post_conductor_update(
+    state: &AppState,
+    session_id: &str,
+    message: &str,
+) -> Result<()> {
+    let client = reqwest::Client::new();
+    
+    let query = r#"
+        mutation AddAgentActivity($input: AgentActivityCreateInput!) {
+            agentActivityCreate(input: $input) {
+                success
+            }
+        }
+    "#;
+    
+    let content = serde_json::json!({
+        "type": "response",
+        "body": message
+    });
+    
+    let variables = serde_json::json!({
+        "input": {
+            "agentSessionId": session_id,
+            "content": content
+        }
+    });
+    
+    let response = client
+        .post(LINEAR_API_URL)
+        .header("Authorization", &state.linear_token)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "query": query,
+            "variables": variables
+        }))
+        .send()
+        .await?;
+    
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        warn!("Failed to post conductor update ({}): {}", status, body);
+    }
+    
+    Ok(())
+}
+
+/// Generate conductor delegation message
+fn conductor_delegation_message(agent_name: &str, task_title: &str) -> String {
+    let emoji = get_agent_emoji(agent_name);
+    format!("{} **Delegating** to {} — {}", emoji, capitalize_agent_name(agent_name), task_title)
+}
+
+/// Generate conductor completion message for a sub-agent
+fn conductor_completion_message(agent_name: &str, duration_secs: f64, cost_usd: f64) -> String {
+    let emoji = get_agent_emoji(agent_name);
+    let duration_str = if duration_secs >= 60.0 {
+        format!("{:.0}m {:.0}s", (duration_secs / 60.0).floor(), duration_secs % 60.0)
+    } else {
+        format!("{:.0}s", duration_secs)
+    };
+    format!("✅ **{}** completed — {} • ${:.4}", capitalize_agent_name(agent_name), duration_str, cost_usd)
 }
 
 /// Post completion summary showing work accomplished, MCP tools and skills
@@ -978,7 +1057,23 @@ async fn post_completion_summary(
     }
     
     // Model
-    body.push_str(&format!("🧠 **Model:** `{}`\n\n", model));
+    body.push_str(&format!("🧠 **Model:** `{}`\n", model));
+    
+    // Iteration info (if multi-attempt)
+    if let Some(attempt) = state.attempt_number {
+        let max = state.max_attempts.unwrap_or(1);
+        if max > 1 {
+            body.push_str(&format!("🔄 **Iteration:** Attempt {}/{}\n", attempt, max));
+        }
+    }
+    
+    // Model rotation (if configured)
+    if !state.model_rotation.is_empty() {
+        let models = state.model_rotation.join(" → ");
+        body.push_str(&format!("🧠 **Model Rotation:** {}\n", models));
+    }
+    
+    body.push('\n');
     
     // Acceptance criteria with progress bar
     if task.total_criteria > 0 {
@@ -1775,6 +1870,29 @@ async fn main() -> Result<()> {
         }
     }
     
+    // Parse iteration tracking env vars
+    let attempt_number = env::var("CTO_ATTEMPT_NUMBER")
+        .ok()
+        .and_then(|v| v.parse().ok());
+    let max_attempts = env::var("CTO_MAX_ATTEMPTS")
+        .ok()
+        .and_then(|v| v.parse().ok());
+    let model_rotation: Vec<String> = env::var("CTO_MODEL_ROTATION")
+        .ok()
+        .map(|v| v.split(',').map(|s| s.trim().to_string()).collect())
+        .unwrap_or_default();
+    let is_conductor = env::var("CTO_CONDUCTOR").is_ok();
+    
+    if let Some(attempt) = attempt_number {
+        info!("🔄 Iteration: attempt {}/{}", attempt, max_attempts.unwrap_or(1));
+    }
+    if !model_rotation.is_empty() {
+        info!("🧠 Model rotation: {:?}", model_rotation);
+    }
+    if is_conductor {
+        info!("🎯 Running in CONDUCTOR mode");
+    }
+    
     info!("Issue: {}, Agent: {}, Source: {}", issue_identifier, agent_name, log_source);
     
     // Create shared state
@@ -1785,6 +1903,10 @@ async fn main() -> Result<()> {
         agent_name,
         task_context,
         workspace_path,
+        attempt_number,
+        max_attempts,
+        model_rotation,
+        is_conductor,
     });
     
     match log_source.as_str() {
