@@ -139,6 +139,8 @@ struct TaskContext {
     role: Option<String>,
     agent: Option<String>,
     language: Option<String>,
+    requirements: Vec<String>,
+    deliverables: Vec<String>,
     // Acceptance criteria tracking
     total_criteria: usize,
     completed_criteria: usize,
@@ -233,6 +235,34 @@ fn parse_task_context(content: &str) -> TaskContext {
                     ctx.goal = Some(objective);
                 }
             }
+        }
+    }
+    
+    // Parse <requirements> section - extract bullet points
+    if let Some(start) = content.find("<requirements>") {
+        if let Some(end) = content.find("</requirements>") {
+            let req_content = &content[start + 14..end];
+            ctx.requirements = req_content.lines()
+                .map(|l| l.trim())
+                .filter(|l| l.starts_with('-') || l.starts_with('*'))
+                .map(|l| l.trim_start_matches(|c| c == '-' || c == '*' || c == ' ').to_string())
+                .filter(|l| !l.is_empty())
+                .take(5) // Limit to 5 for display
+                .collect();
+        }
+    }
+    
+    // Parse <deliverables> section - extract bullet points
+    if let Some(start) = content.find("<deliverables>") {
+        if let Some(end) = content.find("</deliverables>") {
+            let del_content = &content[start + 14..end];
+            ctx.deliverables = del_content.lines()
+                .map(|l| l.trim())
+                .filter(|l| l.starts_with('-') || l.starts_with('*'))
+                .map(|l| l.trim_start_matches(|c| c == '-' || c == '*' || c == ' ').to_string())
+                .filter(|l| !l.is_empty())
+                .take(5) // Limit to 5 for display
+                .collect();
         }
     }
     
@@ -599,10 +629,28 @@ async fn post_milestone_comment(state: &AppState, milestone_type: MilestoneType,
     let body = match milestone_type {
         MilestoneType::TaskStarted => {
             let title = task.title.as_deref().unwrap_or("Task");
-            format!(
-                "{} **{} started working**\n\n📋 {}\n\n{}",
+            let mut msg = format!(
+                "{} **{} started working**\n\n📋 **{}**\n\n{}",
                 agent_emoji, capitalize_agent_name(agent_name), title, details
-            )
+            );
+            
+            // Add requirements preview if available
+            if !task.requirements.is_empty() {
+                msg.push_str("\n\n**What I'll do:**\n");
+                for req in task.requirements.iter().take(3) {
+                    msg.push_str(&format!("• {}\n", req));
+                }
+            }
+            
+            // Add deliverables preview if available
+            if !task.deliverables.is_empty() {
+                msg.push_str("\n**Expected output:**\n");
+                for del in task.deliverables.iter().take(3) {
+                    msg.push_str(&format!("• {}\n", del));
+                }
+            }
+            
+            msg
         }
         MilestoneType::Deployment { ref url } => {
             format!(
