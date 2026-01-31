@@ -8,53 +8,46 @@ spec:
   image: percona/percona-server-mongodb:7.0.4-2
   imagePullPolicy: IfNotPresent
 
-  # Secrets for users
+  # Secrets for MongoDB users
   secrets:
     users: mongodb-cluster-secrets
 
-  # 3-member replica set configuration
+  # Backup configuration
+  backup:
+    enabled: false
+
+  # PMM (Percona Monitoring and Management) integration
+  pmm:
+    enabled: false
+
+  # Replica set configuration - 3 members for HA
   replsets:
   - name: rs0
     size: 3
     affinity:
       antiAffinityTopologyKey: "kubernetes.io/hostname"
 
-    podDisruptionBudget:
-      maxUnavailable: 1
-
-    expose:
-      enabled: false
-
+    # Resource requests/limits
     resources:
       limits:
         cpu: "500m"
-        memory: "1Gi"
+        memory: "1G"
       requests:
         cpu: "100m"
-        memory: "512Mi"
+        memory: "512M"
 
+    # Persistent storage
     volumeSpec:
       persistentVolumeClaim:
         resources:
           requests:
             storage: 5Gi
 
-    # WiredTiger storage engine configuration
-    mongod:
+    # MongoDB configuration
+    configuration: |
+      operationProfiling:
+        mode: slowOp
       storage:
-        engine: wiredTiger
         wiredTiger:
           engineConfig:
             cacheSizeRatio: 0.5
-
-  # PMM monitoring (disabled for minimal testing)
-  pmm:
-    enabled: false
-
-  # Backup configuration (disabled for minimal testing)
-  backup:
-    enabled: false
-
-  # Sharding disabled for replica set deployment
-  sharding:
-    enabled: false

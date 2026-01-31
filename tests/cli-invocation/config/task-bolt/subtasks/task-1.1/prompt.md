@@ -1,26 +1,31 @@
-# Subtask 1.1: Deploy Database Services (PostgreSQL and MongoDB)
+# Deploy PostgreSQL Cluster
 
-**Parent Task:** Setup Infrastructure Components (Bolt - Kubernetes)
-**Agent:** bolt | **Language:** yaml
+<task>
+<objective>Deploy a CloudNative-PG PostgreSQL cluster for the alerthub database</objective>
 
-## Description
+<context>
+The CloudNative-PG operator is already installed in the cluster. Your job is to create a PostgreSQL cluster instance using the operator's CRDs.
+</context>
 
-Set up core database infrastructure including PostgreSQL cluster with CloudNative-PG operator for the alerthub database and Percona MongoDB cluster for integration configurations storage.
+<requirements>
+- Create a `Cluster` CR (CloudNative-PG custom resource)
+- Database name: `alerthub`
+- Configure persistent storage with appropriate PVC
+- Set resource limits (CPU/memory)
+- Enable monitoring annotations for Prometheus scraping
+- Configure backup policy using the operator's backup CRDs
+</requirements>
 
-## Details
+<deliverables>
+- `postgresql-cluster.yaml` - The Cluster CR manifest
+- `postgresql-backup.yaml` - Backup schedule configuration (if separate)
+- Applied to cluster and pods running
+</deliverables>
 
-Deploy CloudNative-PG PostgreSQL cluster with alerthub database configuration, including proper backup policies and monitoring. Deploy Percona MongoDB operator and create cluster for storing integration configurations. Configure persistent storage, resource limits, and health checks for both database services.
-
-## Dependencies
-
-None
-
-## Acceptance Criteria
-
-- [ ] Subtask requirements implemented
-- [ ] Parent task requirements still satisfied
-
-## Resources
-
-- Parent task: `.tasks/docs/task-1/prompt.md`
-- PRD: `.tasks/docs/prd.md`
+<acceptance_criteria>
+- [ ] PostgreSQL cluster pods are Running
+- [ ] `alerthub` database exists and is accessible
+- [ ] PVC is bound with persistent storage
+- [ ] Backup policy is configured
+</acceptance_criteria>
+</task>

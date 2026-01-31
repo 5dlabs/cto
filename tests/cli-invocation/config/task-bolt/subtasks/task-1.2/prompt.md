@@ -1,26 +1,30 @@
-# Subtask 1.2: Deploy Caching and Message Queue Services (Redis/Valkey and RabbitMQ)
+# Deploy MongoDB Cluster
 
-**Parent Task:** Setup Infrastructure Components (Bolt - Kubernetes)
-**Agent:** bolt | **Language:** yaml
+<task>
+<objective>Deploy a Percona MongoDB cluster for storing integration configurations</objective>
 
-## Description
+<context>
+The Percona MongoDB operator is already installed in the cluster. Your job is to create a MongoDB cluster instance using the operator's CRDs.
+</context>
 
-Provision Redis/Valkey cluster for caching and rate limiting capabilities, and RabbitMQ cluster for reliable task queuing and message processing.
+<requirements>
+- Create a `PerconaServerMongoDB` CR (Percona operator custom resource)
+- Database purpose: integration configurations storage
+- Configure persistent storage with appropriate PVC
+- Set resource limits (CPU/memory)
+- Enable monitoring for Prometheus scraping
+- Configure replica set for high availability
+</requirements>
 
-## Details
+<deliverables>
+- `mongodb-cluster.yaml` - The PerconaServerMongoDB CR manifest
+- Applied to cluster and pods running
+</deliverables>
 
-Deploy Valkey/Redis cluster with appropriate memory limits and persistence configuration for caching and rate limiting. Deploy RabbitMQ cluster operator with proper queue configurations, clustering setup, and management interface access. Configure high availability and failover mechanisms for both services.
-
-## Dependencies
-
-None
-
-## Acceptance Criteria
-
-- [ ] Subtask requirements implemented
-- [ ] Parent task requirements still satisfied
-
-## Resources
-
-- Parent task: `.tasks/docs/task-1/prompt.md`
-- PRD: `.tasks/docs/prd.md`
+<acceptance_criteria>
+- [ ] MongoDB cluster pods are Running
+- [ ] Replica set is formed and healthy
+- [ ] PVC is bound with persistent storage
+- [ ] Database is accessible for connections
+</acceptance_criteria>
+</task>

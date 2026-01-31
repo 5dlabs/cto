@@ -4,16 +4,12 @@ kind: Kustomization
 namespace: databases
 
 resources:
-  - namespace.yaml
   - cluster.yaml
 
-# Common labels applied to all resources
 commonLabels:
   app.kubernetes.io/name: redis
+  app.kubernetes.io/component: database
   app.kubernetes.io/managed-by: kustomize
 
-# Images can be managed centrally
-images:
-  - name: redis
-    newName: redis
-    newTag: 7.2-alpine
+commonAnnotations:
+  description: "Redis Cluster with Sentinel HA"

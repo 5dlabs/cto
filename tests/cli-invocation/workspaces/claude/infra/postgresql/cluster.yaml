@@ -1,22 +1,23 @@
----
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-cluster
+  name: postgres-test
   namespace: databases
 spec:
-  instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  instances: 1
 
+  # PostgreSQL configuration
   postgresql:
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
 
+  # Storage configuration
   storage:
-    size: 10Gi
+    size: 1Gi
     storageClass: standard
 
+  # Resource limits
   resources:
     requests:
       memory: "512Mi"
@@ -25,23 +26,14 @@ spec:
       memory: "1Gi"
       cpu: "1000m"
 
+  # Bootstrap configuration
   bootstrap:
     initdb:
-      database: appdb
-      owner: appuser
+      database: app
+      owner: app
       secret:
-        name: postgres-cluster-app-user
+        name: postgres-app-user
 
+  # Monitoring
   monitoring:
     enablePodMonitor: false
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-cluster-app-user
-  namespace: databases
-type: kubernetes.io/basic-auth
-stringData:
-  username: appuser
-  password: test-password-change-me

@@ -1,93 +1,86 @@
 ---
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: databases
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: redis-config
   namespace: databases
 data:
   redis.conf: |
-    # Basic Redis Configuration
+    port 6379
     bind 0.0.0.0
     protected-mode no
-    port 6379
-    tcp-backlog 511
-    timeout 0
-    tcp-keepalive 300
-    loglevel notice
-    databases 16
-
-    # Persistence
+    dir /data
+    appendonly yes
+    appendfsync everysec
     save 900 1
     save 300 10
     save 60 10000
-    appendonly yes
-    appendfsync everysec
-
-    # Replication
-    replica-serve-stale-data yes
-    replica-read-only yes
-    repl-diskless-sync no
-    repl-disable-tcp-nodelay no
-    replica-priority 100
-
-    # Memory
     maxmemory 256mb
     maxmemory-policy allkeys-lru
-
+    replica-read-only yes
   sentinel.conf: |
-    # Sentinel Configuration
-    bind 0.0.0.0
     port 26379
+    bind 0.0.0.0
     sentinel monitor mymaster redis-0.redis-headless.databases.svc.cluster.local 6379 2
     sentinel down-after-milliseconds mymaster 5000
     sentinel parallel-syncs mymaster 1
     sentinel failover-timeout mymaster 10000
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: redis-headless
   namespace: databases
-  labels:
-    app: redis
 spec:
   clusterIP: None
   ports:
-  - name: redis
-    port: 6379
+  - port: 6379
     targetPort: 6379
-  - name: sentinel
-    port: 26379
+    name: redis
+  - port: 26379
     targetPort: 26379
+    name: sentinel
   selector:
     app: redis
-
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: databases
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: redis
+  selector:
+    app: redis
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: redis-sentinel
   namespace: databases
-  labels:
-    app: redis
 spec:
   type: ClusterIP
   ports:
-  - name: sentinel
-    port: 26379
+  - port: 26379
     targetPort: 26379
+    name: sentinel
   selector:
     app: redis
-
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: redis
   namespace: databases
-  labels:
-    app: redis
 spec:
   serviceName: redis-headless
   replicas: 3
@@ -107,44 +100,41 @@ spec:
         - -c
         - |
           set -ex
-          cp /mnt/config/redis.conf /etc/redis/redis.conf
-          cp /mnt/config/sentinel.conf /etc/redis/sentinel.conf
+          # Copy config files
+          cp /config/redis.conf /data/redis.conf
+          cp /config/sentinel.conf /data/sentinel.conf
 
-          # Configure replication for replicas
-          if [ "$(hostname)" != "redis-0" ]; then
-            echo "replica-announce-ip $(hostname).redis-headless.databases.svc.cluster.local" >> /etc/redis/redis.conf
-            echo "replicaof redis-0.redis-headless.databases.svc.cluster.local 6379" >> /etc/redis/redis.conf
+          # Determine if this is master or replica
+          ordinal=${HOSTNAME##*-}
+          if [ "$ordinal" -eq 0 ]; then
+            echo "This is master node"
           else
-            echo "replica-announce-ip $(hostname).redis-headless.databases.svc.cluster.local" >> /etc/redis/redis.conf
+            echo "replicaof redis-0.redis-headless.databases.svc.cluster.local 6379" >> /data/redis.conf
           fi
-
-          echo "sentinel announce-ip $(hostname).redis-headless.databases.svc.cluster.local" >> /etc/redis/sentinel.conf
         volumeMounts:
         - name: config
-          mountPath: /mnt/config
-        - name: redis-config
-          mountPath: /etc/redis
+          mountPath: /config
+        - name: data
+          mountPath: /data
       containers:
       - name: redis
         image: redis:7.2-alpine
         command:
         - redis-server
-        - /etc/redis/redis.conf
+        - /data/redis.conf
         ports:
         - containerPort: 6379
           name: redis
         volumeMounts:
-        - name: redis-config
-          mountPath: /etc/redis
         - name: data
           mountPath: /data
         resources:
           requests:
-            memory: "256Mi"
+            memory: "128Mi"
             cpu: "100m"
           limits:
-            memory: "512Mi"
-            cpu: "500m"
+            memory: "256Mi"
+            cpu: "200m"
         livenessProbe:
           tcpSocket:
             port: 6379
@@ -161,45 +151,34 @@ spec:
         image: redis:7.2-alpine
         command:
         - redis-sentinel
-        - /etc/redis/sentinel.conf
+        - /data/sentinel.conf
         ports:
         - containerPort: 26379
           name: sentinel
         volumeMounts:
-        - name: redis-config
-          mountPath: /etc/redis
+        - name: data
+          mountPath: /data
         resources:
           requests:
             memory: "64Mi"
             cpu: "50m"
           limits:
             memory: "128Mi"
-            cpu: "200m"
+            cpu: "100m"
         livenessProbe:
           tcpSocket:
             port: 26379
           initialDelaySeconds: 30
           periodSeconds: 10
-        readinessProbe:
-          exec:
-            command:
-            - redis-cli
-            - -p
-            - "26379"
-            - ping
-          initialDelaySeconds: 5
-          periodSeconds: 5
       volumes:
       - name: config
         configMap:
           name: redis-config
-      - name: redis-config
-        emptyDir: {}
   volumeClaimTemplates:
   - metadata:
       name: data
     spec:
-      accessModes: [ "ReadWriteOnce" ]
+      accessModes: ["ReadWriteOnce"]
       resources:
         requests:
           storage: 1Gi
