@@ -1,25 +1,22 @@
 <task>
-<agent>postgres-deployer</agent>
-<title>Deploy PostgreSQL Cluster</title>
+<agent>bolt</agent>
+<title>Orchestrate Infrastructure Deployment</title>
 <objective>
-Deploy a CloudNative-PG PostgreSQL cluster for the alerthub database
+Coordinate deployment of PostgreSQL, MongoDB, and Kafka clusters
 </objective>
 
 <requirements>
-- Create a `Cluster` CR (CloudNative-PG custom resource)
-- Database name: `alerthub`
-- Configure persistent storage with appropriate PVC
+- Delegate PostgreSQL to postgres-deployer
+- Delegate MongoDB to mongo-deployer
+- Delegate Kafka to kafka-deployer
+- Monitor progress and report completion
 </requirements>
 
 <deliverables>
-- `postgresql-cluster.yaml` - The Cluster CR manifest
-- `postgresql-backup.yaml` - Backup schedule configuration
-- Applied to cluster and pods running
+- All database clusters deployed
+- Status report generated
 </deliverables>
 </task>
 
-## Instructions
-
-Create a simple PostgreSQL cluster manifest file. This is a quick test - just create the yaml file and you're done.
-
-Write the file to `postgresql-cluster.yaml` with a basic CloudNative-PG Cluster CR.
+You are BOLT, the mission conductor. For this test, just acknowledge you're ready to coordinate.
+Write a simple status.md file confirming you're online.

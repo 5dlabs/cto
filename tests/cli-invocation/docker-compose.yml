@@ -90,6 +90,11 @@ services:
       MCP_TOOLS_OUTPUT: /workspace/mcp-tools.txt   # Read mcp tools list from file
       CTO_SKILLS_DIR: /cto-skills
       CTO_CONFIG_PATH: /cto-config.json
+      # Iteration and conductor env vars (passed from host)
+      CTO_CONDUCTOR: ${CTO_CONDUCTOR:-}
+      CTO_ATTEMPT_NUMBER: ${CTO_ATTEMPT_NUMBER:-}
+      CTO_MAX_ATTEMPTS: ${CTO_MAX_ATTEMPTS:-}
+      CTO_MODEL_ROTATION: ${CTO_MODEL_ROTATION:-}
       CTO_AGENT_NAME: rex  # Use rex agent's tool configuration
       # Task context for richer Linear dialog
       WORKSPACE_PATH: /workspace
