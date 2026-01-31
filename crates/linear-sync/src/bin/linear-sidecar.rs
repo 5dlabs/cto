@@ -144,6 +144,20 @@ struct TaskContext {
     completed_criteria: usize,
 }
 
+/// Capitalize agent name nicely (e.g., "postgres-deployer" -> "Postgres Deployer")
+fn capitalize_agent_name(name: &str) -> String {
+    name.split('-')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().chain(chars).collect(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Get emoji for agent based on name
 fn get_agent_emoji(agent_name: &str) -> &'static str {
     match agent_name.to_lowercase().as_str() {
@@ -587,7 +601,7 @@ async fn post_milestone_comment(state: &AppState, milestone_type: MilestoneType,
             let title = task.title.as_deref().unwrap_or("Task");
             format!(
                 "{} **{} started working**\n\n📋 {}\n\n{}",
-                agent_emoji, agent_name.to_uppercase(), title, details
+                agent_emoji, capitalize_agent_name(agent_name), title, details
             )
         }
         MilestoneType::Deployment { ref url } => {
@@ -611,7 +625,7 @@ async fn post_milestone_comment(state: &AppState, milestone_type: MilestoneType,
             };
             format!(
                 "🎉 **{} completed {}!**\n\n⏱️ {} │ 💰 ${:.4}\n\n{}",
-                agent_name.to_uppercase(), title, duration_str, cost_usd, details
+                capitalize_agent_name(agent_name), title, duration_str, cost_usd, details
             )
         }
         MilestoneType::Error { ref message } => {
@@ -683,7 +697,7 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
     let agent_name = task.agent.as_deref().unwrap_or("Agent");
     let agent_emoji = get_agent_emoji(agent_name);
     
-    let mut body = format!("{} **{} clocked in!**\n\n", agent_emoji, agent_name.to_uppercase());
+    let mut body = format!("{} **{} clocked in!**\n\n", agent_emoji, capitalize_agent_name(agent_name));
     
     // Mission brief - the what
     if let Some(ref title) = task.title {
@@ -821,7 +835,7 @@ async fn post_completion_summary(
     let agent_name = task.agent.as_deref().unwrap_or("Agent");
     let agent_emoji = get_agent_emoji(agent_name);
     
-    let mut body = format!("{} **{} completed the mission!**\n\n", agent_emoji, agent_name.to_uppercase());
+    let mut body = format!("{} **{} completed the mission!**\n\n", agent_emoji, capitalize_agent_name(agent_name));
     
     // Task completed
     if let Some(ref title) = task.title {
