@@ -700,15 +700,7 @@ tools:
         env:
           POSTGRES_URL: "${POSTGRES_URL:-postgresql://localhost:5432/postgres}"
 
-      redis:
-        name: "Redis"
-        description: "Redis key-value store - set, get, delete, and list operations"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@gongrzhe/server-redis-mcp", "${REDIS_URL}"]
-        workingDirectory: "/tmp"
-        env:
-          REDIS_URL: "${REDIS_URL:-redis://localhost:6379}"
+      # redis: removed - should be client-side only, not on backend
 
       mongodb:
         name: "MongoDB"
