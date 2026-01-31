@@ -1,6 +1,7 @@
 # Deploy PostgreSQL Cluster
 
 <task>
+<agent>postgres-deployer</agent>
 <objective>Deploy a CloudNative-PG PostgreSQL cluster for the alerthub database</objective>
 
 <context>

@@ -1656,7 +1656,7 @@ async fn main() -> Result<()> {
             match std::fs::read_to_string(&prompt_path) {
                 Ok(content) => {
                     let ctx = parse_task_context(&content);
-                    info!("📋 Loaded task context: {:?}", ctx.title);
+                    info!("📋 Loaded task context: title={:?}, agent={:?}", ctx.title, ctx.agent);
                     ctx
                 }
                 Err(e) => {
