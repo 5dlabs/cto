@@ -629,9 +629,13 @@ async fn post_milestone_comment(state: &AppState, milestone_type: MilestoneType,
     let body = match milestone_type {
         MilestoneType::TaskStarted => {
             let title = task.title.as_deref().unwrap_or("Task");
+            // Add sub-agent indicator for specialized agents (not main agents like bolt/rex)
+            let is_subagent = !["bolt", "rex", "morgan", "blaze", "agent"].contains(&agent_name.to_lowercase().as_str());
+            let prefix = if is_subagent { "↳ " } else { "" };
+            
             let mut msg = format!(
-                "{} **{} started working**\n\n📋 **{}**\n\n{}",
-                agent_emoji, capitalize_agent_name(agent_name), title, details
+                "{}{} **{} started working**\n\n📋 **{}**\n\n{}",
+                prefix, agent_emoji, capitalize_agent_name(agent_name), title, details
             );
             
             // Add requirements preview if available
@@ -883,7 +887,11 @@ async fn post_completion_summary(
     let agent_name = task.agent.as_deref().unwrap_or("Agent");
     let agent_emoji = get_agent_emoji(agent_name);
     
-    let mut body = format!("{} **{} completed the mission!**\n\n", agent_emoji, capitalize_agent_name(agent_name));
+    // Add sub-agent indicator for specialized agents
+    let is_subagent = !["bolt", "rex", "morgan", "blaze", "agent"].contains(&agent_name.to_lowercase().as_str());
+    let prefix = if is_subagent { "↳ " } else { "" };
+    
+    let mut body = format!("{}{} **{} completed the mission!**\n\n", prefix, agent_emoji, capitalize_agent_name(agent_name));
     
     // Task completed
     if let Some(ref title) = task.title {
@@ -949,7 +957,24 @@ async fn post_completion_summary(
         .collect();
     
     if !mcp_used.is_empty() {
-        body.push_str(&format!("🔧 **Tools Used ({}):** {}\n", mcp_used.len(), mcp_used.join(", ")));
+        body.push_str(&format!("🔧 **MCP Tools ({}):** {}\n", mcp_used.len(), mcp_used.join(", ")));
+    }
+    
+    // Built-in tools used
+    let builtin_used: Vec<_> = tools_used.iter()
+        .filter(|t| !t.starts_with("mcp__"))
+        .cloned()
+        .collect();
+    
+    if !builtin_used.is_empty() {
+        body.push_str(&format!("🛠️ **Built-in Tools:** {}\n", builtin_used.join(", ")));
+    }
+    
+    // Skills used (from init)
+    if !skills.is_empty() {
+        let skill_preview: Vec<_> = skills.iter().take(5).cloned().collect();
+        let suffix = if skills.len() > 5 { format!(" +{} more", skills.len() - 5) } else { String::new() };
+        body.push_str(&format!("📚 **Skills Available ({}):** {}{}\n", skills.len(), skill_preview.join(", "), suffix));
     }
     
     // Model
