@@ -139,6 +139,9 @@ struct TaskContext {
     role: Option<String>,
     agent: Option<String>,
     language: Option<String>,
+    // Acceptance criteria tracking
+    total_criteria: usize,
+    completed_criteria: usize,
 }
 
 /// Parse task context from prompt.md content
@@ -207,6 +210,29 @@ fn parse_task_context(content: &str) -> TaskContext {
     }
     
     ctx
+}
+
+/// Parse acceptance criteria from markdown file
+/// Returns (total_criteria, completed_criteria)
+fn parse_acceptance_criteria(content: &str) -> (usize, usize) {
+    let mut total = 0;
+    let mut completed = 0;
+    
+    for line in content.lines() {
+        let trimmed = line.trim();
+        // Match checked boxes: - [x] or - [X] or * [x] etc
+        if trimmed.starts_with("- [x]") || trimmed.starts_with("- [X]") 
+           || trimmed.starts_with("* [x]") || trimmed.starts_with("* [X]") {
+            total += 1;
+            completed += 1;
+        }
+        // Match unchecked boxes: - [ ] or * [ ]
+        else if trimmed.starts_with("- [ ]") || trimmed.starts_with("* [ ]") {
+            total += 1;
+        }
+    }
+    
+    (total, completed)
 }
 
 /// Agent session state
@@ -352,6 +378,13 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
         sections.push(format!("**Skills ({}):** {}", skills.len(), skills_str));
     } else {
         sections.push("**Skills:** None configured".to_string());
+    }
+    
+    // Acceptance criteria section
+    if task.total_criteria > 0 {
+        let pct = (task.completed_criteria as f64 / task.total_criteria as f64 * 100.0) as u32;
+        sections.push(format!("📊 **Acceptance Criteria:** {}/{} ({}%)", 
+            task.completed_criteria, task.total_criteria, pct));
     }
     
     let body = format!("🚀 **Agent Initialized**\n\n{}", sections.join("\n"));
@@ -520,6 +553,17 @@ async fn post_completion_summary(
         if skills.len() > 8 {
             sections.push(format!("  (+{} more)", skills.len() - 8));
         }
+    }
+    
+    // Acceptance criteria section (re-read to get final state)
+    let task = &state.task_context;
+    if task.total_criteria > 0 {
+        // TODO: Re-read acceptance-criteria.md to get final state
+        // For now, show initial state
+        let pct = (task.completed_criteria as f64 / task.total_criteria as f64 * 100.0) as u32;
+        let status_icon = if pct >= 90 { "✅" } else if pct >= 50 { "🟡" } else { "🔴" };
+        sections.push(format!("{} **Acceptance Criteria:** {}/{} ({}%)", 
+            status_icon, task.completed_criteria, task.total_criteria, pct));
     }
     
     let body = format!("✅ **Session Complete**\n\n{}", sections.join("\n"));
@@ -1140,7 +1184,7 @@ async fn main() -> Result<()> {
         .ok();
     
     // Try to load task context from prompt.md
-    let task_context = if let Some(ref ws_path) = workspace_path {
+    let mut task_context = if let Some(ref ws_path) = workspace_path {
         let prompt_path = env::var("TASK_PROMPT_PATH")
             .map(PathBuf::from)
             .unwrap_or_else(|_| ws_path.join("prompt.md"));
@@ -1164,6 +1208,22 @@ async fn main() -> Result<()> {
     } else {
         TaskContext::default()
     };
+    
+    // Try to load acceptance criteria
+    if let Some(ref ws_path) = workspace_path {
+        let acceptance_path = env::var("TASK_ACCEPTANCE_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| ws_path.join("acceptance-criteria.md"));
+        
+        if acceptance_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&acceptance_path) {
+                let (total, completed) = parse_acceptance_criteria(&content);
+                task_context.total_criteria = total;
+                task_context.completed_criteria = completed;
+                info!("📊 Loaded acceptance criteria: {}/{} complete", completed, total);
+            }
+        }
+    }
     
     info!("Issue: {}, Agent: {}, Source: {}", issue_identifier, agent_name, log_source);
     
