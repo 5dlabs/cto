@@ -235,6 +235,182 @@ fn parse_acceptance_criteria(content: &str) -> (usize, usize) {
     (total, completed)
 }
 
+// =============================================================================
+// Narrative System - Transform tool calls into human-readable journey
+// =============================================================================
+
+/// Phases of work in a task journey
+#[derive(Debug, Clone, PartialEq, Default)]
+enum NarrativePhase {
+    #[default]
+    Starting,           // Just started
+    Understanding,      // Reading PRD, prompt, architecture docs
+    Planning,           // Reading subtasks, acceptance criteria  
+    Building,           // Writing code, configs, manifests
+    Testing,            // Running tests, validation
+    Shipping,           // Git operations, PR creation
+    Complete,           // Task finished
+}
+
+impl NarrativePhase {
+    fn emoji(&self) -> &str {
+        match self {
+            NarrativePhase::Starting => "🎬",
+            NarrativePhase::Understanding => "📖",
+            NarrativePhase::Planning => "📋",
+            NarrativePhase::Building => "🔨",
+            NarrativePhase::Testing => "🧪",
+            NarrativePhase::Shipping => "🚀",
+            NarrativePhase::Complete => "🎉",
+        }
+    }
+    
+    fn description(&self) -> &str {
+        match self {
+            NarrativePhase::Starting => "Getting started...",
+            NarrativePhase::Understanding => "Understanding the mission",
+            NarrativePhase::Planning => "Planning the work",
+            NarrativePhase::Building => "Building",
+            NarrativePhase::Testing => "Testing & validating",
+            NarrativePhase::Shipping => "Preparing to ship",
+            NarrativePhase::Complete => "Mission complete!",
+        }
+    }
+}
+
+/// State for tracking narrative progression
+#[derive(Debug, Default, Clone)]
+struct NarrativeState {
+    phase: NarrativePhase,
+    current_subtask: Option<String>,
+    subtask_number: u32,
+    actions_in_phase: u32,
+    last_action_summary: Option<String>,
+    milestones: Vec<String>,
+}
+
+/// Convert a tool call into a narrative description
+/// Returns (phase, description, is_significant)
+/// is_significant means we should post this to Linear (not just log)
+fn narrate_tool_call(tool_name: &str, params: &serde_json::Value, state: &NarrativeState) -> Option<(NarrativePhase, String, bool)> {
+    let file_path = params.get("file_path")
+        .or_else(|| params.get("path"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    
+    let command = params.get("command")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    
+    match tool_name {
+        "Read" => {
+            // Determine phase and description based on what's being read
+            if file_path.contains("prd") || file_path.contains("PRD") {
+                Some((NarrativePhase::Understanding, "📖 Reading the product requirements...".to_string(), true))
+            } else if file_path.contains("architecture") || file_path.contains("ARCHITECTURE") {
+                Some((NarrativePhase::Understanding, "📖 Studying the architecture...".to_string(), true))
+            } else if file_path.contains("prompt.md") && !file_path.contains("subtask") {
+                Some((NarrativePhase::Understanding, "📖 Reading the mission brief...".to_string(), true))
+            } else if file_path.contains("acceptance") {
+                Some((NarrativePhase::Planning, "✅ Checking what success looks like...".to_string(), true))
+            } else if file_path.contains("subtask") && file_path.contains("prompt") {
+                // Extract subtask number from path
+                let subtask_name = file_path.split('/').rev()
+                    .find(|p| p.starts_with("task-") || p.starts_with("subtask"))
+                    .unwrap_or("next subtask");
+                Some((NarrativePhase::Planning, format!("📋 Reviewing {}...", subtask_name), true))
+            } else if file_path.contains("COMPLETION") || file_path.contains("SUMMARY") {
+                Some((NarrativePhase::Building, "🔍 Checking previous work...".to_string(), true))
+            } else if file_path.ends_with(".yaml") || file_path.ends_with(".yml") {
+                let filename = file_path.split('/').last().unwrap_or("config");
+                Some((NarrativePhase::Building, format!("📄 Examining: {}", filename), false)) // Not significant enough
+            } else {
+                // Generic read - not significant, don't post
+                None
+            }
+        }
+        
+        "Write" => {
+            let filename = file_path.split('/').last().unwrap_or("file");
+            if file_path.contains("COMPLETION") || file_path.contains("SUMMARY") {
+                Some((NarrativePhase::Building, format!("✅ Documenting progress: {}", filename), true))
+            } else if file_path.ends_with(".yaml") || file_path.ends_with(".yml") {
+                Some((NarrativePhase::Building, format!("📝 Creating config: {}", filename), true))
+            } else if file_path.ends_with(".go") || file_path.ends_with(".rs") || file_path.ends_with(".py") || file_path.ends_with(".ts") {
+                Some((NarrativePhase::Building, format!("💻 Writing code: {}", filename), true))
+            } else if file_path.contains("test") {
+                Some((NarrativePhase::Testing, format!("🧪 Creating test: {}", filename), true))
+            } else {
+                Some((NarrativePhase::Building, format!("📝 Creating: {}", filename), true))
+            }
+        }
+        
+        "Edit" => {
+            let filename = file_path.split('/').last().unwrap_or("file");
+            Some((NarrativePhase::Building, format!("✏️ Updating: {}", filename), true))
+        }
+        
+        "Bash" => {
+            // Categorize bash commands
+            if command.contains("git push") || command.contains("git commit") {
+                Some((NarrativePhase::Shipping, "📦 Committing changes...".to_string(), true))
+            } else if command.contains("git checkout") || command.contains("git branch") {
+                Some((NarrativePhase::Shipping, "🌿 Setting up branch...".to_string(), true))
+            } else if command.contains("test") || command.contains("lint") || command.contains("check") {
+                Some((NarrativePhase::Testing, "🧪 Running validation...".to_string(), true))
+            } else if command.contains("helm") && command.contains("lint") {
+                Some((NarrativePhase::Testing, "🧪 Validating Helm charts...".to_string(), true))
+            } else if command.contains("kubectl") && command.contains("dry-run") {
+                Some((NarrativePhase::Testing, "🧪 Testing Kubernetes manifests...".to_string(), true))
+            } else if command.contains("find") || command.contains("ls") || command.contains("cat") {
+                // Exploratory commands - don't narrate individually
+                None
+            } else {
+                None
+            }
+        }
+        
+        // MCP tool calls
+        tool if tool.starts_with("mcp__") || tool.contains("github") => {
+            if tool.contains("create_pull_request") {
+                Some((NarrativePhase::Shipping, "🎁 Creating pull request...".to_string(), true))
+            } else if tool.contains("create_branch") {
+                Some((NarrativePhase::Shipping, "🌿 Creating feature branch...".to_string(), true))
+            } else if tool.contains("push") {
+                Some((NarrativePhase::Shipping, "📤 Pushing changes...".to_string(), true))
+            } else if tool.contains("search") || tool.contains("get") {
+                Some((NarrativePhase::Understanding, "🔍 Researching...".to_string(), false)) // Too noisy
+            } else {
+                None
+            }
+        }
+        
+        "Task" | "TaskOutput" => {
+            // Subagent spawn
+            Some((NarrativePhase::Building, "🤖 Delegating to subagent...".to_string(), true))
+        }
+        
+        _ => None
+    }
+}
+
+/// Generate a milestone message when entering a new subtask
+fn narrate_subtask_start(subtask_name: &str, subtask_num: u32) -> String {
+    format!(
+        "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔨 Working on: Subtask {}.{} - {}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        subtask_num / 10, subtask_num % 10, subtask_name
+    )
+}
+
+/// Generate a phase transition message
+fn narrate_phase_change(old_phase: &NarrativePhase, new_phase: &NarrativePhase) -> Option<String> {
+    if old_phase == new_phase {
+        return None;
+    }
+    
+    Some(format!("{} {}", new_phase.emoji(), new_phase.description()))
+}
+
 /// Agent session state
 #[derive(Debug, Default)]
 struct SessionState {
@@ -250,6 +426,8 @@ struct SessionState {
     files_modified: Vec<String>,
     subagents_spawned: Vec<String>,
     start_time: Option<std::time::Instant>,
+    // Narrative state
+    narrative: NarrativeState,
 }
 
 /// Shared application state
@@ -654,6 +832,27 @@ async fn create_linear_session(state: &AppState, _model: &str, _tools: &[String]
     Ok(session_id)
 }
 
+/// Process a tool call and return narrative description if significant
+/// Returns (should_post, narrative_text, new_phase)
+fn process_tool_for_narrative(
+    tool_name: &str, 
+    params: &serde_json::Value,
+    narrative: &NarrativeState
+) -> (bool, Option<String>, Option<NarrativePhase>) {
+    if let Some((new_phase, description, is_significant)) = narrate_tool_call(tool_name, params, narrative) {
+        // Only post if significant
+        if is_significant {
+            (true, Some(description), Some(new_phase))
+        } else {
+            // Update phase but don't post
+            (false, None, Some(new_phase))
+        }
+    } else {
+        // Not recognized - skip
+        (false, None, None)
+    }
+}
+
 /// Add activity to Linear session
 /// Linear activity types: action, error, thought, response, elicitation
 /// Content structure varies by type:
@@ -672,8 +871,15 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
         }
     "#;
     
+    // Get current narrative state for context
+    let narrative_state = {
+        let session = state.session.read().await;
+        session.narrative.clone()
+    };
+    
     // Build activity content based on entry type
     // Handle both Claude CLI and Droid/Factory formats
+    // Use narrative descriptions for tool calls when available
     let content: Option<serde_json::Value> = match entry.entry_type.as_deref() {
         // =========================================================================
         // Droid/Factory format: direct tool_call events
@@ -686,13 +892,36 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
                 .or_else(|| entry.name.as_deref())
                 .unwrap_or("unknown");
             let params = entry.extra.get("parameters")
-                .map(|v| serde_json::to_string(v).unwrap_or_default())
-                .unwrap_or_default();
-            Some(serde_json::json!({
-                "type": "action",
-                "action": tool_name,
-                "parameter": params
-            }))
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({}));
+            
+            // Try narrative description first
+            let (should_post, narrative, new_phase) = process_tool_for_narrative(tool_name, &params, &narrative_state);
+            
+            // Update narrative phase if changed
+            if let Some(phase) = new_phase {
+                let mut session = state.session.write().await;
+                if phase != session.narrative.phase {
+                    info!("{} Phase: {:?} → {:?}", phase.emoji(), session.narrative.phase, phase);
+                    session.narrative.phase = phase;
+                }
+                session.narrative.actions_in_phase += 1;
+            }
+            
+            if should_post {
+                if let Some(text) = narrative {
+                    // Post as thought (narrative description)
+                    Some(serde_json::json!({
+                        "type": "thought",
+                        "body": text
+                    }))
+                } else {
+                    None
+                }
+            } else {
+                // Not significant - skip
+                None
+            }
         }
         
         // =========================================================================
@@ -747,13 +976,31 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
                 .unwrap_or("unknown");
             let input = entry.tool_input.as_ref()
                 .or(entry.input.as_ref())
-                .map(|v| serde_json::to_string(v).unwrap_or_default())
-                .unwrap_or_default();
-            Some(serde_json::json!({
-                "type": "action",
-                "action": tool_name,
-                "parameter": input
-            }))
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({}));
+            
+            // Try narrative description
+            let (should_post, narrative, new_phase) = process_tool_for_narrative(tool_name, &input, &narrative_state);
+            
+            if let Some(phase) = new_phase {
+                let mut session = state.session.write().await;
+                if phase != session.narrative.phase {
+                    session.narrative.phase = phase;
+                }
+            }
+            
+            if should_post {
+                if let Some(text) = narrative {
+                    Some(serde_json::json!({
+                        "type": "thought",
+                        "body": text
+                    }))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         }
         
         // =========================================================================
@@ -764,12 +1011,31 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
         Some("assistant") => {
             // Check for tool_use in Claude's nested format
             if let Some((tool_name, tool_input)) = extract_claude_tool_use(entry) {
-                let input_str = serde_json::to_string(&tool_input).unwrap_or_default();
-                Some(serde_json::json!({
-                    "type": "action",
-                    "action": tool_name,
-                    "parameter": input_str
-                }))
+                // Try narrative description
+                let (should_post, narrative, new_phase) = process_tool_for_narrative(&tool_name, &tool_input, &narrative_state);
+                
+                if let Some(phase) = new_phase {
+                    let mut session = state.session.write().await;
+                    if phase != session.narrative.phase {
+                        info!("{} Phase: {:?} → {:?}", phase.emoji(), session.narrative.phase, phase);
+                        session.narrative.phase = phase;
+                    }
+                    session.narrative.actions_in_phase += 1;
+                }
+                
+                if should_post {
+                    if let Some(text) = narrative {
+                        Some(serde_json::json!({
+                            "type": "thought",
+                            "body": text
+                        }))
+                    } else {
+                        None
+                    }
+                } else {
+                    // Not significant - skip
+                    None
+                }
             } else if let Some(text) = extract_claude_text(entry) {
                 Some(serde_json::json!({
                     "type": "response",
