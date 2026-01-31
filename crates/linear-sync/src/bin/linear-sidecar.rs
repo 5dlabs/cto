@@ -306,26 +306,26 @@ fn narrate_tool_call(tool_name: &str, params: &serde_json::Value, state: &Narrat
         "Read" => {
             // Determine phase and description based on what's being read
             if file_path.contains("prd") || file_path.contains("PRD") {
-                Some((NarrativePhase::Understanding, "📖 Reading the product requirements...".to_string(), true))
+                Some((NarrativePhase::Understanding, "Checking the PRD to understand what we're building...".to_string(), true))
             } else if file_path.contains("architecture") || file_path.contains("ARCHITECTURE") {
-                Some((NarrativePhase::Understanding, "📖 Studying the architecture...".to_string(), true))
+                Some((NarrativePhase::Understanding, "Looking at the architecture to see how things fit together...".to_string(), true))
             } else if file_path.contains("prompt.md") && !file_path.contains("subtask") {
-                Some((NarrativePhase::Understanding, "📖 Reading the mission brief...".to_string(), true))
+                Some((NarrativePhase::Understanding, "Got the task brief, let me see what's needed...".to_string(), true))
             } else if file_path.contains("acceptance") {
-                Some((NarrativePhase::Planning, "✅ Checking what success looks like...".to_string(), true))
+                Some((NarrativePhase::Planning, "Checking the acceptance criteria - need to know what 'done' looks like...".to_string(), true))
             } else if file_path.contains("subtask") && file_path.contains("prompt") {
                 // Extract subtask number from path
-                let subtask_name = file_path.split('/').rev()
+                let subtask_num = file_path.split('/').rev()
                     .find(|p| p.starts_with("task-") || p.starts_with("subtask"))
-                    .unwrap_or("next subtask");
-                Some((NarrativePhase::Planning, format!("📋 Reviewing {}...", subtask_name), true))
+                    .and_then(|s| s.split('-').last())
+                    .unwrap_or("next");
+                Some((NarrativePhase::Planning, format!("Looking at subtask {}...", subtask_num), true))
             } else if file_path.contains("COMPLETION") || file_path.contains("SUMMARY") {
-                Some((NarrativePhase::Building, "🔍 Checking previous work...".to_string(), true))
+                Some((NarrativePhase::Building, "Checking what's already been done...".to_string(), true))
             } else if file_path.ends_with(".yaml") || file_path.ends_with(".yml") {
                 let filename = file_path.split('/').last().unwrap_or("config");
-                Some((NarrativePhase::Building, format!("📄 Examining: {}", filename), false)) // Not significant enough
+                Some((NarrativePhase::Building, format!("Reading `{}`...", filename), false))
             } else {
-                // Generic read - not significant, don't post
                 None
             }
         }
@@ -333,38 +333,62 @@ fn narrate_tool_call(tool_name: &str, params: &serde_json::Value, state: &Narrat
         "Write" => {
             let filename = file_path.split('/').last().unwrap_or("file");
             if file_path.contains("COMPLETION") || file_path.contains("SUMMARY") {
-                Some((NarrativePhase::Building, format!("✅ Documenting progress: {}", filename), true))
+                Some((NarrativePhase::Building, format!("Writing up the completion report..."), true))
             } else if file_path.ends_with(".yaml") || file_path.ends_with(".yml") {
-                Some((NarrativePhase::Building, format!("📝 Creating config: {}", filename), true))
-            } else if file_path.ends_with(".go") || file_path.ends_with(".rs") || file_path.ends_with(".py") || file_path.ends_with(".ts") {
-                Some((NarrativePhase::Building, format!("💻 Writing code: {}", filename), true))
+                // Be specific about what kind of yaml
+                if file_path.contains("postgres") {
+                    Some((NarrativePhase::Building, "Setting up PostgreSQL cluster config...".to_string(), true))
+                } else if file_path.contains("redis") || file_path.contains("valkey") {
+                    Some((NarrativePhase::Building, "Configuring Redis for caching...".to_string(), true))
+                } else if file_path.contains("kafka") {
+                    Some((NarrativePhase::Building, "Wiring up Kafka cluster...".to_string(), true))
+                } else if file_path.contains("mongo") {
+                    Some((NarrativePhase::Building, "Setting up MongoDB...".to_string(), true))
+                } else if file_path.contains("rabbit") {
+                    Some((NarrativePhase::Building, "Deploying RabbitMQ...".to_string(), true))
+                } else {
+                    Some((NarrativePhase::Building, format!("Creating `{}`...", filename), true))
+                }
+            } else if file_path.ends_with(".go") {
+                Some((NarrativePhase::Building, format!("Writing Go code: `{}`", filename), true))
+            } else if file_path.ends_with(".rs") {
+                Some((NarrativePhase::Building, format!("Writing Rust: `{}`", filename), true))
+            } else if file_path.ends_with(".py") {
+                Some((NarrativePhase::Building, format!("Writing Python: `{}`", filename), true))
+            } else if file_path.ends_with(".ts") || file_path.ends_with(".tsx") {
+                Some((NarrativePhase::Building, format!("Writing TypeScript: `{}`", filename), true))
             } else if file_path.contains("test") {
-                Some((NarrativePhase::Testing, format!("🧪 Creating test: {}", filename), true))
+                Some((NarrativePhase::Testing, format!("Adding test: `{}`", filename), true))
             } else {
-                Some((NarrativePhase::Building, format!("📝 Creating: {}", filename), true))
+                Some((NarrativePhase::Building, format!("Creating `{}`", filename), true))
             }
         }
         
         "Edit" => {
             let filename = file_path.split('/').last().unwrap_or("file");
-            Some((NarrativePhase::Building, format!("✏️ Updating: {}", filename), true))
+            Some((NarrativePhase::Building, format!("Updating `{}`...", filename), true))
         }
         
         "Bash" => {
-            // Categorize bash commands
-            if command.contains("git push") || command.contains("git commit") {
-                Some((NarrativePhase::Shipping, "📦 Committing changes...".to_string(), true))
+            // Categorize bash commands - be specific
+            if command.contains("git push") {
+                Some((NarrativePhase::Shipping, "Pushing changes to remote...".to_string(), true))
+            } else if command.contains("git commit") {
+                Some((NarrativePhase::Shipping, "Committing changes...".to_string(), true))
             } else if command.contains("git checkout") || command.contains("git branch") {
-                Some((NarrativePhase::Shipping, "🌿 Setting up branch...".to_string(), true))
-            } else if command.contains("test") || command.contains("lint") || command.contains("check") {
-                Some((NarrativePhase::Testing, "🧪 Running validation...".to_string(), true))
-            } else if command.contains("helm") && command.contains("lint") {
-                Some((NarrativePhase::Testing, "🧪 Validating Helm charts...".to_string(), true))
+                Some((NarrativePhase::Shipping, "Setting up the feature branch...".to_string(), true))
+            } else if command.contains("helm lint") {
+                Some((NarrativePhase::Testing, "Validating Helm charts...".to_string(), true))
+            } else if command.contains("helm template") {
+                Some((NarrativePhase::Testing, "Testing Helm template rendering...".to_string(), true))
             } else if command.contains("kubectl") && command.contains("dry-run") {
-                Some((NarrativePhase::Testing, "🧪 Testing Kubernetes manifests...".to_string(), true))
+                Some((NarrativePhase::Testing, "Dry-run testing K8s manifests...".to_string(), true))
+            } else if command.contains("yamllint") {
+                Some((NarrativePhase::Testing, "Checking YAML formatting...".to_string(), true))
+            } else if command.contains("test") || command.contains("lint") || command.contains("check") {
+                Some((NarrativePhase::Testing, "Running validation...".to_string(), true))
             } else if command.contains("find") || command.contains("ls") || command.contains("cat") {
-                // Exploratory commands - don't narrate individually
-                None
+                None // Exploratory, skip
             } else {
                 None
             }
@@ -669,7 +693,31 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
     }
     
     body.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-    body.push_str("\n*Let's build something awesome!* 🚀");
+    
+    // Specific call-to-action based on what we're actually doing
+    let action_line = if let Some(ref goal) = task.goal {
+        let goal_lower = goal.to_lowercase();
+        if goal_lower.contains("postgres") || goal_lower.contains("database") {
+            "Starting with database setup... 🗄️"
+        } else if goal_lower.contains("redis") || goal_lower.contains("cache") {
+            "Spinning up cache layer... ⚡"
+        } else if goal_lower.contains("kafka") || goal_lower.contains("event") {
+            "Wiring up event streams... 📡"
+        } else if goal_lower.contains("kubernetes") || goal_lower.contains("k8s") || goal_lower.contains("infra") {
+            "Deploying infrastructure... 🏗️"
+        } else if goal_lower.contains("api") || goal_lower.contains("backend") {
+            "Building the backend... 🔧"
+        } else if goal_lower.contains("frontend") || goal_lower.contains("ui") {
+            "Crafting the interface... 🎨"
+        } else if goal_lower.contains("test") {
+            "Running the test suite... 🧪"
+        } else {
+            "Getting to work... 💪"
+        }
+    } else {
+        "Getting to work... 💪"
+    };
+    body.push_str(&format!("\n*{}*", action_line));
     
     // Use "response" type so it appears as a visible message in the agent dialog
     let content = serde_json::json!({
@@ -826,7 +874,20 @@ async fn post_completion_summary(
         body.push_str(&format!("{} **Progress:** {} {}/{} ({}%)\n", status, bar, task.completed_criteria, task.total_criteria, pct));
     }
     
-    body.push_str(&format!("\n*Great work!* {}", agent_emoji));
+    // Specific sign-off based on what was accomplished
+    let signoff = if !files_created.is_empty() {
+        let count = files_created.len();
+        if count == 1 {
+            format!("Done! Created 1 file, ready for review. {}", agent_emoji)
+        } else {
+            format!("Done! {} files created, ready for review. {}", count, agent_emoji)
+        }
+    } else if !files_modified.is_empty() {
+        format!("Done! Updated {} files. {}", files_modified.len(), agent_emoji)
+    } else {
+        format!("All done! {}", agent_emoji)
+    };
+    body.push_str(&format!("\n*{}*", signoff));
     
     let content = serde_json::json!({
         "type": "response",
