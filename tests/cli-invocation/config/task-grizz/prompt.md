@@ -1,10 +1,10 @@
-# BOLT Test Task
+# GRIZZ Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>grizz</agent>
+<title>Database operations and optimization</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test grizz agent capabilities for Database operations and optimization
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the grizz agent. Replace with actual task content.

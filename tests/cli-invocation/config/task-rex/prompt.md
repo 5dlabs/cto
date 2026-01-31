@@ -1,10 +1,10 @@
-# BOLT Test Task
+# REX Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>rex</agent>
+<title>Backend development and APIs</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test rex agent capabilities for Backend development and APIs
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the rex agent. Replace with actual task content.

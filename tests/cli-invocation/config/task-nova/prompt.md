@@ -1,10 +1,10 @@
-# BOLT Test Task
+# NOVA Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>nova</agent>
+<title>Data science and machine learning</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test nova agent capabilities for Data science and machine learning
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the nova agent. Replace with actual task content.

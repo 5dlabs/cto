@@ -1,10 +1,10 @@
-# BOLT Test Task
+# BLAZE Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>blaze</agent>
+<title>Frontend development and UI/UX</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test blaze agent capabilities for Frontend development and UI/UX
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the blaze agent. Replace with actual task content.

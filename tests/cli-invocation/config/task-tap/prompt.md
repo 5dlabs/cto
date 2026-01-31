@@ -1,10 +1,10 @@
-# BOLT Test Task
+# TAP Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>tap</agent>
+<title>API integrations and webhooks</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test tap agent capabilities for API integrations and webhooks
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the tap agent. Replace with actual task content.

@@ -1,10 +1,10 @@
-# BOLT Test Task
+# VEX Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>vex</agent>
+<title>Debugging and troubleshooting</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test vex agent capabilities for Debugging and troubleshooting
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the vex agent. Replace with actual task content.

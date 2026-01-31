@@ -1,10 +1,10 @@
-# BOLT Test Task
+# CIPHER Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>cipher</agent>
+<title>Security analysis and encryption</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test cipher agent capabilities for Security analysis and encryption
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the cipher agent. Replace with actual task content.

@@ -1,10 +1,10 @@
-# BOLT Test Task
+# CLEO Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>cleo</agent>
+<title>Documentation and technical writing</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test cleo agent capabilities for Documentation and technical writing
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the cleo agent. Replace with actual task content.

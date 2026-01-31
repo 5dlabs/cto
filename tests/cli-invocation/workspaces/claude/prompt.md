@@ -1,22 +1,32 @@
+# Deploy PostgreSQL Cluster
+
 <task>
-<agent>bolt</agent>
-<title>Orchestrate Infrastructure Deployment</title>
-<objective>
-Coordinate deployment of PostgreSQL, MongoDB, and Kafka clusters
-</objective>
+<agent>postgres-deployer</agent>
+<objective>Deploy a CloudNative-PG PostgreSQL cluster for the alerthub database</objective>
+
+<context>
+The CloudNative-PG operator is already installed in the cluster. Your job is to create a PostgreSQL cluster instance using the operator's CRDs.
+</context>
 
 <requirements>
-- Delegate PostgreSQL to postgres-deployer
-- Delegate MongoDB to mongo-deployer
-- Delegate Kafka to kafka-deployer
-- Monitor progress and report completion
+- Create a `Cluster` CR (CloudNative-PG custom resource)
+- Database name: `alerthub`
+- Configure persistent storage with appropriate PVC
+- Set resource limits (CPU/memory)
+- Enable monitoring annotations for Prometheus scraping
+- Configure backup policy using the operator's backup CRDs
 </requirements>
 
 <deliverables>
-- All database clusters deployed
-- Status report generated
+- `postgresql-cluster.yaml` - The Cluster CR manifest
+- `postgresql-backup.yaml` - Backup schedule configuration (if separate)
+- Applied to cluster and pods running
 </deliverables>
-</task>
 
-You are BOLT, the mission conductor. For this test, just acknowledge you're ready to coordinate.
-Write a simple status.md file confirming you're online.
+<acceptance_criteria>
+- [ ] PostgreSQL cluster pods are Running
+- [ ] `alerthub` database exists and is accessible
+- [ ] PVC is bound with persistent storage
+- [ ] Backup policy is configured
+</acceptance_criteria>
+</task>

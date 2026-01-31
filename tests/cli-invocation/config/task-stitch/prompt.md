@@ -1,10 +1,10 @@
-# BOLT Test Task
+# STITCH Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>stitch</agent>
+<title>Integration and glue code</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test stitch agent capabilities for Integration and glue code
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the stitch agent. Replace with actual task content.

@@ -1,10 +1,10 @@
-# BOLT Test Task
+# SPARK Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>spark</agent>
+<title>Performance optimization and profiling</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test spark agent capabilities for Performance optimization and profiling
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the spark agent. Replace with actual task content.

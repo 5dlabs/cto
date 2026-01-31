@@ -1,10 +1,10 @@
-# BOLT Test Task
+# ATLAS Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>atlas</agent>
+<title>Architecture design and system planning</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test atlas agent capabilities for Architecture design and system planning
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the atlas agent. Replace with actual task content.

@@ -1,10 +1,10 @@
-# BOLT Test Task
+# MORGAN Test Task
 
 <task>
-<agent>bolt</agent>
-<title>Infrastructure orchestration and Kubernetes</title>
+<agent>morgan</agent>
+<title>Project management and coordination</title>
 <objective>
-Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
+Test morgan agent capabilities for Project management and coordination
 </objective>
 
 <requirements>
@@ -21,4 +21,4 @@ Test bolt agent capabilities for Infrastructure orchestration and Kubernetes
 
 ## Instructions
 
-This is a test prompt for the bolt agent. Replace with actual task content.
+This is a test prompt for the morgan agent. Replace with actual task content.
