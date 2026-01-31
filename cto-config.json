@@ -685,6 +685,28 @@
       "githubApp": "5DLabs-Stitch",
       "cli": "claude",
       "model": "claude-opus-4-5-20251101",
+      "skills": {
+        "default": [
+          "context-fundamentals",
+          "context-degradation",
+          "context-optimization",
+          "openmemory",
+          "context7",
+          "octocode",
+          "llm-docs",
+          "github-mcp"
+        ],
+        "coder": [
+          "compound-engineering",
+          "verification-before-completion",
+          "systematic-debugging",
+          "tool-design"
+        ],
+        "reviewer": [
+          "receiving-code-review",
+          "requesting-code-review"
+        ]
+      },
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -724,6 +746,28 @@
       "githubApp": "5DLabs-Vex",
       "cli": "claude",
       "model": "claude-opus-4-5-20251101",
+      "skills": {
+        "default": [
+          "context-fundamentals",
+          "context-degradation",
+          "context-optimization",
+          "openmemory",
+          "context7",
+          "octocode",
+          "llm-docs",
+          "github-mcp",
+          "firecrawl"
+        ],
+        "coder": [
+          "systematic-debugging",
+          "verification-before-completion",
+          "compound-engineering"
+        ],
+        "debugger": [
+          "systematic-debugging",
+          "observability"
+        ]
+      },
       "tools": {
         "remote": [
           "context7_resolve_library_id",
