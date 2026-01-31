@@ -40,6 +40,16 @@ url = "2.5"
 # CLI
 clap = { workspace = true }
 
+# Crypto / encoding (OVH signature)
+sha1 = "0.10"
+hex = "0.4"
+
+# YAML (on-prem inventory)
+serde_yaml = { workspace = true }
+
+# UUID (on-prem server IDs)
+uuid = { workspace = true }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 wiremock = { workspace = true }
