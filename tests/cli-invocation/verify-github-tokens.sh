@@ -36,7 +36,7 @@ get_github_app() {
         stitch) echo "GitHub-App-Stitch" ;;
         tap)    echo "GitHub-App-Tap" ;;
         tess)   echo "GitHub-App-Tess" ;;
-        vex)    echo "" ;;  # No GitHub App for vex
+        vex)    echo "GitHub-App-Vex" ;;
         *)      echo "" ;;
     esac
 }
