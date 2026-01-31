@@ -220,11 +220,21 @@ CRITICAL OUTPUT FORMAT:
 ## Subagent Optimization Guidelines
 
 When breaking down tasks for subagent execution:
-1. **Maximize parallelism**: Group independent work units that can run simultaneously
-2. **Minimize dependencies**: Only add dependencies when strictly necessary
-3. **Match subagent types to work**: Use implementer for coding, tester for tests, etc.
-4. **Consider context isolation**: Each subagent works in isolation, so subtasks should be self-contained
-5. **Plan review phases**: Include reviewer subtasks after implementation phases{{/if}}`;
+1. **ONE component per subtask**: Each subtask MUST focus on exactly ONE distinct component, service, database, or technology. NEVER combine multiple databases (e.g., PostgreSQL + MongoDB), multiple queues (e.g., Kafka + RabbitMQ), or multiple services into a single subtask.
+2. **Maximize parallelism**: Create separate subtasks for each component so they can execute in parallel
+3. **Minimize dependencies**: Only add dependencies when strictly necessary
+4. **Match subagent types to work**: Use implementer for coding, tester for tests, etc.
+5. **Consider context isolation**: Each subagent works in isolation, so subtasks should be self-contained
+6. **Plan review phases**: Include reviewer subtasks after implementation phases
+
+## ANTI-PATTERN WARNING
+❌ WRONG: "Deploy PostgreSQL, MongoDB, and Redis" (combines 3 databases)
+❌ WRONG: "Setup Kafka and RabbitMQ messaging" (combines 2 queues)
+✅ CORRECT: "Deploy PostgreSQL cluster" (one subtask)
+✅ CORRECT: "Deploy MongoDB replica set" (separate subtask)
+✅ CORRECT: "Deploy Redis/Valkey cache" (separate subtask)
+✅ CORRECT: "Deploy Kafka cluster" (separate subtask)
+✅ CORRECT: "Deploy RabbitMQ cluster" (separate subtask){{/if}}`;
 
 export const EXPAND_TASK_USER = `Break down this task into {{#if (gt subtask_count 0)}}exactly {{subtask_count}}{{else}}an appropriate number of{{/if}} specific subtasks{{#if enable_subagents}} optimized for parallel subagent execution{{/if}}:
 
@@ -249,7 +259,7 @@ SUBAGENT REQUIREMENTS:
 - Include subagentType for EVERY subtask (implementer, reviewer, tester, documenter, researcher, or debugger)
 - Set parallelizable=true for subtasks that can run concurrently with others at the same dependency level
 - Minimize dependencies to maximize parallel execution potential
-- Group related implementation work so multiple implementer subagents can work simultaneously
+- **ONE COMPONENT PER SUBTASK**: Each subtask must deploy/configure exactly ONE component. Do NOT combine multiple databases, queues, or services. Example: PostgreSQL = 1 subtask, MongoDB = 1 subtask, Redis = 1 subtask (NOT "Deploy PostgreSQL, MongoDB, and Redis" as 1 subtask)
 - Include at least one reviewer subtask after implementation subtasks
 - Include tester subtasks for validation work{{/if}}
 
