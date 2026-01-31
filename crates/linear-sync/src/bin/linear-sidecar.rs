@@ -502,70 +502,65 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
         }
     "#;
     
-    // Build init summary
-    let mut sections = Vec::new();
-    
-    // Task context - what we're working on (most important, shown first)
+    // Build beautiful init summary
     let task = &state.task_context;
+    
+    // Header with agent personality
+    let agent_name = task.agent.as_deref().unwrap_or("Agent");
+    let agent_emoji = match agent_name.to_lowercase().as_str() {
+        "bolt" => "⚡",
+        "rex" => "🦖", 
+        "morgan" => "🧙",
+        "blaze" => "🔥",
+        _ => "🤖"
+    };
+    
+    let mut body = format!("{} **{} clocked in!**\n\n", agent_emoji, agent_name.to_uppercase());
+    
+    // Mission brief - the what
     if let Some(ref title) = task.title {
-        sections.push(format!("📋 **Task:** {}", title));
+        body.push_str(&format!("📋 **Mission:** {}\n", title));
     }
     if let Some(ref goal) = task.goal {
-        // Truncate long goals
-        let goal_preview = if goal.len() > 200 {
-            format!("{}...", &goal[..200])
-        } else {
-            goal.clone()
-        };
-        sections.push(format!("🎯 **Goal:** {}", goal_preview));
-    }
-    if let Some(ref agent) = task.agent {
-        let lang = task.language.as_deref().unwrap_or("general");
-        sections.push(format!("🤖 **Agent:** {} ({})", agent, lang));
+        let goal_short = if goal.len() > 150 { format!("{}...", &goal[..150]) } else { goal.clone() };
+        body.push_str(&format!("🎯 {}\n", goal_short));
     }
     
-    sections.push(String::new()); // Spacer
+    body.push_str("\n");
     
-    // Model section
-    sections.push(format!("**Model:** {}", model));
+    // Equipment loadout - model, tools, skills
+    body.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    body.push_str(&format!("🧠 **Model:** `{}`\n", model));
     
-    // MCP Tools section - ONLY show mcp__ prefixed tools, not native ones
+    // MCP Tools - clean display
     let mcp_tools: Vec<_> = tools.iter()
         .filter(|t| t.starts_with("mcp__"))
-        .cloned()
+        .map(|t| t.strip_prefix("mcp__cto-tools__").unwrap_or(t).to_string())
         .collect();
     
     if !mcp_tools.is_empty() {
-        let tool_preview: Vec<_> = mcp_tools.iter()
-            .take(10)
-            .map(|t| t.strip_prefix("mcp__cto-tools__").unwrap_or(t).to_string())
-            .collect();
-        let tools_str = if tool_preview.len() < mcp_tools.len() {
-            format!("{} (+{} more)", tool_preview.join(", "), mcp_tools.len() - tool_preview.len())
-        } else {
-            tool_preview.join(", ")
-        };
-        sections.push(format!("**MCP Tools ({}):** {}", mcp_tools.len(), tools_str));
-    } else {
-        sections.push("**MCP Tools:** None configured".to_string());
+        let preview: Vec<_> = mcp_tools.iter().take(5).cloned().collect();
+        let extras = if mcp_tools.len() > 5 { format!(" +{} more", mcp_tools.len() - 5) } else { String::new() };
+        body.push_str(&format!("🔧 **Tools ({}):** {}{}\n", mcp_tools.len(), preview.join(", "), extras));
     }
     
-    // Skills section
     if !skills.is_empty() {
-        let skills_str = skills.join(", ");
-        sections.push(format!("**Skills ({}):** {}", skills.len(), skills_str));
-    } else {
-        sections.push("**Skills:** None configured".to_string());
+        let preview: Vec<_> = skills.iter().take(5).cloned().collect();
+        let extras = if skills.len() > 5 { format!(" +{} more", skills.len() - 5) } else { String::new() };
+        body.push_str(&format!("📚 **Skills ({}):** {}{}\n", skills.len(), preview.join(", "), extras));
     }
     
-    // Acceptance criteria section
+    // Acceptance criteria as progress bar
     if task.total_criteria > 0 {
         let pct = (task.completed_criteria as f64 / task.total_criteria as f64 * 100.0) as u32;
-        sections.push(format!("📊 **Acceptance Criteria:** {}/{} ({}%)", 
-            task.completed_criteria, task.total_criteria, pct));
+        let filled = (pct / 10) as usize;
+        let empty = 10 - filled;
+        let bar = format!("{}{}",  "█".repeat(filled), "░".repeat(empty));
+        body.push_str(&format!("\n📊 **Progress:** {} {}/{} ({}%)\n", bar, task.completed_criteria, task.total_criteria, pct));
     }
     
-    let body = format!("🚀 **Agent Initialized**\n\n{}", sections.join("\n"));
+    body.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    body.push_str("\n*Let's build something awesome!* 🚀");
     
     // Use "response" type so it appears as a visible message in the agent dialog
     let content = serde_json::json!({
@@ -627,124 +622,102 @@ async fn post_completion_summary(
         }
     "#;
     
-    let mut sections = Vec::new();
-    
-    // Task context reminder
+    // Build celebration-worthy completion summary
     let task = &state.task_context;
+    
+    // Agent personality
+    let agent_name = task.agent.as_deref().unwrap_or("Agent");
+    let agent_emoji = match agent_name.to_lowercase().as_str() {
+        "bolt" => "⚡",
+        "rex" => "🦖",
+        "morgan" => "🧙",
+        "blaze" => "🔥",
+        _ => "🤖"
+    };
+    
+    let mut body = format!("🎉 **{} completed the mission!**\n\n", agent_name.to_uppercase());
+    
+    // Task completed
     if let Some(ref title) = task.title {
-        sections.push(format!("📋 **Task:** {}", title));
+        body.push_str(&format!("📋 **{}**\n\n", title));
     }
     
-    // Stats line
-    let mut stats_parts = Vec::new();
+    // Stats banner
+    body.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    let mut stats = Vec::new();
     if let Some(ms) = duration_ms {
         let secs = ms as f64 / 1000.0;
         if secs >= 60.0 {
-            let mins = (secs / 60.0).floor();
-            let remaining_secs = secs % 60.0;
-            stats_parts.push(format!("{:.0}m {:.0}s", mins, remaining_secs));
+            stats.push(format!("⏱️ {:.0}m {:.0}s", (secs / 60.0).floor(), secs % 60.0));
         } else {
-            stats_parts.push(format!("{:.1}s", secs));
+            stats.push(format!("⏱️ {:.1}s", secs));
         }
     }
     if let Some(cost) = cost_usd {
-        stats_parts.push(format!("${:.2}", cost));
+        stats.push(format!("💰 ${:.4}", cost));
     }
     if let Some(turns) = num_turns {
-        stats_parts.push(format!("{} turns", turns));
+        stats.push(format!("🔄 {} turns", turns));
     }
-    if !stats_parts.is_empty() {
-        sections.push(format!("⏱️ **Stats:** {}", stats_parts.join(" | ")));
+    if !stats.is_empty() {
+        body.push_str(&format!("{}\n", stats.join(" │ ")));
     }
+    body.push_str("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n");
     
-    sections.push(String::new()); // Spacer
-    
-    // Work Summary - what was actually built/accomplished
+    // What was built - the deliverables
     let total_files = files_created.len() + files_modified.len();
-    if total_files > 0 || !subagents_spawned.is_empty() {
-        sections.push("📁 **Work Summary:**".to_string());
-        
+    if total_files > 0 {
+        body.push_str("📦 **Deliverables:**\n");
         if !files_created.is_empty() {
-            sections.push(format!("  Created {} files:", files_created.len()));
-            for file in files_created.iter().take(10) {
-                // Show just filename, not full path
+            for file in files_created.iter().take(8) {
                 let filename = file.rsplit('/').next().unwrap_or(file);
-                sections.push(format!("    • {}", filename));
+                body.push_str(&format!("  ✅ Created `{}`\n", filename));
             }
-            if files_created.len() > 10 {
-                sections.push(format!("    ... and {} more", files_created.len() - 10));
+            if files_created.len() > 8 {
+                body.push_str(&format!("  ... +{} more files\n", files_created.len() - 8));
             }
         }
-        
         if !files_modified.is_empty() {
-            sections.push(format!("  Modified {} files:", files_modified.len()));
             for file in files_modified.iter().take(5) {
                 let filename = file.rsplit('/').next().unwrap_or(file);
-                sections.push(format!("    • {}", filename));
+                body.push_str(&format!("  ✏️ Updated `{}`\n", filename));
             }
             if files_modified.len() > 5 {
-                sections.push(format!("    ... and {} more", files_modified.len() - 5));
+                body.push_str(&format!("  ... +{} more modified\n", files_modified.len() - 5));
             }
         }
-        
-        if !subagents_spawned.is_empty() {
-            sections.push(format!("  Spawned {} subagent(s): {}", 
-                subagents_spawned.len(),
-                subagents_spawned.join(", ")
-            ));
-        }
+        body.push_str("\n");
     }
     
-    sections.push(String::new()); // Spacer
+    // Subagents spawned
+    if !subagents_spawned.is_empty() {
+        body.push_str(&format!("🤖 **Delegated to:** {}\n\n", subagents_spawned.join(", ")));
+    }
     
-    // Model
-    sections.push(format!("**Model:** {}", model));
-    
-    // MCP Tools with usage indicators
-    let mcp_tools: Vec<_> = tools.iter()
+    // Tools used - only show the ones that were actually used
+    let mcp_used: Vec<_> = tools_used.iter()
         .filter(|t| t.starts_with("mcp__"))
+        .map(|t| t.strip_prefix("mcp__cto-tools__").unwrap_or(t).to_string())
         .collect();
     
-    if !mcp_tools.is_empty() {
-        let mcp_used_count = tools_used.iter()
-            .filter(|t| t.starts_with("mcp__"))
-            .count();
-        
-        sections.push(format!("**MCP Tools ({}/{} used):**", mcp_used_count, mcp_tools.len()));
-        
-        for tool in mcp_tools.iter().take(15) {
-            let short_name = tool.strip_prefix("mcp__cto-tools__").unwrap_or(tool);
-            let indicator = if tools_used.contains(tool) { "✅" } else { "⬜" };
-            sections.push(format!("  {} {}", indicator, short_name));
-        }
-        if mcp_tools.len() > 15 {
-            sections.push(format!("  ... and {} more", mcp_tools.len() - 15));
-        }
+    if !mcp_used.is_empty() {
+        body.push_str(&format!("🔧 **Tools Used ({}):** {}\n", mcp_used.len(), mcp_used.join(", ")));
     }
     
-    // Skills - show all as loaded (skills are context, not callable like tools)
-    if !skills.is_empty() {
-        sections.push(format!("**Skills ({} loaded):** {}", 
-            skills.len(),
-            skills.iter().take(8).cloned().collect::<Vec<_>>().join(", ")
-        ));
-        if skills.len() > 8 {
-            sections.push(format!("  (+{} more)", skills.len() - 8));
-        }
-    }
+    // Model
+    body.push_str(&format!("🧠 **Model:** `{}`\n\n", model));
     
-    // Acceptance criteria section (re-read to get final state)
-    let task = &state.task_context;
+    // Acceptance criteria with progress bar
     if task.total_criteria > 0 {
-        // TODO: Re-read acceptance-criteria.md to get final state
-        // For now, show initial state
         let pct = (task.completed_criteria as f64 / task.total_criteria as f64 * 100.0) as u32;
-        let status_icon = if pct >= 90 { "✅" } else if pct >= 50 { "🟡" } else { "🔴" };
-        sections.push(format!("{} **Acceptance Criteria:** {}/{} ({}%)", 
-            status_icon, task.completed_criteria, task.total_criteria, pct));
+        let filled = (pct / 10) as usize;
+        let empty = 10 - filled;
+        let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
+        let status = if pct >= 90 { "✅" } else if pct >= 50 { "🟡" } else { "🔴" };
+        body.push_str(&format!("{} **Progress:** {} {}/{} ({}%)\n", status, bar, task.completed_criteria, task.total_criteria, pct));
     }
     
-    let body = format!("✅ **Session Complete**\n\n{}", sections.join("\n"));
+    body.push_str(&format!("\n*Great work!* {}", agent_emoji));
     
     let content = serde_json::json!({
         "type": "response",
