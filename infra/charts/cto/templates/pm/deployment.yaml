@@ -78,6 +78,13 @@ spec:
             - name: WEBHOOK_CALLBACK_URL
               value: {{ .Values.pm.github.webhookCallbackUrl | quote }}
             {{- end }}
+            # GitHub token for API calls (remediation buttons, PR file fetching)
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tools-github-secrets
+                  key: GITHUB_PERSONAL_ACCESS_TOKEN
+                  optional: true
             # Linear OAuth App credentials for each agent
             {{- $agents := list "morgan" "rex" "blaze" "grizz" "nova" "tap" "spark" "cleo" "cipher" "tess" "atlas" "bolt" }}
             {{- range $agents }}
