@@ -193,10 +193,10 @@ impl ServerHealthStatus {
 
         let last_check = self
             .last_check
-            .map(|i| Self::instant_to_rfc3339(i));
+            .map(Self::instant_to_rfc3339);
         let last_success = self
             .last_successful_check
-            .map(|i| Self::instant_to_rfc3339(i));
+            .map(Self::instant_to_rfc3339);
 
         ServerHealthSnapshot {
             status,
