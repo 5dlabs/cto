@@ -12,12 +12,17 @@ use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+/// Default maximum number of concurrent MCP server connections.
+/// When this limit is reached, the least recently used connection is evicted.
+const DEFAULT_MAX_CONNECTIONS: usize = 10;
+
 /// Local server process handle
 #[derive(Debug)]
 pub struct LocalServerProcess {
     pub child: Child,
     pub name: String,
     pub started_at: std::time::SystemTime,
+    pub last_used: std::time::Instant,
     pub stdin: Option<tokio::process::ChildStdin>,
     pub stdout: Option<BufReader<tokio::process::ChildStdout>>,
     pub tools: Vec<Value>, // Store actual tool schemas from MCP handshake
@@ -31,6 +36,8 @@ pub struct McpClient {
     client_config: Option<ClientConfig>,
     session_id: String,
     local_servers: Arc<Mutex<HashMap<String, LocalServerProcess>>>,
+    /// Cached tool schemas per server, persists across LRU evictions
+    tool_schema_cache: Arc<Mutex<HashMap<String, Vec<Value>>>>,
 }
 
 impl McpClient {
@@ -53,6 +60,7 @@ impl McpClient {
             client_config,
             session_id,
             local_servers: Arc::new(Mutex::new(HashMap::new())),
+            tool_schema_cache: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -159,17 +167,14 @@ impl McpClient {
         let stdin = io::stdin();
         let mut stdout = io::stdout();
 
-        // Spawn local servers on startup
-        if let Err(e) = self.rt.block_on(async { self.spawn_local_servers().await }) {
-            tracing::debug!("[Bridge] Warning: Failed to spawn some local servers: {e}");
-        }
-
-        // Perform MCP handshakes with local servers
+        // Discover local tools via lazy loading with LRU connection pool.
+        // Servers are spawned one at a time and evicted when MAX_CONNECTIONS is reached,
+        // ensuring we never exceed the memory limit even with many configured servers.
         if let Err(e) = self
             .rt
-            .block_on(async { self.handshake_local_servers().await })
+            .block_on(async { self.discover_all_local_tools().await })
         {
-            tracing::debug!("[Bridge] Warning: Failed to handshake with some local servers: {e}");
+            tracing::debug!("[Bridge] Warning: Failed to discover some local tools: {e}");
         }
 
         // Send initial capabilities
@@ -338,14 +343,16 @@ impl McpClient {
             .collect()
     }
 
-    /// Get local tools from actual MCP handshake results
+    /// Get local tools from cached MCP handshake results.
+    /// Uses the tool schema cache so tools remain available even when their
+    /// server has been evicted from the LRU connection pool.
     async fn get_local_tools(&self) -> Vec<Value> {
-        let servers = self.local_servers.lock().await;
+        let cache = self.tool_schema_cache.lock().await;
 
         let mut all_tools = Vec::new();
 
-        for (server_name, process) in servers.iter() {
-            for tool in &process.tools {
+        for (server_name, tools) in cache.iter() {
+            for tool in tools {
                 if let Some(name) = tool.get("name").and_then(|n| n.as_str()) {
                     // Apply the same filtering logic as remote tools
                     let enabled = self.should_include_tool(name, true);
@@ -509,25 +516,37 @@ impl McpClient {
         Ok(json_response)
     }
 
-    /// Spawn all local servers defined in client configuration
-    async fn spawn_local_servers(&self) -> Result<()> {
+    /// Get the maximum number of concurrent MCP server connections
+    fn max_connections(&self) -> usize {
+        self.client_config
+            .as_ref()
+            .and_then(|c| c.max_connections)
+            .unwrap_or(DEFAULT_MAX_CONNECTIONS)
+    }
+
+    /// Discover tool schemas from all configured local servers.
+    /// Uses the LRU connection pool so we never exceed MAX_CONNECTIONS
+    /// active subprocesses, even during initial discovery.
+    async fn discover_all_local_tools(&self) -> Result<()> {
         if let Some(ref config) = self.client_config {
+            let max = self.max_connections();
             tracing::debug!(
-                "[Bridge] Spawning {} local servers...",
-                config.local_servers.len()
+                "[Bridge] Discovering tools from {} local servers (max connections: {})...",
+                config.local_servers.len(),
+                max
             );
 
-            for (server_name, server_config) in &config.local_servers {
-                match self.spawn_local_server(server_name, server_config).await {
+            for server_name in config.local_servers.keys() {
+                match self.ensure_server_running(server_name).await {
                     Ok(()) => {
                         tracing::debug!(
-                            "[Bridge] ✅ Successfully spawned local server: {}",
+                            "[Bridge] ✅ Discovered tools for '{}'",
                             server_name
                         );
                     }
                     Err(e) => {
                         tracing::debug!(
-                            "[Bridge] ❌ Failed to spawn local server '{}': {}",
+                            "[Bridge] ❌ Failed to discover tools for '{}': {}",
                             server_name,
                             e
                         );
@@ -538,58 +557,66 @@ impl McpClient {
         Ok(())
     }
 
-    /// Perform MCP handshakes with all spawned local servers
-    async fn handshake_local_servers(&self) -> Result<()> {
-        if let Some(ref config) = self.client_config {
-            tracing::debug!(
-                "[Bridge] 🤝 Starting MCP handshakes with {} local servers...",
-                config.local_servers.len()
-            );
-
-            let mut failed_servers = Vec::new();
-            for server_name in config.local_servers.keys() {
-                tracing::info!(
-                    "[Bridge] 🤝 Initiating MCP handshake with '{}' (10s timeout)...",
-                    server_name
-                );
-                match tokio::time::timeout(
-                    tokio::time::Duration::from_secs(10),
-                    self.perform_mcp_handshake(server_name),
-                )
-                .await
-                {
-                    Ok(Ok(tools)) => {
-                        tracing::info!(
-                            "[Bridge] ✅ Handshake successful with '{}': {} tools",
-                            server_name,
-                            tools.len()
-                        );
-                    }
-                    Ok(Err(e)) => {
-                        tracing::warn!(
-                            "[Bridge] ❌ Handshake failed with '{}': {}",
-                            server_name,
-                            e
-                        );
-                        failed_servers.push(server_name.clone());
-                    }
-                    Err(_) => {
-                        tracing::warn!(
-                            "[Bridge] ⏰ Handshake timed out with '{}' after 10s — skipping server",
-                            server_name
-                        );
-                        failed_servers.push(server_name.clone());
-                    }
-                }
-            }
-            if !failed_servers.is_empty() {
-                tracing::warn!(
-                    "[Bridge] ⚠️ {} server(s) failed initialization: {:?}",
-                    failed_servers.len(),
-                    failed_servers
-                );
+    /// Ensure a local server is running, spawning it if needed.
+    /// Implements LRU eviction when the connection pool is at capacity.
+    async fn ensure_server_running(&self, server_name: &str) -> Result<()> {
+        // Check if already running
+        {
+            let mut servers = self.local_servers.lock().await;
+            if let Some(process) = servers.get_mut(server_name) {
+                process.last_used = std::time::Instant::now();
+                return Ok(());
             }
         }
+
+// Need to start this server - evict LRU if at capacity
+        let max = self.max_connections();
+        {
+            let mut servers = self.local_servers.lock().await;
+            while servers.len() >= max {
+                let lru_name = servers
+                    .iter()
+                    .min_by_key(|(_, p)| p.last_used)
+                    .map(|(name, _)| name.clone());
+
+                if let Some(lru_name) = lru_name {
+                    tracing::info!(
+                        "[Bridge] 🗑️ Evicting '{}' to make room for '{}'",
+                        lru_name,
+                        server_name
+                    );
+                    if let Some(mut process) = servers.remove(&lru_name) {
+                        if let Err(e) = process.child.kill().await {
+                            tracing::debug!(
+                                "[Bridge] Warning: Failed to kill evicted server '{}': {}",
+                                lru_name,
+                                e
+                            );
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Spawn the server
+        let config = self
+            .client_config
+            .as_ref()
+            .and_then(|c| c.local_servers.get(server_name))
+            .ok_or_else(|| anyhow::anyhow!("No config for server '{}'", server_name))?
+            .clone();
+
+        self.spawn_local_server(server_name, &config).await?;
+
+        // Perform MCP handshake and cache tool schemas
+        let tools = self.perform_mcp_handshake(server_name).await?;
+        {
+            let mut cache = self.tool_schema_cache.lock().await;
+            cache.insert(server_name.to_string(), tools);
+        }
+
         Ok(())
     }
 
@@ -668,6 +695,7 @@ impl McpClient {
             child,
             name: server_name.to_string(),
             started_at,
+            last_used: std::time::Instant::now(),
             stdin,
             stdout,
             tools: Vec::new(), // Initialize empty, will be populated during handshake
@@ -961,6 +989,9 @@ impl McpClient {
         let mut servers = self.local_servers.lock().await;
 
         if let Some(process) = servers.get_mut(server_name) {
+            // Update LRU timestamp
+            process.last_used = std::time::Instant::now();
+
             tracing::debug!(
                 "[Bridge] 🔧 Executing tool '{}' on local server '{}'",
                 tool_name,
@@ -1082,6 +1113,18 @@ impl McpClient {
                 tool_name,
                 server_name
             );
+
+            // Ensure server is running (lazy start with LRU eviction)
+            if let Err(e) = self.ensure_server_running(&server_name).await {
+                return Ok(json!({
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32603,
+                        "message": format!("Failed to start server '{server_name}': {e}")
+                    }
+                }));
+            }
 
             // Route to local server
             match self
