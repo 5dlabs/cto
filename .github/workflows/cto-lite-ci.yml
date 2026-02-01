@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
       
@@ -83,6 +83,9 @@ jobs:
         with:
           version: 'v3.14.0'
 
+      - name: Build Helm dependencies
+        run: helm dependency build infra/charts/cto-lite
+
       - name: Lint chart
         run: helm lint infra/charts/cto-lite
 
@@ -107,7 +110,7 @@ jobs:
           node-version: '20'
 
       - name: Setup Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-22.04'
