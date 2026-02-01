@@ -687,8 +687,8 @@ async fn create_mention_coderun(
         },
     );
 
-    let obj: kube::api::DynamicObject = serde_json::from_value(coderun)
-        .map_err(|e| format!("Failed to serialize CodeRun: {e}"))?;
+    let obj: kube::api::DynamicObject =
+        serde_json::from_value(coderun).map_err(|e| format!("Failed to serialize CodeRun: {e}"))?;
 
     api.create(&PostParams::default(), &obj)
         .await
@@ -765,8 +765,8 @@ async fn create_remediation_coderun(
         },
     );
 
-    let obj: kube::api::DynamicObject = serde_json::from_value(coderun)
-        .map_err(|e| format!("Failed to serialize CodeRun: {e}"))?;
+    let obj: kube::api::DynamicObject =
+        serde_json::from_value(coderun).map_err(|e| format!("Failed to serialize CodeRun: {e}"))?;
 
     api.create(&PostParams::default(), &obj)
         .await
