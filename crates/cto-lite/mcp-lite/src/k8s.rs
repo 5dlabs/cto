@@ -3,6 +3,7 @@
 //! Communicates with the Kind cluster to create and query Argo Workflows.
 
 use anyhow::{anyhow, Result};
+use reqwest::tls::Certificate;
 use tracing::{debug, info};
 
 /// Kubernetes client for CTO Lite
@@ -60,9 +61,14 @@ impl K8sClient {
             std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
                 .unwrap_or_else(|_| "cto-lite".to_string());
 
+        // Load the in-cluster CA certificate for proper TLS verification
+        let ca_cert_pem =
+            std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")?;
+        let ca_cert = Certificate::from_pem(&ca_cert_pem)?;
+
         Ok(Self {
             client: reqwest::Client::builder()
-                .danger_accept_invalid_certs(true) // In-cluster cert
+                .add_root_certificate(ca_cert)
                 .build()?,
             base_url: "https://kubernetes.default.svc".to_string(),
             token: Some(token),

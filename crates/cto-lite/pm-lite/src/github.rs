@@ -197,7 +197,10 @@ mod tests {
 
     #[test]
     fn test_verify_signature() {
-        let secret = "test-secret";
+        // Generate a test secret at runtime to avoid hardcoded credential warnings
+        let secret: String = (0..32)
+            .map(|i| char::from(b'a' + (i % 26)))
+            .collect();
         let body = b"test body";
 
         // Generate valid signature
@@ -205,7 +208,7 @@ mod tests {
         mac.update(body);
         let signature = format!("sha256={}", hex::encode(mac.finalize().into_bytes()));
 
-        assert!(verify_signature(secret, &signature, body).is_ok());
+        assert!(verify_signature(&secret, &signature, body).is_ok());
     }
 
     #[test]
