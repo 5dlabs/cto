@@ -50,7 +50,11 @@ pub async fn trigger_workflow(namespace: &str, params: WorkflowParams) -> Result
             .chars()
             .take(30)
             .collect::<String>(),
-        uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>()
+        uuid::Uuid::new_v4()
+            .to_string()
+            .chars()
+            .take(8)
+            .collect::<String>()
     );
 
     let workflow = json!({
@@ -87,7 +91,9 @@ pub async fn trigger_workflow(namespace: &str, params: WorkflowParams) -> Result
     let workflows: Api<DynamicObject> = Api::namespaced_with(client, namespace, &api_resource);
 
     let workflow_obj: DynamicObject = serde_json::from_value(workflow)?;
-    workflows.create(&PostParams::default(), &workflow_obj).await?;
+    workflows
+        .create(&PostParams::default(), &workflow_obj)
+        .await?;
 
     info!("Created workflow: {workflow_name}");
     Ok(workflow_name)

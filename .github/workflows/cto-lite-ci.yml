@@ -39,6 +39,11 @@ jobs:
         working-directory: crates/cto-lite/tauri/src-tauri
         run: cargo fmt --check
 
+      - name: Create frontend dist placeholder
+        run: |
+          mkdir -p crates/cto-lite/ui/dist
+          echo '<!DOCTYPE html><html><body>placeholder</body></html>' > crates/cto-lite/ui/dist/index.html
+
       - name: Check clippy
         working-directory: crates/cto-lite/tauri/src-tauri
         run: cargo clippy -- -D warnings

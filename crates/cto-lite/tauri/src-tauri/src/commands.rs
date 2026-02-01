@@ -5,8 +5,7 @@ use crate::helm::{self, HelmRelease, HelmValues};
 use crate::keychain::{self, ApiKeyType};
 use crate::kind::{self, ClusterInfo, KindInfo};
 use crate::state::{AppState, SetupState};
-use crate::workflows::{self, WorkflowDetail, WorkflowNode, WorkflowParams, WorkflowStatus};
-use serde::{Deserialize, Serialize};
+use crate::workflows::{self, WorkflowDetail, WorkflowParams, WorkflowStatus};
 use tauri::State;
 
 // ============================================================================

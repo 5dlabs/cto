@@ -146,8 +146,8 @@ pub fn verify_signature(secret: &str, signature: &str, body: &[u8]) -> Result<()
         .strip_prefix("sha256=")
         .ok_or_else(|| anyhow!("Invalid signature format"))?;
 
-    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
-        .map_err(|e| anyhow!("HMAC error: {e}"))?;
+    let mut mac =
+        HmacSha256::new_from_slice(secret.as_bytes()).map_err(|e| anyhow!("HMAC error: {e}"))?;
     mac.update(body);
 
     let result = mac.finalize();

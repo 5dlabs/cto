@@ -18,8 +18,8 @@ use tracing::{error, info};
 use crate::{
     config::Config,
     github::{
-        extract_prompt, is_trigger_command, should_trigger_workflow, verify_signature,
-        GitHubEvent, IssueCommentPayload, IssuePayload, PullRequestPayload,
+        extract_prompt, is_trigger_command, should_trigger_workflow, verify_signature, GitHubEvent,
+        IssueCommentPayload, IssuePayload, PullRequestPayload,
     },
     workflow::{get_default_stack, trigger_workflow, WorkflowParams},
 };
@@ -92,14 +92,23 @@ async fn github_webhook(
 
     // Verify signature if secret is configured
     if let Some(ref secret) = state.config.github.webhook_secret {
-        if let Some(signature) = headers.get("x-hub-signature-256").and_then(|v| v.to_str().ok()) {
+        if let Some(signature) = headers
+            .get("x-hub-signature-256")
+            .and_then(|v| v.to_str().ok())
+        {
             if let Err(e) = verify_signature(secret, signature, &body) {
                 error!("Webhook signature verification failed: {e}");
-                return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Invalid signature"})));
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(json!({"error": "Invalid signature"})),
+                );
             }
         } else {
             error!("Missing webhook signature");
-            return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Missing signature"})));
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "Missing signature"})),
+            );
         }
     }
 
@@ -115,15 +124,14 @@ async fn github_webhook(
     };
 
     match result {
-        Ok(Some(workflow_name)) => {
-            (StatusCode::OK, Json(json!({"workflow": workflow_name})))
-        }
-        Ok(None) => {
-            (StatusCode::OK, Json(json!({"status": "ignored"})))
-        }
+        Ok(Some(workflow_name)) => (StatusCode::OK, Json(json!({"workflow": workflow_name}))),
+        Ok(None) => (StatusCode::OK, Json(json!({"status": "ignored"}))),
         Err(e) => {
             error!("Error handling webhook: {e}");
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()})))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
         }
     }
 }
@@ -137,7 +145,10 @@ async fn handle_issue_event(state: &ServerState, body: &[u8]) -> Result<Option<S
     }
 
     if !should_trigger_workflow(&payload.issue) {
-        info!("Issue {} doesn't have 'cto' label, skipping", payload.issue.number);
+        info!(
+            "Issue {} doesn't have 'cto' label, skipping",
+            payload.issue.number
+        );
         return Ok(None);
     }
 
