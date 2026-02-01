@@ -1,0 +1,76 @@
+{{- if .Values.tools.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto-lite.fullname" . }}-tools
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "cto-lite.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: tools
+  template:
+    metadata:
+      labels:
+        {{- include "cto-lite.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: tools
+    spec:
+      serviceAccountName: {{ include "cto-lite.serviceAccountName" . }}
+      containers:
+        - name: tools
+          image: "{{ .Values.tools.image.repository }}:{{ .Values.tools.image.tag }}"
+          imagePullPolicy: {{ .Values.tools.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: "info,tools=debug"
+            - name: CTO_CONFIG_PATH
+              value: "/etc/cto/config.json"
+          resources:
+            {{- toYaml .Values.tools.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          volumeMounts:
+            - name: cto-config
+              mountPath: /etc/cto
+      volumes:
+        - name: cto-config
+          configMap:
+            name: {{ include "cto-lite.fullname" . }}-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cto-lite.fullname" . }}-tools
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tools
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto-lite.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: tools
+{{- end }}

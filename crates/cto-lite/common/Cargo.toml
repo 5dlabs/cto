@@ -1,0 +1,12 @@
+[package]
+name = "cto-lite-common"
+version = "0.1.0"
+edition = "2021"
+description = "Shared utilities for CTO Lite components"
+license = "MIT"
+
+# Keep out of root workspace
+[workspace]
+
+[dependencies]
+anyhow = "1"

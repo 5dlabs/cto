@@ -1,0 +1,69 @@
+# Standalone workspace - not part of main CTO workspace
+[workspace]
+
+[package]
+name = "cto-lite-tauri"
+version = "0.1.0"
+description = "CTO Lite - AI Development Platform for Individual Developers"
+authors = ["5D Labs"]
+license = "AGPL-3.0"
+repository = "https://github.com/5dlabs/cto"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+# Tauri framework
+tauri = { version = "2.0", features = ["devtools"] }
+tauri-plugin-shell = "2.0"
+tauri-plugin-dialog = "2.0"
+tauri-plugin-os = "2.0"
+tauri-plugin-process = "2.0"
+tauri-plugin-opener = "2.0"
+
+# Async runtime
+tokio = { version = "1.49", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HTTP client for OAuth flows
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# OS keychain for secure credential storage
+keyring = "3.6"
+
+# Command execution
+which = "7.0"
+
+# SQLite for local storage
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# UUID generation
+uuid = { version = "1.20", features = ["v4"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Regex for parsing
+regex = "1.10"
+
+# URL encoding
+urlencoding = "2.1"
+
+# Directory utilities
+dirs = "6.0"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
