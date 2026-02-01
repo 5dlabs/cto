@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subtask id="8.1" parent="8" agent="bolt">
+    <meta>
+        <title>Create Core Kubernetes Deployment Manifests</title>
+        <dependencies>None</dependencies>
+    </meta>
+
+    <role>You are a DevOps Engineer specializing in Kubernetes. Implement subtask 8.1.</role>
+
+    <context>
+        <overview>Create deployment manifests for all backend services including proper resource allocation, scaling configuration, and health checks</overview>
+        <parent_task>Configure Kubernetes Deployments (Bolt - Kubernetes)</parent_task>
+    </context>
+
+    <requirements>
+        <description>Create deployment YAML files for each backend service with proper resource requests/limits, replica counts, container specifications, environment variables, and liveness/readiness probes. Include HPA (Horizontal Pod Autoscaler) configurations for automatic scaling based on CPU/memory metrics. Set up service accounts and RBAC policies for each service.</description>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>Subtask requirements implemented</criterion>
+        <criterion>Parent task requirements still satisfied</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>kubectl apply --dry-run=client -f .</command>
+        <command>helm lint charts/*</command>
+    </validation>
+</subtask>

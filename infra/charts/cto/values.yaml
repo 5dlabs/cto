@@ -365,10 +365,10 @@ tools:
   resources:
     limits:
       cpu: 1000m
-      memory: 2Gi
+      memory: 4Gi
     requests:
       cpu: 200m
-      memory: 512Mi
+      memory: 1Gi
 
   persistence:
     enabled: true
@@ -441,16 +441,7 @@ tools:
         args: ["run", "-i", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "mcp/docker"]
         workingDirectory: "/tmp"
 
-      kubernetes:
-        name: "Kubernetes"
-        description: "Kubernetes cluster management with kubectl and Helm operations"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@iflow-mcp/mcp-server-kubernetes"]
-        workingDirectory: "/tmp"
-        env:
-          # Set to true for read-only and create/update only (no delete operations)
-          ALLOW_ONLY_NON_DESTRUCTIVE_TOOLS: "${K8S_NON_DESTRUCTIVE:-false}"
+      # kubernetes: removed - duplicate of kubernetes-mcp, caused prefix conflicts
 
       kubernetes-mcp:
         name: "Kubernetes MCP"
@@ -567,10 +558,10 @@ tools:
       # --- Project Management ---
       linear:
         name: "Linear"
-        description: "Linear issue tracking - create, update, and manage issues and projects"
+        description: "Linear issue tracking - full API coverage for issues, projects, milestones, cycles, and more"
         transport: "stdio"
         command: "npx"
-        args: ["-y", "@anthropics/linear-mcp"]
+        args: ["-y", "@calltelemetry/linear-mcp"]
         workingDirectory: "/tmp"
         env:
           LINEAR_API_KEY: "${LINEAR_API_KEY}"
@@ -662,20 +653,7 @@ tools:
         env:
           LATITUDE_API_KEY: "${LATITUDE_API_KEY}"
 
-      # --- Apple Development ---
-      xcodebuild:
-        name: "XcodeBuildMCP"
-        description: "Xcode builds, iOS/macOS development, simulator control, device deployment, UI testing"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "xcodebuildmcp@latest"]
-        workingDirectory: "/workspace"
-        env:
-          # Session-aware mode (recommended) - set defaults once, reuse everywhere
-          # Set XCODEBUILDMCP_DISABLE_SESSION_DEFAULTS=true for explicit parameters
-          XCODEBUILDMCP_DYNAMIC_TOOLS: "false"
-          # Enable specific workflows to reduce context window
-          XCODEBUILDMCP_ENABLED_WORKFLOWS: "simulator,device,macos,swift-package,project-discovery,ui-testing"
+      # xcodebuild: removed - doesn't work on Ubuntu/Linux servers
 
       appstore-connect:
         name: "App Store Connect"
@@ -700,15 +678,7 @@ tools:
         env:
           POSTGRES_URL: "${POSTGRES_URL:-postgresql://localhost:5432/postgres}"
 
-      redis:
-        name: "Redis"
-        description: "Redis key-value store - set, get, delete, and list operations"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@gongrzhe/server-redis-mcp", "${REDIS_URL}"]
-        workingDirectory: "/tmp"
-        env:
-          REDIS_URL: "${REDIS_URL:-redis://localhost:6379}"
+      # redis: removed - should be client-side only, not on backend
 
       mongodb:
         name: "MongoDB"

@@ -159,8 +159,8 @@ fn agent_for_framework(framework: Framework) -> Option<Agent> {
         Framework::Unreal | Framework::Qt => Agent::Forge,
         Framework::Godot => Agent::Forge,
 
-        // Python - Backend
-        Framework::FastApi | Framework::Django | Framework::Flask => Agent::Nova,
+        // Python - Backend (no dedicated agent yet, falls back to Generic/Rex)
+        Framework::FastApi | Framework::Django | Framework::Flask => Agent::Generic,
 
         Framework::Unknown => return None,
     })
@@ -174,11 +174,15 @@ fn agent_for_language(language: Language) -> Agent {
         Language::TypeScript | Language::JavaScript => Agent::Blaze, // Default TS to web
         Language::CSharp => Agent::Vex,
         Language::Cpp => Agent::Forge,
-        Language::Python => Agent::Nova,
+        Language::Python => Agent::Generic, // No dedicated Python agent yet
         Language::Swift | Language::Kotlin => Agent::Tap, // Mobile languages
         Language::Java => Agent::Nova,                    // Java backend
         Language::Ruby | Language::Php => Agent::Nova,    // Web backend
-        Language::Shell | Language::Yaml | Language::Json | Language::Markdown | Language::Other => {
+        Language::Shell
+        | Language::Yaml
+        | Language::Json
+        | Language::Markdown
+        | Language::Other => {
             Agent::Rex // Infra/config goes to Rex
         }
     }
@@ -189,10 +193,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    fn make_result(
-        language: Option<Language>,
-        framework: Option<Framework>,
-    ) -> DetectionResult {
+    fn make_result(language: Option<Language>, framework: Option<Framework>) -> DetectionResult {
         let mut language_counts = HashMap::new();
         if let Some(lang) = language {
             language_counts.insert(lang, 1);

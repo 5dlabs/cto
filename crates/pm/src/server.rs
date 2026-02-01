@@ -207,6 +207,11 @@ pub fn build_router(state: AppState) -> Router {
             post(crate::handlers::agent_interactions::handle_remediation_webhook)
                 .with_state(callback_state.clone()),
         )
+        .route(
+            "/webhooks/github/ci-failure",
+            post(crate::handlers::agent_interactions::handle_ci_failure_webhook)
+                .with_state(callback_state.clone()),
+        )
         // Callback endpoints for Argo workflows
         .route(
             "/callbacks/intake-complete",
