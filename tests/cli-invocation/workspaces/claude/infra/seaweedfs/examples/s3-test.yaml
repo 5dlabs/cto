@@ -1,0 +1,69 @@
+---
+# Example Job to test S3 API connectivity
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seaweedfs-s3-test
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs-test
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs-test
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: aws-cli
+        image: amazon/aws-cli:2.13.31
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Testing SeaweedFS S3 API..."
+
+          # Configure AWS CLI
+          aws configure set aws_access_key_id test-access-key
+          aws configure set aws_secret_access_key test-secret-key
+          aws configure set default.region us-east-1
+
+          ENDPOINT="http://seaweedfs-s3.storage.svc.cluster.local:8333"
+
+          # Create bucket
+          echo "Creating bucket..."
+          aws --endpoint-url $ENDPOINT s3 mb s3://test-bucket || true
+
+          # Create test file
+          echo "Hello from SeaweedFS" > /tmp/test.txt
+
+          # Upload file
+          echo "Uploading file..."
+          aws --endpoint-url $ENDPOINT s3 cp /tmp/test.txt s3://test-bucket/test.txt
+
+          # List objects
+          echo "Listing objects..."
+          aws --endpoint-url $ENDPOINT s3 ls s3://test-bucket/
+
+          # Download file
+          echo "Downloading file..."
+          aws --endpoint-url $ENDPOINT s3 cp s3://test-bucket/test.txt /tmp/downloaded.txt
+
+          # Verify content
+          echo "Verifying content..."
+          cat /tmp/downloaded.txt
+
+          # Cleanup
+          echo "Cleaning up..."
+          aws --endpoint-url $ENDPOINT s3 rm s3://test-bucket/test.txt
+          aws --endpoint-url $ENDPOINT s3 rb s3://test-bucket
+
+          echo "S3 API test completed successfully!"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

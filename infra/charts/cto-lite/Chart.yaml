@@ -1,0 +1,19 @@
+apiVersion: v2
+name: cto-lite
+description: CTO Lite - AI Development for Individual Developers
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+keywords:
+  - ai
+  - agents
+  - local
+  - kind
+maintainers:
+  - name: 5D Labs
+    url: https://5dlabs.ai
+dependencies:
+  - name: argo-workflows
+    version: 0.45.12
+    repository: https://argoproj.github.io/argo-helm
+    condition: argo-workflows.enabled

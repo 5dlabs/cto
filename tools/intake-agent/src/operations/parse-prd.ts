@@ -1,5 +1,10 @@
 /**
  * Parse PRD operation - generates tasks from a Product Requirements Document.
+ * 
+ * Uses minimal prompts based on the "Ralph Wiggum technique" - simpler prompts
+ * (~40 lines) often outperform verbose prompts (~1,500 words).
+ * 
+ * Includes robust JSON parsing with streaming support and fallback.
  */
 
 import { query, type Options, type SDKResultMessage, type SDKAssistantMessage } from '@anthropic-ai/claude-code';
@@ -11,111 +16,24 @@ import type {
   TokenUsage,
   GeneratedTask,
 } from '../types';
-import { renderTemplate, PARSE_PRD_SYSTEM, PARSE_PRD_USER } from '../prompts/templates';
 import { getClaudeCliOrThrow } from '../cli-finder';
+import { parseJsonResponse, isValidTask } from '../utils/json-parser';
+import { createLogger, createTimer } from '../utils/logger';
+import { withTimeout, Timeouts } from '../utils/timeout';
+
+const logger = createLogger('parse-prd');
+
+// Debug helper to log prompts
+function logPrompts(system: string, user: string): void {
+  if (!logger.isDebug()) return;
+  logger.debug('System prompt', { length: system.length, preview: system.slice(0, 200) + '...' });
+  logger.debug('User prompt', { length: user.length, preview: user.slice(0, 200) + '...' });
+}
 
 /**
  * Maximum retry attempts for PRD parsing when AI returns invalid responses.
  */
 const MAX_RETRIES = 3;
-
-/**
- * JSON prefill to force structured output.
- */
-const JSON_PREFILL = '{"tasks":[';
-
-/**
- * Extract JSON continuation from response, handling various edge cases.
- */
-function extractJsonContinuation(text: string): string {
-  let content = text.trim();
-
-  // Strip echoed prefill if present
-  if (content.startsWith(JSON_PREFILL)) {
-    content = content.slice(JSON_PREFILL.length).trim();
-  }
-
-  // Handle markdown code blocks
-  const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-  if (jsonBlockMatch?.[1]) {
-    return jsonBlockMatch[1].trim();
-  }
-
-  const codeBlockMatch = content.match(/```\s*([\s\S]*?)\s*```/);
-  if (codeBlockMatch?.[1] && (codeBlockMatch[1].startsWith('{') || codeBlockMatch[1].startsWith('['))) {
-    return codeBlockMatch[1].trim();
-  }
-
-  // If starts with [, it's an array - return as-is
-  if (content.startsWith('[')) {
-    return content;
-  }
-
-  // Look for {"id": to find start of valid task JSON
-  const idMatch = content.indexOf('{"id":');
-  if (idMatch > 0) {
-    return content.slice(idMatch);
-  } else if (idMatch === 0) {
-    return content;
-  }
-
-  // Check if content starts with { but has wrong structure
-  if (content.startsWith('{')) {
-    const afterBrace = content.slice(1).trim();
-    if (afterBrace.startsWith('"id"')) {
-      return content;
-    }
-    // Look for {"id": in the content
-    const nestedIdMatch = content.indexOf('{"id":');
-    if (nestedIdMatch > 0) {
-      return content.slice(nestedIdMatch);
-    }
-  }
-
-  // Fallback: find first {
-  const firstBrace = content.indexOf('{');
-  if (firstBrace >= 0) {
-    return content.slice(firstBrace);
-  }
-
-  return content;
-}
-
-/**
- * Validate that extracted JSON is valid task content.
- */
-function validateJsonContinuation(content: string): { valid: boolean; error?: string } {
-  const trimmed = content.trim();
-
-  if (!trimmed) {
-    return { valid: false, error: 'AI returned empty response - no task JSON generated' };
-  }
-
-  const firstChar = trimmed[0];
-
-  if (firstChar === '{') {
-    const afterBrace = trimmed.slice(1).trim();
-    if (!afterBrace.startsWith('"id"')) {
-      return {
-        valid: false,
-        error: `AI response does not contain valid task objects. Expected 'id' as first field. Got: ${trimmed.slice(0, 200)}...`,
-      };
-    }
-    return { valid: true };
-  }
-
-  if (firstChar === ']') {
-    if (trimmed !== ']}') {
-      return { valid: false, error: `Incomplete JSON structure. Expected ']}', got: ${trimmed.slice(0, 50)}...` };
-    }
-    return { valid: true };
-  }
-
-  return {
-    valid: false,
-    error: `AI returned prose instead of JSON. First 200 chars: ${trimmed.slice(0, 200)}...`,
-  };
-}
 
 /**
  * Extract text from assistant message content.
@@ -133,6 +51,109 @@ function extractAssistantText(message: SDKAssistantMessage): string {
 }
 
 /**
+ * Generate system prompt for task generation with full features.
+ * Includes decision points, acceptance criteria, and agent hints.
+ */
+function getSystemPrompt(numTasks: number, nextId: number, research: boolean = false): string {
+  const researchSection = research ? `
+
+### Research Mode Active
+Before breaking down the PRD into tasks:
+1. Research latest technologies, libraries, frameworks appropriate for this project
+2. Identify technical challenges, security concerns, scalability issues
+3. Consider current industry standards and trends
+4. Include specific library versions and implementation guidance` : '';
+
+  return `## Role
+You are a Senior Technical PM and Software Architect breaking down requirements into actionable tasks.
+${researchSection}
+
+## Task
+Generate ${numTasks} tasks starting from ID ${nextId}.
+
+## Output Schema
+{
+  "id": number,
+  "title": "Action (AgentName - Stack)",
+  "description": "What and why",
+  "status": "pending",
+  "dependencies": [task_ids],
+  "priority": "high" | "medium" | "low",
+  "details": "Implementation steps (escaped JSON string)",
+  "testStrategy": "Acceptance criteria - how to validate this task is complete",
+  "decisionPoints": [
+    {
+      "id": "d1",
+      "category": "architecture" | "error-handling" | "data-model" | "api-design" | "ux-behavior" | "performance" | "security",
+      "description": "What needs to be decided",
+      "options": ["option1", "option2"],
+      "requiresApproval": boolean,
+      "constraintType": "hard" | "soft" | "open" | "escalation"
+    }
+  ]
+}
+
+## Agent Mapping
+- Infrastructure: (Bolt - Kubernetes)
+- Rust backend: (Rex - Rust/Axum)
+- Go backend: (Grizz - Go/gRPC)
+- Node.js backend: (Nova - Bun/Elysia)
+- React frontend: (Blaze - React/Next.js)
+- Mobile: (Tap - Expo)
+- Desktop: (Spark - Electron)
+
+## Decision Point Categories
+- architecture: System design, patterns, service boundaries
+- error-handling: Error strategies, retry logic, fallbacks
+- data-model: Schema design, relationships, migrations
+- api-design: Endpoints, request/response formats
+- ux-behavior: User interactions, edge cases
+- performance: Caching, optimization, scaling
+- security: Auth, encryption, access control
+
+## Constraint Types
+- hard: PRD requirement (must be this way)
+- soft: Prefer this but adjustable
+- open: Agent chooses best approach
+- escalation: Human must decide
+
+## Rules
+1. Task 1 MUST be infrastructure setup (Bolt) if databases/storage needed
+2. Then backend services, then frontend apps
+3. Dependencies only reference lower IDs
+4. testStrategy MUST define clear acceptance criteria
+5. Include decisionPoints for ambiguous areas
+6. All string fields must be valid JSON (escape quotes/newlines)
+
+Output ONLY the JSON array contents, no markdown, no explanations.`;
+}
+
+/**
+ * Generate user prompt for task generation with full features.
+ */
+function getUserPrompt(prdContent: string, numTasks: number, nextId: number, research: boolean = false): string {
+  const researchReminder = research ? `
+
+Research current best practices before generating. Apply findings to details and testStrategy.` : '';
+
+  return `PRD:
+---
+${prdContent}
+---
+${researchReminder}
+
+Generate ${numTasks} tasks starting from ID ${nextId}.
+
+REQUIREMENTS:
+- Include agent hints in titles: "(AgentName - Stack)"
+- testStrategy must define acceptance criteria
+- Include decisionPoints for ambiguous requirements
+- Set constraintType for each decision point
+
+Output ONLY the JSON array contents.`;
+}
+
+/**
  * Parse PRD into tasks using Claude Agent SDK.
  */
 export async function parsePrd(
@@ -140,26 +161,39 @@ export async function parsePrd(
   model: string,
   _options: GenerateOptions
 ): Promise<AgentResponse<ParsePrdData>> {
-  const context = {
-    num_tasks: payload.num_tasks ?? 10,
-    next_id: payload.next_id ?? 1,
-    research: payload.research ?? false,
-    prd_content: payload.prd_content,
-    prd_path: payload.prd_path ?? '',
-    default_task_priority: payload.default_task_priority ?? 'medium',
-    project_root: payload.project_root ?? '',
-  };
+  const numTasks = payload.num_tasks ?? 10;
+  const nextId = payload.next_id ?? 1;
+  const prdContent = payload.prd_content;
+  const timeout = Timeouts.parsePrd(numTasks);
 
-  const systemPrompt = renderTemplate(PARSE_PRD_SYSTEM, context);
-  const userPrompt = renderTemplate(PARSE_PRD_USER, context);
+  logger.info('Starting PRD parsing', { 
+    numTasks, 
+    nextId, 
+    model, 
+    prdLength: prdContent.length,
+    timeoutMs: timeout 
+  });
+
+  const research = payload.research ?? false;
+  const systemPrompt = getSystemPrompt(numTasks, nextId, research);
+  const userPrompt = getUserPrompt(prdContent, numTasks, nextId, research);
+  
+  // Log prompts in debug mode
+  logPrompts(systemPrompt, userPrompt);
 
   let lastError: string | undefined;
   let totalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
 
   // Find Claude CLI executable once
   const cliPath = getClaudeCliOrThrow();
+  logger.debug('Using Claude CLI', { path: cliPath });
+  
+  const timer = createTimer('parse-prd', logger);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    logger.info(`Attempt ${attempt + 1}/${MAX_RETRIES}`);
+    const attemptStart = Date.now();
+
     try {
       // Configure Claude Agent SDK options
       const sdkOptions: Options = {
@@ -173,69 +207,73 @@ export async function parsePrd(
 
       let responseText = '';
       let usage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
+      let chunkCount = 0;
 
-      // Use prefill technique by including it in the prompt
-      const promptWithPrefill = `${userPrompt}\n\n${JSON_PREFILL}`;
-
-      // Query Claude with the prompt
-      for await (const message of query({
-        prompt: promptWithPrefill,
-        options: sdkOptions,
-      })) {
-        // Handle assistant messages
-        if (message.type === 'assistant') {
-          responseText += extractAssistantText(message);
-        }
-        
-        // Extract usage from result message
-        if (message.type === 'result') {
-          const resultMsg = message as SDKResultMessage;
-          if ('usage' in resultMsg) {
-            usage.input_tokens = resultMsg.usage.input_tokens;
-            usage.output_tokens = resultMsg.usage.output_tokens;
-            usage.total_tokens = usage.input_tokens + usage.output_tokens;
+      // Query Claude with the prompt (with timeout)
+      const queryPromise = (async () => {
+        for await (const message of query({
+          prompt: userPrompt,
+          options: sdkOptions,
+        })) {
+          // Handle assistant messages
+          if (message.type === 'assistant') {
+            const text = extractAssistantText(message);
+            responseText += text;
+            chunkCount++;
+            if (chunkCount % 10 === 0) {
+              logger.debug(`Received ${chunkCount} chunks`, { textLength: responseText.length });
+            }
+          }
+          
+          // Extract usage from result message
+          if (message.type === 'result') {
+            const resultMsg = message as SDKResultMessage;
+            if ('usage' in resultMsg) {
+              usage.input_tokens = resultMsg.usage.input_tokens;
+              usage.output_tokens = resultMsg.usage.output_tokens;
+              usage.total_tokens = usage.input_tokens + usage.output_tokens;
+            }
           }
         }
-      }
+        return { responseText, usage };
+      })();
+
+      const result = await withTimeout(queryPromise, timeout, `PRD parsing (${numTasks} tasks)`);
+      responseText = result.responseText;
+      usage = result.usage;
+
+      const attemptElapsed = Date.now() - attemptStart;
+      logger.info('Query completed', { 
+        elapsed_ms: attemptElapsed, 
+        responseLength: responseText.length,
+        chunks: chunkCount,
+        usage 
+      });
 
       // Accumulate total usage
       totalUsage.input_tokens += usage.input_tokens;
       totalUsage.output_tokens += usage.output_tokens;
       totalUsage.total_tokens += usage.total_tokens;
 
-      // Extract and validate JSON
-      const jsonContent = extractJsonContinuation(responseText);
-      const validation = validateJsonContinuation(jsonContent);
+      // Parse and validate with robust JSON parser
+      logger.debug('Parsing JSON response');
+      const parseResult = parseJsonResponse<GeneratedTask>(responseText, 'tasks', isValidTask);
 
-      if (!validation.valid) {
-        lastError = validation.error;
-        console.error(`Attempt ${attempt + 1}/${MAX_RETRIES} failed: ${validation.error}`);
+      if (!parseResult.success) {
+        lastError = parseResult.error;
+        logger.warn(`Parse failed`, { error: parseResult.error, preview: responseText.slice(0, 200) });
         continue;
       }
 
-      // Reconstruct full JSON and parse
-      const fullJson = `${JSON_PREFILL}${jsonContent}`;
-
-      let parsed: { tasks: GeneratedTask[] };
-      try {
-        parsed = JSON.parse(fullJson);
-      } catch (e) {
-        const parseError = e instanceof Error ? e.message : 'Unknown parse error';
-        lastError = `JSON parse failed: ${parseError}. Content: ${fullJson.slice(0, 500)}...`;
-        console.error(`Attempt ${attempt + 1}/${MAX_RETRIES} failed: ${lastError}`);
-        continue;
-      }
-
-      // Validate tasks array
-      if (!Array.isArray(parsed.tasks)) {
-        lastError = 'Parsed JSON does not contain tasks array';
-        continue;
-      }
+      logger.info('PRD parsing successful', { 
+        taskCount: parseResult.items.length,
+        totalUsage 
+      });
 
       // Success!
       return {
         success: true,
-        data: { tasks: parsed.tasks },
+        data: { tasks: parseResult.items },
         usage: totalUsage,
         model,
         provider: 'claude-agent-sdk',
@@ -243,11 +281,12 @@ export async function parsePrd(
     } catch (e) {
       const error = e instanceof Error ? e.message : 'Unknown error';
       lastError = `API error: ${error}`;
-      console.error(`Attempt ${attempt + 1}/${MAX_RETRIES} failed with API error: ${error}`);
+      logger.error(`Attempt failed`, { attempt: attempt + 1, error });
     }
   }
 
   // All retries exhausted
+  logger.error('All retries exhausted', { lastError });
   return {
     success: false,
     error: lastError ?? 'Failed to generate tasks after multiple attempts',

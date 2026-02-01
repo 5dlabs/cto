@@ -1,0 +1,55 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: messaging
+
+resources:
+  - namespace.yaml
+  - cluster.yaml
+  - definitions.yaml
+  - service.yaml
+  - rbac.yaml
+  - networkpolicy.yaml
+  - poddisruptionbudget.yaml
+  - monitoring.yaml
+  - configmap.yaml
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: messaging-infrastructure
+
+configMapGenerator:
+  - name: rabbitmq-cluster-env
+    namespace: messaging
+    literals:
+      - RABBITMQ_DEFAULT_VHOST=/
+      - RABBITMQ_ERLANG_COOKIE=changeme-secure-cookie-here
+
+secretGenerator:
+  - name: rabbitmq-admin-credentials
+    namespace: messaging
+    literals:
+      - username=admin
+      - password=changeme123
+    type: Opaque
+
+# Patches for environment-specific overrides
+patches:
+  - target:
+      kind: RabbitmqCluster
+      name: rabbitmq-cluster
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          description: "Production RabbitMQ cluster with HA configuration"
+          docs: "https://www.rabbitmq.com/kubernetes/operator/operator-overview.html"
+
+images:
+  - name: rabbitmq
+    newName: rabbitmq
+    newTag: 3.12-management
+
+# Configuration transformers
+configurations:
+  - kustomizeconfig.yaml

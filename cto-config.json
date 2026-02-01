@@ -613,6 +613,29 @@
           "github_get_file_contents"
         ],
         "localServers": {}
+      },
+      "maxRetries": 3,
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-haiku-3-5-20241022",
+          "claude-sonnet-4-5-20250929",
+          "claude-opus-4-5-20251101"
+        ]
+      },
+      "skills": {
+        "default": [
+          "verification-before-completion",
+          "systematic-debugging"
+        ],
+        "coder": [
+          "tool-design",
+          "firecrawl",
+          "compound-engineering",
+          "verification-before-completion",
+          "systematic-debugging",
+          "rust-patterns"
+        ]
       }
     },
     "atlas": {

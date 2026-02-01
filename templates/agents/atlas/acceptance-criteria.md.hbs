@@ -1,0 +1,35 @@
+# Acceptance Criteria: Merge Gate
+
+Atlas must complete all criteria before the integration is considered done.
+
+## Pre-Merge Verification
+
+- [ ] PR state retrieved successfully
+- [ ] All required CI status checks verified
+- [ ] No merge conflicts detected
+- [ ] PR is in mergeable state
+
+## CI Status Checks
+
+- [ ] All GitHub Actions workflows passed (green)
+- [ ] Required status checks are satisfied
+- [ ] No failing checks that would block merge
+
+## Merge Execution
+
+{{#if merge_enabled}}
+- [ ] Merge operation executed successfully
+- [ ] Target branch updated with PR changes
+- [ ] PR state changed to merged
+{{else}}
+- [ ] Merge eligibility confirmed
+- [ ] Report generated for manual merge
+{{/if}}
+
+## Post-Merge
+
+{{#if delete_branch}}
+- [ ] Source branch deleted after successful merge
+{{/if}}
+- [ ] Merge status reported back to Linear/GitHub
+- [ ] No errors during merge process

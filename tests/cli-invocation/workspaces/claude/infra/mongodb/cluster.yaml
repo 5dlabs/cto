@@ -1,0 +1,53 @@
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: mongodb-cluster
+  namespace: databases
+spec:
+  crVersion: 1.16.0
+  image: percona/percona-server-mongodb:7.0.4-2
+  imagePullPolicy: IfNotPresent
+
+  # Secrets for MongoDB users
+  secrets:
+    users: mongodb-cluster-secrets
+
+  # Backup configuration
+  backup:
+    enabled: false
+
+  # PMM (Percona Monitoring and Management) integration
+  pmm:
+    enabled: false
+
+  # Replica set configuration - 3 members for HA
+  replsets:
+  - name: rs0
+    size: 3
+    affinity:
+      antiAffinityTopologyKey: "kubernetes.io/hostname"
+
+    # Resource requests/limits
+    resources:
+      limits:
+        cpu: "500m"
+        memory: "1G"
+      requests:
+        cpu: "100m"
+        memory: "512M"
+
+    # Persistent storage
+    volumeSpec:
+      persistentVolumeClaim:
+        resources:
+          requests:
+            storage: 5Gi
+
+    # MongoDB configuration
+    configuration: |
+      operationProfiling:
+        mode: slowOp
+      storage:
+        wiredTiger:
+          engineConfig:
+            cacheSizeRatio: 0.5

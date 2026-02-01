@@ -104,10 +104,7 @@ impl Framework {
 
     /// Is this a web frontend framework?
     pub fn is_web_frontend(&self) -> bool {
-        matches!(
-            self,
-            Self::NextJs | Self::Remix | Self::Astro | Self::Vite
-        )
+        matches!(self, Self::NextJs | Self::Remix | Self::Astro | Self::Vite)
     }
 
     /// Is this a backend framework?
@@ -176,8 +173,7 @@ pub fn detect_from_path(path: &str) -> Option<Framework> {
     }
 
     // Next.js app router
-    if lower.starts_with("app/") && (lower.ends_with("page.tsx") || lower.ends_with("layout.tsx"))
-    {
+    if lower.starts_with("app/") && (lower.ends_with("page.tsx") || lower.ends_with("layout.tsx")) {
         return Some(Framework::NextJs);
     }
 

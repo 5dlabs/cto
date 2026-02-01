@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subtask id="8.2" parent="8" agent="bolt">
+    <meta>
+        <title>Configure Service Discovery and Network Infrastructure</title>
+        <dependencies>task-8.1</dependencies>
+    </meta>
+
+    <role>You are a DevOps Engineer specializing in Kubernetes. Implement subtask 8.2.</role>
+
+    <context>
+        <overview>Set up ClusterIP services, ingress controller, and network policies for secure service communication</overview>
+        <parent_task>Configure Kubernetes Deployments (Bolt - Kubernetes)</parent_task>
+    </context>
+
+    <requirements>
+        <description>Create ClusterIP service manifests for internal service discovery. Configure ingress controller (nginx/traefik) with proper routing rules for external access. Implement network policies to isolate services and control traffic flow between pods. Set up persistent volume claims for stateful components like databases.</description>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>Subtask requirements implemented</criterion>
+        <criterion>Parent task requirements still satisfied</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>kubectl apply --dry-run=client -f .</command>
+        <command>helm lint charts/*</command>
+    </validation>
+</subtask>
