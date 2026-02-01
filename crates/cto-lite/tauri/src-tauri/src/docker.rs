@@ -15,7 +15,7 @@ pub struct DockerInfo {
 }
 
 /// Detected Docker runtime
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DockerRuntime {
     Docker,
@@ -24,13 +24,8 @@ pub enum DockerRuntime {
     Colima,
     RancherDesktop,
     Unknown,
+    #[default]
     NotFound,
-}
-
-impl Default for DockerRuntime {
-    fn default() -> Self {
-        Self::NotFound
-    }
 }
 
 /// Check Docker installation and status
