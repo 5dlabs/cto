@@ -546,23 +546,48 @@ impl McpClient {
                 config.local_servers.len()
             );
 
+            let mut failed_servers = Vec::new();
             for server_name in config.local_servers.keys() {
-                match self.perform_mcp_handshake(server_name).await {
-                    Ok(tools) => {
-                        tracing::debug!(
+                tracing::info!(
+                    "[Bridge] 🤝 Initiating MCP handshake with '{}' (10s timeout)...",
+                    server_name
+                );
+                match tokio::time::timeout(
+                    tokio::time::Duration::from_secs(10),
+                    self.perform_mcp_handshake(server_name),
+                )
+                .await
+                {
+                    Ok(Ok(tools)) => {
+                        tracing::info!(
                             "[Bridge] ✅ Handshake successful with '{}': {} tools",
                             server_name,
                             tools.len()
                         );
                     }
-                    Err(e) => {
-                        tracing::debug!(
+                    Ok(Err(e)) => {
+                        tracing::warn!(
                             "[Bridge] ❌ Handshake failed with '{}': {}",
                             server_name,
                             e
                         );
+                        failed_servers.push(server_name.clone());
+                    }
+                    Err(_) => {
+                        tracing::warn!(
+                            "[Bridge] ⏰ Handshake timed out with '{}' after 10s — skipping server",
+                            server_name
+                        );
+                        failed_servers.push(server_name.clone());
                     }
                 }
+            }
+            if !failed_servers.is_empty() {
+                tracing::warn!(
+                    "[Bridge] ⚠️ {} server(s) failed initialization: {:?}",
+                    failed_servers.len(),
+                    failed_servers
+                );
             }
         }
         Ok(())
@@ -772,9 +797,18 @@ impl McpClient {
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to flush stdin for '{server_name}': {e}"))?;
 
-            // Step 2: Read initialize response
+            // Step 2: Read initialize response (with timeout to prevent hanging)
             let mut response_line = String::new();
-            stdout.read_line(&mut response_line).await.map_err(|e| {
+            tokio::time::timeout(
+                tokio::time::Duration::from_secs(10),
+                stdout.read_line(&mut response_line),
+            )
+            .await
+            .map_err(|_| {
+                tracing::warn!("[Bridge] ⏰ Timeout reading initialize response from '{server_name}' after 10s");
+                anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 10s")
+            })?
+            .map_err(|e| {
                 anyhow::anyhow!("Failed to read initialize response from '{server_name}': {e}")
             })?;
 
@@ -844,14 +878,20 @@ impl McpClient {
                 )
             })?;
 
-            // Step 5: Read tools/list response
+            // Step 5: Read tools/list response (with timeout to prevent hanging)
             let mut tools_response_line = String::new();
-            stdout
-                .read_line(&mut tools_response_line)
-                .await
-                .map_err(|e| {
-                    anyhow::anyhow!("Failed to read tools/list response from '{server_name}': {e}")
-                })?;
+            tokio::time::timeout(
+                tokio::time::Duration::from_secs(10),
+                stdout.read_line(&mut tools_response_line),
+            )
+            .await
+            .map_err(|_| {
+                tracing::warn!("[Bridge] ⏰ Timeout reading tools/list response from '{server_name}' after 10s");
+                anyhow::anyhow!("Timeout reading tools/list response from '{server_name}' after 10s")
+            })?
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to read tools/list response from '{server_name}': {e}")
+            })?;
 
             tracing::debug!(
                 "[Bridge] 📥 Received tools/list response from {}: {}",
