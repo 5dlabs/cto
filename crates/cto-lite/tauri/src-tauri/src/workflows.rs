@@ -78,14 +78,7 @@ pub async fn check_argo() -> Result<bool> {
 /// List all workflows in the cto-lite namespace
 pub async fn list_workflows() -> Result<Vec<WorkflowStatus>> {
     let output = Command::new("kubectl")
-        .args([
-            "get",
-            "workflows",
-            "-n",
-            "cto-lite",
-            "-o",
-            "json",
-        ])
+        .args(["get", "workflows", "-n", "cto-lite", "-o", "json"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -100,8 +93,8 @@ pub async fn list_workflows() -> Result<Vec<WorkflowStatus>> {
         anyhow::bail!("kubectl failed: {}", stderr);
     }
 
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .context("Failed to parse workflow list")?;
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("Failed to parse workflow list")?;
 
     let empty_items = vec![];
     let items = json["items"].as_array().unwrap_or(&empty_items);
@@ -126,15 +119,7 @@ pub async fn list_workflows() -> Result<Vec<WorkflowStatus>> {
 /// Get detailed status of a specific workflow
 pub async fn get_workflow(name: &str) -> Result<WorkflowDetail> {
     let output = Command::new("kubectl")
-        .args([
-            "get",
-            "workflow",
-            name,
-            "-n",
-            "cto-lite",
-            "-o",
-            "json",
-        ])
+        .args(["get", "workflow", name, "-n", "cto-lite", "-o", "json"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -146,8 +131,8 @@ pub async fn get_workflow(name: &str) -> Result<WorkflowDetail> {
         anyhow::bail!("Failed to get workflow: {}", stderr);
     }
 
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .context("Failed to parse workflow")?;
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("Failed to parse workflow")?;
 
     let status = parse_workflow_status(&json)?;
     let nodes = parse_workflow_nodes(&json)?;
@@ -167,13 +152,7 @@ pub async fn trigger_workflow(params: &WorkflowParams) -> Result<String> {
     let branch = params.branch.as_deref().unwrap_or("main");
 
     let output = Command::new("kubectl")
-        .args([
-            "create",
-            "-n",
-            "cto-lite",
-            "-f",
-            "-",
-        ])
+        .args(["create", "-n", "cto-lite", "-f", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -281,9 +260,7 @@ pub async fn get_workflow_logs(workflow_name: &str, node_name: Option<&str>) -> 
         .await;
 
     match output {
-        Ok(out) if out.status.success() => {
-            Ok(String::from_utf8_lossy(&out.stdout).to_string())
-        }
+        Ok(out) if out.status.success() => Ok(String::from_utf8_lossy(&out.stdout).to_string()),
         Ok(out) => {
             // Try kubectl logs as fallback
             let stderr = String::from_utf8_lossy(&out.stderr);
@@ -297,7 +274,10 @@ pub async fn get_workflow_logs(workflow_name: &str, node_name: Option<&str>) -> 
 /// Get logs using kubectl (fallback)
 async fn get_workflow_logs_kubectl(workflow_name: &str, node_name: Option<&str>) -> Result<String> {
     let selector = if let Some(node) = node_name {
-        format!("workflows.argoproj.io/workflow={},workflows.argoproj.io/node-name={}", workflow_name, node)
+        format!(
+            "workflows.argoproj.io/workflow={},workflows.argoproj.io/node-name={}",
+            workflow_name, node
+        )
     } else {
         format!("workflows.argoproj.io/workflow={}", workflow_name)
     };
@@ -330,13 +310,7 @@ async fn get_workflow_logs_kubectl(workflow_name: &str, node_name: Option<&str>)
 /// Delete a workflow
 pub async fn delete_workflow(name: &str) -> Result<()> {
     let output = Command::new("kubectl")
-        .args([
-            "delete",
-            "workflow",
-            name,
-            "-n",
-            "cto-lite",
-        ])
+        .args(["delete", "workflow", name, "-n", "cto-lite"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -413,18 +387,10 @@ fn parse_workflow_status(json: &serde_json::Value) -> Result<WorkflowStatus> {
             .as_str()
             .unwrap_or("Unknown")
             .to_string(),
-        started_at: json["status"]["startedAt"]
-            .as_str()
-            .map(|s| s.to_string()),
-        finished_at: json["status"]["finishedAt"]
-            .as_str()
-            .map(|s| s.to_string()),
-        progress: json["status"]["progress"]
-            .as_str()
-            .map(|s| s.to_string()),
-        message: json["status"]["message"]
-            .as_str()
-            .map(|s| s.to_string()),
+        started_at: json["status"]["startedAt"].as_str().map(|s| s.to_string()),
+        finished_at: json["status"]["finishedAt"].as_str().map(|s| s.to_string()),
+        progress: json["status"]["progress"].as_str().map(|s| s.to_string()),
+        message: json["status"]["message"].as_str().map(|s| s.to_string()),
     })
 }
 
