@@ -834,11 +834,17 @@ pub fn select_agent_for_files(files: &[String]) -> Agent {
 /// Handle CI failure webhook - creates a check run with remediation buttons
 #[allow(clippy::too_many_lines)]
 pub async fn handle_ci_failure_webhook(
-    State(_state): State<Arc<CallbackState>>,
+    State(state): State<Arc<CallbackState>>,
     _headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, StatusCode> {
     info!("Received CI failure webhook");
+
+    // Get GitHub token (required for API calls)
+    let github_token = state.github_token.as_ref().ok_or_else(|| {
+        error!("No GitHub token configured for CI failure handler");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Parse the payload
     let payload: Value = serde_json::from_slice(&body).map_err(|e| {
@@ -873,28 +879,41 @@ pub async fn handle_ci_failure_webhook(
         "Processing CI failure for remediation buttons"
     );
 
-    // Get changed files from PR using gh CLI
-    let files_output = tokio::process::Command::new("gh")
-        .args([
-            "pr",
-            "view",
-            &pr_number.to_string(),
-            "--repo",
-            repo_full_name,
-            "--json",
-            "files",
-            "--jq",
-            ".files[].path",
-        ])
-        .output()
+    // Get changed files from PR using GitHub API
+    let files_url = format!(
+        "https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files"
+    );
+    
+    let files_response = state
+        .http_client
+        .get(&files_url)
+        .header("Authorization", format!("Bearer {github_token}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "cto-pm-server")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
         .await
         .map_err(|e| {
-            error!("Failed to get PR files: {}", e);
+            error!("Failed to fetch PR files: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let files_str = String::from_utf8_lossy(&files_output.stdout);
-    let files: Vec<String> = files_str.lines().map(String::from).collect();
+    if !files_response.status().is_success() {
+        let status = files_response.status();
+        let body = files_response.text().await.unwrap_or_default();
+        error!("GitHub API error fetching PR files: {} - {}", status, body);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    let files_json: Vec<Value> = files_response.json().await.map_err(|e| {
+        error!("Failed to parse PR files response: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let files: Vec<String> = files_json
+        .iter()
+        .filter_map(|f| f.get("filename").and_then(|v| v.as_str()).map(String::from))
+        .collect();
 
     if files.is_empty() {
         warn!("No files found for PR #{}", pr_number);
@@ -966,42 +985,28 @@ pub async fn handle_ci_failure_webhook(
         }]
     });
 
-    // Create the check run using gh CLI
-    let gh_output = tokio::process::Command::new("gh")
-        .args([
-            "api",
-            "--method",
-            "POST",
-            "-H",
-            "Accept: application/vnd.github+json",
-            &format!("/repos/{repo_full_name}/check-runs"),
-            "--input",
-            "-",
-        ])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+    // Create the check run using GitHub API
+    let check_run_url = format!("https://api.github.com/repos/{repo_full_name}/check-runs");
+    
+    let check_response = state
+        .http_client
+        .post(&check_run_url)
+        .header("Authorization", format!("Bearer {github_token}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "cto-pm-server")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .json(&check_payload)
+        .send()
+        .await
         .map_err(|e| {
-            error!("Failed to spawn gh: {}", e);
+            error!("Failed to create check run: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let mut child = gh_output;
-    if let Some(mut stdin) = child.stdin.take() {
-        use tokio::io::AsyncWriteExt;
-        let payload_str = serde_json::to_string(&check_payload).unwrap_or_default();
-        stdin.write_all(payload_str.as_bytes()).await.ok();
-    }
-
-    let output = child.wait_with_output().await.map_err(|e| {
-        error!("Failed to wait for gh: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        error!("Failed to create check run: {}", stderr);
+    if !check_response.status().is_success() {
+        let status = check_response.status();
+        let body = check_response.text().await.unwrap_or_default();
+        error!("GitHub API error creating check run: {} - {}", status, body);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
