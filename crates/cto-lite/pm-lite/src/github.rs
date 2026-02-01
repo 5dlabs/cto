@@ -161,18 +161,21 @@ pub fn verify_signature(secret: &str, signature: &str, body: &[u8]) -> Result<()
 }
 
 /// Check if an issue/PR should trigger CTO workflow
+#[must_use] 
 pub fn should_trigger_workflow(issue: &Issue) -> bool {
     // Trigger on issues with "cto" label
     issue.labels.iter().any(|l| l.name.to_lowercase() == "cto")
 }
 
 /// Check if a comment is a command to trigger workflow
+#[must_use] 
 pub fn is_trigger_command(body: &str) -> bool {
     let body_lower = body.to_lowercase();
     body_lower.contains("/cto") || body_lower.contains("@cto")
 }
 
 /// Extract prompt from issue body or comment
+#[must_use] 
 pub fn extract_prompt(body: &str) -> String {
     // Remove common prefixes
     let cleaned = body

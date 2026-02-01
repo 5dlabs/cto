@@ -3,7 +3,6 @@
 //! Communicates with the Kind cluster to create and query Argo Workflows.
 
 use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 /// Kubernetes client for CTO Lite
@@ -157,7 +156,7 @@ impl K8sClient {
         debug!("Workflow spec: {:?}", workflow);
 
         let response = self
-            .add_auth(self.client.post(&self.workflows_url()).json(&workflow))
+            .add_auth(self.client.post(self.workflows_url()).json(&workflow))
             .send()
             .await?;
 
@@ -173,7 +172,7 @@ impl K8sClient {
     /// Get workflow status
     pub async fn get_workflow_status(&self, name: &str) -> Result<WorkflowStatus> {
         let response = self
-            .add_auth(self.client.get(&self.workflow_url(name)))
+            .add_auth(self.client.get(self.workflow_url(name)))
             .send()
             .await?;
 

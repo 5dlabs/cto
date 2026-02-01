@@ -101,6 +101,7 @@ pub async fn trigger_workflow(namespace: &str, params: WorkflowParams) -> Result
 
 /// Get the default backend stack from user preferences
 /// For now, defaults to "nova" (TypeScript)
+#[must_use] 
 pub fn get_default_stack() -> String {
     std::env::var("CTO_DEFAULT_STACK").unwrap_or_else(|_| "nova".to_string())
 }
