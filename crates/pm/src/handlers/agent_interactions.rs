@@ -423,16 +423,26 @@ pub async fn handle_mention_webhook(
     // Extract nested payload (from Argo Events sensor)
     let inner_payload = payload.get("payload").unwrap_or(&payload);
 
-    // Extract event type from payload instead of header
+    // Detect event type: first try X-GitHub-Event from payload, then fall back to structure detection
     let mention_source = inner_payload
         .get("X-GitHub-Event")
         .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
+        .map(String::from)
+        .unwrap_or_else(|| {
+            // Fall back to structure detection
+            if inner_payload.get("issue").is_some() && inner_payload.get("comment").is_some() {
+                "issue_comment".to_string()
+            } else if inner_payload.get("pull_request").is_some() && inner_payload.get("comment").is_some() {
+                "pull_request_review_comment".to_string()
+            } else {
+                "unknown".to_string()
+            }
+        });
 
-    info!(source = %mention_source, "Received @mention webhook");
+    info!(source = %mention_source, "Detected mention source");
 
     // Determine PR context based on event type
-    let (pr_context, comment_body, comment_url) = match mention_source {
+    let (pr_context, comment_body, comment_url) = match mention_source.as_str() {
         "issue_comment" => {
             let event: IssueCommentPayload = serde_json::from_value(inner_payload.clone())
                 .map_err(|e| {
