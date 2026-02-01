@@ -50,10 +50,7 @@ impl Language {
 
     /// Is this a "real" programming language (not config/docs)?
     pub fn is_code(&self) -> bool {
-        !matches!(
-            self,
-            Self::Yaml | Self::Json | Self::Markdown | Self::Other
-        )
+        !matches!(self, Self::Yaml | Self::Json | Self::Markdown | Self::Other)
     }
 }
 
@@ -124,7 +121,10 @@ mod tests {
 
     #[test]
     fn test_typescript_extensions() {
-        assert_eq!(detect_from_extension(Some("ts")), Some(Language::TypeScript));
+        assert_eq!(
+            detect_from_extension(Some("ts")),
+            Some(Language::TypeScript)
+        );
         assert_eq!(
             detect_from_extension(Some("tsx")),
             Some(Language::TypeScript)

@@ -360,14 +360,17 @@ pub struct RequestedAction {
 /// Panics if the regex pattern is invalid (this is a compile-time constant).
 #[must_use]
 pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
-    let re = Regex::new(r"(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)\s*(.*)").unwrap();
-    
+    let re = Regex::new(
+        r"(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)\s*(.*)",
+    )
+    .unwrap();
+
     let mut mentions = Vec::new();
-    
+
     for cap in re.captures_iter(comment) {
         let agent_name = cap.get(1).map_or("", |m| m.as_str());
         let instructions = cap.get(2).map_or("", |m| m.as_str()).trim().to_string();
-        
+
         if let Some(agent) = Agent::from_mention(agent_name) {
             mentions.push(ParsedMention {
                 agent,
@@ -376,7 +379,7 @@ pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
             });
         }
     }
-    
+
     mentions
 }
 
@@ -385,16 +388,16 @@ pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
 #[must_use]
 pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
     let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-pr(\d+)-(\d+)$").unwrap();
-    
+
     if let Some(cap) = re.captures(identifier) {
         let agent_name = cap.get(1)?.as_str();
         let pr_number: u64 = cap.get(2)?.as_str().parse().ok()?;
         let check_run_id: u64 = cap.get(3)?.as_str().parse().ok()?;
-        
+
         let agent = Agent::from_mention(agent_name)?;
         return Some((agent, pr_number, check_run_id));
     }
-    
+
     None
 }
 
@@ -428,8 +431,8 @@ pub async fn handle_mention_webhook(
     // Determine PR context based on event type
     let (pr_context, comment_body, comment_url) = match mention_source {
         "issue_comment" => {
-            let event: IssueCommentPayload =
-                serde_json::from_value(inner_payload.clone()).map_err(|e| {
+            let event: IssueCommentPayload = serde_json::from_value(inner_payload.clone())
+                .map_err(|e| {
                     error!("Failed to parse issue_comment payload: {}", e);
                     StatusCode::BAD_REQUEST
                 })?;
@@ -453,17 +456,14 @@ pub async fn handle_mention_webhook(
                 head_branch: String::new(), // Need to fetch from PR API
                 head_sha: String::new(),    // Need to fetch from PR API
                 base_branch: String::new(), // Need to fetch from PR API
-                html_url: format!(
-                    "{}/pull/{}",
-                    event.repository.html_url, event.issue.number
-                ),
+                html_url: format!("{}/pull/{}", event.repository.html_url, event.issue.number),
             };
 
             (pr_context, event.comment.body, event.comment.html_url)
         }
         "pull_request_review_comment" => {
-            let event: ReviewCommentPayload =
-                serde_json::from_value(inner_payload.clone()).map_err(|e| {
+            let event: ReviewCommentPayload = serde_json::from_value(inner_payload.clone())
+                .map_err(|e| {
                     error!("Failed to parse review_comment payload: {}", e);
                     StatusCode::BAD_REQUEST
                 })?;
@@ -557,8 +557,8 @@ pub async fn handle_remediation_webhook(
     })?;
 
     // Parse the button identifier
-    let (agent, pr_number, check_run_id) =
-        parse_button_identifier(&requested_action.identifier).ok_or_else(|| {
+    let (agent, pr_number, check_run_id) = parse_button_identifier(&requested_action.identifier)
+        .ok_or_else(|| {
             warn!(
                 identifier = %requested_action.identifier,
                 "Invalid button identifier format"
