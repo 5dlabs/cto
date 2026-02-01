@@ -176,9 +176,13 @@ fn agent_for_language(language: Language) -> Agent {
         Language::Cpp => Agent::Forge,
         Language::Python => Agent::Generic, // No dedicated Python agent yet
         Language::Swift | Language::Kotlin => Agent::Tap, // Mobile languages
-        Language::Java => Agent::Generic,   // No dedicated Java agent yet
-        Language::Ruby | Language::Php => Agent::Generic, // No dedicated Ruby/PHP agent yet
-        Language::Shell | Language::Yaml | Language::Json | Language::Markdown | Language::Other => {
+        Language::Java => Agent::Nova,                    // Java backend
+        Language::Ruby | Language::Php => Agent::Nova,    // Web backend
+        Language::Shell
+        | Language::Yaml
+        | Language::Json
+        | Language::Markdown
+        | Language::Other => {
             Agent::Rex // Infra/config goes to Rex
         }
     }
@@ -189,10 +193,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    fn make_result(
-        language: Option<Language>,
-        framework: Option<Framework>,
-    ) -> DetectionResult {
+    fn make_result(language: Option<Language>, framework: Option<Framework>) -> DetectionResult {
         let mut language_counts = HashMap::new();
         if let Some(lang) = language {
             language_counts.insert(lang, 1);

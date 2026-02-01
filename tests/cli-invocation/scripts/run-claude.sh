@@ -49,23 +49,34 @@ claude mcp list >&2 2>&1 || true
 echo "" >&2
 echo "--- Executing Claude CLI ---" >&2
 
-# The prompt - can be overridden via CLAUDE_PROMPT env var
-PROMPT="${CLAUDE_PROMPT:-Build a small Python project in /workspace with the following structure:
+# Load prompt from file if it exists (mirrors controller's prompt handling)
+if [[ -f "${WORKSPACE}/task/prompt.md" ]]; then
+  echo "Loading prompt from ${WORKSPACE}/task/prompt.md" >&2
+  PROMPT="$(cat "${WORKSPACE}/task/prompt.md")"
+elif [[ -n "${CLAUDE_PROMPT:-}" ]]; then
+  PROMPT="${CLAUDE_PROMPT}"
+else
+  # Default prompt for testing MCP tools
+  PROMPT="You have access to CTO MCP tools. Please complete these tasks to verify the tools work:
 
-1. First, explore what files exist in /workspace using Glob
-2. Create a project structure:
-   - /workspace/src/calculator.py - A Calculator class with add, subtract, multiply, divide methods
-   - /workspace/src/__init__.py - Package init  
-   - /workspace/tests/test_calculator.py - Unit tests using unittest
-   - /workspace/README.md - Documentation with usage examples
+## Task 1: Use Context7 to look up documentation
+Use the context7 MCP tools to:
+1. Resolve the library ID for 'effect' (the TypeScript Effect library)
+2. Get documentation about Effect's Schema module
 
-3. Run the tests using: python3 -m pytest tests/ -v (or unittest if pytest not available)
-4. Show me the test results and a summary of what you created
+## Task 2: Use Firecrawl to research
+Use the firecrawl MCP tools to:
+1. Search for 'Rust axum framework best practices 2025'
+2. Summarize the top result
 
-Make sure to:
-- Add proper docstrings to all functions
-- Handle division by zero gracefully
-- Include at least 5 test cases}"
+## Task 3: Create a summary file
+Create a file at /workspace/mcp-test-results.md that summarizes:
+- Which MCP tools you called
+- What results you got from each
+- Any errors encountered
+
+Be explicit about which tools you're calling so we can verify the MCP integration is working."
+fi
 
 # Run Claude with streaming output for sidecar parsing
 # The init message in stream-json contains tools, skills, and mcp_servers
