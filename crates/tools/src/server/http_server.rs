@@ -55,6 +55,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tools::config::{process_env_templates, TemplateContext};
 use tools::config::{ServerConfig, SystemConfigManager as ConfigManager};
+use tools::health_monitor::{HealthCheckConfig, HealthMonitor};
 use tools::resolve_working_directory;
 use tower_http::cors::CorsLayer;
 
@@ -1102,6 +1103,8 @@ pub struct BridgeState {
     current_working_dir: Arc<RwLock<Option<std::path::PathBuf>>>,
     // HTTP session IDs for StreamableHTTP servers (server_name -> Mcp-Session-Id)
     http_sessions: Arc<RwLock<HashMap<String, String>>>,
+    // Per-MCP server health monitor with periodic checks and metrics
+    health_monitor: Arc<tokio::sync::Mutex<HealthMonitor>>,
 }
 
 // JSON-RPC 2.0 message types
@@ -1156,6 +1159,11 @@ impl BridgeState {
             http_sessions.clone(),
         ));
 
+        // Create health monitor with default 30-second check interval
+        let health_monitor = Arc::new(tokio::sync::Mutex::new(
+            HealthMonitor::new(HealthCheckConfig::default()),
+        ));
+
         // Create the state
         let state = Self {
             system_config_manager,
@@ -1163,6 +1171,7 @@ impl BridgeState {
             connection_pool,
             current_working_dir: Arc::new(RwLock::new(None)),
             http_sessions,
+            health_monitor,
         };
 
         Ok(state)
@@ -1351,6 +1360,42 @@ impl BridgeState {
         if let Err(e) = self.create_tool_catalog_configmap(&available_tools).await {
             tracing::debug!("⚠️ Failed to create tool catalog ConfigMap: {}", e);
             // Don't fail the entire startup if ConfigMap creation fails
+        }
+
+        // Register all discovered servers with the health monitor and start periodic checks.
+        // Servers that yielded tools are marked healthy; those that failed stay Unknown.
+        {
+            let config_manager = self.system_config_manager.read().await;
+            let servers = config_manager.get_servers();
+            let mut monitor = self.health_monitor.lock().await;
+
+            for server_name in servers.keys() {
+                if let Err(e) = monitor
+                    .start_monitoring_server(server_name.clone())
+                    .await
+                {
+                    tracing::warn!(
+                        "⚠️ Failed to start health monitoring for {}: {:?}",
+                        server_name,
+                        e
+                    );
+                    continue;
+                }
+
+                // If the server contributed at least one tool, mark it healthy right away
+                let has_tools = available_tools
+                    .keys()
+                    .any(|k| k.starts_with(&format!("{}_", server_name.replace('-', "_"))));
+
+                if has_tools {
+                    monitor.mark_server_healthy(server_name).await;
+                }
+            }
+
+            tracing::info!(
+                "✅ Health monitoring started for {} servers",
+                servers.len()
+            );
         }
 
         Ok(())
@@ -3126,8 +3171,10 @@ impl BridgeState {
                                             wd.clone()
                                         };
 
-                                        // Forward to the appropriate server with user context
-                                        match self
+                                        // Forward to the appropriate server with user context,
+                                        // recording metrics in the health monitor.
+                                        let call_start = tokio::time::Instant::now();
+                                        let call_result = self
                                             .connection_pool
                                             .forward_tool_call_with_context(
                                                 &parsed_tool.server_name,
@@ -3135,9 +3182,21 @@ impl BridgeState {
                                                 arguments,
                                                 user_working_dir.as_deref(),
                                             )
-                                            .await
-                                        {
+                                            .await;
+                                        let call_elapsed = call_start.elapsed();
+
+                                        match call_result {
                                             Ok(response) => {
+                                                // Record success in health monitor
+                                                let monitor = self.health_monitor.lock().await;
+                                                monitor
+                                                    .record_success(
+                                                        &parsed_tool.server_name,
+                                                        call_elapsed,
+                                                    )
+                                                    .await;
+                                                drop(monitor);
+
                                                 // Extract result from response or return the response directly
                                                 if let Some(result) = response.get("result") {
                                                     result.clone()
@@ -3146,6 +3205,16 @@ impl BridgeState {
                                                 }
                                             }
                                             Err(e) => {
+                                                // Record failure in health monitor
+                                                let monitor = self.health_monitor.lock().await;
+                                                monitor
+                                                    .record_failure(
+                                                        &parsed_tool.server_name,
+                                                        &e.to_string(),
+                                                    )
+                                                    .await;
+                                                drop(monitor);
+
                                                 json!({
                                                     "content": [{
                                                         "type": "text",
@@ -3259,6 +3328,51 @@ async fn readiness_check(State(state): State<BridgeState>) -> Result<Json<Value>
         "tools_available": tools_count,
         "timestamp": Utc::now().to_rfc3339()
     })))
+}
+
+// Per-MCP server health status — shows which MCPs are connected, their tool counts, and call metrics
+async fn servers_health(
+    State(state): State<BridgeState>,
+) -> Json<Value> {
+    // Build a map of server_name → number of tools from available_tools
+    let available_tools = state.available_tools.read().await;
+    let mut tool_counts: HashMap<String, usize> = HashMap::new();
+    for tool in available_tools.values() {
+        *tool_counts.entry(tool.server_name.clone()).or_default() += 1;
+    }
+    drop(available_tools);
+
+    let monitor = state.health_monitor.lock().await;
+    let servers = monitor.build_servers_health_response(&tool_counts).await;
+    drop(monitor);
+
+    Json(json!({
+        "servers": servers,
+        "timestamp": Utc::now().to_rfc3339()
+    }))
+}
+
+// Prometheus-compatible metrics endpoint
+async fn prometheus_metrics(
+    State(state): State<BridgeState>,
+) -> (StatusCode, [(axum::http::HeaderName, &'static str); 1], String) {
+    // Build tool counts the same way
+    let available_tools = state.available_tools.read().await;
+    let mut tool_counts: HashMap<String, usize> = HashMap::new();
+    for tool in available_tools.values() {
+        *tool_counts.entry(tool.server_name.clone()).or_default() += 1;
+    }
+    drop(available_tools);
+
+    let monitor = state.health_monitor.lock().await;
+    let body = monitor.render_prometheus_metrics(&tool_counts).await;
+    drop(monitor);
+
+    (
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")],
+        body,
+    )
 }
 
 // Session initialization endpoint
@@ -3474,7 +3588,9 @@ async fn main() -> Result<()> {
         .route("/mcp", post(mcp_endpoint))
         .route("/client-config", get(client_config_endpoint))
         .route("/health", get(health_check))
+        .route("/health/servers", get(servers_health))
         .route("/ready", get(readiness_check))
+        .route("/metrics", get(prometheus_metrics))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
