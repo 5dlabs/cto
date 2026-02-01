@@ -62,8 +62,7 @@ impl K8sClient {
                 .unwrap_or_else(|_| "cto-lite".to_string());
 
         // Load the in-cluster CA certificate for proper TLS verification
-        let ca_cert_pem =
-            std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")?;
+        let ca_cert_pem = std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")?;
         let ca_cert = Certificate::from_pem(&ca_cert_pem)?;
 
         Ok(Self {
@@ -140,7 +139,7 @@ impl K8sClient {
                 "namespace": self.namespace,
                 "labels": {
                     "app.kubernetes.io/part-of": "cto-lite",
-                    "cto.dev/repo": repo.replace('/', "-"),
+                    "cto.dev/repo": repo.replace('/', "-").chars().take(63).collect::<String>(),
                 }
             },
             "spec": {
@@ -308,7 +307,7 @@ impl K8sClient {
         if let Some(repo) = repo_filter {
             url.push_str(&format!(
                 "&labelSelector=cto.dev/repo={}",
-                repo.replace('/', "-")
+                repo.replace('/', "-").chars().take(63).collect::<String>()
             ));
         }
 
