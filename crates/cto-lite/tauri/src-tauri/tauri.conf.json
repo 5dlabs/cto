@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CTO Lite",
+  "productName": "CTO App",
   "version": "0.1.0",
   "identifier": "dev.cto.lite",
   "build": {
@@ -14,7 +14,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "CTO Lite",
+        "title": "CTO App",
         "width": 1200,
         "height": 800,
         "minWidth": 900,

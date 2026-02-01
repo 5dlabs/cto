@@ -77,7 +77,7 @@ export function Updates() {
           <div>
             <CardTitle>Updates</CardTitle>
             <CardDescription>
-              Keep CTO Lite components up to date
+              Keep CTO App components up to date
             </CardDescription>
           </div>
           <div className="flex gap-2">

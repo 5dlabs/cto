@@ -1,5 +1,5 @@
 /**
- * Tauri API bindings for CTO Lite
+ * Tauri API bindings for CTO App
  * 
  * These functions wrap Tauri's invoke() to call Rust backend commands
  * with full TypeScript type safety.
@@ -148,12 +148,12 @@ export async function hasApiKey(keyType: ApiKeyType): Promise<boolean> {
 // Cluster Commands
 // ============================================================================
 
-/** Create the CTO Lite Kind cluster */
+/** Create the CTO App Kind cluster */
 export async function createCluster(): Promise<void> {
   return invoke('create_cluster');
 }
 
-/** Delete the CTO Lite Kind cluster */
+/** Delete the CTO App Kind cluster */
 export async function deleteCluster(): Promise<void> {
   return invoke('delete_cluster');
 }
@@ -240,7 +240,7 @@ export async function checkHelm(): Promise<string | null> {
   return invoke<string | null>('check_helm');
 }
 
-/** Deploy the CTO Lite Helm chart */
+/** Deploy the CTO App Helm chart */
 export async function deployChart(values: HelmValues): Promise<void> {
   return invoke('deploy_chart', { values });
 }
@@ -250,7 +250,7 @@ export async function getReleaseStatus(): Promise<HelmRelease | null> {
   return invoke<HelmRelease | null>('get_release_status');
 }
 
-/** Uninstall the CTO Lite Helm chart */
+/** Uninstall the CTO App Helm chart */
 export async function uninstallChart(): Promise<void> {
   return invoke('uninstall_chart');
 }
