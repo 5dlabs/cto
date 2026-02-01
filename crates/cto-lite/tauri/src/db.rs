@@ -1,6 +1,6 @@
 //! SQLite database for local state storage
 
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -22,9 +22,9 @@ impl Database {
 
     /// Run database migrations
     pub fn migrate(&self) -> AppResult<()> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         conn.execute_batch(
             r#"
@@ -102,9 +102,9 @@ impl Database {
 
     /// Get a configuration value
     pub fn get_config(&self, key: &str) -> AppResult<Option<String>> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         let result: Result<String, _> = conn.query_row(
             "SELECT value FROM config WHERE key = ?",
@@ -121,9 +121,9 @@ impl Database {
 
     /// Set a configuration value
     pub fn set_config(&self, key: &str, value: &str) -> AppResult<()> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         conn.execute(
             "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
@@ -135,9 +135,9 @@ impl Database {
 
     /// Get setup progress
     pub fn get_setup_progress(&self) -> AppResult<(i32, bool)> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         let (step, completed): (i32, Option<String>) = conn.query_row(
             "SELECT current_step, completed_at FROM setup_progress WHERE id = 1",
@@ -150,9 +150,9 @@ impl Database {
 
     /// Update setup progress
     pub fn set_setup_progress(&self, step: i32) -> AppResult<()> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         conn.execute(
             "UPDATE setup_progress SET current_step = ? WHERE id = 1",
@@ -164,9 +164,9 @@ impl Database {
 
     /// Mark setup as complete
     pub fn mark_setup_complete(&self) -> AppResult<()> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         conn.execute(
             "UPDATE setup_progress SET completed_at = CURRENT_TIMESTAMP WHERE id = 1",
@@ -185,9 +185,9 @@ impl Database {
         name: &str,
         default_branch: &str,
     ) -> AppResult<()> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         conn.execute(
             r#"
@@ -202,9 +202,9 @@ impl Database {
 
     /// Set webhook ID for a repository
     pub fn set_repository_webhook(&self, full_name: &str, webhook_id: &str) -> AppResult<()> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         conn.execute(
             "UPDATE repositories SET webhook_id = ? WHERE full_name = ?",
@@ -223,9 +223,9 @@ impl Database {
         task_id: Option<i32>,
         status: &str,
     ) -> AppResult<()> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         conn.execute(
             r#"
@@ -246,9 +246,9 @@ impl Database {
         phase: Option<&str>,
         error: Option<&str>,
     ) -> AppResult<()> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         if status == "Succeeded" || status == "Failed" || status == "Error" {
             conn.execute(
@@ -276,9 +276,9 @@ impl Database {
         level: &str,
         message: &str,
     ) -> AppResult<()> {
-        let conn = self.conn.lock().map_err(|e| AppError::DatabaseError(
-            rusqlite::Error::InvalidParameterName(e.to_string())
-        ))?;
+        let conn = self.conn.lock().map_err(|e| {
+            AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
+        })?;
 
         conn.execute(
             r#"

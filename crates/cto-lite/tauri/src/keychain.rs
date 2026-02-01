@@ -4,8 +4,8 @@
 //! - Windows: Credential Manager
 //! - Linux: Secret Service (GNOME Keyring / KWallet)
 
-use keyring::Entry;
 use crate::error::{AppError, AppResult};
+use keyring::Entry;
 
 const SERVICE_NAME: &str = "cto-lite";
 
@@ -47,7 +47,10 @@ impl std::str::FromStr for CredentialKey {
             "cloudflare_access_token" | "cloudflare" => Ok(Self::CloudflareAccessToken),
             "cloudflare_refresh_token" => Ok(Self::CloudflareRefreshToken),
             "cloudflare_tunnel_token" => Ok(Self::CloudflareTunnelToken),
-            _ => Err(AppError::KeychainError(format!("Unknown credential key: {}", s))),
+            _ => Err(AppError::KeychainError(format!(
+                "Unknown credential key: {}",
+                s
+            ))),
         }
     }
 }
@@ -56,11 +59,11 @@ impl std::str::FromStr for CredentialKey {
 pub fn set_credential(key: CredentialKey, value: &str) -> AppResult<()> {
     let entry = Entry::new(SERVICE_NAME, key.as_str())
         .map_err(|e| AppError::KeychainError(e.to_string()))?;
-    
+
     entry
         .set_password(value)
         .map_err(|e| AppError::KeychainError(e.to_string()))?;
-    
+
     tracing::debug!("Stored credential: {}", key.as_str());
     Ok(())
 }
@@ -69,7 +72,7 @@ pub fn set_credential(key: CredentialKey, value: &str) -> AppResult<()> {
 pub fn get_credential(key: CredentialKey) -> AppResult<Option<String>> {
     let entry = Entry::new(SERVICE_NAME, key.as_str())
         .map_err(|e| AppError::KeychainError(e.to_string()))?;
-    
+
     match entry.get_password() {
         Ok(password) => Ok(Some(password)),
         Err(keyring::Error::NoEntry) => Ok(None),
@@ -81,7 +84,7 @@ pub fn get_credential(key: CredentialKey) -> AppResult<Option<String>> {
 pub fn delete_credential(key: CredentialKey) -> AppResult<()> {
     let entry = Entry::new(SERVICE_NAME, key.as_str())
         .map_err(|e| AppError::KeychainError(e.to_string()))?;
-    
+
     match entry.delete_credential() {
         Ok(()) => {
             tracing::debug!("Deleted credential: {}", key.as_str());
@@ -103,7 +106,7 @@ mod tests {
 
     // Note: These tests interact with the real keychain
     // Run with: cargo test -- --ignored
-    
+
     #[test]
     #[ignore]
     fn test_credential_roundtrip() {

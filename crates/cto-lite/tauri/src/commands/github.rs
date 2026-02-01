@@ -1,10 +1,10 @@
 //! GitHub OAuth and repository management commands
 
-use serde::{Deserialize, Serialize};
-use tauri::State;
 use crate::db::Database;
 use crate::error::AppError;
 use crate::keychain::{self, CredentialKey};
+use serde::{Deserialize, Serialize};
+use tauri::State;
 
 // GitHub OAuth App credentials - loaded from environment
 // Client ID is public, secret is validated server-side
@@ -71,7 +71,7 @@ struct GitHubRepoOwner {
 pub async fn start_github_oauth() -> Result<String, AppError> {
     // Generate state parameter for CSRF protection
     let state = uuid::Uuid::new_v4().to_string();
-    
+
     // Build authorization URL
     let auth_url = format!(
         "https://github.com/login/oauth/authorize?\
@@ -96,7 +96,7 @@ pub async fn start_github_oauth() -> Result<String, AppError> {
 pub async fn get_github_status(db: State<'_, Database>) -> Result<GitHubStatus, AppError> {
     // Check if we have a token
     let has_token = keychain::has_credential(CredentialKey::GithubAccessToken)?;
-    
+
     if !has_token {
         return Ok(GitHubStatus {
             connected: false,
@@ -147,10 +147,10 @@ pub async fn get_github_status(db: State<'_, Database>) -> Result<GitHubStatus, 
 pub async fn disconnect_github(db: State<'_, Database>) -> Result<(), AppError> {
     keychain::delete_credential(CredentialKey::GithubAccessToken)?;
     keychain::delete_credential(CredentialKey::GithubRefreshToken)?;
-    
+
     // Clear stored username
     db.set_config("github_username", "")?;
-    
+
     tracing::info!("Disconnected from GitHub");
     Ok(())
 }
@@ -178,9 +178,10 @@ pub async fn list_repositories() -> Result<Vec<Repository>, AppError> {
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        return Err(AppError::OAuthError(
-            format!("GitHub API error {}: {}", status, body)
-        ));
+        return Err(AppError::OAuthError(format!(
+            "GitHub API error {}: {}",
+            status, body
+        )));
     }
 
     let repos: Vec<GitHubRepo> = response.json().await?;

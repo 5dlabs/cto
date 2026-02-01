@@ -93,9 +93,10 @@ fn get_mcp_binary_path() -> std::path::PathBuf {
 /// Start the MCP server
 #[tauri::command]
 pub async fn start_mcp_server(state: State<'_, McpState>) -> AppResult<McpStatus> {
-    let mut process_guard = state.process.lock().map_err(|e| {
-        AppError::CommandFailed(format!("Failed to acquire lock: {e}"))
-    })?;
+    let mut process_guard = state
+        .process
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to acquire lock: {e}")))?;
 
     // Check if already running
     if let Some(ref mut child) = *process_guard {
@@ -133,9 +134,7 @@ pub async fn start_mcp_server(state: State<'_, McpState>) -> AppResult<McpStatus
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| {
-            AppError::CommandFailed(format!("Failed to start MCP server: {e}"))
-        })?;
+        .map_err(|e| AppError::CommandFailed(format!("Failed to start MCP server: {e}")))?;
 
     let pid = child.id();
     *process_guard = Some(child);
@@ -152,9 +151,10 @@ pub async fn start_mcp_server(state: State<'_, McpState>) -> AppResult<McpStatus
 /// Stop the MCP server
 #[tauri::command]
 pub async fn stop_mcp_server(state: State<'_, McpState>) -> AppResult<McpStatus> {
-    let mut process_guard = state.process.lock().map_err(|e| {
-        AppError::CommandFailed(format!("Failed to acquire lock: {e}"))
-    })?;
+    let mut process_guard = state
+        .process
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to acquire lock: {e}")))?;
 
     if let Some(mut child) = process_guard.take() {
         tracing::info!("Stopping MCP server (PID: {})", child.id());
@@ -172,9 +172,10 @@ pub async fn stop_mcp_server(state: State<'_, McpState>) -> AppResult<McpStatus>
 /// Get MCP server status
 #[tauri::command]
 pub async fn get_mcp_status(state: State<'_, McpState>) -> AppResult<McpStatus> {
-    let mut process_guard = state.process.lock().map_err(|e| {
-        AppError::CommandFailed(format!("Failed to acquire lock: {e}"))
-    })?;
+    let mut process_guard = state
+        .process
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to acquire lock: {e}")))?;
 
     if let Some(ref mut child) = *process_guard {
         match child.try_wait() {

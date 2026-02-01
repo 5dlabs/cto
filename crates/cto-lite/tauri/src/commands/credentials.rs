@@ -9,7 +9,12 @@ pub async fn set_api_key(provider: String, api_key: String) -> Result<(), AppErr
     let key = match provider.as_str() {
         "anthropic" => CredentialKey::AnthropicApiKey,
         "openai" => CredentialKey::OpenAiApiKey,
-        _ => return Err(AppError::KeychainError(format!("Unknown provider: {}", provider))),
+        _ => {
+            return Err(AppError::KeychainError(format!(
+                "Unknown provider: {}",
+                provider
+            )))
+        }
     };
 
     keychain::set_credential(key, &api_key)?;
@@ -23,7 +28,12 @@ pub async fn get_api_key(provider: String) -> Result<Option<String>, AppError> {
     let key = match provider.as_str() {
         "anthropic" => CredentialKey::AnthropicApiKey,
         "openai" => CredentialKey::OpenAiApiKey,
-        _ => return Err(AppError::KeychainError(format!("Unknown provider: {}", provider))),
+        _ => {
+            return Err(AppError::KeychainError(format!(
+                "Unknown provider: {}",
+                provider
+            )))
+        }
     };
 
     // Return masked version for security
@@ -31,7 +41,7 @@ pub async fn get_api_key(provider: String) -> Result<Option<String>, AppError> {
         Some(value) => {
             // Mask the key: show first 7 and last 4 chars
             let masked = if value.len() > 15 {
-                format!("{}...{}", &value[..7], &value[value.len()-4..])
+                format!("{}...{}", &value[..7], &value[value.len() - 4..])
             } else {
                 "***".to_string()
             };
@@ -47,7 +57,12 @@ pub async fn delete_api_key(provider: String) -> Result<(), AppError> {
     let key = match provider.as_str() {
         "anthropic" => CredentialKey::AnthropicApiKey,
         "openai" => CredentialKey::OpenAiApiKey,
-        _ => return Err(AppError::KeychainError(format!("Unknown provider: {}", provider))),
+        _ => {
+            return Err(AppError::KeychainError(format!(
+                "Unknown provider: {}",
+                provider
+            )))
+        }
     };
 
     keychain::delete_credential(key)?;
@@ -61,7 +76,12 @@ pub async fn has_api_key(provider: String) -> Result<bool, AppError> {
     let key = match provider.as_str() {
         "anthropic" => CredentialKey::AnthropicApiKey,
         "openai" => CredentialKey::OpenAiApiKey,
-        _ => return Err(AppError::KeychainError(format!("Unknown provider: {}", provider))),
+        _ => {
+            return Err(AppError::KeychainError(format!(
+                "Unknown provider: {}",
+                provider
+            )))
+        }
     };
 
     keychain::has_credential(key)

@@ -1,5 +1,5 @@
 //! Helm chart management for CTO Lite
-//! 
+//!
 //! Handles deployment of the cto-lite Helm chart to the local Kind cluster.
 
 use anyhow::{Context, Result};
@@ -25,19 +25,19 @@ pub struct HelmValues {
     /// Anthropic API key
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anthropic_api_key: Option<String>,
-    
+
     /// OpenAI API key
     #[serde(skip_serializing_if = "Option::is_none")]
     pub openai_api_key: Option<String>,
-    
+
     /// GitHub token
     #[serde(skip_serializing_if = "Option::is_none")]
     pub github_token: Option<String>,
-    
+
     /// Cloudflare tunnel token
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cloudflare_tunnel_token: Option<String>,
-    
+
     /// Stack selection (grizz or nova)
     #[serde(default = "default_stack")]
     pub stack: String,
@@ -56,7 +56,7 @@ pub async fn check_helm() -> Result<Option<String>> {
         .stderr(Stdio::piped())
         .output()
         .await;
-    
+
     match output {
         Ok(out) if out.status.success() => {
             let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -82,10 +82,10 @@ pub async fn deploy_chart(values: &HelmValues) -> Result<()> {
     check_helm()
         .await?
         .ok_or_else(|| anyhow::anyhow!("Helm is not installed"))?;
-    
+
     // Get the chart path (bundled with app)
     let chart_path = get_chart_path()?;
-    
+
     // Build helm command
     let mut cmd = Command::new("helm");
     cmd.arg("upgrade")
@@ -98,43 +98,48 @@ pub async fn deploy_chart(values: &HelmValues) -> Result<()> {
         .arg("--wait")
         .arg("--timeout")
         .arg("5m");
-    
+
     // Add values as --set flags
     if let Some(ref key) = values.anthropic_api_key {
-        cmd.arg("--set").arg(format!("secrets.anthropic.enabled=true"));
-        cmd.arg("--set").arg(format!("secrets.anthropic.apiKey={}", key));
+        cmd.arg("--set")
+            .arg(format!("secrets.anthropic.enabled=true"));
+        cmd.arg("--set")
+            .arg(format!("secrets.anthropic.apiKey={}", key));
     }
-    
+
     if let Some(ref key) = values.openai_api_key {
         cmd.arg("--set").arg(format!("secrets.openai.enabled=true"));
-        cmd.arg("--set").arg(format!("secrets.openai.apiKey={}", key));
+        cmd.arg("--set")
+            .arg(format!("secrets.openai.apiKey={}", key));
     }
-    
+
     if let Some(ref token) = values.github_token {
         cmd.arg("--set").arg(format!("secrets.github.enabled=true"));
-        cmd.arg("--set").arg(format!("secrets.github.token={}", token));
+        cmd.arg("--set")
+            .arg(format!("secrets.github.token={}", token));
     }
-    
+
     if let Some(ref token) = values.cloudflare_tunnel_token {
-        cmd.arg("--set").arg(format!("cloudflared.tunnelToken={}", token));
+        cmd.arg("--set")
+            .arg(format!("cloudflared.tunnelToken={}", token));
     }
-    
+
     cmd.arg("--set").arg(format!("stack={}", values.stack));
-    
+
     info!("Deploying CTO Lite chart...");
-    
+
     let output = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
         .await
         .context("Failed to run helm upgrade")?;
-    
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         anyhow::bail!("Helm deploy failed: {}", stderr);
     }
-    
+
     info!("CTO Lite deployed successfully");
     Ok(())
 }
@@ -148,7 +153,7 @@ pub async fn get_release_status() -> Result<Option<HelmRelease>> {
         .output()
         .await
         .context("Failed to check helm status")?;
-    
+
     if !output.status.success() {
         // Release not found is not an error
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -157,16 +162,19 @@ pub async fn get_release_status() -> Result<Option<HelmRelease>> {
         }
         anyhow::bail!("Helm status failed: {}", stderr);
     }
-    
+
     // Parse the JSON output
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .context("Failed to parse helm status output")?;
-    
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).context("Failed to parse helm status output")?;
+
     let release = HelmRelease {
         name: json["name"].as_str().unwrap_or("cto-lite").to_string(),
         namespace: json["namespace"].as_str().unwrap_or("cto-lite").to_string(),
         revision: json["version"].as_u64().unwrap_or(1) as u32,
-        status: json["info"]["status"].as_str().unwrap_or("unknown").to_string(),
+        status: json["info"]["status"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string(),
         chart: json["chart"]["metadata"]["name"]
             .as_str()
             .unwrap_or("cto-lite")
@@ -176,7 +184,7 @@ pub async fn get_release_status() -> Result<Option<HelmRelease>> {
             .unwrap_or("0.1.0")
             .to_string(),
     };
-    
+
     Ok(Some(release))
 }
 
@@ -189,14 +197,14 @@ pub async fn uninstall_chart() -> Result<()> {
         .output()
         .await
         .context("Failed to run helm uninstall")?;
-    
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !stderr.contains("not found") {
             anyhow::bail!("Helm uninstall failed: {}", stderr);
         }
     }
-    
+
     info!("CTO Lite uninstalled");
     Ok(())
 }
@@ -208,13 +216,13 @@ fn get_chart_path() -> Result<String> {
     if dev_path.exists() {
         return Ok(dev_path.to_string_lossy().to_string());
     }
-    
+
     // In production, the chart is bundled with the app
     // For now, we'll need to handle this differently
     // Option 1: Download from GHCR
     // Option 2: Bundle as a resource
     // Option 3: Use embedded tarball
-    
+
     // Fallback to OCI registry
     Ok("oci://ghcr.io/5dlabs/charts/cto-lite".to_string())
 }
@@ -222,7 +230,7 @@ fn get_chart_path() -> Result<String> {
 /// Update Argo Workflows dependency
 pub async fn update_dependencies() -> Result<()> {
     let chart_path = get_chart_path()?;
-    
+
     let output = Command::new("helm")
         .args(["dependency", "update", &chart_path])
         .stdout(Stdio::piped())
@@ -230,19 +238,19 @@ pub async fn update_dependencies() -> Result<()> {
         .output()
         .await
         .context("Failed to update helm dependencies")?;
-    
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         anyhow::bail!("Helm dependency update failed: {}", stderr);
     }
-    
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_check_helm() {
         // This test will pass if helm is installed, skip otherwise

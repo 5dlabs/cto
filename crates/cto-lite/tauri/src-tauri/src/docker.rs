@@ -37,7 +37,7 @@ impl Default for DockerRuntime {
 pub fn check_docker() -> Result<DockerInfo> {
     // First, check if docker CLI exists
     let docker_path = which::which("docker").ok();
-    
+
     if docker_path.is_none() {
         return Ok(DockerInfo {
             installed: false,
@@ -54,7 +54,11 @@ pub fn check_docker() -> Result<DockerInfo> {
         .context("Failed to run docker version")?;
 
     let version = if version_output.status.success() {
-        Some(String::from_utf8_lossy(&version_output.stdout).trim().to_string())
+        Some(
+            String::from_utf8_lossy(&version_output.stdout)
+                .trim()
+                .to_string(),
+        )
     } else {
         None
     };
@@ -99,7 +103,10 @@ fn detect_runtime() -> DockerRuntime {
     }
 
     // Check for Podman
-    if let Ok(output) = Command::new("docker").args(["info", "--format", "{{.Host.RemoteSocket.Path}}"]).output() {
+    if let Ok(output) = Command::new("docker")
+        .args(["info", "--format", "{{.Host.RemoteSocket.Path}}"])
+        .output()
+    {
         let output_str = String::from_utf8_lossy(&output.stdout);
         if output_str.contains("podman") {
             return DockerRuntime::Podman;
@@ -108,7 +115,9 @@ fn detect_runtime() -> DockerRuntime {
 
     // Check Docker context for hints
     if let Ok(output) = Command::new("docker").args(["context", "show"]).output() {
-        let context = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+        let context = String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .to_lowercase();
         if context.contains("orbstack") {
             return DockerRuntime::OrbStack;
         }
@@ -133,7 +142,7 @@ mod tests {
         // This test will pass/fail based on local Docker installation
         let info = check_docker().unwrap();
         println!("Docker info: {:?}", info);
-        
+
         // At minimum, we should get a valid response
         assert!(info.runtime != DockerRuntime::Unknown || !info.installed);
     }

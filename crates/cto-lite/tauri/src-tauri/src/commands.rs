@@ -58,36 +58,36 @@ pub async fn complete_setup(state: State<'_, AppState>) -> Result<(), String> {
 /// Store an API key in the system keychain
 #[tauri::command]
 pub async fn store_api_key(key_type: String, value: String) -> Result<(), String> {
-    let key_type = ApiKeyType::from_str(&key_type)
-        .ok_or_else(|| format!("Unknown key type: {}", key_type))?;
-    
+    let key_type =
+        ApiKeyType::from_str(&key_type).ok_or_else(|| format!("Unknown key type: {}", key_type))?;
+
     keychain::store_key(key_type, &value).map_err(|e| e.to_string())
 }
 
 /// Get an API key from the system keychain
 #[tauri::command]
 pub async fn get_api_key(key_type: String) -> Result<Option<String>, String> {
-    let key_type = ApiKeyType::from_str(&key_type)
-        .ok_or_else(|| format!("Unknown key type: {}", key_type))?;
-    
+    let key_type =
+        ApiKeyType::from_str(&key_type).ok_or_else(|| format!("Unknown key type: {}", key_type))?;
+
     keychain::get_key(key_type).map_err(|e| e.to_string())
 }
 
 /// Delete an API key from the system keychain
 #[tauri::command]
 pub async fn delete_api_key(key_type: String) -> Result<(), String> {
-    let key_type = ApiKeyType::from_str(&key_type)
-        .ok_or_else(|| format!("Unknown key type: {}", key_type))?;
-    
+    let key_type =
+        ApiKeyType::from_str(&key_type).ok_or_else(|| format!("Unknown key type: {}", key_type))?;
+
     keychain::delete_key(key_type).map_err(|e| e.to_string())
 }
 
 /// Check if an API key exists in the keychain
 #[tauri::command]
 pub async fn has_api_key(key_type: String) -> Result<bool, String> {
-    let key_type = ApiKeyType::from_str(&key_type)
-        .ok_or_else(|| format!("Unknown key type: {}", key_type))?;
-    
+    let key_type =
+        ApiKeyType::from_str(&key_type).ok_or_else(|| format!("Unknown key type: {}", key_type))?;
+
     keychain::has_key(key_type).map_err(|e| e.to_string())
 }
 
@@ -153,9 +153,7 @@ pub async fn get_workflow_status(workflow_name: String) -> Result<WorkflowDetail
 /// List all workflows
 #[tauri::command]
 pub async fn list_workflows() -> Result<Vec<WorkflowStatus>, String> {
-    workflows::list_workflows()
-        .await
-        .map_err(|e| e.to_string())
+    workflows::list_workflows().await.map_err(|e| e.to_string())
 }
 
 /// Get workflow logs
@@ -188,9 +186,7 @@ pub async fn stop_workflow(workflow_name: String) -> Result<(), String> {
 /// Check if Argo Workflows is available
 #[tauri::command]
 pub async fn check_argo() -> Result<bool, String> {
-    workflows::check_argo()
-        .await
-        .map_err(|e| e.to_string())
+    workflows::check_argo().await.map_err(|e| e.to_string())
 }
 
 // ============================================================================

@@ -1,8 +1,8 @@
 //! Cloudflare OAuth and tunnel management commands
 
-use serde::{Deserialize, Serialize};
 use crate::error::AppError;
 use crate::keychain::{self, CredentialKey};
+use serde::{Deserialize, Serialize};
 
 // Cloudflare OAuth App credentials (CTO Lite app)
 // Register at: https://dash.cloudflare.com/profile/api-tokens
@@ -48,11 +48,11 @@ struct CloudflareAccount {
 pub async fn start_cloudflare_oauth() -> Result<String, AppError> {
     // Generate state parameter for CSRF protection
     let state = uuid::Uuid::new_v4().to_string();
-    
+
     // Cloudflare OAuth scopes for tunnel management
     // See: https://developers.cloudflare.com/fundamentals/api/reference/permissions/
     let scopes = "account:read zone:read tunnel:edit";
-    
+
     // Build authorization URL
     let auth_url = format!(
         "https://dash.cloudflare.com/oauth2/authorize?\
@@ -79,7 +79,7 @@ pub async fn start_cloudflare_oauth() -> Result<String, AppError> {
 pub async fn get_cloudflare_status() -> Result<CloudflareStatus, AppError> {
     // Check if we have a token
     let has_token = keychain::has_credential(CredentialKey::CloudflareAccessToken)?;
-    
+
     if !has_token {
         return Ok(CloudflareStatus {
             connected: false,
@@ -93,7 +93,7 @@ pub async fn get_cloudflare_status() -> Result<CloudflareStatus, AppError> {
         .ok_or_else(|| AppError::NotConfigured("Cloudflare token not found".to_string()))?;
 
     let client = reqwest::Client::new();
-    
+
     // Get user info
     let user_response = client
         .get("https://api.cloudflare.com/client/v4/user")
@@ -112,7 +112,7 @@ pub async fn get_cloudflare_status() -> Result<CloudflareStatus, AppError> {
     }
 
     let user_result: CloudflareUserResult = user_response.json().await?;
-    
+
     if !user_result.success {
         return Ok(CloudflareStatus {
             connected: false,
@@ -149,7 +149,7 @@ pub async fn disconnect_cloudflare() -> Result<(), AppError> {
     keychain::delete_credential(CredentialKey::CloudflareAccessToken)?;
     keychain::delete_credential(CredentialKey::CloudflareRefreshToken)?;
     keychain::delete_credential(CredentialKey::CloudflareTunnelToken)?;
-    
+
     tracing::info!("Disconnected from Cloudflare");
     Ok(())
 }

@@ -1,9 +1,9 @@
 //! Configuration commands
 
-use serde::{Deserialize, Serialize};
-use tauri::State;
 use crate::db::Database;
 use crate::error::AppError;
+use serde::{Deserialize, Serialize};
+use tauri::State;
 
 /// Application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,7 +80,10 @@ pub async fn set_config(
     // Validate key
     let valid_keys = ["backend_stack", "cli", "model", "ai_provider"];
     if !valid_keys.contains(&key.as_str()) {
-        return Err(AppError::ConfigError(format!("Invalid config key: {}", key)));
+        return Err(AppError::ConfigError(format!(
+            "Invalid config key: {}",
+            key
+        )));
     }
 
     // Validate values
@@ -88,21 +91,21 @@ pub async fn set_config(
         "backend_stack" => {
             if !["go", "node"].contains(&value.as_str()) {
                 return Err(AppError::ConfigError(
-                    "backend_stack must be 'go' or 'node'".to_string()
+                    "backend_stack must be 'go' or 'node'".to_string(),
                 ));
             }
         }
         "cli" => {
             if !["claude", "factory", "codex"].contains(&value.as_str()) {
                 return Err(AppError::ConfigError(
-                    "cli must be 'claude', 'factory', or 'codex'".to_string()
+                    "cli must be 'claude', 'factory', or 'codex'".to_string(),
                 ));
             }
         }
         "ai_provider" => {
             if !["anthropic", "openai"].contains(&value.as_str()) {
                 return Err(AppError::ConfigError(
-                    "ai_provider must be 'anthropic' or 'openai'".to_string()
+                    "ai_provider must be 'anthropic' or 'openai'".to_string(),
                 ));
             }
         }

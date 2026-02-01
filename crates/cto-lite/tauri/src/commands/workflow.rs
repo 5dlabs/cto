@@ -1,8 +1,8 @@
 //! Workflow management commands
 
+use crate::error::AppError;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-use crate::error::AppError;
 
 const CLUSTER_NAME: &str = "cto-lite";
 const NAMESPACE: &str = "cto";
@@ -61,9 +61,12 @@ pub async fn list_workflows() -> Result<Vec<WorkflowInfo>, AppError> {
 
     let output = run_argo(&[
         "list",
-        "-n", NAMESPACE,
-        "--context", &format!("kind-{}", CLUSTER_NAME),
-        "-o", "json",
+        "-n",
+        NAMESPACE,
+        "--context",
+        &format!("kind-{}", CLUSTER_NAME),
+        "-o",
+        "json",
     ])?;
 
     if output.is_empty() || output == "null" {
@@ -71,8 +74,8 @@ pub async fn list_workflows() -> Result<Vec<WorkflowInfo>, AppError> {
     }
 
     // Parse JSON output
-    let workflows: Vec<ArgoWorkflow> = serde_json::from_str(&output)
-        .map_err(|e| AppError::JsonError(e))?;
+    let workflows: Vec<ArgoWorkflow> =
+        serde_json::from_str(&output).map_err(|e| AppError::JsonError(e))?;
 
     Ok(workflows
         .into_iter()
@@ -91,19 +94,26 @@ pub async fn list_workflows() -> Result<Vec<WorkflowInfo>, AppError> {
 #[tauri::command]
 pub async fn get_workflow_status(name: String) -> Result<WorkflowInfo, AppError> {
     let output = run_argo(&[
-        "get", &name,
-        "-n", NAMESPACE,
-        "--context", &format!("kind-{}", CLUSTER_NAME),
-        "-o", "json",
+        "get",
+        &name,
+        "-n",
+        NAMESPACE,
+        "--context",
+        &format!("kind-{}", CLUSTER_NAME),
+        "-o",
+        "json",
     ])?;
 
-    let workflow: ArgoWorkflow = serde_json::from_str(&output)
-        .map_err(|e| AppError::JsonError(e))?;
+    let workflow: ArgoWorkflow =
+        serde_json::from_str(&output).map_err(|e| AppError::JsonError(e))?;
 
     Ok(WorkflowInfo {
         name: workflow.metadata.name,
         namespace: workflow.metadata.namespace,
-        phase: workflow.status.phase.unwrap_or_else(|| "Unknown".to_string()),
+        phase: workflow
+            .status
+            .phase
+            .unwrap_or_else(|| "Unknown".to_string()),
         started_at: workflow.status.started_at,
         finished_at: workflow.status.finished_at,
         message: workflow.status.message,
@@ -114,9 +124,12 @@ pub async fn get_workflow_status(name: String) -> Result<WorkflowInfo, AppError>
 #[tauri::command]
 pub async fn get_workflow_logs(name: String) -> Result<Vec<WorkflowLogEntry>, AppError> {
     let output = run_argo(&[
-        "logs", &name,
-        "-n", NAMESPACE,
-        "--context", &format!("kind-{}", CLUSTER_NAME),
+        "logs",
+        &name,
+        "-n",
+        NAMESPACE,
+        "--context",
+        &format!("kind-{}", CLUSTER_NAME),
         "--no-color",
     ])?;
 
@@ -167,9 +180,12 @@ pub async fn get_workflow_logs(name: String) -> Result<Vec<WorkflowLogEntry>, Ap
 #[tauri::command]
 pub async fn cancel_workflow(name: String) -> Result<(), AppError> {
     run_argo(&[
-        "stop", &name,
-        "-n", NAMESPACE,
-        "--context", &format!("kind-{}", CLUSTER_NAME),
+        "stop",
+        &name,
+        "-n",
+        NAMESPACE,
+        "--context",
+        &format!("kind-{}", CLUSTER_NAME),
     ])?;
 
     tracing::info!("Cancelled workflow: {}", name);

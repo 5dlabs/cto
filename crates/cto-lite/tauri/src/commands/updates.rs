@@ -98,7 +98,12 @@ async fn check_image_version(image: &str) -> AppResult<ImageVersion> {
 /// Get the digest of a locally pulled image
 fn get_local_digest(image: &str) -> Option<String> {
     let output = Command::new("docker")
-        .args(["inspect", "--format", "{{.Id}}", &format!("{}:latest", image)])
+        .args([
+            "inspect",
+            "--format",
+            "{{.Id}}",
+            &format!("{}:latest", image),
+        ])
         .output()
         .ok()?;
 
@@ -203,12 +208,7 @@ pub async fn apply_updates() -> AppResult<String> {
     // After pulling new images, we need to restart the deployments
     // to pick up the new versions
 
-    let deployments = [
-        "controller",
-        "pm-lite",
-        "tool-server",
-        "intake",
-    ];
+    let deployments = ["controller", "pm-lite", "tool-server", "intake"];
 
     let mut messages = Vec::new();
 

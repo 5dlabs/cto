@@ -36,7 +36,7 @@ pub struct NodeInfo {
 /// Check if Kind is installed
 pub fn check_kind() -> Result<KindInfo> {
     let kind_path = which::which("kind").ok();
-    
+
     if kind_path.is_none() {
         return Ok(KindInfo {
             installed: false,
@@ -101,8 +101,18 @@ pub fn get_cluster_status() -> Result<ClusterInfo> {
                     let parts: Vec<&str> = l.split(',').collect();
                     NodeInfo {
                         name: parts.first().unwrap_or(&"").to_string(),
-                        status: if parts.get(1) == Some(&"True") { "Ready" } else { "NotReady" }.to_string(),
-                        role: if parts.get(2).is_some() { "control-plane" } else { "worker" }.to_string(),
+                        status: if parts.get(1) == Some(&"True") {
+                            "Ready"
+                        } else {
+                            "NotReady"
+                        }
+                        .to_string(),
+                        role: if parts.get(2).is_some() {
+                            "control-plane"
+                        } else {
+                            "worker"
+                        }
+                        .to_string(),
                     }
                 })
                 .collect()
@@ -158,7 +168,12 @@ nodes:
 
     // Create cluster
     let output = Command::new("kind")
-        .args(["create", "cluster", "--config", config_path.to_str().unwrap()])
+        .args([
+            "create",
+            "cluster",
+            "--config",
+            config_path.to_str().unwrap(),
+        ])
         .output()
         .context("Failed to create Kind cluster")?;
 

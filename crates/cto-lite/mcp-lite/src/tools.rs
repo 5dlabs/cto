@@ -29,7 +29,8 @@ pub fn list_tools() -> Vec<Tool> {
             name: "cto_trigger".to_string(),
             description: "Trigger a CTO workflow to implement a feature. \
                 Provide a prompt describing what you want built. \
-                Returns a workflow ID you can use to check status.".to_string(),
+                Returns a workflow ID you can use to check status."
+                .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -58,7 +59,8 @@ pub fn list_tools() -> Vec<Tool> {
         Tool {
             name: "cto_status".to_string(),
             description: "Get the status of a CTO workflow. \
-                Returns the current phase and any error messages.".to_string(),
+                Returns the current phase and any error messages."
+                .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -73,7 +75,8 @@ pub fn list_tools() -> Vec<Tool> {
         Tool {
             name: "cto_logs".to_string(),
             description: "Get logs from a CTO workflow. \
-                Returns recent log output from the workflow execution.".to_string(),
+                Returns recent log output from the workflow execution."
+                .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -93,7 +96,8 @@ pub fn list_tools() -> Vec<Tool> {
         Tool {
             name: "cto_jobs".to_string(),
             description: "List recent CTO workflows. \
-                Shows workflow IDs, status, and creation time.".to_string(),
+                Shows workflow IDs, status, and creation time."
+                .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -138,16 +142,16 @@ fn default_stack() -> String {
 
 async fn handle_trigger(arguments: Value) -> Result<Value> {
     let args: TriggerArgs = serde_json::from_value(arguments)?;
-    
-    info!("Triggering workflow for {} with prompt: {}", args.repo, args.prompt);
+
+    info!(
+        "Triggering workflow for {} with prompt: {}",
+        args.repo, args.prompt
+    );
 
     let client = K8sClient::new().await?;
-    let workflow_id = client.create_workflow(
-        &args.repo,
-        &args.prompt,
-        args.issue_number,
-        &args.stack,
-    ).await?;
+    let workflow_id = client
+        .create_workflow(&args.repo, &args.prompt, args.issue_number, &args.stack)
+        .await?;
 
     Ok(json!({
         "content": [{
@@ -171,7 +175,7 @@ struct StatusArgs {
 
 async fn handle_status(arguments: Value) -> Result<Value> {
     let args: StatusArgs = serde_json::from_value(arguments)?;
-    
+
     info!("Getting status for workflow: {}", args.workflow_id);
 
     let client = K8sClient::new().await?;
@@ -192,7 +196,9 @@ async fn handle_status(arguments: Value) -> Result<Value> {
         status_emoji,
         status.phase,
         args.workflow_id,
-        status.started_at.unwrap_or_else(|| "Not started".to_string()),
+        status
+            .started_at
+            .unwrap_or_else(|| "Not started".to_string()),
     );
 
     if let Some(finished) = status.finished_at {
@@ -239,11 +245,13 @@ fn default_tail() -> i64 {
 
 async fn handle_logs(arguments: Value) -> Result<Value> {
     let args: LogsArgs = serde_json::from_value(arguments)?;
-    
+
     info!("Getting logs for workflow: {}", args.workflow_id);
 
     let client = K8sClient::new().await?;
-    let logs = client.get_workflow_logs(&args.workflow_id, args.tail).await?;
+    let logs = client
+        .get_workflow_logs(&args.workflow_id, args.tail)
+        .await?;
 
     Ok(json!({
         "content": [{
@@ -266,11 +274,13 @@ fn default_limit() -> i64 {
 
 async fn handle_jobs(arguments: Value) -> Result<Value> {
     let args: JobsArgs = serde_json::from_value(arguments)?;
-    
+
     info!("Listing workflows (limit: {})", args.limit);
 
     let client = K8sClient::new().await?;
-    let jobs = client.list_workflows(args.limit, args.repo.as_deref()).await?;
+    let jobs = client
+        .list_workflows(args.limit, args.repo.as_deref())
+        .await?;
 
     if jobs.is_empty() {
         return Ok(json!({

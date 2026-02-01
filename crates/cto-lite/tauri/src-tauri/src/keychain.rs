@@ -34,22 +34,22 @@ impl ApiKeyType {
 
 /// Store an API key in the system keychain
 pub fn store_key(key_type: ApiKeyType, value: &str) -> Result<()> {
-    let entry = Entry::new(SERVICE_NAME, key_type.as_str())
-        .context("Failed to create keychain entry")?;
-    
+    let entry =
+        Entry::new(SERVICE_NAME, key_type.as_str()).context("Failed to create keychain entry")?;
+
     entry
         .set_password(value)
         .context("Failed to store API key in keychain")?;
-    
+
     tracing::info!("Stored {} API key in keychain", key_type.as_str());
     Ok(())
 }
 
 /// Retrieve an API key from the system keychain
 pub fn get_key(key_type: ApiKeyType) -> Result<Option<String>> {
-    let entry = Entry::new(SERVICE_NAME, key_type.as_str())
-        .context("Failed to create keychain entry")?;
-    
+    let entry =
+        Entry::new(SERVICE_NAME, key_type.as_str()).context("Failed to create keychain entry")?;
+
     match entry.get_password() {
         Ok(password) => Ok(Some(password)),
         Err(keyring::Error::NoEntry) => Ok(None),
@@ -59,9 +59,9 @@ pub fn get_key(key_type: ApiKeyType) -> Result<Option<String>> {
 
 /// Delete an API key from the system keychain
 pub fn delete_key(key_type: ApiKeyType) -> Result<()> {
-    let entry = Entry::new(SERVICE_NAME, key_type.as_str())
-        .context("Failed to create keychain entry")?;
-    
+    let entry =
+        Entry::new(SERVICE_NAME, key_type.as_str()).context("Failed to create keychain entry")?;
+
     match entry.delete_credential() {
         Ok(()) => {
             tracing::info!("Deleted {} API key from keychain", key_type.as_str());
@@ -83,25 +83,25 @@ mod tests {
 
     // Note: These tests require a real keychain and may prompt for access
     // Run manually with: cargo test --package cto-lite -- keychain --ignored
-    
+
     #[test]
     #[ignore]
     fn test_keychain_roundtrip() {
         let test_value = "test-key-12345";
-        
+
         // Store
         store_key(ApiKeyType::Anthropic, test_value).unwrap();
-        
+
         // Retrieve
         let retrieved = get_key(ApiKeyType::Anthropic).unwrap();
         assert_eq!(retrieved, Some(test_value.to_string()));
-        
+
         // Check exists
         assert!(has_key(ApiKeyType::Anthropic).unwrap());
-        
+
         // Delete
         delete_key(ApiKeyType::Anthropic).unwrap();
-        
+
         // Verify deleted
         assert!(!has_key(ApiKeyType::Anthropic).unwrap());
     }

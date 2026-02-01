@@ -1,12 +1,12 @@
 //! Cloudflare tunnel management commands
 
-use serde::{Deserialize, Serialize};
-use std::process::{Command, Child, Stdio};
-use std::sync::Mutex;
-use tauri::State;
 use crate::db::Database;
 use crate::error::AppError;
 use crate::keychain::{self, CredentialKey};
+use serde::{Deserialize, Serialize};
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
+use tauri::State;
 
 // Global tunnel process handle
 static TUNNEL_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
@@ -65,9 +65,12 @@ pub async fn create_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppE
     }
 
     let accounts: AccountsResult = accounts_response.json().await?;
-    let account_id = accounts.result.first()
+    let account_id = accounts
+        .result
+        .first()
         .ok_or_else(|| AppError::TunnelError("No Cloudflare account found".to_string()))?
-        .id.clone();
+        .id
+        .clone();
 
     // Check if tunnel already exists
     let tunnel_name = "cto-lite";
@@ -82,14 +85,14 @@ pub async fn create_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppE
         .await?;
 
     let tunnels: CloudflareTunnelsResult = tunnels_response.json().await?;
-    
+
     let tunnel_id = if let Some(existing) = tunnels.result.first() {
         tracing::info!("Using existing tunnel: {}", existing.id);
         existing.id.clone()
     } else {
         // Create new tunnel
         tracing::info!("Creating new tunnel: {}", tunnel_name);
-        
+
         let create_response = client
             .post(&format!(
                 "https://api.cloudflare.com/client/v4/accounts/{}/cfd_tunnel",
@@ -129,7 +132,9 @@ pub async fn create_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppE
 
     let token_result: CloudflareTunnelTokenResult = token_response.json().await?;
     if !token_result.success {
-        return Err(AppError::TunnelError("Failed to get tunnel token".to_string()));
+        return Err(AppError::TunnelError(
+            "Failed to get tunnel token".to_string(),
+        ));
     }
 
     // Store tunnel token in keychain
@@ -155,7 +160,8 @@ pub async fn create_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppE
 pub async fn start_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppError> {
     // Check if already running
     {
-        let process = TUNNEL_PROCESS.lock()
+        let process = TUNNEL_PROCESS
+            .lock()
             .map_err(|e| AppError::TunnelError(e.to_string()))?;
         if process.is_some() {
             // Check if process is still alive
@@ -180,13 +186,7 @@ pub async fn start_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppEr
 
     // Start cloudflared tunnel
     let child = Command::new(cloudflared_path)
-        .args([
-            "tunnel",
-            "--no-autoupdate",
-            "run",
-            "--token",
-            &tunnel_token,
-        ])
+        .args(["tunnel", "--no-autoupdate", "run", "--token", &tunnel_token])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -194,7 +194,8 @@ pub async fn start_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppEr
 
     // Store process handle
     {
-        let mut process = TUNNEL_PROCESS.lock()
+        let mut process = TUNNEL_PROCESS
+            .lock()
             .map_err(|e| AppError::TunnelError(e.to_string()))?;
         *process = Some(child);
     }
@@ -216,14 +217,15 @@ pub async fn start_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppEr
 #[tauri::command]
 pub async fn stop_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppError> {
     {
-        let mut process = TUNNEL_PROCESS.lock()
+        let mut process = TUNNEL_PROCESS
+            .lock()
             .map_err(|e| AppError::TunnelError(e.to_string()))?;
-        
+
         if let Some(ref mut child) = *process {
             let _ = child.kill();
             let _ = child.wait();
         }
-        
+
         *process = None;
     }
 
@@ -247,7 +249,8 @@ pub async fn get_tunnel_status(db: State<'_, Database>) -> Result<TunnelStatus, 
     let tunnel_url = db.get_config("tunnel_url")?;
 
     let running = {
-        let process = TUNNEL_PROCESS.lock()
+        let process = TUNNEL_PROCESS
+            .lock()
             .map_err(|e| AppError::TunnelError(e.to_string()))?;
         process.is_some()
     };

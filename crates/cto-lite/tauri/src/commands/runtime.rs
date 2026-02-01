@@ -1,8 +1,8 @@
 //! Runtime detection commands
 
-use serde::{Deserialize, Serialize};
 use crate::error::AppError;
-use crate::runtime::{self as rt, ContainerRuntime, RuntimeStatus, RuntimeEnvironment};
+use crate::runtime::{self as rt, ContainerRuntime, RuntimeEnvironment, RuntimeStatus};
+use serde::{Deserialize, Serialize};
 
 /// Result of runtime detection
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,7 +31,7 @@ pub async fn start_container_runtime(runtime: ContainerRuntime) -> Result<(), Ap
 #[tauri::command]
 pub async fn detect_container_runtime() -> Result<RuntimeDetectionResult, AppError> {
     let available = rt::get_all_runtime_status();
-    
+
     match rt::detect_running_runtime() {
         Ok(runtime) => Ok(RuntimeDetectionResult {
             detected: Some(runtime),

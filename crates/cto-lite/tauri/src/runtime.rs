@@ -132,19 +132,19 @@ pub fn get_preferred_runtimes() -> Vec<ContainerRuntime> {
     {
         vec![
             // Docker-socket compatible (work with Kind out of the box)
-            ContainerRuntime::OrbStack,       // Fastest, uses Apple Virtualization
-            ContainerRuntime::Docker,         // Reference implementation
-            ContainerRuntime::Colima,         // Lightweight Lima-based
+            ContainerRuntime::OrbStack, // Fastest, uses Apple Virtualization
+            ContainerRuntime::Docker,   // Reference implementation
+            ContainerRuntime::Colima,   // Lightweight Lima-based
             ContainerRuntime::RancherDesktop, // Includes K8s
             // Experimental Kind providers
-            ContainerRuntime::Finch,          // AWS's tool (Lima + nerdctl)
-            ContainerRuntime::Nerdctl,        // containerd CLI
-            ContainerRuntime::Podman,         // Daemonless/rootless
+            ContainerRuntime::Finch,   // AWS's tool (Lima + nerdctl)
+            ContainerRuntime::Nerdctl, // containerd CLI
+            ContainerRuntime::Podman,  // Daemonless/rootless
             // Low-level (not directly Kind-compatible)
-            ContainerRuntime::Lima,           // VM manager (used by Colima/Finch)
+            ContainerRuntime::Lima, // VM manager (used by Colima/Finch)
         ]
     }
-    
+
     #[cfg(target_os = "linux")]
     {
         vec![
@@ -156,7 +156,7 @@ pub fn get_preferred_runtimes() -> Vec<ContainerRuntime> {
             ContainerRuntime::Finch,
         ]
     }
-    
+
     #[cfg(target_os = "windows")]
     {
         vec![
@@ -185,21 +185,21 @@ fn get_runtime_binary(runtime: ContainerRuntime) -> &'static str {
 /// Common paths where binaries might be installed (not in default app PATH)
 fn get_common_binary_paths() -> Vec<std::path::PathBuf> {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-    
+
     vec![
         // System paths
-        "/opt/homebrew/bin".into(),      // macOS ARM Homebrew
-        "/usr/local/bin".into(),         // macOS Intel Homebrew / Linux
-        "/usr/bin".into(),               // System binaries
+        "/opt/homebrew/bin".into(), // macOS ARM Homebrew
+        "/usr/local/bin".into(),    // macOS Intel Homebrew / Linux
+        "/usr/bin".into(),          // System binaries
         // Application bundles
         "/Applications/Docker.app/Contents/Resources/bin".into(),
         "/Applications/OrbStack.app/Contents/MacOS".into(),
         "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin".into(),
         "/Applications/Finch/bin".into(),
         // User-local installs
-        format!("{}/.local/bin", home).into(),    // nerdctl, containerd tools
-        format!("{}/.finch/bin", home).into(),    // Finch alternate location
-        format!("{}/.rd/bin", home).into(),       // Rancher Desktop user bin
+        format!("{}/.local/bin", home).into(), // nerdctl, containerd tools
+        format!("{}/.finch/bin", home).into(), // Finch alternate location
+        format!("{}/.rd/bin", home).into(),    // Rancher Desktop user bin
     ]
 }
 
@@ -209,7 +209,7 @@ fn find_binary(name: &str) -> Option<std::path::PathBuf> {
     if let Ok(path) = which::which(name) {
         return Some(path);
     }
-    
+
     // Check common paths
     for dir in get_common_binary_paths() {
         let path = dir.join(name);
@@ -217,7 +217,7 @@ fn find_binary(name: &str) -> Option<std::path::PathBuf> {
             return Some(path);
         }
     }
-    
+
     None
 }
 
@@ -237,7 +237,7 @@ pub fn get_runtime_path(runtime: ContainerRuntime) -> Option<String> {
 pub fn get_runtime_version(runtime: ContainerRuntime) -> Option<String> {
     let binary = get_runtime_binary(runtime);
     let cmd_path = find_binary(binary)?;
-    
+
     let args: &[&str] = match runtime {
         ContainerRuntime::Docker => &["--version"],
         ContainerRuntime::OrbStack => &["version"],
@@ -248,7 +248,7 @@ pub fn get_runtime_version(runtime: ContainerRuntime) -> Option<String> {
         ContainerRuntime::RancherDesktop => &["version"],
         ContainerRuntime::Lima => &["--version"],
     };
-    
+
     Command::new(cmd_path)
         .args(args)
         .output()
@@ -269,7 +269,7 @@ pub fn is_runtime_running(runtime: ContainerRuntime) -> bool {
         Some(p) => p,
         None => return false,
     };
-    
+
     match runtime {
         ContainerRuntime::Docker => {
             // Try docker info - returns 0 if daemon is running
@@ -287,7 +287,9 @@ pub fn is_runtime_running(runtime: ContainerRuntime) -> bool {
                 .args(["status"])
                 .output()
                 .ok()
-                .map(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).contains("running"))
+                .map(|o| {
+                    o.status.success() && String::from_utf8_lossy(&o.stdout).contains("running")
+                })
                 .unwrap_or(false)
         }
         ContainerRuntime::Colima => {
@@ -327,7 +329,9 @@ pub fn is_runtime_running(runtime: ContainerRuntime) -> bool {
                 .args(["vm", "status"])
                 .output()
                 .ok()
-                .map(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).contains("Running"))
+                .map(|o| {
+                    o.status.success() && String::from_utf8_lossy(&o.stdout).contains("Running")
+                })
                 .unwrap_or(false)
         }
         ContainerRuntime::RancherDesktop => {
@@ -356,17 +360,17 @@ pub fn is_runtime_running(runtime: ContainerRuntime) -> bool {
 fn has_docker_compatibility(runtime: ContainerRuntime) -> bool {
     match runtime {
         ContainerRuntime::Docker => true,
-        ContainerRuntime::OrbStack => true,      // Full Docker compatibility
-        ContainerRuntime::Colima => true,        // Provides Docker socket
+        ContainerRuntime::OrbStack => true, // Full Docker compatibility
+        ContainerRuntime::Colima => true,   // Provides Docker socket
         ContainerRuntime::RancherDesktop => true, // Can use dockerd
         ContainerRuntime::Podman => {
             // Podman can provide Docker compatibility via socket
             std::path::Path::new("/var/run/docker.sock").exists()
                 || std::env::var("DOCKER_HOST").is_ok()
         }
-        ContainerRuntime::Nerdctl => false,  // Uses containerd, needs KIND_EXPERIMENTAL_PROVIDER
-        ContainerRuntime::Finch => false,    // Uses nerdctl, needs KIND_EXPERIMENTAL_PROVIDER
-        ContainerRuntime::Lima => false,     // Low-level VM, need manual config
+        ContainerRuntime::Nerdctl => false, // Uses containerd, needs KIND_EXPERIMENTAL_PROVIDER
+        ContainerRuntime::Finch => false,   // Uses nerdctl, needs KIND_EXPERIMENTAL_PROVIDER
+        ContainerRuntime::Lima => false,    // Low-level VM, need manual config
     }
 }
 
@@ -375,7 +379,7 @@ fn get_kind_provider(runtime: ContainerRuntime) -> Option<&'static str> {
     match runtime {
         ContainerRuntime::Podman => Some("podman"),
         ContainerRuntime::Nerdctl => Some("nerdctl"),
-        ContainerRuntime::Finch => Some("nerdctl"),  // Finch uses nerdctl under the hood
+        ContainerRuntime::Finch => Some("nerdctl"), // Finch uses nerdctl under the hood
         _ => None,
     }
 }
@@ -409,8 +413,8 @@ fn has_kubernetes_included(runtime: ContainerRuntime) -> bool {
         ContainerRuntime::Colima => false,        // Need to enable with --kubernetes
         ContainerRuntime::RancherDesktop => true, // Primary feature
         ContainerRuntime::Podman => false,
-        ContainerRuntime::Nerdctl => false,       // Just container runtime
-        ContainerRuntime::Finch => false,         // Just container runtime
+        ContainerRuntime::Nerdctl => false, // Just container runtime
+        ContainerRuntime::Finch => false,   // Just container runtime
         ContainerRuntime::Lima => false,
     }
 }
@@ -418,14 +422,30 @@ fn has_kubernetes_included(runtime: ContainerRuntime) -> bool {
 /// Get full status of a runtime
 pub fn get_runtime_status(runtime: ContainerRuntime) -> RuntimeStatus {
     let installed = is_runtime_installed(runtime);
-    let running = if installed { is_runtime_running(runtime) } else { false };
-    let version = if installed { get_runtime_version(runtime) } else { None };
-    let path = if installed { get_runtime_path(runtime) } else { None };
-    let docker_compatible = if running { has_docker_compatibility(runtime) } else { false };
+    let running = if installed {
+        is_runtime_running(runtime)
+    } else {
+        false
+    };
+    let version = if installed {
+        get_runtime_version(runtime)
+    } else {
+        None
+    };
+    let path = if installed {
+        get_runtime_path(runtime)
+    } else {
+        None
+    };
+    let docker_compatible = if running {
+        has_docker_compatibility(runtime)
+    } else {
+        false
+    };
     let kubernetes_included = has_kubernetes_included(runtime);
     let kind_compatible = is_kind_compatible(runtime);
     let kind_provider = get_kind_provider(runtime).map(|s| s.to_string());
-    
+
     RuntimeStatus {
         runtime,
         installed,
@@ -449,7 +469,7 @@ pub fn detect_running_runtime() -> AppResult<ContainerRuntime> {
             return Ok(runtime);
         }
     }
-    
+
     // Check if any runtime is installed but not running
     for runtime in get_preferred_runtimes() {
         if is_runtime_installed(runtime) {
@@ -459,9 +479,10 @@ pub fn detect_running_runtime() -> AppResult<ContainerRuntime> {
             )));
         }
     }
-    
+
     Err(AppError::RuntimeNotFound(
-        "No container runtime found. Please install Docker Desktop, OrbStack, Colima, or Podman.".to_string()
+        "No container runtime found. Please install Docker Desktop, OrbStack, Colima, or Podman."
+            .to_string(),
     ))
 }
 
@@ -471,22 +492,21 @@ pub fn scan_runtime_environment() -> RuntimeEnvironment {
         .into_iter()
         .map(get_runtime_status)
         .collect();
-    
-    let docker_available = runtimes.iter()
-        .any(|r| r.running && r.docker_compatible);
-    
-    let kubernetes_available = runtimes.iter()
-        .any(|r| r.running && r.kubernetes_included);
-    
+
+    let docker_available = runtimes.iter().any(|r| r.running && r.docker_compatible);
+
+    let kubernetes_available = runtimes.iter().any(|r| r.running && r.kubernetes_included);
+
     // Find recommended runtime
-    let recommended = runtimes.iter()
+    let recommended = runtimes
+        .iter()
         .filter(|r| r.running && r.docker_compatible)
         .map(|r| r.runtime)
         .next();
-    
+
     let macos_version = get_macos_version();
     let can_use_apple_virtualization = supports_apple_virtualization();
-    
+
     RuntimeEnvironment {
         runtimes,
         docker_available,
@@ -504,9 +524,7 @@ pub fn start_runtime(runtime: ContainerRuntime) -> AppResult<()> {
             tracing::info!("Starting OrbStack...");
             #[cfg(target_os = "macos")]
             {
-                let _ = Command::new("open")
-                    .args(["-a", "OrbStack"])
-                    .status();
+                let _ = Command::new("open").args(["-a", "OrbStack"]).status();
             }
             Ok(())
         }
@@ -516,36 +534,36 @@ pub fn start_runtime(runtime: ContainerRuntime) -> AppResult<()> {
                 .args(["start"])
                 .status()
                 .map_err(|e| AppError::CommandFailed(e.to_string()))?;
-            
+
             if !status.success() {
-                return Err(AppError::CommandFailed("Failed to start Colima".to_string()));
+                return Err(AppError::CommandFailed(
+                    "Failed to start Colima".to_string(),
+                ));
             }
-            
+
             Ok(())
         }
         ContainerRuntime::Docker => {
             tracing::info!("Starting Docker Desktop...");
             #[cfg(target_os = "macos")]
             {
-                let _ = Command::new("open")
-                    .args(["-a", "Docker"])
-                    .status();
+                let _ = Command::new("open").args(["-a", "Docker"]).status();
             }
-            
+
             #[cfg(target_os = "linux")]
             {
                 let _ = Command::new("systemctl")
                     .args(["--user", "start", "docker-desktop"])
                     .status();
             }
-            
+
             #[cfg(target_os = "windows")]
             {
                 let _ = Command::new("cmd")
                     .args(["/c", "start", "", "Docker Desktop"])
                     .status();
             }
-            
+
             Ok(())
         }
         ContainerRuntime::Podman => {
@@ -554,11 +572,13 @@ pub fn start_runtime(runtime: ContainerRuntime) -> AppResult<()> {
                 .args(["machine", "start"])
                 .status()
                 .map_err(|e| AppError::CommandFailed(e.to_string()))?;
-            
+
             if !status.success() {
-                return Err(AppError::CommandFailed("Failed to start Podman machine".to_string()));
+                return Err(AppError::CommandFailed(
+                    "Failed to start Podman machine".to_string(),
+                ));
             }
-            
+
             Ok(())
         }
         ContainerRuntime::Nerdctl => {
@@ -581,9 +601,11 @@ pub fn start_runtime(runtime: ContainerRuntime) -> AppResult<()> {
                     .args(["vm", "start"])
                     .status()
                     .map_err(|e| AppError::CommandFailed(e.to_string()))?;
-                
+
                 if !status.success() {
-                    return Err(AppError::CommandFailed("Failed to start Finch VM".to_string()));
+                    return Err(AppError::CommandFailed(
+                        "Failed to start Finch VM".to_string(),
+                    ));
                 }
             }
             Ok(())
@@ -595,7 +617,7 @@ pub fn start_runtime(runtime: ContainerRuntime) -> AppResult<()> {
                     .args(["start"])
                     .status()
                     .map_err(|e| AppError::CommandFailed(e.to_string()))?;
-                
+
                 if !status.success() {
                     return Err(AppError::CommandFailed("Failed to start Lima".to_string()));
                 }
@@ -610,13 +632,12 @@ pub fn start_runtime(runtime: ContainerRuntime) -> AppResult<()> {
                     .args(["-a", "Rancher Desktop"])
                     .status();
             }
-            
+
             #[cfg(target_os = "linux")]
             {
-                let _ = Command::new("rancher-desktop")
-                    .status();
+                let _ = Command::new("rancher-desktop").status();
             }
-            
+
             Ok(())
         }
     }

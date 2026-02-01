@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::{debug, error, info};
 
-mod tools;
 mod k8s;
+mod tools;
 
 use tools::{handle_tool_call, list_tools};
 
@@ -132,16 +132,12 @@ async fn main() -> Result<()> {
 
         let response = match serde_json::from_str::<JsonRpcRequest>(&line) {
             Ok(request) => handle_request(request).await,
-            Err(e) => JsonRpcResponse::error(
-                Value::Null,
-                -32700,
-                format!("Parse error: {e}"),
-            ),
+            Err(e) => JsonRpcResponse::error(Value::Null, -32700, format!("Parse error: {e}")),
         };
 
         let response_str = serde_json::to_string(&response)?;
         debug!("Sending: {}", response_str);
-        
+
         writeln!(stdout, "{response_str}")?;
         stdout.flush()?;
     }
@@ -160,7 +156,9 @@ async fn handle_request(request: JsonRpcRequest) -> JsonRpcResponse {
                 serde_json::to_value(InitializeResult {
                     protocol_version: "2024-11-05".to_string(),
                     capabilities: Capabilities {
-                        tools: ToolsCapability { list_changed: false },
+                        tools: ToolsCapability {
+                            list_changed: false,
+                        },
                     },
                     server_info: ServerInfo {
                         name: "cto-lite".to_string(),
@@ -182,10 +180,14 @@ async fn handle_request(request: JsonRpcRequest) -> JsonRpcResponse {
         }
 
         "tools/call" => {
-            let name = request.params.get("name")
+            let name = request
+                .params
+                .get("name")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            let arguments = request.params.get("arguments")
+            let arguments = request
+                .params
+                .get("arguments")
                 .cloned()
                 .unwrap_or(json!({}));
 
@@ -200,9 +202,7 @@ async fn handle_request(request: JsonRpcRequest) -> JsonRpcResponse {
             }
         }
 
-        "ping" => {
-            JsonRpcResponse::success(id, json!({}))
-        }
+        "ping" => JsonRpcResponse::success(id, json!({})),
 
         method => {
             error!("Unknown method: {}", method);

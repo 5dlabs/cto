@@ -39,16 +39,16 @@ fn main() {
             // Initialize database on startup
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
-            
+
             let db_path = app_data_dir.join("cto-lite.db");
             let db = db::Database::new(&db_path)?;
             db.migrate()?;
-            
+
             app.manage(db);
-            
+
             // Initialize MCP state
             app.manage(commands::mcp::McpState::new());
-            
+
             tracing::info!("Database initialized at {:?}", db_path);
             Ok(())
         })
@@ -59,7 +59,6 @@ fn main() {
             commands::runtime::check_docker_running,
             commands::runtime::scan_runtime_environment,
             commands::runtime::start_container_runtime,
-            
             // Cluster management
             commands::cluster::scan_environment,
             commands::cluster::detect_existing_clusters,
@@ -68,54 +67,45 @@ fn main() {
             commands::cluster::get_cluster_status,
             commands::cluster::list_clusters,
             commands::cluster::use_existing_cluster,
-            
             // Configuration
             commands::config::get_config,
             commands::config::set_config,
             commands::config::get_setup_status,
             commands::config::mark_setup_complete,
-            
             // Credentials (keychain)
             commands::credentials::set_api_key,
             commands::credentials::get_api_key,
             commands::credentials::delete_api_key,
             commands::credentials::has_api_key,
-            
             // GitHub OAuth
             commands::github::start_github_oauth,
             commands::github::get_github_status,
             commands::github::disconnect_github,
             commands::github::list_repositories,
-            
-            // Cloudflare OAuth  
+            // Cloudflare OAuth
             commands::cloudflare::start_cloudflare_oauth,
             commands::cloudflare::get_cloudflare_status,
             commands::cloudflare::disconnect_cloudflare,
-            
             // Tunnel management
             commands::tunnel::create_tunnel,
             commands::tunnel::start_tunnel,
             commands::tunnel::stop_tunnel,
             commands::tunnel::get_tunnel_status,
-            
             // Workflow management
             commands::workflow::list_workflows,
             commands::workflow::get_workflow_status,
             commands::workflow::get_workflow_logs,
             commands::workflow::cancel_workflow,
-            
             // MCP server management
             commands::mcp::start_mcp_server,
             commands::mcp::stop_mcp_server,
             commands::mcp::get_mcp_status,
             commands::mcp::get_mcp_config,
-            
             // Updates
             commands::updates::check_updates,
             commands::updates::pull_updates,
             commands::updates::apply_updates,
             commands::updates::get_component_versions,
-            
             // Installation
             commands::install::check_prerequisites,
             commands::install::run_installation,

@@ -18,7 +18,7 @@ use crate::error::{AppError, AppResult};
 pub struct InstallStatus {
     pub step: InstallStep,
     pub message: String,
-    pub progress: u8,  // 0-100
+    pub progress: u8, // 0-100
     pub error: Option<String>,
 }
 
@@ -57,7 +57,7 @@ const BREW_INSTALLABLE: &[(&str, &str)] = &[
 
 /// Images to pull for initial deployment
 const CORE_IMAGES: &[&str] = &[
-    "kindest/node:v1.31.0",  // Kind node image - pulled automatically by kind
+    "kindest/node:v1.31.0", // Kind node image - pulled automatically by kind
 ];
 
 /// Path to our Helm chart (relative to repo root)
@@ -70,8 +70,10 @@ pub async fn check_prerequisites() -> Result<Vec<BinaryCheck>, AppError> {
 
     for name in REQUIRED_BINARIES {
         let found = which::which(name).is_ok();
-        let path = which::which(name).ok().map(|p| p.to_string_lossy().to_string());
-        
+        let path = which::which(name)
+            .ok()
+            .map(|p| p.to_string_lossy().to_string());
+
         let version = if found {
             get_binary_version(name)
         } else {
@@ -97,7 +99,7 @@ fn is_brew_installed() -> bool {
 /// Install a binary via Homebrew
 fn brew_install(formula: &str) -> AppResult<()> {
     tracing::info!("Installing {} via Homebrew...", formula);
-    
+
     let output = Command::new("brew")
         .args(["install", formula])
         .output()
@@ -109,7 +111,10 @@ fn brew_install(formula: &str) -> AppResult<()> {
         if stderr.contains("already installed") {
             return Ok(());
         }
-        return Err(AppError::CommandFailed(format!("brew install {} failed: {}", formula, stderr)));
+        return Err(AppError::CommandFailed(format!(
+            "brew install {} failed: {}",
+            formula, stderr
+        )));
     }
 
     Ok(())
@@ -118,12 +123,15 @@ fn brew_install(formula: &str) -> AppResult<()> {
 /// Install missing dependencies automatically
 fn install_missing_dependencies(window: &tauri::Window) -> AppResult<()> {
     let emit = |msg: &str| {
-        let _ = window.emit("install-progress", InstallStatus {
-            step: InstallStep::InstallingBinaries,
-            message: msg.to_string(),
-            progress: 10,
-            error: None,
-        });
+        let _ = window.emit(
+            "install-progress",
+            InstallStatus {
+                step: InstallStep::InstallingBinaries,
+                message: msg.to_string(),
+                progress: 10,
+                error: None,
+            },
+        );
     };
 
     // Check what's missing
@@ -143,10 +151,11 @@ fn install_missing_dependencies(window: &tauri::Window) -> AppResult<()> {
         #[cfg(target_os = "macos")]
         {
             return Err(AppError::CommandFailed(
-                "Homebrew is required to install dependencies. Install it from https://brew.sh".to_string()
+                "Homebrew is required to install dependencies. Install it from https://brew.sh"
+                    .to_string(),
             ));
         }
-        
+
         #[cfg(not(target_os = "macos"))]
         {
             let names: Vec<_> = missing.iter().map(|(bin, _)| *bin).collect();
@@ -201,47 +210,60 @@ pub async fn run_installation(
 ) -> Result<(), AppError> {
     // Helper to emit progress
     let emit_progress = |step: InstallStep, message: &str, progress: u8| {
-        let _ = window.emit("install-progress", InstallStatus {
-            step,
-            message: message.to_string(),
-            progress,
-            error: None,
-        });
+        let _ = window.emit(
+            "install-progress",
+            InstallStatus {
+                step,
+                message: message.to_string(),
+                progress,
+                error: None,
+            },
+        );
     };
 
     // Step 1: Check prerequisites
-    emit_progress(InstallStep::CheckingPrerequisites, "Checking prerequisites...", 5);
-    
+    emit_progress(
+        InstallStep::CheckingPrerequisites,
+        "Checking prerequisites...",
+        5,
+    );
+
     let prereqs = check_prerequisites().await?;
     let missing: Vec<_> = prereqs.iter().filter(|b| !b.found).collect();
-    
+
     // Docker must be present - we can't auto-install it
     if prereqs.iter().any(|b| b.name == "docker" && !b.found) {
         return Err(AppError::CommandFailed(
-            "Docker is required. Please install Docker Desktop, OrbStack, or Colima first.".to_string()
+            "Docker is required. Please install Docker Desktop, OrbStack, or Colima first."
+                .to_string(),
         ));
     }
-    
+
     // Auto-install other missing dependencies
     if !missing.is_empty() {
-        let missing_names: Vec<_> = missing.iter()
+        let missing_names: Vec<_> = missing
+            .iter()
             .filter(|b| b.name != "docker")
             .map(|b| b.name.as_str())
             .collect();
-        
+
         if !missing_names.is_empty() {
             emit_progress(
-                InstallStep::InstallingBinaries, 
+                InstallStep::InstallingBinaries,
                 &format!("Installing {}...", missing_names.join(", ")),
-                10
+                10,
             );
             install_missing_dependencies(&window)?;
         }
     }
 
     // Step 2: Create Kind cluster
-    emit_progress(InstallStep::CreatingCluster, "Creating Kubernetes cluster...", 20);
-    
+    emit_progress(
+        InstallStep::CreatingCluster,
+        "Creating Kubernetes cluster...",
+        20,
+    );
+
     if !kind_cluster_exists("cto-lite")? {
         create_kind_cluster()?;
     } else {
@@ -249,40 +271,60 @@ pub async fn run_installation(
     }
 
     // Step 3: Pull images
-    emit_progress(InstallStep::PullingImages, "Pulling container images...", 40);
-    
+    emit_progress(
+        InstallStep::PullingImages,
+        "Pulling container images...",
+        40,
+    );
+
     for (i, image) in CORE_IMAGES.iter().enumerate() {
         let progress = 40 + ((i as u8 + 1) * 20 / CORE_IMAGES.len() as u8);
         emit_progress(
-            InstallStep::PullingImages, 
+            InstallStep::PullingImages,
             &format!("Pulling {}...", image),
-            progress
+            progress,
         );
         pull_image(image)?;
     }
 
     // Step 4: Add Helm repos and update dependencies
-    emit_progress(InstallStep::PullingImages, "Setting up Helm repositories...", 50);
+    emit_progress(
+        InstallStep::PullingImages,
+        "Setting up Helm repositories...",
+        50,
+    );
     add_argo_helm_repo()?;
-    
+
     // Find chart path
     let chart_path = get_chart_path()?;
     tracing::info!("Using chart at: {}", chart_path);
-    
-    emit_progress(InstallStep::PullingImages, "Updating Helm dependencies...", 55);
+
+    emit_progress(
+        InstallStep::PullingImages,
+        "Updating Helm dependencies...",
+        55,
+    );
     update_helm_dependencies(&chart_path)?;
 
     // Step 5: Deploy services via Helm
-    emit_progress(InstallStep::DeployingServices, "Deploying CTO Lite services...", 70);
+    emit_progress(
+        InstallStep::DeployingServices,
+        "Deploying CTO Lite services...",
+        70,
+    );
     helm_install(&chart_path, "cto-lite")?;
 
     // Step 6: Wait for services to be ready
-    emit_progress(InstallStep::ConfiguringIngress, "Waiting for services to start...", 90);
+    emit_progress(
+        InstallStep::ConfiguringIngress,
+        "Waiting for services to start...",
+        90,
+    );
     wait_for_pods("cto-lite")?;
 
     // Complete
     emit_progress(InstallStep::Complete, "Installation complete!", 100);
-    
+
     // Mark installation done in DB
     db.set_config("installation_complete", "true")?;
 
@@ -338,10 +380,14 @@ nodes:
 
     let output = Command::new("kind")
         .args([
-            "create", "cluster",
-            "--name", "cto-lite",
-            "--config", config_path.to_str().unwrap(),
-            "--wait", "120s",
+            "create",
+            "cluster",
+            "--name",
+            "cto-lite",
+            "--config",
+            config_path.to_str().unwrap(),
+            "--wait",
+            "120s",
         ])
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to create cluster: {}", e)))?;
@@ -351,7 +397,10 @@ nodes:
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(AppError::ClusterError(format!("Failed to create cluster: {}", stderr)));
+        return Err(AppError::ClusterError(format!(
+            "Failed to create cluster: {}",
+            stderr
+        )));
     }
 
     tracing::info!("Kind cluster 'cto-lite' created successfully");
@@ -404,7 +453,10 @@ fn create_namespace(name: &str) -> AppResult<()> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !stderr.contains("already exists") {
-            return Err(AppError::CommandFailed(format!("Failed to create namespace: {}", stderr)));
+            return Err(AppError::CommandFailed(format!(
+                "Failed to create namespace: {}",
+                stderr
+            )));
         }
     }
 
@@ -414,9 +466,14 @@ fn create_namespace(name: &str) -> AppResult<()> {
 /// Add Argo Helm repository
 fn add_argo_helm_repo() -> AppResult<()> {
     tracing::info!("Adding Argo Helm repository");
-    
+
     let output = Command::new("helm")
-        .args(["repo", "add", "argo", "https://argoproj.github.io/argo-helm"])
+        .args([
+            "repo",
+            "add",
+            "argo",
+            "https://argoproj.github.io/argo-helm",
+        ])
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to add Argo repo: {}", e)))?;
 
@@ -429,9 +486,7 @@ fn add_argo_helm_repo() -> AppResult<()> {
     }
 
     // Update repos
-    let _ = Command::new("helm")
-        .args(["repo", "update"])
-        .output();
+    let _ = Command::new("helm").args(["repo", "update"]).output();
 
     Ok(())
 }
@@ -439,7 +494,7 @@ fn add_argo_helm_repo() -> AppResult<()> {
 /// Update Helm chart dependencies
 fn update_helm_dependencies(chart_path: &str) -> AppResult<()> {
     tracing::info!("Updating Helm dependencies for {}", chart_path);
-    
+
     let output = Command::new("helm")
         .args(["dependency", "update", chart_path])
         .output()
@@ -447,7 +502,10 @@ fn update_helm_dependencies(chart_path: &str) -> AppResult<()> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(AppError::CommandFailed(format!("Failed to update Helm dependencies: {}", stderr)));
+        return Err(AppError::CommandFailed(format!(
+            "Failed to update Helm dependencies: {}",
+            stderr
+        )));
     }
 
     Ok(())
@@ -456,29 +514,35 @@ fn update_helm_dependencies(chart_path: &str) -> AppResult<()> {
 /// Install CTO Lite via Helm
 fn helm_install(chart_path: &str, namespace: &str) -> AppResult<()> {
     tracing::info!("Installing CTO Lite chart from {}", chart_path);
-    
+
     // Check if release already exists
     let check = Command::new("helm")
         .args([
-            "status", "cto-lite",
-            "--namespace", namespace,
-            "--kube-context", "kind-cto-lite",
+            "status",
+            "cto-lite",
+            "--namespace",
+            namespace,
+            "--kube-context",
+            "kind-cto-lite",
         ])
         .output();
-    
+
     let release_exists = check.map(|o| o.status.success()).unwrap_or(false);
-    
+
     let mut args = vec![
         if release_exists { "upgrade" } else { "install" },
         "cto-lite",
         chart_path,
-        "--namespace", namespace,
+        "--namespace",
+        namespace,
         "--create-namespace",
-        "--kube-context", "kind-cto-lite",
+        "--kube-context",
+        "kind-cto-lite",
         "--wait",
-        "--timeout", "5m",
+        "--timeout",
+        "5m",
     ];
-    
+
     if release_exists {
         args.push("--reuse-values");
     }
@@ -491,8 +555,15 @@ fn helm_install(chart_path: &str, namespace: &str) -> AppResult<()> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        tracing::error!("Helm install failed:\nstdout: {}\nstderr: {}", stdout, stderr);
-        return Err(AppError::CommandFailed(format!("Helm install failed: {}", stderr)));
+        tracing::error!(
+            "Helm install failed:\nstdout: {}\nstderr: {}",
+            stdout,
+            stderr
+        );
+        return Err(AppError::CommandFailed(format!(
+            "Helm install failed: {}",
+            stderr
+        )));
     }
 
     tracing::info!("CTO Lite installed successfully");
@@ -502,34 +573,39 @@ fn helm_install(chart_path: &str, namespace: &str) -> AppResult<()> {
 /// Wait for pods to be ready
 fn wait_for_pods(namespace: &str) -> AppResult<()> {
     tracing::info!("Waiting for pods in namespace {} to be ready", namespace);
-    
+
     // Wait up to 3 minutes for pods to be ready
     for _ in 0..36 {
         let output = Command::new("kubectl")
             .args([
-                "get", "pods",
-                "--namespace", namespace,
-                "--context", "kind-cto-lite",
-                "-o", "jsonpath={.items[*].status.phase}",
+                "get",
+                "pods",
+                "--namespace",
+                namespace,
+                "--context",
+                "kind-cto-lite",
+                "-o",
+                "jsonpath={.items[*].status.phase}",
             ])
             .output();
 
         if let Ok(o) = output {
             if o.status.success() {
                 let phases = String::from_utf8_lossy(&o.stdout);
-                let all_running = phases.split_whitespace()
+                let all_running = phases
+                    .split_whitespace()
                     .all(|p| p == "Running" || p == "Succeeded");
-                
+
                 if all_running && !phases.is_empty() {
                     tracing::info!("All pods are running");
                     return Ok(());
                 }
             }
         }
-        
+
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
-    
+
     // Don't fail - some pods might still be starting
     tracing::warn!("Timeout waiting for all pods, but continuing...");
     Ok(())
@@ -539,20 +615,20 @@ fn wait_for_pods(namespace: &str) -> AppResult<()> {
 fn get_chart_path() -> AppResult<String> {
     // In development, use relative path from repo root
     // In production, chart is bundled in app resources
-    
+
     // Try repo-relative path first
     let repo_path = std::path::Path::new(CHART_PATH);
     if repo_path.exists() {
         return Ok(CHART_PATH.to_string());
     }
-    
+
     // Try from current working directory
     if let Ok(cwd) = std::env::current_dir() {
         let cwd_path = cwd.join(CHART_PATH);
         if cwd_path.exists() {
             return Ok(cwd_path.to_string_lossy().to_string());
         }
-        
+
         // Try parent directories (in case we're in a subdirectory)
         let mut parent = cwd.parent();
         while let Some(p) = parent {
@@ -563,7 +639,7 @@ fn get_chart_path() -> AppResult<String> {
             parent = p.parent();
         }
     }
-    
+
     Err(AppError::ConfigError(format!(
         "Could not find Helm chart at {}. Make sure you're running from the repository root.",
         CHART_PATH

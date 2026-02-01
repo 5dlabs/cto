@@ -55,8 +55,9 @@ impl K8sClient {
 
     async fn in_cluster() -> Result<Self> {
         let token = std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token")?;
-        let namespace = std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-            .unwrap_or_else(|_| "cto-lite".to_string());
+        let namespace =
+            std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+                .unwrap_or_else(|_| "cto-lite".to_string());
 
         Ok(Self {
             client: reqwest::Client::builder()
@@ -71,7 +72,7 @@ impl K8sClient {
     async fn from_kubeconfig() -> Result<Self> {
         // For local development, use kubectl proxy or direct API
         let namespace = std::env::var("CTO_NAMESPACE").unwrap_or_else(|_| "cto-lite".to_string());
-        
+
         // Try kubectl proxy first (localhost:8001)
         let proxy_url = std::env::var("KUBERNETES_PROXY_URL")
             .unwrap_or_else(|_| "http://localhost:8001".to_string());
@@ -117,7 +118,11 @@ impl K8sClient {
         let workflow_name = format!(
             "cto-{}-{}",
             repo.replace('/', "-").chars().take(30).collect::<String>(),
-            uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>()
+            uuid::Uuid::new_v4()
+                .to_string()
+                .chars()
+                .take(8)
+                .collect::<String>()
         );
 
         let workflow = serde_json::json!({
@@ -151,13 +156,10 @@ impl K8sClient {
         info!("Creating workflow: {}", workflow_name);
         debug!("Workflow spec: {:?}", workflow);
 
-        let response = self.add_auth(
-            self.client
-                .post(&self.workflows_url())
-                .json(&workflow)
-        )
-        .send()
-        .await?;
+        let response = self
+            .add_auth(self.client.post(&self.workflows_url()).json(&workflow))
+            .send()
+            .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -170,11 +172,10 @@ impl K8sClient {
 
     /// Get workflow status
     pub async fn get_workflow_status(&self, name: &str) -> Result<WorkflowStatus> {
-        let response = self.add_auth(
-            self.client.get(&self.workflow_url(name))
-        )
-        .send()
-        .await?;
+        let response = self
+            .add_auth(self.client.get(&self.workflow_url(name)))
+            .send()
+            .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -194,19 +195,44 @@ impl K8sClient {
                 let node_type = node.get("type").and_then(|t| t.as_str()).unwrap_or("");
                 if node_type == "Pod" || node_type == "Steps" || node_type == "DAG" {
                     nodes.push(NodeStatus {
-                        name: node.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string(),
-                        display_name: node.get("displayName").and_then(|n| n.as_str()).unwrap_or("").to_string(),
-                        phase: node.get("phase").and_then(|p| p.as_str()).unwrap_or("Unknown").to_string(),
+                        name: node
+                            .get("name")
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        display_name: node
+                            .get("displayName")
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        phase: node
+                            .get("phase")
+                            .and_then(|p| p.as_str())
+                            .unwrap_or("Unknown")
+                            .to_string(),
                     });
                 }
             }
         }
 
         Ok(WorkflowStatus {
-            phase: status.get("phase").and_then(|p| p.as_str()).unwrap_or("Unknown").to_string(),
-            started_at: status.get("startedAt").and_then(|s| s.as_str()).map(String::from),
-            finished_at: status.get("finishedAt").and_then(|s| s.as_str()).map(String::from),
-            message: status.get("message").and_then(|m| m.as_str()).map(String::from),
+            phase: status
+                .get("phase")
+                .and_then(|p| p.as_str())
+                .unwrap_or("Unknown")
+                .to_string(),
+            started_at: status
+                .get("startedAt")
+                .and_then(|s| s.as_str())
+                .map(String::from),
+            finished_at: status
+                .get("finishedAt")
+                .and_then(|s| s.as_str())
+                .map(String::from),
+            message: status
+                .get("message")
+                .and_then(|m| m.as_str())
+                .map(String::from),
             nodes,
         })
     }
@@ -233,7 +259,8 @@ impl K8sClient {
         if let Some(items) = items {
             for pod in items.iter().take(5) {
                 // Limit to 5 pods
-                let pod_name = pod.get("metadata")
+                let pod_name = pod
+                    .get("metadata")
                     .and_then(|m| m.get("name"))
                     .and_then(|n| n.as_str())
                     .unwrap_or("unknown");
@@ -247,7 +274,8 @@ impl K8sClient {
                     if response.status().is_success() {
                         if let Ok(log_text) = response.text().await {
                             if !log_text.is_empty() {
-                                all_logs.push_str(&format!("=== {} ===\n{}\n\n", pod_name, log_text));
+                                all_logs
+                                    .push_str(&format!("=== {} ===\n{}\n\n", pod_name, log_text));
                             }
                         }
                     }
@@ -263,11 +291,18 @@ impl K8sClient {
     }
 
     /// List workflows
-    pub async fn list_workflows(&self, limit: i64, repo_filter: Option<&str>) -> Result<Vec<JobSummary>> {
+    pub async fn list_workflows(
+        &self,
+        limit: i64,
+        repo_filter: Option<&str>,
+    ) -> Result<Vec<JobSummary>> {
         let mut url = format!("{}?limit={}", self.workflows_url(), limit);
-        
+
         if let Some(repo) = repo_filter {
-            url.push_str(&format!("&labelSelector=cto.dev/repo={}", repo.replace('/', "-")));
+            url.push_str(&format!(
+                "&labelSelector=cto.dev/repo={}",
+                repo.replace('/', "-")
+            ));
         }
 
         let response = self.add_auth(self.client.get(&url)).send().await?;
@@ -282,25 +317,29 @@ impl K8sClient {
         let mut jobs = Vec::new();
         if let Some(items) = items {
             for item in items {
-                let name = item.get("metadata")
+                let name = item
+                    .get("metadata")
                     .and_then(|m| m.get("name"))
                     .and_then(|n| n.as_str())
                     .unwrap_or("unknown")
                     .to_string();
 
-                let phase = item.get("status")
+                let phase = item
+                    .get("status")
                     .and_then(|s| s.get("phase"))
                     .and_then(|p| p.as_str())
                     .unwrap_or("Unknown")
                     .to_string();
 
-                let created_at = item.get("metadata")
+                let created_at = item
+                    .get("metadata")
                     .and_then(|m| m.get("creationTimestamp"))
                     .and_then(|t| t.as_str())
                     .unwrap_or("Unknown")
                     .to_string();
 
-                let repo = item.get("metadata")
+                let repo = item
+                    .get("metadata")
                     .and_then(|m| m.get("labels"))
                     .and_then(|l| l.get("cto.dev/repo"))
                     .and_then(|r| r.as_str())
