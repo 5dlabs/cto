@@ -7,6 +7,7 @@ import tsparser from '@typescript-eslint/parser';
 
 export default [
   { ignores: ['dist', 'node_modules'] },
+  // TypeScript/React files
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
@@ -32,7 +33,19 @@ export default [
       ],
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-empty-object-type': 'off', // Allow empty interfaces for component props
       'no-unused-vars': 'off', // Use TypeScript's version
+    },
+  },
+  // Vite config file - Node.js environment
+  {
+    files: ['vite.config.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        __dirname: 'readonly',
+        process: 'readonly',
+      },
     },
   },
 ];
