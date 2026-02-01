@@ -1,0 +1,151 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: databases
+  labels:
+    name: databases
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: alerthub-pg
+  namespace: databases
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9187"
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2
+
+  postgresql:
+    parameters:
+      shared_buffers: "256MB"
+      max_connections: "200"
+      work_mem: "16MB"
+      maintenance_work_mem: "128MB"
+      effective_cache_size: "1GB"
+      wal_level: "replica"
+      max_wal_senders: "10"
+      max_replication_slots: "10"
+      hot_standby: "on"
+    pg_hba:
+      - host all all all scram-sha-256
+
+  bootstrap:
+    initdb:
+      database: alerthub
+      owner: alerthub_admin
+      secret:
+        name: alerthub-pg-superuser
+
+  storage:
+    storageClass: standard
+    size: 20Gi
+    pvcTemplate:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+
+  walStorage:
+    storageClass: standard
+    size: 5Gi
+    pvcTemplate:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+  monitoring:
+    enabled: true
+    podMonitorEnabled: true
+    customQueriesConfigMap:
+      - name: alerthub-pg-monitoring
+        key: custom-queries
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                postgresql: alerthub-pg
+            topologyKey: kubernetes.io/hostname
+
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: true
+
+  primaryUpdateStrategy: unsupervised
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://alerthub-pg-backups/
+      endpointURL: http://minio.minio-system.svc.cluster.local:9000
+      s3Credentials:
+        accessKeyId:
+          name: alerthub-pg-backup-secret
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: alerthub-pg-backup-secret
+          key: SECRET_ACCESS_KEY
+      wal:
+        compression: gzip
+        maxParallel: 2
+      data:
+        compression: gzip
+        immediateCheckpoint: true
+        jobs: 2
+    retentionPolicy: "30d"
+
+  superuserSecret:
+    name: alerthub-pg-superuser
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alerthub-pg-superuser
+  namespace: databases
+type: kubernetes.io/basic-auth
+stringData:
+  username: postgres
+  password: "ChangeMeInProduction123!"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alerthub-pg-backup-secret
+  namespace: databases
+type: Opaque
+stringData:
+  ACCESS_KEY_ID: "minioadmin"
+  SECRET_ACCESS_KEY: "minioadmin"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alerthub-pg-monitoring
+  namespace: databases
+data:
+  custom-queries: |
+    alerthub_custom:
+      query: "SELECT current_database() as database, pg_database_size(current_database()) as size_bytes"
+      metrics:
+        - database:
+            usage: "LABEL"
+            description: "Database name"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Database size in bytes"

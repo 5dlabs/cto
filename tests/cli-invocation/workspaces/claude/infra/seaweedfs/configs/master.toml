@@ -1,0 +1,25 @@
+# Master server configuration
+[master]
+port = 9333
+volumeSizeLimitMB = 30000
+defaultReplication = "001"
+
+# Pulse interval for heartbeat
+pulseSeconds = 5
+
+[master.sequencer]
+type = "memory"
+
+[master.maintenance]
+scripts = ""
+
+# Volume growth strategy
+[master.volume_growth]
+copy_1 = 7
+copy_2 = 6
+copy_3 = 3
+copy_other = 1
+
+# Replication type limits
+[master.replication]
+type = "001"

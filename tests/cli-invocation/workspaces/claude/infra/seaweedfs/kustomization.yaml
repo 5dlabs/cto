@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: storage
+
+resources:
+- namespace.yaml
+- configmap.yaml
+- deployment.yaml
+- services.yaml
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: seaweedfs
+
+# ConfigMap generator for custom configuration
+configMapGenerator:
+- name: seaweedfs-config
+  namespace: storage
+  behavior: merge
+  files:
+  - configs/master.toml
+  - configs/filer.toml
+  - configs/security.toml
+
+# Images to use
+images:
+- name: chrislusf/seaweedfs
+  newTag: "3.66"
+
+# Patches for customization
+patches:
+- target:
+    kind: StatefulSet
+    name: seaweedfs-volume
+  patch: |-
+    - op: replace
+      path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+      value: 100Gi
+
+# Resource label transformers
+labels:
+- pairs:
+    environment: production
+    tier: storage
+
+# Annotations
+commonAnnotations:
+  documentation: "https://github.com/seaweedfs/seaweedfs"
+  version: "3.66"

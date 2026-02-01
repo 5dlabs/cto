@@ -1,0 +1,110 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: linear-token-refresh
+  namespace: cto-system
+spec:
+  # Run on the 1st and 15th of each month at 3am UTC
+  # Tokens last 30 days, so refreshing twice a month gives safety margin
+  schedule: "0 3 1,15 * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: refresh
+            image: curlimages/curl:latest
+            env:
+            - name: VAULT_ADDR
+              value: "http://openbao.openbao.svc:8200"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              AGENTS="atlas blaze bolt cipher cleo grizz morgan nova rex spark stitch tap tess vex"
+              
+              for agent in $AGENTS; do
+                AGENT_UPPER=$(echo "$agent" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
+                
+                # Read credentials from OpenBao
+                CREDS=$(curl -s -H "X-Vault-Token: $VAULT_TOKEN" \
+                  "$VAULT_ADDR/v1/secret/data/linear-oauth/$agent")
+                
+                CLIENT_ID=$(echo "$CREDS" | jq -r '.data.data.client_id')
+                CLIENT_SECRET=$(echo "$CREDS" | jq -r '.data.data.client_secret')
+                
+                # Request new token via client_credentials
+                RESPONSE=$(curl -s -X POST https://api.linear.app/oauth/token \
+                  -H "Content-Type: application/x-www-form-urlencoded" \
+                  -d "grant_type=client_credentials" \
+                  -d "scope=read,write,issues:create,comments:create" \
+                  -d "client_id=$CLIENT_ID" \
+                  -d "client_secret=$CLIENT_SECRET")
+                
+                TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
+                
+                if [ -n "$TOKEN" ]; then
+                  # Write new token back to OpenBao
+                  curl -s -X POST -H "X-Vault-Token: $VAULT_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    "$VAULT_ADDR/v1/secret/data/linear-oauth/$agent" \
+                    -d "{\"data\":{\"client_id\":\"$CLIENT_ID\",\"client_secret\":\"$CLIENT_SECRET\",\"developer_token\":\"$TOKEN\"}}"
+                  
+                  echo "✅ $AGENT_UPPER refreshed"
+                else
+                  ERROR=$(echo "$RESPONSE" | jq -r '.error_description // .error')
+                  echo "❌ $AGENT_UPPER failed: $ERROR"
+                fi
+              done
+            envFrom:
+            - secretRef:
+                name: openbao-token
+---
+# Alternative: Simple script that works with 1Password CLI
+# For local/dev environments
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: linear-token-refresh-1password
+  namespace: cto-system
+spec:
+  schedule: "0 3 1,15 * *"
+  suspend: true  # Enable when using 1Password instead of OpenBao
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: 1password-connect
+          containers:
+          - name: refresh
+            image: 1password/op:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              for agent in Atlas Blaze Bolt Cipher Cleo Grizz Morgan Nova Rex Spark Stitch Tap Tess Vex; do
+                CLIENT_ID=$(op read "op://Automation/Linear $agent OAuth/client_id")
+                CLIENT_SECRET=$(op read "op://Automation/Linear $agent OAuth/client_secret")
+                
+                RESPONSE=$(curl -s -X POST https://api.linear.app/oauth/token \
+                  -H "Content-Type: application/x-www-form-urlencoded" \
+                  -d "grant_type=client_credentials" \
+                  -d "scope=read,write,issues:create,comments:create" \
+                  -d "client_id=$CLIENT_ID" \
+                  -d "client_secret=$CLIENT_SECRET")
+                
+                TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty')
+                
+                if [ -n "$TOKEN" ]; then
+                  op item edit "Linear $agent OAuth" "developer_token=$TOKEN" --vault Automation
+                  echo "✅ $agent refreshed"
+                else
+                  echo "❌ $agent failed"
+                fi
+              done

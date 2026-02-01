@@ -1,0 +1,19 @@
+{"type":"system","subtype":"init","cwd":"/workspace","session_id":"smoke-test-atlas","tools":["Read","Write","Bash","Glob","Grep"],"mcp_servers":[{"name":"cto-tools","status":"ok"}],"model":"claude-sonnet-4-5-20250929","skills":[
+  "context-degradation",
+  "context-fundamentals",
+  "context-optimization",
+  "context7",
+  "executing-plans",
+  "finishing-branch",
+  "git-integration",
+  "git-worktrees",
+  "github-mcp",
+  "llm-docs",
+  "multi-agent-patterns",
+  "openmemory",
+  "parallel-agents",
+  "repomix",
+  "verification-before-completion"
+],"uuid":"smoke-atlas"}
+{"type":"assistant","message":{"model":"claude-sonnet-4-5-20250929","id":"msg_smoke_atlas","type":"message","role":"assistant","content":[{"type":"text","text":"Smoke test for atlas agent - verifying Linear integration."}],"stop_reason":"end_turn","usage":{"input_tokens":100,"output_tokens":20}},"session_id":"smoke-test-atlas","uuid":"smoke-msg-atlas"}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":1000,"num_turns":1,"result":"Smoke test complete for atlas","session_id":"smoke-test-atlas","total_cost_usd":0.001,"uuid":"smoke-result-atlas"}

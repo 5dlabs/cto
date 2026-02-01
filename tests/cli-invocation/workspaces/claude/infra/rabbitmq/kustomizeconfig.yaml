@@ -1,0 +1,26 @@
+nameReference:
+  - kind: ConfigMap
+    version: v1
+    fieldSpecs:
+      - path: spec/volumes/configMap/name
+        kind: Pod
+      - path: spec/containers/envFrom/configMapRef/name
+        kind: Pod
+      - path: spec/initContainers/envFrom/configMapRef/name
+        kind: Pod
+
+  - kind: Secret
+    version: v1
+    fieldSpecs:
+      - path: spec/volumes/secret/secretName
+        kind: Pod
+      - path: spec/containers/envFrom/secretRef/name
+        kind: Pod
+      - path: spec/initContainers/envFrom/secretRef/name
+        kind: Pod
+
+varReference:
+  - path: spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
+    kind: Deployment
+  - path: spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+    kind: Deployment

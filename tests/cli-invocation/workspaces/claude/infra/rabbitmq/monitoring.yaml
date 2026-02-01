@@ -1,0 +1,159 @@
+---
+# ServiceMonitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq-cluster
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+      app.kubernetes.io/component: metrics
+  endpoints:
+    - port: prometheus
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      scheme: http
+      honorLabels: true
+
+---
+# PrometheusRule for RabbitMQ alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rabbitmq-cluster-alerts
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: rabbitmq.rules
+      interval: 30s
+      rules:
+        # Cluster availability alerts
+        - alert: RabbitMQClusterDown
+          expr: |
+            sum(up{job="rabbitmq-cluster-metrics"}) < 2
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "RabbitMQ cluster has less than 2 nodes available"
+            description: "RabbitMQ cluster {{ $labels.namespace }}/{{ $labels.service }} has {{ $value }} nodes available. High availability is compromised."
+
+        - alert: RabbitMQNodeDown
+          expr: |
+            up{job="rabbitmq-cluster-metrics"} == 0
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "RabbitMQ node is down"
+            description: "RabbitMQ node {{ $labels.pod }} in namespace {{ $labels.namespace }} is down for more than 3 minutes."
+
+        # Memory alerts
+        - alert: RabbitMQMemoryHigh
+          expr: |
+            rabbitmq_process_resident_memory_bytes / rabbitmq_resident_memory_limit_bytes > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "RabbitMQ memory usage is high"
+            description: "RabbitMQ node {{ $labels.pod }} memory usage is above 90% ({{ $value | humanizePercentage }})"
+
+        - alert: RabbitMQMemoryCritical
+          expr: |
+            rabbitmq_process_resident_memory_bytes / rabbitmq_resident_memory_limit_bytes > 0.95
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "RabbitMQ memory usage is critical"
+            description: "RabbitMQ node {{ $labels.pod }} memory usage is above 95% ({{ $value | humanizePercentage }}). Node may block publishers."
+
+        # Disk alerts
+        - alert: RabbitMQDiskSpaceLow
+          expr: |
+            rabbitmq_disk_space_available_bytes / rabbitmq_disk_space_available_limit_bytes < 1.2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "RabbitMQ disk space is running low"
+            description: "RabbitMQ node {{ $labels.pod }} has less than 20% free disk space available"
+
+        - alert: RabbitMQDiskSpaceCritical
+          expr: |
+            rabbitmq_disk_space_available_bytes / rabbitmq_disk_space_available_limit_bytes < 1.1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "RabbitMQ disk space is critically low"
+            description: "RabbitMQ node {{ $labels.pod }} has less than 10% free disk space. Node will block publishers."
+
+        # File descriptor alerts
+        - alert: RabbitMQFileDescriptorsHigh
+          expr: |
+            rabbitmq_process_open_fds / rabbitmq_process_max_fds > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "RabbitMQ file descriptors usage is high"
+            description: "RabbitMQ node {{ $labels.pod }} is using more than 80% of available file descriptors"
+
+        # Queue alerts
+        - alert: RabbitMQQueueMessagesHigh
+          expr: |
+            sum by (namespace, queue, vhost) (rabbitmq_queue_messages) > 10000
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "RabbitMQ queue has too many messages"
+            description: "Queue {{ $labels.queue }} in vhost {{ $labels.vhost }} has {{ $value }} messages for more than 10 minutes"
+
+        - alert: RabbitMQUnackedMessagesHigh
+          expr: |
+            sum by (namespace, queue, vhost) (rabbitmq_queue_messages_unacked) > 1000
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "RabbitMQ queue has too many unacked messages"
+            description: "Queue {{ $labels.queue }} in vhost {{ $labels.vhost }} has {{ $value }} unacked messages"
+
+        # Connection alerts
+        - alert: RabbitMQTooManyConnections
+          expr: |
+            rabbitmq_connections > 1000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "RabbitMQ has too many connections"
+            description: "RabbitMQ node {{ $labels.pod }} has {{ $value }} connections"
+
+        # Consumer alerts
+        - alert: RabbitMQNoConsumers
+          expr: |
+            sum by (namespace, queue, vhost) (rabbitmq_queue_consumers) == 0
+            and sum by (namespace, queue, vhost) (rabbitmq_queue_messages) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "RabbitMQ queue has no consumers"
+            description: "Queue {{ $labels.queue }} in vhost {{ $labels.vhost }} has messages but no consumers for more than 10 minutes"

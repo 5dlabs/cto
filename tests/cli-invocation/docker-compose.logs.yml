@@ -1,0 +1,46 @@
+# =============================================================================
+# Raw Log Redirect - Docker Compose Override (Simple Alternative to Loki)
+# =============================================================================
+#
+# For CLIs without JSONL output, redirect stdout/stderr to a log file
+# that the sidecar can tail and parse.
+#
+# Use with: docker compose -f docker-compose.yml -f docker-compose.logs.yml up
+#
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Factory CLI - Log to file
+  # ===========================================================================
+  factory:
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        # Redirect all output to log file while also showing on console
+        exec > >(tee /workspace/agent.log) 2>&1
+        bash /run.sh
+
+  factory-sidecar:
+    environment:
+      LOG_SOURCE: file
+      LOG_FILE: /workspace/agent.log
+      # Parse patterns for non-JSONL logs
+      LOG_PARSE_TOOL_PATTERN: '^\[TOOL\] (\w+): (.*)$'
+      LOG_PARSE_ERROR_PATTERN: '^(ERROR|Error|error): (.*)$'
+      LOG_PARSE_COMPLETE_PATTERN: '^\[COMPLETE\]|^✅|^Task completed'
+
+  # ===========================================================================
+  # Codex CLI - Log to file
+  # ===========================================================================
+  codex:
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        exec > >(tee /workspace/agent.log) 2>&1
+        codex --help || echo "Codex requires API key"
+
+  codex-sidecar:
+    environment:
+      LOG_SOURCE: file
+      LOG_FILE: /workspace/agent.log
