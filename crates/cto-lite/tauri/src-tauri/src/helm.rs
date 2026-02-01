@@ -101,8 +101,7 @@ pub async fn deploy_chart(values: &HelmValues) -> Result<()> {
 
     // Add values as --set flags
     if let Some(ref key) = values.anthropic_api_key {
-        cmd.arg("--set")
-            .arg("secrets.anthropic.enabled=true");
+        cmd.arg("--set").arg("secrets.anthropic.enabled=true");
         cmd.arg("--set")
             .arg(format!("secrets.anthropic.apiKey={}", key));
     }
