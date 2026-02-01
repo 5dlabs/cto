@@ -490,6 +490,43 @@
         "localServers": {}
       }
     },
+    "pixel": {
+      "githubApp": "5DLabs-Pixel",
+      "cli": "claude",
+      "model": "claude-opus-4-5-20251101",
+      "tools": {
+        "remote": [
+          "context7_resolve_library_id",
+          "context7_get_library_docs",
+          "octocode_githubSearchCode",
+          "octocode_githubSearchRepositories",
+          "octocode_githubViewRepoStructure",
+          "octocode_githubGetFileContent",
+          "octocode_githubSearchPullRequests",
+          "octocode_packageSearch",
+          "firecrawl_scrape",
+          "firecrawl_crawl",
+          "firecrawl_map",
+          "firecrawl_search",
+          "openmemory_openmemory_query",
+          "openmemory_openmemory_store",
+          "openmemory_openmemory_list",
+          "openmemory_openmemory_get",
+          "openmemory_openmemory_reinforce",
+          "nano_banana_generate_image",
+          "nano_banana_edit_image",
+          "nano_banana_continue_editing",
+          "nano_banana_get_last_image_info",
+          "nano_banana_get_configuration_status",
+          "github_create_pull_request",
+          "github_push_files",
+          "github_create_branch",
+          "github_get_file_contents",
+          "linear_image_upload_from_url"
+        ],
+        "localServers": {}
+      }
+    },
     "tap": {
       "githubApp": "5DLabs-Tap",
       "cli": "claude",
