@@ -87,6 +87,10 @@ serial_test = "3.3"
 # UUID generation
 uuid = { version = "1.20", features = ["v4", "serde"] }
 
+# Cryptography
+sha1 = "0.10"
+hex = "0.4"
+
 [profile.release]
 lto = true
 opt-level = 3

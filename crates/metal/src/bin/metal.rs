@@ -11,8 +11,10 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use metal::providers::latitude::Latitude;
-use metal::providers::{CreateServerRequest, Provider, ReinstallIpxeRequest};
+use metal::providers::{
+    create_provider, latitude::Latitude, CreateServerRequest, Provider, ProviderConfig,
+    ProviderKind, ReinstallIpxeRequest,
+};
 use metal::stack;
 use metal::state::{with_retry_async, ClusterState, ProvisionStep, RetryConfig};
 use metal::talos::{self, BootstrapConfig, TalosConfig};
@@ -23,6 +25,10 @@ use tokio::task::JoinSet;
 #[command(name = "metal")]
 #[command(about = "Provision and manage bare metal servers")]
 struct Cli {
+    /// Infrastructure provider (latitude, hetzner, ovh, vultr, scaleway, cherry, onprem).
+    #[arg(long, env = "METAL_PROVIDER", default_value = "latitude", value_enum)]
+    provider: ProviderKind,
+
     /// Latitude.sh API key (or set `LATITUDE_API_KEY` env var).
     ///
     /// If omitted, `metal` can optionally fetch this from 1Password via `op`.
@@ -34,6 +40,64 @@ struct Cli {
     /// If omitted, `metal` can optionally fetch this from 1Password via `op`.
     #[arg(long, env = "LATITUDE_PROJECT_ID", default_value = "")]
     project_id: String,
+
+    // ── Hetzner Robot credentials ──────────────────────────────────────
+    /// Hetzner Robot API user.
+    #[arg(long, env = "HETZNER_ROBOT_USER", default_value = "")]
+    hetzner_user: String,
+
+    /// Hetzner Robot API password.
+    #[arg(long, env = "HETZNER_ROBOT_PASSWORD", default_value = "")]
+    hetzner_password: String,
+
+    // ── OVH credentials ────────────────────────────────────────────────
+    /// OVH application key.
+    #[arg(long, env = "OVH_APPLICATION_KEY", default_value = "")]
+    ovh_app_key: String,
+
+    /// OVH application secret.
+    #[arg(long, env = "OVH_APPLICATION_SECRET", default_value = "")]
+    ovh_app_secret: String,
+
+    /// OVH consumer key.
+    #[arg(long, env = "OVH_CONSUMER_KEY", default_value = "")]
+    ovh_consumer_key: String,
+
+    // ── Vultr credentials ──────────────────────────────────────────────
+    /// Vultr API key.
+    #[arg(long, env = "VULTR_API_KEY", default_value = "")]
+    vultr_api_key: String,
+
+    // ── Scaleway credentials ───────────────────────────────────────────
+    /// Scaleway secret key.
+    #[arg(long, env = "SCALEWAY_SECRET_KEY", default_value = "")]
+    scaleway_secret_key: String,
+
+    /// Scaleway organization ID.
+    #[arg(long, env = "SCALEWAY_ORGANIZATION_ID", default_value = "")]
+    scaleway_org_id: String,
+
+    /// Scaleway project ID.
+    #[arg(long, env = "SCALEWAY_PROJECT_ID", default_value = "")]
+    scaleway_project_id: String,
+
+    /// Scaleway zone (e.g., fr-par-2).
+    #[arg(long, env = "SCALEWAY_ZONE", default_value = "")]
+    scaleway_zone: String,
+
+    // ── Cherry Servers credentials ─────────────────────────────────────
+    /// Cherry Servers API key.
+    #[arg(long, env = "CHERRY_API_KEY", default_value = "")]
+    cherry_api_key: String,
+
+    /// Cherry Servers team ID.
+    #[arg(long, env = "CHERRY_TEAM_ID", default_value = "")]
+    cherry_team_id: String,
+
+    // ── On-prem inventory ──────────────────────────────────────────────
+    /// Path to on-prem inventory file.
+    #[arg(long, env = "ONPREM_INVENTORY_PATH", default_value = "")]
+    onprem_inventory: String,
 
     /// Fetch missing Latitude credentials from 1Password via the `op` CLI.
     ///
@@ -500,12 +564,46 @@ async fn main() -> Result<()> {
     };
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    // Resolve Latitude credentials (optionally via 1Password)
-    let (api_key, project_id) = resolve_latitude_creds(&cli)?;
+    // Resolve Latitude credentials (optionally via 1Password) when using Latitude provider
+    let (api_key, project_id) = match cli.provider {
+        ProviderKind::Latitude => resolve_latitude_creds(&cli)?,
+        _ => (cli.api_key.clone(), cli.project_id.clone()),
+    };
 
-    // Create provider
-    let provider =
-        Latitude::new(&api_key, &project_id).context("Failed to create Latitude provider")?;
+    // Helper to convert empty strings to None
+    let opt = |s: &str| -> Option<String> {
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    };
+
+    // Build provider config from CLI args using the factory's ProviderConfig
+    let provider_config = ProviderConfig {
+        kind: cli.provider.clone(),
+        latitude_api_key: opt(&api_key),
+        latitude_project_id: opt(&project_id),
+        hetzner_user: opt(&cli.hetzner_user),
+        hetzner_password: opt(&cli.hetzner_password),
+        ovh_app_key: opt(&cli.ovh_app_key),
+        ovh_app_secret: opt(&cli.ovh_app_secret),
+        ovh_consumer_key: opt(&cli.ovh_consumer_key),
+        ovh_subsidiary: None, // Not exposed via CLI yet
+        vultr_api_key: opt(&cli.vultr_api_key),
+        scaleway_secret_key: opt(&cli.scaleway_secret_key),
+        scaleway_org_id: opt(&cli.scaleway_org_id),
+        scaleway_project_id: opt(&cli.scaleway_project_id),
+        scaleway_zone: opt(&cli.scaleway_zone),
+        cherry_api_key: opt(&cli.cherry_api_key),
+        cherry_team_id: cli.cherry_team_id.trim().parse::<i64>().ok(),
+        onprem_inventory_path: opt(&cli.onprem_inventory).map(PathBuf::from),
+    };
+
+    // Create provider via the factory module
+    let provider: Box<dyn Provider> =
+        create_provider(provider_config.clone()).context("Failed to create provider")?;
 
     match cli.command {
         Commands::List => {
@@ -531,7 +629,13 @@ async fn main() -> Result<()> {
             in_stock,
             gen4,
         } => {
-            let plans = provider.list_plans().await?;
+            // Plans discovery is currently Latitude-specific
+            if !matches!(cli.provider, ProviderKind::Latitude) {
+                anyhow::bail!("Plans command is currently only supported for Latitude provider. Use --provider latitude");
+            }
+            let latitude = Latitude::new(&api_key, &project_id)
+                .context("Failed to create Latitude provider for plans")?;
+            let plans = latitude.list_plans().await?;
 
             println!("\n📦 Available Plans");
             println!("{}", "=".repeat(100));
@@ -685,7 +789,13 @@ async fn main() -> Result<()> {
         }
 
         Commands::Regions => {
-            let regions = provider.list_regions().await?;
+            // Regions discovery is currently Latitude-specific
+            if !matches!(cli.provider, ProviderKind::Latitude) {
+                anyhow::bail!("Regions command is currently only supported for Latitude provider. Use --provider latitude");
+            }
+            let latitude = Latitude::new(&api_key, &project_id)
+                .context("Failed to create Latitude provider for regions")?;
+            let regions = latitude.list_regions().await?;
 
             println!("\n🌍 Available Regions");
             println!("{}", "=".repeat(60));
@@ -1040,8 +1150,8 @@ async fn main() -> Result<()> {
             };
 
             // Create second provider instance for parallel ops
-            let provider2 = Latitude::new(&api_key, &project_id)
-                .context("Failed to create second Latitude provider")?;
+            let provider2: Box<dyn Provider> = create_provider(provider_config.clone())
+                .context("Failed to create second provider")?;
 
             // Variables to track server state (may be restored from saved state)
             let (cp_id, worker_id, cp_addr, worker_addr) =
@@ -1717,10 +1827,10 @@ async fn main() -> Result<()> {
                 ssh_keys,
             };
 
-            let provider2 = Latitude::new(&api_key, &project_id)
-                .context("Failed to create second Latitude provider")?;
-            let provider3 = Latitude::new(&api_key, &project_id)
-                .context("Failed to create third Latitude provider")?;
+            let provider2: Box<dyn Provider> = create_provider(provider_config.clone())
+                .context("Failed to create second provider")?;
+            let provider3: Box<dyn Provider> = create_provider(provider_config.clone())
+                .context("Failed to create third provider")?;
 
             let (cp_server, w1_server, w2_server) =
                 with_retry_async(&retry_config, "Create 3 servers", || {
