@@ -31,12 +31,14 @@ struct CloudflareUser {
 
 /// Cloudflare accounts from API
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct CloudflareAccountsResult {
     result: Vec<CloudflareAccount>,
     success: bool,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct CloudflareAccount {
     id: String,
     name: String,

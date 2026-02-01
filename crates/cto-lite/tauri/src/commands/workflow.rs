@@ -75,7 +75,7 @@ pub async fn list_workflows() -> Result<Vec<WorkflowInfo>, AppError> {
 
     // Parse JSON output
     let workflows: Vec<ArgoWorkflow> =
-        serde_json::from_str(&output).map_err(|e| AppError::JsonError(e))?;
+        serde_json::from_str(&output).map_err(AppError::JsonError)?;
 
     Ok(workflows
         .into_iter()
@@ -105,7 +105,7 @@ pub async fn get_workflow_status(name: String) -> Result<WorkflowInfo, AppError>
     ])?;
 
     let workflow: ArgoWorkflow =
-        serde_json::from_str(&output).map_err(|e| AppError::JsonError(e))?;
+        serde_json::from_str(&output).map_err(AppError::JsonError)?;
 
     Ok(WorkflowInfo {
         name: workflow.metadata.name,

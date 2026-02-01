@@ -149,6 +149,7 @@ impl Database {
     }
 
     /// Update setup progress
+    #[allow(dead_code)]
     pub fn set_setup_progress(&self, step: i32) -> AppResult<()> {
         let conn = self.conn.lock().map_err(|e| {
             AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
@@ -177,6 +178,7 @@ impl Database {
     }
 
     /// Add or update a repository
+    #[allow(dead_code)]
     pub fn upsert_repository(
         &self,
         id: &str,
@@ -201,6 +203,7 @@ impl Database {
     }
 
     /// Set webhook ID for a repository
+    #[allow(dead_code)]
     pub fn set_repository_webhook(&self, full_name: &str, webhook_id: &str) -> AppResult<()> {
         let conn = self.conn.lock().map_err(|e| {
             AppError::DatabaseError(rusqlite::Error::InvalidParameterName(e.to_string()))
@@ -215,6 +218,7 @@ impl Database {
     }
 
     /// Insert a workflow record
+    #[allow(dead_code)]
     pub fn insert_workflow(
         &self,
         id: &str,
@@ -239,6 +243,7 @@ impl Database {
     }
 
     /// Update workflow status
+    #[allow(dead_code)]
     pub fn update_workflow_status(
         &self,
         id: &str,
@@ -270,6 +275,7 @@ impl Database {
     }
 
     /// Append a log entry
+    #[allow(dead_code)]
     pub fn append_workflow_log(
         &self,
         workflow_id: &str,

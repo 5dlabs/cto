@@ -8,10 +8,15 @@ use crate::error::{AppError, AppResult};
 use std::path::PathBuf;
 
 /// Binary names we bundle
+#[allow(dead_code)]
 pub const KIND: &str = "kind";
+#[allow(dead_code)]
 pub const KUBECTL: &str = "kubectl";
+#[allow(dead_code)]
 pub const HELM: &str = "helm";
+#[allow(dead_code)]
 pub const CLOUDFLARED: &str = "cloudflared";
+#[allow(dead_code)]
 pub const MCP_LITE: &str = "mcp-lite";
 
 /// Get the path to a bundled binary
@@ -50,7 +55,7 @@ fn binary_name(name: &str) -> String {
 pub fn get_resources_dir() -> AppResult<PathBuf> {
     #[cfg(target_os = "macos")]
     {
-        let exe = std::env::current_exe().map_err(|e| AppError::IoError(e))?;
+        let exe = std::env::current_exe().map_err(AppError::IoError)?;
         // /path/to/CTO Lite.app/Contents/MacOS/cto-lite-tauri
         // -> /path/to/CTO Lite.app/Contents/Resources
         let resources = exe
@@ -63,7 +68,7 @@ pub fn get_resources_dir() -> AppResult<PathBuf> {
 
     #[cfg(target_os = "windows")]
     {
-        let exe = std::env::current_exe().map_err(|e| AppError::IoError(e))?;
+        let exe = std::env::current_exe().map_err(AppError::IoError)?;
         // /path/to/CTO Lite/cto-lite.exe -> /path/to/CTO Lite/resources
         let resources = exe.parent().map(|p| p.join("resources"));
         resources.ok_or_else(|| AppError::ConfigError("Could not determine resources path".into()))
@@ -71,7 +76,7 @@ pub fn get_resources_dir() -> AppResult<PathBuf> {
 
     #[cfg(target_os = "linux")]
     {
-        let exe = std::env::current_exe().map_err(|e| AppError::IoError(e))?;
+        let exe = std::env::current_exe().map_err(AppError::IoError)?;
         // AppImage or /opt install
         let resources = exe.parent().map(|p| p.join("resources"));
         resources.ok_or_else(|| AppError::ConfigError("Could not determine resources path".into()))
@@ -79,6 +84,7 @@ pub fn get_resources_dir() -> AppResult<PathBuf> {
 }
 
 /// Get the bundled Helm chart directory
+#[allow(dead_code)]
 pub fn get_chart_path() -> AppResult<PathBuf> {
     let chart = get_resources_dir()?.join("charts").join("cto-lite");
 
@@ -108,6 +114,7 @@ pub fn get_chart_path() -> AppResult<PathBuf> {
 }
 
 /// Get the workflow template path
+#[allow(dead_code)]
 pub fn get_workflow_template_path() -> AppResult<PathBuf> {
     let template = get_resources_dir()?
         .join("templates")
@@ -139,6 +146,7 @@ pub fn get_workflow_template_path() -> AppResult<PathBuf> {
 }
 
 /// Get the user data directory
+#[allow(dead_code)]
 pub fn get_data_dir() -> AppResult<PathBuf> {
     // Check environment override first
     if let Ok(dir) = std::env::var("CTO_DATA_DIR") {
@@ -168,6 +176,7 @@ pub fn get_data_dir() -> AppResult<PathBuf> {
 }
 
 /// Get the kubeconfig path for the Kind cluster
+#[allow(dead_code)]
 pub fn get_kubeconfig_path() -> AppResult<PathBuf> {
     Ok(get_data_dir()?
         .join("kubeconfig")
@@ -175,11 +184,13 @@ pub fn get_kubeconfig_path() -> AppResult<PathBuf> {
 }
 
 /// Get the logs directory
+#[allow(dead_code)]
 pub fn get_logs_dir() -> AppResult<PathBuf> {
     Ok(get_data_dir()?.join("logs"))
 }
 
 /// MCP configuration for IDE integration
+#[allow(dead_code)]
 #[derive(serde::Serialize)]
 pub struct McpConfig {
     pub command: String,
@@ -188,6 +199,7 @@ pub struct McpConfig {
 }
 
 /// Generate MCP config for IDE integration
+#[allow(dead_code)]
 pub fn get_mcp_config() -> AppResult<McpConfig> {
     let mcp_path = get_binary_path(MCP_LITE)?;
     let data_dir = get_data_dir()?;

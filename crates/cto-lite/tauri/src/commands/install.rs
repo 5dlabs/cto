@@ -137,7 +137,7 @@ fn install_missing_dependencies(window: &tauri::Window) -> AppResult<()> {
     // Check what's missing
     let missing: Vec<_> = BREW_INSTALLABLE
         .iter()
-        .filter(|(bin, _)| !which::which(bin).is_ok())
+        .filter(|(bin, _)| which::which(bin).is_err())
         .collect();
 
     if missing.is_empty() {
@@ -426,6 +426,7 @@ fn pull_image(image: &str) -> AppResult<()> {
 }
 
 /// Load image into Kind cluster
+#[allow(dead_code)]
 fn load_image_to_kind(image: &str, cluster: &str) -> AppResult<()> {
     tracing::info!("Loading image {} into cluster {}", image, cluster);
 
@@ -443,6 +444,7 @@ fn load_image_to_kind(image: &str, cluster: &str) -> AppResult<()> {
 }
 
 /// Create Kubernetes namespace
+#[allow(dead_code)]
 fn create_namespace(name: &str) -> AppResult<()> {
     let output = Command::new("kubectl")
         .args(["create", "namespace", name, "--context", "kind-cto-lite"])

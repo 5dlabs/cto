@@ -7,6 +7,8 @@
     all(not(debug_assertions), target_os = "windows"),
     windows_subsystem = "windows"
 )]
+// Allow tauri::generate_context! which internally uses eprintln
+#![allow(clippy::disallowed_macros)]
 
 mod commands;
 mod db;

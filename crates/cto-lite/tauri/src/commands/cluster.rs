@@ -203,6 +203,7 @@ fn scan_installed_tools() -> Vec<InstalledTool> {
 }
 
 /// Get all possible kubeconfig file paths
+#[allow(dead_code)]
 fn get_kubeconfig_paths() -> Vec<std::path::PathBuf> {
     let mut paths = Vec::new();
 

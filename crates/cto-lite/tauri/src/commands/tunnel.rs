@@ -22,12 +22,14 @@ pub struct TunnelStatus {
 
 /// Cloudflare tunnel info from API
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct CloudflareTunnelsResult {
     result: Vec<CloudflareTunnel>,
     success: bool,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct CloudflareTunnel {
     id: String,
     name: String,
@@ -35,6 +37,7 @@ struct CloudflareTunnel {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct CloudflareTunnelTokenResult {
     result: String,
     success: bool,
@@ -56,6 +59,7 @@ pub async fn create_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppE
         .await?;
 
     #[derive(Deserialize)]
+    #[allow(dead_code)]
     struct AccountsResult {
         result: Vec<Account>,
     }
@@ -75,7 +79,7 @@ pub async fn create_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppE
     // Check if tunnel already exists
     let tunnel_name = "cto-lite";
     let tunnels_response = client
-        .get(&format!(
+        .get(format!(
             "https://api.cloudflare.com/client/v4/accounts/{}/cfd_tunnel",
             account_id
         ))
@@ -94,7 +98,7 @@ pub async fn create_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppE
         tracing::info!("Creating new tunnel: {}", tunnel_name);
 
         let create_response = client
-            .post(&format!(
+            .post(format!(
                 "https://api.cloudflare.com/client/v4/accounts/{}/cfd_tunnel",
                 account_id
             ))
@@ -122,7 +126,7 @@ pub async fn create_tunnel(db: State<'_, Database>) -> Result<TunnelStatus, AppE
 
     // Get tunnel token
     let token_response = client
-        .get(&format!(
+        .get(format!(
             "https://api.cloudflare.com/client/v4/accounts/{}/cfd_tunnel/{}/token",
             account_id, tunnel_id
         ))
