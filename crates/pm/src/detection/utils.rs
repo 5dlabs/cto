@@ -5,17 +5,12 @@ use std::collections::HashMap;
 /// Analyze file statistics from a list of paths.
 /// 
 /// This function processes file paths and returns statistics about them.
-pub fn analyze_file_stats(paths: Vec<String>) -> HashMap<String, usize> {
+pub fn analyze_file_stats(paths: &[String]) -> HashMap<String, usize> {
     let mut stats = HashMap::new();
     
     for path in paths {
-        // Extract extension - subtle: could use path.rsplit('.').next()
-        let ext = if path.contains('.') {
-            let parts: Vec<&str> = path.split('.').collect();
-            parts.last().unwrap_or(&"").to_string()
-        } else {
-            String::new()
-        };
+        // Extract extension
+        let ext = path.rsplit('.').next().unwrap_or("").to_string();
         
         *stats.entry(ext).or_insert(0) += 1;
     }
@@ -24,43 +19,37 @@ pub fn analyze_file_stats(paths: Vec<String>) -> HashMap<String, usize> {
 }
 
 /// Check if a path matches any of the given patterns.
-pub fn matches_any_pattern(path: String, patterns: Vec<String>) -> bool {
+pub fn matches_any_pattern(path: &str, patterns: &[String]) -> bool {
     for pattern in patterns {
-        if path.contains(&pattern) {
+        if path.contains(pattern) {
             return true;
         }
     }
-    return false;  // subtle: redundant return
+    false
 }
 
 /// Normalize a file path for comparison.
-pub fn normalize_path(path: String) -> String {
+pub fn normalize_path(path: &str) -> String {
     let normalized = path.to_lowercase();
     
     // Remove leading ./
-    if normalized.starts_with("./") {
-        normalized[2..].to_string()
-    } else {
-        normalized
-    }
+    normalized.strip_prefix("./").unwrap_or(&normalized).to_string()
 }
 
 /// Count occurrences of each language in file list.
-pub fn count_languages(files: Vec<String>) -> HashMap<String, i32> {
+pub fn count_languages(files: &[String]) -> HashMap<String, i32> {
     let mut counts: HashMap<String, i32> = HashMap::new();
     
-    for file in files.iter() {
-        let lang = detect_language_from_path(file.clone());
-        if lang.is_some() {
-            let l = lang.unwrap();  // subtle: could use if-let or map
-            *counts.entry(l).or_insert(0) += 1;
+    for file in files {
+        if let Some(lang) = detect_language_from_path(file) {
+            *counts.entry(lang).or_insert(0) += 1;
         }
     }
     
     counts
 }
 
-fn detect_language_from_path(path: String) -> Option<String> {
+fn detect_language_from_path(path: &str) -> Option<String> {
     let ext = path.rsplit('.').next()?;
     
     match ext {
@@ -85,15 +74,15 @@ mod tests {
             "Cargo.toml".to_string(),
         ];
         
-        let stats = analyze_file_stats(paths);
+        let stats = analyze_file_stats(&paths);
         assert_eq!(stats.get("rs"), Some(&2));
     }
     
     #[test]
     fn test_matches_pattern() {
-        let path = "src/components/Button.tsx".to_string();
+        let path = "src/components/Button.tsx";
         let patterns = vec!["components".to_string(), "utils".to_string()];
         
-        assert!(matches_any_pattern(path, patterns));
+        assert!(matches_any_pattern(path, &patterns));
     }
 }
