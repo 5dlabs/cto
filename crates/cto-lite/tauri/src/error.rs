@@ -55,25 +55,52 @@ pub struct CommandError {
 
 impl From<AppError> for CommandError {
     fn from(err: AppError) -> Self {
-        let code = match &err {
-            AppError::RuntimeNotFound(_) => "RUNTIME_NOT_FOUND",
-            AppError::RuntimeNotRunning(_) => "RUNTIME_NOT_RUNNING",
-            AppError::ClusterError(_) => "CLUSTER_ERROR",
-            AppError::DatabaseError(_) => "DATABASE_ERROR",
-            AppError::KeychainError(_) => "KEYCHAIN_ERROR",
-            AppError::OAuthError(_) => "OAUTH_ERROR",
-            AppError::HttpError(_) => "HTTP_ERROR",
-            AppError::IoError(_) => "IO_ERROR",
-            AppError::JsonError(_) => "JSON_ERROR",
-            AppError::CommandFailed(_) => "COMMAND_FAILED",
-            AppError::ConfigError(_) => "CONFIG_ERROR",
-            AppError::TunnelError(_) => "TUNNEL_ERROR",
-            AppError::NotConfigured(_) => "NOT_CONFIGURED",
+        let (code, message) = match &err {
+            AppError::RuntimeNotFound(msg) => ("RUNTIME_NOT_FOUND", msg.clone()),
+            AppError::RuntimeNotRunning(msg) => ("RUNTIME_NOT_RUNNING", msg.clone()),
+            AppError::ClusterError(msg) => ("CLUSTER_ERROR", msg.clone()),
+            // Sanitize internal errors - don't expose database/system details
+            AppError::DatabaseError(_) => {
+                tracing::error!("Database error: {}", err);
+                ("DATABASE_ERROR", "A database error occurred".to_string())
+            }
+            AppError::KeychainError(msg) => ("KEYCHAIN_ERROR", msg.clone()),
+            AppError::OAuthError(msg) => ("OAUTH_ERROR", msg.clone()),
+            // Sanitize HTTP errors - don't expose internal URLs or auth details
+            AppError::HttpError(e) => {
+                tracing::error!("HTTP error: {}", e);
+                let sanitized = if e.is_timeout() {
+                    "Request timed out".to_string()
+                } else if e.is_connect() {
+                    "Connection failed".to_string()
+                } else {
+                    "Network request failed".to_string()
+                };
+                ("HTTP_ERROR", sanitized)
+            }
+            // Sanitize IO errors - don't expose file paths
+            AppError::IoError(e) => {
+                tracing::error!("IO error: {}", e);
+                let sanitized = match e.kind() {
+                    std::io::ErrorKind::NotFound => "File not found".to_string(),
+                    std::io::ErrorKind::PermissionDenied => "Permission denied".to_string(),
+                    _ => "An I/O error occurred".to_string(),
+                };
+                ("IO_ERROR", sanitized)
+            }
+            AppError::JsonError(_) => {
+                tracing::error!("JSON error: {}", err);
+                ("JSON_ERROR", "Invalid data format".to_string())
+            }
+            AppError::CommandFailed(msg) => ("COMMAND_FAILED", msg.clone()),
+            AppError::ConfigError(msg) => ("CONFIG_ERROR", msg.clone()),
+            AppError::TunnelError(msg) => ("TUNNEL_ERROR", msg.clone()),
+            AppError::NotConfigured(msg) => ("NOT_CONFIGURED", msg.clone()),
         };
 
         CommandError {
             code: code.to_string(),
-            message: err.to_string(),
+            message,
         }
     }
 }

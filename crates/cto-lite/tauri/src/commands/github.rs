@@ -6,9 +6,17 @@ use crate::db::Database;
 use crate::error::AppError;
 use crate::keychain::{self, CredentialKey};
 
-// GitHub OAuth App credentials (CTO Lite app)
-// These are public - the secret is validated server-side
-const GITHUB_CLIENT_ID: &str = "Ov23liXXXXXXXXXXXXXX"; // TODO: Replace with real client ID
+// GitHub OAuth App credentials - loaded from environment
+// Client ID is public, secret is validated server-side
+fn github_client_id() -> String {
+    std::env::var("GITHUB_CLIENT_ID")
+        .or_else(|_| std::env::var("CTO_LITE_GITHUB_CLIENT_ID"))
+        .unwrap_or_else(|_| {
+            tracing::warn!("GITHUB_CLIENT_ID not set, using placeholder");
+            "Ov23liXXXXXXXXXXXXXX".to_string()
+        })
+}
+
 const GITHUB_REDIRECT_URI: &str = "http://localhost:19284/callback/github";
 
 /// GitHub connection status
@@ -71,7 +79,7 @@ pub async fn start_github_oauth() -> Result<String, AppError> {
         redirect_uri={}&\
         scope=repo,read:user,user:email&\
         state={}",
-        GITHUB_CLIENT_ID,
+        github_client_id(),
         urlencoding::encode(GITHUB_REDIRECT_URI),
         state
     );
