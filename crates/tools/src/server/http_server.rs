@@ -1351,7 +1351,7 @@ impl BridgeState {
                     .await
                 {
                     tracing::warn!(
-                        "⚠️ Failed to start health monitoring for {}: {}",
+                        "⚠️ Failed to start health monitoring for {}: {:?}",
                         server_name,
                         e
                     );
