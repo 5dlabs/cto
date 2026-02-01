@@ -376,6 +376,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cto-lite-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1650,6 +1657,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "config",
+ "cto-lite-common",
  "dotenvy",
  "hex",
  "hmac",
