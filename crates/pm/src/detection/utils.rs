@@ -10,7 +10,11 @@ pub fn analyze_file_stats(paths: &[String]) -> HashMap<String, usize> {
     
     for path in paths {
         // Extract extension
-        let ext = path.rsplit('.').next().unwrap_or("").to_string();
+        let ext = if path.contains('.') {
+            path.rsplit('.').next().unwrap_or("").to_string()
+        } else {
+            String::new()
+        };
         
         *stats.entry(ext).or_insert(0) += 1;
     }
