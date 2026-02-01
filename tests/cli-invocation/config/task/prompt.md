@@ -1,50 +1,22 @@
-# Task 1: Setup Kubernetes infrastructure and databases
+# Task: Create Kubernetes Health Check Module
 
-## Priority
-high
+You are the Bolt infrastructure agent. Create a simple health check module for a Kubernetes deployment.
 
-## Description
-Provision all required databases and infrastructure services including PostgreSQL, Redis/Valkey, Kafka, MongoDB, RabbitMQ, and SeaweedFS using CRDs
+## Requirements
 
-## CRITICAL: Use Subagents for Parallel Work
-
-**You MUST delegate each database deployment to a subagent using the `Task` tool.**
-
-Structure your work as follows:
-1. **Main agent (you):** Orchestrate and coordinate
-2. **Subagent 1:** Deploy PostgreSQL with CloudNative-PG (use `Task` tool)
-3. **Subagent 2:** Deploy Redis/Valkey cluster (use `Task` tool)
-4. **Subagent 3:** Deploy MongoDB with Percona (use `Task` tool)
-5. **Subagent 4:** Deploy Kafka with Strimzi (use `Task` tool)
-6. **Subagent 5:** Deploy RabbitMQ cluster (use `Task` tool)
-7. **Subagent 6:** Deploy SeaweedFS for object storage (use `Task` tool)
-
-Example of spawning a subagent:
-```
-Task({
-  task: "Create PostgreSQL CRD manifest using CloudNative-PG operator. Create the file at /workspace/infra/postgresql/cluster.yaml with a 3-instance HA cluster.",
-  agentName: "general-purpose"
-})
-```
-
-After all subagents complete, harmonize their work:
-- Create the main kustomization.yaml
-- Configure namespaces and network policies
-- Document the deployment
-
-## Dependencies
-None
+1. Create a directory structure at `/workspace/health/`
+2. Create `health/mod.rs` - Module entry point with pub exports
+3. Create `health/probes.rs` - Implement liveness and readiness probe handlers
+4. Create `health/types.rs` - Define response types (HealthStatus enum, HealthResponse struct)
 
 ## Implementation Details
-Deploy CloudNative-PG PostgreSQL cluster, Valkey Redis, Strimzi Kafka, Percona MongoDB, RabbitMQ cluster, and SeaweedFS for object storage. Configure namespaces, network policies, and resource quotas.
 
-## Acceptance Criteria
-All CRDs deploy successfully, databases are reachable from test pods, health checks pass, persistent storage is provisioned
+The module should:
+- Return JSON responses
+- Include version and uptime information
+- Support both `/healthz` (liveness) and `/readyz` (readiness) endpoints
 
-## Workspace
-You are working in `/workspace` which is a Git repository. Create all manifests and configurations there.
+## Definition of Done
 
-## Notes
-- This is a LOCAL Docker test environment - you will NOT have a real Kubernetes cluster
-- Focus on CREATING the manifest files and configurations
-- **USE SUBAGENTS** - This is critical for testing parallel execution
+Check off items in `/workspace/task/acceptance-criteria.md` as you complete them.
+Use the `Read` tool to view the acceptance criteria file first.

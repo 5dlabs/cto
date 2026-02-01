@@ -44,47 +44,42 @@ echo "--- Verifying MCP Server ---" >&2
 claude mcp list >&2 2>&1 || true
 
 # -----------------------------------------------------------------------------
-# 3. Check for Custom Agents (auto-discovered from ~/.claude/agents/)
-# -----------------------------------------------------------------------------
-echo "" >&2
-echo "--- Checking Custom Agents ---" >&2
-AGENTS_DIR="${HOME}/.claude/agents"
-
-if [[ -d "${AGENTS_DIR}" ]]; then
-  echo "📂 Agents directory: ${AGENTS_DIR}" >&2
-  for agent_file in "${AGENTS_DIR}"/*.md; do
-    if [[ -f "$agent_file" ]]; then
-      agent_name=$(basename "$agent_file" .md)
-      echo "  ✓ Found agent: ${agent_name}" >&2
-    fi
-  done
-else
-  echo "  No custom agents directory found" >&2
-fi
-
-# -----------------------------------------------------------------------------
-# 4. Execute Claude CLI
+# 3. Execute Claude CLI
 # -----------------------------------------------------------------------------
 echo "" >&2
 echo "--- Executing Claude CLI ---" >&2
 
-# The prompt - read from TASK_FILE, prompt.md file, or use CLAUDE_PROMPT env var
-if [[ -n "${TASK_FILE:-}" && -f "${TASK_FILE}" ]]; then
-  echo "📋 Reading prompt from ${TASK_FILE}" >&2
-  PROMPT="$(cat "${TASK_FILE}")"
-elif [[ -f "${WORKSPACE}/prompt.md" ]]; then
-  echo "📋 Reading prompt from ${WORKSPACE}/prompt.md" >&2
-  PROMPT="$(cat "${WORKSPACE}/prompt.md")"
+# Load prompt from file if it exists (mirrors controller's prompt handling)
+if [[ -f "${WORKSPACE}/task/prompt.md" ]]; then
+  echo "Loading prompt from ${WORKSPACE}/task/prompt.md" >&2
+  PROMPT="$(cat "${WORKSPACE}/task/prompt.md")"
 elif [[ -n "${CLAUDE_PROMPT:-}" ]]; then
   PROMPT="${CLAUDE_PROMPT}"
 else
-  echo "❌ Error: No prompt found. Either set TASK_FILE, create ${WORKSPACE}/prompt.md, or set CLAUDE_PROMPT env var" >&2
-  exit 1
+  # Default prompt for testing MCP tools
+  PROMPT="You have access to CTO MCP tools. Please complete these tasks to verify the tools work:
+
+## Task 1: Use Context7 to look up documentation
+Use the context7 MCP tools to:
+1. Resolve the library ID for 'effect' (the TypeScript Effect library)
+2. Get documentation about Effect's Schema module
+
+## Task 2: Use Firecrawl to research
+Use the firecrawl MCP tools to:
+1. Search for 'Rust axum framework best practices 2025'
+2. Summarize the top result
+
+## Task 3: Create a summary file
+Create a file at /workspace/mcp-test-results.md that summarizes:
+- Which MCP tools you called
+- What results you got from each
+- Any errors encountered
+
+Be explicit about which tools you're calling so we can verify the MCP integration is working."
 fi
 
 # Run Claude with streaming output for sidecar parsing
-# Custom agents are auto-discovered from ~/.claude/agents/*.md
-# The init message in stream-json contains tools, skills, agents, and mcp_servers
+# The init message in stream-json contains tools, skills, and mcp_servers
 (echo "n" | claude --print --output-format stream-json --verbose \
   --dangerously-skip-permissions \
   "${PROMPT}" 2>&1) | tee "${WORKSPACE}/stream.jsonl"

@@ -1,279 +1,112 @@
 # CLI Invocation Tests
 
-End-to-end testing for CTO agents with Linear integration.
+Local Docker-based smoke and integration tests for all CTO agent CLIs and the Linear sidecar.
 
-## Quick Start
+## Prerequisites
 
-```bash
-# 1. Setup environment
-cp .env.example .env
-# Edit .env with your credentials (see "OAuth Token Setup" below)
+- Docker (or Colima) with buildx
+- Pre-built images: `./build-images.sh all`
 
-# 2. Generate per-agent configurations
-./scaffold-skills.sh     # Creates config/skills-{agent}/ for all agents
-./scaffold-agents.sh     # Creates config/client-config-{agent}.json
+## Smoke Tests (No Linear)
 
-# 3. Build Docker images (first time only)
-./build-images.sh all
-
-# 4. Run an agent test
-./run-agent.sh bolt      # Run Bolt agent test
-./run-agent.sh rex       # Run Rex agent test
-./run-agent.sh blaze     # Run Blaze agent test
-```
-
-## Directory Structure
-
-```
-tests/cli-invocation/
-├── config/
-│   ├── skills-{agent}/           # Per-agent skills (from scaffold-skills.sh)
-│   │   └── {skill-name}/
-│   │       └── SKILL.md
-│   ├── client-config-{agent}.json  # Per-agent MCP tool filtering
-│   ├── task-{agent}/             # Per-agent task prompts
-│   │   └── prompt.md
-│   ├── claude-settings.json      # Claude CLI settings
-│   └── agents/                   # Sub-agent definitions
-├── scripts/
-│   ├── run-claude.sh             # Container entrypoint for Claude CLI
-│   ├── run-bolt.sh               # Bolt-specific entrypoint
-│   └── run-factory.sh            # Factory CLI entrypoint
-├── workspaces/
-│   └── {agent}/                  # Agent workspace (stream.jsonl output)
-├── docs/
-│   └── GITHUB-TOKENS.md          # GitHub App token documentation
-├── docker-compose.yml            # Multi-agent service definitions
-├── .env.example                  # Environment template
-├── scaffold-skills.sh            # Generate per-agent skills
-├── scaffold-agents.sh            # Generate per-agent configs
-├── verify-github-tokens.sh       # Verify GitHub App tokens
-├── run-agent.sh                  # Easy agent test runner
-└── build-images.sh               # Build Docker images
-```
-
-## Available Agents
-
-All agents use the Claude CLI:
-
-| Agent | Specialty | Skills | Tools |
-|-------|-----------|--------|-------|
-| **bolt** | Infrastructure & DevOps | 20 | 53 |
-| **rex** | Backend Rust Development | 22 | 53 |
-| **blaze** | Frontend Development | 26 | 30 |
-| **morgan** | Project Management | 20 | 25 |
-| **cleo** | Code Review & Quality | 17 | 25 |
-| **tess** | Testing & QA | 19 | 25 |
-| **atlas** | Integration & Coordination | 15 | 20 |
-| **cipher** | Security Analysis | 20 | 25 |
-| **grizz** | Database & Backend | 21 | 30 |
-| **nova** | Data Science | 23 | 30 |
-| **tap** | Mobile (Expo) | 26 | 30 |
-| **spark** | Electron Desktop | 20 | 25 |
-| **stitch** | PR Review | 9 | 15 |
-| **vex** | VR/AR Development | 18 | 20 |
-
-## OAuth Token Setup
-
-### 1. Linear OAuth Token
-
-Required for posting agent sessions to Linear issues.
+Run all CLI smoke tests in parallel (version checks, no API keys required):
 
 ```bash
-# Read from 1Password
-op read "op://Automation/Linear Morgan OAuth/developer_token" --reveal
+docker compose up
 ```
 
-Add to `.env`:
-```
-LINEAR_OAUTH_TOKEN=your_token_here
-```
-
-### 2. Anthropic API Key
-
-Required for Claude CLI execution.
+Run a specific CLI:
 
 ```bash
-# Read from 1Password
-op read "op://Automation/cto-secrets/anthropic_api_key" --reveal
+docker compose up claude
 ```
 
-Add to `.env`:
-```
-ANTHROPIC_API_KEY=your_key_here
-```
+## Integration Test (Linear Agent Dialog)
 
-### 3. Linear Issue Identifier
+To stream real activity to a Linear issue, the sidecar **creates the agent session** from an issue. You supply the issue (by ID or identifier) and Morgan's OAuth token from 1Password; the sidecar creates the session and emits activities.
 
-The Linear issue where agent sessions will be posted.
-
-```
-LINEAR_ISSUE_IDENTIFIER=CTOPA-123
-```
-
-### 4. GitHub App Tokens (Optional)
-
-Each agent has a dedicated GitHub App for repository access. Tokens are auto-generated from private keys.
-
-See `docs/GITHUB-TOKENS.md` for details.
+### 1. Get Morgan's token from 1Password
 
 ```bash
-# Verify all tokens
-./verify-github-tokens.sh
+# Morgan's Linear OAuth access token (Linear Agent Client Secrets)
+export LINEAR_OAUTH_TOKEN=$(op read "op://Development/Linear App Morgan/access_token" --reveal)
 ```
 
-## Running Tests
-
-### Single Agent
+If your 1Password item/section name differs (e.g. "Linear Agent Client Secrets (Rotated YYYY-MM-DD)" with section "Morgan"):
 
 ```bash
-# Using the helper script (recommended)
-./run-agent.sh bolt
-./run-agent.sh rex coder
-
-# Using docker compose directly
-docker compose --profile bolt up
+export LINEAR_OAUTH_TOKEN=$(op read "op://VaultName/Item Name/Morgan/access_token" --reveal)
 ```
 
-### Multiple Agents
+### 2. Set the target issue
+
+Use either the issue **identifier** (e.g. `CTOPA-2620`) or the issue **UUID**:
 
 ```bash
-# Run all agents (parallel)
-docker compose --profile all up
+# By identifier (sidecar resolves to UUID and creates session)
+export LINEAR_ISSUE_IDENTIFIER=CTOPA-2620
+
+# Or by UUID (from Linear issue URL or API)
+export LINEAR_ISSUE_ID=<issue-uuid>
 ```
 
-### Viewing Output
+You do **not** set `LINEAR_SESSION_ID` — the sidecar creates the session via `agentSessionCreateOnIssue` and then emits to it.
 
-Agent output is written to `workspaces/{agent}/stream.jsonl`:
+### 3. Run Claude + sidecar with Linear
+
+From repo root, with token and issue set:
 
 ```bash
-# View stream types
-cat workspaces/bolt/stream.jsonl | jq -r '.type' | sort | uniq -c
+cd tests/cli-invocation
 
-# View init message (skills, tools, model)
-head -1 workspaces/bolt/stream.jsonl | jq .
-
-# View tool calls
-grep '"tool_use"' workspaces/bolt/stream.jsonl | jq .
+# Run Claude to produce stream, then sidecar to parse and emit to Linear
+# (Claude needs ANTHROPIC_API_KEY for real responses; sidecar needs LINEAR_OAUTH_TOKEN + issue)
+export LINEAR_OAUTH_TOKEN=$(op read "op://Development/Linear App Morgan/access_token" --reveal)
+export LINEAR_ISSUE_IDENTIFIER=CTOPA-2620   # or your test issue
+./run-with-linear.sh
 ```
 
-## Troubleshooting
-
-### "Skills showing empty []"
-
-**Cause:** Skills not mounted or wrong directory structure.
-
-**Fix:**
-```bash
-./scaffold-skills.sh {agent}
-ls config/skills-{agent}/  # Should show directories, not flat files
-```
-
-### "MCP tools 0/X used"
-
-**Cause:** Tool filtering not working or CLI didn't use MCP tools.
-
-**Check:**
-```bash
-jq '.remoteTools | length' config/client-config-{agent}.json
-grep mcp workspaces/{agent}/stream.jsonl
-```
-
-### "Container exits immediately"
-
-**Cause:** Missing environment variables or API keys.
-
-**Check:**
-```bash
-docker compose --profile bolt config  # Validate compose file
-grep -E "^(ANTHROPIC|LINEAR)" .env    # Verify secrets
-```
-
-### "Linear post failed"
-
-**Cause:** Invalid OAuth token or issue not accessible.
-
-**Check:**
-```bash
-# Test token
-curl -H "Authorization: Bearer $LINEAR_OAUTH_TOKEN" \
-  https://api.linear.app/graphql \
-  -d '{"query":"{ viewer { id } }"}'
-```
-
-### Docker Image Issues
+The script **opens the Linear issue in your browser** before the test runs so you can watch the agent dialog update in real time. If your Linear workspace URL uses a different slug (e.g. `mycompany` instead of `5dlabs`), set:
 
 ```bash
-# Rebuild images
-./build-images.sh all
-
-# Check image exists
-docker images | grep cto-claude
-
-# Pull base images if slow
-docker pull debian:bookworm-slim
+export LINEAR_WORKSPACE_SLUG=mycompany
 ```
 
-## Configuration Sources
+Or run the sidecar alone against an existing stream file (e.g. from a previous Claude run):
 
-Skills and tools are configured in `cto-config.json`:
-
-```json
-{
-  "agents": {
-    "bolt": {
-      "skills": {
-        "default": ["context-fundamentals", "github-mcp", ...],
-        "coder": ["compound-engineering", "systematic-debugging", ...],
-        "healer": ["incident-response", "observability", ...]
-      },
-      "tools": {
-        "remote": ["github_push_files", "github_create_pr", ...]
-      }
-    }
-  }
-}
-```
-
-Fallback skills are in `templates/skills/skill-mappings.yaml`.
-
-## Adding a New Agent
-
-1. Add agent config to `cto-config.json`
-2. Run scaffolding:
-   ```bash
-   ./scaffold-skills.sh {agent}
-   ./scaffold-agents.sh
-   ```
-3. Add docker-compose service (copy from existing agent)
-4. Create task prompt in `config/task-{agent}/prompt.md`
-5. Test: `./run-agent.sh {agent}`
-
-## Development
-
-### Modifying Skills
-
-Skills source: `../../templates/skills/`
-
-After modifying, regenerate:
 ```bash
-./scaffold-skills.sh
+export LINEAR_OAUTH_TOKEN=$(op read "op://Development/Linear App Morgan/access_token" --reveal)
+export LINEAR_ISSUE_IDENTIFIER=CTOPA-2620
+export CLI_TYPE=claude
+export STREAM_FILE=$(pwd)/workspaces/claude/stream.jsonl
+
+docker run --rm \
+  -v "$(pwd)/workspaces/claude:/workspace:ro" \
+  -e LINEAR_OAUTH_TOKEN \
+  -e LINEAR_ISSUE_IDENTIFIER \
+  -e CLI_TYPE \
+  -e STREAM_FILE \
+  -e RUST_LOG=info \
+  cto-linear-sidecar:local
 ```
 
-### Modifying Tools
+The sidecar will:
 
-Tools source: `cto-config.json` → `agents.{name}.tools.remote`
+1. Resolve `LINEAR_ISSUE_IDENTIFIER` to an issue UUID (if needed).
+2. Call Linear `agentSessionCreateOnIssue(issueId)` to create the agent session.
+3. Emit init summary, streamed activities, and completion summary to that session.
 
-After modifying, regenerate:
-```bash
-./scaffold-agents.sh
-```
+### 4. Verify in Linear
 
-### Sidecar Development
+Open the issue in Linear and check the agent dialog: you should see the init summary, streamed thoughts/actions/responses, and the completion summary.
 
-Sidecar source: `../../crates/linear-sync/src/bin/linear-sidecar.rs`
+## Environment Reference
 
-Rebuild:
-```bash
-./build-images.sh sidecar
-```
+| Variable | Purpose |
+|----------|---------|
+| `LINEAR_SESSION_ID` | Existing agent session ID (skip session creation) |
+| `LINEAR_ISSUE_ID` | Issue UUID; sidecar creates session on this issue |
+| `LINEAR_ISSUE_IDENTIFIER` | Issue identifier (e.g. CTOPA-2620); resolved to UUID then session created |
+| `LINEAR_OAUTH_TOKEN` | OAuth access token (e.g. Morgan's from 1Password) |
+| `LINEAR_API_KEY` | Alternative to `LINEAR_OAUTH_TOKEN` (Personal API key) |
+| `DRY_RUN=1` | Skip Linear API; log activities only |

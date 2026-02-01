@@ -1,26 +1,15 @@
-# Acceptance Criteria - Task 1: Kubernetes Infrastructure
+# Acceptance Criteria
 
-## Database Infrastructure
-- [ ] PostgreSQL CRD manifest created (CloudNative-PG)
-- [ ] MongoDB CRD manifest created (Percona)
-- [ ] Redis/Valkey CRD manifest created
-
-## Messaging Infrastructure
-- [ ] Kafka CRD manifest created (Strimzi)
-- [ ] RabbitMQ cluster manifest created
-
-## Storage Infrastructure
-- [ ] SeaweedFS manifest created
-
-## Kubernetes Configuration
-- [ ] Namespace definitions created
-- [ ] Network policies defined
-- [ ] Resource quotas configured
-
-## Documentation
-- [ ] README with deployment instructions
-- [ ] Architecture decision documented (d1: sizing strategy)
+## Code Implementation
+- [ ] health/mod.rs exists with pub exports
+- [ ] health/probes.rs exists with probe handlers
+- [ ] health/types.rs exists with HealthStatus and HealthResponse
 
 ## Quality
-- [ ] All YAML manifests are valid
-- [ ] Manifests follow Kubernetes best practices
+- [ ] Code compiles without errors
+- [ ] Proper Rust documentation comments added
+
+## Functionality
+- [ ] Liveness probe returns 200 OK when healthy
+- [ ] Readiness probe returns 200 OK when ready
+- [ ] Response includes version and uptime

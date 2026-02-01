@@ -1,5 +1,7 @@
 /**
  * Analyze Complexity operation - analyzes task complexity and recommends subtask counts.
+ * Uses minimal prompts based on "Ralph Wiggum technique".
+ * Includes robust JSON parsing with fallback.
  */
 
 import { query, type Options, type SDKResultMessage, type SDKAssistantMessage } from '@anthropic-ai/claude-code';
@@ -11,44 +13,8 @@ import type {
   TokenUsage,
   TaskComplexityAnalysis,
 } from '../types';
-import { renderTemplate, ANALYZE_COMPLEXITY_SYSTEM, ANALYZE_COMPLEXITY_USER } from '../prompts/templates';
 import { getClaudeCliOrThrow } from '../cli-finder';
-
-/**
- * JSON prefill to force structured output.
- */
-const JSON_PREFILL = '{"complexityAnalysis":[';
-
-/**
- * Extract JSON continuation from response.
- */
-function extractJsonContinuation(text: string): string {
-  let content = text.trim();
-
-  // Strip echoed prefill if present
-  if (content.startsWith(JSON_PREFILL)) {
-    content = content.slice(JSON_PREFILL.length).trim();
-  }
-
-  // Handle markdown code blocks
-  const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-  if (jsonBlockMatch?.[1]) {
-    return jsonBlockMatch[1].trim();
-  }
-
-  // Look for valid JSON start
-  if (content.startsWith('[') || content.startsWith('{')) {
-    return content;
-  }
-
-  // Fallback
-  const firstBrace = content.indexOf('{');
-  if (firstBrace >= 0) {
-    return content.slice(firstBrace);
-  }
-
-  return content;
-}
+import { parseJsonResponse, isValidComplexityAnalysis } from '../utils/json-parser';
 
 /**
  * Extract text from assistant message content.
@@ -66,6 +32,58 @@ function extractAssistantText(message: SDKAssistantMessage): string {
 }
 
 /**
+ * Generate system prompt for complexity analysis.
+ */
+function getSystemPrompt(): string {
+  return `You are a task complexity analyzer. Evaluate tasks and recommend subtask counts for parallel subagent execution.
+
+## Output Schema
+For each task, provide:
+{
+  "taskId": number,
+  "taskTitle": "task title",
+  "complexityScore": 1-10,
+  "recommendedSubtasks": number (0 if no expansion needed),
+  "expansionPrompt": "detailed guidance for subtask generation",
+  "reasoning": "explanation of complexity factors"
+}
+
+## Scoring Guide
+- 1-3: Simple, single-file changes, isolated scope
+- 4-6: Moderate, multiple files/components, some integration
+- 7-10: Complex, architectural changes, multiple services, significant integration
+
+## Expansion Guidance
+For tasks scoring 5+, the expansionPrompt should provide:
+- Key areas to break down
+- Suggested parallel work streams
+- Critical dependencies to consider
+- Subagent types needed (implementer, tester, reviewer)
+
+CRITICAL OUTPUT FORMAT:
+- The JSON structure \`{"complexityAnalysis":[\` has already been started for you
+- You must CONTINUE by outputting analysis objects directly as array elements
+- Do NOT repeat the opening structure - just output the analysis objects
+- No markdown formatting, no explanatory text before or after`;
+}
+
+/**
+ * Generate user prompt for complexity analysis.
+ */
+function getUserPrompt(tasks: Array<{ id: string; title: string; description: string; details?: string }>, threshold: number): string {
+  const taskList = tasks.map(t => `- ID ${t.id}: ${t.title}`).join('\n');
+  return `Analyze these tasks for complexity:
+${taskList}
+
+Tasks data:
+${JSON.stringify(tasks, null, 2)}
+
+Threshold: ${threshold} (recommend subtasks for tasks scoring >= ${threshold})
+
+OUTPUT: Continue the JSON array by outputting analysis objects directly. Start with the first analysis object's opening brace { - do NOT output {"complexityAnalysis":[ again as that is already provided. End with ]} to close the array and object.`;
+}
+
+/**
  * Analyze task complexity using Claude Agent SDK.
  */
 export async function analyzeComplexity(
@@ -73,16 +91,11 @@ export async function analyzeComplexity(
   model: string,
   _options: GenerateOptions
 ): Promise<AgentResponse<AnalyzeComplexityData>> {
-  const context = {
-    tasks: payload.tasks,
-    gathered_context: '',
-    threshold: payload.threshold ?? 5,
-    use_research: payload.use_research ?? false,
-    project_root: payload.project_root ?? '',
-  };
+  const tasks = payload.tasks;
+  const threshold = payload.threshold ?? 5;
 
-  const systemPrompt = renderTemplate(ANALYZE_COMPLEXITY_SYSTEM, context);
-  const userPrompt = renderTemplate(ANALYZE_COMPLEXITY_USER, context);
+  const systemPrompt = getSystemPrompt();
+  const userPrompt = getUserPrompt(tasks, threshold);
 
   try {
     const cliPath = getClaudeCliOrThrow();
@@ -99,10 +112,8 @@ export async function analyzeComplexity(
     let responseText = '';
     let usage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
 
-    const promptWithPrefill = `${userPrompt}\n\n${JSON_PREFILL}`;
-
     for await (const message of query({
-      prompt: promptWithPrefill,
+      prompt: userPrompt,
       options: sdkOptions,
     })) {
       if (message.type === 'assistant') {
@@ -119,34 +130,38 @@ export async function analyzeComplexity(
       }
     }
 
-    // Extract and parse JSON
-    const jsonContent = extractJsonContinuation(responseText);
-    const fullJson = `${JSON_PREFILL}${jsonContent}`;
-
-    let parsed: { complexityAnalysis: TaskComplexityAnalysis[] };
-    try {
-      parsed = JSON.parse(fullJson);
-    } catch (e) {
-      const parseError = e instanceof Error ? e.message : 'Unknown parse error';
-      return {
-        success: false,
-        error: `JSON parse failed: ${parseError}`,
-        error_type: 'parse_error',
-        details: fullJson.slice(0, 500),
-      };
+    // Prepend the JSON structure that the prompt tells the model is "already provided"
+    // Handle both cases:
+    // 1. Model outputs array contents directly (needs wrapping)
+    // 2. Model outputs full JSON (use as-is)
+    const trimmed = responseText.trim();
+    let wrappedResponse: string;
+    
+    if (trimmed.startsWith('{"complexityAnalysis"') || trimmed.startsWith('{ "complexityAnalysis"')) {
+      wrappedResponse = trimmed;
+    } else if (trimmed.startsWith('[')) {
+      wrappedResponse = '{"complexityAnalysis":' + trimmed + '}';
+    } else if (trimmed.startsWith('{')) {
+      wrappedResponse = '{"complexityAnalysis":[' + trimmed;
+    } else {
+      wrappedResponse = '{"complexityAnalysis":[' + trimmed;
     }
+    
+    // Parse with robust JSON parser
+    const result = parseJsonResponse<TaskComplexityAnalysis>(wrappedResponse, 'complexityAnalysis', isValidComplexityAnalysis);
 
-    if (!Array.isArray(parsed.complexityAnalysis)) {
+    if (!result.success) {
       return {
         success: false,
-        error: 'Parsed JSON does not contain complexityAnalysis array',
+        error: result.error,
         error_type: 'parse_error',
+        details: responseText.slice(0, 500),
       };
     }
 
     return {
       success: true,
-      data: { complexity_analysis: parsed.complexityAnalysis },
+      data: { complexity_analysis: result.items },
       usage,
       model,
       provider: 'claude-agent-sdk',

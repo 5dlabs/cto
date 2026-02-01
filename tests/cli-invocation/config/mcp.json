@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "cto-tools": {
+      "url": "http://cto-tools.cto.svc.cluster.local:3000/mcp",
+      "transport": {
+        "type": "sse"
+      }
+    }
+  }
+}

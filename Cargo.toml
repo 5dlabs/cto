@@ -20,7 +20,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.34"
+version = "0.2.35"
 edition = "2021"
 authors = ["5D team"]
 license = "AGPL-3.0"
@@ -86,6 +86,10 @@ serial_test = "3.3"
 
 # UUID generation
 uuid = { version = "1.20", features = ["v4", "serde"] }
+
+# Cryptography
+sha1 = "0.10"
+hex = "0.4"
 
 [profile.release]
 lto = true

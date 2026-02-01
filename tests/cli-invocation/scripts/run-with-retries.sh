@@ -1,169 +1,175 @@
 #!/usr/bin/env bash
-# =========================================================================
+# =============================================================================
 # Run With Retries - Controller Simulator
-# Mirrors: controller retry behavior with model rotation
-# =========================================================================
+# =============================================================================
+#
+# This script mimics the Kubernetes controller's retry behavior for local testing.
+# It runs the container multiple times with model rotation until acceptance criteria
+# pass or max retries is reached.
+#
+# Usage:
+#   ./scripts/run-with-retries.sh [agent]
+#
+# Examples:
+#   ./scripts/run-with-retries.sh          # Default: bolt
+#   ./scripts/run-with-retries.sh bolt     # Bolt agent
+#   ./scripts/run-with-retries.sh claude   # Claude/Rex agent
+#
+# =============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-CLI_INVOCATION_DIR="$SCRIPT_DIR/.."
+TEST_DIR="${SCRIPT_DIR}/.."
+CTO_CONFIG="${TEST_DIR}/../../cto-config.json"
+START_TIME=$(date +%s)
 
-# Configuration
-AGENT_NAME="${1:-rex}"
-CTO_CONFIG="${CTO_CONFIG:-$REPO_ROOT/cto-config.json}"
+AGENT="${1:-bolt}"
 
-# Read configuration from cto-config.json
-get_config_value() {
-    local path="$1"
-    local default="$2"
-    jq -r "$path // \"$default\"" "$CTO_CONFIG" 2>/dev/null || echo "$default"
+echo "════════════════════════════════════════════════════════════════"
+echo "║ Controller Simulator - ${AGENT} Agent"
+echo "════════════════════════════════════════════════════════════════"
+
+# -----------------------------------------------------------------------------
+# Read Configuration from cto-config.json (mirrors MCP server behavior)
+# -----------------------------------------------------------------------------
+if [[ ! -f "${CTO_CONFIG}" ]]; then
+  echo "❌ Config not found: ${CTO_CONFIG}" >&2
+  exit 1
+fi
+
+MAX_RETRIES=$(jq -r ".agents.${AGENT}.maxRetries // .defaults.play.infrastructureMaxRetries // 3" "$CTO_CONFIG")
+MODEL_ROTATION_ENABLED=$(jq -r ".agents.${AGENT}.modelRotation.enabled // false" "$CTO_CONFIG")
+MODEL_ROTATION=$(jq -c ".agents.${AGENT}.modelRotation.models // []" "$CTO_CONFIG")
+DEFAULT_MODEL=$(jq -r ".agents.${AGENT}.model // \"claude-sonnet-4-20250514\"" "$CTO_CONFIG")
+
+echo "║ Config source: ${CTO_CONFIG}"
+echo "║ Max retries: ${MAX_RETRIES}"
+echo "║ Model rotation: ${MODEL_ROTATION_ENABLED}"
+if [ "$MODEL_ROTATION_ENABLED" = "true" ]; then
+  echo "║ Models: ${MODEL_ROTATION}"
+else
+  echo "║ Model: ${DEFAULT_MODEL}"
+fi
+echo "════════════════════════════════════════════════════════════════"
+
+# -----------------------------------------------------------------------------
+# Helper Functions
+# -----------------------------------------------------------------------------
+get_model_for_attempt() {
+  local attempt=$1
+  if [ "$MODEL_ROTATION_ENABLED" = "true" ]; then
+    local model_count
+    model_count=$(echo "$MODEL_ROTATION" | jq length)
+    local index=$(( (attempt - 1) % model_count ))
+    echo "$MODEL_ROTATION" | jq -r ".[$index]"
+  else
+    echo "$DEFAULT_MODEL"
+  fi
 }
 
-# Get model rotation config
-MODEL_ROTATION_ENABLED=$(get_config_value ".agents.$AGENT_NAME.modelRotation.enabled" "false")
-MODEL_ROTATION_MODELS=$(get_config_value ".agents.$AGENT_NAME.modelRotation.models | @json" "[]")
+# Tracking arrays for summary
+declare -a ATTEMPT_MODELS=()
+declare -a ATTEMPT_RESULTS=()
+declare -a ATTEMPT_DURATIONS=()
+declare -a ATTEMPT_COSTS=()
 
-# Get max retries (agent-specific or default)
-MAX_RETRIES=$(get_config_value ".agents.$AGENT_NAME.maxRetries" "")
-if [ -z "$MAX_RETRIES" ] || [ "$MAX_RETRIES" = "null" ]; then
-    MAX_RETRIES=$(get_config_value ".defaults.play.implementationMaxRetries" "3")
-fi
+# -----------------------------------------------------------------------------
+# Main Retry Loop
+# -----------------------------------------------------------------------------
+CURRENT_ATTEMPT=1
+FINAL_RESULT="FAILED"
 
-# Default models for rotation (haiku → sonnet → opus)
-DEFAULT_MODELS='["claude-haiku-3-5-20241022","claude-sonnet-4-5-20250929","claude-opus-4-5-20251101"]'
-if [ "$MODEL_ROTATION_MODELS" = "[]" ] || [ "$MODEL_ROTATION_MODELS" = "null" ]; then
-    MODEL_ROTATION_MODELS="$DEFAULT_MODELS"
-fi
-
-# Parse models into array (portable approach)
-MODELS=()
-while IFS= read -r model; do
-    [ -n "$model" ] && MODELS+=("$model")
-done < <(echo "$MODEL_ROTATION_MODELS" | jq -r '.[]' 2>/dev/null)
-
-# Fallback if no models parsed
-if [ ${#MODELS[@]} -eq 0 ]; then
-    MODELS=("claude-sonnet-4-5-20250929")
-fi
-
-echo ""
-echo "════════════════════════════════════════════════════════════════"
-echo "║ Run With Retries - Controller Simulator"
-echo "════════════════════════════════════════════════════════════════"
-echo ""
-echo "Agent: $AGENT_NAME"
-echo "Max Retries: $MAX_RETRIES"
-echo "Model Rotation: $MODEL_ROTATION_ENABLED"
-echo "Models: ${MODELS[*]}"
-echo ""
-
-# Track attempt history
-declare -a ATTEMPT_HISTORY
-TOTAL_START_TIME=$(date +%s)
-
-# Retry loop
-for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
-    echo ""
-    echo "────────────────────────────────────────────────────────────────"
-    echo "║ Attempt $attempt of $MAX_RETRIES"
-    echo "────────────────────────────────────────────────────────────────"
-    
-    # Select model for this attempt (rotate through models array)
-    MODEL_INDEX=$(( (attempt - 1) % ${#MODELS[@]} ))
-    CURRENT_MODEL="${MODELS[$MODEL_INDEX]}"
-    
-    echo "Model: $CURRENT_MODEL"
-    echo ""
-    
-    ATTEMPT_START_TIME=$(date +%s)
-    
-    # Set environment variables for the container
-    export CURRENT_ATTEMPT="$attempt"
-    export CURRENT_MODEL="$CURRENT_MODEL"
-    export MAX_RETRIES="$MAX_RETRIES"
-    
-    # Run the container
-    cd "$CLI_INVOCATION_DIR"
-    
-    # Determine which service to run
-    SERVICE="${AGENT_NAME}"
-    if [ "$AGENT_NAME" = "rex" ]; then
-        SERVICE="claude"
-    fi
-    
-    # Run docker compose with the model
-    docker compose run --rm \
-        -e "CURRENT_ATTEMPT=$attempt" \
-        -e "CURRENT_MODEL=$CURRENT_MODEL" \
-        -e "MAX_RETRIES=$MAX_RETRIES" \
-        "$SERVICE" || true
-    
-    ATTEMPT_END_TIME=$(date +%s)
-    ATTEMPT_DURATION=$((ATTEMPT_END_TIME - ATTEMPT_START_TIME))
-    
-    # Check acceptance result
-    RESULT_FILE="$CLI_INVOCATION_DIR/workspaces/${SERVICE}/.acceptance_result"
-    ACCEPTANCE_RESULT="unknown"
-    
-    if [ -f "$RESULT_FILE" ]; then
-        ACCEPTANCE_RESULT=$(cat "$RESULT_FILE")
-    fi
-    
-    # Record attempt in history
-    if [ "$ACCEPTANCE_RESULT" = "passed" ]; then
-        ATTEMPT_HISTORY+=("✅ Attempt $attempt: $CURRENT_MODEL (passed) - ${ATTEMPT_DURATION}s")
-    else
-        ATTEMPT_HISTORY+=("❌ Attempt $attempt: $CURRENT_MODEL ($ACCEPTANCE_RESULT) - ${ATTEMPT_DURATION}s")
-    fi
-    
-    echo ""
-    echo "Acceptance Result: $ACCEPTANCE_RESULT"
-    
-    # Check if passed
-    if [ "$ACCEPTANCE_RESULT" = "passed" ]; then
-        break
-    fi
-    
-    # If not last attempt, continue
-    if [ "$attempt" -lt "$MAX_RETRIES" ]; then
-        echo "Retrying with next model..."
-        sleep 2
-    fi
+while [ "$CURRENT_ATTEMPT" -le "$MAX_RETRIES" ]; do
+  ATTEMPT_START=$(date +%s)
+  CURRENT_MODEL=$(get_model_for_attempt "$CURRENT_ATTEMPT")
+  
+  echo ""
+  echo "═══════════════════════════════════════════════"
+  echo "║ Attempt ${CURRENT_ATTEMPT}/${MAX_RETRIES} | Model: ${CURRENT_MODEL}"
+  echo "═══════════════════════════════════════════════"
+  
+  # Clean workspace for fresh attempt
+  rm -rf "${TEST_DIR}/workspaces/${AGENT}"/*
+  rm -f "${TEST_DIR}/workspaces/${AGENT}/.acceptance_result"
+  
+  # Run container with current attempt parameters
+  # The sidecar should already be running or will be started separately
+  cd "${TEST_DIR}"
+  docker compose run --rm \
+    -e CURRENT_ATTEMPT="$CURRENT_ATTEMPT" \
+    -e EXECUTION_MAX_RETRIES="$MAX_RETRIES" \
+    -e MODEL_ROTATION_MODELS="$MODEL_ROTATION" \
+    -e CURRENT_MODEL="$CURRENT_MODEL" \
+    "${AGENT}" || true
+  
+  ATTEMPT_END=$(date +%s)
+  ATTEMPT_DURATION=$((ATTEMPT_END - ATTEMPT_START))
+  ATTEMPT_DURATIONS+=("$ATTEMPT_DURATION")
+  ATTEMPT_MODELS+=("$CURRENT_MODEL")
+  
+  # Check acceptance result
+  RESULT_FILE="${TEST_DIR}/workspaces/${AGENT}/.acceptance_result"
+  if [[ -f "$RESULT_FILE" ]]; then
+    RESULT=$(cat "$RESULT_FILE")
+  else
+    RESULT="failed"
+  fi
+  ATTEMPT_RESULTS+=("$RESULT")
+  
+  # Try to extract cost from stream (if available)
+  COST="unknown"
+  if [[ -f "${TEST_DIR}/workspaces/${AGENT}/stream.jsonl" ]]; then
+    # Look for cost in the last line or summary
+    COST=$(tail -1 "${TEST_DIR}/workspaces/${AGENT}/stream.jsonl" 2>/dev/null | jq -r '.cost // "unknown"' 2>/dev/null || echo "unknown")
+  fi
+  ATTEMPT_COSTS+=("$COST")
+  
+  echo ""
+  echo "║ Attempt ${CURRENT_ATTEMPT} Result: ${RESULT} (${ATTEMPT_DURATION}s)"
+  
+  if [ "$RESULT" = "passed" ]; then
+    FINAL_RESULT="PASSED"
+    echo "║ ✅ Acceptance criteria met!"
+    break
+  fi
+  
+  if [ "$CURRENT_ATTEMPT" -lt "$MAX_RETRIES" ]; then
+    echo "║ ❌ Failed, scheduling retry..."
+  else
+    echo "║ ❌ Failed, no more retries."
+  fi
+  
+  CURRENT_ATTEMPT=$((CURRENT_ATTEMPT + 1))
 done
 
-# Final summary
-TOTAL_END_TIME=$(date +%s)
-TOTAL_DURATION=$((TOTAL_END_TIME - TOTAL_START_TIME))
+# -----------------------------------------------------------------------------
+# Final Summary
+# -----------------------------------------------------------------------------
+END_TIME=$(date +%s)
+TOTAL_DURATION=$((END_TIME - START_TIME))
+TOTAL_ATTEMPTS=${#ATTEMPT_RESULTS[@]}
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 echo "║ EXECUTION COMPLETE"
 echo "════════════════════════════════════════════════════════════════"
-
-if [ "$ACCEPTANCE_RESULT" = "passed" ]; then
-    echo "║ Result: PASSED"
-else
-    echo "║ Result: FAILED (after $MAX_RETRIES attempts)"
-fi
-
-echo "║ Total Iterations: $attempt of $MAX_RETRIES max"
+echo "║ Result: ${FINAL_RESULT}"
+echo "║ Total Iterations: ${TOTAL_ATTEMPTS} of ${MAX_RETRIES} max"
 echo "║"
 echo "║ Attempt History:"
-
-for entry in "${ATTEMPT_HISTORY[@]}"; do
-    echo "║   $entry"
+for i in "${!ATTEMPT_RESULTS[@]}"; do
+  status="${ATTEMPT_RESULTS[$i]}"
+  model="${ATTEMPT_MODELS[$i]}"
+  duration="${ATTEMPT_DURATIONS[$i]}"
+  cost="${ATTEMPT_COSTS[$i]}"
+  icon=$( [ "$status" = "passed" ] && echo "✅" || echo "❌" )
+  echo "║   ${icon} Attempt $((i+1)): ${model}"
+  echo "║      Status: ${status} | Duration: ${duration}s | Cost: ${cost}"
 done
-
 echo "║"
-echo "║ Total Duration: ${TOTAL_DURATION}s"
+echo "║ Total Duration: $((TOTAL_DURATION / 60))m $((TOTAL_DURATION % 60))s"
 echo "════════════════════════════════════════════════════════════════"
-echo ""
 
 # Exit with appropriate code
-if [ "$ACCEPTANCE_RESULT" = "passed" ]; then
-    exit 0
-else
-    exit 1
-fi
+[ "$FINAL_RESULT" = "PASSED" ] && exit 0 || exit 1

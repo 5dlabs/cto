@@ -614,30 +614,27 @@
         ],
         "localServers": {}
       },
+      "maxRetries": 3,
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "claude-haiku-3-5-20241022",
+          "claude-sonnet-4-5-20250929",
+          "claude-opus-4-5-20251101"
+        ]
+      },
       "skills": {
         "default": [
-          "context-fundamentals",
-          "context-degradation",
-          "context-optimization",
-          "openmemory",
-          "context7",
-          "octocode",
-          "llm-docs",
-          "github-mcp",
-          "kubernetes-mcp",
-          "observability",
-          "kubernetes-operators",
-          "argocd-gitops",
-          "secrets-management",
-          "storage-operators",
-          "mcp-development"
+          "verification-before-completion",
+          "systematic-debugging"
         ],
         "coder": [
           "tool-design",
           "firecrawl",
           "compound-engineering",
           "verification-before-completion",
-          "systematic-debugging"
+          "systematic-debugging",
+          "rust-patterns"
         ]
       }
     },
@@ -669,44 +666,12 @@
           "github_get_file_contents"
         ],
         "localServers": {}
-      },
-      "modelRotation": {
-        "enabled": true,
-        "models": [
-          "claude-opus-4-5-20251101",
-          "claude-sonnet-4-20250514",
-          "claude-opus-4-5-20251101"
-        ]
-      },
-      "defaultRetries": 3,
-      "acceptanceThreshold": 90
+      }
     },
     "stitch": {
       "githubApp": "5DLabs-Stitch",
       "cli": "claude",
       "model": "claude-opus-4-5-20251101",
-      "skills": {
-        "default": [
-          "context-fundamentals",
-          "context-degradation",
-          "context-optimization",
-          "openmemory",
-          "context7",
-          "octocode",
-          "llm-docs",
-          "github-mcp"
-        ],
-        "coder": [
-          "compound-engineering",
-          "verification-before-completion",
-          "systematic-debugging",
-          "tool-design"
-        ],
-        "reviewer": [
-          "receiving-code-review",
-          "requesting-code-review"
-        ]
-      },
       "tools": {
         "remote": [
           "context7_resolve_library_id",
@@ -730,44 +695,12 @@
           "github_get_file_contents"
         ],
         "localServers": {}
-      },
-      "modelRotation": {
-        "enabled": true,
-        "models": [
-          "claude-opus-4-5-20251101",
-          "claude-sonnet-4-20250514",
-          "claude-opus-4-5-20251101"
-        ]
-      },
-      "defaultRetries": 3,
-      "acceptanceThreshold": 90
+      }
     },
     "vex": {
       "githubApp": "5DLabs-Vex",
       "cli": "claude",
       "model": "claude-opus-4-5-20251101",
-      "skills": {
-        "default": [
-          "context-fundamentals",
-          "context-degradation",
-          "context-optimization",
-          "openmemory",
-          "context7",
-          "octocode",
-          "llm-docs",
-          "github-mcp",
-          "firecrawl"
-        ],
-        "coder": [
-          "systematic-debugging",
-          "verification-before-completion",
-          "compound-engineering"
-        ],
-        "debugger": [
-          "systematic-debugging",
-          "observability"
-        ]
-      },
       "tools": {
         "remote": [
           "context7_resolve_library_id",

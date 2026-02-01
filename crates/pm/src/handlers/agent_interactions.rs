@@ -16,8 +16,6 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-use std::path::Path;
-
 use super::callbacks::CallbackState;
 
 // =============================================================================
@@ -150,20 +148,16 @@ pub enum Language {
 impl Language {
     /// Detect language from file path
     #[must_use]
+    #[allow(clippy::case_sensitive_file_extension_comparisons)]
     pub fn from_path(path: &str) -> Self {
         let lower = path.to_lowercase();
-        let p = Path::new(path);
-        let ext = p
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(str::to_lowercase);
 
         // Check for React/React Native patterns first
         if lower.contains("/components/")
             || lower.contains("/pages/")
             || lower.contains("/app/")
-            || ext.as_deref() == Some("tsx")
-            || ext.as_deref() == Some("jsx")
+            || lower.ends_with(".tsx")
+            || lower.ends_with(".jsx")
         {
             if lower.contains("native") || lower.contains("/ios/") || lower.contains("/android/") {
                 return Self::ReactNative;
@@ -172,15 +166,27 @@ impl Language {
         }
 
         // Check by extension
-        match ext.as_deref() {
-            Some("rs") => Self::Rust,
-            Some("go") => Self::Go,
-            Some("ts" | "tsx") => Self::TypeScript,
-            Some("js" | "jsx") => Self::JavaScript,
-            Some("py") => Self::Python,
-            Some("cs") => Self::CSharp,
-            Some("cpp" | "cc" | "cxx" | "h" | "hpp") => Self::Cpp,
-            _ => Self::Unknown,
+        if lower.ends_with(".rs") {
+            Self::Rust
+        } else if lower.ends_with(".go") {
+            Self::Go
+        } else if lower.ends_with(".ts") || lower.ends_with(".tsx") {
+            Self::TypeScript
+        } else if lower.ends_with(".js") || lower.ends_with(".jsx") {
+            Self::JavaScript
+        } else if lower.ends_with(".py") {
+            Self::Python
+        } else if lower.ends_with(".cs") {
+            Self::CSharp
+        } else if lower.ends_with(".cpp")
+            || lower.ends_with(".cc")
+            || lower.ends_with(".cxx")
+            || lower.ends_with(".h")
+            || lower.ends_with(".hpp")
+        {
+            Self::Cpp
+        } else {
+            Self::Unknown
         }
     }
 
@@ -188,14 +194,14 @@ impl Language {
     #[must_use]
     pub fn recommended_agent(&self) -> Agent {
         match self {
+            Self::Rust => Agent::Rex,
             Self::Go => Agent::Grizz,
             Self::TypeScript | Self::JavaScript | Self::React => Agent::Blaze,
             Self::ReactNative => Agent::Tap,
             Self::CSharp => Agent::Vex,
             Self::Cpp => Agent::Forge,
-            Self::Python => Agent::Nova,
-            // Default to Rex for Rust and unknown languages
-            Self::Rust | Self::Unknown => Agent::Rex,
+            Self::Python => Agent::Nova, // Default to Nova for Python
+            Self::Unknown => Agent::Rex, // Default to Rex for unknown
         }
     }
 }
@@ -351,13 +357,13 @@ pub struct RequestedAction {
 ///
 /// # Panics
 ///
-/// Panics if the internal regex pattern is invalid (should never happen).
+/// Panics if the regex pattern is invalid (this is a compile-time constant).
 #[must_use]
 pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
     let re = Regex::new(
         r"(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)\s*(.*)",
     )
-    .expect("valid regex");
+    .unwrap();
 
     let mut mentions = Vec::new();
 
@@ -378,16 +384,10 @@ pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
 }
 
 /// Parse remediation button identifier
-///
-/// Format: `fix-<agent>-pr<number>-<check_run_id>`
-///
-/// # Panics
-///
-/// Panics if the internal regex pattern is invalid (should never happen).
+/// Format: fix-<agent>-pr<number>-<check_run_id>
 #[must_use]
 pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
-    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-pr(\d+)-(\d+)$")
-        .expect("valid regex");
+    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-pr(\d+)-(\d+)$").unwrap();
 
     if let Some(cap) = re.captures(identifier) {
         let agent_name = cap.get(1)?.as_str();
