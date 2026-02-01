@@ -147,20 +147,37 @@ impl std::str::FromStr for ClusterSize {
 // Bare Metal Provider
 // ============================================================================
 
-/// Bare metal provider (Latitude for now, extensible).
+/// Bare metal provider for cluster provisioning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum BareMetalProvider {
     /// Latitude.sh bare metal provider.
     #[default]
     Latitude,
-    // Future: Cherry, Hetzner, DigitalOcean, etc.
+    /// Hetzner dedicated servers.
+    Hetzner,
+    /// OVHcloud dedicated servers.
+    Ovh,
+    /// Vultr bare metal.
+    Vultr,
+    /// Scaleway Elastic Metal.
+    Scaleway,
+    /// Cherry Servers.
+    Cherry,
+    /// On-premises / colocation with IPMI.
+    OnPrem,
 }
 
 impl std::fmt::Display for BareMetalProvider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Latitude => write!(f, "latitude"),
+            Self::Hetzner => write!(f, "hetzner"),
+            Self::Ovh => write!(f, "ovh"),
+            Self::Vultr => write!(f, "vultr"),
+            Self::Scaleway => write!(f, "scaleway"),
+            Self::Cherry => write!(f, "cherry"),
+            Self::OnPrem => write!(f, "onprem"),
         }
     }
 }
@@ -171,8 +188,14 @@ impl std::str::FromStr for BareMetalProvider {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "latitude" => Ok(Self::Latitude),
+            "hetzner" => Ok(Self::Hetzner),
+            "ovh" => Ok(Self::Ovh),
+            "vultr" => Ok(Self::Vultr),
+            "scaleway" => Ok(Self::Scaleway),
+            "cherry" => Ok(Self::Cherry),
+            "onprem" | "on-prem" | "on_prem" => Ok(Self::OnPrem),
             _ => Err(anyhow::anyhow!(
-                "Unknown provider: {s}. Supported: latitude"
+                "Unknown provider: {s}. Supported: latitude, hetzner, ovh, vultr, scaleway, cherry, onprem"
             )),
         }
     }

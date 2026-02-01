@@ -187,6 +187,32 @@ spec:
                   name: cto-secrets
                   key: CLOUDFLARE_API_TOKEN
                   optional: true
+            # ArgoCD API token for GitOps management
+            - name: ARGOCD_BASE_URL
+              value: "https://argocd.5dlabs.ai"
+            - name: ARGOCD_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tools-argocd-secrets
+                  key: ARGOCD_API_TOKEN
+                  optional: true
+            # S3/SeaweedFS credentials for object storage
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-s3-credentials
+                  key: access_key
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-s3-credentials
+                  key: secret_key
+                  optional: true
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: S3_ENDPOINT
+              value: "http://seaweedfs-s3.seaweedfs.svc:8333"
           resources:
             {{- toYaml .Values.tools.resources | nindent 12 }}
           # Readiness probe - ensures service doesn't receive traffic until tools are discovered
