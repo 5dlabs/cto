@@ -76,15 +76,85 @@ If the subtask description mentions:
 
 → **SPLIT IT** into separate subtasks.
 
+## Sub-Agent Definition (REQUIRED)
+
+Every subtask **MUST** include an `## Agent` section in its prompt.md file. This defines which sub-agent will execute the subtask.
+
+### Required Format
+
+```markdown
+# Subtask X.Y: [Title]
+
+## Parent Task
+Task X
+
+## Subagent Type
+implementer
+
+## Agent
+{agent-name}
+
+## Parallelizable
+Yes
+
+## Description
+...
+```
+
+The `## Agent` field MUST be present and follow the naming conventions below.
+
 ## Sub-Agent Naming Convention
 
-Each sub-agent should have a descriptive name:
+Each sub-agent should have a descriptive name based on what it does:
 
+### Technology-Specific Deployers
 ```
-{technology}-deployer    → for deployment tasks (postgres-deployer, kafka-deployer)
-{domain}-agent          → for configuration tasks (policy-agent, quota-agent)
-{domain}-reviewer       → for review tasks (infra-reviewer, security-reviewer)
+postgres-deployer     → PostgreSQL deployment
+mongo-deployer        → MongoDB deployment
+redis-deployer        → Redis/Valkey deployment
+kafka-deployer        → Kafka deployment
+rabbitmq-deployer     → RabbitMQ deployment
+prometheus-deployer   → Prometheus setup
+grafana-deployer      → Grafana setup
+ingress-deployer      → NGINX ingress
+nextjs-deployer       → Next.js projects
+expo-deployer         → Expo mobile apps
+electron-deployer     → Electron desktop apps
 ```
+
+### Service Implementers
+```
+slack-implementer       → Slack integration
+discord-implementer     → Discord integration
+email-implementer       → Email services
+webhook-implementer     → Webhook delivery
+websocket-implementer   → WebSocket handling
+notification-implementer → Notification logic
+analytics-implementer   → Analytics features
+auth-implementer        → Authentication
+rbac-implementer        → RBAC authorization
+grpc-implementer        → gRPC services
+protobuf-implementer    → Protobuf schemas
+```
+
+### Generic Agents
+```
+code-implementer   → General code implementation
+code-reviewer      → Code review tasks
+test-agent         → Test writing
+config-agent       → Configuration tasks
+init-agent         → Project initialization
+infra-deployer     → Generic infrastructure
+researcher-agent   → Research tasks
+```
+
+### Naming Rules
+1. Use lowercase with hyphens: `postgres-deployer` not `PostgresDeployer`
+2. Be specific when possible: `slack-implementer` not `integration-implementer`
+3. Use `-deployer` suffix for deployment/setup tasks
+4. Use `-implementer` suffix for code implementation tasks
+5. Use `-reviewer` suffix for review tasks
+6. Use `-agent` suffix for other tasks
 
 ## Benefits of Single-Concern Subtasks
 
