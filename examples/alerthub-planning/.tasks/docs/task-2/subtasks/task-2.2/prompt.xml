@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subtask id="2.2" parent="2" agent="rex">
+    <meta>
+        <title>Implement core notification processing and rate limiting</title>
+        <dependencies>task-2.1</dependencies>
+    </meta>
+
+    <role>You are a Rust Engineer specializing in high-performance systems. Implement subtask 2.2.</role>
+
+    <context>
+        <overview>Build the main notification endpoint with validation, rate limiting using Redis, and deduplication logic to handle incoming notification requests efficiently.</overview>
+        <parent_task>Implement Notification Router Service (Rex - Rust/Axum)</parent_task>
+    </context>
+
+    <requirements>
+        <description>Create POST /api/v1/notifications endpoint with comprehensive input validation, implement Redis-based rate limiting middleware with configurable limits per user/IP, add deduplication logic using Redis with configurable TTL to prevent duplicate notifications, implement request parsing and validation using serde with proper error responses.</description>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>Subtask requirements implemented</criterion>
+        <criterion>Parent task requirements still satisfied</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test --all</command>
+        <command>cargo clippy -- -D warnings</command>
+        <command>cargo fmt --check</command>
+    </validation>
+</subtask>

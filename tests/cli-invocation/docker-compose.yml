@@ -87,6 +87,52 @@ services:
       CTO_AGENT_NAME: rex  # Use rex agent's tool configuration
 
   # ===========================================================================
+  # Bolt CLI + Sidecar (Infrastructure Agent with Model Rotation)
+  # ===========================================================================
+  bolt:
+    pull_policy: never
+    image: cto-claude:local
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ./workspaces/bolt:/workspace
+      - ./config/claude-settings.json:/home/node/.claude/settings.json:ro
+      - ./config/skills:/home/node/.claude/skills:ro
+      - ./config/client-config-bolt.json:/config/client-config.json:ro
+      - ./config/task:/workspace/task:ro
+      - ./scripts/run-claude.sh:/run.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CLI_WORK_DIR=/workspace
+      - MCP_CLIENT_CONFIG=/config/client-config.json
+      - TOOLS_URL=http://tools.fra.5dlabs.ai/mcp
+      - CURRENT_ATTEMPT=${CURRENT_ATTEMPT:-1}
+      - EXECUTION_MAX_RETRIES=${EXECUTION_MAX_RETRIES:-3}
+      - CURRENT_MODEL=${CURRENT_MODEL:-}
+    working_dir: /workspace
+    entrypoint: ["bash", "/run.sh"]
+
+  bolt-sidecar:
+    pull_policy: never
+    image: cto-linear-sidecar:local
+    network_mode: host
+    depends_on:
+      bolt:
+        condition: service_completed_successfully
+    volumes:
+      - ./workspaces/bolt:/workspace
+      - ../../templates/skills:/cto-skills:ro
+      - ../../cto-config.json:/cto-config.json:ro
+    environment:
+      <<: *sidecar-env
+      CLI_TYPE: claude
+      STREAM_FILE: /workspace/stream.jsonl
+      DEBUG_JSONL_PATH: /workspace/debug.jsonl
+      CTO_SKILLS_DIR: /cto-skills
+      CTO_CONFIG_PATH: /cto-config.json
+      CTO_AGENT_NAME: bolt
+
+  # ===========================================================================
   # Codex CLI + Sidecar
   # ===========================================================================
   codex:

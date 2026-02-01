@@ -2497,11 +2497,19 @@ Review the pull request and provide feedback.
    - Security vulnerabilities  
    - Performance issues
    - Code style and maintainability
-3. Use `github_add_pull_request_review_comment` to add inline comments on specific issues
-4. Use `github_create_pull_request_review` to submit your overall review with:
-   - `event: "APPROVE"` if changes look good
-   - `event: "REQUEST_CHANGES"` if there are blocking issues
-   - `event: "COMMENT"` if there are suggestions but no blocking issues
+3. **IMPORTANT: Use the `gh` CLI to post your review** (NOT MCP tools):
+   ```bash
+   # Post review with inline comments
+   gh pr review {pr_number} --repo {repo_slug} --comment --body "Your review body"
+   
+   # Or approve
+   gh pr review {pr_number} --repo {repo_slug} --approve --body "LGTM!"
+   
+   # Or request changes  
+   gh pr review {pr_number} --repo {repo_slug} --request-changes --body "Please fix..."
+   ```
+   
+   **Never use** `github_create_pull_request_review` or `github_add_pull_request_review_comment` MCP tools - they use the wrong identity.
 
 Be constructive and explain the "why" behind your suggestions.
 "#

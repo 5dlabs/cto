@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "context7": {
+      "name": "Context7",
+      "description": "Up-to-date library documentation",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "workingDirectory": "/tmp",
+      "env": {}
+    }
+  }
+}

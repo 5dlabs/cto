@@ -9,6 +9,21 @@ This feature enables two interaction patterns for AI agents on GitHub PRs:
 
 Both mechanisms use the same underlying architecture: GitHub webhook → PM Server → CodeRun CRD.
 
+### Key Insight: Pure Webhook-Based Buttons (No External Links)
+
+Following Cursor's "Fix with Web" pattern, our buttons work entirely through webhooks:
+
+1. **No external URLs** - Buttons don't open browser tabs or redirect
+2. **GitHub Actions API** - We add `actions` array to check_run output
+3. **Webhook callback** - Button click sends `check_run` event with `action: requested_action`
+4. **Instant response** - Everything stays in GitHub's UI, instant feedback
+
+This is cleaner than external link approaches because:
+- No page loads or redirects
+- User stays in GitHub context
+- Immediate webhook-based response
+- Consistent with GitHub's native check run actions pattern
+
 ---
 
 ## Architecture
@@ -66,41 +81,45 @@ Both mechanisms use the same underlying architecture: GitHub webhook → PM Serv
 
 ---
 
-## Scope
+## Scope & Status
 
-### Phase 1: GitHub App Webhooks (Foundation)
+### Phase 1: GitHub App Webhooks (Foundation) ✅ DONE
 
-- [ ] Configure per-app webhooks (instead of org-wide)
-  - Each GitHub App (Stitch, Rex, Morgan, etc.) has its own webhook URL
-  - Allows granular control and easier debugging
-- [ ] Update Cloudflare Tunnel bindings if needed
-- [ ] Verify webhook secret rotation/management
+- [x] Org-wide webhook configured at `https://github-webhooks.5dlabs.ai`
+- [x] Argo EventSource receives all GitHub events
+- [x] Sensors filter to specific event types
 
-**Webhook URLs:**
-| App | Webhook URL | Events |
-|-----|-------------|--------|
-| 5DLabs-Stitch | `https://pm.5dlabs.ai/webhooks/github/stitch` | `issue_comment`, `pull_request_review_comment` |
-| 5DLabs-Rex | `https://pm.5dlabs.ai/webhooks/github/rex` | `check_run` (for remediation buttons) |
-| 5DLabs-Blaze | `https://pm.5dlabs.ai/webhooks/github/blaze` | `check_run` |
-| (org-wide) | `https://github-webhooks.5dlabs.ai` | `*` (existing, for Play workflow) |
+**Note:** We use org-wide webhooks (simpler) rather than per-app webhooks. The Argo Events sensors filter events by type and content.
 
-### Phase 2: @Mention Sensor & Handler
+### Phase 2: @Mention Sensor & Handler ✅ DONE
 
-- [ ] Create `stitch-mention-sensor.yaml` for Argo Events
-  - Filter: `issue_comment` + `pull_request_review_comment` events
-  - Match: Body contains `@5DLabs-Stitch` (case insensitive)
-  - Exclude: Bot authors, own comments
-- [ ] Add PM Server endpoint: `POST /webhooks/github/comment`
-  - Parse comment for @mention and instructions
-  - Extract PR context (repo, number, branch, files changed)
-  - Create CodeRun with appropriate prompt
-- [ ] Support multiple agents via mention:
-  - `@5DLabs-Stitch` → Code review
-  - `@5DLabs-Rex` → Rust fixes
-  - `@5DLabs-Blaze` → Frontend fixes
-  - `@5DLabs-Grizz` → Go fixes
+- [x] `agent-mention-sensor.yaml` - Catches @mention comments
+- [x] `crates/pm/src/handlers/agent_interactions.rs` - Handler implementation
+  - `handle_mention_webhook()` - Parses @mentions, creates CodeRun
+  - `parse_mentions()` - Extracts agent + instructions from comment
+  - `Agent` enum - All 12 agents supported
+- [x] Support for all agents via @mention
 
-### Phase 3: Remediation Buttons
+### Phase 3: Remediation Buttons (Webhook-Based) 🚧 IN PROGRESS
+
+**How It Works (Cursor-Inspired Pattern):**
+1. Check run fails → We include `actions` array in check run output
+2. User clicks button → GitHub sends `check_run` webhook with `action: requested_action`
+3. Our sensor catches → PM Server handler parses `identifier` → Creates CodeRun
+4. Controller spawns agent → Agent fixes issue → Pushes commit
+
+**Completed:**
+- [x] `remediation-button-sensor.yaml` - Catches button clicks
+- [x] `handle_remediation_webhook()` - Creates CodeRun from button click
+- [x] `parse_button_identifier()` - Parses `fix-rex-pr123-456789` format
+- [x] `templates/_shared/partials/remediation-buttons.sh.hbs` - Button rendering helpers
+- [x] Detection module in `crates/pm/src/detection/` - Language → Agent mapping
+
+**Remaining:**
+- [ ] Integration: Call button rendering when Stitch/Morgan posts check status
+- [ ] E2E test: Full flow from CI failure → button → click → fix
+
+### Phase 4: Detection Integration
 
 - [ ] **Language Detection** in check_run annotations
   - Analyze failed files to determine primary language

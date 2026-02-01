@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subtask id="10.1" parent="10" agent="grizz">
+    <meta>
+        <title>Set up comprehensive E2E test environment and infrastructure</title>
+        <dependencies>None</dependencies>
+    </meta>
+
+    <role>You are a Go Engineer specializing in APIs and backend services. Implement subtask 10.1.</role>
+
+    <context>
+        <overview>Establish the complete testing infrastructure including all services, test data management, and CI pipeline configuration for end-to-end integration tests.</overview>
+        <parent_task>Implement End-to-End Integration Tests (Grizz - Go/Testing)</parent_task>
+    </context>
+
+    <requirements>
+        <description>Set up test environment with all notification services running (Slack, Discord, email, WebSocket servers). Create Docker compose or equivalent for service orchestration. Implement test data fixtures for tenants, users, and integrations with proper cleanup mechanisms. Configure CI pipeline to run E2E tests on deployment with proper environment isolation and secrets management.</description>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>Subtask requirements implemented</criterion>
+        <criterion>Parent task requirements still satisfied</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>go test ./...</command>
+        <command>golangci-lint run</command>
+        <command>go build ./...</command>
+    </validation>
+</subtask>

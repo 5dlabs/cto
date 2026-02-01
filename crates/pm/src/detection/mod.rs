@@ -14,6 +14,9 @@
 mod agent;
 mod framework;
 mod language;
+#[cfg(test)]
+mod integration_tests;
+mod utils;
 
 pub use agent::Agent;
 pub use framework::Framework;
@@ -153,7 +156,7 @@ pub fn detect_full(files: &[ChangedFile], package_json: Option<&str>) -> (Detect
             if result.framework.is_none()
                 || matches!(
                     result.primary_language,
-                    Some(Language::TypeScript) | Some(Language::JavaScript)
+                    Some(Language::TypeScript | Language::JavaScript)
                 )
             {
                 result.framework = Some(framework);

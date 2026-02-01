@@ -1,6 +1,8 @@
 use crate::errors::{BridgeError, BridgeResult, ErrorContext};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Write as FmtWrite;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::{Duration, Instant};
@@ -141,6 +143,84 @@ impl ServerHealthStatus {
                 ),
             };
         }
+    }
+}
+
+/// JSON-serializable snapshot of a single server's health (for the /health/servers API).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerHealthSnapshot {
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub last_check: Option<String>,
+    pub last_success: Option<String>,
+    pub tool_count: usize,
+    pub metrics: ServerMetricsSnapshot,
+}
+
+/// Per-server call metrics (subset for JSON output).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerMetricsSnapshot {
+    pub successful_calls: u64,
+    pub failed_calls: u64,
+    pub total_calls: u64,
+    pub success_rate_pct: f64,
+    pub avg_response_time_ms: u64,
+    pub consecutive_failures: u32,
+    pub uptime_secs: Option<u64>,
+}
+
+impl ServerHealthStatus {
+    /// Produce a JSON-serializable snapshot, enriched with the tool count from the caller.
+    pub fn snapshot(&self, tool_count: usize) -> ServerHealthSnapshot {
+        let (status, error) = match &self.health {
+            ServerHealth::Healthy => ("connected".to_string(), None),
+            ServerHealth::Degraded { reason } => ("degraded".to_string(), Some(reason.clone())),
+            ServerHealth::Unresponsive { last_response } => (
+                "disconnected".to_string(),
+                Some(format!("unresponsive since {}", last_response.to_rfc3339())),
+            ),
+            ServerHealth::Crashed { exit_code } => (
+                "crashed".to_string(),
+                Some(format!("exit code: {exit_code:?}")),
+            ),
+            ServerHealth::Restarting { attempt } => (
+                "restarting".to_string(),
+                Some(format!("attempt #{attempt}")),
+            ),
+            ServerHealth::Unknown => ("unknown".to_string(), None),
+        };
+
+        let last_check = self
+            .last_check
+            .map(Self::instant_to_rfc3339);
+        let last_success = self
+            .last_successful_check
+            .map(Self::instant_to_rfc3339);
+
+        ServerHealthSnapshot {
+            status,
+            error,
+            last_check,
+            last_success,
+            tool_count,
+            metrics: ServerMetricsSnapshot {
+                successful_calls: self.successful_requests,
+                failed_calls: self.failed_requests,
+                total_calls: self.total_requests,
+                success_rate_pct: self.success_rate(),
+                avg_response_time_ms: self.average_response_time.as_millis() as u64,
+                consecutive_failures: self.consecutive_failures,
+                uptime_secs: self.uptime().map(|d| d.as_secs()),
+            },
+        }
+    }
+
+    /// Convert a `tokio::time::Instant` to an approximate RFC-3339 wall-clock string.
+    fn instant_to_rfc3339(instant: Instant) -> String {
+        let elapsed = instant.elapsed();
+        let wall = Utc::now() - chrono::Duration::from_std(elapsed).unwrap_or_default();
+        wall.to_rfc3339()
     }
 }
 
@@ -343,6 +423,102 @@ impl HealthMonitor {
             .collect()
     }
 
+    /// Build the full /health/servers response payload.
+    ///
+    /// `tool_counts` maps server_name → number of discovered tools for that server.
+    pub async fn build_servers_health_response(
+        &self,
+        tool_counts: &HashMap<String, usize>,
+    ) -> HashMap<String, ServerHealthSnapshot> {
+        let health_map = self.server_health.read().await;
+        health_map
+            .iter()
+            .map(|(name, status)| {
+                let count = tool_counts.get(name).copied().unwrap_or(0);
+                (name.clone(), status.snapshot(count))
+            })
+            .collect()
+    }
+
+    /// Render all server metrics in Prometheus exposition format.
+    ///
+    /// `tool_counts` maps server_name → number of discovered tools for that server.
+    pub async fn render_prometheus_metrics(
+        &self,
+        tool_counts: &HashMap<String, usize>,
+    ) -> String {
+        let health_map = self.server_health.read().await;
+        let mut out = String::with_capacity(2048);
+
+        // --- HELP / TYPE headers once, then one line per server ---
+
+        let _ = writeln!(out, "# HELP mcp_server_up 1 if the MCP server is connected, 0 otherwise.");
+        let _ = writeln!(out, "# TYPE mcp_server_up gauge");
+        for (name, status) in health_map.iter() {
+            let up: u8 = match &status.health {
+                ServerHealth::Healthy => 1,
+                _ => 0,
+            };
+            let _ = writeln!(out, "mcp_server_up{{server=\"{name}\"}} {up}");
+        }
+
+        let _ = writeln!(out);
+        let _ = writeln!(out, "# HELP mcp_server_tool_count Number of tools provided by this MCP server.");
+        let _ = writeln!(out, "# TYPE mcp_server_tool_count gauge");
+        for name in health_map.keys() {
+            let count = tool_counts.get(name).copied().unwrap_or(0);
+            let _ = writeln!(out, "mcp_server_tool_count{{server=\"{name}\"}} {count}");
+        }
+
+        let _ = writeln!(out);
+        let _ = writeln!(out, "# HELP mcp_server_requests_total Total tool-call requests forwarded to this MCP server.");
+        let _ = writeln!(out, "# TYPE mcp_server_requests_total counter");
+        for (name, status) in health_map.iter() {
+            let _ = writeln!(
+                out,
+                "mcp_server_requests_total{{server=\"{name}\",result=\"success\"}} {}",
+                status.successful_requests
+            );
+            let _ = writeln!(
+                out,
+                "mcp_server_requests_total{{server=\"{name}\",result=\"failure\"}} {}",
+                status.failed_requests
+            );
+        }
+
+        let _ = writeln!(out);
+        let _ = writeln!(out, "# HELP mcp_server_avg_response_time_ms Rolling average response time in milliseconds.");
+        let _ = writeln!(out, "# TYPE mcp_server_avg_response_time_ms gauge");
+        for (name, status) in health_map.iter() {
+            let _ = writeln!(
+                out,
+                "mcp_server_avg_response_time_ms{{server=\"{name}\"}} {}",
+                status.average_response_time.as_millis()
+            );
+        }
+
+        let _ = writeln!(out);
+        let _ = writeln!(out, "# HELP mcp_server_consecutive_failures Current streak of consecutive health-check failures.");
+        let _ = writeln!(out, "# TYPE mcp_server_consecutive_failures gauge");
+        for (name, status) in health_map.iter() {
+            let _ = writeln!(
+                out,
+                "mcp_server_consecutive_failures{{server=\"{name}\"}} {}",
+                status.consecutive_failures
+            );
+        }
+
+        let _ = writeln!(out);
+        let _ = writeln!(out, "# HELP mcp_server_uptime_seconds Seconds since this MCP server was last marked healthy.");
+        let _ = writeln!(out, "# TYPE mcp_server_uptime_seconds gauge");
+        for (name, status) in health_map.iter() {
+            let secs = status.uptime().map_or(0, |d| d.as_secs());
+            let _ = writeln!(out, "mcp_server_uptime_seconds{{server=\"{name}\"}} {secs}");
+        }
+
+        out
+    }
+
     /// Internal monitoring loop for a server
     async fn monitor_server_loop(
         server_name: String,
@@ -454,6 +630,48 @@ mod tests {
         assert_eq!(status.total_requests, 3);
         assert_eq!(status.successful_requests, 2);
         assert_eq!(status.failed_requests, 1);
+    }
+
+    #[tokio::test]
+    async fn test_server_health_snapshot() {
+        let mut status = ServerHealthStatus::new("github".to_string());
+        status.health = ServerHealth::Healthy;
+        status.uptime_start = Some(Instant::now());
+        status.record_success(Duration::from_millis(50));
+        status.record_success(Duration::from_millis(150));
+        status.record_failure("timeout");
+
+        let snap = status.snapshot(15);
+        assert_eq!(snap.status, "connected");
+        assert!(snap.error.is_none());
+        assert_eq!(snap.tool_count, 15);
+        assert_eq!(snap.metrics.successful_calls, 2);
+        assert_eq!(snap.metrics.failed_calls, 1);
+        assert_eq!(snap.metrics.total_calls, 3);
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_metrics_output() {
+        let config = HealthCheckConfig::default();
+        let mut monitor = HealthMonitor::new(config);
+
+        monitor
+            .start_monitoring_server("github".to_string())
+            .await
+            .unwrap();
+        monitor
+            .record_success("github", Duration::from_millis(42))
+            .await;
+
+        let mut tool_counts = HashMap::new();
+        tool_counts.insert("github".to_string(), 15);
+
+        let prom = monitor.render_prometheus_metrics(&tool_counts).await;
+        assert!(prom.contains("mcp_server_up{server=\"github\"}"));
+        assert!(prom.contains("mcp_server_tool_count{server=\"github\"} 15"));
+        assert!(prom.contains("mcp_server_requests_total{server=\"github\",result=\"success\"} 1"));
+
+        monitor.shutdown().await;
     }
 
     #[tokio::test]

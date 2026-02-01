@@ -15,7 +15,7 @@
 # =============================================================================
 # Dependencies stage - install npm packages
 # =============================================================================
-FROM node:20-bookworm-slim AS deps
+FROM node:25-bookworm-slim AS deps
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN npm ci --legacy-peer-deps
 # =============================================================================
 # Build stage - compile Next.js application
 # =============================================================================
-FROM node:20-bookworm-slim AS builder
+FROM node:25-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -55,7 +55,7 @@ RUN npm run build
 # =============================================================================
 # Production stage - minimal runtime
 # =============================================================================
-FROM node:20-bookworm-slim AS production
+FROM node:25-bookworm-slim AS production
 
 WORKDIR /app
 
@@ -97,7 +97,7 @@ CMD ["node", "server.js"]
 # =============================================================================
 # Build with: docker build --target migrate -f infra/images/web/Dockerfile -t ghcr.io/5dlabs/web-migrate:latest .
 # This is a separate image used as an init container to run database migrations
-FROM node:20-bookworm-slim AS migrate
+FROM node:25-bookworm-slim AS migrate
 
 WORKDIR /app
 
