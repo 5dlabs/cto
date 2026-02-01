@@ -156,6 +156,7 @@ researcher-agent   → Research tasks
 5. Use `-reviewer` suffix for review tasks
 6. Use `-agent` suffix for other tasks
 
+
 ## Benefits of Single-Concern Subtasks
 
 1. **Parallel Execution**: Independent subtasks can run simultaneously
