@@ -19,6 +19,9 @@ pub struct ClientConfig {
     /// Local servers to spawn in client context
     #[serde(rename = "localServers")]
     pub local_servers: HashMap<String, LocalServerConfig>,
+    /// Maximum number of concurrent MCP server connections (LRU eviction when exceeded)
+    #[serde(rename = "maxConnections", default)]
+    pub max_connections: Option<usize>,
 }
 
 /// Configuration for a local MCP server to be spawned by the client
