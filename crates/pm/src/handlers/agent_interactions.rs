@@ -409,15 +409,10 @@ pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
 #[allow(clippy::too_many_lines)]
 pub async fn handle_mention_webhook(
     State(state): State<Arc<CallbackState>>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, StatusCode> {
-    let mention_source = headers
-        .get("X-Mention-Source")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("unknown");
-
-    info!(source = %mention_source, "Received @mention webhook");
+    info!("Received @mention webhook");
 
     // Parse the payload
     let payload: Value = serde_json::from_slice(&body).map_err(|e| {
@@ -427,6 +422,14 @@ pub async fn handle_mention_webhook(
 
     // Extract nested payload (from Argo Events sensor)
     let inner_payload = payload.get("payload").unwrap_or(&payload);
+
+    // Extract event type from payload instead of header
+    let mention_source = inner_payload
+        .get("X-GitHub-Event")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+
+    info!(source = %mention_source, "Received @mention webhook");
 
     // Determine PR context based on event type
     let (pr_context, comment_body, comment_url) = match mention_source {
@@ -881,7 +884,7 @@ pub async fn handle_ci_failure_webhook(
 
     // Get changed files from PR using GitHub API
     let files_url = format!(
-        "https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files"
+        "https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files?per_page=100"
     );
     
     let files_response = state
