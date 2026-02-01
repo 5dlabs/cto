@@ -198,9 +198,7 @@ mod tests {
     #[test]
     fn test_verify_signature() {
         // Generate a test secret at runtime to avoid hardcoded credential warnings
-        let secret: String = (0..32)
-            .map(|i| char::from(b'a' + (i % 26)))
-            .collect();
+        let secret: String = (0..32).map(|i| char::from(b'a' + (i % 26))).collect();
         let body = b"test body";
 
         // Generate valid signature
