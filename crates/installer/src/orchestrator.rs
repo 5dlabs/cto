@@ -1577,7 +1577,8 @@ spec:
             ui::print_section("ArgoCD Access");
             ui::print_info("URL: https://argocd.<your-domain>");
             ui::print_info("Username: admin");
-            ui::print_info(&format!("Password: {password}"));
+            ui::print_info(&format!("Password: {}", "*".repeat(password.len())));
+            ui::print_info("(Retrieve password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)");
         }
 
         ui::print_section("Quick Start");
