@@ -7,12 +7,14 @@ on:
     paths:
       - 'crates/research/**'
       - 'infra/images/research/**'
+      - 'tools/intake-agent/**'
       - '.github/workflows/research-ci.yaml'
   pull_request:
     branches: [main]
     paths:
       - 'crates/research/**'
       - 'infra/images/research/**'
+      - 'tools/intake-agent/**'
       - '.github/workflows/research-ci.yaml'
   workflow_dispatch:
 
