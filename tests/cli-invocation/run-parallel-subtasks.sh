@@ -6,6 +6,13 @@ set -e
 
 source .env
 
+# Ensure LINEAR_TEAM_ID is set
+if [ -z "$LINEAR_TEAM_ID" ]; then
+  echo "❌ ERROR: LINEAR_TEAM_ID environment variable is not set"
+  echo "   Please set it in your .env file"
+  exit 1
+fi
+
 # Create fresh issue for this test
 echo "Creating fresh Linear issue..."
 ISSUE=$(curl -s -X POST https://api.linear.app/graphql \
@@ -15,7 +22,7 @@ ISSUE=$(curl -s -X POST https://api.linear.app/graphql \
     "query": "mutation CreateIssue($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { identifier url } } }",
     "variables": {
       "input": {
-        "teamId": "9cc787e5-3039-46b3-8fd6-4e0d0d381e74",
+        "teamId": "'"$LINEAR_TEAM_ID"'",
         "title": "Parallel Sub-Agent Test - '"$(date +%H:%M)"'",
         "description": "Testing parallel execution of sub-agents with final summary"
       }

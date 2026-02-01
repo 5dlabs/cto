@@ -33,6 +33,17 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
+/// Safely truncate a UTF-8 string to a maximum number of characters.
+/// Avoids panics from slicing mid-character by using char boundaries.
+fn safe_truncate(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(max_chars).collect();
+        format!("{}...", truncated)
+    }
+}
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -117,18 +128,28 @@ fn extract_claude_text(entry: &LogEntry) -> Option<String> {
     None
 }
 
-/// Helper to extract tool use from Claude assistant message
-fn extract_claude_tool_use(entry: &LogEntry) -> Option<(String, serde_json::Value)> {
-    let msg = entry.message.as_ref()?;
-    let content = msg.get("content")?.as_array()?;
-    for item in content {
-        if item.get("type")?.as_str()? == "tool_use" {
-            let name = item.get("name")?.as_str()?.to_string();
-            let input = item.get("input").cloned().unwrap_or(serde_json::json!({}));
-            return Some((name, input));
+/// Helper to extract all tool uses from Claude assistant message
+/// Claude can emit multiple parallel tool calls in a single message
+fn extract_claude_tool_uses(entry: &LogEntry) -> Vec<(String, serde_json::Value)> {
+    let mut results = Vec::new();
+    if let Some(msg) = entry.message.as_ref() {
+        if let Some(content) = msg.get("content").and_then(|c| c.as_array()) {
+            for item in content {
+                if item.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
+                    if let Some(name) = item.get("name").and_then(|n| n.as_str()) {
+                        let input = item.get("input").cloned().unwrap_or(serde_json::json!({}));
+                        results.push((name.to_string(), input));
+                    }
+                }
+            }
         }
     }
-    None
+    results
+}
+
+/// Helper to extract first tool use from Claude assistant message (for backward compatibility)
+fn extract_claude_tool_use(entry: &LogEntry) -> Option<(String, serde_json::Value)> {
+    extract_claude_tool_uses(entry).into_iter().next()
 }
 
 /// Parsed task context from prompt.md
@@ -510,6 +531,7 @@ fn narrate_tool_call(tool_name: &str, params: &serde_json::Value, state: &Narrat
 }
 
 /// Generate a milestone message when entering a new subtask
+#[allow(dead_code)]
 fn narrate_subtask_start(subtask_name: &str, subtask_num: u32) -> String {
     format!(
         "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔨 Working on: Subtask {}.{} - {}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
@@ -518,6 +540,7 @@ fn narrate_subtask_start(subtask_name: &str, subtask_num: u32) -> String {
 }
 
 /// Generate a phase transition message
+#[allow(dead_code)]
 fn narrate_phase_change(old_phase: &NarrativePhase, new_phase: &NarrativePhase) -> Option<String> {
     if old_phase == new_phase {
         return None;
@@ -870,6 +893,7 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
 }
 
 /// Post a conductor play-by-play update (delegation or completion event)
+#[allow(dead_code)]
 async fn post_conductor_update(
     state: &AppState,
     session_id: &str,
@@ -918,12 +942,14 @@ async fn post_conductor_update(
 }
 
 /// Generate conductor delegation message
+#[allow(dead_code)]
 fn conductor_delegation_message(agent_name: &str, task_title: &str) -> String {
     let emoji = get_agent_emoji(agent_name);
     format!("{} **Delegating** to {} — {}", emoji, capitalize_agent_name(agent_name), task_title)
 }
 
 /// Generate conductor completion message for a sub-agent
+#[allow(dead_code)]
 fn conductor_completion_message(agent_name: &str, duration_secs: f64, cost_usd: f64) -> String {
     let emoji = get_agent_emoji(agent_name);
     let duration_str = if duration_secs >= 60.0 {
@@ -1525,6 +1551,12 @@ async fn ingest(
     let is_init = is_claude_init(&entry) || entry.entry_type.as_deref() == Some("init");
     
     if is_init {
+        // Guard: Don't create duplicate sessions (can happen from retries or sidecar restart)
+        if session.session_id.is_some() {
+            info!("⏭️ Init event received but session already exists, skipping creation");
+            return StatusCode::OK;
+        }
+        
         let model = entry.model.clone().unwrap_or_else(|| "unknown".to_string());
         let tools = entry.tools.clone().unwrap_or_default();
         let skills = entry.skills.clone().unwrap_or_default();
@@ -1547,7 +1579,7 @@ async fn ingest(
                 
                 // Post milestone comment on the issue itself
                 let goal = state.task_context.goal.as_deref().unwrap_or("");
-                let goal_preview = if goal.len() > 200 { format!("{}...", &goal[..200]) } else { goal.to_string() };
+                let goal_preview = safe_truncate(goal, 200);
                 if let Err(e) = post_milestone_comment(&state, MilestoneType::TaskStarted, &goal_preview).await {
                     warn!("Failed to post task started milestone: {}", e);
                 }
@@ -1593,7 +1625,8 @@ async fn ingest(
                     }
                     "Edit" | "edit" => {
                         if let Some(file) = params.and_then(|p| p.get("file_path").or(p.get("path"))).and_then(|v| v.as_str()) {
-                            if !session.files_modified.contains(&file.to_string()) {
+                            // Don't double-count files that were already created in this session
+                            if !session.files_modified.contains(&file.to_string()) && !session.files_created.contains(&file.to_string()) {
                                 session.files_modified.push(file.to_string());
                                 debug!("File modified: {}", file);
                             }
@@ -1601,7 +1634,7 @@ async fn ingest(
                     }
                     "Task" | "task" => {
                         if let Some(desc) = params.and_then(|p| p.get("description")).and_then(|v| v.as_str()) {
-                            let short_desc = if desc.len() > 50 { format!("{}...", &desc[..50]) } else { desc.to_string() };
+                            let short_desc = safe_truncate(desc, 50);
                             session.subagents_spawned.push(short_desc);
                             debug!("Subagent spawned");
                         }
@@ -1639,7 +1672,8 @@ async fn ingest(
                     }
                     "Edit" | "edit" => {
                         if let Some(file) = tool_input.get("file_path").or(tool_input.get("path")).and_then(|v| v.as_str()) {
-                            if !session.files_modified.contains(&file.to_string()) {
+                            // Don't double-count files that were already created in this session
+                            if !session.files_modified.contains(&file.to_string()) && !session.files_created.contains(&file.to_string()) {
                                 session.files_modified.push(file.to_string());
                                 debug!("File modified (Claude): {}", file);
                             }
@@ -1647,7 +1681,7 @@ async fn ingest(
                     }
                     "Task" | "task" => {
                         if let Some(desc) = tool_input.get("description").and_then(|v| v.as_str()) {
-                            let short_desc = if desc.len() > 50 { format!("{}...", &desc[..50]) } else { desc.to_string() };
+                            let short_desc = safe_truncate(desc, 50);
                             session.subagents_spawned.push(short_desc);
                             debug!("Subagent spawned (Claude)");
                         }
@@ -1759,7 +1793,7 @@ async fn status(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
 
 async fn watch_file(state: Arc<AppState>, path: PathBuf) -> Result<()> {
     use tokio::fs::File;
-    use tokio::io::{AsyncBufReadExt, BufReader};
+    use tokio::io::{AsyncBufReadExt, AsyncSeekExt, BufReader};
     
     info!("Watching file: {:?}", path);
     
@@ -1768,14 +1802,24 @@ async fn watch_file(state: Arc<AppState>, path: PathBuf) -> Result<()> {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
     }
     
-    let file = File::open(&path).await?;
-    let reader = BufReader::new(file);
-    let mut lines = reader.lines();
+    // Track file position to properly tail the file
+    let mut file_pos: u64 = 0;
     
     // Continuously watch for new content (tail -f style)
     loop {
-        match lines.next_line().await? {
-            Some(line) => {
+        // Check current file size
+        let metadata = tokio::fs::metadata(&path).await?;
+        let file_len = metadata.len();
+        
+        // If file has new content, read it
+        if file_len > file_pos {
+            let mut file = File::open(&path).await?;
+            file.seek(std::io::SeekFrom::Start(file_pos)).await?;
+            
+            let reader = BufReader::new(file);
+            let mut lines = reader.lines();
+            
+            while let Some(line) = lines.next_line().await? {
                 if line.trim().is_empty() {
                     continue;
                 }
@@ -1789,11 +1833,13 @@ async fn watch_file(state: Arc<AppState>, path: PathBuf) -> Result<()> {
                     }
                 }
             }
-            None => {
-                // No new data - wait and check again (poll for new content)
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            }
+            
+            // Update position to current end of file
+            file_pos = file_len;
         }
+        
+        // Wait before checking for new content
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
     }
 }
 

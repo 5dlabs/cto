@@ -1,31 +1,30 @@
-# Configure Security Policies
+# Configure RBAC Policies
 
 <task>
-<agent>security-agent</agent>
-<objective>Configure security policies for the infrastructure components</objective>
+<agent>rbac-agent</agent>
+<objective>Configure RBAC roles and role bindings for infrastructure components</objective>
 
 <context>
-Infrastructure components (databases, messaging) are deployed. Your job is to configure security policies including RBAC, secrets management, and pod security.
+Infrastructure components (databases, messaging) are deployed. Your job is to configure RBAC policies to ensure proper access control for service accounts.
 </context>
 
 <requirements>
-- Create RBAC roles and role bindings for service accounts
-- Configure secrets for database credentials
-- Set up pod security policies/standards
-- Configure service account tokens
-- Enable audit logging where appropriate
+- Create RBAC roles for each infrastructure component
+- Create role bindings for service accounts
+- Configure service account tokens with minimal permissions
+- Enable audit logging for RBAC changes where appropriate
 </requirements>
 
 <deliverables>
-- `rbac.yaml` - RBAC configuration
-- `secrets.yaml` - Secrets management (sealed or external)
-- `pod-security.yaml` - Pod security policies
+- `rbac-roles.yaml` - Role definitions
+- `rbac-bindings.yaml` - RoleBinding configurations
+- Applied to cluster
 </deliverables>
 
 <acceptance_criteria>
 - [ ] RBAC roles are applied
-- [ ] Secrets are properly configured
-- [ ] Pod security policies are enforced
+- [ ] Role bindings connect service accounts to roles
 - [ ] Service accounts have minimal required permissions
+- [ ] No cluster-admin bindings for application workloads
 </acceptance_criteria>
 </task>

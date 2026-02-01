@@ -5,6 +5,13 @@ set -e
 
 source .env
 
+# Ensure LINEAR_TEAM_ID is set
+if [ -z "$LINEAR_TEAM_ID" ]; then
+  echo "❌ ERROR: LINEAR_TEAM_ID environment variable is not set"
+  echo "   Please set it in your .env file"
+  exit 1
+fi
+
 # Create a fresh issue for this test run
 echo "🎯 Creating Linear issue for full orchestration test..."
 ISSUE_JSON=$(curl -s -X POST https://api.linear.app/graphql \
@@ -14,7 +21,7 @@ ISSUE_JSON=$(curl -s -X POST https://api.linear.app/graphql \
     "query": "mutation CreateIssue($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id identifier url } } }",
     "variables": {
       "input": {
-        "teamId": "9cc787e5-3039-46b3-8fd6-4e0d0d381e74",
+        "teamId": "'"$LINEAR_TEAM_ID"'",
         "title": "Full Infrastructure Deployment - '"$(date +%H:%M)"'",
         "description": "Complete orchestration: databases + storage + security + networking"
       }

@@ -1,31 +1,30 @@
-# Configure Network Policies
+# Configure Secrets Management
 
 <task>
-<agent>network-agent</agent>
-<objective>Configure network policies for infrastructure components</objective>
+<agent>secrets-agent</agent>
+<objective>Configure secrets management for database credentials and sensitive data</objective>
 
 <context>
-Infrastructure components are deployed. Your job is to configure network policies to control traffic flow between services and ensure proper isolation.
+Infrastructure components (databases, messaging) are deployed. Your job is to configure secrets for database credentials and other sensitive configuration data.
 </context>
 
 <requirements>
-- Create NetworkPolicy resources for each namespace
-- Configure ingress rules for external access
-- Configure egress rules for outbound traffic
-- Set up service mesh policies if applicable
-- Ensure database services are only accessible from authorized pods
+- Create Kubernetes secrets for database credentials (PostgreSQL, MongoDB)
+- Configure secrets for Kafka authentication if needed
+- Use sealed-secrets or external-secrets operator if available
+- Ensure secrets are not stored in plaintext in git
 </requirements>
 
 <deliverables>
-- `networkpolicy-databases.yaml` - Database network policies
-- `networkpolicy-messaging.yaml` - Messaging network policies
-- `ingress.yaml` - Ingress configuration (if needed)
+- `secrets-databases.yaml` - Database credential secrets (sealed/encrypted)
+- `secrets-messaging.yaml` - Messaging secrets if needed
+- Applied to cluster
 </deliverables>
 
 <acceptance_criteria>
-- [ ] Network policies are applied
-- [ ] Database services are properly isolated
-- [ ] Only authorized pods can access databases
-- [ ] Egress is restricted appropriately
+- [ ] Database secrets are created and encrypted
+- [ ] Applications can mount secrets as volumes or env vars
+- [ ] No plaintext secrets in manifests
+- [ ] Secret rotation policy documented
 </acceptance_criteria>
 </task>
