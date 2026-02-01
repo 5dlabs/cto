@@ -1,0 +1,39 @@
+# Simple Dockerfile for local sidecar builds
+# Bypasses buildx syntax directive issues
+
+FROM rustlang/rust:nightly-bookworm AS builder
+
+WORKDIR /build
+
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+
+# Build the linear-sidecar binary
+RUN cargo build --release -p linear-sink --bin linear-sidecar
+
+# Runtime image
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
+
+WORKDIR /app
+
+COPY --from=builder /build/target/release/linear-sidecar /app/linear-sidecar
+
+RUN chmod +x /app/linear-sidecar && chown -R app:app /app
+
+USER app
+
+ENV RUST_LOG=info
+
+EXPOSE 8080
+
+CMD ["./linear-sidecar"]

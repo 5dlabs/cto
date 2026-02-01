@@ -1,0 +1,165 @@
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: rabbitmq-cluster
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: messaging
+spec:
+  # RabbitMQ version
+  image: rabbitmq:3.12-management
+
+  # High availability with 3 nodes
+  replicas: 3
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    annotations:
+      service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+
+  # Persistent storage configuration
+  persistence:
+    storageClassName: ""  # Use default storage class
+    storage: 10Gi
+
+  # Resource management
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+
+  # RabbitMQ configuration
+  rabbitmq:
+    # Additional plugins
+    additionalPlugins:
+      - rabbitmq_management
+      - rabbitmq_prometheus
+      - rabbitmq_shovel
+      - rabbitmq_shovel_management
+      - rabbitmq_federation
+      - rabbitmq_federation_management
+      - rabbitmq_consistent_hash_exchange
+
+    # Advanced RabbitMQ configuration
+    advancedConfig: |
+      [
+        {rabbit, [
+          {collect_statistics_interval, 10000},
+          {consumer_timeout, 1800000}
+        ]},
+        {rabbitmq_management, [
+          {load_definitions, "/etc/rabbitmq/definitions.json"}
+        ]}
+      ].
+
+    # RabbitMQ configuration
+    additionalConfig: |
+      # Cluster configuration
+      cluster_formation.peer_discovery_backend = rabbit_peer_discovery_k8s
+      cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+      cluster_formation.k8s.address_type = hostname
+      cluster_formation.node_cleanup.interval = 30
+      cluster_formation.node_cleanup.only_log_warning = true
+      cluster_partition_handling = autoheal
+
+      # Queue master locator
+      queue_master_locator = min-masters
+
+      # Memory and disk settings
+      vm_memory_high_watermark.relative = 0.6
+      disk_free_limit.absolute = 2GB
+
+      # Connection and channel limits
+      channel_max = 2047
+
+      # Logging
+      log.console = true
+      log.console.level = info
+      log.file.level = info
+
+      # Management plugin
+      management.tcp.port = 15672
+      management.load_definitions = /etc/rabbitmq/definitions.json
+
+      # Prometheus metrics
+      prometheus.return_per_object_metrics = true
+
+      # Default user (will be overridden by definitions)
+      default_user = guest
+      default_pass = guest
+      default_user_tags.administrator = true
+
+      # Network settings
+      heartbeat = 60
+      handshake_timeout = 10000
+
+  # Override StatefulSet settings
+  override:
+    statefulSet:
+      spec:
+        template:
+          spec:
+            # Pod Security Context
+            securityContext:
+              fsGroup: 999
+              runAsUser: 999
+              runAsNonRoot: true
+
+            # Container configuration
+            containers:
+              - name: rabbitmq
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  runAsNonRoot: true
+                  runAsUser: 999
+                  capabilities:
+                    drop:
+                      - ALL
+
+                # Liveness probe
+                livenessProbe:
+                  exec:
+                    command:
+                      - rabbitmq-diagnostics
+                      - status
+                  initialDelaySeconds: 60
+                  periodSeconds: 30
+                  timeoutSeconds: 10
+                  failureThreshold: 6
+
+                # Readiness probe
+                readinessProbe:
+                  exec:
+                    command:
+                      - rabbitmq-diagnostics
+                      - ping
+                  initialDelaySeconds: 20
+                  periodSeconds: 10
+                  timeoutSeconds: 10
+                  failureThreshold: 3
+
+            # Anti-affinity for high availability
+            affinity:
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    podAffinityTerm:
+                      labelSelector:
+                        matchExpressions:
+                          - key: app.kubernetes.io/name
+                            operator: In
+                            values:
+                              - rabbitmq-cluster
+                      topologyKey: kubernetes.io/hostname
+
+  # TLS configuration (optional - uncomment to enable)
+  # tls:
+  #   secretName: rabbitmq-tls-secret
+  #   caSecretName: rabbitmq-ca-secret
+  #   disableNonTLSListeners: false

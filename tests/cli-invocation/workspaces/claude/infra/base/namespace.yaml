@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: databases
+  labels:
+    name: databases
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: storage
+  labels:
+    name: storage
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: messaging
+  labels:
+    name: messaging
+    environment: production

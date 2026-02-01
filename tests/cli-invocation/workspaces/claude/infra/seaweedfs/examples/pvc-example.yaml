@@ -1,0 +1,147 @@
+---
+# Example: Using SeaweedFS S3 from application
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-s3-config
+  namespace: default
+data:
+  S3_ENDPOINT: "http://seaweedfs-s3.storage.svc.cluster.local:8333"
+  S3_REGION: "us-east-1"
+  S3_BUCKET: "my-app-bucket"
+
+---
+# Example: Application using SeaweedFS S3
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3-app-example
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: s3-app-example
+  template:
+    metadata:
+      labels:
+        app: s3-app-example
+    spec:
+      initContainers:
+      # Init container to create bucket
+      - name: create-bucket
+        image: amazon/aws-cli:2.13.31
+        command:
+        - /bin/sh
+        - -c
+        - |
+          aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
+          aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
+          aws configure set default.region ${S3_REGION}
+          aws --endpoint-url ${S3_ENDPOINT} s3 mb s3://${S3_BUCKET} || true
+        envFrom:
+        - configMapRef:
+            name: app-s3-config
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          value: "any"
+        - name: AWS_SECRET_ACCESS_KEY
+          value: "any"
+      containers:
+      - name: app
+        image: python:3.11-slim
+        command:
+        - python3
+        - -c
+        - |
+          import os
+          import boto3
+          from botocore.client import Config
+
+          # Configure S3 client
+          s3_client = boto3.client(
+              's3',
+              endpoint_url=os.environ['S3_ENDPOINT'],
+              aws_access_key_id='any',
+              aws_secret_access_key='any',
+              region_name=os.environ['S3_REGION'],
+              config=Config(signature_version='s3v4')
+          )
+
+          bucket = os.environ['S3_BUCKET']
+
+          # Upload object
+          s3_client.put_object(
+              Bucket=bucket,
+              Key='test.txt',
+              Body=b'Hello from SeaweedFS!'
+          )
+          print(f"Uploaded object to {bucket}/test.txt")
+
+          # List objects
+          response = s3_client.list_objects_v2(Bucket=bucket)
+          print(f"Objects in bucket {bucket}:")
+          for obj in response.get('Contents', []):
+              print(f"  - {obj['Key']}")
+
+          # Download object
+          obj = s3_client.get_object(Bucket=bucket, Key='test.txt')
+          content = obj['Body'].read().decode('utf-8')
+          print(f"Downloaded content: {content}")
+
+          # Keep running
+          import time
+          while True:
+              time.sleep(60)
+        envFrom:
+        - configMapRef:
+            name: app-s3-config
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+---
+# Example: Using SeaweedFS via CSI (if CSI driver is installed)
+# Note: This requires SeaweedFS CSI driver to be deployed
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: seaweedfs-pvc
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: seaweedfs-storage
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: seaweedfs-pvc-pod
+  namespace: default
+spec:
+  containers:
+  - name: app
+    image: busybox
+    command:
+    - sh
+    - -c
+    - |
+      echo "Writing to SeaweedFS volume..."
+      echo "Hello SeaweedFS" > /data/test.txt
+      cat /data/test.txt
+      sleep 3600
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: seaweedfs-pvc
