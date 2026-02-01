@@ -25,6 +25,7 @@ use tools::{handle_tool_call, list_tools};
 
 /// JSON-RPC 2.0 Request
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct JsonRpcRequest {
     jsonrpc: String,
     id: Option<Value>,

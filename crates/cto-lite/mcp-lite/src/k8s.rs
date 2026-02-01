@@ -25,6 +25,7 @@ pub struct WorkflowStatus {
 
 /// Node (step) status
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct NodeStatus {
     pub name: String,
     pub display_name: String,
@@ -33,6 +34,7 @@ pub struct NodeStatus {
 
 /// Job summary
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct JobSummary {
     pub name: String,
     pub phase: String,

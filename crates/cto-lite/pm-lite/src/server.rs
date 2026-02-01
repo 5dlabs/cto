@@ -85,7 +85,10 @@ async fn github_webhook(
     let event_type = headers
         .get("x-github-event")
         .and_then(|v| v.to_str().ok())
-        .map_or(GitHubEvent::Unknown("missing".to_string()), GitHubEvent::from);
+        .map_or(
+            GitHubEvent::Unknown("missing".to_string()),
+            GitHubEvent::from,
+        );
 
     info!("Received GitHub webhook: {event_type:?}");
 
