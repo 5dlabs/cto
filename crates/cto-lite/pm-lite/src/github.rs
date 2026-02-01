@@ -141,19 +141,26 @@ pub struct Label {
 /// # Errors
 /// Returns error if signature is invalid or missing
 pub fn verify_signature(secret: &str, signature: &str, body: &[u8]) -> Result<()> {
+    use subtle::ConstantTimeEq;
+
     // GitHub signature format: sha256=<hex>
-    let expected = signature
+    let expected_hex = signature
         .strip_prefix("sha256=")
         .ok_or_else(|| anyhow!("Invalid signature format"))?;
+
+    // Decode expected signature from hex
+    let expected_bytes =
+        hex::decode(expected_hex).map_err(|e| anyhow!("Invalid signature hex: {e}"))?;
 
     let mut mac =
         HmacSha256::new_from_slice(secret.as_bytes()).map_err(|e| anyhow!("HMAC error: {e}"))?;
     mac.update(body);
 
     let result = mac.finalize();
-    let computed = hex::encode(result.into_bytes());
+    let computed_bytes = result.into_bytes();
 
-    if computed == expected {
+    // Use constant-time comparison to prevent timing attacks
+    if computed_bytes.ct_eq(&expected_bytes).into() {
         Ok(())
     } else {
         Err(anyhow!("Signature mismatch"))
