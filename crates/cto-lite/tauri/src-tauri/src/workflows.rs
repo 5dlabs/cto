@@ -55,7 +55,7 @@ pub struct WorkflowParams {
 
 /// Check if Argo Workflows is available
 pub async fn check_argo() -> Result<bool> {
-    let _output = Command::new("kubectl")
+    let output = Command::new("kubectl")
         .args([
             "get",
             "deployment",
@@ -77,7 +77,7 @@ pub async fn check_argo() -> Result<bool> {
 
 /// List all workflows in the cto-lite namespace
 pub async fn list_workflows() -> Result<Vec<WorkflowStatus>> {
-    let _output = Command::new("kubectl")
+    let output = Command::new("kubectl")
         .args(["get", "workflows", "-n", "cto-lite", "-o", "json"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -118,7 +118,7 @@ pub async fn list_workflows() -> Result<Vec<WorkflowStatus>> {
 
 /// Get detailed status of a specific workflow
 pub async fn get_workflow(name: &str) -> Result<WorkflowDetail> {
-    let _output = Command::new("kubectl")
+    let output = Command::new("kubectl")
         .args(["get", "workflow", name, "-n", "cto-lite", "-o", "json"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -188,7 +188,7 @@ spec:
         stack
     );
 
-    let _output = Command::new("kubectl")
+    let output = Command::new("kubectl")
         .args(["apply", "-n", "cto-lite", "-f", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -204,7 +204,7 @@ spec:
         }
         _ => {
             // Try using argo CLI as fallback
-            let _output = Command::new("argo")
+            let output = Command::new("argo")
                 .args([
                     "submit",
                     "--from",
@@ -252,7 +252,7 @@ pub async fn get_workflow_logs(workflow_name: &str, node_name: Option<&str>) -> 
         args.push(node.to_string());
     }
 
-    let _output = Command::new("argo")
+    let output = Command::new("argo")
         .args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -282,7 +282,7 @@ async fn get_workflow_logs_kubectl(workflow_name: &str, node_name: Option<&str>)
         format!("workflows.argoproj.io/workflow={}", workflow_name)
     };
 
-    let _output = Command::new("kubectl")
+    let output = Command::new("kubectl")
         .args([
             "logs",
             "-n",
@@ -309,7 +309,7 @@ async fn get_workflow_logs_kubectl(workflow_name: &str, node_name: Option<&str>)
 
 /// Delete a workflow
 pub async fn delete_workflow(name: &str) -> Result<()> {
-    let _output = Command::new("kubectl")
+    let output = Command::new("kubectl")
         .args(["delete", "workflow", name, "-n", "cto-lite"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -328,7 +328,7 @@ pub async fn delete_workflow(name: &str) -> Result<()> {
 
 /// Stop a running workflow
 pub async fn stop_workflow(name: &str) -> Result<()> {
-    let _output = Command::new("argo")
+    let output = Command::new("argo")
         .args(["stop", name, "-n", "cto-lite"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -342,7 +342,7 @@ pub async fn stop_workflow(name: &str) -> Result<()> {
         }
         _ => {
             // Fallback: patch the workflow to terminate
-            let _output = Command::new("kubectl")
+            let output = Command::new("kubectl")
                 .args([
                     "patch",
                     "workflow",
