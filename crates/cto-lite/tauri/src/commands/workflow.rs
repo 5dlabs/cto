@@ -104,8 +104,7 @@ pub async fn get_workflow_status(name: String) -> Result<WorkflowInfo, AppError>
         "json",
     ])?;
 
-    let workflow: ArgoWorkflow =
-        serde_json::from_str(&output).map_err(AppError::JsonError)?;
+    let workflow: ArgoWorkflow = serde_json::from_str(&output).map_err(AppError::JsonError)?;
 
     Ok(WorkflowInfo {
         name: workflow.metadata.name,
