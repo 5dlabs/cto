@@ -37,10 +37,19 @@ chrono = { workspace = true }
 # URL handling
 url = "2.5"
 
+# YAML (on-prem inventory)
+serde_yaml = { workspace = true }
+
+# UUID (on-prem server IDs)
+uuid = { workspace = true }
+
+# Cryptography (OVH signature)
+sha1 = { workspace = true }
+hex = { workspace = true }
+
 # CLI
 clap = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 wiremock = { workspace = true }
-
