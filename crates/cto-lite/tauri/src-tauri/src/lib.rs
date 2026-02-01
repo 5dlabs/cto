@@ -22,6 +22,7 @@ pub use commands::*;
 pub use state::AppState;
 
 /// Initialize and run the Tauri application
+#[allow(clippy::disallowed_macros)] // tauri::generate_context! internally uses eprintln
 pub fn run() {
     // Initialize tracing
     tracing_subscriber::registry()

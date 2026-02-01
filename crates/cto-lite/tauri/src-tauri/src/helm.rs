@@ -102,19 +102,19 @@ pub async fn deploy_chart(values: &HelmValues) -> Result<()> {
     // Add values as --set flags
     if let Some(ref key) = values.anthropic_api_key {
         cmd.arg("--set")
-            .arg(format!("secrets.anthropic.enabled=true"));
+            .arg("secrets.anthropic.enabled=true");
         cmd.arg("--set")
             .arg(format!("secrets.anthropic.apiKey={}", key));
     }
 
     if let Some(ref key) = values.openai_api_key {
-        cmd.arg("--set").arg(format!("secrets.openai.enabled=true"));
+        cmd.arg("--set").arg("secrets.openai.enabled=true");
         cmd.arg("--set")
             .arg(format!("secrets.openai.apiKey={}", key));
     }
 
     if let Some(ref token) = values.github_token {
-        cmd.arg("--set").arg(format!("secrets.github.enabled=true"));
+        cmd.arg("--set").arg("secrets.github.enabled=true");
         cmd.arg("--set")
             .arg(format!("secrets.github.token={}", token));
     }
