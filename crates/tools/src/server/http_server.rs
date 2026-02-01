@@ -701,7 +701,7 @@ impl ServerConnectionPool {
         Ok(())
     }
 
-    /// Initialize an MCP server with the required handshake
+    /// Initialize an MCP server with the required handshake (10s timeout)
     async fn initialize_server(
         &self,
         connection: Arc<Mutex<McpServerConnection>>,
@@ -711,8 +711,32 @@ impl ServerConnectionPool {
             conn.server_name.clone()
         };
 
-        tracing::info!("🔄 Initializing MCP server: {}", server_name);
+        tracing::info!("🔄 Initializing MCP server: {} (10s timeout)", server_name);
 
+        match tokio::time::timeout(
+            tokio::time::Duration::from_secs(10),
+            self.initialize_server_inner(connection, &server_name),
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                tracing::error!(
+                    "⏰ [{server_name}] MCP server initialization timed out after 10s"
+                );
+                Err(anyhow::anyhow!(
+                    "MCP server '{server_name}' initialization timed out after 10s"
+                ))
+            }
+        }
+    }
+
+    /// Inner initialization logic (called within timeout wrapper)
+    async fn initialize_server_inner(
+        &self,
+        connection: Arc<Mutex<McpServerConnection>>,
+        server_name: &str,
+    ) -> anyhow::Result<()> {
         // Send initialize request
         let init_request = json!({
             "jsonrpc": "2.0",
@@ -738,7 +762,7 @@ impl ServerConnectionPool {
 
         // Read initialization response
         tracing::info!(
-            "🔄 [{}] About to read initialize response (THIS MIGHT HANG)",
+            "🔄 [{}] About to read initialize response",
             server_name
         );
         let _init_response = self.read_response(connection.clone()).await?;

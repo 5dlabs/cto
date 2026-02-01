@@ -1,0 +1,14 @@
+// Test fixture for Grizz (Go) detection
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello from Grizz!")
+	})
+	http.ListenAndServe(":8080", nil)
+}
