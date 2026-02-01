@@ -1,0 +1,106 @@
+---
+# NetworkPolicy for RabbitMQ cluster
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rabbitmq-cluster
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: networkpolicy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq-cluster
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow AMQP connections from application pods
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+        - namespaceSelector:
+            matchLabels:
+              name: production
+        - namespaceSelector:
+            matchLabels:
+              name: staging
+      ports:
+        - protocol: TCP
+          port: 5672
+        - protocol: TCP
+          port: 5671
+
+    # Allow Management UI access from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 15672
+
+    # Allow Prometheus metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 15692
+
+    # Allow inter-node communication (cluster ports)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rabbitmq-cluster
+      ports:
+        - protocol: TCP
+          port: 4369   # epmd
+        - protocol: TCP
+          port: 25672  # inter-node communication
+
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow inter-node communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rabbitmq-cluster
+      ports:
+        - protocol: TCP
+          port: 4369
+        - protocol: TCP
+          port: 5672
+        - protocol: TCP
+          port: 25672
+
+    # Allow Kubernetes API access for peer discovery
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              component: apiserver
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Allow all egress for shovel/federation (optional - restrict as needed)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5672

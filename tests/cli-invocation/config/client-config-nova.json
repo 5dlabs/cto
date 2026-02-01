@@ -1,0 +1,3 @@
+{
+  "remoteTools": ["context7_resolve_library_id","context7_get_library_docs","octocode_githubSearchCode","octocode_githubSearchRepositories","octocode_githubViewRepoStructure","octocode_githubGetFileContent","octocode_githubSearchPullRequests","octocode_packageSearch","firecrawl_scrape","firecrawl_crawl","firecrawl_map","firecrawl_search","openmemory_openmemory_query","openmemory_openmemory_store","openmemory_openmemory_list","openmemory_openmemory_get","openmemory_openmemory_reinforce","github_create_pull_request","github_push_files","github_create_branch","github_get_file_contents"]
+}

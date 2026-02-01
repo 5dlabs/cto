@@ -1,0 +1,313 @@
+name: CTO Lite Release
+
+on:
+  push:
+    tags:
+      - "cto-lite-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., 0.1.0)"
+        required: true
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+env:
+  TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+  TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS builds
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            name: macOS-arm64
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            name: macOS-x64
+
+          # Windows builds
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: Windows-x64
+
+          # Linux builds
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            name: Linux-x64
+
+    runs-on: ${{ matrix.platform }}
+    name: Build (${{ matrix.name }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: crates/cto-lite/ui/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./crates/cto-lite/tauri -> target"
+
+      # Linux dependencies
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libgtk-3-dev
+
+      # macOS code signing
+      - name: Import Apple certificates
+        if: startsWith(matrix.platform, 'macos')
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+            KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+            echo -n "$APPLE_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
+            security create-keychain -p "$APPLE_KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+            security unlock-keychain -p "$APPLE_KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            security import $CERTIFICATE_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+            security list-keychain -d user -s $KEYCHAIN_PATH
+          fi
+
+      # Windows code signing
+      - name: Import Windows certificate
+        if: matrix.platform == 'windows-latest'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:WINDOWS_CERTIFICATE) {
+            $certBytes = [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+            $certPath = "$env:RUNNER_TEMP\certificate.pfx"
+            [System.IO.File]::WriteAllBytes($certPath, $certBytes)
+            Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
+          }
+        shell: pwsh
+
+      # Install UI dependencies
+      - name: Install UI dependencies
+        run: npm ci
+        working-directory: crates/cto-lite/ui
+
+      # Build Tauri app
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: crates/cto-lite/tauri
+          tauriScript: npx tauri
+          args: --target ${{ matrix.target }}
+
+      # Upload artifacts
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cto-lite-${{ matrix.name }}
+          path: |
+            crates/cto-lite/tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
+            crates/cto-lite/tauri/target/${{ matrix.target }}/release/bundle/**/*.app
+            crates/cto-lite/tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
+            crates/cto-lite/tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
+            crates/cto-lite/tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
+            crates/cto-lite/tauri/target/${{ matrix.target }}/release/bundle/**/*.rpm
+            crates/cto-lite/tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
+          if-no-files-found: error
+
+  # macOS Universal binary
+  universal-macos:
+    needs: build
+    runs-on: macos-latest
+    name: Universal macOS Binary
+
+    steps:
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cto-lite-macOS-arm64
+          path: arm64
+
+      - name: Download x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cto-lite-macOS-x64
+          path: x64
+
+      - name: Create universal binary
+        run: |
+          mkdir -p universal
+          # The DMG files contain the app bundles
+          # For a proper universal binary, we'd need to lipo the executables
+          # For now, we'll provide separate downloads
+          cp -r arm64/* universal/ || true
+          cp -r x64/* universal/ || true
+
+      - name: Upload universal artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cto-lite-macOS-universal
+          path: universal/
+
+  # Create GitHub Release
+  release:
+    needs: [build, universal-macos]
+    runs-on: ubuntu-latest
+    name: Create Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Organize release assets
+        run: |
+          mkdir -p release
+          
+          # macOS
+          find artifacts/cto-lite-macOS-arm64 -name "*.dmg" -exec cp {} release/CTO-Lite-macOS-arm64.dmg \; || true
+          find artifacts/cto-lite-macOS-x64 -name "*.dmg" -exec cp {} release/CTO-Lite-macOS-x64.dmg \; || true
+          
+          # Windows
+          find artifacts/cto-lite-Windows-x64 -name "*.exe" -exec cp {} release/CTO-Lite-Windows-x64-Setup.exe \; || true
+          find artifacts/cto-lite-Windows-x64 -name "*.msi" -exec cp {} release/CTO-Lite-Windows-x64.msi \; || true
+          
+          # Linux
+          find artifacts/cto-lite-Linux-x64 -name "*.deb" -exec cp {} release/cto-lite_amd64.deb \; || true
+          find artifacts/cto-lite-Linux-x64 -name "*.rpm" -exec cp {} release/cto-lite.x86_64.rpm \; || true
+          find artifacts/cto-lite-Linux-x64 -name "*.AppImage" -exec cp {} release/CTO-Lite-x86_64.AppImage \; || true
+          
+          ls -la release/
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF_NAME#cto-lite-v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cto-lite-v${{ steps.version.outputs.version }}
+          name: CTO Lite v${{ steps.version.outputs.version }}
+          draft: true
+          prerelease: true
+          generate_release_notes: true
+          files: release/*
+          body: |
+            ## CTO Lite v${{ steps.version.outputs.version }}
+
+            AI-powered development assistant for your desktop.
+
+            ### Downloads
+
+            | Platform | Architecture | File |
+            |----------|--------------|------|
+            | macOS | Apple Silicon | `CTO-Lite-macOS-arm64.dmg` |
+            | macOS | Intel | `CTO-Lite-macOS-x64.dmg` |
+            | Windows | x64 | `CTO-Lite-Windows-x64-Setup.exe` |
+            | Linux | x64 (Debian/Ubuntu) | `cto-lite_amd64.deb` |
+            | Linux | x64 (Fedora/RHEL) | `cto-lite.x86_64.rpm` |
+            | Linux | x64 (Universal) | `CTO-Lite-x86_64.AppImage` |
+
+            ### Requirements
+
+            - **Docker Desktop** (macOS/Windows) or **Docker Engine** (Linux)
+            - API key for Anthropic or OpenAI
+
+            ### Quick Start
+
+            1. Download the installer for your platform
+            2. Run the installer and follow the setup wizard
+            3. Configure your API keys and preferred stack
+            4. Start coding with MCP from your IDE!
+
+            ### Documentation
+
+            📚 [Getting Started Guide](https://cto.dev/docs/lite)
+            🐛 [Report Issues](https://github.com/5dlabs/cto/issues)
+            💬 [Discord Community](https://discord.gg/5dlabs)
+
+  # Upload to CDN
+  cdn-upload:
+    needs: release
+    runs-on: ubuntu-latest
+    name: Upload to CDN
+    if: github.event_name == 'push'  # Only on tag push, not manual
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload to R2 (Cloudflare)
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          if [ -n "$R2_ACCESS_KEY_ID" ]; then
+            pip install boto3
+            python3 << 'EOF'
+          import boto3
+          import os
+          from pathlib import Path
+
+          s3 = boto3.client(
+              's3',
+              endpoint_url=os.environ['R2_ENDPOINT'],
+              aws_access_key_id=os.environ['R2_ACCESS_KEY_ID'],
+              aws_secret_access_key=os.environ['R2_SECRET_ACCESS_KEY']
+          )
+
+          bucket = os.environ['R2_BUCKET']
+          version = os.environ.get('GITHUB_REF_NAME', 'latest').replace('cto-lite-v', '')
+
+          for artifact in Path('artifacts').rglob('*'):
+              if artifact.is_file():
+                  key = f"cto-lite/{version}/{artifact.name}"
+                  print(f"Uploading {artifact} to {key}")
+                  s3.upload_file(str(artifact), bucket, key)
+          EOF
+          fi

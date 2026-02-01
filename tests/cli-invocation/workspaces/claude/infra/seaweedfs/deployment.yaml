@@ -1,0 +1,441 @@
+---
+# Master StatefulSet - 3 replicas for HA
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: seaweedfs-master
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+spec:
+  serviceName: seaweedfs-master
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: master
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: master
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: seaweedfs
+                  app.kubernetes.io/component: master
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: seaweedfs
+        image: chrislusf/seaweedfs:3.66
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -ec
+        - |
+          exec /usr/bin/weed \
+            -logdir=/logs \
+            -v=1 \
+            master \
+            -port=9333 \
+            -ip=$(POD_NAME).seaweedfs-master.storage.svc.cluster.local \
+            -peers=seaweedfs-master-0.seaweedfs-master.storage.svc.cluster.local:9333,seaweedfs-master-1.seaweedfs-master.storage.svc.cluster.local:9333,seaweedfs-master-2.seaweedfs-master.storage.svc.cluster.local:9333 \
+            -mdir=/data \
+            -defaultReplication=001 \
+            -volumeSizeLimitMB=30000
+        ports:
+        - name: master
+          containerPort: 9333
+          protocol: TCP
+        - name: grpc
+          containerPort: 19333
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: logs
+          mountPath: /logs
+        - name: config
+          mountPath: /etc/seaweedfs
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /cluster/status
+            port: 9333
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 4
+        readinessProbe:
+          httpGet:
+            path: /cluster/status
+            port: 9333
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: seaweedfs-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+      storageClassName: standard
+
+---
+# Volume Server StatefulSet - 3 replicas for data storage
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: seaweedfs-volume
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+spec:
+  serviceName: seaweedfs-volume
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: volume
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: volume
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: seaweedfs
+                  app.kubernetes.io/component: volume
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: seaweedfs
+        image: chrislusf/seaweedfs:3.66
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -ec
+        - |
+          exec /usr/bin/weed \
+            -logdir=/logs \
+            -v=1 \
+            volume \
+            -port=8080 \
+            -ip=$(POD_NAME).seaweedfs-volume.storage.svc.cluster.local \
+            -mserver=seaweedfs-master-0.seaweedfs-master.storage.svc.cluster.local:9333,seaweedfs-master-1.seaweedfs-master.storage.svc.cluster.local:9333,seaweedfs-master-2.seaweedfs-master.storage.svc.cluster.local:9333 \
+            -dir=/data \
+            -max=0 \
+            -compactionMBps=50 \
+            -minFreeSpacePercent=5
+        ports:
+        - name: volume
+          containerPort: 8080
+          protocol: TCP
+        - name: grpc
+          containerPort: 18080
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: logs
+          mountPath: /logs
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 4
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+      - name: logs
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: standard
+
+---
+# Filer StatefulSet - 2 replicas for file system interface
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: seaweedfs-filer
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+spec:
+  serviceName: seaweedfs-filer
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: filer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: filer
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: seaweedfs
+                  app.kubernetes.io/component: filer
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: seaweedfs
+        image: chrislusf/seaweedfs:3.66
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -ec
+        - |
+          exec /usr/bin/weed \
+            -logdir=/logs \
+            -v=1 \
+            filer \
+            -port=8888 \
+            -ip=$(POD_NAME).seaweedfs-filer.storage.svc.cluster.local \
+            -master=seaweedfs-master-0.seaweedfs-master.storage.svc.cluster.local:9333,seaweedfs-master-1.seaweedfs-master.storage.svc.cluster.local:9333,seaweedfs-master-2.seaweedfs-master.storage.svc.cluster.local:9333 \
+            -s3 \
+            -s3.port=8333 \
+            -s3.domainName="" \
+            -defaultReplicaPlacement=001 \
+            -encryptVolumeData=false
+        ports:
+        - name: filer
+          containerPort: 8888
+          protocol: TCP
+        - name: grpc
+          containerPort: 18888
+          protocol: TCP
+        - name: s3
+          containerPort: 8333
+          protocol: TCP
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: logs
+          mountPath: /logs
+        - name: config
+          mountPath: /etc/seaweedfs
+          readOnly: true
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 2000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8888
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 4
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8888
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: seaweedfs-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+      storageClassName: standard
+
+---
+# S3 Gateway Deployment - for S3-compatible access
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seaweedfs-s3
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: s3
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: s3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: s3
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: seaweedfs
+                  app.kubernetes.io/component: s3
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: seaweedfs
+        image: chrislusf/seaweedfs:3.66
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        - -ec
+        - |
+          exec /usr/bin/weed \
+            -logdir=/logs \
+            -v=1 \
+            s3 \
+            -port=8333 \
+            -filer=seaweedfs-filer:8888 \
+            -config=/etc/seaweedfs/security.toml
+        ports:
+        - name: s3
+          containerPort: 8333
+          protocol: TCP
+        env:
+        - name: WEED_FILER
+          value: "seaweedfs-filer:8888"
+        volumeMounts:
+        - name: logs
+          mountPath: /logs
+        - name: config
+          mountPath: /etc/seaweedfs
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8333
+            scheme: HTTP
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 4
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8333
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: seaweedfs-config

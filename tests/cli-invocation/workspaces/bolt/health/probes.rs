@@ -1,74 +1,67 @@
-//! Kubernetes health probe handlers for liveness and readiness checks.
+use crate::health::types::{HealthResponse, HealthStatus};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use super::types::{HealthResponse, HealthStatus};
-
-/// Global start time for tracking uptime
-static START_TIME: AtomicU64 = AtomicU64::new(0);
-
-/// Initialize the probe system with the current time.
-/// Should be called once at application startup.
-pub fn init() {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
-    START_TIME.store(now, Ordering::SeqCst);
+/// Service state tracking for health checks
+pub struct ServiceState {
+    start_time: Instant,
+    version: String,
+    ready: Arc<std::sync::atomic::AtomicBool>,
 }
 
-/// Get the current uptime in seconds.
-fn get_uptime() -> u64 {
-    let start = START_TIME.load(Ordering::SeqCst);
-    if start == 0 {
-        // If not initialized, initialize now
-        init();
-        return 0;
+impl ServiceState {
+    /// Creates a new service state tracker
+    pub fn new(version: impl Into<String>) -> Self {
+        Self {
+            start_time: Instant::now(),
+            version: version.into(),
+            ready: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+        }
     }
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
+    /// Sets the readiness state
+    pub fn set_ready(&self, ready: bool) {
+        self.ready
+            .store(ready, std::sync::atomic::Ordering::SeqCst);
+    }
 
-    now.saturating_sub(start)
+    /// Checks if the service is ready
+    pub fn is_ready(&self) -> bool {
+        self.ready.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Gets the uptime in seconds
+    pub fn uptime(&self) -> u64 {
+        self.start_time.elapsed().as_secs()
+    }
+
+    /// Gets the version string
+    pub fn version(&self) -> &str {
+        &self.version
+    }
 }
 
-/// Liveness probe handler for `/healthz` endpoint.
+/// Liveness probe handler
 ///
-/// This probe indicates whether the application is running.
-/// Kubernetes will restart the pod if this probe fails.
-///
-/// # Returns
-///
-/// A `HealthResponse` with status `Healthy` and current uptime.
-pub fn liveness_probe() -> HealthResponse {
-    HealthResponse::healthy(
-        env!("CARGO_PKG_VERSION"),
-        get_uptime(),
-    )
+/// Returns 200 OK when the service is alive (basic process check).
+/// This endpoint should return healthy unless the process is deadlocked or crashed.
+pub fn liveness_probe(state: &ServiceState) -> (u16, HealthResponse) {
+    let response = HealthResponse::healthy(state.version().to_string(), state.uptime());
+    (200, response)
 }
 
-/// Readiness probe handler for `/readyz` endpoint.
+/// Readiness probe handler
 ///
-/// This probe indicates whether the application is ready to serve traffic.
-/// Kubernetes will not send traffic to the pod if this probe fails.
-///
-/// # Returns
-///
-/// A `HealthResponse` with status `Healthy` and current uptime.
-pub fn readiness_probe() -> HealthResponse {
-    // In a real application, you would check:
-    // - Database connections
-    // - External service availability
-    // - Cache readiness
-    // - Any other dependencies
-
-    HealthResponse::healthy(
-        env!("CARGO_PKG_VERSION"),
-        get_uptime(),
-    )
+/// Returns 200 OK when the service is ready to handle requests.
+/// This checks if dependencies are available and the service is fully initialized.
+pub fn readiness_probe(state: &ServiceState) -> (u16, HealthResponse) {
+    if state.is_ready() {
+        let response = HealthResponse::healthy(state.version().to_string(), state.uptime());
+        (200, response)
+    } else {
+        let response = HealthResponse::unhealthy(state.version().to_string(), state.uptime());
+        (503, response)
+    }
 }
 
 #[cfg(test)]
@@ -76,26 +69,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_liveness_probe() {
-        init();
-        let response = liveness_probe();
+    fn test_liveness_probe_returns_healthy() {
+        let state = ServiceState::new("1.0.0");
+        let (status, response) = liveness_probe(&state);
+
+        assert_eq!(status, 200);
         assert_eq!(response.status, HealthStatus::Healthy);
-        assert!(!response.version.is_empty());
+        assert_eq!(response.version, "1.0.0");
     }
 
     #[test]
-    fn test_readiness_probe() {
-        init();
-        let response = readiness_probe();
+    fn test_readiness_probe_when_ready() {
+        let state = ServiceState::new("1.0.0");
+        state.set_ready(true);
+        let (status, response) = readiness_probe(&state);
+
+        assert_eq!(status, 200);
         assert_eq!(response.status, HealthStatus::Healthy);
-        assert!(!response.version.is_empty());
     }
 
     #[test]
-    fn test_uptime_tracking() {
-        init();
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        let uptime = get_uptime();
-        assert!(uptime >= 0);
+    fn test_readiness_probe_when_not_ready() {
+        let state = ServiceState::new("1.0.0");
+        state.set_ready(false);
+        let (status, response) = readiness_probe(&state);
+
+        assert_eq!(status, 503);
+        assert_eq!(response.status, HealthStatus::Unhealthy);
     }
 }

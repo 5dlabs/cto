@@ -1,0 +1,251 @@
+# =============================================================================
+# FluentD + Loki Logging Stack - Docker Compose Override
+# =============================================================================
+#
+# Unified log collection for ALL CLIs via FluentD.
+# FluentD tees logs to:
+#   1. Loki - dashboards, querying, retention
+#   2. Sidecar - real-time Linear agent dialog updates
+#
+# Use with: docker compose -f docker-compose.yml -f docker-compose.loki.yml up
+#
+# =============================================================================
+
+# Common FluentD logging config for all CLIs
+# Note: fluentd-async=true allows CLIs to start even if FluentD isn't ready yet
+x-fluentd-logging: &fluentd-logging
+  driver: fluentd
+  options:
+    fluentd-address: "localhost:24224"
+    fluentd-async: "true"
+    fluentd-retry-wait: "2s"
+    fluentd-max-retries: "10"
+    fluentd-sub-second-precision: "true"
+    tag: "agent.{{.Name}}"
+
+services:
+  # ===========================================================================
+  # FluentD - Log Router (receives from Docker, forwards to Loki + Sidecar)
+  # ===========================================================================
+  fluentd:
+    image: grafana/fluent-plugin-loki:main
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./config/fluent.conf:/fluentd/etc/fluent.conf:ro
+    environment:
+      - FLUENTD_CONF=fluent.conf
+    healthcheck:
+      test: ["CMD-SHELL", "ruby -e \"require 'socket'; TCPSocket.new('localhost', 24224).close\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ===========================================================================
+  # Loki - Log Storage & Querying
+  # ===========================================================================
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Grafana - Log Visualization
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:10.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    depends_on:
+      loki:
+        condition: service_healthy
+
+  # ===========================================================================
+  # Sidecar - Receives logs from FluentD, posts to Linear (status-sync binary)
+  # ===========================================================================
+  sidecar:
+    image: cto-linear-sidecar:local
+    pull_policy: never
+    ports:
+      - "8080:8080"
+    environment:
+      # Linear session (from .env or pre-created)
+      LINEAR_SESSION_ID: ${LINEAR_SESSION_ID:-}
+      LINEAR_ISSUE_ID: ${LINEAR_ISSUE_ID:-}
+      LINEAR_TEAM_ID: ${LINEAR_TEAM_ID:-}
+      LINEAR_OAUTH_TOKEN: ${LINEAR_OAUTH_TOKEN}
+      LINEAR_API_URL: https://api.linear.app/graphql
+      # Workflow info
+      WORKFLOW_NAME: docker-compose-test
+      # HTTP server port (FluentD forwards here)
+      HTTP_PORT: 8080
+      # Logging
+      RUST_LOG: info,status_sync=debug
+      # Disable file-based streaming (using FluentD ingest)
+      STATUS_FILE: /dev/null
+      LOG_FILE_PATH: /dev/null
+      CLAUDE_STREAM_FILE: /dev/null
+    volumes:
+      - ../../templates/skills:/cto-skills:ro
+      - ../../cto-config.json:/cto-config.json:ro
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  # ===========================================================================
+  # Claude CLI - Logs to FluentD
+  # ===========================================================================
+  claude:
+    logging:
+      <<: *fluentd-logging
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "agent.claude"
+        labels: "cli=claude,agent=rex"
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  # Remove individual sidecars - using unified sidecar now
+  claude-sidecar:
+    profiles: ["disabled"]
+
+  # ===========================================================================
+  # Factory CLI - Logs to FluentD
+  # ===========================================================================
+  factory:
+    logging:
+      <<: *fluentd-logging
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "agent.factory"
+        labels: "cli=factory,agent=rex"
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  factory-sidecar:
+    profiles: ["disabled"]
+
+  # ===========================================================================
+  # Codex CLI - Logs to FluentD
+  # ===========================================================================
+  codex:
+    logging:
+      <<: *fluentd-logging
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "agent.codex"
+        labels: "cli=codex"
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  codex-sidecar:
+    profiles: ["disabled"]
+
+  # ===========================================================================
+  # Code CLI - Logs to FluentD
+  # ===========================================================================
+  code:
+    logging:
+      <<: *fluentd-logging
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "agent.code"
+        labels: "cli=code"
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  code-sidecar:
+    profiles: ["disabled"]
+
+  # ===========================================================================
+  # Cursor CLI - Logs to FluentD
+  # ===========================================================================
+  cursor:
+    logging:
+      <<: *fluentd-logging
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "agent.cursor"
+        labels: "cli=cursor"
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  cursor-sidecar:
+    profiles: ["disabled"]
+
+  # ===========================================================================
+  # OpenCode CLI - Logs to FluentD
+  # ===========================================================================
+  opencode:
+    logging:
+      <<: *fluentd-logging
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "agent.opencode"
+        labels: "cli=opencode"
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  opencode-sidecar:
+    profiles: ["disabled"]
+
+  # ===========================================================================
+  # Gemini CLI - Logs to FluentD
+  # ===========================================================================
+  gemini:
+    logging:
+      <<: *fluentd-logging
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "agent.gemini"
+        labels: "cli=gemini"
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  gemini-sidecar:
+    profiles: ["disabled"]
+
+  # ===========================================================================
+  # Dexter CLI - Logs to FluentD
+  # ===========================================================================
+  dexter:
+    logging:
+      <<: *fluentd-logging
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "agent.dexter"
+        labels: "cli=dexter"
+    depends_on:
+      fluentd:
+        condition: service_healthy
+
+  dexter-sidecar:
+    profiles: ["disabled"]
+
+volumes:
+  loki-data:
+  grafana-data:

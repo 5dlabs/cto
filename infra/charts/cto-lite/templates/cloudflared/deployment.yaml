@@ -1,0 +1,64 @@
+{{- if and .Values.cloudflared.enabled .Values.cloudflared.tunnelToken }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cto-lite.fullname" . }}-cloudflared
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflared
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "cto-lite.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: cloudflared
+  template:
+    metadata:
+      labels:
+        {{- include "cto-lite.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: cloudflared
+    spec:
+      containers:
+        - name: cloudflared
+          image: {{ .Values.cloudflared.image.repository }}:{{ .Values.cloudflared.image.tag }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          args:
+            - tunnel
+            - --no-autoupdate
+            - run
+            - --token
+            - $(TUNNEL_TOKEN)
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cto-lite.fullname" . }}-cloudflared
+                  key: token
+          resources:
+            {{- toYaml .Values.cloudflared.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "cto-lite.fullname" . }}-cloudflared
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  token: {{ .Values.cloudflared.tunnelToken | quote }}
+{{- end }}

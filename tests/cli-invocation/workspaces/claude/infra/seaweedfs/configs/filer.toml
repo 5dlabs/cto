@@ -1,0 +1,25 @@
+# Filer configuration
+[filer.options]
+recursive_delete = true
+buckets_folder = "/buckets"
+
+# Use LevelDB2 for metadata storage
+[leveldb2]
+enabled = true
+dir = "/data/filerldb2"
+
+# Enable S3 compatible API
+[filer.s3]
+enabled = true
+port = 8333
+domainName = ""
+allowEmptyFolder = true
+allowDeleteBucketNotEmpty = false
+
+# Directory buckets for S3
+[filer.sync.buckets]
+enabled = true
+
+# WebDAV configuration (optional)
+[webdav]
+enabled = false

@@ -1,0 +1,16 @@
+# Ignore generated files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ignore secrets
+secret*.yaml
+tls*.yaml
+
+# Ignore local testing
+test-output/
+*.log
+
+# Ignore kustomize build output
+kustomization-output.yaml
