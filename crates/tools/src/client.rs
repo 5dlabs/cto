@@ -1121,7 +1121,7 @@ impl McpClient {
                     "id": request_id,
                     "error": {
                         "code": -32603,
-                        "message": format!("Failed to start server '{}': {}", server_name, e)
+                        "message": format!("Failed to start server '{server_name}': {e}")
                     }
                 }));
             }
