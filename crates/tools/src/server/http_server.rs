@@ -721,12 +721,10 @@ impl ServerConnectionPool {
             Ok(result) => result,
             Err(_) => {
                 tracing::error!(
-                    "⏰ [{}] MCP server initialization timed out after 10s",
-                    server_name
+                    "⏰ [{server_name}] MCP server initialization timed out after 10s"
                 );
                 Err(anyhow::anyhow!(
-                    "MCP server '{}' initialization timed out after 10s",
-                    server_name
+                    "MCP server '{server_name}' initialization timed out after 10s"
                 ))
             }
         }
