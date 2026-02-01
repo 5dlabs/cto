@@ -582,7 +582,7 @@ async fn resolve_issue_id(token: &str, identifier: &str) -> Result<String> {
     
     let response = client
         .post(LINEAR_API_URL)
-        .header("Authorization", token)
+        .header("Authorization", format!("Bearer {}", token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "query": query,
@@ -703,7 +703,7 @@ async fn post_milestone_comment(state: &AppState, milestone_type: MilestoneType,
     
     let response = client
         .post(LINEAR_API_URL)
-        .header("Authorization", &state.linear_token)
+        .header("Authorization", format!("Bearer {}", &state.linear_token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "query": query,
@@ -849,7 +849,7 @@ async fn post_init_activity(state: &AppState, session_id: &str, model: &str, too
     
     let response = client
         .post(LINEAR_API_URL)
-        .header("Authorization", &state.linear_token)
+        .header("Authorization", format!("Bearer {}", &state.linear_token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "query": query,
@@ -899,7 +899,7 @@ async fn post_conductor_update(
     
     let response = client
         .post(LINEAR_API_URL)
-        .header("Authorization", &state.linear_token)
+        .header("Authorization", format!("Bearer {}", &state.linear_token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "query": query,
@@ -1114,7 +1114,7 @@ async fn post_completion_summary(
     
     let response = client
         .post(LINEAR_API_URL)
-        .header("Authorization", &state.linear_token)
+        .header("Authorization", format!("Bearer {}", &state.linear_token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "query": query,
@@ -1160,7 +1160,7 @@ async fn create_linear_session(state: &AppState, _model: &str, _tools: &[String]
     
     let response = client
         .post(LINEAR_API_URL)
-        .header("Authorization", &state.linear_token)
+        .header("Authorization", format!("Bearer {}", &state.linear_token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "query": query,
@@ -1482,7 +1482,7 @@ async fn add_linear_activity(state: &AppState, session_id: &str, entry: &LogEntr
     
     let response = client
         .post(LINEAR_API_URL)
-        .header("Authorization", &state.linear_token)
+        .header("Authorization", format!("Bearer {}", &state.linear_token))
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "query": query,

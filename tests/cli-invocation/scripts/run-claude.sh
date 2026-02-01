@@ -68,14 +68,17 @@ fi
 echo "" >&2
 echo "--- Executing Claude CLI ---" >&2
 
-# The prompt - read from prompt.md file or use CLAUDE_PROMPT env var
-if [[ -f "${WORKSPACE}/prompt.md" ]]; then
+# The prompt - read from TASK_FILE, prompt.md file, or use CLAUDE_PROMPT env var
+if [[ -n "${TASK_FILE:-}" && -f "${TASK_FILE}" ]]; then
+  echo "📋 Reading prompt from ${TASK_FILE}" >&2
+  PROMPT="$(cat "${TASK_FILE}")"
+elif [[ -f "${WORKSPACE}/prompt.md" ]]; then
   echo "📋 Reading prompt from ${WORKSPACE}/prompt.md" >&2
   PROMPT="$(cat "${WORKSPACE}/prompt.md")"
 elif [[ -n "${CLAUDE_PROMPT:-}" ]]; then
   PROMPT="${CLAUDE_PROMPT}"
 else
-  echo "❌ Error: No prompt found. Either create ${WORKSPACE}/prompt.md or set CLAUDE_PROMPT env var" >&2
+  echo "❌ Error: No prompt found. Either set TASK_FILE, create ${WORKSPACE}/prompt.md, or set CLAUDE_PROMPT env var" >&2
   exit 1
 fi
 
