@@ -5,15 +5,17 @@
 #
 # Supports both CI (pre-built binary) and local (from source) builds:
 #
-#   CI/GHCR build (default - expects pre-built binary in context):
+#   CI/GHCR build (default - expects pre-built binaries in context):
 #     cargo build --release --package research
 #     cp target/release/research research
+#     cd tools/intake-agent && bun run build
+#     cp tools/intake-agent/dist/intake-agent intake-agent
 #     docker build -f infra/images/research/Dockerfile -t ghcr.io/5dlabs/research .
 #
 #   Local/Kind build (compiles from source):
 #     docker build --target local -f infra/images/research/Dockerfile -t ghcr.io/5dlabs/research:local .
 #
-# Includes Chromium for headless browser automation
+# Includes Chromium for headless browser automation and intake-agent for AI
 #
 # =============================================================================
 
@@ -40,6 +42,16 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
     cargo build --release --package research
+
+# =============================================================================
+# INTAKE-AGENT BUILD STAGE (for local builds)
+# =============================================================================
+FROM oven/bun:1.1-debian AS intake-builder
+WORKDIR /build
+COPY tools/intake-agent/package.json tools/intake-agent/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY tools/intake-agent/ ./
+RUN bun run build
 
 # =============================================================================
 # RUNTIME BASE (shared by all targets)
@@ -74,6 +86,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV CHROME_PATH=/usr/bin/chromium
 ENV CHROMIUM_PATH=/usr/bin/chromium
 
+# Set intake-agent path for AI provider
+ENV INTAKE_AGENT_PATH=/usr/local/bin/intake-agent
+
 # Create non-root user with explicit UID to match k8s securityContext
 RUN useradd -u 1000 -ms /bin/bash research
 
@@ -88,12 +103,16 @@ WORKDIR /data
 # =============================================================================
 FROM runtime-base AS local
 
-# Copy binary from builder stage
+# Copy research binary from builder stage
 COPY --from=builder /build/target/release/research /usr/local/bin/research
 RUN chmod +x /usr/local/bin/research
 
-# Verify binary works
-RUN research --help
+# Copy intake-agent binary from intake-builder stage
+COPY --from=intake-builder /build/dist/intake-agent /usr/local/bin/intake-agent
+RUN chmod +x /usr/local/bin/intake-agent
+
+# Verify binaries work
+RUN research --help && intake-agent --help
 
 USER research
 
@@ -101,16 +120,20 @@ ENTRYPOINT ["research"]
 CMD ["--help"]
 
 # =============================================================================
-# PRODUCTION TARGET (default - uses pre-built binary from CI)
+# PRODUCTION TARGET (default - uses pre-built binaries from CI)
 # =============================================================================
 FROM runtime-base AS production
 
-# Copy pre-built binary (placed by CI workflow into build context)
+# Copy pre-built research binary (placed by CI workflow into build context)
 COPY research /usr/local/bin/research
 RUN chmod +x /usr/local/bin/research
 
-# Verify binary works
-RUN research --help
+# Copy pre-built intake-agent binary (placed by CI workflow into build context)
+COPY intake-agent /usr/local/bin/intake-agent
+RUN chmod +x /usr/local/bin/intake-agent
+
+# Verify binaries work
+RUN research --help && intake-agent --help
 
 USER research
 
