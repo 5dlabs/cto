@@ -1397,20 +1397,12 @@ impl BridgeState {
             transports.sort_by_key(|(transport, _)| transport.as_str());
             
             for (transport, (count, servers)) in transports {
-                if *count == 0 {
-                    tracing::error!(
-                        "   ❌ {}: 0 tools ({} servers failed)",
-                        transport,
-                        servers.len()
-                    );
-                } else {
-                    tracing::info!(
-                        "   ✅ {}: {} tools ({} servers)",
-                        transport,
-                        count,
-                        servers.len()
-                    );
-                }
+                tracing::info!(
+                    "   ✅ {}: {} tools ({} servers)",
+                    transport,
+                    count,
+                    servers.len()
+                );
             }
         }
 
