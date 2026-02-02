@@ -605,7 +605,7 @@ impl McpClient {
             .client_config
             .as_ref()
             .and_then(|c| c.local_servers.get(server_name))
-            .ok_or_else(|| anyhow::anyhow!("No config for server '{}'", server_name))?
+            .ok_or_else(|| anyhow::anyhow!("No config for server '{server_name}'"))?
             .clone();
 
         self.spawn_local_server(server_name, &config).await?;

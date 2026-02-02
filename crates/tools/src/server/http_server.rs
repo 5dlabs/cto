@@ -765,15 +765,14 @@ impl ServerConnectionPool {
             "🔄 [{}] About to read initialize response",
             server_name
         );
-        let init_response = tokio::time::timeout(
-            tokio::time::Duration::from_secs(10),
+        let _init_response = tokio::time::timeout(
+            tokio::time::Duration::from_secs(8),
             self.read_response(connection.clone()),
         )
         .await
         .map_err(|_| {
             anyhow::anyhow!(
-                "Timeout reading initialize response from '{}' after 10s",
-                server_name
+                "Timeout reading initialize response from '{server_name}' after 8s"
             )
         })??;
         tracing::info!(
