@@ -385,6 +385,10 @@ pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
 
 /// Parse remediation button identifier
 /// Format: fix-<agent>-pr<number>-<check_run_id>
+///
+/// # Panics
+///
+/// Panics if the regex pattern is invalid (this is a compile-time constant).
 #[must_use]
 pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
     let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-pr(\d+)-(\d+)$").unwrap();
@@ -427,17 +431,19 @@ pub async fn handle_mention_webhook(
     let mention_source = inner_payload
         .get("X-GitHub-Event")
         .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| {
-            // Fall back to structure detection
-            if inner_payload.get("issue").is_some() && inner_payload.get("comment").is_some() {
-                "issue_comment".to_string()
-            } else if inner_payload.get("pull_request").is_some() && inner_payload.get("comment").is_some() {
-                "pull_request_review_comment".to_string()
-            } else {
-                "unknown".to_string()
-            }
-        });
+        .map_or_else(
+            || {
+                // Fall back to structure detection
+                if inner_payload.get("issue").is_some() && inner_payload.get("comment").is_some() {
+                    "issue_comment".to_string()
+                } else if inner_payload.get("pull_request").is_some() && inner_payload.get("comment").is_some() {
+                    "pull_request_review_comment".to_string()
+                } else {
+                    "unknown".to_string()
+                }
+            },
+            String::from,
+        );
 
     info!(source = %mention_source, "Detected mention source");
 

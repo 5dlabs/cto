@@ -2629,6 +2629,7 @@ async fn handle_stop(State(state): State<AppState>) -> impl IntoResponse {
 /// Ingest request body from FluentD.
 /// Supports both raw log lines and structured JSON.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct IngestRequest {
     /// Raw log line (if not structured)
     #[serde(default)]
