@@ -317,31 +317,17 @@ impl McpClient {
 
                     // Health check: validate tool discovery succeeded
                     if total_count == 0 {
-                        tracing::error!(
-                            "❌ CLIENT TOOL DISCOVERY FAILED: 0 tools discovered"
-                        );
-                        tracing::error!(
-                            "   Remote (HTTP endpoint): {} tools", 
-                            remote_count
-                        );
-                        tracing::error!(
-                            "   Local (stdio processes): {} tools", 
-                            local_count
-                        );
+                        tracing::error!("❌ CLIENT TOOL DISCOVERY FAILED: 0 tools discovered");
+                        tracing::error!("   Remote (HTTP endpoint): {} tools", remote_count);
+                        tracing::error!("   Local (stdio processes): {} tools", local_count);
                         tracing::error!("⚠️  This likely indicates a problem with tool server connectivity or configuration");
                     } else {
                         tracing::info!(
                             "✅ CLIENT TOOL DISCOVERY SUCCESS: {} total tools",
                             total_count
                         );
-                        tracing::info!(
-                            "   Remote (HTTP endpoint): {} tools", 
-                            remote_count
-                        );
-                        tracing::info!(
-                            "   Local (stdio processes): {} tools", 
-                            local_count
-                        );
+                        tracing::info!("   Remote (HTTP endpoint): {} tools", remote_count);
+                        tracing::info!("   Local (stdio processes): {} tools", local_count);
                     }
 
                     // Apply Cursor-specific compatibility fixes
@@ -571,10 +557,7 @@ impl McpClient {
             for server_name in config.local_servers.keys() {
                 match self.ensure_server_running(server_name).await {
                     Ok(()) => {
-                        tracing::debug!(
-                            "[Bridge] ✅ Discovered tools for '{}'",
-                            server_name
-                        );
+                        tracing::debug!("[Bridge] ✅ Discovered tools for '{}'", server_name);
                     }
                     Err(e) => {
                         tracing::debug!(
@@ -601,7 +584,7 @@ impl McpClient {
             }
         }
 
-// Need to start this server - evict LRU if at capacity
+        // Need to start this server - evict LRU if at capacity
         let max = self.max_connections();
         {
             let mut servers = self.local_servers.lock().await;
