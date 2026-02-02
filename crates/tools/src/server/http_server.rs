@@ -1357,13 +1357,62 @@ impl BridgeState {
 
         // Store discovered tools
         let mut available_tools = self.available_tools.write().await;
-        *available_tools = all_tools;
+        *available_tools = all_tools.clone();
         let total_elapsed = init_start.elapsed();
-        tracing::info!(
-            "✅ Tool discovery complete in {:.2}s. Total tools available: {}",
-            total_elapsed.as_secs_f64(),
-            available_tools.len()
-        );
+        
+        // Group tools by transport type for better debugging
+        let mut transport_counts: HashMap<String, (usize, Vec<String>)> = HashMap::new();
+        {
+            let config_manager = self.system_config_manager.read().await;
+            let servers = config_manager.get_servers();
+            
+            for (_tool_name, tool) in &all_tools {
+                if let Some(server_config) = servers.get(&tool.server_name) {
+                    let transport = server_config.transport.clone();
+                    let entry = transport_counts.entry(transport).or_insert((0, Vec::new()));
+                    entry.0 += 1;
+                    if !entry.1.contains(&tool.server_name) {
+                        entry.1.push(tool.server_name.clone());
+                    }
+                }
+            }
+        }
+        
+        // Log overall success/failure
+        if available_tools.is_empty() {
+            tracing::error!("❌ TOOL DISCOVERY FAILED: 0 tools discovered");
+            tracing::error!("⚠️  This likely indicates all MCP servers failed to initialize");
+        } else {
+            tracing::info!(
+                "✅ TOOL DISCOVERY SUCCESS: {} total tools (discovered in {:.2}s)",
+                available_tools.len(),
+                total_elapsed.as_secs_f64()
+            );
+        }
+        
+        // Log breakdown by transport type
+        if !transport_counts.is_empty() {
+            tracing::info!("📊 Tools by transport type:");
+            let mut transports: Vec<_> = transport_counts.iter().collect();
+            transports.sort_by_key(|(transport, _)| transport.as_str());
+            
+            for (transport, (count, servers)) in transports {
+                if *count == 0 {
+                    tracing::error!(
+                        "   ❌ {}: 0 tools ({} servers failed)",
+                        transport,
+                        servers.len()
+                    );
+                } else {
+                    tracing::info!(
+                        "   ✅ {}: {} tools ({} servers)",
+                        transport,
+                        count,
+                        servers.len()
+                    );
+                }
+            }
+        }
 
         // Create or update the tool catalog ConfigMap
         if let Err(e) = self.create_tool_catalog_configmap(&available_tools).await {

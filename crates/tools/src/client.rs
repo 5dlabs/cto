@@ -318,16 +318,28 @@ impl McpClient {
                     // Health check: validate tool discovery succeeded
                     if total_count == 0 {
                         tracing::error!(
-                            "❌ TOOL DISCOVERY FAILED: 0 tools discovered (remote: {}, local: {})",
-                            remote_count,
+                            "❌ CLIENT TOOL DISCOVERY FAILED: 0 tools discovered"
+                        );
+                        tracing::error!(
+                            "   Remote (HTTP endpoint): {} tools", 
+                            remote_count
+                        );
+                        tracing::error!(
+                            "   Local (stdio processes): {} tools", 
                             local_count
                         );
                         tracing::error!("⚠️  This likely indicates a problem with tool server connectivity or configuration");
                     } else {
                         tracing::info!(
-                            "✅ TOOL DISCOVERY SUCCESS: {} total tools ({} remote, {} local)",
-                            total_count,
-                            remote_count,
+                            "✅ CLIENT TOOL DISCOVERY SUCCESS: {} total tools",
+                            total_count
+                        );
+                        tracing::info!(
+                            "   Remote (HTTP endpoint): {} tools", 
+                            remote_count
+                        );
+                        tracing::info!(
+                            "   Local (stdio processes): {} tools", 
                             local_count
                         );
                     }
