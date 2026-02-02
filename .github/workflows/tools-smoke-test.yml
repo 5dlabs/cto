@@ -37,10 +37,6 @@ jobs:
           cat > /tmp/tools-test-config/system-config.yaml << 'EOF'
           servers:
             # Fast HTTP servers for smoke test (no npm/npx required)
-            - name: openmemory
-              transport: http
-              url: http://10.106.163.36:8080/mcp
-            
             - name: ai-elements
               transport: http
               url: https://registry.ai-sdk.dev/api/mcp
@@ -72,7 +68,7 @@ jobs:
           # Wait a bit for server to initialize
           sleep 10
           
-          # Run smoke test (expect at least 15 tools from 5 HTTP servers)
+          # Run smoke test (expect at least 15 tools from 4 HTTP servers)
           export TOOLS_URL=http://localhost:3000
           ./scripts/smoke-test-tools.sh 15
       
