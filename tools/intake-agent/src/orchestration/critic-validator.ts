@@ -163,7 +163,7 @@ function addUsage(tracker: UsageTracker, response: ProviderResponse): void {
 /**
  * Parse critic JSON response.
  */
-function parseCriticResponse(text: string): CriticResult | null {
+export function parseCriticResponse(text: string): CriticResult | null {
   try {
     // Try to extract JSON from the response (it might have markdown code blocks)
     let jsonStr = text;
@@ -201,7 +201,7 @@ function parseCriticResponse(text: string): CriticResult | null {
 /**
  * Create a fallback critic result when parsing fails.
  */
-function createFallbackCriticResult(rawResponse: string): CriticResult {
+export function createFallbackCriticResult(rawResponse: string): CriticResult {
   return {
     approved: true, // Assume approved if we can't parse
     issues: [],

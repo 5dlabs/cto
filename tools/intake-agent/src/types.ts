@@ -333,7 +333,9 @@ export function validateRequest(request: unknown): request is AgentRequest {
       'research',
       'research_capabilities',
       'generate_with_critic',
+      'generate_with_debate',
       'validate_content',
+      'generate_docs',
       'provider_status',
       'ping',
     ].includes(req['operation'] as string)

@@ -33,6 +33,8 @@ import {
   validateContentOperation,
   getProviderStatus,
 } from './operations/generate-with-critic';
+import { generateWithDebate } from './operations/generate-with-debate';
+import { generateDocs } from './operations/generate-docs';
 import type { GenerateWithCriticPayload, ProviderName } from './providers/types';
 
 /**
@@ -179,6 +181,76 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
     case 'provider_status':
       return getProviderStatus();
 
+    case 'generate_docs': {
+      const payload = request.payload as {
+        tasks: Array<{
+          id: number;
+          title: string;
+          description: string;
+          status?: string;
+          priority?: string;
+          dependencies: number[];
+          details?: string;
+          test_strategy?: string;
+          subtasks?: Array<{
+            id: string;
+            title: string;
+            description: string;
+            status?: string;
+            dependencies?: number[];
+            details?: string;
+            test_strategy?: string;
+          }>;
+          decision_points?: Array<{
+            id: string;
+            category: string;
+            description: string;
+            options: string[];
+            requires_approval: boolean;
+            constraint_type: string;
+          }>;
+        }>;
+        base_path: string;
+        project_root?: string;
+      };
+      if (!payload?.tasks || !Array.isArray(payload.tasks)) {
+        return errorResponse('Missing tasks array in payload', 'validation_error');
+      }
+      if (!payload?.base_path) {
+        return errorResponse('Missing base_path in payload', 'validation_error');
+      }
+      return generateDocs(payload);
+    }
+
+    case 'generate_with_debate': {
+      const payload = request.payload as {
+        user_prompt: string;
+        system_prompt?: string;
+        prefill?: string;
+        context?: string;
+        content_type?: string;
+        config?: {
+          generator?: ProviderName;
+          critic?: ProviderName;
+          generator_model?: string;
+          critic_model?: string;
+          max_refinements?: number;
+          critic_threshold?: number;
+        };
+      };
+      if (!payload?.user_prompt) {
+        return errorResponse('Missing user_prompt in payload', 'validation_error');
+      }
+      return generateWithDebate({
+        systemPrompt: payload.system_prompt || 'You are a helpful assistant.',
+        userPrompt: payload.user_prompt,
+        prefill: payload.prefill,
+        context: payload.context,
+        contentType: payload.content_type,
+        config: payload.config,
+      });
+    }
+
     default:
       return errorResponse(`Unknown operation: ${request.operation}`, 'validation_error');
   }
@@ -244,7 +316,7 @@ async function main(): Promise<void> {
     if (!validateRequest(request)) {
       writeStdout(
         errorResponse(
-          'Invalid request structure. Expected { operation: "parse_prd" | "expand_task" | "analyze_complexity" | "generate" | "research" | "research_capabilities" | "ping", payload?: {...} }',
+          'Invalid request structure. Expected { operation: "parse_prd" | "expand_task" | "analyze_complexity" | "generate" | "research" | "research_capabilities" | "generate_docs" | "ping", payload?: {...} }',
           'validation_error'
         )
       );
