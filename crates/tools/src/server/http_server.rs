@@ -1231,13 +1231,20 @@ impl BridgeState {
         let mut all_tools = HashMap::new();
 
         // Parallel initialization: spawn tasks for each server to avoid deadlock
+        // Limit concurrent stdio initializations to prevent resource exhaustion
         tracing::info!("🚀 Starting parallel server initialization...");
+        
+        // Create semaphore to limit concurrent stdio server initializations
+        // This prevents overwhelming the system with too many concurrent npm/npx installs
+        let stdio_semaphore = Arc::new(tokio::sync::Semaphore::new(5)); // Max 5 concurrent stdio inits
+        tracing::info!("🔧 Limiting concurrent stdio initializations to 5");
 
         let tasks: Vec<_> = server_list
             .into_iter()
             .map(|(server_name, config)| {
                 let connection_pool = self.connection_pool.clone();
                 let self_clone = self.clone();
+                let stdio_sem = stdio_semaphore.clone();
 
                 tokio::spawn(async move {
                     tracing::info!(
@@ -1246,9 +1253,13 @@ impl BridgeState {
                         chrono::Utc::now().format("%H:%M:%S")
                     );
 
-                    // For stdio servers, initialize them permanently
+                    // For stdio servers, initialize them permanently with concurrency limit
                     if config.transport == "stdio" {
                         tracing::info!("🔄 [{}] Initializing stdio server...", server_name);
+
+                        // Acquire semaphore permit to limit concurrent inits
+                        let _permit = stdio_sem.acquire().await.unwrap();
+                        tracing::info!("🔓 [{}] Acquired stdio init permit", server_name);
 
                         match connection_pool.start_server(&server_name).await {
                             Ok(_) => {
@@ -1261,7 +1272,7 @@ impl BridgeState {
                                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                             }
                             Err(e) => {
-                                tracing::debug!(
+                                tracing::warn!(
                                     "⚠️ [{}] Failed to initialize server: {}",
                                     server_name,
                                     e
@@ -1272,6 +1283,7 @@ impl BridgeState {
                                 ));
                             }
                         }
+                        // Permit is automatically released when _permit is dropped
                     } else {
                         tracing::info!(
                             "🔄 [{}] Skipping initialization for {} server",
@@ -1281,10 +1293,10 @@ impl BridgeState {
                     }
 
                     // Discover tools with timeout
-                    // Increased to 180s to allow for first-time uvx installations from git repos
+                    // Increased to 300s (5 minutes) to allow for first-time uvx installations from git repos
                     tracing::info!("🔍 [{}] Starting tool discovery...", server_name);
                     let discovery_start = std::time::Instant::now();
-                    let discovery_timeout = tokio::time::Duration::from_secs(180);
+                    let discovery_timeout = tokio::time::Duration::from_secs(300);
 
                     match tokio::time::timeout(
                         discovery_timeout,
