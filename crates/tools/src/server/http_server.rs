@@ -766,13 +766,13 @@ impl ServerConnectionPool {
             server_name
         );
         let _init_response = tokio::time::timeout(
-            tokio::time::Duration::from_secs(10),
+            tokio::time::Duration::from_secs(8),
             self.read_response(connection.clone()),
         )
         .await
         .map_err(|_| {
             anyhow::anyhow!(
-                "Timeout reading initialize response from '{server_name}' after 10s"
+                "Timeout reading initialize response from '{server_name}' after 8s"
             )
         })??;
         tracing::info!(
