@@ -947,7 +947,8 @@ impl<'a> CodeResourceManager<'a> {
                 "valueFrom": {
                     "secretKeyRef": {
                         "name": github_app_secret_name(github_app),
-                        "key": "installation-id"
+                        "key": "installation-id",
+                        "optional": true
                     }
                 }
             }),
