@@ -760,12 +760,22 @@ impl ServerConnectionPool {
         self.send_request(connection.clone(), init_request).await?;
         tracing::info!("✅ [{}] Initialize request sent successfully", server_name);
 
-        // Read initialization response
+        // Read initialization response (with timeout to prevent hanging)
         tracing::info!(
             "🔄 [{}] About to read initialize response",
             server_name
         );
-        let _init_response = self.read_response(connection.clone()).await?;
+        let init_response = tokio::time::timeout(
+            tokio::time::Duration::from_secs(10),
+            self.read_response(connection.clone()),
+        )
+        .await
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "Timeout reading initialize response from '{}' after 10s",
+                server_name
+            )
+        })??;
         tracing::info!(
             "✅ [{}] Initialize response received successfully",
             server_name
