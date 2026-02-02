@@ -34,24 +34,27 @@ jobs:
       - name: Create minimal test config
         run: |
           mkdir -p /tmp/tools-test-config
-          cat > /tmp/tools-test-config/system-config.yaml << 'EOF'
-          servers:
-            # Fast HTTP servers for smoke test (no npm/npx required)
-            - name: ai-elements
-              transport: http
-              url: https://registry.ai-sdk.dev/api/mcp
-            
-            - name: better-auth
-              transport: http
-              url: https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp
-            
-            - name: exa-mcp
-              transport: http
-              url: https://mcp.exa.ai/mcp
-            
-            - name: pg-aiguide
-              transport: http
-              url: https://mcp.tigerdata.com/docs
+          cat > /tmp/tools-test-config/mcp-servers.json << 'EOF'
+          {
+            "servers": {
+              "ai-elements": {
+                "transport": "http",
+                "url": "https://registry.ai-sdk.dev/api/mcp"
+              },
+              "better-auth": {
+                "transport": "http",
+                "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp"
+              },
+              "exa-mcp": {
+                "transport": "http",
+                "url": "https://mcp.exa.ai/mcp"
+              },
+              "pg-aiguide": {
+                "transport": "http",
+                "url": "https://mcp.tigerdata.com/docs"
+              }
+            }
+          }
           EOF
       
       - name: Start tools server

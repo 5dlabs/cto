@@ -70,7 +70,22 @@ echo "✅ PASS: Tool count meets minimum requirement ($tool_count >= $EXPECTED_M
 echo ""
 echo "📋 Tools by server:"
 echo "$response" | jq -r '.result.tools[] | .name' | \
-    sed 's/_[^_]*$//' | sort | uniq -c | sort -rn | head -20
+    awk -F'_' '{
+      # Heuristic: if more than 3 segments, assume tool name is last 2 segments
+      # Otherwise, assume tool name is last 1 segment
+      if (NF > 3) {
+        for (i = 1; i <= NF - 2; i++) {
+          if (i > 1) printf "_"
+          printf $i
+        }
+      } else {
+        for (i = 1; i < NF; i++) {
+          if (i > 1) printf "_"
+          printf $i
+        }
+      }
+      print ""
+    }' | sort | uniq -c | sort -rn | head -20
 
 echo ""
 echo "✅ Smoke test passed!"

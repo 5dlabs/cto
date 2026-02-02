@@ -557,7 +557,8 @@ impl ServerConnectionPool {
 
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
 
         // Set working directory (default to project directory if not specified)
         let working_dir = config.working_directory.as_ref().map_or_else(
