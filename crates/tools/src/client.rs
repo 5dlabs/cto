@@ -309,8 +309,18 @@ impl McpClient {
                     let local_tools = self.get_local_tools().await;
 
                     // Combine remote and local tools
+                    let remote_count = filtered_remote_tools.len();
+                    let local_count = local_tools.len();
                     let mut all_tools = filtered_remote_tools;
                     all_tools.extend(local_tools);
+                    let total_count = all_tools.len();
+
+                    tracing::info!(
+                        "🔧 Tool discovery complete: {} total tools ({} remote, {} local)",
+                        total_count,
+                        remote_count,
+                        local_count
+                    );
 
                     // Apply Cursor-specific compatibility fixes
                     let cursor_compatible_tools = self.apply_cursor_compatibility(all_tools);
