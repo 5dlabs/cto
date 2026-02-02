@@ -1329,10 +1329,16 @@ impl BridgeState {
         tracing::info!("⏳ Waiting for all servers to complete initialization...");
         let results = future::join_all(tasks).await;
 
+        // Track server-level results for reporting
+        let mut server_results: HashMap<String, usize> = HashMap::new();
+
         // Collect all tools from successful initializations
         for task_result in results {
             match task_result {
-                Ok(Ok((_server_name, tools))) => {
+                Ok(Ok((server_name, tools))) => {
+                    let tool_count = tools.len();
+                    server_results.insert(server_name.clone(), tool_count);
+                    
                     // Add tools to collection with server prefix
                     for tool in tools {
                         // Normalize server name: replace hyphens with underscores for consistent parsing
@@ -1360,28 +1366,64 @@ impl BridgeState {
         *available_tools = all_tools.clone();
         let total_elapsed = init_start.elapsed();
         
-        // Group tools by transport type for better debugging
-        let mut transport_counts: HashMap<String, (usize, Vec<String>)> = HashMap::new();
-        {
+        // Get all configured servers for comparison
+        let (all_configured_servers, transport_by_server) = {
             let config_manager = self.system_config_manager.read().await;
             let servers = config_manager.get_servers();
-            
-            for (_tool_name, tool) in &all_tools {
-                if let Some(server_config) = servers.get(&tool.server_name) {
-                    let transport = server_config.transport.clone();
-                    let entry = transport_counts.entry(transport).or_insert((0, Vec::new()));
-                    entry.0 += 1;
-                    if !entry.1.contains(&tool.server_name) {
-                        entry.1.push(tool.server_name.clone());
-                    }
+            let all_names: Vec<String> = servers.keys().cloned().collect();
+            let transport_map: HashMap<String, String> = servers
+                .iter()
+                .map(|(name, config)| (name.clone(), config.transport.clone()))
+                .collect();
+            (all_names, transport_map)
+        };
+        
+        // Find servers that didn't contribute any tools
+        let successful_servers: Vec<_> = server_results
+            .iter()
+            .filter(|(_, count)| **count > 0)
+            .map(|(name, _)| name.clone())
+            .collect();
+        
+        let missing_servers: Vec<String> = all_configured_servers
+            .iter()
+            .filter(|name| !successful_servers.contains(name))
+            .cloned()
+            .collect();
+        
+        // Group tools by transport type for better debugging
+        let mut transport_counts: HashMap<String, (usize, Vec<String>)> = HashMap::new();
+        let mut transport_failed: HashMap<String, Vec<String>> = HashMap::new();
+        
+        for (_tool_name, tool) in &all_tools {
+            if let Some(transport) = transport_by_server.get(&tool.server_name) {
+                let entry = transport_counts.entry(transport.clone()).or_insert((0, Vec::new()));
+                entry.0 += 1;
+                if !entry.1.contains(&tool.server_name) {
+                    entry.1.push(tool.server_name.clone());
                 }
             }
         }
         
-        // Log overall success/failure
+        for server_name in &missing_servers {
+            if let Some(transport) = transport_by_server.get(server_name) {
+                transport_failed
+                    .entry(transport.clone())
+                    .or_insert_with(Vec::new)
+                    .push(server_name.clone());
+            }
+        }
+        
+        // Log overall success/failure with configured server count
+        tracing::info!(
+            "📋 Server Summary: {}/{} servers provided tools",
+            successful_servers.len(),
+            all_configured_servers.len()
+        );
+        
         if available_tools.is_empty() {
             tracing::error!("❌ TOOL DISCOVERY FAILED: 0 tools discovered");
-            tracing::error!("⚠️  This likely indicates all MCP servers failed to initialize");
+            tracing::error!("⚠️  All {} configured servers failed to provide tools", all_configured_servers.len());
         } else {
             tracing::info!(
                 "✅ TOOL DISCOVERY SUCCESS: {} total tools (discovered in {:.2}s)",
@@ -1391,18 +1433,54 @@ impl BridgeState {
         }
         
         // Log breakdown by transport type
-        if !transport_counts.is_empty() {
-            tracing::info!("📊 Tools by transport type:");
-            let mut transports: Vec<_> = transport_counts.iter().collect();
-            transports.sort_by_key(|(transport, _)| transport.as_str());
+        tracing::info!("📊 Tools by transport type:");
+        let mut all_transports: std::collections::HashSet<String> = transport_by_server.values().cloned().collect();
+        let mut transports: Vec<_> = all_transports.iter().collect();
+        transports.sort();
+        
+        for transport in transports {
+            let (tool_count, successful) = transport_counts.get(transport).unwrap_or(&(0, Vec::new()));
+            let failed = transport_failed.get(transport).unwrap_or(&Vec::new());
+            let total_servers = successful.len() + failed.len();
             
-            for (transport, (count, servers)) in transports {
-                tracing::info!(
-                    "   ✅ {}: {} tools ({} servers)",
+            if *tool_count == 0 {
+                tracing::error!(
+                    "   ❌ {}: 0 tools (0/{} servers succeeded)",
                     transport,
-                    count,
-                    servers.len()
+                    total_servers
                 );
+                if !failed.is_empty() {
+                    tracing::error!("      Failed servers: {}", failed.join(", "));
+                }
+            } else if !failed.is_empty() {
+                tracing::warn!(
+                    "   ⚠️  {}: {} tools ({}/{} servers succeeded)",
+                    transport,
+                    tool_count,
+                    successful.len(),
+                    total_servers
+                );
+                tracing::warn!("      Failed servers: {}", failed.join(", "));
+            } else {
+                tracing::info!(
+                    "   ✅ {}: {} tools ({}/{} servers)",
+                    transport,
+                    tool_count,
+                    successful.len(),
+                    total_servers
+                );
+            }
+        }
+        
+        // If there are missing servers, log them explicitly
+        if !missing_servers.is_empty() {
+            tracing::error!(
+                "⚠️  {} servers failed to provide tools:",
+                missing_servers.len()
+            );
+            for server_name in &missing_servers {
+                let transport = transport_by_server.get(server_name).unwrap_or(&"unknown".to_string());
+                tracing::error!("   - {} ({})", server_name, transport);
             }
         }
 
