@@ -1472,7 +1472,7 @@ impl BridgeState {
             }
         }
         
-        // If there are missing servers, log them explicitly
+        // If there are missing servers, log them explicitly and FAIL
         if !missing_servers.is_empty() {
             tracing::error!(
                 "⚠️  {} servers failed to provide tools:",
@@ -1482,6 +1482,13 @@ impl BridgeState {
                 let transport = transport_by_server.get(server_name).unwrap_or(&"unknown".to_string());
                 tracing::error!("   - {} ({})", server_name, transport);
             }
+            
+            // FAIL initialization if any configured servers provided 0 tools
+            return Err(anyhow::anyhow!(
+                "Tool discovery failed: {}/{} configured servers provided 0 tools. This indicates a misconfiguration or initialization failure. See logs above for details.",
+                missing_servers.len(),
+                all_configured_servers.len()
+            ));
         }
 
         // Create or update the tool catalog ConfigMap
