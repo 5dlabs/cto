@@ -1369,7 +1369,7 @@ impl BridgeState {
 
         // Store discovered tools
         let mut available_tools = self.available_tools.write().await;
-        *available_tools = all_tools.clone();
+        (*available_tools).clone_from(&all_tools);
         let total_elapsed = init_start.elapsed();
 
         // Get all configured servers for comparison
@@ -1401,7 +1401,7 @@ impl BridgeState {
         let mut transport_counts: HashMap<String, (usize, Vec<String>)> = HashMap::new();
         let mut transport_failed: HashMap<String, Vec<String>> = HashMap::new();
 
-        for (_tool_name, tool) in &all_tools {
+        for tool in all_tools.values() {
             if let Some(transport) = transport_by_server.get(&tool.server_name) {
                 let entry = transport_counts
                     .entry(transport.clone())
@@ -1417,7 +1417,7 @@ impl BridgeState {
             if let Some(transport) = transport_by_server.get(server_name) {
                 transport_failed
                     .entry(transport.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(server_name.clone());
             }
         }
