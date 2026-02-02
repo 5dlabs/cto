@@ -220,11 +220,31 @@ CRITICAL OUTPUT FORMAT:
 ## Subagent Optimization Guidelines
 
 When breaking down tasks for subagent execution:
-1. **Maximize parallelism**: Group independent work units that can run simultaneously
-2. **Minimize dependencies**: Only add dependencies when strictly necessary
-3. **Match subagent types to work**: Use implementer for coding, tester for tests, etc.
-4. **Consider context isolation**: Each subagent works in isolation, so subtasks should be self-contained
-5. **Plan review phases**: Include reviewer subtasks after implementation phases{{/if}}`;
+1. **ONE component per subtask**: Each subtask MUST focus on exactly ONE distinct component, service, database, or technology. NEVER combine multiple databases (e.g., PostgreSQL + MongoDB), multiple queues (e.g., Kafka + RabbitMQ), or multiple services into a single subtask.
+2. **Maximize parallelism**: Create separate subtasks for each component so they can execute in parallel
+3. **Minimize dependencies**: Only add dependencies when strictly necessary
+4. **Match subagent types to work**: Use implementer for coding, tester for tests, etc.
+5. **Consider context isolation**: Each subagent works in isolation, so subtasks should be self-contained
+6. **Plan review phases**: Include reviewer subtasks after implementation phases
+
+## ANTI-PATTERN WARNING - STRICTLY FORBIDDEN
+The following patterns are STRICTLY FORBIDDEN. If you generate any of these, the output is INVALID:
+❌ WRONG: "Deploy PostgreSQL, MongoDB, and Redis" (combines 3 databases)
+❌ WRONG: "Deploy MongoDB and RabbitMQ" (combines database + queue)
+❌ WRONG: "Setup Kafka and RabbitMQ messaging" (combines 2 queues)
+❌ WRONG: "Deploy SeaweedFS and review infrastructure" (combines storage + review)
+❌ WRONG: Any title containing "X and Y" where X and Y are different infrastructure components
+
+✅ CORRECT patterns (ONE component per subtask):
+✅ "Deploy PostgreSQL cluster" (just PostgreSQL)
+✅ "Deploy MongoDB replica set" (just MongoDB)  
+✅ "Deploy Redis/Valkey cache" (just Redis)
+✅ "Deploy Kafka cluster" (just Kafka)
+✅ "Deploy RabbitMQ cluster" (just RabbitMQ)
+✅ "Deploy SeaweedFS storage" (just SeaweedFS)
+✅ "Review infrastructure deployment" (just review)
+
+CRITICAL: If the task mentions N distinct infrastructure components, you MUST create at least N separate subtasks (one per component) plus review/validation subtasks. NEVER combine components to meet a subtask count target - it's better to exceed the requested count than to combine components.{{/if}}`;
 
 export const EXPAND_TASK_USER = `Break down this task into {{#if (gt subtask_count 0)}}exactly {{subtask_count}}{{else}}an appropriate number of{{/if}} specific subtasks{{#if enable_subagents}} optimized for parallel subagent execution{{/if}}:
 
@@ -249,8 +269,12 @@ SUBAGENT REQUIREMENTS:
 - Include subagentType for EVERY subtask (implementer, reviewer, tester, documenter, researcher, or debugger)
 - Set parallelizable=true for subtasks that can run concurrently with others at the same dependency level
 - Minimize dependencies to maximize parallel execution potential
-- Group related implementation work so multiple implementer subagents can work simultaneously
-- Include at least one reviewer subtask after implementation subtasks
+- **STRICTLY ONE COMPONENT PER SUBTASK**: 
+  * Each subtask MUST deploy/configure exactly ONE infrastructure component
+  * NEVER use "and" to combine components (e.g., "MongoDB and RabbitMQ" is FORBIDDEN)
+  * If the task mentions 6 components (PostgreSQL, MongoDB, Redis, Kafka, RabbitMQ, SeaweedFS), create 6 separate subtasks
+  * Subtask titles should be like "Deploy PostgreSQL cluster" NOT "Deploy databases"
+- Include at least one reviewer subtask SEPARATE from implementation subtasks
 - Include tester subtasks for validation work{{/if}}
 
 OUTPUT: Continue the JSON array by outputting subtask objects directly. Start with the first subtask's opening brace { - do NOT output {"subtasks":[ again as that is already provided. End with ]} to close the array and object.`;

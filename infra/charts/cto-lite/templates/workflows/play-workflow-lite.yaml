@@ -1,0 +1,311 @@
+{{- if .Values.controller.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: play-workflow-lite
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+spec:
+  entrypoint: play-lite
+  serviceAccountName: {{ include "cto-lite.serviceAccountName" . }}
+  
+  # Volume for sharing code between steps
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.workflow.artifacts.size }}
+        {{- if .Values.workflow.artifacts.storageClass }}
+        storageClassName: {{ .Values.workflow.artifacts.storageClass }}
+        {{- end }}
+
+  arguments:
+    parameters:
+      - name: repo-url
+        description: "GitHub repository URL"
+      - name: branch
+        description: "Branch to work on"
+        default: "main"
+      - name: prompt
+        description: "User's development request"
+      - name: stack
+        description: "Backend stack (grizz or nova)"
+        default: {{ .Values.stack | quote }}
+
+  templates:
+    # Main entry point - orchestrates the full workflow
+    - name: play-lite
+      dag:
+        tasks:
+          # Step 1: Morgan (Intake) - Analyze the request
+          - name: intake
+            template: run-morgan
+            arguments:
+              parameters:
+                - name: repo-url
+                  value: "{{`{{workflow.parameters.repo-url}}`}}"
+                - name: branch
+                  value: "{{`{{workflow.parameters.branch}}`}}"
+                - name: prompt
+                  value: "{{`{{workflow.parameters.prompt}}`}}"
+          
+          # Step 2: Backend Implementation (Grizz or Nova based on stack)
+          - name: backend
+            dependencies: [intake]
+            template: run-backend
+            arguments:
+              parameters:
+                - name: stack
+                  value: "{{`{{workflow.parameters.stack}}`}}"
+                - name: task
+                  value: "{{`{{tasks.intake.outputs.parameters.backend-task}}`}}"
+          
+          # Step 3: Frontend Implementation (Blaze)
+          - name: frontend
+            dependencies: [intake]
+            template: run-blaze
+            arguments:
+              parameters:
+                - name: task
+                  value: "{{`{{tasks.intake.outputs.parameters.frontend-task}}`}}"
+          
+          # Step 4: Quality Review (Cleo)
+          - name: quality
+            dependencies: [backend, frontend]
+            template: run-cleo
+          
+          # Step 5: Security Review (Cipher)
+          - name: security
+            dependencies: [quality]
+            template: run-cipher
+          
+          # Step 6: Testing (Tess)
+          - name: testing
+            dependencies: [security]
+            template: run-tess
+          
+          # Step 7: Deploy (Bolt) - Local/Docker only for Lite
+          - name: deploy
+            dependencies: [testing]
+            template: run-bolt
+            when: "{{`{{workflow.parameters.deploy}}`}} == 'true'"
+
+    # Morgan (Intake Agent) - Analyzes request and creates tasks
+    - name: run-morgan
+      inputs:
+        parameters:
+          - name: repo-url
+          - name: branch
+          - name: prompt
+      outputs:
+        parameters:
+          - name: backend-task
+            valueFrom:
+              path: /workspace/backend-task.json
+          - name: frontend-task
+            valueFrom:
+              path: /workspace/frontend-task.json
+      container:
+        image: {{ .Values.agents.imageRegistry }}/{{ .Values.agents.morgan.image }}
+        command: ["/bin/agent"]
+        args:
+          - "--mode=intake"
+          - "--repo={{`{{inputs.parameters.repo-url}}`}}"
+          - "--branch={{`{{inputs.parameters.branch}}`}}"
+          - "--prompt={{`{{inputs.parameters.prompt}}`}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "cto-lite.fullname" . }}-anthropic
+                key: ANTHROPIC_API_KEY
+                optional: true
+        resources:
+          {{- toYaml .Values.agents.morgan.resources | nindent 10 }}
+      activeDeadlineSeconds: {{ mul .Values.workflow.stepTimeout 60 }}
+
+    # Backend agent selector (Grizz or Nova)
+    - name: run-backend
+      inputs:
+        parameters:
+          - name: stack
+          - name: task
+      steps:
+        - - name: grizz
+            template: run-grizz
+            when: "{{`{{inputs.parameters.stack}}`}} == 'grizz'"
+            arguments:
+              parameters:
+                - name: task
+                  value: "{{`{{inputs.parameters.task}}`}}"
+          - name: nova
+            template: run-nova
+            when: "{{`{{inputs.parameters.stack}}`}} == 'nova'"
+            arguments:
+              parameters:
+                - name: task
+                  value: "{{`{{inputs.parameters.task}}`}}"
+
+    # Grizz (Go Backend)
+    - name: run-grizz
+      inputs:
+        parameters:
+          - name: task
+      container:
+        image: {{ .Values.agents.imageRegistry }}/{{ .Values.agents.grizz.image }}
+        command: ["/bin/agent"]
+        args:
+          - "--mode=coder"
+          - "--task={{`{{inputs.parameters.task}}`}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "cto-lite.fullname" . }}-anthropic
+                key: ANTHROPIC_API_KEY
+                optional: true
+        resources:
+          {{- toYaml .Values.agents.grizz.resources | nindent 10 }}
+      activeDeadlineSeconds: {{ mul .Values.workflow.stepTimeout 60 }}
+
+    # Nova (TypeScript Backend)
+    - name: run-nova
+      inputs:
+        parameters:
+          - name: task
+      container:
+        image: {{ .Values.agents.imageRegistry }}/{{ .Values.agents.nova.image }}
+        command: ["/bin/agent"]
+        args:
+          - "--mode=coder"
+          - "--task={{`{{inputs.parameters.task}}`}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "cto-lite.fullname" . }}-anthropic
+                key: ANTHROPIC_API_KEY
+                optional: true
+        resources:
+          {{- toYaml .Values.agents.nova.resources | nindent 10 }}
+      activeDeadlineSeconds: {{ mul .Values.workflow.stepTimeout 60 }}
+
+    # Blaze (Frontend)
+    - name: run-blaze
+      inputs:
+        parameters:
+          - name: task
+      container:
+        image: {{ .Values.agents.imageRegistry }}/{{ .Values.agents.blaze.image }}
+        command: ["/bin/agent"]
+        args:
+          - "--mode=coder"
+          - "--task={{`{{inputs.parameters.task}}`}}"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "cto-lite.fullname" . }}-anthropic
+                key: ANTHROPIC_API_KEY
+                optional: true
+        resources:
+          {{- toYaml .Values.agents.blaze.resources | nindent 10 }}
+      activeDeadlineSeconds: {{ mul .Values.workflow.stepTimeout 60 }}
+
+    # Cleo (Quality)
+    - name: run-cleo
+      container:
+        image: {{ .Values.agents.imageRegistry }}/{{ .Values.agents.cleo.image }}
+        command: ["/bin/agent"]
+        args:
+          - "--mode=quality"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "cto-lite.fullname" . }}-anthropic
+                key: ANTHROPIC_API_KEY
+                optional: true
+        resources:
+          {{- toYaml .Values.agents.cleo.resources | nindent 10 }}
+      activeDeadlineSeconds: {{ mul .Values.workflow.stepTimeout 60 }}
+
+    # Cipher (Security)
+    - name: run-cipher
+      container:
+        image: {{ .Values.agents.imageRegistry }}/{{ .Values.agents.cipher.image }}
+        command: ["/bin/agent"]
+        args:
+          - "--mode=security"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "cto-lite.fullname" . }}-anthropic
+                key: ANTHROPIC_API_KEY
+                optional: true
+        resources:
+          {{- toYaml .Values.agents.cipher.resources | nindent 10 }}
+      activeDeadlineSeconds: {{ mul .Values.workflow.stepTimeout 60 }}
+
+    # Tess (Testing)
+    - name: run-tess
+      container:
+        image: {{ .Values.agents.imageRegistry }}/{{ .Values.agents.tess.image }}
+        command: ["/bin/agent"]
+        args:
+          - "--mode=test"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "cto-lite.fullname" . }}-anthropic
+                key: ANTHROPIC_API_KEY
+                optional: true
+        resources:
+          {{- toYaml .Values.agents.tess.resources | nindent 10 }}
+      activeDeadlineSeconds: {{ mul .Values.workflow.stepTimeout 60 }}
+
+    # Bolt (Deployment - Local/Docker for Lite)
+    - name: run-bolt
+      container:
+        image: {{ .Values.agents.imageRegistry }}/{{ .Values.agents.bolt.image }}
+        command: ["/bin/agent"]
+        args:
+          - "--mode=deploy"
+          - "--target=local"  # Lite only supports local/docker
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        env:
+          - name: DOCKER_HOST
+            value: "unix:///var/run/docker.sock"
+        resources:
+          {{- toYaml .Values.agents.bolt.resources | nindent 10 }}
+      activeDeadlineSeconds: {{ mul .Values.workflow.stepTimeout 60 }}
+{{- end }}

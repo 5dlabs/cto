@@ -1,0 +1,225 @@
+---
+# BoltRun CRD - Admin Provisioning Tasks
+# Group: cto.5dlabs.ai, Version: v1alpha1, Kind: BoltRun
+# BOLT-001: BoltRun CRD Schema Definition
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: boltruns.cto.5dlabs.ai
+spec:
+  group: cto.5dlabs.ai
+  scope: Namespaced
+  names:
+    plural: boltruns
+    singular: boltrun
+    kind: BoltRun
+    shortNames:
+    - br
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: Tenant
+      type: string
+      jsonPath: .spec.tenantRef
+    - name: Task
+      type: string
+      jsonPath: .spec.taskType
+    - name: Provider
+      type: string
+      jsonPath: .spec.provision.provider
+    - name: Region
+      type: string
+      jsonPath: .spec.provision.region
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: Step
+      type: string
+      jsonPath: .status.currentStep.name
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        type: object
+        required: ["spec"]
+        properties:
+          spec:
+            type: object
+            required: ["tenantRef"]
+            properties:
+              tenantRef:
+                type: string
+                description: "Reference to the tenant this task is for"
+              taskType:
+                type: string
+                default: "provision"
+                description: "Type of task to perform"
+                enum:
+                - provision
+                - debug
+                - upgrade
+                - destroy
+              provision:
+                type: object
+                description: "Provisioning configuration (required for provision task type)"
+                required: ["provider", "region", "credentialRef"]
+                properties:
+                  provider:
+                    type: string
+                    description: "Bare metal provider to use"
+                    enum:
+                    - latitude
+                    - hetzner
+                    - ovh
+                    - vultr
+                    - scaleway
+                  region:
+                    type: string
+                    description: "Region to deploy in (provider-specific, e.g., 'DAL', 'FRA')"
+                  clusterSize:
+                    type: string
+                    default: "medium"
+                    description: "Cluster size determining node count and specs"
+                    enum:
+                    - small
+                    - medium
+                    - large
+                  credentialRef:
+                    type: string
+                    description: "Reference to credentials in OpenBao (path format: tenants/{tenant-id}/provider-creds)"
+                  clusterName:
+                    type: string
+                    description: "Custom cluster name (optional, derived from tenant if not set)"
+                  talosVersion:
+                    type: string
+                    default: "v1.9.0"
+                    description: "Talos Linux version to install"
+                  enableWarpConnector:
+                    type: boolean
+                    default: true
+                    description: "Enable WARP Connector for connectivity"
+                  enableClusterMesh:
+                    type: boolean
+                    default: true
+                    description: "Enable Cilium ClusterMesh for multi-cluster networking"
+                  gitopsRepo:
+                    type: string
+                    description: "Customer-owned GitOps repository URL for ArgoCD"
+              execution:
+                type: object
+                description: "Execution configuration"
+                properties:
+                  timeout:
+                    type: string
+                    default: "30m"
+                    description: "Timeout for the entire task"
+                  retryLimit:
+                    type: integer
+                    format: int32
+                    default: 3
+                    description: "Maximum retry attempts on failure"
+                  model:
+                    type: string
+                    default: "claude-sonnet-4-20250514"
+                    description: "Model to use for Bolt agent"
+              externalSecretRef:
+                type: string
+                description: "Reference to ExternalSecret for credential injection"
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: "Current phase of the task"
+                enum:
+                - Pending
+                - Initializing
+                - Running
+                - Succeeded
+                - Failed
+                - Cancelled
+              message:
+                type: string
+                description: "Human-readable status message"
+              startTime:
+                type: string
+                description: "When the task started (RFC3339)"
+              completionTime:
+                type: string
+                description: "When the task completed (RFC3339)"
+              currentStep:
+                type: object
+                description: "Current step progress (BOLT-004)"
+                properties:
+                  number:
+                    type: integer
+                    format: int32
+                    description: "Step number (1-31 for full provisioning)"
+                  total:
+                    type: integer
+                    format: int32
+                    description: "Total steps expected"
+                  name:
+                    type: string
+                    description: "Step name (e.g., 'CreatingServers')"
+                  startedAt:
+                    type: string
+                    description: "Started at timestamp (RFC3339)"
+                  completedAt:
+                    type: string
+                    description: "Completed at timestamp (RFC3339)"
+              lastUpdate:
+                type: string
+                description: "Last update timestamp"
+              error:
+                type: string
+                description: "Error details if failed"
+              jobName:
+                type: string
+                description: "Associated Kubernetes Job name"
+              podName:
+                type: string
+                description: "Pod name running the task"
+              logsUrl:
+                type: string
+                description: "URL to detailed logs"
+              clusterName:
+                type: string
+                description: "Cluster name if provisioned"
+              kubeconfigPath:
+                type: string
+                description: "Kubeconfig path if provisioned"
+              retryCount:
+                type: integer
+                format: int32
+                description: "Retry count"
+              externalSecretName:
+                type: string
+                description: "ExternalSecret created for credential injection (BOLT-003)"
+              conditions:
+                type: array
+                description: "Conditions for detailed status tracking"
+                items:
+                  type: object
+                  required: ["type", "status"]
+                  properties:
+                    type:
+                      type: string
+                      description: "Type of condition (e.g., 'Ready', 'ServersCreated')"
+                    status:
+                      type: string
+                      description: "Status of the condition (True, False, Unknown)"
+                    lastTransitionTime:
+                      type: string
+                      description: "Last time the condition transitioned (RFC3339)"
+                    reason:
+                      type: string
+                      description: "Reason for the condition's last transition"
+                    message:
+                      type: string
+                      description: "Human-readable message about the condition"

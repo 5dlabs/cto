@@ -3,6 +3,31 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.36](https://github.com/5dlabs/cto/compare/v0.2.35...v0.2.36) (2026-02-01)
+
+
+### ✨ Features
+
+* **intake-agent:** subagent-aware task expansion and dual-agent support ([#4136](https://github.com/5dlabs/cto/issues/4136)) ([2e447ac](https://github.com/5dlabs/cto/commit/2e447ace32adae6035a9ead52a1f9d548129eebe))
+* **intake:** add file analysis utilities ([#4148](https://github.com/5dlabs/cto/issues/4148)) ([9988fbb](https://github.com/5dlabs/cto/commit/9988fbb6698fab461308515b103ec4642a6204ec))
+* **linear-sink:** CLI-agnostic tool/skill discovery for Linear agent dialog ([#4129](https://github.com/5dlabs/cto/issues/4129)) ([f5923e9](https://github.com/5dlabs/cto/commit/f5923e9f3e44dd21735fe1e32001e5ba3807e88e))
+* Multi-provider LLM support ([#4191](https://github.com/5dlabs/cto/issues/4191)) ([8a16d02](https://github.com/5dlabs/cto/commit/8a16d02974fc3e7b981c8ea40d60362b3cff64e7))
+* **stitch:** Stitch implementation branch merge ([#4204](https://github.com/5dlabs/cto/issues/4204)) ([867b694](https://github.com/5dlabs/cto/commit/867b694869e984fe5e32a0166ee7998c3dbada3f))
+* **tests:** CLI agent testing infrastructure with Linear sidecar ([#4180](https://github.com/5dlabs/cto/issues/4180)) ([846a1a8](https://github.com/5dlabs/cto/commit/846a1a851b8e8ec5048614b911f831535fe77ed7))
+* **tools:** add per-MCP health status and metrics endpoints ([#4189](https://github.com/5dlabs/cto/issues/4189)) ([b7fe6f5](https://github.com/5dlabs/cto/commit/b7fe6f5a9bd78b4eb93156476d265c815cfe2e8f))
+* **tools:** LRU connection pool to prevent MCP subprocess OOM ([#4188](https://github.com/5dlabs/cto/issues/4188)) ([0c95319](https://github.com/5dlabs/cto/commit/0c95319432e380092704bb4d3cebc3e7d7787035))
+
+
+### 🐛 Bug Fixes
+
+* **tools:** add timeout and error handling for MCP server init ([#4187](https://github.com/5dlabs/cto/issues/4187)) ([b4ab5bd](https://github.com/5dlabs/cto/commit/b4ab5bd34ba63222b9438bb4639d8dc677ebd30f))
+* **tools:** remove redis from server config (client-side only) ([#4190](https://github.com/5dlabs/cto/issues/4190)) ([a202ae8](https://github.com/5dlabs/cto/commit/a202ae8802300de7b8c9e0c1f12f60404a775693))
+
+
+### 📚 Documentation
+
+* **intake:** add subtask splitting guide for intake agent ([#4199](https://github.com/5dlabs/cto/issues/4199)) ([03cca6c](https://github.com/5dlabs/cto/commit/03cca6c690ac753754df1705870c7d226ff53e3a))
+
 ## [0.2.35](https://github.com/5dlabs/cto/compare/v0.2.34...v0.2.35) (2026-01-31)
 
 

@@ -1,0 +1,271 @@
+---
+# ConfigMap with client configuration examples
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-client-examples
+  namespace: messaging
+data:
+  # Java client properties (plain)
+  client.properties: |
+    bootstrap.servers=kafka-cluster-kafka-bootstrap:9092
+    client.id=example-client
+
+    # Producer settings
+    acks=all
+    retries=3
+    max.in.flight.requests.per.connection=5
+    enable.idempotence=true
+    compression.type=snappy
+
+    # Consumer settings
+    group.id=example-consumer-group
+    auto.offset.reset=earliest
+    enable.auto.commit=true
+    auto.commit.interval.ms=5000
+
+  # Java client properties (TLS)
+  client-tls.properties: |
+    bootstrap.servers=kafka-cluster-kafka-bootstrap:9093
+    security.protocol=SSL
+    ssl.truststore.location=/tmp/truststore.jks
+    ssl.truststore.password=changeit
+    ssl.keystore.location=/tmp/keystore.jks
+    ssl.keystore.password=changeit
+    ssl.key.password=changeit
+
+    # Producer settings
+    acks=all
+    retries=3
+    max.in.flight.requests.per.connection=5
+    enable.idempotence=true
+    compression.type=snappy
+
+    # Consumer settings
+    group.id=example-consumer-group
+    auto.offset.reset=earliest
+    enable.auto.commit=true
+    auto.commit.interval.ms=5000
+
+  # Python example (kafka-python)
+  python-example.py: |
+    from kafka import KafkaProducer, KafkaConsumer
+    import json
+
+    # Producer example
+    def produce_messages():
+        producer = KafkaProducer(
+            bootstrap_servers=['kafka-cluster-kafka-bootstrap:9092'],
+            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+            acks='all',
+            retries=3,
+            max_in_flight_requests_per_connection=5
+        )
+
+        for i in range(100):
+            message = {'id': i, 'data': f'Message {i}'}
+            producer.send('events', value=message)
+            print(f"Sent: {message}")
+
+        producer.flush()
+        producer.close()
+
+    # Consumer example
+    def consume_messages():
+        consumer = KafkaConsumer(
+            'events',
+            bootstrap_servers=['kafka-cluster-kafka-bootstrap:9092'],
+            group_id='python-consumer-group',
+            auto_offset_reset='earliest',
+            enable_auto_commit=True,
+            value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+        )
+
+        for message in consumer:
+            print(f"Received: {message.value}")
+            # Process message here
+
+    if __name__ == '__main__':
+        # Uncomment to run
+        # produce_messages()
+        # consume_messages()
+        pass
+
+  # Node.js example (kafkajs)
+  nodejs-example.js: |
+    const { Kafka } = require('kafkajs');
+
+    const kafka = new Kafka({
+      clientId: 'my-app',
+      brokers: ['kafka-cluster-kafka-bootstrap:9092'],
+      retry: {
+        initialRetryTime: 100,
+        retries: 8
+      }
+    });
+
+    // Producer example
+    async function produceMessages() {
+      const producer = kafka.producer({
+        idempotent: true,
+        maxInFlightRequests: 5,
+        transactionalId: 'my-transactional-id'
+      });
+
+      await producer.connect();
+
+      for (let i = 0; i < 100; i++) {
+        await producer.send({
+          topic: 'events',
+          messages: [
+            {
+              key: `key-${i}`,
+              value: JSON.stringify({ id: i, data: `Message ${i}` })
+            }
+          ]
+        });
+        console.log(`Sent message ${i}`);
+      }
+
+      await producer.disconnect();
+    }
+
+    // Consumer example
+    async function consumeMessages() {
+      const consumer = kafka.consumer({
+        groupId: 'nodejs-consumer-group',
+        sessionTimeout: 30000,
+        heartbeatInterval: 3000
+      });
+
+      await consumer.connect();
+      await consumer.subscribe({
+        topic: 'events',
+        fromBeginning: true
+      });
+
+      await consumer.run({
+        eachMessage: async ({ topic, partition, message }) => {
+          console.log({
+            partition,
+            offset: message.offset,
+            value: message.value.toString(),
+          });
+        },
+      });
+    }
+
+    // Uncomment to run
+    // produceMessages().catch(console.error);
+    // consumeMessages().catch(console.error);
+
+  # Go example (confluent-kafka-go)
+  go-example.go: |
+    package main
+
+    import (
+        "fmt"
+        "github.com/confluentinc/confluent-kafka-go/kafka"
+    )
+
+    // Producer example
+    func produceMessages() {
+        p, err := kafka.NewProducer(&kafka.ConfigMap{
+            "bootstrap.servers": "kafka-cluster-kafka-bootstrap:9092",
+            "acks":               "all",
+            "retries":            3,
+            "enable.idempotence": true,
+        })
+        if err != nil {
+            panic(err)
+        }
+        defer p.Close()
+
+        topic := "events"
+        for i := 0; i < 100; i++ {
+            value := fmt.Sprintf(`{"id": %d, "data": "Message %d"}`, i, i)
+            p.Produce(&kafka.Message{
+                TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+                Value:          []byte(value),
+            }, nil)
+        }
+
+        p.Flush(15 * 1000)
+    }
+
+    // Consumer example
+    func consumeMessages() {
+        c, err := kafka.NewConsumer(&kafka.ConfigMap{
+            "bootstrap.servers": "kafka-cluster-kafka-bootstrap:9092",
+            "group.id":          "go-consumer-group",
+            "auto.offset.reset": "earliest",
+        })
+        if err != nil {
+            panic(err)
+        }
+        defer c.Close()
+
+        c.Subscribe("events", nil)
+
+        for {
+            msg, err := c.ReadMessage(-1)
+            if err == nil {
+                fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
+            } else {
+                fmt.Printf("Consumer error: %v (%v)\n", err, msg)
+            }
+        }
+    }
+
+    // func main() {
+    //     // Uncomment to run
+    //     // produceMessages()
+    //     // consumeMessages()
+    // }
+
+  # Spring Boot application.properties
+  spring-boot-application.properties: |
+    # Kafka Configuration
+    spring.kafka.bootstrap-servers=kafka-cluster-kafka-bootstrap:9092
+    spring.kafka.client-id=spring-boot-app
+
+    # Producer Configuration
+    spring.kafka.producer.acks=all
+    spring.kafka.producer.retries=3
+    spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+    spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer
+    spring.kafka.producer.properties.enable.idempotence=true
+    spring.kafka.producer.properties.max.in.flight.requests.per.connection=5
+
+    # Consumer Configuration
+    spring.kafka.consumer.group-id=spring-boot-consumer-group
+    spring.kafka.consumer.auto-offset-reset=earliest
+    spring.kafka.consumer.enable-auto-commit=true
+    spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+    spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
+    spring.kafka.consumer.properties.spring.json.trusted.packages=*
+
+  # Kafka Connect configuration
+  connect-worker.properties: |
+    bootstrap.servers=kafka-cluster-kafka-bootstrap:9092
+    group.id=connect-cluster
+
+    key.converter=org.apache.kafka.connect.json.JsonConverter
+    value.converter=org.apache.kafka.connect.json.JsonConverter
+    key.converter.schemas.enable=false
+    value.converter.schemas.enable=false
+
+    offset.storage.topic=connect-offsets
+    offset.storage.replication.factor=3
+    offset.storage.partitions=25
+
+    config.storage.topic=connect-configs
+    config.storage.replication.factor=3
+
+    status.storage.topic=connect-status
+    status.storage.replication.factor=3
+    status.storage.partitions=5
+
+    offset.flush.interval.ms=10000
+
+    plugin.path=/usr/share/java,/usr/share/confluent-hub-components

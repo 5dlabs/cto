@@ -1,0 +1,100 @@
+---
+# Service for AMQP protocol access
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-cluster-amqp
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: amqp
+spec:
+  type: ClusterIP
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+      protocol: TCP
+    - name: amqp-tls
+      port: 5671
+      targetPort: 5671
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: rabbitmq-cluster
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+---
+# Service for Management UI and API
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-cluster-management
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: management
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 15672
+      targetPort: 15672
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: rabbitmq-cluster
+
+---
+# Service for Prometheus metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-cluster-metrics
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: metrics
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "15692"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+    - name: prometheus
+      port: 15692
+      targetPort: 15692
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: rabbitmq-cluster
+
+---
+# Headless service for StatefulSet DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-cluster-nodes
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: nodes
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: epmd
+      port: 4369
+      targetPort: 4369
+      protocol: TCP
+    - name: cluster-rpc
+      port: 25672
+      targetPort: 25672
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: rabbitmq-cluster

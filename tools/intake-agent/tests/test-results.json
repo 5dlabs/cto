@@ -1,0 +1,62 @@
+[
+  {
+    "taskId": 1,
+    "taskTitle": "Setup Kubernetes infrastructure and databases (Bolt - Kubernetes)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  },
+  {
+    "taskId": 2,
+    "taskTitle": "Configure Kubernetes networking and ingress (Bolt - Kubernetes)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  },
+  {
+    "taskId": 3,
+    "taskTitle": "Setup observability stack (Bolt - Kubernetes)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  },
+  {
+    "taskId": 4,
+    "taskTitle": "Create Rust notification router service skeleton (Rex - Rust/Axum)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  },
+  {
+    "taskId": 5,
+    "taskTitle": "Implement notification data models (Rex - Rust/Axum)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  },
+  {
+    "taskId": 6,
+    "taskTitle": "Setup PostgreSQL connection and migrations (Rex - Rust/Axum)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  },
+  {
+    "taskId": 7,
+    "taskTitle": "Implement notification submission endpoint (Rex - Rust/Axum)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  },
+  {
+    "taskId": 8,
+    "taskTitle": "Setup Redis integration for caching and rate limiting (Rex - Rust/Axum)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  },
+  {
+    "taskId": 9,
+    "taskTitle": "Implement Kafka producer for event streaming (Rex - Rust/Axum)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  },
+  {
+    "taskId": 10,
+    "taskTitle": "Add batch notification endpoint (Rex - Rust/Axum)",
+    "subtaskCount": 10,
+    "antiPatterns": []
+  }
+]

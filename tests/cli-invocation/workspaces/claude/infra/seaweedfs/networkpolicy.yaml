@@ -1,0 +1,285 @@
+---
+# NetworkPolicy for Master servers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: seaweedfs-master
+  namespace: storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: master
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from volume servers
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: volume
+    ports:
+    - protocol: TCP
+      port: 9333
+    - protocol: TCP
+      port: 19333
+  # Allow from filer servers
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: filer
+    ports:
+    - protocol: TCP
+      port: 9333
+    - protocol: TCP
+      port: 19333
+  # Allow from other master servers (peer communication)
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: master
+    ports:
+    - protocol: TCP
+      port: 9333
+    - protocol: TCP
+      port: 19333
+  # Allow monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9333
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow master peer communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: master
+    ports:
+    - protocol: TCP
+      port: 9333
+    - protocol: TCP
+      port: 19333
+
+---
+# NetworkPolicy for Volume servers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: seaweedfs-volume
+  namespace: storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: volume
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from filer servers
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: filer
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 18080
+  # Allow from other volume servers (replication)
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: volume
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 18080
+  # Allow monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow to master servers
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: master
+    ports:
+    - protocol: TCP
+      port: 9333
+    - protocol: TCP
+      port: 19333
+  # Allow to other volume servers
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: volume
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 18080
+
+---
+# NetworkPolicy for Filer servers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: seaweedfs-filer
+  namespace: storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: filer
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from S3 gateway
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: s3
+    ports:
+    - protocol: TCP
+      port: 8888
+    - protocol: TCP
+      port: 18888
+  # Allow from ingress
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8888
+    - protocol: TCP
+      port: 8333
+  # Allow monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8888
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow to master servers
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: master
+    ports:
+    - protocol: TCP
+      port: 9333
+    - protocol: TCP
+      port: 19333
+  # Allow to volume servers
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: volume
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 18080
+
+---
+# NetworkPolicy for S3 Gateway
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: seaweedfs-s3
+  namespace: storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: s3
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from ingress
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8333
+  # Allow from application namespaces
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: default
+    ports:
+    - protocol: TCP
+      port: 8333
+  # Allow monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8333
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow to filer servers
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: filer
+    ports:
+    - protocol: TCP
+      port: 8888
+    - protocol: TCP
+      port: 18888

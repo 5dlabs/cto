@@ -1,0 +1,230 @@
+---
+# Master Headless Service - for StatefulSet pod discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-master
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+  - name: master
+    port: 9333
+    targetPort: 9333
+    protocol: TCP
+  - name: grpc
+    port: 19333
+    targetPort: 19333
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+
+---
+# Master Client Service - for accessing master API
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-master-client
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+spec:
+  type: ClusterIP
+  ports:
+  - name: master
+    port: 9333
+    targetPort: 9333
+    protocol: TCP
+  - name: grpc
+    port: 19333
+    targetPort: 19333
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+
+---
+# Volume Headless Service - for StatefulSet pod discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-volume
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+  - name: volume
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: grpc
+    port: 18080
+    targetPort: 18080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+
+---
+# Volume Client Service - for accessing volume servers
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-volume-client
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+spec:
+  type: ClusterIP
+  ports:
+  - name: volume
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: grpc
+    port: 18080
+    targetPort: 18080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+
+---
+# Filer Headless Service - for StatefulSet pod discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-filer
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+  - name: filer
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+  - name: grpc
+    port: 18888
+    targetPort: 18888
+    protocol: TCP
+  - name: s3
+    port: 8333
+    targetPort: 8333
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+
+---
+# Filer Client Service - for accessing filer
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-filer-client
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+spec:
+  type: ClusterIP
+  ports:
+  - name: filer
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+  - name: grpc
+    port: 18888
+    targetPort: 18888
+    protocol: TCP
+  - name: s3
+    port: 8333
+    targetPort: 8333
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+
+---
+# S3 Gateway Service - for S3-compatible API access
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-s3
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: s3
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: ClusterIP
+  ports:
+  - name: s3
+    port: 8333
+    targetPort: 8333
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: s3
+
+---
+# Ingress for external access (optional)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: seaweedfs
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: seaweedfs-master.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: seaweedfs-master-client
+            port:
+              number: 9333
+  - host: seaweedfs-filer.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: seaweedfs-filer-client
+            port:
+              number: 8888
+  - host: seaweedfs-s3.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: seaweedfs-s3
+            port:
+              number: 8333
