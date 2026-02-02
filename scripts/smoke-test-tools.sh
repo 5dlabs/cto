@@ -55,6 +55,13 @@ tool_count=$(echo "$response" | jq -r '.result.tools | length' 2>/dev/null) || {
 echo "📊 Tool Count: $tool_count"
 echo ""
 
+# Check for null response
+if [ "$tool_count" = "null" ] || [ -z "$tool_count" ]; then
+    echo "❌ Failed to get tool count from server response"
+    echo "Response: $response"
+    exit 1
+fi
+
 # Validate tool count
 if [ "$tool_count" -lt "$EXPECTED_MIN_TOOLS" ]; then
     echo "❌ FAIL: Only $tool_count tools discovered (expected at least $EXPECTED_MIN_TOOLS)"

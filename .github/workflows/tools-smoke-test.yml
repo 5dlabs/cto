@@ -63,7 +63,7 @@ jobs:
           export PROJECT_DIR=/tmp/tools-test-config
           export SYSTEM_CONFIG_PATH=/tmp/tools-test-config
           export PORT=3000
-          ../../target/release/tools-server &
+          ../../target/release/tools-server > /tmp/tools-server.log 2>&1 &
           echo $! > /tmp/tools-server.pid
       
       - name: Run smoke test
