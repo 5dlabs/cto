@@ -13,6 +13,9 @@ name = "pm-lite"
 path = "src/bin/main.rs"
 
 [dependencies]
+# Shared utilities
+cto-lite-common = { path = "../common" }
+
 # Web framework
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"

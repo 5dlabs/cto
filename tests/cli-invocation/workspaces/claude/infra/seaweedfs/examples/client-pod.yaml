@@ -1,0 +1,57 @@
+---
+# Example client pod for testing SeaweedFS
+apiVersion: v1
+kind: Pod
+metadata:
+  name: seaweedfs-client
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs-client
+spec:
+  containers:
+  - name: client
+    image: chrislusf/seaweedfs:3.66
+    command:
+    - sleep
+    - "3600"
+    env:
+    - name: WEED_MASTER
+      value: "seaweedfs-master-client:9333"
+    - name: WEED_FILER
+      value: "seaweedfs-filer-client:8888"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  restartPolicy: Never
+
+---
+# Example: How to use the client pod
+#
+# 1. Create the pod:
+#    kubectl apply -f client-pod.yaml
+#
+# 2. Exec into the pod:
+#    kubectl exec -it -n storage seaweedfs-client -- /bin/sh
+#
+# 3. Test master API:
+#    weed shell -master=$WEED_MASTER
+#    > cluster.status
+#    > volume.list
+#    > exit
+#
+# 4. Test filer API (create file):
+#    echo "test content" > /tmp/test.txt
+#    curl -F file=@/tmp/test.txt http://$WEED_FILER/test/
+#
+# 5. Test filer API (read file):
+#    curl http://$WEED_FILER/test/test.txt
+#
+# 6. Test S3 API:
+#    export S3_ENDPOINT=http://seaweedfs-s3.storage.svc.cluster.local:8333
+#    weed shell -master=$WEED_MASTER
+#    > s3.bucket.create -name test-bucket
+#    > exit

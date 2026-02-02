@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subtask id="1.3" parent="1" agent="bolt">
+    <meta>
+        <title>Deploy Event Streaming and Object Storage (Kafka and SeaweedFS)</title>
+        <dependencies>None</dependencies>
+    </meta>
+
+    <role>You are a DevOps Engineer specializing in Kubernetes. Implement subtask 1.3.</role>
+
+    <context>
+        <overview>Set up Kafka cluster using Strimzi operator for event streaming and SeaweedFS for distributed object storage to support file handling and event-driven architecture.</overview>
+        <parent_task>Setup Infrastructure Components (Bolt - Kubernetes)</parent_task>
+    </context>
+
+    <requirements>
+        <description>Deploy Strimzi Kafka operator with appropriate topic configurations, retention policies, and replication factors. Configure Kafka Connect if needed for data integration. Deploy SeaweedFS cluster with master and volume servers for object storage, including proper data replication and load balancing configuration.</description>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>Subtask requirements implemented</criterion>
+        <criterion>Parent task requirements still satisfied</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>kubectl apply --dry-run=client -f .</command>
+        <command>helm lint charts/*</command>
+    </validation>
+</subtask>

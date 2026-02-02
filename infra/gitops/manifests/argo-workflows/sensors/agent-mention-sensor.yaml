@@ -39,6 +39,8 @@ spec:
           method: POST
           headers:
             Content-Type: application/json
+            # Pass the GitHub event type so handler knows the payload format
+            X-Mention-Source: "{{ .Input.comment-event.body.X-GitHub-Event }}"
           payload:
             - src:
                 dependencyName: comment-event

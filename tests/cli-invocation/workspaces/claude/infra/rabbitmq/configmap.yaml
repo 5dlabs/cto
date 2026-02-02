@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-cluster-config
+  namespace: messaging
+  labels:
+    app: rabbitmq
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: config
+data:
+  # Additional environment variables
+  enabled_plugins: |
+    [rabbitmq_management,rabbitmq_prometheus,rabbitmq_shovel,rabbitmq_shovel_management,rabbitmq_federation,rabbitmq_federation_management,rabbitmq_consistent_hash_exchange].
+
+  # Custom entrypoint script for additional initialization
+  init.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "Starting RabbitMQ initialization..."
+
+    # Wait for RabbitMQ to be ready
+    until rabbitmq-diagnostics ping; do
+      echo "Waiting for RabbitMQ to start..."
+      sleep 5
+    done
+
+    echo "RabbitMQ is ready!"
+
+    # Any additional initialization commands can go here
+    # For example: creating exchanges, queues, etc.
+
+    echo "Initialization complete."

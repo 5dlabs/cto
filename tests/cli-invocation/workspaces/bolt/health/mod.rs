@@ -1,25 +1,24 @@
-//! Health check module for Kubernetes liveness and readiness probes.
+//! Kubernetes health check module
 //!
-//! This module provides endpoints and types for Kubernetes health checks:
-//! - `/healthz` - Liveness probe (indicates if the application is running)
-//! - `/readyz` - Readiness probe (indicates if the application can serve traffic)
+//! This module provides liveness and readiness probe implementations for Kubernetes deployments.
 //!
-//! # Example
+//! # Examples
 //!
-//! ```rust
-//! use health::probes::{liveness_probe, readiness_probe};
+//! ```no_run
+//! use health::probes::{ServiceState, liveness_probe, readiness_probe};
 //!
-//! // Initialize the probe system at startup
-//! health::probes::init();
+//! let state = ServiceState::new("1.0.0");
 //!
-//! // Use in your HTTP handlers
-//! let liveness = liveness_probe();
-//! let readiness = readiness_probe();
+//! // Liveness probe - checks if service is alive
+//! let (status, response) = liveness_probe(&state);
+//!
+//! // Readiness probe - checks if service is ready to handle traffic
+//! let (status, response) = readiness_probe(&state);
 //! ```
 
 pub mod probes;
 pub mod types;
 
 // Re-export commonly used items
-pub use probes::{liveness_probe, readiness_probe};
+pub use probes::{liveness_probe, readiness_probe, ServiceState};
 pub use types::{HealthResponse, HealthStatus};

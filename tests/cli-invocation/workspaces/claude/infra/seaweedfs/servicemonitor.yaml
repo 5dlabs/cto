@@ -1,0 +1,83 @@
+---
+# ServiceMonitor for Master metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seaweedfs-master
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: master
+  endpoints:
+  - port: master
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# ServiceMonitor for Volume metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seaweedfs-volume
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: volume
+  endpoints:
+  - port: volume
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# ServiceMonitor for Filer metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seaweedfs-filer
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: filer
+  endpoints:
+  - port: filer
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# ServiceMonitor for S3 Gateway metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: seaweedfs-s3
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: s3
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: s3
+  endpoints:
+  - port: s3
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

@@ -7,12 +7,14 @@ on:
     paths:
       - 'crates/research/**'
       - 'infra/images/research/**'
+      - 'tools/intake-agent/**'
       - '.github/workflows/research-ci.yaml'
   pull_request:
     branches: [main]
     paths:
       - 'crates/research/**'
       - 'infra/images/research/**'
+      - 'tools/intake-agent/**'
       - '.github/workflows/research-ci.yaml'
   workflow_dispatch:
 
@@ -151,6 +153,18 @@ jobs:
           binary: research
           output-path: research
           use-sccache: 'true'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build intake-agent
+        run: |
+          cd tools/intake-agent
+          bun install --frozen-lockfile
+          bun run build
+          cp dist/intake-agent ../../intake-agent
 
       - name: Get version info
         id: version

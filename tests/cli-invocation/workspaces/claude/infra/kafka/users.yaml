@@ -1,0 +1,115 @@
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: kafka-producer
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+spec:
+  authentication:
+    type: tls
+  authorization:
+    type: simple
+    acls:
+      # Producer permissions for events topic
+      - resource:
+          type: topic
+          name: events
+          patternType: literal
+        operations:
+          - Write
+          - Describe
+          - Create
+      # Producer permissions for commands topic
+      - resource:
+          type: topic
+          name: commands
+          patternType: literal
+        operations:
+          - Write
+          - Describe
+          - Create
+      # Allow access to producer groups
+      - resource:
+          type: group
+          name: producer-
+          patternType: prefix
+        operations:
+          - Read
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: kafka-consumer
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+spec:
+  authentication:
+    type: tls
+  authorization:
+    type: simple
+    acls:
+      # Consumer permissions for all topics
+      - resource:
+          type: topic
+          name: events
+          patternType: literal
+        operations:
+          - Read
+          - Describe
+      - resource:
+          type: topic
+          name: commands
+          patternType: literal
+        operations:
+          - Read
+          - Describe
+      - resource:
+          type: topic
+          name: logs
+          patternType: literal
+        operations:
+          - Read
+          - Describe
+      # Allow access to consumer groups
+      - resource:
+          type: group
+          name: consumer-
+          patternType: prefix
+        operations:
+          - Read
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: kafka-admin
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+spec:
+  authentication:
+    type: tls
+  authorization:
+    type: simple
+    acls:
+      # Admin has full access to all topics
+      - resource:
+          type: topic
+          name: "*"
+          patternType: literal
+        operations:
+          - All
+      # Admin has full access to all consumer groups
+      - resource:
+          type: group
+          name: "*"
+          patternType: literal
+        operations:
+          - All
+      # Admin has full access to cluster operations
+      - resource:
+          type: cluster
+        operations:
+          - All

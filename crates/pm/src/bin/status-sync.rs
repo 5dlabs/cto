@@ -319,6 +319,161 @@ impl LinearApiClient {
         })
     }
 
+    /// Resolve an issue identifier (e.g., "CTOPA-123") to a UUID.
+    ///
+    /// Linear's session creation API now requires the issue UUID, not the identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the issue is not found or the request fails.
+    async fn resolve_issue_id(&self, identifier: &str) -> Result<String> {
+        #[derive(Serialize)]
+        struct Variables {
+            identifier: String,
+        }
+
+        #[derive(Serialize)]
+        struct Request {
+            query: &'static str,
+            variables: Variables,
+        }
+
+        const QUERY: &str = r#"
+            query GetIssue($identifier: String!) {
+                issue(id: $identifier) {
+                    id
+                }
+            }
+        "#;
+
+        let request = Request {
+            query: QUERY,
+            variables: Variables {
+                identifier: identifier.to_string(),
+            },
+        };
+
+        debug!(identifier = %identifier, "Resolving issue identifier to UUID");
+
+        let response = self
+            .client
+            .post(&self.api_url)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to resolve issue ID")?;
+
+        let body = response.text().await.unwrap_or_default();
+        let json: serde_json::Value =
+            serde_json::from_str(&body).context("Failed to parse issue resolution response")?;
+
+        if let Some(errors) = json.get("errors") {
+            anyhow::bail!("Failed to resolve issue: {}", errors);
+        }
+
+        let issue_id = json["data"]["issue"]["id"]
+            .as_str()
+            .context("Issue not found")?
+            .to_string();
+
+        info!(identifier = %identifier, issue_id = %issue_id, "Resolved issue identifier");
+        Ok(issue_id)
+    }
+
+    /// Create a new agent session on a Linear issue.
+    ///
+    /// This is used when running in standalone mode (e.g., docker-compose)
+    /// where no session is pre-created by the controller.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session creation fails.
+    pub async fn create_session_on_issue(
+        &self,
+        issue_identifier: &str,
+        model: &str,
+        provider: &str,
+    ) -> Result<String> {
+        #[derive(Serialize)]
+        struct Variables {
+            input: SessionCreateInput,
+        }
+
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct SessionCreateInput {
+            issue_id: String,
+        }
+
+        #[derive(Serialize)]
+        struct Request {
+            query: &'static str,
+            variables: Variables,
+        }
+
+        // First, resolve issue identifier to UUID
+        let issue_id = self.resolve_issue_id(issue_identifier).await?;
+
+        const MUTATION: &str = r#"
+            mutation CreateAgentSession($input: AgentSessionCreateOnIssue!) {
+                agentSessionCreateOnIssue(input: $input) {
+                    success
+                    agentSession {
+                        id
+                    }
+                }
+            }
+        "#;
+
+        let request = Request {
+            query: MUTATION,
+            variables: Variables {
+                input: SessionCreateInput {
+                    issue_id,
+                },
+            },
+        };
+        
+        // Log model/provider for debugging (no longer sent to Linear)
+        debug!(model = %model, provider = %provider, "Session metadata (for reference)");
+
+        info!(
+            issue = %issue_identifier,
+            model = %model,
+            "Creating Linear agent session"
+        );
+
+        let response = self
+            .client
+            .post(&self.api_url)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to send session creation request")?;
+
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            anyhow::bail!("Session creation failed: {} - {}", status, body);
+        }
+
+        let json: serde_json::Value =
+            serde_json::from_str(&body).context("Failed to parse session creation response")?;
+
+        if let Some(errors) = json.get("errors") {
+            anyhow::bail!("GraphQL errors: {}", errors);
+        }
+
+        let session_id = json["data"]["agentSessionCreateOnIssue"]["agentSession"]["id"]
+            .as_str()
+            .context("Missing session ID in response")?
+            .to_string();
+
+        info!(session_id = %session_id, "Created Linear agent session");
+        Ok(session_id)
+    }
+
     /// Generic activity emission helper
     async fn emit_activity(
         &self,
@@ -1152,6 +1307,7 @@ pub enum ClaudeStreamEvent {
         subtype: Option<String>,
         model: Option<String>,
         tools: Option<Vec<String>>,
+        skills: Option<Vec<String>>,
         session_id: Option<String>,
     },
     /// Assistant message (may contain text or `tool_use`)
@@ -1697,11 +1853,54 @@ async fn process_stream_event(
     artifact_trail: &mut ArtifactTrail,
 ) -> Result<()> {
     match event {
-        ClaudeStreamEvent::System { model, tools, .. } => {
+        ClaudeStreamEvent::System { model, tools, skills, .. } => {
             // System init - emit as thought (it's informational, not an action)
             let tool_count = tools.as_ref().map_or(0, Vec::len);
+            let skill_count = skills.as_ref().map_or(0, Vec::len);
             let model_name = model.as_deref().unwrap_or("unknown");
-            let msg = format!("🚀 Starting with **{model_name}** | {tool_count} tools available");
+            
+            // Build sections for verbose init message
+            let mut sections = vec![format!("**Model:** {model_name}")];
+            
+            // MCP Tools section (show first few names if available)
+            if tool_count > 0 {
+                if let Some(tool_list) = tools {
+                    // Separate MCP tools from native tools
+                    let mcp_tools: Vec<_> = tool_list.iter()
+                        .filter(|t| t.starts_with("mcp__") || t.contains("__"))
+                        .take(10)
+                        .cloned()
+                        .collect();
+                    let native_count = tool_count - mcp_tools.len();
+                    
+                    if !mcp_tools.is_empty() {
+                        let mcp_preview = mcp_tools.iter()
+                            .map(|t| t.replace("mcp__cto-tools__", ""))
+                            .take(5)
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        sections.push(format!("**MCP Tools ({}):** {} (+{} more)", mcp_tools.len(), mcp_preview, mcp_tools.len().saturating_sub(5)));
+                    }
+                    sections.push(format!("**Native Tools:** {native_count}"));
+                } else {
+                    sections.push(format!("**Tools:** {tool_count}"));
+                }
+            }
+            
+            // Skills section
+            if skill_count > 0 {
+                if let Some(skill_list) = skills {
+                    let skill_preview: Vec<_> = skill_list.iter().take(10).cloned().collect();
+                    let skill_str = if skill_preview.len() < skill_count {
+                        format!("{} (+{} more)", skill_preview.join(", "), skill_count - skill_preview.len())
+                    } else {
+                        skill_preview.join(", ")
+                    };
+                    sections.push(format!("**Skills ({skill_count}):** {skill_str}"));
+                }
+            }
+            
+            let msg = format!("🚀 **Agent Initialized**\n\n{}", sections.join("\n"));
             client.emit_thought(session_id, &msg).await?;
         }
 
@@ -2223,7 +2422,14 @@ async fn progress_monitor_task(
 async fn main_exit_watch_task(config: Arc<Config>, shutdown: Arc<AtomicBool>) {
     if !config.main_exit_watch_enabled {
         info!("Main exit watch disabled");
-        return;
+        // When disabled, block forever instead of returning immediately.
+        // Returning would cause the select! to trigger shutdown.
+        loop {
+            if shutdown.load(Ordering::Relaxed) {
+                return;
+            }
+            sleep(Duration::from_secs(3600)).await; // Check hourly for shutdown
+        }
     }
 
     info!(
@@ -2416,6 +2622,121 @@ async fn handle_stop(State(state): State<AppState>) -> impl IntoResponse {
     (StatusCode::OK, "Agent stopped")
 }
 
+// =============================================================================
+// FluentD Ingest Endpoint
+// =============================================================================
+
+/// Ingest request body from FluentD.
+/// Supports both raw log lines and structured JSON.
+#[derive(Debug, Deserialize)]
+struct IngestRequest {
+    /// Raw log line (if not structured)
+    #[serde(default)]
+    log: Option<String>,
+    /// Structured event type
+    #[serde(rename = "type", default)]
+    event_type: Option<String>,
+    /// Container/CLI name from FluentD labels
+    #[serde(default)]
+    cli: Option<String>,
+    /// Agent name from FluentD labels
+    #[serde(default)]
+    agent: Option<String>,
+    /// Catch-all for other fields (full event data)
+    #[serde(flatten)]
+    extra: serde_json::Value,
+}
+
+/// Ingest endpoint - receives logs from FluentD and emits to Linear.
+///
+/// FluentD sends logs to this endpoint which are then parsed and
+/// emitted to the Linear agent dialog in real-time.
+async fn handle_ingest(
+    State(state): State<AppState>,
+    Json(payload): Json<IngestRequest>,
+) -> impl IntoResponse {
+    debug!(?payload, "Received ingest from FluentD");
+
+    let Some(ref client) = state.linear_client else {
+        return (StatusCode::OK, "No Linear client configured");
+    };
+
+    if !state.config.has_linear_session() {
+        return (StatusCode::OK, "No Linear session configured");
+    }
+
+    let session_id = &state.config.linear_session_id;
+
+    // Try to parse as ClaudeStreamEvent
+    let event_json = if let Some(log) = &payload.log {
+        // FluentD wraps the log line in a "log" field
+        log.clone()
+    } else {
+        // Direct JSON structure
+        serde_json::to_string(&payload.extra).unwrap_or_default()
+    };
+
+    // Attempt to parse as Claude stream event
+    match serde_json::from_str::<ClaudeStreamEvent>(&event_json) {
+        Ok(event) => {
+            // Use a static tool state for ingest (stateless per-request)
+            // In production, this should be shared state
+            let mut tool_state = ToolState::default();
+            let mut total_cost = 0.0;
+            let mut artifact_trail = ArtifactTrail::default();
+
+            if let Err(e) = process_stream_event(
+                client,
+                session_id,
+                &event,
+                &mut tool_state,
+                &mut total_cost,
+                &mut artifact_trail,
+            )
+            .await
+            {
+                warn!(error = %e, "Failed to process stream event");
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to process event");
+            }
+        }
+        Err(_) => {
+            // Not a structured Claude event - emit as raw thought
+            let msg = payload
+                .log
+                .as_ref()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| event_json.trim());
+
+            // Skip empty or boilerplate messages
+            if msg.is_empty() || msg.len() < 10 {
+                return (StatusCode::OK, "Skipped empty message");
+            }
+
+            // Emit as thought
+            if let Err(e) = client.emit_thought(session_id, msg).await {
+                warn!(error = %e, "Failed to emit thought from ingest");
+            }
+        }
+    }
+
+    (StatusCode::OK, "Ingested")
+}
+
+/// Batch ingest endpoint - receives array of logs from FluentD.
+async fn handle_ingest_batch(
+    State(state): State<AppState>,
+    Json(payloads): Json<Vec<IngestRequest>>,
+) -> impl IntoResponse {
+    debug!(count = payloads.len(), "Received batch ingest from FluentD");
+
+    for payload in payloads {
+        let _ = handle_ingest(State(state.clone()), Json(payload)).await;
+    }
+
+    (StatusCode::OK, "Batch ingested")
+}
+
 /// HTTP server task.
 async fn http_server_task(config: Arc<Config>, state: AppState) {
     let app = Router::new()
@@ -2423,6 +2744,9 @@ async fn http_server_task(config: Arc<Config>, state: AppState) {
         .route("/input", post(handle_input))
         .route("/stop", post(handle_stop))
         .route("/shutdown", post(handle_shutdown))
+        // FluentD ingest endpoints
+        .route("/ingest", post(handle_ingest))
+        .route("/ingest/batch", post(handle_ingest_batch))
         .with_state(state);
 
     let addr = format!("0.0.0.0:{}", config.http_port);
@@ -2471,11 +2795,6 @@ async fn main() -> Result<()> {
         "Sidecar configured"
     );
 
-    // Skip if no Linear session configured
-    if !config.has_linear_session() {
-        info!("No Linear session configured, running in minimal mode (HTTP only)");
-    }
-
     // Create Linear API client if token available
     let linear_client = config.linear_oauth_token.as_ref().and_then(|token| {
         match LinearApiClient::new(token, &config.linear_api_url) {
@@ -2489,6 +2808,46 @@ async fn main() -> Result<()> {
             }
         }
     });
+
+    // Auto-create session if issue identifier provided but no session ID
+    // This enables standalone mode (docker-compose) without pre-created sessions
+    let config = if !config.has_linear_session() {
+        if let Some(ref client) = linear_client {
+            // Check for LINEAR_ISSUE_IDENTIFIER env var
+            if let Ok(issue_id) = std::env::var("LINEAR_ISSUE_IDENTIFIER") {
+                if !issue_id.is_empty() {
+                    info!(issue = %issue_id, "No session configured, attempting to create one");
+                    match client
+                        .create_session_on_issue(&issue_id, "claude-sonnet-4", "anthropic")
+                        .await
+                    {
+                        Ok(session_id) => {
+                            info!(session_id = %session_id, "Auto-created Linear session");
+                            // Create new config with the session ID
+                            let mut new_config = (*config).clone();
+                            new_config.linear_session_id = session_id;
+                            Arc::new(new_config)
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "Failed to auto-create session, running in minimal mode");
+                            config
+                        }
+                    }
+                } else {
+                    info!("No Linear session or issue configured, running in minimal mode (HTTP only)");
+                    config
+                }
+            } else {
+                info!("No Linear session or issue configured, running in minimal mode (HTTP only)");
+                config
+            }
+        } else {
+            info!("No Linear API client, running in minimal mode (HTTP only)");
+            config
+        }
+    } else {
+        config
+    };
 
     // Initialize session with external URL and plan (if Linear API available)
     if let Some(ref client) = linear_client {

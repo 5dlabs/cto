@@ -1,0 +1,14 @@
+{
+  "postgres-deployer": {
+    "description": "Deploys PostgreSQL clusters using CloudNative-PG operator",
+    "prompt": "agents/postgres-deployer.md"
+  },
+  "redis-deployer": {
+    "description": "Deploys Redis/Valkey clusters with Sentinel HA",
+    "prompt": "agents/redis-deployer.md"
+  },
+  "mongo-deployer": {
+    "description": "Deploys MongoDB replica sets using Percona operator",
+    "prompt": "agents/mongo-deployer.md"
+  }
+}

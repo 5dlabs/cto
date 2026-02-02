@@ -3,6 +3,7 @@
 //! Communicates with the Kind cluster to create and query Argo Workflows.
 
 use anyhow::{anyhow, Result};
+use cto_lite_common::{sanitize_k8s_name, validate_prompt, validate_repo, validate_stack};
 use reqwest::tls::Certificate;
 use tracing::{debug, info};
 
@@ -113,69 +114,6 @@ impl K8sClient {
         }
     }
 
-    /// Sanitize a string for use in Kubernetes resource names (DNS-1123 compliant)
-    fn sanitize_k8s_name(s: &str, max_len: usize) -> String {
-        s.to_lowercase()
-            .replace(['/', '_'], "-")
-            .chars()
-            .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
-            .take(max_len)
-            .collect::<String>()
-            .trim_end_matches('-')
-            .to_string()
-    }
-
-    /// Validate repository format (owner/repo)
-    fn validate_repo(repo: &str) -> Result<()> {
-        if repo.is_empty() {
-            return Err(anyhow!("Repository name cannot be empty"));
-        }
-        if !repo.contains('/') || repo.split('/').count() != 2 {
-            return Err(anyhow!(
-                "Invalid repository format. Expected 'owner/repo', got '{repo}'"
-            ));
-        }
-        if repo.len() > 200 {
-            return Err(anyhow!("Repository name too long (max 200 chars)"));
-        }
-        // Check for valid characters (alphanumeric, hyphen, underscore, dot, slash)
-        if !repo
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '/')
-        {
-            return Err(anyhow!(
-                "Repository name contains invalid characters. Only alphanumeric, hyphen, underscore, dot allowed"
-            ));
-        }
-        Ok(())
-    }
-
-    /// Validate stack parameter
-    fn validate_stack(stack: &str) -> Result<()> {
-        match stack {
-            "nova" | "grizz" => Ok(()),
-            _ => Err(anyhow!(
-                "Invalid stack '{stack}'. Must be 'nova' or 'grizz'"
-            )),
-        }
-    }
-
-    /// Validate prompt length
-    fn validate_prompt(prompt: &str) -> Result<()> {
-        const MAX_PROMPT_LEN: usize = 50_000;
-        if prompt.is_empty() {
-            return Err(anyhow!("Prompt cannot be empty"));
-        }
-        if prompt.len() > MAX_PROMPT_LEN {
-            return Err(anyhow!(
-                "Prompt too long ({} chars, max {} chars)",
-                prompt.len(),
-                MAX_PROMPT_LEN
-            ));
-        }
-        Ok(())
-    }
-
     /// Create a new workflow
     pub async fn create_workflow(
         &self,
@@ -185,14 +123,14 @@ impl K8sClient {
         stack: &str,
     ) -> Result<String> {
         // Validate inputs
-        Self::validate_repo(repo)?;
-        Self::validate_prompt(prompt)?;
-        Self::validate_stack(stack)?;
+        validate_repo(repo)?;
+        validate_prompt(prompt)?;
+        validate_stack(stack)?;
 
         // Generate DNS-1123 compliant workflow name with longer UUID to reduce collision risk
         let workflow_name = format!(
             "cto-{}-{}",
-            Self::sanitize_k8s_name(repo, 30),
+            sanitize_k8s_name(repo, 30),
             uuid::Uuid::new_v4()
                 .simple()
                 .to_string()
@@ -209,7 +147,7 @@ impl K8sClient {
                 "namespace": self.namespace,
                 "labels": {
                     "app.kubernetes.io/part-of": "cto-lite",
-                    "cto.dev/repo": Self::sanitize_k8s_name(repo, 63),
+                    "cto.dev/repo": sanitize_k8s_name(repo, 63),
                 }
             },
             "spec": {
@@ -377,7 +315,7 @@ impl K8sClient {
         if let Some(repo) = repo_filter {
             url.push_str(&format!(
                 "&labelSelector=cto.dev/repo={}",
-                repo.replace('/', "-").chars().take(63).collect::<String>()
+                sanitize_k8s_name(repo, 63)
             ));
         }
 
