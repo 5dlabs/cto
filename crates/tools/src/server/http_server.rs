@@ -1446,13 +1446,17 @@ impl BridgeState {
         
         // Log breakdown by transport type
         tracing::info!("📊 Tools by transport type:");
-        let mut all_transports: std::collections::HashSet<String> = transport_by_server.values().cloned().collect();
+        let all_transports: std::collections::HashSet<String> = transport_by_server.values().cloned().collect();
         let mut transports: Vec<_> = all_transports.iter().collect();
         transports.sort();
         
+        // Create static defaults for unwrap_or to avoid lifetime issues
+        let default_counts = (0, Vec::new());
+        let default_failed: Vec<String> = Vec::new();
+        
         for transport in transports {
-            let (tool_count, successful) = transport_counts.get(transport).unwrap_or(&(0, Vec::new()));
-            let failed = transport_failed.get(transport).unwrap_or(&Vec::new());
+            let (tool_count, successful) = transport_counts.get(transport).unwrap_or(&default_counts);
+            let failed = transport_failed.get(transport).unwrap_or(&default_failed);
             let total_servers = successful.len() + failed.len();
             
             if *tool_count == 0 {
@@ -1490,8 +1494,9 @@ impl BridgeState {
                 "⚠️  {} servers failed to provide tools:",
                 missing_servers.len()
             );
+            let unknown_transport = "unknown".to_string();
             for server_name in &missing_servers {
-                let transport = transport_by_server.get(server_name).unwrap_or(&"unknown".to_string());
+                let transport = transport_by_server.get(server_name).unwrap_or(&unknown_transport);
                 tracing::error!("   - {} ({})", server_name, transport);
             }
             
