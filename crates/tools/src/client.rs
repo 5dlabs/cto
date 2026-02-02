@@ -315,12 +315,22 @@ impl McpClient {
                     all_tools.extend(local_tools);
                     let total_count = all_tools.len();
 
-                    tracing::info!(
-                        "🔧 Tool discovery complete: {} total tools ({} remote, {} local)",
-                        total_count,
-                        remote_count,
-                        local_count
-                    );
+                    // Health check: validate tool discovery succeeded
+                    if total_count == 0 {
+                        tracing::error!(
+                            "❌ TOOL DISCOVERY FAILED: 0 tools discovered (remote: {}, local: {})",
+                            remote_count,
+                            local_count
+                        );
+                        tracing::error!("⚠️  This likely indicates a problem with tool server connectivity or configuration");
+                    } else {
+                        tracing::info!(
+                            "✅ TOOL DISCOVERY SUCCESS: {} total tools ({} remote, {} local)",
+                            total_count,
+                            remote_count,
+                            local_count
+                        );
+                    }
 
                     // Apply Cursor-specific compatibility fixes
                     let cursor_compatible_tools = self.apply_cursor_compatibility(all_tools);

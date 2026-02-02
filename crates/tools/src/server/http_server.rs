@@ -3588,10 +3588,16 @@ async fn main() -> Result<()> {
     // Discover all available tools and initialize servers at startup
     tracing::info!("🔄 Initializing all MCP servers...");
     if let Err(e) = state.discover_all_tools().await {
-        tracing::debug!("❌ Failed to discover tools at startup: {}", e);
+        tracing::error!("❌ INITIALIZATION FAILED: {}", e);
         return Err(e);
     }
-    tracing::info!("✅ All MCP servers initialized and ready");
+    
+    // Final readiness banner - if this is missing, something went wrong with initialization
+    tracing::info!("═══════════════════════════════════════════════════════════");
+    tracing::info!("✅ MCP TOOLS SERVER READY");
+    tracing::info!("   All servers initialized successfully");
+    tracing::info!("   Check logs above for tool discovery counts");
+    tracing::info!("═══════════════════════════════════════════════════════════");
 
     let app = Router::new()
         .route("/mcp", post(mcp_endpoint))
