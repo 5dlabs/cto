@@ -191,12 +191,8 @@ impl ServerHealthStatus {
             ServerHealth::Unknown => ("unknown".to_string(), None),
         };
 
-        let last_check = self
-            .last_check
-            .map(Self::instant_to_rfc3339);
-        let last_success = self
-            .last_successful_check
-            .map(Self::instant_to_rfc3339);
+        let last_check = self.last_check.map(Self::instant_to_rfc3339);
+        let last_success = self.last_successful_check.map(Self::instant_to_rfc3339);
 
         ServerHealthSnapshot {
             status,
@@ -443,16 +439,16 @@ impl HealthMonitor {
     /// Render all server metrics in Prometheus exposition format.
     ///
     /// `tool_counts` maps server_name → number of discovered tools for that server.
-    pub async fn render_prometheus_metrics(
-        &self,
-        tool_counts: &HashMap<String, usize>,
-    ) -> String {
+    pub async fn render_prometheus_metrics(&self, tool_counts: &HashMap<String, usize>) -> String {
         let health_map = self.server_health.read().await;
         let mut out = String::with_capacity(2048);
 
         // --- HELP / TYPE headers once, then one line per server ---
 
-        let _ = writeln!(out, "# HELP mcp_server_up 1 if the MCP server is connected, 0 otherwise.");
+        let _ = writeln!(
+            out,
+            "# HELP mcp_server_up 1 if the MCP server is connected, 0 otherwise."
+        );
         let _ = writeln!(out, "# TYPE mcp_server_up gauge");
         for (name, status) in health_map.iter() {
             let up: u8 = match &status.health {
@@ -463,7 +459,10 @@ impl HealthMonitor {
         }
 
         let _ = writeln!(out);
-        let _ = writeln!(out, "# HELP mcp_server_tool_count Number of tools provided by this MCP server.");
+        let _ = writeln!(
+            out,
+            "# HELP mcp_server_tool_count Number of tools provided by this MCP server."
+        );
         let _ = writeln!(out, "# TYPE mcp_server_tool_count gauge");
         for name in health_map.keys() {
             let count = tool_counts.get(name).copied().unwrap_or(0);
@@ -487,7 +486,10 @@ impl HealthMonitor {
         }
 
         let _ = writeln!(out);
-        let _ = writeln!(out, "# HELP mcp_server_avg_response_time_ms Rolling average response time in milliseconds.");
+        let _ = writeln!(
+            out,
+            "# HELP mcp_server_avg_response_time_ms Rolling average response time in milliseconds."
+        );
         let _ = writeln!(out, "# TYPE mcp_server_avg_response_time_ms gauge");
         for (name, status) in health_map.iter() {
             let _ = writeln!(
