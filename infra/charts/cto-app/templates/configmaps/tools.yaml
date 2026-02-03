@@ -1,0 +1,98 @@
+{{- if .Values.agents.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tool-configs
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+data:
+  # Tool configurations for agents
+  tools.yaml: |
+    # Tool configurations
+    tools:
+      # GitHub integration
+      github:
+        enabled: true
+        repositories:
+          - name: "cto"
+            url: "https://github.com/cto/cto"
+            defaultBranch: "main"
+        
+        # MCP endpoints
+        mcp:
+          endpoint: "http://mcp-lite:8080"
+        
+        # Default permissions
+        permissions:
+          issues: read
+          pulls: read
+          contents: read
+      
+      # Claude Code integration
+      claude:
+        enabled: true
+        endpoint: "http://controller:8080"
+        model: "claude-3-5-sonnet-20241022"
+        maxTokens: 8192
+      
+      # File system access
+      filesystem:
+        enabled: true
+        basePath: "/workspace"
+        allowedPaths:
+          - "/workspace"
+        excludedPaths:
+          - "/workspace/.git"
+          - "/workspace/node_modules"
+          - "/workspace/target"
+      
+      # Shell execution
+      shell:
+        enabled: true
+        allowedCommands:
+          - "git"
+          - "npm"
+          - "yarn"
+          - "pnpm"
+          - "cargo"
+          - "docker"
+        maxOutputSize: 10485760
+      
+      # Web search
+      websearch:
+        enabled: true
+        rateLimit: 10
+        timeout: 30000
+      
+      # Web scraping
+      webscrape:
+        enabled: true
+        rateLimit: 5
+        timeout: 30000
+        userAgent: "CTO-Agent/1.0"
+      
+      # Database access
+      database:
+        enabled: false
+        type: "postgresql"
+        connectionString: ""
+        allowedDatabases: []
+      
+      # Kubernetes access
+      kubernetes:
+        enabled: true
+        namespace: "cto-app"
+        allowedResources:
+          - "pods"
+          - "deployments"
+          - "services"
+          - "configmaps"
+          - "secrets"
+      
+      # Argo Workflows
+      argo:
+        enabled: {{ .Values.argo.enabled }}
+        endpoint: "http://argo-workflows-server:2746"
+        namespace: "cto-app"
+{{- end }}

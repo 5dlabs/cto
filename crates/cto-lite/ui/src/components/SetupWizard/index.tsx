@@ -34,7 +34,7 @@ const STEPS = [
   { id: 3, name: 'github', title: 'GitHub Connection', icon: Github },
   { id: 4, name: 'cloudflare', title: 'Cloudflare Tunnel', icon: Cloud },
   { id: 5, name: 'install', title: 'Create Cluster', icon: Download },
-  { id: 6, name: 'deploy', title: 'Deploy CTO Lite', icon: Rocket },
+  { id: 6, name: 'deploy', title: 'Deploy CTO App', icon: Rocket },
 ]
 
 export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
@@ -279,7 +279,7 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
         return (
           <div className="space-y-6">
             <p className="text-muted-foreground">
-              Connect your GitHub account to allow CTO Lite to create branches and pull requests.
+              Connect your GitHub account to allow CTO App to create branches and pull requests.
             </p>
             {githubConnected ? (
               <>
@@ -322,7 +322,7 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
           <div className="space-y-6">
             <p className="text-muted-foreground">
               Connect your Cloudflare account to enable secure webhook tunnels.
-              This allows GitHub to send events to your local CTO Lite instance.
+              This allows GitHub to send events to your local CTO App instance.
             </p>
             {cloudflareConnected ? (
               <>
@@ -395,7 +395,7 @@ export function SetupWizard({ initialStep, onComplete }: SetupWizardProps) {
       <div className="w-full max-w-2xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">Welcome to CTO Lite</h1>
+          <h1 className="text-3xl font-bold">Welcome to CTO App</h1>
           <p className="text-muted-foreground">
             Let's set up your AI development environment
           </p>

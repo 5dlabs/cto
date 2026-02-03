@@ -1,0 +1,50 @@
+{{- if .Values.argo.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-workflows-controller
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  replicas: {{ .Values.argo.controller.replicas }}
+  selector:
+    matchLabels:
+      {{- include "cto-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+  template:
+    metadata:
+      labels:
+        {{- include "cto-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: controller
+    spec:
+      serviceAccountName: argo-workflows-controller
+      containers:
+        - name: controller
+          image: quay.io/argoproj/argo-workflows:{{ .Values.argo.version }}
+          command:
+            - workflow-controller
+            {{- range .Values.argo.controller.args }}
+            - {{ . }}
+            {{- end }}
+          ports:
+            - containerPort: 9090
+              name: metrics
+          resources:
+            {{- toYaml .Values.argo.resources | nindent 12 }}
+          env:
+            - name: ARGO_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: config
+              mountPath: /argo-workflows-config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: argo-workflows-config
+{{- end }}

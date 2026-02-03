@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CTO Lite",
+  "productName": "CTO App",
   "identifier": "ai.5dlabs.cto-lite",
   "version": "0.1.0",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "CTO Lite",
+        "title": "CTO App",
         "width": 1200,
         "height": 800,
         "minWidth": 900,
@@ -36,7 +36,7 @@
     "icon": [],
     "category": "DeveloperTool",
     "shortDescription": "AI-powered development assistant",
-    "longDescription": "CTO Lite brings AI-powered development workflows to your desktop. Configure once, then use MCP from your IDE to create features, fix bugs, and ship code faster.",
+    "longDescription": "CTO App brings AI-powered development workflows to your desktop. Configure once, then use MCP from your IDE to create features, fix bugs, and ship code faster.",
     "copyright": "© 2025 5D Labs",
     "publisher": "5D Labs",
     "homepage": "https://cto.dev",

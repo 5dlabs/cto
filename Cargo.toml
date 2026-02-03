@@ -13,10 +13,12 @@ members = [
     "crates/metal",
     "crates/notify",
     "crates/pm",
+    "crates/pm-lite",
     "crates/research",
     "crates/tenant-operator",
     "crates/tools",
     "crates/utils",
+    "crates/cto-app/tauri",
 ]
 
 [workspace.package]

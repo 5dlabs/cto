@@ -1,0 +1,48 @@
+{{- if .Values.argo.enabled }}
+# Argo Workflows CRD - Using Helm chart from Argo
+# This template is a placeholder - in production, use the official Argo Workflows chart
+# https://github.com/argoproj/argo-helm/tree/main/charts/argo-workflows
+#
+# For local Kind deployment, we recommend:
+# kubectl create namespace argo
+# helm repo add argo https://argoproj.github.io/argo-helm
+# helm install argo-workflows argo/argo-workflows -n argo --version 0.40.x
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argo-workflows-config
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+data:
+  # Argo Workflows configuration for local development
+  config.yaml: |
+    # Container runtime configuration
+    containerRuntimeExecutor: emissary
+    
+    # Executor configuration
+    executor:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    
+    # Workflow defaults
+    workflowDefaults:
+      spec:
+        ttlStrategy:
+          secondsAfterCompletion: 3600
+          secondsAfterSuccess: 3600
+          secondsAfterFailure: 86400
+        parallelism: 10
+    
+    # Artifact repository (local minio or disabled for local)
+    artifactRepository:
+      # Disable artifact storage for local development
+      # In production, configure S3-compatible storage
+      disabled: true
+{{- end }}

@@ -1,0 +1,103 @@
+{{- if .Values.agents.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-configs
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+data:
+  # Agent configurations
+  agents.yaml: |
+    # Global agent settings
+    global:
+      repository: {{ .Values.agents.global.imageRepository }}
+      tag: {{ .Values.agents.global.agentTag | default "latest" }}
+    
+    # Individual agent configurations
+    agents:
+      morgan:
+        enabled: {{ .Values.agents.morgan.enabled }}
+        replicas: {{ .Values.agents.morgan.replicas }}
+        {{- if .Values.agents.morgan.enabled }}
+        config:
+          name: "Morgan"
+          role: "Senior Developer"
+          systemPrompt: |
+            You are Morgan, a senior software engineer specializing in code review and 
+            refactoring. You have extensive experience with multiple programming languages
+            and software architecture patterns.
+        {{- end }}
+      
+      grizz:
+        enabled: {{ .Values.agents.grizz.enabled }}
+        replicas: {{ .Values.agents.grizz.replicas }}
+        {{- if .Values.agents.grizz.enabled }}
+        config:
+          name: "Grizz"
+          role: "DevOps Engineer"
+          systemPrompt: |
+            You are Grizz, a DevOps engineer specializing in CI/CD pipelines,
+            infrastructure as code, and cloud platform management.
+        {{- end }}
+      
+      blaze:
+        enabled: {{ .Values.agents.blaze.enabled }}
+        replicas: {{ .Values.agents.blaze.replicas }}
+        {{- if .Values.agents.blaze.enabled }}
+        config:
+          name: "Blaze"
+          role: "Frontend Developer"
+          systemPrompt: |
+            You are Blaze, a frontend developer with expertise in React, Vue,
+            and modern CSS frameworks.
+        {{- end }}
+      
+      cleo:
+        enabled: {{ .Values.agents.cleo.enabled }}
+        replicas: {{ .Values.agents.cleo.replicas }}
+        {{- if .Values.agents.cleo.enabled }}
+        config:
+          name: "Cleo"
+          role: "Backend Developer"
+          systemPrompt: |
+            You are Cleo, a backend developer specializing in server-side logic,
+            databases, and API design.
+        {{- end }}
+      
+      cipher:
+        enabled: {{ .Values.agents.cipher.enabled }}
+        replicas: {{ .Values.agents.cipher.replicas }}
+        {{- if .Values.agents.cipher.enabled }}
+        config:
+          name: "Cipher"
+          role: "Security Engineer"
+          systemPrompt: |
+            You are Cipher, a security engineer focused on code security,
+            vulnerability assessment, and secure coding practices.
+        {{- end }}
+      
+      tess:
+        enabled: {{ .Values.agents.tess.enabled }}
+        replicas: {{ .Values.agents.tess.replicas }}
+        {{- if .Values.agents.tess.enabled }}
+        config:
+          name: "Tess"
+          role: "QA Engineer"
+          systemPrompt: |
+            You are Tess, a QA engineer specializing in test automation,
+            quality assurance, and bug detection.
+        {{- end }}
+      
+      bolt:
+        enabled: {{ .Values.agents.bolt.enabled }}
+        replicas: {{ .Values.agents.bolt.replicas }}
+        {{- if .Values.agents.bolt.enabled }}
+        config:
+          name: "Bolt"
+          role: "Mobile Developer"
+          systemPrompt: |
+            You are Bolt, a mobile developer with expertise in iOS and Android
+            development, cross-platform frameworks, and mobile UX.
+        {{- end }}
+{{- end }}

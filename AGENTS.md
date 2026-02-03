@@ -282,3 +282,32 @@ cd /Users/jonathonfritz/clawd-ctolite
 ```
 
 The swarm features (TeammateTool, Task with team_name, etc.) are only available in `claudesp`.
+
+---
+
+## Coding Standards
+
+Before pushing code or opening PRs:
+
+1. **Format check:** `cargo fmt --all --check`
+2. **Clippy Pedantic:** `cargo clippy --all-targets -- -D warnings -W clippy::pedantic`
+3. **Tests:** `cargo test`
+4. **Pre-commit hooks:** `pre-commit run --all-files`
+
+⚠️ **CRITICAL:** Never push code or open a PR without running Clippy in pedantic mode. The `-W clippy::pedantic` flag enables additional lints that catch common mistakes and enforce best practices. All pedantic warnings must be resolved before code is pushed.
+
+## Security
+
+- Never commit secrets
+- Use `cto-config.json` for local configuration
+- See [Secrets Management](docs/secrets-management.md) for credential handling
+
+---
+
+## UI Automation (Peekaboo)
+
+When automating macOS UI:
+1. Always run `peekaboo see --annotate --path /tmp/ui-state.png` first
+2. Use element IDs from the annotated image (e.g., B1, T2)
+3. Target by app + window when possible: `--app "App Name" --window-title "Window"`
+4. Peekaboo requires Screen Recording + Accessibility permissions (already granted)

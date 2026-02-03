@@ -1,0 +1,90 @@
+# Local Kind overrides for cto-app chart
+# These values override defaults for local development
+
+global:
+  domain: "127.0.0.1.nip.io"
+  tunnel_id: ""
+
+# Argo Workflows - lightweight for local
+argo:
+  enabled: true
+  controller:
+    replicas: 1
+    args:
+      - "--namespaces"
+      - "cto-app"
+      - "--loglevel"
+      - "debug"
+  server:
+    replicas: 1
+    service:
+      type: NodePort
+      port: 2746
+      nodePort: 32746
+
+# Controller - dev settings
+controller:
+  enabled: true
+  image:
+    tag: "dev"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  replicas: 1
+
+# Agents - off by default for local
+agents:
+  enabled: true
+  morgan:
+    replicas: 0
+  grizz:
+    replicas: 0
+  blaze:
+    replicas: 0
+  cleo:
+    replicas: 0
+  cipher:
+    replicas: 0
+  tess:
+    replicas: 0
+  bolt:
+    replicas: 0
+
+# PM Lite - dev settings
+pm:
+  enabled: true
+  image:
+    tag: "dev"
+  replicas: 1
+  config:
+    logLevel: "debug"
+
+# MCP Lite - dev settings
+mcp:
+  enabled: true
+  image:
+    tag: "dev"
+  replicas: 1
+  config:
+    logLevel: "debug"
+
+# Ingress - disabled for local (use NodePort)
+ingress:
+  enabled: false
+
+# NodePort for direct access
+pm:
+  service:
+    type: NodePort
+    port: 8080
+    nodePort: 32780
+
+mcp:
+  service:
+    type: NodePort
+    port: 8080
+    nodePort: 32781

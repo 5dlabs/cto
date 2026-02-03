@@ -1,12 +1,12 @@
-# CTO Lite - Freemium Desktop Application
+# CTO App - Desktop Application
 
 ## Executive Summary
 
-CTO Lite is a freemium desktop application built with Tauri that runs the CTO platform on a local Kind cluster. Users install via native installer, configure via GUI, and trigger workflows via MCP or GitHub events. The workflow runs the full lifecycle from implementation through PR merge.
+The CTO App is a desktop application built with Tauri that runs the CTO platform on a local Kind cluster. Users install via native installer, configure via GUI, and trigger workflows via MCP or GitHub events. The workflow runs the full lifecycle from implementation through PR merge.
 
 **Target Users:** Individual developers who want AI-assisted development without enterprise infrastructure complexity.
 
-**Business Model:** Freemium with upgrade path to paid CTO platform.
+**Business Model:** Tiered subscription model with feature flags controlling access at each tier (Free/Pro/Enterprise).
 
 ---
 
@@ -33,7 +33,7 @@ CTO Lite is a freemium desktop application built with Tauri that runs the CTO pl
 ┌─────────────────────────────────────────────────────────────────┐
 │                        User Workstation                         │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │                  CTO Lite App (Tauri)                     │  │
+│  │                    CTO App (Tauri)                        │  │
 │  │  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐   │  │
 │  │  │ Setup       │  │ Dashboard    │  │ Settings        │   │  │
 │  │  │ Wizard      │  │ (Logs/Status)│  │ (API Keys)      │   │  │
@@ -43,7 +43,7 @@ CTO Lite is a freemium desktop application built with Tauri that runs the CTO pl
 │  ┌───────────────────────────┼───────────────────────────────┐  │
 │  │            Container Runtime (Colima/Docker/Podman)       │  │
 │  │  ┌────────────────────────┼────────────────────────────┐  │  │
-│  │  │              Kind Cluster (cto-lite)                │  │  │
+│  │  │              Kind Cluster (cto-app)                │  │  │
 │  │  │  ┌──────────────┐  ┌──────────────┐  ┌───────────┐  │  │  │
 │  │  │  │ Argo         │  │ Controller   │  │ PM Server │  │  │  │
 │  │  │  │ Workflows    │  │              │  │ (GitHub)  │  │  │  │
@@ -98,7 +98,7 @@ CTO Lite is a freemium desktop application built with Tauri that runs the CTO pl
 
 | Chart | Purpose | Lite Status |
 |-------|---------|-------------|
-| `cto/` | Full platform deployment | **FORK** - create `cto-lite/` |
+| `cto/` | Full platform deployment | **FORK** - create `cto-app/` |
 | `buildkit/` | Image building | **EXCLUDE** |
 | `tenant-agents/` | Multi-tenant agent config | **EXCLUDE** |
 
@@ -137,7 +137,7 @@ Location: `templates/workflows/`
 ### NEW Code to Write
 
 ```
-crates/cto-lite/                    # NEW - All Lite-specific code
+crates/cto-app/                    # NEW - All Lite-specific code
 ├── tauri/                          # Tauri Rust backend
 │   ├── src/
 │   │   ├── main.rs                 # Tauri entry point
@@ -176,10 +176,10 @@ crates/cto-lite/                    # NEW - All Lite-specific code
 
 | Original | Fork To | Changes |
 |----------|---------|---------|
-| `crates/pm/` | `crates/cto-lite/pm-lite/` | Remove Linear, direct Argo API |
-| `crates/mcp/` | `crates/cto-lite/mcp/` | Curated tools only, no customization |
+| `crates/pm/` | `crates/cto-app/pm-lite/` | Remove Linear, direct Argo API |
+| `crates/mcp/` | `crates/cto-app/mcp/` | Curated tools only, no customization |
 | `crates/tools/` | Built into `mcp-lite` | Hardcode tool sets per agent |
-| `infra/charts/cto/` | `infra/charts/cto-lite/` | Single chart, simplified |
+| `infra/charts/cto/` | `infra/charts/cto-app/` | Single chart, simplified |
 
 ### MODIFIED Code (In-Place Changes)
 
@@ -192,7 +192,7 @@ crates/cto-lite/                    # NEW - All Lite-specific code
 
 ### EXCLUDED Code (Enterprise Only)
 
-These are NOT included in CTO Lite images:
+These are NOT included in CTO App images:
 
 - `crates/healer/` - Self-healing
 - `crates/installer/` - Bare metal provisioning
@@ -206,7 +206,7 @@ These are NOT included in CTO Lite images:
 
 ## File Structure
 
-### Complete CTO Lite Directory Structure
+### Complete CTO App Directory Structure
 
 ```
 cto/                                        # Main repo (PRIVATE)
@@ -216,7 +216,7 @@ cto/                                        # Main repo (PRIVATE)
 │   ├── controller/                         # SHARED - CodeRun orchestrator
 │   ├── intake/                             # SHARED - PRD processing
 │   │
-│   ├── cto-lite/                           # NEW - Lite-specific
+│   ├── cto-app/                           # NEW - Lite-specific
 │   │   ├── tauri/                          # Tauri desktop app
 │   │   │   ├── Cargo.toml
 │   │   │   ├── tauri.conf.json
@@ -305,7 +305,7 @@ cto/                                        # Main repo (PRIVATE)
 │   └── charts/
 │       ├── cto/                            # FULL - Enterprise chart
 │       │
-│       └── cto-lite/                       # NEW - Lite chart
+│       └── cto-app/                       # NEW - Lite chart
 │           ├── Chart.yaml
 │           ├── values.yaml
 │           ├── crds/
@@ -335,7 +335,7 @@ cto/                                        # Main repo (PRIVATE)
 │       └── play-workflow-lite.yaml         # NEW - Lite workflow
 │
 ├── apps/
-│   └── cto-lite-web/                       # NEW - Download page
+│   └── cto-app-web/                       # NEW - Download page
 │       ├── package.json
 │       └── src/
 │           └── pages/
@@ -344,7 +344,7 @@ cto/                                        # Main repo (PRIVATE)
 └── .github/
     └── workflows/
         ├── release.yaml                    # FULL releases
-        └── release-cto-lite.yaml           # NEW - Lite releases
+        └── release-cto-app.yaml           # NEW - Lite releases
 ```
 
 ### What Goes in Each Docker Image
@@ -352,7 +352,7 @@ cto/                                        # Main repo (PRIVATE)
 **Agent Images (Lite-specific builds):**
 
 ```dockerfile
-# ghcr.io/5dlabs/cto-lite-grizz:v1.0
+# ghcr.io/5dlabs/cto-app-grizz:v1.0
 FROM ghcr.io/5dlabs/runtime:lite
 
 # Bundled skills (no runtime fetch)
@@ -362,20 +362,20 @@ COPY skills/git-integration /skills/git-integration
 COPY skills/testing-strategies /skills/testing-strategies
 
 ENV SKILLS_PATH=/skills
-ENV CTO_LITE=true
+ENV CTO_APP=true
 ```
 
 **Controller Image (Lite):**
 
 ```dockerfile
-# ghcr.io/5dlabs/cto-lite-controller:v1.0
+# ghcr.io/5dlabs/cto-app-controller:v1.0
 FROM debian:bookworm-slim
 
 COPY target/release/agent-controller /usr/local/bin/
 COPY templates/agents/ /templates/agents/
 COPY templates/workflows/play-workflow-lite.yaml /templates/workflows/
 
-ENV CTO_LITE=true
+ENV CTO_APP=true
 ```
 
 ---
@@ -452,7 +452,7 @@ PRD → Intake (Morgan) → [Multiple Tasks Generated]
     → Merge (Atlas) → Done
 ```
 
-### CTO Lite (Freemium)
+### CTO App (Freemium)
 
 ```
 PRD → Intake (Morgan, single-agent) → [One Task at a Time]
@@ -475,7 +475,7 @@ PRD → Intake (Morgan, single-agent) → [One Task at a Time]
 ### Agent Tool Sets (Curated, Not Modifiable)
 
 ```rust
-// crates/cto-lite/mcp/src/tools.rs
+// crates/cto-app/mcp/src/tools.rs
 pub fn get_tools_for_agent(agent: &str) -> Vec<Tool> {
     match agent {
         "morgan" => vec![READ, WRITE, EDIT, SHELL, GIT, GITHUB, WEB_SEARCH],
@@ -541,9 +541,9 @@ pub fn get_tools_for_agent(agent: &str) -> Vec<Tool> {
 
 ```
 CTO-Lite.dmg
-├── CTO Lite.app/
+├── CTO App.app/
 │   ├── Contents/
-│   │   ├── MacOS/cto-lite           # Tauri binary
+│   │   ├── MacOS/cto-app           # Tauri binary
 │   │   ├── Resources/
 │   │   │   ├── kind                 # Pre-bundled
 │   │   │   ├── kubectl              # Pre-bundled
@@ -561,7 +561,7 @@ CTO-Lite.dmg
 
 ```
 CTO-Lite-Setup.msi
-├── cto-lite.exe                     # Tauri binary
+├── cto-app.exe                     # Tauri binary
 ├── resources/
 │   ├── kind.exe
 │   ├── kubectl.exe
@@ -578,10 +578,10 @@ CTO-Lite-Setup.msi
 ```
 CTO-Lite.AppImage
 ├── AppRun
-├── cto-lite.desktop
+├── cto-app.desktop
 ├── usr/
-│   ├── bin/cto-lite
-│   └── share/cto-lite/
+│   ├── bin/cto-app
+│   └── share/cto-app/
 │       ├── kind
 │       ├── kubectl
 │       ├── helm
@@ -601,8 +601,8 @@ CTO-Lite.AppImage
 
 ```
 1. Check container runtime → Install/prompt if missing
-2. Create Kind cluster → kind create cluster --name cto-lite
-3. Deploy Helm chart → helm install cto-lite oci://ghcr.io/5dlabs/charts/cto-lite
+2. Create Kind cluster → kind create cluster --name cto-app
+3. Deploy Helm chart → helm install cto-app oci://ghcr.io/5dlabs/charts/cto-app
 4. Wait for pods ready
 5. Configure tunnel → Allocate subdomain, start cloudflared
 6. Show setup wizard → API key + GitHub OAuth
@@ -628,7 +628,7 @@ CTO-Lite.AppImage
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    CTO Lite Setup                       │
+│                    CTO App Setup                       │
 ├─────────────────────────────────────────────────────────┤
 │  [1/4] Container Runtime                                │
 │  ✓ Detected: Docker Desktop                             │
@@ -673,17 +673,17 @@ Show users their curated skills/tools AND locked premium options:
 
 ### Uninstall / Cleanup
 
-Track resources in `~/.cto-lite/resources.json`:
+Track resources in `~/.cto-app/resources.json`:
 
 ```json
 {
-  "kind_cluster": "cto-lite",
+  "kind_cluster": "cto-app",
   "tunnel_subdomain": "abc123",
   "github_webhooks": [
     {"repo": "user/my-project", "hook_id": 12345}
   ],
   "colima_installed_by_us": true,
-  "docker_images": ["ghcr.io/5dlabs/cto-lite-controller:v1.0"]
+  "docker_images": ["ghcr.io/5dlabs/cto-app-controller:v1.0"]
 }
 ```
 
@@ -763,7 +763,7 @@ Clean all on uninstall.
 
 ### Phase 2: Core Infrastructure
 
-- [ ] Create `cto-lite` Helm chart
+- [ ] Create `cto-app` Helm chart
 - [ ] Fork PM server to `pm-lite`
 - [ ] Update agent prompts (no Atlas, clean PRs)
 - [ ] Build tunnel allocation system
@@ -818,8 +818,8 @@ Clean all on uninstall.
 | macOS Installer | cto.dev/download | Website |
 | Windows Installer | cto.dev/download | Website |
 | Linux Packages | cto.dev/download | Website |
-| Helm chart | ghcr.io/5dlabs/charts/cto-lite | Public |
-| Agent images | ghcr.io/5dlabs/cto-lite-* | Public |
+| Helm chart | ghcr.io/5dlabs/charts/cto-app | Public |
+| Agent images | ghcr.io/5dlabs/cto-app-* | Public |
 | Source code | github.com/5dlabs/cto | Private |
 
 ---

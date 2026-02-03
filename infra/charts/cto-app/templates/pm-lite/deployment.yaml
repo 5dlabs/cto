@@ -1,0 +1,73 @@
+{{- if .Values.pm.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pm-lite
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pm
+spec:
+  replicas: {{ .Values.pm.replicas }}
+  selector:
+    matchLabels:
+      {{- include "cto-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: pm
+  template:
+    metadata:
+      labels:
+        {{- include "cto-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: pm
+    spec:
+      containers:
+        - name: pm-lite
+          image: {{ .Values.pm.image.repository }}:{{ .Values.pm.image.tag | default "latest" }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            {{- toYaml .Values.pm.resources | nindent 12 }}
+          env:
+            - name: LOG_LEVEL
+              value: {{ .Values.pm.config.logLevel | default "info" | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: pm-lite-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pm-lite
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pm
+spec:
+  type: {{ .Values.pm.service.type }}
+  ports:
+    - port: {{ .Values.pm.service.port }}
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto-app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: pm
+{{- end }}
