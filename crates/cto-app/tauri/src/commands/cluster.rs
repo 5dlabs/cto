@@ -27,7 +27,8 @@ pub fn start_kind_cluster(name: &str) -> Result<String, String> {
 
     // Check if cluster already exists
     let check_output = Command::new("kind")
-        .arg("get clusters")
+        .arg("get")
+        .arg("clusters")
         .output()
         .map_err(|e| format!("Failed to check clusters: {}", e))?;
 

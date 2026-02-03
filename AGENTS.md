@@ -281,14 +281,6 @@ cd /Users/jonathonfritz/clawd-ctolite
 /Users/jonathonfritz/.local/bin/claudesp
 ```
 
-<<<<<<< Updated upstream
-The swarm features (TeammateTool, Task with team_name, etc.) are only available in `claudesp`.
-=======
-1. **Format check:** `cargo fmt --all --check`
-2. **Clippy Pedantic:** `cargo clippy --all-targets -- -D warnings -W clippy::pedantic`
-3. **Tests:** `cargo test`
-4. **Pre-commit hooks:** `pre-commit run --all-files`
-
 The swarm features (TeammateTool, Task with team_name, etc.) are only available in `claudesp`.
 
 ---
