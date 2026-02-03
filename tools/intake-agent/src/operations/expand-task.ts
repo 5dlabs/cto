@@ -14,7 +14,7 @@ import type {
   GeneratedSubtask,
 } from '../types';
 import { getClaudeCliOrThrow } from '../cli-finder';
-import { parseJsonResponse, isValidSubtask } from '../utils/json-parser';
+import { parseJsonResponse, isValidSubtask, validateSingleConcern } from '../utils/json-parser';
 
 /**
  * Extract text from assistant message content.
@@ -60,7 +60,27 @@ When breaking down tasks for subagent execution:
 4. **Consider context isolation**: Each subagent works in isolation, so subtasks should be self-contained
 5. **Plan review phases**: Include reviewer subtasks after implementation phases` : '';
 
-  return `You are an AI assistant helping with task breakdown for software development. Break down high-level tasks into specific, actionable subtasks that can be implemented${enableSubagents ? ' in parallel by specialized subagents' : ' sequentially'}.${researchSection}
+  const singleConcernRule = `
+
+## CRITICAL: Single-Concern Subtask Rule ⚠️
+
+Each subtask MUST do exactly ONE thing. VIOLATIONS include:
+- "Deploy PostgreSQL, MongoDB, Redis" → SPLIT INTO 3 subtasks!
+- "Deploy Kafka and RabbitMQ" → SPLIT INTO 2 subtasks!
+- "Configure namespaces, policies, and quotas" → SPLIT INTO 3 subtasks!
+- Any subtask with "(X, Y, Z)" or "X and Y" for different systems
+
+PATTERNS THAT INDICATE VIOLATION:
+- Multiple operator names (CloudNative-PG, Percona, Strimzi)
+- Multiple technology names in parentheses
+- The word "and" connecting different systems
+- Multiple CRD types in one subtask
+
+✅ CORRECT: "Deploy PostgreSQL Cluster" (one database, one subtask)
+✅ CORRECT: "Configure Network Policies" (one concern, one subtask)
+❌ WRONG: "Deploy PostgreSQL and MongoDB" (two databases, needs split!)`;
+
+  return `You are an AI assistant helping with task breakdown for software development. Break down high-level tasks into specific, actionable subtasks that can be implemented${enableSubagents ? ' in parallel by specialized subagents' : ' sequentially'}.${singleConcernRule}${researchSection}
 
 IMPORTANT: Each subtask object must include ALL of the following fields:
 - id: MUST be sequential integers starting EXACTLY from ${nextId}. First subtask id=${nextId}, second id=${nextId + 1}, etc. DO NOT use any other numbering pattern!
@@ -99,7 +119,13 @@ SUBAGENT REQUIREMENTS:
 - Minimize dependencies to maximize parallel execution potential
 - Group related implementation work so multiple implementer subagents can work simultaneously
 - Include at least one reviewer subtask after implementation subtasks
-- Include tester subtasks for validation work` : '';
+- Include tester subtasks for validation work
+
+SINGLE-CONCERN RULE:
+- Each subtask must deploy/configure ONE system only
+- "Deploy PostgreSQL, MongoDB, Redis" → MUST split into 3 subtasks!
+- "Configure namespaces, policies, quotas" → MUST split into 3 subtasks!
+- Review each subtask - if it mentions multiple technologies, SPLIT IT!` : '';
 
   return `Break down this task into ${subtaskCount > 0 ? `exactly ${subtaskCount}` : 'an appropriate number of'} specific subtasks${enableSubagents ? ' optimized for parallel subagent execution' : ''}:
 
@@ -207,6 +233,21 @@ export async function expandTask(
         error: result.error,
         error_type: 'parse_error',
         details: responseText.slice(0, 500),
+      };
+    }
+
+    // Validate single-concern rule
+    const validation = validateSingleConcern(result.items);
+    if (!validation.valid) {
+      const violations = validation.violations.map(v => 
+        `Subtask ${v.id} ("${v.title}"): ${v.reason}`
+      ).join('\n');
+      
+      return {
+        success: false,
+        error: `Combined subtasks detected. Each subtask must do exactly ONE thing.\n\n${violations}\n\nPlease regenerate with SPLIT subtasks.`,
+        error_type: 'validation_error',
+        details: violations,
       };
     }
 

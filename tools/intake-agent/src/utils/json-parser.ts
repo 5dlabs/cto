@@ -233,3 +233,72 @@ export function isValidComplexityAnalysis(item: unknown): item is { taskId: numb
   return typeof item === 'object' && item !== null && 'taskId' in item &&
     (typeof (item as any).taskId === 'number' || typeof (item as any).taskId === 'string');
 }
+
+// =============================================================================
+// Single-Concern Validation
+// =============================================================================
+
+const MULTIPLE_SYSTEM_PATTERNS = [
+  /postgresql.*mongodb/i,
+  /mongodb.*redis/i,
+  /kafka.*rabbitmq/i,
+  /postgres.*mongo/i,
+  /postgres.*redis/i,
+  /namespaces.*policies.*quotas/i,
+  /and\b.*\band\b/i,  // "X and Y and Z"
+  /\([^)]*,[^)]*\)/,   // "(X, Y, Z)" pattern
+];
+
+const COMBINED_DB_PATTERN = /\b(postgresql|mongodb|redis|kafka|rabbitmq|mysql|postgres)\b.*\b(mongodb|redis|kafka|rabbitmq|mysql|postgres)\b/i;
+
+/**
+ * Check if a subtask violates single-concern rule.
+ * Returns true if violation detected.
+ */
+export function hasCombinedConcerns(title: string, details: string): boolean {
+  const text = `${title} ${details}`.toLowerCase();
+  
+  // Check for multiple databases or systems
+  const dbMatch = text.match(COMBINED_DB_PATTERN);
+  if (dbMatch) return true;
+  
+  // Check for "(X, Y, Z)" patterns
+  if (MULTIPLE_SYSTEM_PATTERNS[4].test(text)) return true;
+  
+  // Check for "and" connecting multiple distinct concepts
+  const andMatch = text.match(/(\b\w+\b).*and.*(\b\w+\b).*and.*(\b\w+\b)/);
+  if (andMatch) {
+    // Check if they're different systems
+    const systems = ['postgresql', 'mongodb', 'redis', 'kafka', 'rabbitmq', 'nginx', 'prometheus', 'grafana'];
+    const found = systems.filter(s => text.includes(s));
+    if (found.length >= 2) return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Validate that all subtasks follow single-concern rule.
+ */
+export function validateSingleConcern(subtasks: Array<{ id: number; title: string; details?: string }>): {
+  valid: boolean;
+  violations: Array<{ id: number; title: string; reason: string }>;
+} {
+  const violations: Array<{ id: number; title: string; reason: string }> = [];
+  
+  for (const subtask of subtasks) {
+    const details = subtask.details || '';
+    if (hasCombinedConcerns(subtask.title, details)) {
+      violations.push({
+        id: subtask.id,
+        title: subtask.title,
+        reason: 'Subtask combines multiple systems - split into separate subtasks'
+      });
+    }
+  }
+  
+  return {
+    valid: violations.length === 0,
+    violations
+  };
+}
