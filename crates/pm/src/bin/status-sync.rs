@@ -368,7 +368,7 @@ impl LinearApiClient {
             serde_json::from_str(&body).context("Failed to parse issue resolution response")?;
 
         if let Some(errors) = json.get("errors") {
-            anyhow::bail!("Failed to resolve issue: {}", errors);
+            anyhow::bail!("Failed to resolve issue: {errors}");
         }
 
         let issue_id = json["data"]["issue"]["id"]
@@ -411,10 +411,8 @@ impl LinearApiClient {
             variables: Variables,
         }
 
-        // First, resolve issue identifier to UUID
-        let issue_id = self.resolve_issue_id(issue_identifier).await?;
-
-        const MUTATION: &str = r#"
+        // GraphQL mutation for creating a session
+        const MUTATION: &str = "
             mutation CreateAgentSession($input: AgentSessionCreateOnIssue!) {
                 agentSessionCreateOnIssue(input: $input) {
                     success
@@ -423,7 +421,10 @@ impl LinearApiClient {
                     }
                 }
             }
-        "#;
+        ";
+
+        // First, resolve issue identifier to UUID
+        let issue_id = self.resolve_issue_id(issue_identifier).await?;
 
         let request = Request {
             query: MUTATION,
@@ -455,14 +456,14 @@ impl LinearApiClient {
         let body = response.text().await.unwrap_or_default();
 
         if !status.is_success() {
-            anyhow::bail!("Session creation failed: {} - {}", status, body);
+            anyhow::bail!("Session creation failed: {status} - {body}");
         }
 
         let json: serde_json::Value =
             serde_json::from_str(&body).context("Failed to parse session creation response")?;
 
         if let Some(errors) = json.get("errors") {
-            anyhow::bail!("GraphQL errors: {}", errors);
+            anyhow::bail!("GraphQL errors: {errors}");
         }
 
         let session_id = json["data"]["agentSessionCreateOnIssue"]["agentSession"]["id"]
@@ -2626,7 +2627,7 @@ async fn handle_stop(State(state): State<AppState>) -> impl IntoResponse {
 // FluentD Ingest Endpoint
 // =============================================================================
 
-/// Ingest request body from FluentD.
+/// Ingest request body from `FluentD`.
 /// Supports both raw log lines and structured JSON.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -2637,10 +2638,10 @@ struct IngestRequest {
     /// Structured event type
     #[serde(rename = "type", default)]
     event_type: Option<String>,
-    /// Container/CLI name from FluentD labels
+    /// Container/CLI name from `FluentD` labels
     #[serde(default)]
     cli: Option<String>,
-    /// Agent name from FluentD labels
+    /// Agent name from `FluentD` labels
     #[serde(default)]
     agent: Option<String>,
     /// Catch-all for other fields (full event data)
@@ -2648,9 +2649,9 @@ struct IngestRequest {
     extra: serde_json::Value,
 }
 
-/// Ingest endpoint - receives logs from FluentD and emits to Linear.
+/// Ingest endpoint - receives logs from `FluentD` and emits to Linear.
 ///
-/// FluentD sends logs to this endpoint which are then parsed and
+/// `FluentD` sends logs to this endpoint which are then parsed and
 /// emitted to the Linear agent dialog in real-time.
 async fn handle_ingest(
     State(state): State<AppState>,
@@ -2678,53 +2679,50 @@ async fn handle_ingest(
     };
 
     // Attempt to parse as Claude stream event
-    match serde_json::from_str::<ClaudeStreamEvent>(&event_json) {
-        Ok(event) => {
-            // Use a static tool state for ingest (stateless per-request)
-            // In production, this should be shared state
-            let mut tool_state = ToolState::default();
-            let mut total_cost = 0.0;
-            let mut artifact_trail = ArtifactTrail::default();
+    if let Ok(event) = serde_json::from_str::<ClaudeStreamEvent>(&event_json) {
+        // Use a static tool state for ingest (stateless per-request)
+        // In production, this should be shared state
+        let mut tool_state = ToolState::default();
+        let mut total_cost = 0.0;
+        let mut artifact_trail = ArtifactTrail::default();
 
-            if let Err(e) = process_stream_event(
-                client,
-                session_id,
-                &event,
-                &mut tool_state,
-                &mut total_cost,
-                &mut artifact_trail,
-            )
-            .await
-            {
-                warn!(error = %e, "Failed to process stream event");
-                return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to process event");
-            }
+        if let Err(e) = process_stream_event(
+            client,
+            session_id,
+            &event,
+            &mut tool_state,
+            &mut total_cost,
+            &mut artifact_trail,
+        )
+        .await
+        {
+            warn!(error = %e, "Failed to process stream event");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to process event");
         }
-        Err(_) => {
-            // Not a structured Claude event - emit as raw thought
-            let msg = payload
-                .log
-                .as_ref()
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| event_json.trim());
+    } else {
+        // Not a structured Claude event - emit as raw thought
+        let msg = payload
+            .log
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| event_json.trim());
 
-            // Skip empty or boilerplate messages
-            if msg.is_empty() || msg.len() < 10 {
-                return (StatusCode::OK, "Skipped empty message");
-            }
+        // Skip empty or boilerplate messages
+        if msg.is_empty() || msg.len() < 10 {
+            return (StatusCode::OK, "Skipped empty message");
+        }
 
-            // Emit as thought
-            if let Err(e) = client.emit_thought(session_id, msg).await {
-                warn!(error = %e, "Failed to emit thought from ingest");
-            }
+        // Emit as thought
+        if let Err(e) = client.emit_thought(session_id, msg).await {
+            warn!(error = %e, "Failed to emit thought from ingest");
         }
     }
 
     (StatusCode::OK, "Ingested")
 }
 
-/// Batch ingest endpoint - receives array of logs from FluentD.
+/// Batch ingest endpoint - receives array of logs from `FluentD`.
 async fn handle_ingest_batch(
     State(state): State<AppState>,
     Json(payloads): Json<Vec<IngestRequest>>,
@@ -2812,41 +2810,39 @@ async fn main() -> Result<()> {
 
     // Auto-create session if issue identifier provided but no session ID
     // This enables standalone mode (docker-compose) without pre-created sessions
-    let config = if !config.has_linear_session() {
-        if let Some(ref client) = linear_client {
-            // Check for LINEAR_ISSUE_IDENTIFIER env var
-            if let Ok(issue_id) = std::env::var("LINEAR_ISSUE_IDENTIFIER") {
-                if !issue_id.is_empty() {
-                    info!(issue = %issue_id, "No session configured, attempting to create one");
-                    match client
-                        .create_session_on_issue(&issue_id, "claude-sonnet-4", "anthropic")
-                        .await
-                    {
-                        Ok(session_id) => {
-                            info!(session_id = %session_id, "Auto-created Linear session");
-                            // Create new config with the session ID
-                            let mut new_config = (*config).clone();
-                            new_config.linear_session_id = session_id;
-                            Arc::new(new_config)
-                        }
-                        Err(e) => {
-                            warn!(error = %e, "Failed to auto-create session, running in minimal mode");
-                            config
-                        }
-                    }
-                } else {
-                    info!("No Linear session or issue configured, running in minimal mode (HTTP only)");
-                    config
-                }
-            } else {
+    let config = if config.has_linear_session() {
+        config
+    } else if let Some(ref client) = linear_client {
+        // Check for LINEAR_ISSUE_IDENTIFIER env var
+        if let Ok(issue_id) = std::env::var("LINEAR_ISSUE_IDENTIFIER") {
+            if issue_id.is_empty() {
                 info!("No Linear session or issue configured, running in minimal mode (HTTP only)");
                 config
+            } else {
+                info!(issue = %issue_id, "No session configured, attempting to create one");
+                match client
+                    .create_session_on_issue(&issue_id, "claude-sonnet-4", "anthropic")
+                    .await
+                {
+                    Ok(session_id) => {
+                        info!(session_id = %session_id, "Auto-created Linear session");
+                        // Create new config with the session ID
+                        let mut new_config = (*config).clone();
+                        new_config.linear_session_id = session_id;
+                        Arc::new(new_config)
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "Failed to auto-create session, running in minimal mode");
+                        config
+                    }
+                }
             }
         } else {
-            info!("No Linear API client, running in minimal mode (HTTP only)");
+            info!("No Linear session or issue configured, running in minimal mode (HTTP only)");
             config
         }
     } else {
+        info!("No Linear API client, running in minimal mode (HTTP only)");
         config
     };
 
