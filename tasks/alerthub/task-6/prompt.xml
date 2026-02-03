@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task xmlns="https://cto.5dlabs.ai/task">
+  <id>6</id>
+  <title>Mobile Application (Tap - Expo)</title>
+  <description>Develop cross-platform mobile app with native features</description>
+  <priority>medium</priority>
+  <dependencies>2, 3, 4</dependencies>
+  <status>pending</status>
+  <details>Initialize Expo project, Set up navigation, Implement biometric auth, Create responsive UI, Add camera features, Implement push notifications, Build offline storage, Add deep linking</details>
+  <test_strategy></test_strategy>
+  <decision_points>
+    <decision id="d11" category="architecture" constraint_type="open" requires_approval="false">
+      <description>Mobile data persistence</description>
+      <options>AsyncStorage, SQLite, Realm</options>
+    </decision>
+  </decision_points>
+</task>

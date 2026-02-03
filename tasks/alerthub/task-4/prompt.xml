@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task xmlns="https://cto.5dlabs.ai/task">
+  <id>4</id>
+  <title>Real-time Notification Service (Nova - Bun/Elysia)</title>
+  <description>Implement WebSocket-based real-time notification system</description>
+  <priority>medium</priority>
+  <dependencies>1, 2</dependencies>
+  <status>pending</status>
+  <details>Set up Bun runtime with Elysia, Implement WebSocket connection management, Create notification queue processing, Build user presence tracking, Implement room-based messaging, Add message persistence, Create push notification integration</details>
+  <test_strategy></test_strategy>
+  <decision_points>
+    <decision id="d7" category="architecture" constraint_type="open" requires_approval="false">
+      <description>WebSocket scaling strategy</description>
+      <options>Redis pub/sub, Message queue broadcasting, Database polling</options>
+    </decision>
+  </decision_points>
+</task>

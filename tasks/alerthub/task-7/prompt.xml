@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task xmlns="https://cto.5dlabs.ai/task">
+  <id>7</id>
+  <title>Desktop Application (Spark - Electron)</title>
+  <description>Create native desktop experience with system integration</description>
+  <priority>low</priority>
+  <dependencies>2, 3</dependencies>
+  <status>pending</status>
+  <details>Set up Electron, Implement system tray, Add file system access, Create keyboard shortcuts, Implement auto-updater, Add system notifications, Build native dialogs</details>
+  <test_strategy></test_strategy>
+  <decision_points>
+    <decision id="d13" category="architecture" constraint_type="soft" requires_approval="true">
+      <description>Distribution strategy</description>
+      <options>Electron Builder, Store distribution, Direct download</options>
+    </decision>
+  </decision_points>
+</task>

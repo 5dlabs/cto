@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task xmlns="https://cto.5dlabs.ai/task">
+  <id>8</id>
+  <title>Data Analytics Pipeline (Bolt - Kubernetes)</title>
+  <description>Build data processing and analytics infrastructure</description>
+  <priority>medium</priority>
+  <dependencies>1, 3</dependencies>
+  <status>pending</status>
+  <details>Deploy data warehouse, Set up ETL pipeline, Implement event tracking, Create data transformation jobs, Build analytics dashboard, Set up automated reporting, Implement data retention, Add GDPR compliance</details>
+  <test_strategy></test_strategy>
+  <decision_points>
+    <decision id="d15" category="data-model" constraint_type="open" requires_approval="false">
+      <description>Event tracking schema</description>
+      <options>Fixed schema, Schema-less JSON, Hybrid</options>
+    </decision>
+  </decision_points>
+</task>
