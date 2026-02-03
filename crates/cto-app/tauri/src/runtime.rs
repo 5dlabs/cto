@@ -268,7 +268,6 @@ pub fn ensure_kind_installed() -> Result<bool, String> {
     let arch = std::env::consts::ARCH;
 
     let kind_version = get_latest_kind_version()?;
-    let download_url = format!("https://kind.sigs.k8s.io/dl/v}/kind-{}-{}", os, arch);
 
     // Adjust arch naming for URL
     let arch_str = match arch {
