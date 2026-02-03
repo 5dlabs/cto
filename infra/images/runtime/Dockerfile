@@ -89,19 +89,19 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 COPY .docker-binaries/ /tmp/binaries/
 
 ARG TOOLS_VERSION=skip
-RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
+RUN if [ "${TOOLS_VERSION:-skip}" != "skip" ] && [ -n "${TOOLS_VERSION:-}" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
       mv /tmp/binaries/tools-client-linux-x86_64 /usr/local/bin/tools && \
       chmod +x /usr/local/bin/tools; \
     fi
 
 ARG PLAY_MONITOR_VERSION=skip
-RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
+RUN if [ "${PLAY_MONITOR_VERSION:-skip}" != "skip" ] && [ -n "${PLAY_MONITOR_VERSION:-}" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
       mv /tmp/binaries/play-monitor-linux-x86_64 /usr/local/bin/play-monitor && \
       chmod +x /usr/local/bin/play-monitor; \
     fi
 
 ARG TASKS_VERSION=0.2.12
-RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
+RUN if [ "${TASKS_VERSION:-skip}" != "skip" ] && [ -n "${TASKS_VERSION:-}" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
       mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && \
       chmod +x /usr/local/bin/intake; \
     fi
