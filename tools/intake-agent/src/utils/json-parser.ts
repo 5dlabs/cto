@@ -238,19 +238,6 @@ export function isValidComplexityAnalysis(item: unknown): item is { taskId: numb
 // Single-Concern Validation
 // =============================================================================
 
-const MULTIPLE_SYSTEM_PATTERNS = [
-  /postgresql.*mongodb/i,
-  /mongodb.*redis/i,
-  /kafka.*rabbitmq/i,
-  /postgres.*mongo/i,
-  /postgres.*redis/i,
-  /namespaces.*policies.*quotas/i,
-  /and\b.*\band\b/i,  // "X and Y and Z"
-  /\([^)]*,[^)]*\)/,   // "(X, Y, Z)" pattern
-];
-
-const COMBINED_DB_PATTERN = /\b(postgresql|mongodb|redis|kafka|rabbitmq|mysql|postgres)\b.*\b(mongodb|redis|kafka|rabbitmq|mysql|postgres)\b/i;
-
 /**
  * Check if a subtask violates single-concern rule.
  * Returns true if violation detected.
@@ -258,21 +245,43 @@ const COMBINED_DB_PATTERN = /\b(postgresql|mongodb|redis|kafka|rabbitmq|mysql|po
 export function hasCombinedConcerns(title: string, details: string): boolean {
   const text = `${title} ${details}`.toLowerCase();
   
-  // Check for multiple databases or systems
-  const dbMatch = text.match(COMBINED_DB_PATTERN);
-  if (dbMatch) return true;
+  // List of systems that should NOT be combined
+  const systems = ['postgresql', 'mongodb', 'redis', 'kafka', 'rabbitmq', 'mysql', 'postgres'];
   
-  // Check for "(X, Y, Z)" patterns
-  if (MULTIPLE_SYSTEM_PATTERNS[4].test(text)) return true;
+  // Find which systems are mentioned
+  const found = systems.filter(s => text.includes(s));
   
-  // Check for "and" connecting multiple distinct concepts
-  const andMatch = text.match(/(\b\w+\b).*and.*(\b\w+\b).*and.*(\b\w+\b)/);
-  if (andMatch) {
-    // Check if they're different systems
-    const systems = ['postgresql', 'mongodb', 'redis', 'kafka', 'rabbitmq', 'nginx', 'prometheus', 'grafana'];
-    const found = systems.filter(s => text.includes(s));
-    if (found.length >= 2) return true;
+  // Check for comma-separated lists (PostgreSQL, MongoDB, Redis)
+  const commaListMatch = text.match(/\b(\w+), (\w+)\b/);
+  if (commaListMatch && found.length >= 2) return true;
+  
+  // Check for "and" connecting multiple systems (Kafka and RabbitMQ)
+  if (found.length >= 2 && text.includes(' and ')) return true;
+  
+  // Check for "(X, Y, Z)" pattern
+  const parenListMatch = text.match(/\([^)]*\)/);
+  if (parenListMatch) {
+    const parenText = parenListMatch[0].toLowerCase();
+    const parenSystems = systems.filter(s => parenText.includes(s));
+    if (parenSystems.length >= 2) return true;
   }
+  
+  // Check for "namespaces, policies, quotas" pattern (multiple K8s concepts)
+  const k8sPatterns = [
+    /\bnamespaces?\b.*\bpolicies?\b/,
+    /\bpolicies?\b.*\bquotas?\b/,
+    /\bnamespaces?\b.*\bquotas?\b/,
+    /\brbac\b.*\bnetwork policies?\b/,
+  ];
+  
+  for (const pattern of k8sPatterns) {
+    if (pattern.test(text)) return true;
+  }
+  
+  // Count K8s-related words
+  const k8sConcepts = ['namespaces', 'policies', 'quotas', 'rbac', 'network policy', 'security context'];
+  const k8sFound = k8sConcepts.filter(c => text.includes(c));
+  if (k8sFound.length >= 2) return true;
   
   return false;
 }
