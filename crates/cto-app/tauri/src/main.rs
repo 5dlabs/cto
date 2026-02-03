@@ -3,29 +3,24 @@
 
 use tauri::Manager;
 
+mod commands;
+mod keychain;
+mod runtime;
+
+use commands::cluster::*;
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
-            // Runtime commands
-            cto_app_tauri::get_container_runtime,
-            cto_app_tauri::install_kind,
-            // Cluster commands
-            cto_app_tauri::start_kind_cluster,
-            cto_app_tauri::stop_kind_cluster,
-            cto_app_tauri::get_cluster_status,
-            cto_app_tauri::list_clusters,
-            // Settings commands
-            cto_app_tauri::get_setting,
-            cto_app_tauri::set_setting,
-            cto_app_tauri::list_settings,
-            // GitHub commands
-            cto_app_tauri::get_github_token,
-            cto_app_tauri::set_github_token,
-            cto_app_tauri::create_webhook,
-            // Tunnel commands
-            cto_app_tauri::get_cf_tunnel_token,
-            cto_app_tauri::set_cf_tunnel_token,
+            // Cluster management commands
+            list_clusters,
+            get_cluster_info,
+            start_cluster,
+            stop_cluster,
+            restart_cluster,
+            delete_cluster,
+            get_clusters_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

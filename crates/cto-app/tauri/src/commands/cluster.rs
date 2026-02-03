@@ -141,7 +141,12 @@ pub fn list_clusters() -> Result<Vec<ClusterStatus>, String> {
                 .ok();
 
             let node_count = nodes_output
-                .and_then(|o| String::from_utf8_lossy(&o.stdout).lines().filter(|l| !l.trim().is_empty()).count())
+                .and_then(|o| {
+                    String::from_utf8_lossy(&o.stdout)
+                        .lines()
+                        .filter(|l| !l.trim().is_empty())
+                        .count()
+                })
                 .unwrap_or(0);
 
             statuses.push(ClusterStatus {
