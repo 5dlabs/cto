@@ -17,6 +17,7 @@ members = [
     "crates/tenant-operator",
     "crates/tools",
     "crates/utils",
+    "crates/cto-app/tauri",
 ]
 
 [workspace.package]

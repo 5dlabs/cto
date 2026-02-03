@@ -8,7 +8,7 @@ use std::process::Command;
 /// Represents a detected container runtime
 #[derive(Debug, Serialize, Clone)]
 pub struct ContainerRuntime {
-    pub name: String,         // "docker", "colima", "podman"
+    pub name: String, // "docker", "colima", "podman"
     pub version: String,
     pub available: bool,
     pub path: Option<String>,
@@ -28,7 +28,7 @@ pub struct RuntimeInfo {
 #[derive(Debug, Serialize, Clone)]
 pub struct ClusterStatus {
     pub name: String,
-    pub status: String,                    // "running", "stopped", "unknown"
+    pub status: String, // "running", "stopped", "unknown"
     pub kubernetes_version: Option<String>,
     pub nodes: usize,
 }
@@ -268,10 +268,7 @@ pub fn ensure_kind_installed() -> Result<bool, String> {
     let arch = std::env::consts::ARCH;
 
     let kind_version = get_latest_kind_version()?;
-    let download_url = format!(
-        "https://kind.sigs.k8s.io/dl/v}/kind-{}-{}",
-        os, arch
-    );
+    let download_url = format!("https://kind.sigs.k8s.io/dl/v}/kind-{}-{}", os, arch);
 
     // Adjust arch naming for URL
     let arch_str = match arch {
@@ -480,17 +477,13 @@ fn get_version(cmd: &str, version_flag: &str) -> Option<String> {
 
 /// Get version output with custom arguments
 fn get_version_with_args(cmd: &str, args: &[&str]) -> Option<String> {
-    Command::new(cmd)
-        .args(args)
-        .output()
-        .ok()
-        .and_then(|o| {
-            if o.status.success() {
-                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
-            } else {
-                None
-            }
-        })
+    Command::new(cmd).args(args).output().ok().and_then(|o| {
+        if o.status.success() {
+            Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+        } else {
+            None
+        }
+    })
 }
 
 /// Parse container count from docker ps output
@@ -511,7 +504,12 @@ fn parse_container_count(cmd: &str, subcmd: &str, flag: &str) -> Result<usize, S
 }
 
 /// Parse container count with environment variable
-fn parse_container_count_with_env(env: &str, cmd: &str, subcmd: &str, flag: &str) -> Result<usize, String> {
+fn parse_container_count_with_env(
+    env: &str,
+    cmd: &str,
+    subcmd: &str,
+    flag: &str,
+) -> Result<usize, String> {
     let output = Command::new("sh")
         .arg("-c")
         .arg(format!("{} {} {} {}", env, cmd, subcmd, flag))
@@ -533,7 +531,12 @@ fn parse_image_count(cmd: &str, subcmd: &str, flag: &str) -> Result<usize, Strin
 }
 
 /// Parse image count with environment variable
-fn parse_image_count_with_env(env: &str, cmd: &str, subcmd: &str, flag: &str) -> Result<usize, String> {
+fn parse_image_count_with_env(
+    env: &str,
+    cmd: &str,
+    subcmd: &str,
+    flag: &str,
+) -> Result<usize, String> {
     parse_container_count_with_env(env, cmd, subcmd, flag)
 }
 
@@ -601,11 +604,11 @@ mod shell_commands {
         get_all_cluster_status()
     }
 
+    pub use ensure_kind_installed_command as ensure_kind_installed;
+    pub use get_all_cluster_status_command as get_all_cluster_status;
     pub use get_container_runtime_command as get_container_runtime;
     pub use get_runtime_info_command as get_runtime_info;
-    pub use ensure_kind_installed_command as ensure_kind_installed;
     pub use is_kind_cluster_running_command as is_kind_cluster_running;
-    pub use get_all_cluster_status_command as get_all_cluster_status;
 }
 
 #[cfg(feature = "shell-open")]
