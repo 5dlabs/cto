@@ -338,13 +338,13 @@ impl LinearApiClient {
             variables: Variables,
         }
 
-        const QUERY: &str = r#"
+        const QUERY: &str = "
             query GetIssue($identifier: String!) {
                 issue(id: $identifier) {
                     id
                 }
             }
-        "#;
+        ";
 
         let request = Request {
             query: QUERY,
