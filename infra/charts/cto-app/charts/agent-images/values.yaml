@@ -1,65 +1,30 @@
 # Agent images subchart values
-# Individual agent chart configurations
+# Defaults - parent chart values will override these
 
 morgan:
-  enabled: {{ .Values.agents.morgan.enabled }}
-  replicaCount: {{ .Values.agents.morgan.replicas }}
-  image:
-    repository: {{ .Values.agents.global.imageRepository }}/morgan
-    tag: {{ .Values.agents.global.agentTag | default "latest" }}
-  resources:
-    {{- toYaml .Values.agents.morgan.resources | nindent 4 }}
+  enabled: false
+  replicaCount: 0
 
 grizz:
-  enabled: {{ .Values.agents.grizz.enabled }}
-  replicaCount: {{ .Values.agents.grizz.replicas }}
-  image:
-    repository: {{ .Values.agents.global.imageRepository }}/grizz
-    tag: {{ .Values.agents.global.agentTag | default "latest" }}
-  resources:
-    {{- toYaml .Values.agents.grizz.resources | nindent 4 }}
+  enabled: false
+  replicaCount: 0
 
 blaze:
-  enabled: {{ .Values.agents.blaze.enabled }}
-  replicaCount: {{ .Values.agents.blaze.replicas }}
-  image:
-    repository: {{ .Values.agents.global.imageRepository }}/blaze
-    tag: {{ .Values.agents.global.agentTag | default "latest" }}
-  resources:
-    {{- toYaml .Values.agents.blaze.resources | nindent 4 }}
+  enabled: false
+  replicaCount: 0
 
 cleo:
-  enabled: {{ .Values.agents.cleo.enabled }}
-  replicaCount: {{ .Values.agents.cleo.replicas }}
-  image:
-    repository: {{ .Values.agents.global.imageRepository }}/cleo
-    tag: {{ .Values.agents.global.agentTag | default "latest" }}
-  resources:
-    {{- toYaml .Values.agents.cleo.resources | nindent 4 }}
+  enabled: false
+  replicaCount: 0
 
 cipher:
-  enabled: {{ .Values.agents.cipher.enabled }}
-  replicaCount: {{ .Values.agents.cipher.replicas }}
-  image:
-    repository: {{ .Values.agents.global.imageRepository }}/cipher
-    tag: {{ .Values.agents.global.agentTag | default "latest" }}
-  resources:
-    {{- toYaml .Values.agents.cipher.resources | nindent 4 }}
+  enabled: false
+  replicaCount: 0
 
 tess:
-  enabled: {{ .Values.agents.tess.enabled }}
-  replicaCount: {{ .Values.agents.tess.replicas }}
-  image:
-    repository: {{ .Values.agents.global.imageRepository }}/tess
-    tag: {{ .Values.agents.global.agentTag | default "latest" }}
-  resources:
-    {{- toYaml .Values.agents.tess.resources | nindent 4 }}
+  enabled: false
+  replicaCount: 0
 
 bolt:
-  enabled: {{ .Values.agents.bolt.enabled }}
-  replicaCount: {{ .Values.agents.bolt.replicas }}
-  image:
-    repository: {{ .Values.agents.global.imageRepository }}/bolt
-    tag: {{ .Values.agents.global.agentTag | default "latest" }}
-  resources:
-    {{- toYaml .Values.agents.bolt.resources | nindent 4 }}
+  enabled: false
+  replicaCount: 0
