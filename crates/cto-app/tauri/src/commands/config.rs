@@ -1,19 +1,5 @@
 // Settings CRUD commands
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AppSettings {
-    pub theme: String,
-    pub auto_start: bool,
-    pub cluster_defaults: ClusterDefaults,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ClusterDefaults {
-    pub k8s_version: String,
-    pub node_count: usize,
-}
 
 lazy_static::lazy_static! {
     static ref SETTINGS: parking_lot::RwLock<HashMap<String, String>> = parking_lot::RwLock::new(HashMap::new());
