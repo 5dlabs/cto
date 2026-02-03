@@ -105,12 +105,27 @@ async function runAdvocate(
     prefill: options.prefill,
   });
   
-  return advocateProvider.generate(
-    userPrompt,
-    systemPrompt,
-    { temperature: 0.7 },
-    config.generatorModel
-  );
+  console.error(`[DEBATE] Calling advocate generate with model: ${config.generatorModel || 'default'}`);
+  
+  try {
+    const response = await advocateProvider.generate(
+      userPrompt,
+      systemPrompt,
+      { temperature: 0.7 },
+      config.generatorModel
+    );
+    
+    console.error(`[DEBATE] Advocate response: success=${response.success}, text_len=${response.text?.length || 0}`);
+    
+    if (!response.text) {
+      throw new Error(`Advocate returned no text: ${response.error || 'unknown error'}`);
+    }
+    
+    return { proposal: response.text, response };
+  } catch (e) {
+    console.error(`[DEBATE] Advocate error: ${e instanceof Error ? e.message : 'unknown'}`);
+    throw e;
+  }
 }
 
 /**

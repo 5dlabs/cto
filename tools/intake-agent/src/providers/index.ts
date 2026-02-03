@@ -2,18 +2,24 @@
  * Provider Registry - Manages multi-model providers.
  * 
  * Provides a unified interface for accessing Claude, Minimax, and OpenAI/Codex providers.
+ * Supports both Claude Code SDK (OAuth) and Anthropic API (API key).
  */
 
 import type { ModelProvider, ProviderName, ProviderRegistry } from './types';
-import { claudeProvider } from './claude';
+import { createClaudeProvider } from './claude';
 import { minimaxProvider } from './minimax';
 import { codexProvider } from './codex';
 
 // Re-export types and providers
 export * from './types';
-export { claudeProvider } from './claude';
 export { minimaxProvider } from './minimax';
 export { codexProvider } from './codex';
+
+/**
+ * Create the Claude provider - uses Anthropic API if ANTHROPIC_API_KEY is set,
+ * otherwise falls back to Claude Code SDK.
+ */
+const claudeProvider = createClaudeProvider();
 
 /**
  * Map of all registered providers.
