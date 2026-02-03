@@ -54,7 +54,7 @@ pub fn start_kind_cluster(name: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn stop_kind_cluster(name: &str) -> Result<String, String> {
+pub fn delete_kind_cluster(name: &str) -> Result<String, String> {
     if !check_command_exists("kind") {
         return Err("kind is not installed".to_string());
     }
@@ -152,7 +152,7 @@ pub fn list_clusters() -> Result<Vec<ClusterStatus>, String> {
 
             statuses.push(ClusterStatus {
                 name: name.to_string(),
-                status: "Available".to_string(),
+                status: "Running".to_string(),
                 nodes: node_count,
                 kubernetes_version: None,
             });

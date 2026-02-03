@@ -2,6 +2,7 @@
 // Provides wrapper functions that expose runtime and keychain operations
 
 pub mod cluster;
+pub mod config;
 
 pub use crate::runtime::get_container_runtime;
 pub use crate::runtime::get_runtime_info;

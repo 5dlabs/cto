@@ -31,7 +31,7 @@ export function Home({ onNavigate }: HomeProps) {
         </div>
       </div>
 
-      <Dashboard clusterName="cto-local" status={clusterStatus} />
+      <Dashboard status={clusterStatus} />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card

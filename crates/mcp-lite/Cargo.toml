@@ -1,0 +1,45 @@
+# CTO Lite MCP Server - Tauri-compatible MCP server for desktop
+
+[workspace]
+
+[package]
+name = "cto-mcp-lite"
+version = "0.1.0"
+edition = "2021"
+authors = ["5D team"]
+license = "AGPL-3.0"
+description = "CTO Lite MCP server - Tauri-compatible desktop MCP server with core task sync and workflow triggering"
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+
+# Time utilities
+chrono = { version = "0.4", features = ["serde"] }
+
+# Encoding
+base64 = "0.22"
+
+# Commands
+tempfile = "3.0"
+
+# Logging
+tracing-subscriber = "0.3"
+
+[features]
+default = ["stdio"]
+stdio = []
+ipc = []
+
+[package.metadata.dist]
+dist = true

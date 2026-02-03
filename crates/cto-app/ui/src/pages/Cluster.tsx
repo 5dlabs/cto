@@ -10,7 +10,7 @@ interface ClusterProps {
 }
 
 export function Cluster({ onBack }: ClusterProps) {
-  const [clusters, setClusters] = useState([
+  const [clusters] = useState([
     { name: 'cto-local', status: 'running', nodes: 1, kubeconfig: '~/.kube/config' },
   ]);
 

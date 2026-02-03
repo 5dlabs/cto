@@ -1,0 +1,53 @@
+[package]
+name = "pm-lite"
+version = "0.1.0"
+description = "GitHub App integration for CTO Desktop (webhooks + Tauri commands)"
+authors = ["CTO Team"]
+edition = "2021"
+
+[dependencies]
+# Tauri IPC - using same version as cto-app-tauri
+tauri = { version = "2.0" }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+anyhow = "1"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID generation
+uuid = { version = "1", features = ["v4"] }
+
+# HTTP client for GitHub API
+reqwest = { version = "0.12", features = ["json"] }
+
+# Cryptography for webhook verification
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+
+# Logging
+tracing = "0.1"
+
+# Storage (for webhooks/events)
+directories = "5"
+shellexpand = "3"
+
+# Base64 for private key handling
+base64 = "0.22"
+
+# JWT generation for GitHub App auth
+jsonwebtoken = "9"
+
+# Lazy static initialization
+lazy_static = "1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util", "macros"] }

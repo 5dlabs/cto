@@ -8,6 +8,11 @@ mod keychain;
 mod runtime;
 
 use commands::cluster::*;
+use pm_lite::github_app::{
+    install_github_app,
+    list_webhook_events,
+    redeliver_webhook,
+};
 
 fn main() {
     tauri::Builder::default()
@@ -21,6 +26,10 @@ fn main() {
             restart_cluster,
             delete_cluster,
             get_clusters_status,
+            // PM-Lite: GitHub App commands
+            install_github_app,
+            list_webhook_events,
+            redeliver_webhook,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
