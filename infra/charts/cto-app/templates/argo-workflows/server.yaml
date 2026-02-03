@@ -1,0 +1,83 @@
+{{- if .Values.argo.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-workflows-server
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  replicas: {{ .Values.argo.server.replicas }}
+  selector:
+    matchLabels:
+      {{- include "cto-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        {{- include "cto-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+    spec:
+      serviceAccountName: argo-workflows-server
+      containers:
+        - name: server
+          image: quay.io/argoproj/argo-workflows:{{ .Values.argo.version }}
+          command:
+            - workflow-server
+            - --namespaces
+            - cto-app
+            {{- range .Values.argo.server.args }}
+            - {{ . }}
+            {{- end }}
+          ports:
+            - containerPort: 2746
+              name: http
+          resources:
+            {{- toYaml .Values.argo.resources | nindent 12 }}
+          env:
+            - name: ARGO_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: config
+              mountPath: /argo-workflows-config
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 2746
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 2746
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: argo-workflows-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argo-workflows-server
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  type: {{ .Values.argo.server.service.type }}
+  ports:
+    - port: {{ .Values.argo.server.service.port }}
+      targetPort: 2746
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto-app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+{{- end }}

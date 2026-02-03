@@ -1,0 +1,20 @@
+{{- if .Values.pm.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: pm-lite
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pm
+spec:
+  type: {{ .Values.pm.service.type }}
+  ports:
+    - port: {{ .Values.pm.service.port }}
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto-app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: pm
+{{- end }}

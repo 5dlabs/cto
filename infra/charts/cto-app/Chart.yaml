@@ -1,0 +1,9 @@
+apiVersion: v2
+name: cto-app
+description: CTO App Helm chart for local Kind deployment
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: agent-images
+    version: "0.1.0"
+    repository: "file://charts/agent-images"
