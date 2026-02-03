@@ -57,7 +57,7 @@ reqwest = { workspace = true, features = ["json"] }
 handlebars = "6.4"
 
 # Regex for prompt processing
-regex = "1.10"
+regex = "1.12"
 
 # Base64 encoding (for API auth)
 base64 = "0.22"
