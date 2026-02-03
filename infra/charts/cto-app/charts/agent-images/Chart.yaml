@@ -3,38 +3,31 @@ name: agent-images
 description: Subchart for CTO agent images
 version: 0.1.0
 dependencies:
-  {{- if .Values.agents.morgan.enabled }}
   - name: morgan
     version: "0.1.0"
     repository: "file://../morgan"
-  {{- end }}
-  {{- if .Values.agents.grizz.enabled }}
+    condition: agents.morgan.enabled
   - name: grizz
     version: "0.1.0"
     repository: "file://../grizz"
-  {{- end }}
-  {{- if .Values.agents.blaze.enabled }}
+    condition: agents.grizz.enabled
   - name: blaze
     version: "0.1.0"
     repository: "file://../blaze"
-  {{- end }}
-  {{- if .Values.agents.cleo.enabled }}
+    condition: agents.blaze.enabled
   - name: cleo
     version: "0.1.0"
     repository: "file://../cleo"
-  {{- end }}
-  {{- if .Values.agents.cipher.enabled }}
+    condition: agents.cleo.enabled
   - name: cipher
     version: "0.1.0"
     repository: "file://../cipher"
-  {{- end }}
-  {{- if .Values.agents.tess.enabled }}
+    condition: agents.cipher.enabled
   - name: tess
     version: "0.1.0"
     repository: "file://../tess"
-  {{- end }}
-  {{- if .Values.agents.bolt.enabled }}
+    condition: agents.tess.enabled
   - name: bolt
     version: "0.1.0"
     repository: "file://../bolt"
-  {{- end }}
+    condition: agents.bolt.enabled
