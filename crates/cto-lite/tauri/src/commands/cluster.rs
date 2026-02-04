@@ -11,6 +11,8 @@ const CLUSTER_NAME: &str = "cto";
 fn is_cto_cluster(context: &str) -> bool {
     // Match any kind-cto* cluster (cto, cto-lite, cto-dev, etc.)
     context.starts_with("kind-cto")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ClusterType {
     /// Kind cluster (what we create)

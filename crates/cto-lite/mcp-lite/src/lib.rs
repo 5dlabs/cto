@@ -119,7 +119,9 @@ pub async fn handle_request(request: JsonRpcRequest) -> JsonRpcResponse {
                 serde_json::to_value(InitializeResult {
                     protocol_version: "2024-11-05".to_string(),
                     capabilities: Capabilities {
-                        tools: ToolsCapability { list_changed: false },
+                        tools: ToolsCapability {
+                            list_changed: false,
+                        },
                     },
                     server_info: ServerInfo {
                         name: "cto-lite".to_string(),
