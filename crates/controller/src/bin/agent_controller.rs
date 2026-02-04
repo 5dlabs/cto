@@ -249,6 +249,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Build the HTTP router
+    #[allow(deprecated)]
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/ready", get(readiness_check))
@@ -263,7 +264,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .on_response(DefaultOnResponse::new().level(Level::INFO)),
                 )
                 .layer(CorsLayer::permissive())
-                #[allow(deprecated)]
                 .layer(TimeoutLayer::new(Duration::from_secs(60))),
         )
         .with_state(state);
