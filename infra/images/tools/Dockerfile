@@ -34,9 +34,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Build dependencies - THIS IS THE CACHED LAYER!
+# Use --package to only build dependencies for tools, not entire workspace
+# (avoids GTK/Tauri deps that would require additional system libraries)
 COPY --from=planner /build/recipe.json recipe.json
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
-    cargo chef cook --release --recipe-path recipe.json
+    cargo chef cook --release --package tools --recipe-path recipe.json
 
 # Copy source and build tools-server (part of main workspace)
 COPY Cargo.toml Cargo.lock ./
