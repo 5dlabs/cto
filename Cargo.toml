@@ -33,7 +33,7 @@ repository = "https://github.com/5dlabs/cto"
 axum = "0.8.8"
 tokio = { version = "1.49", features = ["full"] }
 tower = "0.5"
-tower-http = { version = "0.5", features = ["trace", "cors", "limit", "timeout"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "limit", "timeout"] }
 
 # Kubernetes
 kube = { version = "0.93", features = ["runtime", "derive", "client", "ws"] }
