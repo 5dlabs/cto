@@ -106,6 +106,7 @@ jobs:
           TOOLS_VERSION=""
           MONITOR_VERSION=""
           TASKS_VERSION=""
+          INTAKE_AGENT_VERSION=""
 
           # Create directory for downloaded binaries (will be copied into Docker context)
           # Include a placeholder so COPY doesn't fail if no binaries are found
