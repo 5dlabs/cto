@@ -35,8 +35,10 @@ if [ -z "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_A
   # Create signature using temp file (not process substitution which requires bash)
   SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$TEMP_KEY" | openssl base64 -e | tr -d '=' | tr '/+' '_-' | tr -d '\n')
   
-  # Clean up temp key
-  rm -f "$TEMP_KEY"
+  # Keep temp key for duration of job (Rex and other tools need it)
+  # Note: Job containers are ephemeral, so this temp file is automatically cleaned up
+  export GITHUB_APP_PRIVATE_KEY_FILE="$TEMP_KEY"
+  echo "📝 GitHub App private key available at: $TEMP_KEY"
   
   JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
   
