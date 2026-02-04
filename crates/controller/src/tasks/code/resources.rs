@@ -2002,8 +2002,8 @@ impl<'a> CodeResourceManager<'a> {
                                 volumes.iter().any(|vol| {
                                     vol.config_map
                                         .as_ref()
-                                        .and_then(|cm| cm.name.as_ref())
-                                        .is_some_and(|name| name == &cm_name)
+                                        .map(|cm| cm.name.clone())
+                                        .is_some_and(|name| name == cm_name)
                                 })
                             })
                     });
@@ -2034,8 +2034,8 @@ impl<'a> CodeResourceManager<'a> {
                                         volumes.iter().any(|vol| {
                                             vol.config_map
                                                 .as_ref()
-                                                .and_then(|cm| cm.name.as_ref())
-                                                .is_some_and(|name| name == &cm_name)
+                                                .map(|cm| cm.name.clone())
+                                                .is_some_and(|name| name == cm_name)
                                         })
                                     })
                             });
