@@ -263,7 +263,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .on_response(DefaultOnResponse::new().level(Level::INFO)),
                 )
                 .layer(CorsLayer::permissive())
-                .layer(TimeoutLayer::with_status_code(Duration::from_secs(60), StatusCode::REQUEST_TIMEOUT)),
+                .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(60))),
         )
         .with_state(state);
 
