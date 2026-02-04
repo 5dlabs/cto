@@ -265,15 +265,6 @@ export interface PodInfo {
   containers: string[];
 }
 
-/** Filter for log streaming */
-export interface LogStreamFilter {
-  namespace?: string;
-  pod_pattern?: string;
-  container?: string;
-  since_seconds?: number;
-  tail_lines?: number;
-}
-
 /** Get list of namespaces */
 export async function listNamespaces(): Promise<string[]> {
   return invoke<string[]>('list_namespaces');

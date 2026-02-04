@@ -7,12 +7,6 @@ use tracing;
 
 const CLUSTER_NAME: &str = "cto";
 
-/// Check if a cluster name matches our CTO cluster pattern
-fn is_cto_cluster(context: &str) -> bool {
-    // Match any kind-cto* cluster (cto, cto-lite, cto-dev, etc.)
-    context.starts_with("kind-cto")
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ClusterType {
     /// Kind cluster (what we create)
@@ -1231,6 +1225,17 @@ async fn ensure_kind_installed() -> AppResult<bool> {
 
     tracing::info!("Kind not found, downloading...");
 
+    // Determine platform
+    let platform = if cfg!(target_os = "macos") {
+        "darwin"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        return Err(AppError::Other("Unsupported platform".to_string()));
+    };
+
     // Determine architecture
     let arch = if cfg!(target_arch = "aarch64") {
         "arm64"
@@ -1240,8 +1245,8 @@ async fn ensure_kind_installed() -> AppResult<bool> {
 
     // Download URL for Kind
     let url = format!(
-        "https://kind.sigs.k8s.io/dl/v0.25.0/kind-darwin-{}",
-        arch
+        "https://kind.sigs.k8s.io/dl/v0.25.0/kind-{}-{}",
+        platform, arch
     );
 
     // Download to temp location

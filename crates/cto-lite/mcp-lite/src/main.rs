@@ -4,11 +4,11 @@
 
 use mcp_lite::run_server;
 
-fn main() {
-    // Initialize logging
-    env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
-
-    // Run the server
-    let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-    rt.block_on(run_server());
+#[tokio::main]
+async fn main() {
+    // Run the server (logging is initialized in run_server)
+    if let Err(e) = run_server().await {
+        eprintln!("MCP server error: {}", e);
+        std::process::exit(1);
+    }
 }

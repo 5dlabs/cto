@@ -119,15 +119,16 @@ pub async fn stream_pod_logs(
     args.push("-n".to_string());
     args.push(ns.clone());
 
-    // Add container if specified
+    // Add container if specified, otherwise get all containers
     if let Some(c) = &container {
         args.push("-c".to_string());
         args.push(c.clone());
+    } else {
+        args.push("--all-containers".to_string());
     }
 
     // Add timestamps
     args.push("--timestamps".to_string());
-    args.push("--all-containers".to_string());
 
     let output = Command::new("kubectl")
         .args(&args)

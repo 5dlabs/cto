@@ -67,7 +67,6 @@ pub fn run() {
             commands::get_tasks,
             commands::create_task,
             commands::update_task_status,
-            commands::trigger_mcp_workflow,
             // Setup commands
             commands::check_docker,
             commands::check_kind,

@@ -175,7 +175,6 @@ pub async fn handle_request(request: JsonRpcRequest) -> JsonRpcResponse {
 }
 
 /// Run the MCP server with stdin/stdout
-#[tokio::main]
 pub async fn run_server() -> Result<()> {
     // Initialize logging to stderr (stdout is for JSON-RPC)
     tracing_subscriber::fmt()
