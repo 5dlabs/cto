@@ -32,9 +32,11 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM chef AS builder
 
 # Build dependencies - THIS IS THE CACHED LAYER!
+# Use --package to only build dependencies for pm, not entire workspace
+# (avoids GTK/Tauri deps that would require additional system libraries)
 COPY --from=planner /build/recipe.json recipe.json
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
-    cargo chef cook --release --recipe-path recipe.json
+    cargo chef cook --release --package pm --recipe-path recipe.json
 
 # Copy source and build
 COPY Cargo.toml Cargo.lock ./
