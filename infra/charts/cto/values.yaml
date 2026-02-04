@@ -424,13 +424,7 @@ tools:
         args: ["-y", "@sparesparrow/mcp-prompts"]
         workingDirectory: "/tmp"
 
-      courses:
-        name: "Anthropic Courses"
-        description: "Access to Anthropic's educational courses including API fundamentals, prompt engineering, and tool use"
-        transport: "stdio"
-        command: "git"
-        args: ["clone", "--depth=1", "https://github.com/anthropics/courses.git", "/tmp/courses"]
-        workingDirectory: "/tmp"
+      # courses: removed - git clone is not an MCP server, it exits immediately
 
       # --- Infrastructure ---
       docker:
@@ -477,7 +471,7 @@ tools:
         transport: "stdio"
         command: "npx"
         args: ["-y", "shadcn@latest", "mcp"]
-        workingDirectory: "/workspace"
+        workingDirectory: "/tmp"
 
       ai-elements:
         name: "AI Elements"
@@ -661,7 +655,7 @@ tools:
         transport: "stdio"
         command: "npx"
         args: ["-y", "app-store-connect-mcp-server"]
-        workingDirectory: "/workspace"
+        workingDirectory: "/tmp"
         env:
           APP_STORE_KEY_ID: "${APP_STORE_KEY_ID}"
           APP_STORE_ISSUER_ID: "${APP_STORE_ISSUER_ID}"
@@ -752,14 +746,8 @@ tools:
           CONFLUENT_CLOUD_API_SECRET: "${CONFLUENT_CLOUD_API_SECRET}"
 
       # --- Local Servers (run in agent containers, not proxied) ---
-      rust-tools:
-        name: "Rust Development Tools"
-        description: "Rust analyzer integration"
-        transport: "stdio"
-        command: "/home/node/.cargo/bin/cursor-rust-tools"
-        args: ["--no-ui"]
-        workingDirectory: "/workspace"
-        local: true
+      # rust-tools: removed - requires cursor-rust-tools binary which is only available locally
+      # Re-enable when a proper npm package or Docker image is available
 
 # =============================================================================
 # Healer - Self-Healing Monitor
