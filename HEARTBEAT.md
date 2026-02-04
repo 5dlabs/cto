@@ -1,4 +1,9 @@
 # HEARTBEAT.md
 
-# Keep this file empty (or with only comments) to skip heartbeat API calls.
-# Add tasks below when you want the agent to check something periodically.
+## Daily Research Review
+
+Check for new research entries in docs/research and review them for CTO relevance.
+
+- Look for new entries since last review
+- Evaluate which could benefit CTO
+- Propose valuable findings to user
