@@ -29,9 +29,9 @@
 
 ## Fixed Issues
 
-### 2026-02-04: GitHub App Key File Deletion (RESOLVED)
+### 2026-02-04: GitHub App Key File Deletion (✅ RESOLVED)
 
-**Symptom:** 1,315 coderun jobs failing with "Could not read private key from /tmp/github-app-key-15"
+**Symptom:** 1,315+ coderun jobs failing with "Could not read private key from /tmp/github-app-key-15"
 
 **Root Cause:** The `github-auth.sh.hbs` template created a temp key file for JWT generation, then immediately deleted it. Rex and other agents tried to read this file later and failed.
 
@@ -42,16 +42,25 @@
 
 **Resolution Steps Taken:**
 1. Deleted 5 stuck healer-ci-rex CodeRuns that were spawning failed jobs
-2. Cleaned up 1,315 failed coderun jobs  
-3. Rebuilt and deployed controller with fixed template
-4. Commit: 808bb43f on agents/healer-fix branch
+2. Cleaned up 1,315+ failed coderun jobs  
+3. Deployed fix via ConfigMap overlay (immediate)
+4. Commits: 808bb43f, 7429df26 on agents/healer-fix branch
 
-**Status:** ✅ DEPLOYED & VERIFIED - Fix is live and working
+**Status:** ✅ FULLY RESOLVED - No failures since deployment
 
 **Deployment Method:**
 - Created ConfigMap `controller-template-fix-github-auth` with fixed template
 - Patched Deployment to mount ConfigMap over buggy template file
 - Controller restarted with fix at 2026-02-04 14:11 PST
 - Verified: `GITHUB_APP_PRIVATE_KEY_FILE` env var now exported
-- Failed jobs cleaned: 330 → 1 (unrelated research-poller)
-- No CodeRuns currently running or spawning failures
+
+**Final State (2026-02-04 14:40 PST):**
+- 0 CodeRuns (down from 5 stuck)
+- 0 CodeRun jobs (down from 1,315+ failures)
+- 0 healer-initiated workflows (no remediation loops)
+- Controller running with fix mounted and verified
+
+**Next Steps:**
+- Merge agents/healer-fix branch to main for permanent fix
+- Normal CI/CD will rebuild controller image with fix baked in
+- ConfigMap overlay can be removed after new controller deploys
