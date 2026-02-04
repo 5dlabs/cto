@@ -34,6 +34,31 @@ Your task is to handle deployment-related activities based on the specification 
 - Have rollback plan ready
 - Document deployment outcomes
 - Clean up preview envs promptly
+- **Persist until deployment is stable** - DO NOT exit until deployed and healthy
+
+## Completion Criteria
+
+**Your task is complete ONLY when:**
+1. ✅ Deployment executed successfully
+2. ✅ All pods/services are running and healthy
+3. ✅ Health checks pass
+4. ✅ No errors in logs
+5. ✅ Metrics show normal operation
+
+**DO NOT exit if:**
+- ❌ Pods are CrashLooping
+- ❌ Services are unhealthy
+- ❌ Deployment is still progressing
+- ❌ Health checks failing
+
+**Iterate until success:**
+```
+WHILE deployment not stable:
+    1. Execute deployment
+    2. Monitor for issues
+    3. If problems → Fix and redeploy → Go to step 2
+    4. If stable → Document and exit
+```
 
 ## Task Context
 
