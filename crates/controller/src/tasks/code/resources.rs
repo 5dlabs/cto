@@ -2002,7 +2002,7 @@ impl<'a> CodeResourceManager<'a> {
                                 volumes.iter().any(|vol| {
                                     vol.config_map
                                         .as_ref()
-                                        .is_some_and(|cm| cm.name == &cm_name)
+                                        .is_some_and(|cm| cm.name == *cm_name)
                                 })
                             })
                     });
@@ -2033,7 +2033,7 @@ impl<'a> CodeResourceManager<'a> {
                                         volumes.iter().any(|vol| {
                                             vol.config_map
                                                 .as_ref()
-                                                .is_some_and(|cm| cm.name == &cm_name)
+                                                .is_some_and(|cm| cm.name == *cm_name)
                                         })
                                     })
                             });
