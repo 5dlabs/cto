@@ -26,6 +26,9 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    # Only run on main branch - skip any stale runs from develop or other branches
+    # This guards against queued runs from before develop was removed from triggers
+    if: github.ref == 'refs/heads/main'
     runs-on: [k8s-runner]
     timeout-minutes: 60
     strategy:
@@ -56,4 +59,3 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
-
