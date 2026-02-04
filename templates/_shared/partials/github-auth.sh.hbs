@@ -5,26 +5,6 @@
 GITHUB_APP="{{github_app}}"
 GH_HOST="${GH_HOST:-github.com}"
 
-# Wait for DNS to be ready before GitHub API calls (fixes race condition on pod startup)
-echo "🌐 Waiting for DNS to be ready..."
-DNS_RETRIES=0
-DNS_MAX_RETRIES=30
-while [ $DNS_RETRIES -lt $DNS_MAX_RETRIES ]; do
-  if nslookup api.github.com >/dev/null 2>&1; then
-    echo "✅ DNS ready"
-    # Wait a bit for DNS to stabilize after initial resolution
-    sleep 3
-    break
-  fi
-  DNS_RETRIES=$((DNS_RETRIES + 1))
-  if [ $DNS_RETRIES -eq $DNS_MAX_RETRIES ]; then
-    echo "❌ DNS not available after ${DNS_MAX_RETRIES} attempts"
-    exit 1
-  fi
-  echo "  ⏳ DNS not ready yet, retrying in 2s... (attempt $DNS_RETRIES/$DNS_MAX_RETRIES)"
-  sleep 2
-done
-
 # Generate GITHUB_TOKEN from app credentials if not already set
 if [ -z "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
   echo "🔐 Generating GitHub token from app credentials..."
