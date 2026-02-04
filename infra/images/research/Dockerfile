@@ -49,7 +49,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 FROM oven/bun:1.1-debian AS intake-builder
 WORKDIR /build
 COPY tools/intake-agent/package.json tools/intake-agent/bun.lock ./
-RUN bun install --frozen-lockfile
+# Note: Using regular install instead of --frozen-lockfile due to known
+# issues with bun 1.3.x and text-based lockfiles (see oven-sh/bun#12801)
+RUN bun install
 COPY tools/intake-agent/ ./
 RUN bun run build
 
