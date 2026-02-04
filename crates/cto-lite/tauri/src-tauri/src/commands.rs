@@ -19,20 +19,6 @@ use uuid::Uuid;
 // MCP Server Management
 // ============================================================================
 
-/// MCP Server instance manager
-pub struct McpServerManager {
-    // Map of session_id -> child process
-    sessions: Mutex<HashMap<String, Child>>,
-}
-
-impl McpServerManager {
-    pub fn new() -> Self {
-        Self {
-            sessions: Mutex::new(HashMap::new()),
-        }
-    }
-}
-
 /// Spawn the MCP server as a child process and initialize it
 #[tauri::command]
 pub async fn spawn_mcp_server(state: State<'_, AppState>) -> Result<String, String> {
@@ -92,6 +78,11 @@ pub async fn mcp_call(
         .map_err(|e| e.to_string())?;
     
     stdin.write_all((request_str + "\n").as_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    // Flush stdin to ensure the request is sent before reading response
+    stdin.flush()
         .await
         .map_err(|e| e.to_string())?;
     
@@ -212,26 +203,6 @@ pub async fn update_task_status(
         json!({
             "workflow_id": workflow_id
         })
-    ).await
-}
-
-/// Trigger a workflow (wraps cto_trigger - alias for create_task)
-#[tauri::command]
-pub async fn trigger_mcp_workflow(
-    state: State<'_, AppState>,
-    session_id: String,
-    repo: String,
-    prompt: String,
-    issue_number: Option<i64>,
-    stack: Option<String>,
-) -> Result<Value, String> {
-    create_task(
-        state,
-        session_id,
-        repo,
-        prompt,
-        issue_number,
-        stack,
     ).await
 }
 

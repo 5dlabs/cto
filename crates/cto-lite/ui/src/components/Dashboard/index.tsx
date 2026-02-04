@@ -95,12 +95,19 @@ export function Dashboard() {
     try {
       const pods = await tauri.listPodsWithStatus(namespace);
       setAvailablePods(pods);
-      if (pods.length > 0 && !selectedPod) {
-        setSelectedPod(pods[0].name);
+      // Always reset to first pod when namespace changes or if current selection is invalid
+      if (pods.length > 0) {
+        const currentPodExists = pods.some(p => p.name === selectedPod);
+        if (!currentPodExists) {
+          setSelectedPod(pods[0].name);
+        }
+      } else {
+        setSelectedPod("");
       }
     } catch (e) {
       console.error("Failed to load pods:", e);
       setAvailablePods([]);
+      setSelectedPod("");
     }
   };
 
@@ -110,25 +117,42 @@ export function Dashboard() {
     setIsStreaming(true);
     setLogLines([]);
 
+    // Track seen log entries to avoid duplicates
+    const seenEntries = new Set<string>();
+
     // Poll for logs every 2 seconds
     logIntervalRef.current = setInterval(async () => {
       try {
         const logEntries = await tauri.streamPodLogs(selectedPod, selectedNamespace);
         if (logEntries.length > 0) {
-          const newLines: LogLine[] = logEntries.map(entry => ({
-            timestamp: entry.timestamp,
-            pod: entry.pod,
-            container: entry.container,
-            message: entry.message
-          }));
-          setLogLines(prev => {
-            // Keep last 1000 lines to prevent memory issues
-            const combined = [...prev, ...newLines];
-            if (combined.length > 1000) {
-              return combined.slice(-1000);
-            }
-            return combined;
-          });
+          // Only add new log entries we haven't seen before
+          const newLines: LogLine[] = logEntries
+            .filter(entry => {
+              // Create a unique key for each log entry
+              const key = `${entry.timestamp}:${entry.container}:${entry.message}`;
+              if (seenEntries.has(key)) {
+                return false;
+              }
+              seenEntries.add(key);
+              return true;
+            })
+            .map(entry => ({
+              timestamp: entry.timestamp,
+              pod: entry.pod,
+              container: entry.container,
+              message: entry.message
+            }));
+          
+          if (newLines.length > 0) {
+            setLogLines(prev => {
+              // Keep last 1000 lines to prevent memory issues
+              const combined = [...prev, ...newLines];
+              if (combined.length > 1000) {
+                return combined.slice(-1000);
+              }
+              return combined;
+            });
+          }
         }
       } catch (e) {
         console.error("Failed to fetch logs:", e);
