@@ -3,10 +3,14 @@
 use crate::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use std::process::Command;
+use tracing;
 
-const CLUSTER_NAME: &str = "cto-lite";
+const CLUSTER_NAME: &str = "cto";
 
-/// Types of Kubernetes clusters we can detect
+/// Check if a cluster name matches our CTO cluster pattern
+fn is_cto_cluster(context: &str) -> bool {
+    // Match any kind-cto* cluster (cto, cto-lite, cto-dev, etc.)
+    context.starts_with("kind-cto")
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ClusterType {
     /// Kind cluster (what we create)
@@ -974,4 +978,350 @@ pub async fn use_existing_cluster(
         nodes,
         kubeconfig_path: kubeconfig,
     })
+}
+
+// ============================================================================
+// Smart Initialization - Zero Friction Setup
+// ============================================================================
+
+/// Result of smart initialization
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SmartInitResult {
+    /// Whether Docker was started
+    pub docker_started: bool,
+    /// Whether a cluster is ready
+    pub cluster_ready: bool,
+    /// The context being used
+    pub context: String,
+    /// What actions were taken
+    pub actions: Vec<String>,
+    /// Any errors that occurred
+    pub errors: Vec<String>,
+    /// Whether user intervention is required
+    pub needs_user_action: bool,
+    /// Message for user if intervention needed
+    pub user_message: Option<String>,
+}
+
+/// Smart initialization - fully automated setup
+/// This is the main entry point for zero-touch initialization
+#[tauri::command]
+pub async fn smart_init(
+    db: tauri::State<'_, crate::db::Database>,
+) -> Result<SmartInitResult, AppError> {
+    tracing::info!("Starting smart initialization...");
+    
+    let mut result = SmartInitResult {
+        docker_started: false,
+        cluster_ready: false,
+        context: String::new(),
+        actions: Vec::new(),
+        errors: Vec::new(),
+        needs_user_action: false,
+        user_message: None,
+    };
+
+    // Step 1: Check and start Docker
+    tracing::info!("Step 1: Checking container runtime...");
+    match check_and_start_runtime().await {
+        Ok(started) => {
+            if started {
+                result.docker_started = true;
+                result.actions.push("Started Docker container runtime".to_string());
+            } else {
+                result.actions.push("Docker was already running".to_string());
+            }
+        }
+        Err(e) => {
+            tracing::error!("Failed to start Docker: {}", e);
+            result.errors.push(format!("Docker: {}", e));
+        }
+    }
+
+    // Step 2: Wait for Docker to be fully ready
+    if result.docker_started {
+        tracing::info!("Waiting for Docker daemon to be ready...");
+        if let Err(e) = wait_for_docker_ready(30) {
+            tracing::warn!("Docker ready check timed out: {}", e);
+            result.actions.push("Waiting for Docker (may still be starting)".to_string());
+        }
+    }
+
+    // Step 3: Check/install Kind
+    tracing::info!("Step 2: Checking Kind installation...");
+    match ensure_kind_installed().await {
+        Ok(true) => {
+            result.actions.push("Kind installed (or already present)".to_string());
+        }
+        Ok(false) => {
+            result.actions.push("Kind binary found".to_string());
+        }
+        Err(e) => {
+            tracing::error!("Failed to install Kind: {}", e);
+            result.errors.push(format!("Kind installation: {}", e));
+            result.needs_user_action = true;
+            result.user_message = Some(
+                "Failed to install Kind. Please run: brew install kind".to_string()
+            );
+        }
+    }
+
+    // Step 4: Check for existing clusters
+    tracing::info!("Step 3: Checking for existing clusters...");
+    let existing = detect_existing_clusters().await?;
+    
+    // Check if CTO cluster exists
+    let cto_context = format!("kind-{}", CLUSTER_NAME);
+    let cto_cluster = existing.clusters.iter()
+        .find(|c| c.context == cto_context);
+    
+    if let Some(cluster) = cto_cluster {
+        if cluster.is_running {
+            tracing::info!("Found existing CTO cluster running");
+            result.actions.push(format!(
+                "Using existing cluster '{}' (v{})", 
+                cluster.context, 
+                cluster.kubernetes_version.as_deref().unwrap_or("unknown")
+            ));
+            result.cluster_ready = true;
+            result.context = cluster.context.clone();
+            
+            // Switch to it
+            let _ = Command::new("kubectl")
+                .args(["config", "use-context", &cluster.context])
+                .output();
+        } else {
+            tracing::info!("Found existing CTO cluster (not running)");
+            result.actions.push("Found CTO cluster (not running)".to_string());
+            // For now, we'll still try to create a new one since this one isn't running
+        }
+    }
+
+    // Step 5: If no CTO cluster, check for other usable clusters
+    if !result.cluster_ready {
+        tracing::info!("No CTO cluster found, checking for alternatives...");
+        
+        // Look for running Docker Desktop K8s, OrbStack, etc.
+        let usable = existing.clusters.iter()
+            .filter(|c| c.is_running && c.cluster_type != ClusterType::Other)
+            .collect::<Vec<_>>();
+        
+        if let Some(best) = usable.first() {
+            tracing::info!("Found alternative cluster: {}", best.context);
+            result.actions.push(format!(
+                "Using existing {} cluster", 
+                match best.cluster_type {
+                    ClusterType::DockerDesktop => "Docker Desktop",
+                    ClusterType::OrbStack => "OrbStack",
+                    ClusterType::RancherDesktop => "Rancher Desktop",
+                    _ => "Kubernetes",
+                }
+            ));
+            
+            // Switch to it
+            let output = Command::new("kubectl")
+                .args(["config", "use-context", &best.context])
+                .output();
+            
+            if output.map(|o| o.status.success()).unwrap_or(false) {
+                result.cluster_ready = true;
+                result.context = best.context.clone();
+                
+                // Save preference
+                let _ = db.set_config("prefer_existing_cluster", "true");
+                let _ = db.set_config("cluster_context", &best.context);
+            }
+        }
+    }
+
+    // Step 6: If still no cluster, create one
+    if !result.cluster_ready {
+        tracing::info!("No usable cluster found, creating new CTO cluster...");
+        result.actions.push("Creating new CTO cluster".to_string());
+        
+        // Check prerequisites first
+        if !is_kind_installed() {
+            result.errors.push("Kind is not installed".to_string());
+            result.needs_user_action = true;
+            result.user_message = Some(
+                "Please install Kind: brew install kind".to_string()
+            );
+            return Ok(result);
+        }
+
+        // Create the cluster
+        match create_cluster().await {
+            Ok(status) => {
+                if status.running {
+                    result.cluster_ready = true;
+                    result.context = cto_context.clone();
+                    result.actions.push("CTO cluster created and running".to_string());
+                    
+                    // Save preference
+                    let _ = db.set_config("prefer_cto_cluster", "true");
+                    let _ = db.set_config("cluster_context", &cto_context);
+                } else {
+                    result.errors.push("Cluster created but not running".to_string());
+                    result.needs_user_action = true;
+                    result.user_message = Some(
+                        "Cluster was created but is not yet ready. Please wait...".to_string()
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to create cluster: {}", e);
+                result.errors.push(format!("Cluster creation: {}", e));
+                result.needs_user_action = true;
+                result.user_message = Some(
+                    "Failed to create cluster. Check logs for details.".to_string()
+                );
+            }
+        }
+    }
+
+    // Final status
+    tracing::info!(
+        "Smart init complete: docker_started={}, cluster_ready={}, context={}",
+        result.docker_started,
+        result.cluster_ready,
+        result.context
+    );
+
+    Ok(result)
+}
+
+/// Check and start container runtime if needed
+async fn check_and_start_runtime() -> AppResult<bool> {
+    use crate::runtime as rt;
+    
+    // Check if Docker is already running
+    if rt::is_runtime_running(rt::ContainerRuntime::Docker) {
+        return Ok(false);
+    }
+
+    // Check if Docker is available (installed)
+    if !rt::is_docker_available() {
+        return Err(AppError::RuntimeNotFound(
+            "Docker not found. Please install Docker Desktop.".to_string()
+        ));
+    }
+
+    // Try to start Docker
+    tracing::info!("Docker is installed but not running, attempting to start...");
+    rt::start_runtime(rt::ContainerRuntime::Docker)?;
+    
+    Ok(true)
+}
+
+/// Wait for Docker daemon to be ready
+fn wait_for_docker_ready(timeout_secs: u64) -> AppResult<()> {
+    use crate::runtime as rt;
+    rt::wait_for_docker_ready(timeout_secs)
+}
+
+/// Ensure Kind is installed, download if missing
+async fn ensure_kind_installed() -> AppResult<bool> {
+    use std::os::unix::fs::PermissionsExt;
+    
+    if is_kind_installed() {
+        return Ok(false);
+    }
+
+    tracing::info!("Kind not found, downloading...");
+
+    // Determine architecture
+    let arch = if cfg!(target_arch = "aarch64") {
+        "arm64"
+    } else {
+        "amd64"
+    };
+
+    // Download URL for Kind
+    let url = format!(
+        "https://kind.sigs.k8s.io/dl/v0.25.0/kind-darwin-{}",
+        arch
+    );
+
+    // Download to temp location
+    let temp_dir = std::env::temp_dir();
+    let kind_path = temp_dir.join("kind");
+
+    let response = reqwest::Client::new()
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| AppError::HttpError(e))?;
+
+    if !response.status().is_success() {
+        return Err(AppError::HttpError(
+            reqwest::Error::from(response.error_for_status().unwrap_err())
+        ));
+    }
+
+    let bytes = response.bytes()
+        .await
+        .map_err(|e| AppError::HttpError(e))?;
+
+    // Write to temp file
+    std::fs::write(&kind_path, &bytes)?;
+
+    // Make executable
+    let mut perms = std::fs::metadata(&kind_path)?.permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&kind_path, perms)?;
+
+    // Move to ~/.local/bin (create if needed)
+    let local_bin = dirs::home_dir()
+        .ok_or_else(|| AppError::CommandFailed("Cannot find home directory".to_string()))?
+        .join(".local/bin");
+    
+    std::fs::create_dir_all(&local_bin)?;
+    
+    let final_path = local_bin.join("kind");
+    std::fs::rename(&kind_path, &final_path)?;
+
+    // Ensure ~/.local/bin is in PATH
+    let path_var = std::env::var("PATH").unwrap_or_default();
+    if !path_var.contains(".local/bin") {
+        tracing::warn!("~/.local/bin is not in PATH. Consider adding it to your shell profile.");
+    }
+
+    tracing::info!("Kind installed to: {:?}", final_path);
+    Ok(true)
+}
+
+/// Quick health check - returns what's ready
+#[tauri::command]
+pub async fn quick_health_check() -> Result<serde_json::Value, AppError> {
+    use crate::runtime as rt;
+    
+    let docker_ready = rt::is_runtime_running(rt::ContainerRuntime::Docker);
+    let kind_ready = is_kind_installed();
+    let cluster = get_cluster_status().await.ok();
+    let cluster_ready = cluster.as_ref().map(|c| c.running).unwrap_or(false);
+
+    Ok(serde_json::json!({
+        "docker": {
+            "available": rt::is_docker_available(),
+            "ready": docker_ready,
+        },
+        "kind": {
+            "installed": kind_ready,
+        },
+        "cluster": {
+            "exists": cluster.as_ref().map(|c| c.exists).unwrap_or(false),
+            "ready": cluster_ready,
+            "name": cluster.map(|c| c.name).unwrap_or_else(|| "".to_string()),
+        },
+        "overall": docker_ready && cluster_ready,
+        "message": if docker_ready && cluster_ready {
+            "Everything is ready!"
+        } else if !docker_ready {
+            "Docker is not running"
+        } else if !cluster_ready {
+            "Kubernetes cluster is not ready"
+        } else {
+            "Some dependencies are missing"
+        }
+    }))
 }

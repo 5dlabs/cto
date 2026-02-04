@@ -6,6 +6,7 @@
 //! - Helm chart deployment
 //! - API key storage (via system keychain)
 //! - Workflow triggering and monitoring
+//! - MCP server management for IDE integration
 
 mod commands;
 mod docker;
@@ -56,6 +57,17 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // MCP Server commands
+            commands::spawn_mcp_server,
+            commands::mcp_call,
+            commands::get_mcp_tools,
+            commands::call_mcp_tool,
+            commands::kill_mcp_server,
+            // MCP Task commands (convenience wrappers)
+            commands::get_tasks,
+            commands::create_task,
+            commands::update_task_status,
+            commands::trigger_mcp_workflow,
             // Setup commands
             commands::check_docker,
             commands::check_kind,

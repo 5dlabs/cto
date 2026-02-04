@@ -1,4 +1,4 @@
-//! Error types for CTO Lite
+//! Error types for CTO
 
 use serde::Serialize;
 use thiserror::Error;
