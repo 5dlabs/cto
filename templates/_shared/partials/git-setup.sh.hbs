@@ -33,6 +33,14 @@ if [ -d "$REPO_NAME/.git" ]; then
   # Also clean up any ref locks
   find .git/refs -name "*.lock" -delete 2>/dev/null || true
   
+  # Check for and fix corrupted git index
+  # "index file smaller than expected" means the index is corrupted
+  if ! git status >/dev/null 2>&1; then
+    echo "  ⚠️ Git index appears corrupted, rebuilding..."
+    rm -f .git/index
+    git reset 2>/dev/null || true
+  fi
+  
   # Clean any dirty state from previous runs before checkout
   # This prevents "Your local changes would be overwritten by checkout" errors
   if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
@@ -47,6 +55,8 @@ if [ -d "$REPO_NAME/.git" ]; then
     echo "  ⚠️ Fetch failed, resetting remote refs"
     # If fetch still fails, remove the corrupted refs and try again
     rm -rf .git/refs/remotes/origin/*
+    # Also try removing corrupted index if it wasn't caught earlier
+    rm -f .git/index
     git fetch --all --prune || true
   }
 else
