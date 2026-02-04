@@ -82,7 +82,7 @@ regex = "1.12"
 handlebars = "6.4.0"
 
 # Testing
-mockall = "0.13"
+mockall = "0.14"
 wiremock = "0.6"
 serial_test = "3.3"
 
