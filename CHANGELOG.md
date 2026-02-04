@@ -3,6 +3,51 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.37](https://github.com/5dlabs/cto/compare/v0.2.36...v0.2.37) (2026-02-04)
+
+
+### ✨ Features
+
+* **cto-app:** React UI Scaffolding - Phase 1 ([#4245](https://github.com/5dlabs/cto/issues/4245)) ([de3fbfe](https://github.com/5dlabs/cto/commit/de3fbfe3db61564fd5c1dbadb3068f51055d7187))
+* **intake-agent:** add Anthropic API key support for Claude provider ([fadf37e](https://github.com/5dlabs/cto/commit/fadf37eaed0477ad080ebea44f819341b0d1886c))
+* **intake-agent:** implement 3-agent debate pattern with arbiter decision ([d4dff79](https://github.com/5dlabs/cto/commit/d4dff79040fed9bf970acf2a46aa9e33317e5dc4))
+* **tasks:** AlertHub intake output with 10 tasks and prompts ([#4242](https://github.com/5dlabs/cto/issues/4242)) ([53fff1c](https://github.com/5dlabs/cto/commit/53fff1c0ac567baf229667bb292152af17cf685c))
+* **tools:** add summary log for tool discovery ([#4219](https://github.com/5dlabs/cto/issues/4219)) ([c947dff](https://github.com/5dlabs/cto/commit/c947dff1bd258a48452272ed6d39b12bdc789db7))
+
+
+### 🐛 Bug Fixes
+
+* **ci:** remove frozen-lockfile flag for bun due to known issues ([#4279](https://github.com/5dlabs/cto/issues/4279)) ([9e24e7e](https://github.com/5dlabs/cto/commit/9e24e7e073178e458e3b566da78be47b90aca780))
+* **controller:** make GITHUB_APP_INSTALLATION_ID optional ([#4221](https://github.com/5dlabs/cto/issues/4221)) ([ce985c1](https://github.com/5dlabs/cto/commit/ce985c19fa09cf92699359bd033600f9fcece935))
+* **detection:** route Java/Ruby/PHP to Generic instead of Nova ([#4254](https://github.com/5dlabs/cto/issues/4254)) ([5996f56](https://github.com/5dlabs/cto/commit/5996f56cf3651ebd59bf49f6e5369566b200606a))
+* **intake-agent:** add --help and --version CLI flag support ([#4266](https://github.com/5dlabs/cto/issues/4266)) ([f62ddd3](https://github.com/5dlabs/cto/commit/f62ddd3184322f347ba993c22f3e08698f8dc9a6))
+* **intake-agent:** add missing @streamparser/json dependency ([#4261](https://github.com/5dlabs/cto/issues/4261)) ([e72ef24](https://github.com/5dlabs/cto/commit/e72ef24e1ed8a91a7e2cd53cb8168b480c72bf70))
+* **intake-agent:** enforce single-concern subtasks per SUBTASK-SPLITTING-GUIDE ([115f6e2](https://github.com/5dlabs/cto/commit/115f6e24be7ab863495e92bbc051fb5deafc1dc8))
+* **intake-agent:** improve single-concern validation accuracy ([8936f07](https://github.com/5dlabs/cto/commit/8936f074e386a7fb0ed7015dce0e081f6a7889b1))
+* **pm:** remove unnecessary hashes from raw string literal ([37faa29](https://github.com/5dlabs/cto/commit/37faa29268a8191f2d5669496a2115d96cf33673))
+* **pm:** resolve all clippy pedantic warnings in status-sync ([8e9b0f6](https://github.com/5dlabs/cto/commit/8e9b0f6af71d8a0dd03886293e0aa8936f5666c9))
+* **pm:** resolve clippy errors in agent_interactions and detection/utils ([#4211](https://github.com/5dlabs/cto/issues/4211)) ([96057d0](https://github.com/5dlabs/cto/commit/96057d01ac0642431bf9e2003df5916b21e13ab8))
+* **pm:** use GitHub API instead of gh CLI for CI failure handler ([#4208](https://github.com/5dlabs/cto/issues/4208)) ([9a0f78e](https://github.com/5dlabs/cto/commit/9a0f78eccb15df3eb6cfb844548ad7876acaa3a8))
+* **templates:** remove unnecessary DNS checks ([#4262](https://github.com/5dlabs/cto/issues/4262)) ([b72170e](https://github.com/5dlabs/cto/commit/b72170e198368f8be15de182b09a27fc5b978878))
+* **tools:** add timeout to stdio MCP init to prevent hanging ([706a17d](https://github.com/5dlabs/cto/commit/706a17d1a60d8cff0ab66a8bcf6a5932b988f497))
+* **tools:** limit concurrent stdio init + add smoke tests to prevent regressions ([#4224](https://github.com/5dlabs/cto/issues/4224)) ([e9556ab](https://github.com/5dlabs/cto/commit/e9556ab61a163f50d0d32d69bf4d8b1ee08821bd))
+* **tools:** LRU connection pool + lint fixes ([#4218](https://github.com/5dlabs/cto/issues/4218)) ([34ff24b](https://github.com/5dlabs/cto/commit/34ff24bcaea6d1aa34954c724ee039f61eaf2453))
+
+
+### 📚 Documentation
+
+* **prds:** add Morgan Coordinator PRD and ACP research notes ([#4214](https://github.com/5dlabs/cto/issues/4214)) ([ad3d84c](https://github.com/5dlabs/cto/commit/ad3d84cd3c7c1abe66c5e6bf40f3c2da7e33a3f4))
+* **prds:** Agent Capability PRDs - LSP, Self-Diagnosis, Recursive Learning ([#4225](https://github.com/5dlabs/cto/issues/4225)) ([5ddacec](https://github.com/5dlabs/cto/commit/5ddacece9fd645c2b5749151a587ce2e6775c2a7))
+
+
+### 🔧 Maintenance
+
+* **deps:** bump @types/node from 20.19.28 to 25.2.0 in /apps/web ([#4238](https://github.com/5dlabs/cto/issues/4238)) ([300a220](https://github.com/5dlabs/cto/commit/300a220ae3d28ed740dd6e7be04d7a29ba054953))
+* **deps:** bump jsdom from 27.4.0 to 28.0.0 in /apps/web ([#4237](https://github.com/5dlabs/cto/issues/4237)) ([7ce9421](https://github.com/5dlabs/cto/commit/7ce942187b883d334072269dc409a47742cb4d18))
+* **deps:** bump octocrab from 0.38.0 to 0.49.5 ([#4234](https://github.com/5dlabs/cto/issues/4234)) ([bb3415d](https://github.com/5dlabs/cto/commit/bb3415da16a1b77cac0c7e90de1a8a06fb713b0c))
+* **deps:** bump the marketing-npm group in /marketing with 7 updates ([#4230](https://github.com/5dlabs/cto/issues/4230)) ([2a35dc9](https://github.com/5dlabs/cto/commit/2a35dc951a35fd9c83c2b291f5637e0e7ba17b2b))
+* **deps:** bump the rust-minor group across 1 directory with 2 updates ([#4255](https://github.com/5dlabs/cto/issues/4255)) ([8c24c59](https://github.com/5dlabs/cto/commit/8c24c597dca3ea76fcbf125e8d774bece0778888))
+
 ## [0.2.36](https://github.com/5dlabs/cto/compare/v0.2.35...v0.2.36) (2026-02-01)
 
 
