@@ -926,7 +926,7 @@ checksum = "c3e64b0cc0439b12df2fa678eae89a1c56a529fd067a9115f7827f1fffd22b32"
 
 [[package]]
 name = "cli"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -934,7 +934,7 @@ dependencies = [
  "dashmap",
  "futures",
  "handlebars",
- "k8s-openapi 0.22.0",
+ "k8s-openapi",
  "opentelemetry 0.30.0",
  "regex",
  "schemars 0.8.22",
@@ -996,7 +996,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "serde",
  "serde_json",
@@ -1039,7 +1039,7 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
 name = "controller"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1050,7 +1050,7 @@ dependencies = [
  "dashmap",
  "futures",
  "handlebars",
- "k8s-openapi 0.22.0",
+ "k8s-openapi",
  "kube",
  "lazy_static",
  "mockall",
@@ -2045,7 +2045,7 @@ dependencies = [
 
 [[package]]
 name = "experience"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2629,7 +2629,7 @@ dependencies = [
 
 [[package]]
 name = "gpu"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2811,7 +2811,7 @@ dependencies = [
 
 [[package]]
 name = "healer"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "axum",
@@ -3285,7 +3285,7 @@ dependencies = [
 
 [[package]]
 name = "installer"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3295,7 +3295,7 @@ dependencies = [
  "dirs 5.0.1",
  "futures",
  "indicatif",
- "k8s-openapi 0.22.0",
+ "k8s-openapi",
  "kube",
  "metal",
  "reqwest 0.12.28",
@@ -3322,7 +3322,7 @@ dependencies = [
 
 [[package]]
 name = "intake"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3586,19 +3586,6 @@ dependencies = [
 
 [[package]]
 name = "k8s-openapi"
-version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19501afb943ae5806548bc3ebd7f3374153ca057a38f480ef30adfde5ef09755"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "serde",
- "serde-value",
- "serde_json",
-]
-
-[[package]]
-name = "k8s-openapi"
 version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c75b990324f09bef15e791606b7b7a296d02fc88a344f6eba9390970a870ad5"
@@ -3641,7 +3628,7 @@ version = "0.98.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32053dc495efad4d188c7b33cc7c02ef4a6e43038115348348876efd39a53cba"
 dependencies = [
- "k8s-openapi 0.24.0",
+ "k8s-openapi",
  "kube-client",
  "kube-core",
  "kube-derive",
@@ -3669,7 +3656,7 @@ dependencies = [
  "hyper-timeout",
  "hyper-util",
  "jsonpath-rust",
- "k8s-openapi 0.24.0",
+ "k8s-openapi",
  "kube-core",
  "pem",
  "rand 0.8.5",
@@ -3698,7 +3685,7 @@ dependencies = [
  "form_urlencoded",
  "http",
  "json-patch",
- "k8s-openapi 0.24.0",
+ "k8s-openapi",
  "schemars 0.8.22",
  "serde",
  "serde-value",
@@ -3736,7 +3723,7 @@ dependencies = [
  "hostname",
  "json-patch",
  "jsonptr",
- "k8s-openapi 0.24.0",
+ "k8s-openapi",
  "kube-client",
  "parking_lot",
  "pin-project",
@@ -3866,7 +3853,7 @@ dependencies = [
 
 [[package]]
 name = "linear-sink"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4054,7 +4041,7 @@ dependencies = [
 
 [[package]]
 name = "metal"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4243,7 +4230,7 @@ dependencies = [
 
 [[package]]
 name = "notify"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5269,7 +5256,7 @@ dependencies = [
 
 [[package]]
 name = "pm"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5280,7 +5267,7 @@ dependencies = [
  "config",
  "hex",
  "hmac",
- "k8s-openapi 0.22.0",
+ "k8s-openapi",
  "kube",
  "linear-sink",
  "regex",
@@ -5954,7 +5941,7 @@ dependencies = [
 
 [[package]]
 name = "research"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "chromiumoxide",
@@ -7595,7 +7582,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures",
- "k8s-openapi 0.24.0",
+ "k8s-openapi",
  "kube",
  "reqwest 0.12.28",
  "schemars 0.8.22",
@@ -7972,7 +7959,7 @@ dependencies = [
 
 [[package]]
 name = "tools"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "axum",
@@ -7982,7 +7969,7 @@ dependencies = [
  "dirs 6.0.0",
  "env_logger",
  "futures",
- "k8s-openapi 0.22.0",
+ "k8s-openapi",
  "kube",
  "libc",
  "log",
@@ -8392,7 +8379,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.2.36"
+version = "0.2.37"
 dependencies = [
  "anyhow",
  "clap",
