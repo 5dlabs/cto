@@ -712,19 +712,20 @@ impl ServerConnectionPool {
             conn.server_name.clone()
         };
 
-        tracing::info!("🔄 Initializing MCP server: {} (10s timeout)", server_name);
+        // 45s timeout: 30s for response read + 15s buffer for request/notification
+        tracing::info!("🔄 Initializing MCP server: {} (45s timeout)", server_name);
 
         match tokio::time::timeout(
-            tokio::time::Duration::from_secs(10),
+            tokio::time::Duration::from_secs(45),
             self.initialize_server_inner(connection, &server_name),
         )
         .await
         {
             Ok(result) => result,
             Err(_) => {
-                tracing::error!("⏰ [{server_name}] MCP server initialization timed out after 10s");
+                tracing::error!("⏰ [{server_name}] MCP server initialization timed out after 45s");
                 Err(anyhow::anyhow!(
-                    "MCP server '{server_name}' initialization timed out after 10s"
+                    "MCP server '{server_name}' initialization timed out after 45s"
                 ))
             }
         }
@@ -760,14 +761,15 @@ impl ServerConnectionPool {
         tracing::info!("✅ [{}] Initialize request sent successfully", server_name);
 
         // Read initialization response (with timeout to prevent hanging)
+        // 30s timeout allows for Docker image pulls and npm package downloads
         tracing::info!("🔄 [{}] About to read initialize response", server_name);
         let _init_response = tokio::time::timeout(
-            tokio::time::Duration::from_secs(8),
+            tokio::time::Duration::from_secs(30),
             self.read_response(connection.clone()),
         )
         .await
         .map_err(|_| {
-            anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 8s")
+            anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 30s")
         })??;
         tracing::info!(
             "✅ [{}] Initialize response received successfully",
@@ -1252,18 +1254,31 @@ impl BridgeState {
                         tracing::info!("🔄 [{}] Initializing stdio server...", server_name);
 
                         // Acquire semaphore permit to limit concurrent inits
-                        let _permit = stdio_sem.acquire().await.unwrap();
-                        tracing::info!("🔓 [{}] Acquired stdio init permit", server_name);
+                        // IMPORTANT: The permit is scoped to ONLY the initialization phase,
+                        // NOT the tool discovery phase. This allows other servers to start
+                        // initializing while this server does tool discovery.
+                        let init_result = {
+                            let _permit = stdio_sem.acquire().await.unwrap();
+                            tracing::info!("🔓 [{}] Acquired stdio init permit", server_name);
 
-                        match connection_pool.start_server(&server_name).await {
+                            let result = connection_pool.start_server(&server_name).await;
+                            
+                            // Small delay to ensure connection is stored before releasing permit
+                            if result.is_ok() {
+                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                            }
+                            
+                            tracing::info!("🔓 [{}] Releasing stdio init permit", server_name);
+                            result
+                            // _permit is dropped here, releasing the semaphore
+                        };
+
+                        match init_result {
                             Ok(_) => {
                                 tracing::info!(
                                     "✅ [{}] Server initialized successfully",
                                     server_name
                                 );
-
-                                // Small delay to ensure connection is stored
-                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                             }
                             Err(e) => {
                                 tracing::warn!(
@@ -1277,7 +1292,6 @@ impl BridgeState {
                                 ));
                             }
                         }
-                        // Permit is automatically released when _permit is dropped
                     } else {
                         tracing::info!(
                             "🔄 [{}] Skipping initialization for {} server",
