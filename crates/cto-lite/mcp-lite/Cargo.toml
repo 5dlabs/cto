@@ -12,6 +12,10 @@ license = "MIT"
 name = "mcp-lite"
 path = "src/main.rs"
 
+[lib]
+path = "src/lib.rs"
+name = "mcp_lite_lib"
+
 [dependencies]
 # Shared utilities
 cto-lite-common = { path = "../common" }
@@ -42,3 +46,4 @@ chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
+env_logger = "0.11"
