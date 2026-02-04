@@ -2002,7 +2002,7 @@ impl<'a> CodeResourceManager<'a> {
                                 volumes.iter().any(|vol| {
                                     vol.config_map
                                         .as_ref()
-                                        .and_then(|cm| cm.name)
+                                        .and_then(|cm| Some(cm.name))
                                         .is_some_and(|name| name == &cm_name)
                                 })
                             })
@@ -2034,7 +2034,7 @@ impl<'a> CodeResourceManager<'a> {
                                         volumes.iter().any(|vol| {
                                             vol.config_map
                                                 .as_ref()
-                                                .and_then(|cm| cm.name)
+                                                .and_then(|cm| Some(cm.name))
                                                 .is_some_and(|name| name == &cm_name)
                                         })
                                     })
