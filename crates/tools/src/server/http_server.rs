@@ -1503,9 +1503,10 @@ impl BridgeState {
             }
         }
 
-        // If there are missing servers, log them explicitly and FAIL
+        // If there are missing servers, log them as warnings (not errors)
+        // Only fail if ALL servers failed (no tools discovered at all)
         if !missing_servers.is_empty() {
-            tracing::error!(
+            tracing::warn!(
                 "⚠️  {} servers failed to provide tools:",
                 missing_servers.len()
             );
@@ -1514,15 +1515,25 @@ impl BridgeState {
                 let transport = transport_by_server
                     .get(server_name)
                     .unwrap_or(&unknown_transport);
-                tracing::error!("   - {} ({})", server_name, transport);
+                tracing::warn!("   - {} ({})", server_name, transport);
             }
 
-            // FAIL initialization if any configured servers provided 0 tools
-            return Err(anyhow::anyhow!(
-                "Tool discovery failed: {}/{} configured servers provided 0 tools. This indicates a misconfiguration or initialization failure. See logs above for details.",
-                missing_servers.len(),
-                all_configured_servers.len()
-            ));
+            // Only FAIL if NO tools were discovered at all
+            if available_tools.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Tool discovery failed: ALL {}/{} configured servers provided 0 tools. No tools available.",
+                    missing_servers.len(),
+                    all_configured_servers.len()
+                ));
+            }
+            
+            // Log warning but continue if some tools were discovered
+            tracing::warn!(
+                "⚠️  Continuing with {} tools from {} working servers ({} servers failed)",
+                available_tools.len(),
+                all_configured_servers.len() - missing_servers.len(),
+                missing_servers.len()
+            );
         }
 
         // Create or update the tool catalog ConfigMap
