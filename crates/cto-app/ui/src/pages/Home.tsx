@@ -24,16 +24,16 @@ export function Home({ onNavigate }: HomeProps) {
     try {
       const dockerRunning = await invoke<boolean>('check_docker_running');
       if (dockerRunning) {
-        setRuntimeStatus('docker');
+        const clusters = await invoke<string[]>('list_clusters');
+        if (clusters && clusters.length > 0) {
+          setRuntimeStatus('kind');
+        } else {
+          setRuntimeStatus('docker');
+        }
         return;
       }
 
-      const clusters = await invoke<string[]>('list_clusters');
-      if (clusters && clusters.length > 0) {
-        setRuntimeStatus('kind');
-      } else {
-        setRuntimeStatus('none');
-      }
+      setRuntimeStatus('none');
     } catch (e) {
       console.error('Failed to check runtime:', e);
       setRuntimeStatus('error');
