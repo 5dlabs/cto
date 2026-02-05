@@ -51,6 +51,42 @@ export function useDockerStatus() {
   return useAsync(() => tauri.checkDocker(), []);
 }
 
+/** Auto-start Docker if installed but not running */
+export function useAutoStartRuntime() {
+  const [state, setState] = useState<{
+    started: boolean;
+    runtime: string | null;
+    loading: boolean;
+    error: Error | null;
+  }>({
+    started: false,
+    runtime: null,
+    loading: true,
+    error: null,
+  });
+
+  const autoStart = useCallback(async () => {
+    setState((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const result = await tauri.autoDetectAndStartRuntime();
+      // fully_auto_runtime returns RuntimeEnvironment, check docker availability
+      if (result.docker_available) {
+        setState({ started: true, runtime: "Docker", loading: false, error: null });
+      } else {
+        setState({ started: false, runtime: null, loading: false, error: null });
+      }
+    } catch (e) {
+      setState((s) => ({ ...s, loading: false, error: e as Error }));
+    }
+  }, []);
+
+  useEffect(() => {
+    autoStart();
+  }, [autoStart]);
+
+  return state;
+}
+
 /** Hook to check Kind status */
 export function useKindStatus() {
   return useAsync(() => tauri.checkKind(), []);
@@ -264,4 +300,42 @@ export function useSystemCheck() {
       kind.refetch();
     },
   };
+}
+
+// ============================================================================
+// Smart Initialization Hook
+// ============================================================================
+
+/** Hook for smart zero-touch initialization */
+export function useSmartInit() {
+  const [state, setState] = useState<{
+    result: tauri.SmartInitResult | null;
+    loading: boolean;
+    error: Error | null;
+  }>({
+    result: null,
+    loading: false,
+    error: null,
+  });
+
+  const init = useCallback(async () => {
+    setState((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const result = await tauri.smartInit();
+      setState({ result, loading: false, error: null });
+    } catch (e) {
+      setState((s) => ({ ...s, loading: false, error: e as Error }));
+    }
+  }, []);
+
+  useEffect(() => {
+    init();
+  }, [init]);
+
+  return { ...state, init, refetch: init };
+}
+
+/** Hook for quick health check */
+export function useQuickHealth() {
+  return useAsync(() => tauri.quickHealthCheck(), []);
 }

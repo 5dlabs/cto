@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,35 +6,190 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Play, 
-  Square, 
-  Trash2, 
-  RefreshCw, 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Play,
+  Square,
+  Trash2,
+  RefreshCw,
   Loader2,
   CheckCircle,
   XCircle,
   Clock,
   GitBranch,
-  Terminal
+  Terminal,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import * as tauri from "@/lib/tauri";
 
 interface WorkflowListItem extends tauri.WorkflowStatus {}
+
+interface LogLine {
+  timestamp: string;
+  pod: string;
+  container: string;
+  message: string;
+}
 
 export function Dashboard() {
   const [workflows, setWorkflows] = useState<WorkflowListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
   const [workflowDetail, setWorkflowDetail] = useState<tauri.WorkflowDetail | null>(null);
-  const [logs, setLogs] = useState<string>("");
   const [showNewWorkflow, setShowNewWorkflow] = useState(false);
-  
+
+  // Log streaming state
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [followEnabled, setFollowEnabled] = useState(true);
+  const [selectedPod, setSelectedPod] = useState<string>("");
+  const [selectedNamespace, setSelectedNamespace] = useState<string>("default");
+  const [availablePods, setAvailablePods] = useState<tauri.PodInfo[]>([]);
+  const [namespaces, setNamespaces] = useState<string[]>([]);
+  const [logLines, setLogLines] = useState<LogLine[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const logIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // New workflow form
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
   const [prompt, setPrompt] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Load namespaces on mount
+  useEffect(() => {
+    loadNamespaces();
+  }, []);
+
+  // Load pods when namespace changes
+  useEffect(() => {
+    if (selectedNamespace) {
+      loadPods(selectedNamespace);
+    }
+  }, [selectedNamespace]);
+
+  // Stop and restart log streaming when pod/namespace selection changes
+  useEffect(() => {
+    if (isStreaming) {
+      stopLogStreaming();
+      // Auto-restart streaming with new selection
+      if (selectedPod && selectedNamespace) {
+        // Small delay to ensure cleanup completes
+        const timer = setTimeout(() => {
+          startLogStreaming();
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPod, selectedNamespace]);
+
+  // Auto-scroll when follow is enabled
+  useEffect(() => {
+    if (followEnabled && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [logLines, followEnabled]);
+
+  const loadNamespaces = async () => {
+    try {
+      const ns = await tauri.listNamespaces();
+      setNamespaces(ns.length > 0 ? ns : ["default", "cto", "argo"]);
+    } catch (e) {
+      console.error("Failed to load namespaces:", e);
+      setNamespaces(["default", "cto", "argo"]);
+    }
+  };
+
+  const loadPods = async (namespace: string) => {
+    try {
+      const pods = await tauri.listPodsWithStatus(namespace);
+      setAvailablePods(pods);
+      // Always reset to first pod when namespace changes or if current selection is invalid
+      if (pods.length > 0) {
+        const currentPodExists = pods.some(p => p.name === selectedPod);
+        if (!currentPodExists) {
+          setSelectedPod(pods[0].name);
+        }
+      } else {
+        setSelectedPod("");
+      }
+    } catch (e) {
+      console.error("Failed to load pods:", e);
+      setAvailablePods([]);
+      setSelectedPod("");
+    }
+  };
+
+  const startLogStreaming = useCallback(async () => {
+    if (!selectedPod) return;
+
+    setIsStreaming(true);
+    setLogLines([]);
+
+    // Track seen log entries to avoid duplicates
+    const seenEntries = new Set<string>();
+
+    // Poll for logs every 2 seconds
+    logIntervalRef.current = setInterval(async () => {
+      try {
+        const logEntries = await tauri.streamPodLogs(selectedPod, selectedNamespace);
+        if (logEntries.length > 0) {
+          // Only add new log entries we haven't seen before
+          const newLines: LogLine[] = logEntries
+            .filter(entry => {
+              // Create a unique key for each log entry
+              const key = `${entry.timestamp}:${entry.container}:${entry.message}`;
+              if (seenEntries.has(key)) {
+                return false;
+              }
+              seenEntries.add(key);
+              return true;
+            })
+            .map(entry => ({
+              timestamp: entry.timestamp,
+              pod: entry.pod,
+              container: entry.container,
+              message: entry.message
+            }));
+          
+          if (newLines.length > 0) {
+            setLogLines(prev => {
+              // Keep last 1000 lines to prevent memory issues
+              const combined = [...prev, ...newLines];
+              if (combined.length > 1000) {
+                return combined.slice(-1000);
+              }
+              return combined;
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch logs:", e);
+      }
+    }, 2000);
+  }, [selectedPod, selectedNamespace]);
+
+  const stopLogStreaming = useCallback(() => {
+    if (logIntervalRef.current) {
+      clearInterval(logIntervalRef.current);
+      logIntervalRef.current = null;
+    }
+    setIsStreaming(false);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopLogStreaming();
+    };
+  }, [stopLogStreaming]);
 
   const refreshWorkflows = useCallback(async () => {
     setLoading(true);
@@ -57,16 +212,6 @@ export function Dashboard() {
     }
   }, []);
 
-  const loadLogs = useCallback(async (workflowName: string, nodeName?: string) => {
-    try {
-      const logContent = await tauri.getWorkflowLogs(workflowName, nodeName);
-      setLogs(logContent);
-    } catch (e) {
-      console.error("Failed to load logs:", e);
-      setLogs("Failed to load logs");
-    }
-  }, []);
-
   useEffect(() => {
     refreshWorkflows();
     // Poll for updates every 10 seconds
@@ -77,19 +222,17 @@ export function Dashboard() {
   useEffect(() => {
     if (selectedWorkflow) {
       loadWorkflowDetail(selectedWorkflow);
-      loadLogs(selectedWorkflow);
       // Poll selected workflow every 5 seconds
       const interval = setInterval(() => {
         loadWorkflowDetail(selectedWorkflow);
-        loadLogs(selectedWorkflow);
       }, 5000);
       return () => clearInterval(interval);
     }
-  }, [selectedWorkflow, loadWorkflowDetail, loadLogs]);
+  }, [selectedWorkflow, loadWorkflowDetail]);
 
   const handleTrigger = async () => {
     if (!repoUrl || !prompt) return;
-    
+
     setSubmitting(true);
     try {
       const name = await tauri.triggerWorkflow(repoUrl, prompt, branch || undefined);
@@ -121,7 +264,11 @@ export function Dashboard() {
       if (selectedWorkflow === name) {
         setSelectedWorkflow(null);
         setWorkflowDetail(null);
-        setLogs("");
+        // Stop log streaming if active
+        if (isStreaming) {
+          stopLogStreaming();
+        }
+        setLogLines([]);
       }
       await refreshWorkflows();
     } catch (e) {
@@ -157,6 +304,17 @@ export function Dashboard() {
     return <Badge variant={variant}>{phase}</Badge>;
   };
 
+  const formatTimestamp = (ts: string) => {
+    if (!ts) return "";
+    try {
+      // Parse ISO timestamp
+      const date = new Date(ts);
+      return date.toLocaleTimeString();
+    } catch {
+      return ts.split("T")[1]?.split(".")[0] || ts;
+    }
+  };
+
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar - Workflow List */}
@@ -165,15 +323,15 @@ export function Dashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Workflows</h2>
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="icon"
                 onClick={refreshWorkflows}
                 disabled={loading}
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
-              <Button 
+              <Button
                 size="icon"
                 onClick={() => setShowNewWorkflow(true)}
               >
@@ -182,7 +340,7 @@ export function Dashboard() {
             </div>
           </div>
         </div>
-        
+
         <ScrollArea className="flex-1">
           {workflows.length === 0 && !loading && (
             <div className="p-4 text-center text-muted-foreground">
@@ -348,17 +506,119 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Logs */}
-            <div className="flex-1 flex flex-col min-h-0">
-              <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
-                <Terminal className="h-4 w-4" />
-                Logs
-              </h3>
-              <ScrollArea className="flex-1 bg-black rounded-lg p-3">
-                <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">
-                  {logs || "No logs available"}
-                </pre>
+            {/* Real-time Log Viewer */}
+            <div className="flex-1 flex flex-col min-h-0 border rounded-lg overflow-hidden">
+              <div className="bg-muted px-3 py-2 border-b flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Terminal className="h-4 w-4" />
+                    Live Logs
+                  </h3>
+                  {isStreaming && (
+                    <Badge variant="secondary" className="text-xs">
+                      <span className="w-2 h-2 rounded-full bg-green-500 mr-1 animate-pulse" />
+                      Streaming
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Namespace filter */}
+                  <Select value={selectedNamespace} onValueChange={setSelectedNamespace}>
+                    <SelectTrigger className="w-32 h-8 text-xs">
+                      <SelectValue placeholder="Namespace" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {namespaces.map((ns) => (
+                        <SelectItem key={ns} value={ns}>{ns}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Pod filter */}
+                  <Select value={selectedPod} onValueChange={setSelectedPod}>
+                    <SelectTrigger className="w-48 h-8 text-xs">
+                      <SelectValue placeholder="Select pod" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePods.map((pod) => (
+                        <SelectItem key={pod.name} value={pod.name}>
+                          {pod.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Follow toggle */}
+                  <Button
+                    variant={followEnabled ? "default" : "outline"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setFollowEnabled(!followEnabled)}
+                    title={followEnabled ? "Disable auto-scroll" : "Enable auto-scroll"}
+                  >
+                    {followEnabled ? (
+                      <Eye className="h-4 w-4" />
+                    ) : (
+                      <EyeOff className="h-4 w-4" />
+                    )}
+                  </Button>
+
+                  {/* Stream controls */}
+                  {!isStreaming ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={startLogStreaming}
+                      disabled={!selectedPod}
+                    >
+                      <Play className="h-3 w-3 mr-1" />
+                      Start
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={stopLogStreaming}
+                    >
+                      <Square className="h-3 w-3 mr-1" />
+                      Stop
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Log content */}
+              <ScrollArea ref={scrollRef} className="flex-1 bg-black p-3">
+                {logLines.length === 0 ? (
+                  <div className="text-muted-foreground text-sm text-center py-8">
+                    {isStreaming
+                      ? "Waiting for log entries..."
+                      : "Click 'Start' to begin streaming logs"}
+                  </div>
+                ) : (
+                  <div className="font-mono text-xs space-y-1">
+                    {logLines.map((line, idx) => (
+                      <div key={idx} className="flex gap-2 hover:bg-muted/30 px-1 rounded">
+                        <span className="text-muted-foreground shrink-0">
+                          {formatTimestamp(line.timestamp)}
+                        </span>
+                        <span className="text-blue-400 shrink-0">
+                          [{line.container}]
+                        </span>
+                        <span className="text-green-400 whitespace-pre-wrap break-all">
+                          {line.message}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </ScrollArea>
+
+              {/* Status bar */}
+              <div className="bg-muted px-3 py-1 border-t text-xs text-muted-foreground flex items-center justify-between">
+                <span>{logLines.length} lines</span>
+                <span>Following: {followEnabled ? "On" : "Off"}</span>
+              </div>
             </div>
           </div>
         ) : (

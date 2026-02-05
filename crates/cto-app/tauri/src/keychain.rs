@@ -10,7 +10,8 @@ pub struct GitHubToken {
 
 #[tauri::command]
 pub fn get_github_token() -> Result<Option<GitHubToken>, String> {
-    let entry = Entry::new("cto-app", "github_token");
+    let entry = Entry::new("cto-app", "github_token")
+        .map_err(|e| format!("Failed to access keychain: {}", e))?;
 
     match entry.get_password() {
         Ok(token) => Ok(Some(GitHubToken {
@@ -24,7 +25,8 @@ pub fn get_github_token() -> Result<Option<GitHubToken>, String> {
 
 #[tauri::command]
 pub fn set_github_token(token: &str) -> Result<(), String> {
-    let entry = Entry::new("cto-app", "github_token");
+    let entry = Entry::new("cto-app", "github_token")
+        .map_err(|e| format!("Failed to access keychain: {}", e))?;
 
     entry
         .set_password(token)
@@ -33,7 +35,8 @@ pub fn set_github_token(token: &str) -> Result<(), String> {
 
 #[tauri::command]
 pub fn delete_github_token() -> Result<(), String> {
-    let entry = Entry::new("cto-app", "github_token");
+    let entry = Entry::new("cto-app", "github_token")
+        .map_err(|e| format!("Failed to access keychain: {}", e))?;
 
     entry
         .delete_password()
@@ -42,7 +45,8 @@ pub fn delete_github_token() -> Result<(), String> {
 
 #[tauri::command]
 pub fn get_cf_tunnel_token() -> Result<Option<String>, String> {
-    let entry = Entry::new("cto-app", "cf_tunnel_token");
+    let entry = Entry::new("cto-app", "cf_tunnel_token")
+        .map_err(|e| format!("Failed to access keychain: {}", e))?;
 
     match entry.get_password() {
         Ok(token) => Ok(Some(token)),
@@ -53,7 +57,8 @@ pub fn get_cf_tunnel_token() -> Result<Option<String>, String> {
 
 #[tauri::command]
 pub fn set_cf_tunnel_token(token: &str) -> Result<(), String> {
-    let entry = Entry::new("cto-app", "cf_tunnel_token");
+    let entry = Entry::new("cto-app", "cf_tunnel_token")
+        .map_err(|e| format!("Failed to access keychain: {}", e))?;
 
     entry
         .set_password(token)

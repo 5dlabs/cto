@@ -15,6 +15,20 @@ pub struct RuntimeDetectionResult {
     pub error: Option<String>,
 }
 
+/// Docker installation and daemon status (matches UI DockerInfo interface)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DockerInfo {
+    /// Whether Docker is installed
+    pub installed: bool,
+    /// Whether Docker daemon is running
+    pub running: bool,
+    /// Docker version if running
+    pub version: Option<String>,
+    /// Runtime type (for UI compatibility)
+    #[serde(default)]
+    pub runtime: String,
+}
+
 /// Scan the complete runtime environment
 #[tauri::command]
 pub async fn scan_runtime_environment() -> Result<RuntimeEnvironment, AppError> {
@@ -62,4 +76,33 @@ pub async fn get_runtime_status() -> Result<Vec<RuntimeStatus>, AppError> {
 #[tauri::command]
 pub async fn check_docker_running() -> Result<bool, AppError> {
     Ok(rt::is_runtime_running(ContainerRuntime::Docker))
+}
+
+/// Check Docker installation and daemon status (legacy wrapper for UI compatibility)
+#[tauri::command]
+pub async fn check_docker() -> Result<DockerInfo, AppError> {
+    let running = rt::is_runtime_running(ContainerRuntime::Docker);
+    Ok(DockerInfo {
+        installed: rt::is_docker_available(),
+        running,
+        version: if running {
+            rt::get_runtime_version(ContainerRuntime::Docker)
+        } else {
+            None
+        },
+        runtime: "docker".to_string(),
+    })
+}
+
+/// Fully automated runtime detection and startup
+/// Zero-touch: detects, starts if needed, and waits for ready
+#[tauri::command]
+pub async fn auto_detect_and_start_runtime() -> Result<RuntimeEnvironment, AppError> {
+    rt::fully_auto_runtime()
+}
+
+/// Auto-detect and start container runtime (legacy, kept for compatibility)
+#[tauri::command]
+pub async fn auto_start_runtime() -> Result<Option<ContainerRuntime>, AppError> {
+    rt::auto_start_runtime()
 }

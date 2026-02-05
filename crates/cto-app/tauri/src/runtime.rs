@@ -195,8 +195,9 @@ fn get_docker_info() -> Result<RuntimeInfo, String> {
     let version = get_version("docker", "--version")
         .ok_or_else(|| "Failed to get Docker version".to_string())?;
 
-    let api_version = get_version("docker", "version", "--format", "{{.Server.APIVersion}}")
-        .unwrap_or_else(|| "unknown".to_string());
+    let api_version =
+        get_version_with_args("docker", &["version", "--format", "{{.Server.APIVersion}}"])
+            .unwrap_or_else(|| "unknown".to_string());
 
     let containers = parse_container_count("docker", "ps", "-aq")?;
     let images = parse_image_count("docker", "images", "-q")?;
@@ -241,8 +242,9 @@ fn get_podman_info() -> Result<RuntimeInfo, String> {
     let version = get_version("podman", "--version")
         .ok_or_else(|| "Failed to get Podman version".to_string())?;
 
-    let api_version = get_version("podman", "info", "--format", "{{.Host.ServerVersion}}")
-        .unwrap_or_else(|| "unknown".to_string());
+    let api_version =
+        get_version_with_args("podman", &["info", "--format", "{{.Host.ServerVersion}}"])
+            .unwrap_or_else(|| "unknown".to_string());
 
     let containers = parse_podman_container_count()?;
     let images = parse_podman_image_count()?;
@@ -312,9 +314,11 @@ pub fn ensure_kind_installed() -> Result<bool, String> {
         .map(|o| o.status.success())
         .unwrap_or(false)
     {
-        "/usr/local/bin/kind"
+        "/usr/local/bin/kind".to_string()
     } else {
-        format!("{}/bin/kind", std::env::home_dir()?.display())
+        let home =
+            std::env::home_dir().ok_or_else(|| "Could not determine home directory".to_string())?;
+        format!("{}/bin/kind", home.display())
     };
 
     let move_output = Command::new("sh")
@@ -573,42 +577,103 @@ fn parse_podman_image_count() -> Result<usize, String> {
     }
 }
 
-// Re-export for use as tauri commands
-#[cfg(feature = "shell-open")]
-mod shell_commands {
-    use super::*;
+/// Check if Docker is running and accessible
+#[tauri::command]
+pub fn check_docker_running() -> Result<bool, String> {
+    let output = Command::new("docker")
+        .arg("info")
+        .output()
+        .map_err(|e| format!("Failed to check Docker: {}", e))?;
 
-    #[tauri::command]
-    pub fn get_container_runtime_command() -> Result<ContainerRuntime, String> {
-        get_container_runtime()
-    }
-
-    #[tauri::command]
-    pub fn get_runtime_info_command(runtime: String) -> Result<RuntimeInfo, String> {
-        get_runtime_info(&runtime)
-    }
-
-    #[tauri::command]
-    pub fn ensure_kind_installed_command() -> Result<bool, String> {
-        ensure_kind_installed()
-    }
-
-    #[tauri::command]
-    pub fn is_kind_cluster_running_command(name: String) -> Result<bool, String> {
-        is_kind_cluster_running(&name)
-    }
-
-    #[tauri::command]
-    pub fn get_all_cluster_status_command() -> Result<Vec<ClusterStatus>, String> {
-        get_all_cluster_status()
-    }
-
-    pub use ensure_kind_installed_command as ensure_kind_installed;
-    pub use get_all_cluster_status_command as get_all_cluster_status;
-    pub use get_container_runtime_command as get_container_runtime;
-    pub use get_runtime_info_command as get_runtime_info;
-    pub use is_kind_cluster_running_command as is_kind_cluster_running;
+    Ok(output.status.success())
 }
 
-#[cfg(feature = "shell-open")]
-pub use shell_commands::*;
+/// Get Docker socket path
+#[tauri::command]
+pub fn get_docker_socket() -> Result<Option<String>, String> {
+    // Common Docker socket locations
+    let mut socket_paths = vec![
+        "/var/run/docker.sock".to_string(),
+        "/run/docker.sock".to_string(),
+    ];
+
+    // Add home directory socket if it exists
+    if let Some(home) = std::env::home_dir() {
+        let home_socket = home.join(".docker/run/docker.sock");
+        if home_socket.exists() {
+            socket_paths.push(home_socket.to_string_lossy().to_string());
+        }
+    }
+
+    for socket in socket_paths {
+        if std::path::Path::new(&socket).exists() {
+            return Ok(Some(socket));
+        }
+    }
+
+    // Check via environment variable
+    if let Ok(socket_path) = std::env::var("DOCKER_HOST") {
+        if !socket_path.is_empty() {
+            return Ok(Some(socket_path));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Auto-provision local runtime
+#[tauri::command]
+pub fn auto_provision_runtime() -> Result<String, String> {
+    // First, check if Docker is already available
+    if check_docker_running().unwrap_or(false) {
+        return Ok("docker".to_string());
+    }
+
+    // Check if Kind is installed
+    if check_command_exists("kind") {
+        // Check if a cluster exists
+        let output = Command::new("kind")
+            .arg("get")
+            .arg("clusters")
+            .output()
+            .map_err(|e| format!("Failed to check clusters: {}", e))?;
+
+        let clusters = String::from_utf8_lossy(&output.stdout);
+        if clusters.lines().any(|l| !l.trim().is_empty()) {
+            return Ok("kind".to_string());
+        }
+
+        // No cluster exists, create one
+        let create_output = Command::new("kind")
+            .arg("create")
+            .arg("cluster")
+            .arg("--name")
+            .arg("cto-local")
+            .output()
+            .map_err(|e| format!("Failed to create cluster: {}", e))?;
+
+        if create_output.status.success() {
+            return Ok("kind".to_string());
+        } else {
+            return Err(String::from_utf8_lossy(&create_output.stderr).to_string());
+        }
+    }
+
+    // Kind not installed, install it
+    ensure_kind_installed()?;
+
+    // Create cluster
+    let create_output = Command::new("kind")
+        .arg("create")
+        .arg("cluster")
+        .arg("--name")
+        .arg("cto-local")
+        .output()
+        .map_err(|e| format!("Failed to create cluster: {}", e))?;
+
+    if create_output.status.success() {
+        Ok("kind".to_string())
+    } else {
+        Err(String::from_utf8_lossy(&create_output.stderr).to_string())
+    }
+}

@@ -8,24 +8,24 @@ mod keychain;
 mod runtime;
 
 use commands::cluster::*;
-use pm_lite::github_app::{install_github_app, list_webhook_events, redeliver_webhook};
+use commands::{auto_provision_runtime, check_docker_running, get_docker_socket};
 
 fn main() {
+    // Initialize tracing subscriber for logging
+    tracing_subscriber::fmt::init();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
+            // Runtime detection commands
+            check_docker_running,
+            get_docker_socket,
+            auto_provision_runtime,
             // Cluster management commands
             list_clusters,
-            get_cluster_info,
-            start_cluster,
-            stop_cluster,
-            restart_cluster,
-            delete_cluster,
-            get_clusters_status,
-            // PM-Lite: GitHub App commands
-            install_github_app,
-            list_webhook_events,
-            redeliver_webhook,
+            get_cluster_status,
+            start_kind_cluster,
+            delete_kind_cluster,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

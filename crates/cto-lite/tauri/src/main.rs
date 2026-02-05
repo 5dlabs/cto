@@ -58,9 +58,12 @@ fn main() {
             // Runtime detection
             commands::runtime::detect_container_runtime,
             commands::runtime::get_runtime_status,
+            commands::runtime::check_docker,
             commands::runtime::check_docker_running,
             commands::runtime::scan_runtime_environment,
             commands::runtime::start_container_runtime,
+            commands::runtime::auto_detect_and_start_runtime,
+            commands::runtime::auto_start_runtime,
             // Cluster management
             commands::cluster::scan_environment,
             commands::cluster::detect_existing_clusters,
@@ -69,6 +72,8 @@ fn main() {
             commands::cluster::get_cluster_status,
             commands::cluster::list_clusters,
             commands::cluster::use_existing_cluster,
+            commands::cluster::smart_init,
+            commands::cluster::quick_health_check,
             // Configuration
             commands::config::get_config,
             commands::config::set_config,
@@ -103,6 +108,11 @@ fn main() {
             commands::mcp::stop_mcp_server,
             commands::mcp::get_mcp_status,
             commands::mcp::get_mcp_config,
+            // Log streaming
+            commands::logs::list_namespaces,
+            commands::logs::list_pods,
+            commands::logs::list_pods_with_status,
+            commands::logs::stream_pod_logs,
             // Updates
             commands::updates::check_updates,
             commands::updates::pull_updates,

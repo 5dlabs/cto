@@ -89,6 +89,29 @@ export interface WorkflowDetail {
   nodes: WorkflowNode[];
 }
 
+/** Full runtime environment scan result */
+export interface RuntimeEnvironment {
+  runtimes: RuntimeStatus[];
+  docker_available: boolean;
+  kubernetes_available: boolean;
+  recommended: string | null;
+  macos_version: string | null;
+  can_use_apple_virtualization: boolean;
+}
+
+/** Runtime status from environment scan */
+export interface RuntimeStatus {
+  runtime: string;
+  installed: boolean;
+  running: boolean;
+  version: string | null;
+  path: string | null;
+  docker_compatible: boolean;
+  kubernetes_included: boolean;
+  kind_compatible: boolean;
+  kind_provider: string | null;
+}
+
 // ============================================================================
 // Setup Commands
 // ============================================================================
@@ -96,6 +119,16 @@ export interface WorkflowDetail {
 /** Check Docker installation and daemon status */
 export async function checkDocker(): Promise<DockerInfo> {
   return invoke<DockerInfo>('check_docker');
+}
+
+/** Auto-detect and start container runtime */
+export async function autoStartRuntime(): Promise<string | null> {
+  return invoke<string | null>('auto_start_runtime');
+}
+
+/** Fully automated runtime detection and startup - zero touch */
+export async function autoDetectAndStartRuntime(): Promise<RuntimeEnvironment> {
+  return invoke<RuntimeEnvironment>('auto_detect_and_start_runtime');
 }
 
 /** Check Kind installation */
@@ -213,6 +246,50 @@ export async function checkArgo(): Promise<boolean> {
 }
 
 // ============================================================================
+// Log Streaming Commands
+// ============================================================================
+
+/** Log entry from pod */
+export interface LogEntry {
+  timestamp: string;
+  pod: string;
+  container: string;
+  namespace: string;
+  message: string;
+}
+
+/** Pod information */
+export interface PodInfo {
+  name: string;
+  phase: string;
+  containers: string[];
+}
+
+/** Get list of namespaces */
+export async function listNamespaces(): Promise<string[]> {
+  return invoke<string[]>('list_namespaces');
+}
+
+/** Get list of pods in a namespace */
+export async function listPods(namespace?: string): Promise<string[]> {
+  return invoke<string[]>('list_pods', { namespace });
+}
+
+/** Get pods with status information */
+export async function listPodsWithStatus(namespace?: string): Promise<PodInfo[]> {
+  return invoke<PodInfo[]>('list_pods_with_status', { namespace });
+}
+
+/** Stream logs from a specific pod */
+export async function streamPodLogs(
+  podName: string,
+  namespace?: string,
+  container?: string
+): Promise<LogEntry[]> {
+  return invoke<LogEntry[]>('stream_pod_logs', { podName, namespace, container });
+}
+
+// ============================================================================
 // Helm Commands
 // ============================================================================
 
@@ -258,4 +335,34 @@ export async function uninstallChart(): Promise<void> {
 /** Update Helm dependencies */
 export async function updateHelmDependencies(): Promise<void> {
   return invoke('update_helm_dependencies');
+}
+
+// ============================================================================
+// Smart Initialization Commands
+// ============================================================================
+
+/** Smart initialization - fully automated zero-touch setup */
+export interface SmartInitResult {
+  docker_started: boolean;
+  cluster_ready: boolean;
+  context: string;
+  actions: string[];
+  errors: string[];
+  needs_user_action: boolean;
+  user_message: string | null;
+}
+
+export async function smartInit(): Promise<SmartInitResult> {
+  return invoke<SmartInitResult>('smart_init');
+}
+
+/** Quick health check */
+export async function quickHealthCheck(): Promise<{
+  docker: { available: boolean; ready: boolean };
+  kind: { installed: boolean };
+  cluster: { exists: boolean; ready: boolean; name: string };
+  overall: boolean;
+  message: string;
+}> {
+  return invoke('quick_health_check');
 }
