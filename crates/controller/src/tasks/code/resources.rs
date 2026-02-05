@@ -239,7 +239,110 @@ impl<'a> CodeResourceManager<'a> {
         self.cleanup_old_jobs(code_run).await?;
         self.cleanup_old_configmaps(code_run).await?;
 
+        // Clean up the workspace subdirectory to prevent disk exhaustion
+        self.cleanup_workspace_subdir(code_run).await?;
+
         Ok(Action::await_change())
+    }
+
+    /// Creates a cleanup Job to remove the workspace subdirectory for this CodeRun.
+    /// This prevents workspace directories from accumulating on the shared PVC.
+    async fn cleanup_workspace_subdir(&self, code_run: &CodeRun) -> Result<()> {
+        let coderun_name = code_run.name_any();
+        let coderun_uid = code_run.metadata.uid.as_deref().unwrap_or("nouid");
+        let workspace_subdir = format!(
+            "runs/{}-{}",
+            coderun_name,
+            &coderun_uid[..coderun_uid.len().min(8)]
+        );
+
+        // Determine the PVC name (same logic as in create_resources)
+        let classifier = AgentClassifier::new();
+        let template_setting = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|c| c.settings.get("template"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let is_healer = template_setting.starts_with("healer/")
+            || code_run.spec.service.to_lowercase().contains("healer");
+
+        let pvc_name = if is_healer {
+            AgentClassifier::get_healer_pvc_name(&code_run.spec.service)
+        } else if let Some(github_app) = &code_run.spec.github_app {
+            classifier
+                .get_pvc_name(&code_run.spec.service, github_app)
+                .unwrap_or_else(|_| format!("workspace-{}", code_run.spec.service))
+        } else {
+            format!("workspace-{}", code_run.spec.service)
+        };
+
+        let cleanup_job_name = format!("{}-workspace-cleanup", coderun_name);
+        info!(
+            "Creating cleanup job {} to remove /workspace/{}",
+            cleanup_job_name, workspace_subdir
+        );
+
+        let cleanup_job = json!({
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {
+                "name": cleanup_job_name,
+                "namespace": code_run.namespace().as_ref().unwrap_or(&"default".to_string()),
+                "labels": {
+                    LABEL_CLEANUP_SCOPE: SCOPE_RUN,
+                    LABEL_CLEANUP_RUN: coderun_name,
+                    LABEL_CLEANUP_KIND: "workspace-cleanup",
+                }
+            },
+            "spec": {
+                "ttlSecondsAfterFinished": 300,
+                "backoffLimit": 0,
+                "template": {
+                    "spec": {
+                        "restartPolicy": "Never",
+                        "containers": [{
+                            "name": "cleanup",
+                            "image": "busybox:1.36",
+                            "command": ["/bin/sh", "-c", format!("rm -rf /workspace/{}", workspace_subdir)],
+                            "volumeMounts": [{
+                                "name": "workspace",
+                                "mountPath": "/workspace"
+                            }]
+                        }],
+                        "volumes": [{
+                            "name": "workspace",
+                            "persistentVolumeClaim": {
+                                "claimName": pvc_name
+                            }
+                        }]
+                    }
+                }
+            }
+        });
+
+        match self
+            .jobs
+            .create(
+                &PostParams::default(),
+                &serde_json::from_value(cleanup_job)?,
+            )
+            .await
+        {
+            Ok(_) => {
+                info!("✅ Cleanup job {} created successfully", cleanup_job_name);
+            }
+            Err(kube::Error::Api(ae)) if ae.code == 409 => {
+                info!("Cleanup job {} already exists", cleanup_job_name);
+            }
+            Err(e) => {
+                warn!("Failed to create cleanup job {}: {}", cleanup_job_name, e);
+                // Don't fail the entire cleanup if workspace cleanup fails
+            }
+        }
+
+        Ok(())
     }
 
     /// Determines if a fresh workspace should be used.
@@ -830,7 +933,11 @@ impl<'a> CodeResourceManager<'a> {
         // when multiple pods share the same PVC
         let coderun_name = code_run.name_any();
         let coderun_uid = code_run.metadata.uid.as_deref().unwrap_or("nouid");
-        let workspace_subdir = format!("runs/{}-{}", coderun_name, &coderun_uid[..8]);
+        let workspace_subdir = format!(
+            "runs/{}-{}",
+            coderun_name,
+            &coderun_uid[..coderun_uid.len().min(8)]
+        );
 
         volumes.push(json!({
             "name": "workspace",

@@ -11,14 +11,7 @@
 pub mod github_app;
 
 pub use github_app::{
-    GitHubAppConfig,
-    WebhookEvent,
-    WebhookEventType,
-    PullRequestEvent,
+    install_github_app, list_webhook_events, redeliver_webhook, verify_webhook_signature,
+    CheckRunEvent, GitHubAppConfig, PullRequestEvent, WebhookEvent, WebhookEventType,
     WorkflowRunEvent,
-    CheckRunEvent,
-    install_github_app,
-    list_webhook_events,
-    redeliver_webhook,
-    verify_webhook_signature,
 };

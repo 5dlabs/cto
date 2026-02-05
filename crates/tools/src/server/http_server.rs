@@ -1262,12 +1262,12 @@ impl BridgeState {
                             tracing::info!("🔓 [{}] Acquired stdio init permit", server_name);
 
                             let result = connection_pool.start_server(&server_name).await;
-                            
+
                             // Small delay to ensure connection is stored before releasing permit
                             if result.is_ok() {
                                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                             }
-                            
+
                             tracing::info!("🔓 [{}] Releasing stdio init permit", server_name);
                             result
                             // _permit is dropped here, releasing the semaphore
