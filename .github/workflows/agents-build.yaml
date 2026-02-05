@@ -81,7 +81,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
+          set -eo pipefail
+
+          # Initialize version variables to empty strings (prevent unbound errors)
+          TOOLS_VERSION=""
+          MONITOR_VERSION=""
+          TASKS_VERSION=""
+          INTAKE_AGENT_VERSION=""
 
           # Debug: Check if gh CLI is available
           echo "📍 Checking gh CLI..."
@@ -102,11 +108,6 @@ jobs:
           echo "$RAW_RELEASES"
           RELEASES=$(echo "$RAW_RELEASES" | awk -F'\t' '{print $3}' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "")
           echo "Parsed releases: $RELEASES"
-
-          TOOLS_VERSION=""
-          MONITOR_VERSION=""
-          TASKS_VERSION=""
-          INTAKE_AGENT_VERSION=""
 
           # Create directory for downloaded binaries (will be copied into Docker context)
           # Include a placeholder so COPY doesn't fail if no binaries are found
