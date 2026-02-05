@@ -28,7 +28,6 @@ pub struct DockerInfo {
     #[serde(default)]
     pub runtime: String,
 }
-}
 
 /// Scan the complete runtime environment
 #[tauri::command]
