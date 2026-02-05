@@ -3,16 +3,24 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::process::Child;
+use tokio::io::BufReader;
+use tokio::process::ChildStdout;
 use tokio::sync::RwLock;
 use tokio::sync::Mutex;
 use std::collections::HashMap;
+
+/// MCP session containing child process and buffered reader for stdout
+pub struct McpSession {
+    pub child: Child,
+    pub reader: BufReader<ChildStdout>,
+}
 
 /// Global application state
 #[derive(Debug, Default)]
 pub struct AppState {
     pub setup: Arc<RwLock<SetupState>>,
     pub cluster: Arc<RwLock<ClusterState>>,
-    pub mcp_sessions: Arc<Mutex<HashMap<String, Child>>>,
+    pub mcp_sessions: Arc<Mutex<HashMap<String, McpSession>>>,
 }
 
 impl AppState {

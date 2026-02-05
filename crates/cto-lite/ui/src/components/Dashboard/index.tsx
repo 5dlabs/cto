@@ -74,6 +74,22 @@ export function Dashboard() {
     }
   }, [selectedNamespace]);
 
+  // Stop and restart log streaming when pod/namespace selection changes
+  useEffect(() => {
+    if (isStreaming) {
+      stopLogStreaming();
+      // Auto-restart streaming with new selection
+      if (selectedPod && selectedNamespace) {
+        // Small delay to ensure cleanup completes
+        const timer = setTimeout(() => {
+          startLogStreaming();
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPod, selectedNamespace]);
+
   // Auto-scroll when follow is enabled
   useEffect(() => {
     if (followEnabled && scrollRef.current) {

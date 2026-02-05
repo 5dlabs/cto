@@ -1285,7 +1285,9 @@ async fn ensure_kind_installed() -> AppResult<bool> {
     std::fs::create_dir_all(&local_bin)?;
     
     let final_path = local_bin.join("kind");
-    std::fs::rename(&kind_path, &final_path)?;
+    // Use copy + remove instead of rename to support cross-filesystem moves
+    std::fs::copy(&kind_path, &final_path)?;
+    std::fs::remove_file(&kind_path)?;
 
     // Ensure ~/.local/bin is in PATH
     let path_var = std::env::var("PATH").unwrap_or_default();

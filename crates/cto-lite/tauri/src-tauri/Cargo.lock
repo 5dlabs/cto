@@ -647,7 +647,6 @@ dependencies = [
  "chrono",
  "cocoa",
  "keyring",
- "mcp-lite",
  "objc",
  "reqwest",
  "serde",
@@ -666,13 +665,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "which",
-]
-
-[[package]]
-name = "cto-lite-common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
 ]
 
 [[package]]
@@ -2176,23 +2168,6 @@ name = "matches"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
-
-[[package]]
-name = "mcp-lite"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "cto-lite-common",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
 
 [[package]]
 name = "memchr"

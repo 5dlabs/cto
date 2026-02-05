@@ -31,7 +31,7 @@ pub async fn spawn_mcp_server(state: State<'_, AppState>) -> Result<String, Stri
     // Try to find the mcp-lite binary
     let mcp_binary = binary_path.join("mcp-lite");
     
-    let child = Command::new(&mcp_binary)
+    let mut child = Command::new(&mcp_binary)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -39,10 +39,15 @@ pub async fn spawn_mcp_server(state: State<'_, AppState>) -> Result<String, Stri
         .spawn()
         .map_err(|e| format!("Failed to spawn MCP server: {}", e))?;
     
-    // Store the child process
+    // Create buffered reader for stdout
+    let stdout = child.stdout.take()
+        .ok_or("Failed to capture MCP server stdout")?;
+    let reader = BufReader::new(stdout);
+    
+    // Store the child process with its reader
     {
         let mut sessions = state.mcp_sessions.lock().await;
-        sessions.insert(session_id.clone(), child);
+        sessions.insert(session_id.clone(), crate::state::McpSession { child, reader });
     }
     
     Ok(session_id)
@@ -58,10 +63,10 @@ pub async fn mcp_call(
 ) -> Result<Value, String> {
     let mut sessions = state.mcp_sessions.lock().await;
     
-    let child = sessions.get_mut(&session_id)
+    let session = sessions.get_mut(&session_id)
         .ok_or("Session not found")?;
     
-    let stdin = child.stdin.as_mut()
+    let stdin = session.child.stdin.as_mut()
         .ok_or("MCP server stdin not available")?;
     
     let request = json!({
@@ -83,12 +88,9 @@ pub async fn mcp_call(
         .await
         .map_err(|e| e.to_string())?;
     
-    let stdout = child.stdout.as_mut()
-        .ok_or("MCP server stdout not available")?;
-    
-    let mut reader = BufReader::new(stdout);
+    // Use the persistent reader to avoid losing buffered data
     let mut response = String::new();
-    reader.read_line(&mut response)
+    session.reader.read_line(&mut response)
         .await
         .map_err(|e| e.to_string())?;
     
@@ -134,8 +136,8 @@ pub async fn kill_mcp_server(
 ) -> Result<(), String> {
     let mut sessions = state.mcp_sessions.lock().await;
     
-    if let Some(mut child) = sessions.remove(&session_id) {
-        child.kill().await
+    if let Some(mut session) = sessions.remove(&session_id) {
+        session.child.kill().await
             .map_err(|e| format!("Failed to kill MCP server: {}", e))?;
     }
     
