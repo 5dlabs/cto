@@ -278,7 +278,8 @@ impl<'a> CodeResourceManager<'a> {
             format!("workspace-{}", code_run.spec.service)
         };
 
-        let cleanup_job_name = format!("{coderun_name}-workspace-cleanup");
+        let cleanup_job_name = ResourceNaming::cleanup_job_name(code_run);
+        let cleanup_run_label = Self::sanitize_label_value(&coderun_name);
         info!(
             "Creating cleanup job {} to remove /workspace/{}",
             cleanup_job_name, workspace_subdir
@@ -292,7 +293,7 @@ impl<'a> CodeResourceManager<'a> {
                 "namespace": code_run.namespace().as_ref().unwrap_or(&"default".to_string()),
                 "labels": {
                     LABEL_CLEANUP_SCOPE: SCOPE_RUN,
-                    LABEL_CLEANUP_RUN: coderun_name,
+                    LABEL_CLEANUP_RUN: cleanup_run_label,
                     LABEL_CLEANUP_KIND: "workspace-cleanup",
                 }
             },
