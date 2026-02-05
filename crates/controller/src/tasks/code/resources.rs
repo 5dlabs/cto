@@ -950,6 +950,12 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/workspace"
         }));
 
+        // Mount shared GitHub App key volume (init container writes, main container reads)
+        volume_mounts.push(json!({
+            "name": "github-app-key",
+            "mountPath": "/var/run/secrets/github-app-key"
+        }));
+
         // Docker-in-Docker volumes (enabled by default, can be disabled via enableDocker: false)
         let enable_docker = code_run.spec.enable_docker;
         if enable_docker {
@@ -989,6 +995,13 @@ impl<'a> CodeResourceManager<'a> {
                 "mountPath": "/config/coordination"
             }));
         }
+
+        // Shared volume for GitHub App private key - shared between init and main containers
+        // This allows the init container to write the key and main container (Ruby/Go) to read it
+        volumes.push(json!({
+            "name": "github-app-key",
+            "emptyDir": {}
+        }));
 
         // GitHub App authentication only - no SSH volumes needed
         // Validate github_app is present and non-empty
@@ -1511,7 +1524,10 @@ impl<'a> CodeResourceManager<'a> {
                 "runAsGroup": 0,
                 "allowPrivilegeEscalation": false
             },
-            "volumeMounts": [ {"name": "workspace", "mountPath": "/workspace"} ]
+            "volumeMounts": [
+                {"name": "workspace", "mountPath": "/workspace"},
+                {"name": "github-app-key", "mountPath": "/var/run/secrets/github-app-key", "readOnly": false}
+            ]
         })];
 
         // For watcher CodeRuns, add init container to copy coordination.json to workspace
