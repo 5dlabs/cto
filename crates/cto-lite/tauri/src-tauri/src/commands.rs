@@ -28,7 +28,11 @@ pub async fn spawn_mcp_server(state: State<'_, AppState>) -> Result<String, Stri
         .ok_or("Could not determine executable directory")?
         .to_path_buf();
     
-    // Try to find the mcp-lite binary
+    // Try to find the mcp-lite binary (with .exe on Windows)
+    #[cfg(target_os = "windows")]
+    let mcp_binary = binary_path.join("mcp-lite.exe");
+    
+    #[cfg(not(target_os = "windows"))]
     let mcp_binary = binary_path.join("mcp-lite");
     
     let mut child = Command::new(&mcp_binary)
@@ -90,9 +94,19 @@ pub async fn mcp_call(
     
     // Use the persistent reader to avoid losing buffered data
     let mut response = String::new();
-    session.reader.read_line(&mut response)
-        .await
-        .map_err(|e| e.to_string())?;
+    
+    // Add timeout to prevent deadlock if MCP server hangs
+    let read_result = tokio::time::timeout(
+        tokio::time::Duration::from_secs(30),
+        session.reader.read_line(&mut response)
+    )
+    .await
+    .map_err(|_| "MCP server request timed out after 30 seconds".to_string())?
+    .map_err(|e| e.to_string())?;
+    
+    if read_result == 0 {
+        return Err("MCP server closed connection".to_string());
+    }
     
     let response_value: Value = serde_json::from_str(&response)
         .map_err(|e| e.to_string())?;

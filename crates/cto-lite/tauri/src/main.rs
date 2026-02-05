@@ -112,8 +112,6 @@ fn main() {
             commands::logs::list_pods,
             commands::logs::list_pods_with_status,
             commands::logs::stream_pod_logs,
-            commands::logs::start_log_stream,
-            commands::logs::stop_log_stream,
             // Updates
             commands::updates::check_updates,
             commands::updates::pull_updates,

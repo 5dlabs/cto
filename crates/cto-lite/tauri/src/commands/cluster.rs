@@ -1217,6 +1217,7 @@ fn wait_for_docker_ready(timeout_secs: u64) -> AppResult<()> {
 
 /// Ensure Kind is installed, download if missing
 async fn ensure_kind_installed() -> AppResult<bool> {
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
     
     if is_kind_installed() {
@@ -1251,7 +1252,12 @@ async fn ensure_kind_installed() -> AppResult<bool> {
 
     // Download to temp location
     let temp_dir = std::env::temp_dir();
-    let kind_path = temp_dir.join("kind");
+    let kind_filename = if cfg!(target_os = "windows") {
+        "kind.exe"
+    } else {
+        "kind"
+    };
+    let kind_path = temp_dir.join(kind_filename);
 
     let response = reqwest::Client::new()
         .get(&url)
@@ -1272,27 +1278,39 @@ async fn ensure_kind_installed() -> AppResult<bool> {
     // Write to temp file
     std::fs::write(&kind_path, &bytes)?;
 
-    // Make executable
-    let mut perms = std::fs::metadata(&kind_path)?.permissions();
-    perms.set_mode(0o755);
-    std::fs::set_permissions(&kind_path, perms)?;
+    // Make executable (Unix only)
+    #[cfg(unix)]
+    {
+        let mut perms = std::fs::metadata(&kind_path)?.permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&kind_path, perms)?;
+    }
 
-    // Move to ~/.local/bin (create if needed)
-    let local_bin = dirs::home_dir()
+    // Determine installation directory based on platform
+    #[cfg(unix)]
+    let install_dir = dirs::home_dir()
         .ok_or_else(|| AppError::CommandFailed("Cannot find home directory".to_string()))?
         .join(".local/bin");
     
-    std::fs::create_dir_all(&local_bin)?;
+    #[cfg(target_os = "windows")]
+    let install_dir = dirs::data_local_dir()
+        .ok_or_else(|| AppError::CommandFailed("Cannot find local data directory".to_string()))?
+        .join("Microsoft\\WindowsApps");
     
-    let final_path = local_bin.join("kind");
+    std::fs::create_dir_all(&install_dir)?;
+    
+    let final_path = install_dir.join(kind_filename);
     // Use copy + remove instead of rename to support cross-filesystem moves
     std::fs::copy(&kind_path, &final_path)?;
     std::fs::remove_file(&kind_path)?;
 
-    // Ensure ~/.local/bin is in PATH
-    let path_var = std::env::var("PATH").unwrap_or_default();
-    if !path_var.contains(".local/bin") {
-        tracing::warn!("~/.local/bin is not in PATH. Consider adding it to your shell profile.");
+    // Warn if install directory is not in PATH (Unix only)
+    #[cfg(unix)]
+    {
+        let path_var = std::env::var("PATH").unwrap_or_default();
+        if !path_var.contains(".local/bin") {
+            tracing::warn!("~/.local/bin is not in PATH. Consider adding it to your shell profile.");
+        }
     }
 
     tracing::info!("Kind installed to: {:?}", final_path);

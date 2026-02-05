@@ -196,34 +196,6 @@ fn parse_log_line(line: &str, pod: &str, namespace: &str, container: Option<&str
     })
 }
 
-/// Stream logs from all pods matching a pattern
-/// Returns a channel receiver that will receive log entries
-#[tauri::command]
-pub async fn start_log_stream(
-    namespace: Option<String>,
-    pod_pattern: Option<String>,
-    _container: Option<String>,
-) -> Result<String, AppError> {
-    let ns = namespace.unwrap_or_else(|| "default".to_string());
-    let pattern = pod_pattern.unwrap_or_else(|| ".*".to_string());
-
-    // Generate a unique stream ID
-    let stream_id = format!("log-stream-{}", uuid::Uuid::new_v4());
-
-    // For now, we'll return a simple status
-    // The actual streaming would use WebSocket or SSE in a real implementation
-    tracing::info!("Log stream requested: ns={}, pattern={}", ns, pattern);
-
-    Ok(format!("Stream {} initialized for namespace={}, pattern={}", stream_id, ns, pattern))
-}
-
-/// Stop a log stream
-#[tauri::command]
-pub async fn stop_log_stream(stream_id: String) -> Result<(), AppError> {
-    tracing::info!("Log stream stopped: {}", stream_id);
-    Ok(())
-}
-
 /// Get namespaces
 #[tauri::command]
 pub async fn list_namespaces() -> Result<Vec<String>, AppError> {
