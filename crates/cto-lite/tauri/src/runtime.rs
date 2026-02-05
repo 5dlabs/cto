@@ -275,20 +275,38 @@ pub fn is_runtime_running(runtime: ContainerRuntime) -> bool {
             // Try docker info - returns 0 if daemon is running
             // Note: docker info may return success but daemon not fully ready
             // So we also verify we can list containers
-            Command::new(&cmd_path)
-                .args(["info"])
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status()
-                .map(|s| s.success())
-                .unwrap_or(false)
-                && Command::new(&cmd_path)
-                    .args(["ps"])
+            
+            // First check if Docker socket exists (common case for Docker Desktop)
+            let socket_path = std::path::Path::new("/var/run/docker.sock");
+            let socket_exists = socket_path.exists() || 
+                std::path::Path::new("/Users/jonathonfritz/.docker/run/docker.sock").exists();
+            
+            if socket_exists {
+                // Socket exists, try docker info
+                let info_ok = Command::new(&cmd_path)
+                    .args(["info"])
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
                     .status()
                     .map(|s| s.success())
-                    .unwrap_or(false)
+                    .unwrap_or(false);
+                
+                if info_ok {
+                    tracing::debug!("Docker daemon detected via socket and docker info");
+                    return true;
+                }
+            }
+            
+            // Fallback: try just docker ps
+            let ps_ok = Command::new(&cmd_path)
+                .args(["ps"])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+            
+            ps_ok
         }
         ContainerRuntime::OrbStack => {
             // OrbStack status check
