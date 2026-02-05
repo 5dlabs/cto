@@ -3,6 +3,17 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.38](https://github.com/5dlabs/cto/compare/v0.2.37...v0.2.38) (2026-02-05)
+
+
+### 🐛 Bug Fixes
+
+* **agents:** Add persistence logic to Atlas and Bolt agents ([#4290](https://github.com/5dlabs/cto/issues/4290)) ([9d6919d](https://github.com/5dlabs/cto/commit/9d6919d412e5a23b9ca2e35049f35c9d4edd31c8))
+* **codeql:** correct job condition and increase timeout ([#4325](https://github.com/5dlabs/cto/issues/4325)) ([c99a729](https://github.com/5dlabs/cto/commit/c99a7299640bb3210b638fb93b3bca208369a482))
+* **controller:** use TimeoutLayer::with_status_code for consistent 408 responses ([#4317](https://github.com/5dlabs/cto/issues/4317)) ([c329fda](https://github.com/5dlabs/cto/commit/c329fdab64b6c941e70573f1222a4a236e940a7a))
+* Preserve GitHub App private key for agent access ([#4316](https://github.com/5dlabs/cto/issues/4316)) ([66396d0](https://github.com/5dlabs/cto/commit/66396d0ee6c6c001a7391f5cb659f9ebf2d39946))
+* **tools:** release stdio semaphore permit immediately after init ([#4304](https://github.com/5dlabs/cto/issues/4304)) ([77b70cd](https://github.com/5dlabs/cto/commit/77b70cd83544567e828ce5aac9fadc36d761ff33))
+
 ## [0.2.37](https://github.com/5dlabs/cto/compare/v0.2.36...v0.2.37) (2026-02-04)
 
 
