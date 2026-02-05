@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 use tracing;
 
-const CLUSTER_NAME: &str = "cto";
+const CLUSTER_NAME: &str = "cto-lite";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ClusterType {

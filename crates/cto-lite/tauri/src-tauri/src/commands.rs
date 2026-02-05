@@ -10,9 +10,6 @@ use tauri::State;
 use tokio::process::{Child, Command};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use serde_json::{json, Value};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 // ============================================================================
