@@ -1,17 +1,130 @@
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Dashboard } from '../components/Dashboard';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Server, Plus, GitBranch, FileJson, Play } from 'lucide-react';
+import { Server, Plus, GitBranch, FileJson, Play, Terminal, Download, Loader2 } from 'lucide-react';
 
 interface HomeProps {
   onNavigate: (view: 'setup' | 'cluster' | 'settings' | 'home') => void;
 }
 
+type RuntimeStatus = 'checking' | 'docker' | 'kind' | 'none' | 'error';
+
 export function Home({ onNavigate }: HomeProps) {
-  const clusterStatus = 'running';
+  const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatus>('checking');
+  const [isProvisioning, setIsProvisioning] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    checkRuntime();
+  }, []);
+
+  const checkRuntime = async () => {
+    try {
+      const dockerRunning = await invoke<boolean>('check_docker_running');
+      if (dockerRunning) {
+        const clusters = await invoke<string[]>('list_clusters');
+        if (clusters && clusters.length > 0) {
+          setRuntimeStatus('kind');
+        } else {
+          setRuntimeStatus('docker');
+        }
+        return;
+      }
+
+      setRuntimeStatus('none');
+    } catch (e) {
+      console.error('Failed to check runtime:', e);
+      setRuntimeStatus('error');
+      setErrorMessage(String(e));
+    }
+  };
+
+  const provisionRuntime = async () => {
+    setIsProvisioning(true);
+    try {
+      await invoke('auto_provision_runtime');
+      await checkRuntime();
+    } catch (e) {
+      console.error('Failed to provision runtime:', e);
+      setErrorMessage(String(e));
+    } finally {
+      setIsProvisioning(false);
+    }
+  };
+
+  const getStatusMessage = () => {
+    switch (runtimeStatus) {
+      case 'checking':
+        return { title: 'Checking runtime...', description: 'Detecting available container runtime' };
+      case 'docker':
+        return { title: 'Docker is ready', description: 'Container runtime detected and running' };
+      case 'kind':
+        return { title: 'Kind cluster is ready', description: 'Local Kubernetes cluster is running' };
+      case 'none':
+        return { title: 'No runtime found', description: 'Install Docker or let us set up Kind for you' };
+      case 'error':
+        return { title: 'Runtime check failed', description: errorMessage || 'Unable to detect container runtime' };
+      default:
+        return { title: 'Unknown', description: '' };
+    }
+  };
+
+  const status = runtimeStatus === 'docker' || runtimeStatus === 'kind' ? 'running' : 'stopped';
+  const msg = getStatusMessage();
 
   return (
     <div className="space-y-8">
+      {runtimeStatus === 'none' && (
+        <Card className="bg-zinc-900/50 border-zinc-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Terminal className="w-5 h-5 text-amber-500" />
+              {msg.title}
+            </CardTitle>
+            <CardDescription>{msg.description}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Button onClick={provisionRuntime} disabled={isProvisioning} className="gap-2">
+                {isProvisioning ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Setting up Kind...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Install Kind & Create Cluster
+                  </>
+                )}
+              </Button>
+              <span className="text-sm text-zinc-400">
+                Kind is a lightweight Kubernetes that runs locally in Docker
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {runtimeStatus === 'error' && (
+        <Card className="bg-red-900/20 border-red-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-400">
+              <Terminal className="w-5 h-5" />
+              {msg.title}
+            </CardTitle>
+            <CardDescription className="text-red-300">{msg.description}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" onClick={checkRuntime}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -31,7 +144,7 @@ export function Home({ onNavigate }: HomeProps) {
         </div>
       </div>
 
-      <Dashboard status={clusterStatus} />
+      <Dashboard status={status} />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card

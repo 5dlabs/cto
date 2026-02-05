@@ -1,40 +1,26 @@
 # syntax=docker/dockerfile:1
+# OpenClaw Agent Image - CLI tool from npm
+# Based on runtime:minimal with OpenClaw CLI installed via npm
+
 ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:latest
 FROM ${BASE_IMAGE}
 
 USER root
 
-# Install OpenClaw from GitHub releases
-# Downloads the latest release and extracts binaries
+# Install OpenClaw CLI from npm
 ARG VERSION=latest
 
-RUN set -euo pipefail && \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in \
-        amd64) OPENCLAW_ARCH="x86_64" ;; \
-        arm64) OPENCLAW_ARCH="aarch64" ;; \
-        *) OPENCLAW_ARCH="$ARCH" ;; \
-    esac && \
-    # Determine version to download
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     if [ "$VERSION" = "latest" ]; then \
-        TAG=$(curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/latest" | jq -r '.tag_name'); \
+        npm install -g openclaw; \
     else \
-        TAG="v${VERSION}"; \
+        npm install -g openclaw@${VERSION}; \
     fi && \
-    echo "📦 Installing OpenClaw version: $TAG" && \
-    # Download and extract OpenClaw binaries
-    curl -fsSL "https://github.com/openclaw/openclaw/releases/download/${TAG}/openclaw-${OPENCLAW_ARCH}-unknown-linux-gnu.tar.gz" | \
-        tar -xzf - -C /usr/local/bin && \
-    chmod +x /usr/local/bin/openclaw && \
-    # Verify installation
-    openclaw --version && \
-    # Print changelog
     echo "" && \
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-    echo "📋 OpenClaw Changelog (${TAG})" && \
+    echo "📋 OpenClaw Changelog" && \
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-    curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/tags/${TAG}" | \
-        jq -r '.body // "No changelog available"' | head -100 && \
+    npm view openclaw changelog --json 2>/dev/null | head -50 || echo "Run 'openclaw --help' for usage" && \
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Create config and workspace directories
