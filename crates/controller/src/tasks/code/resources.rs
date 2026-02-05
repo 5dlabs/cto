@@ -826,6 +826,12 @@ impl<'a> CodeResourceManager<'a> {
             format!("workspace-{}", code_run.spec.service)
         };
 
+        // Generate unique workspace subdirectory per CodeRun to prevent git lock conflicts
+        // when multiple pods share the same PVC
+        let coderun_name = code_run.name_any();
+        let coderun_uid = code_run.metadata.uid.as_deref().unwrap_or("nouid");
+        let workspace_subdir = format!("runs/{}-{}", coderun_name, &coderun_uid[..8]);
+
         volumes.push(json!({
             "name": "workspace",
             "persistentVolumeClaim": {
@@ -1009,6 +1015,12 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "PROGRESS_FILE",
                 "value": "/workspace/progress.jsonl"
             }),
+            // WORKSPACE_DIR provides isolation for concurrent CodeRuns sharing the same PVC
+            // Each CodeRun gets a unique subdirectory: /workspace/runs/{coderun-name}-{uid}/
+            json!({
+                "name": "WORKSPACE_DIR",
+                "value": format!("/workspace/{}", workspace_subdir)
+            }),
         ];
 
         if cli_type == CLIType::Codex {
@@ -1091,7 +1103,7 @@ impl<'a> CodeResourceManager<'a> {
             "env": final_env_vars,
             "command": ["/bin/bash"],
             "args": ["/task-files/container.sh"],
-            "workingDir": "/workspace",
+            "workingDir": format!("/workspace/{}", workspace_subdir),
             "volumeMounts": volume_mounts
         });
 
@@ -1377,11 +1389,17 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         // Build init containers array
-        // Always include the workspace permissions fix init container
+        // Always include the workspace setup init container that:
+        // 1. Creates a unique subdirectory per CodeRun to prevent git lock conflicts
+        // 2. Sets proper ownership for the agent (uid 1000)
+        let workspace_setup_cmd = format!(
+            "mkdir -p /workspace/{} && chown -R 1000:1000 /workspace/{} && chmod -R ug+rwX /workspace/{}",
+            workspace_subdir, workspace_subdir, workspace_subdir
+        );
         let mut init_containers = vec![json!({
-            "name": "fix-workspace-perms",
+            "name": "setup-workspace",
             "image": "busybox:1.36",
-            "command": ["/bin/sh", "-lc", "chown -R 1000:1000 /workspace && chmod -R ug+rwX /workspace || true"],
+            "command": ["/bin/sh", "-lc", workspace_setup_cmd],
             "securityContext": {
                 "runAsUser": 0,
                 "runAsGroup": 0,

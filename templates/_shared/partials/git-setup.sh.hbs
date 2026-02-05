@@ -8,11 +8,23 @@ if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
   WORK_DIR="{{service}}"
 fi
 
-cd /workspace
+# Use WORKSPACE_DIR if set (provides isolation for concurrent CodeRuns)
+# Otherwise fall back to /workspace for backward compatibility
+if [ -n "$WORKSPACE_DIR" ] && [ -d "$WORKSPACE_DIR" ]; then
+  cd "$WORKSPACE_DIR"
+else
+  cd /workspace
+fi
 
 # Parse repo name from URL
 REPO_NAME=$(echo "$REPO_URL" | sed 's|.*/||' | sed 's|\.git$||')
-REPO_ROOT="/workspace/$REPO_NAME"
+
+# Determine the repo root - use WORKSPACE_DIR if set, otherwise /workspace
+if [ -n "$WORKSPACE_DIR" ]; then
+  REPO_ROOT="$WORKSPACE_DIR/$REPO_NAME"
+else
+  REPO_ROOT="/workspace/$REPO_NAME"
+fi
 
 git config --global --add safe.directory "$REPO_ROOT"
 git config --global user.name "$GIT_AUTHOR_NAME"
