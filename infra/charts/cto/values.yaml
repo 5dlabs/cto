@@ -416,24 +416,33 @@ tools:
         env:
           CONTEXT7_API_KEY: "${CONTEXT7_API_KEY}"
 
-      prompts:
-        name: "MCP Prompts"
-        description: "Prompt management, versioning, and templates for LLM applications with cognitive architecture"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@sparesparrow/mcp-prompts"]
-        workingDirectory: "/tmp"
+      # prompts: disabled - package times out during initialization
+      # prompts:
+      #   name: "MCP Prompts"
+      #   description: "Prompt management, versioning, and templates for LLM applications with cognitive architecture"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "@sparesparrow/mcp-prompts"]
+      #   workingDirectory: "/tmp"
 
-      # courses: removed - git clone is not an MCP server, it exits immediately
+      # courses: disabled - git clone is not an MCP server, just clones a repo
+      # courses:
+      #   name: "Anthropic Courses"
+      #   description: "Access to Anthropic's educational courses including API fundamentals, prompt engineering, and tool use"
+      #   transport: "stdio"
+      #   command: "git"
+      #   args: ["clone", "--depth=1", "https://github.com/anthropics/courses.git", "/tmp/courses"]
+      #   workingDirectory: "/tmp"
 
       # --- Infrastructure ---
-      docker:
-        name: "Docker"
-        description: "Docker container management"
-        transport: "stdio"
-        command: "docker"
-        args: ["run", "-i", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "mcp/docker"]
-        workingDirectory: "/tmp"
+      # docker: disabled - Docker-in-Docker (DinD) times out in containerized environment
+      # docker:
+      #   name: "Docker"
+      #   description: "Docker container management"
+      #   transport: "stdio"
+      #   command: "docker"
+      #   args: ["run", "-i", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "mcp/docker"]
+      #   workingDirectory: "/tmp"
 
       # kubernetes: removed - duplicate of kubernetes-mcp, caused prefix conflicts
 
@@ -465,13 +474,14 @@ tools:
           GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 
       # --- UI Components ---
-      shadcn:
-        name: "shadcn/ui"
-        description: "Official shadcn/ui MCP server - browse, search, and install components"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "shadcn@latest", "mcp"]
-        workingDirectory: "/tmp"
+      # shadcn: disabled - 'shadcn@latest mcp' command exits immediately
+      # shadcn:
+      #   name: "shadcn/ui"
+      #   description: "Official shadcn/ui MCP server - browse, search, and install components"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "shadcn@latest", "mcp"]
+      #   workingDirectory: "/workspace"
 
       ai-elements:
         name: "AI Elements"
@@ -520,24 +530,27 @@ tools:
         url: "https://mcp.exa.ai/mcp"
 
       # --- Web Scraping ---
-      firecrawl:
-        name: "Firecrawl"
-        description: "Web scraping, crawling, and content extraction with search capabilities"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@iflow-mcp/firecrawl-mcp"]
-        workingDirectory: "/tmp"
-        env:
-          FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
+      # firecrawl: disabled - @iflow-mcp/firecrawl-mcp exits immediately
+      # Use official @anthropic/firecrawl-mcp when available, or use exa-mcp for web search
+      # firecrawl:
+      #   name: "Firecrawl"
+      #   description: "Web scraping, crawling, and content extraction with search capabilities"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "@iflow-mcp/firecrawl-mcp"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
 
       # --- Codebase Analysis ---
-      repomix:
-        name: "Repomix"
-        description: "Pack codebases into AI-friendly formats - compress, search, and analyze repositories for existing project context"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "repomix", "--mcp"]
-        workingDirectory: "/tmp"
+      # repomix: disabled - --mcp flag causes immediate exit
+      # repomix:
+      #   name: "Repomix"
+      #   description: "Pack codebases into AI-friendly formats - compress, search, and analyze repositories for existing project context"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "repomix", "--mcp"]
+      #   workingDirectory: "/tmp"
 
       octocode:
         name: "Octocode"
@@ -572,48 +585,52 @@ tools:
           GRAFANA_URL: "${GRAFANA_URL:-http://grafana.observability.svc:80}"
           GRAFANA_SERVICE_ACCOUNT_TOKEN: "${GRAFANA_SERVICE_ACCOUNT_TOKEN}"
 
-      loki:
-        name: "Loki"
-        description: "Query and analyze Grafana Loki logs with LogQL"
-        transport: "stdio"
-        command: "docker"
-        args: ["run", "-i", "--rm", "-e", "LOKI_URL", "grafana/loki-mcp:latest"]
-        workingDirectory: "/tmp"
-        env:
-          LOKI_URL: "${LOKI_URL:-http://loki.observability.svc:3100}"
+      # loki: disabled - Docker-based MCP server times out, use grafana server instead
+      # loki:
+      #   name: "Loki"
+      #   description: "Query and analyze Grafana Loki logs with LogQL"
+      #   transport: "stdio"
+      #   command: "docker"
+      #   args: ["run", "-i", "--rm", "-e", "LOKI_URL", "grafana/loki-mcp:latest"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     LOKI_URL: "${LOKI_URL:-http://loki.observability.svc:3100}"
 
-      prometheus:
-        name: "Prometheus"
-        description: "Query and analyze Prometheus metrics with PromQL"
-        transport: "stdio"
-        command: "docker"
-        args: ["run", "-i", "--rm", "-e", "PROMETHEUS_URL", "ghcr.io/pab1it0/prometheus-mcp-server:latest"]
-        workingDirectory: "/tmp"
-        env:
-          PROMETHEUS_URL: "${PROMETHEUS_URL:-http://prometheus.observability.svc:9090}"
+      # prometheus: disabled - Docker image unavailable, use grafana server instead
+      # prometheus:
+      #   name: "Prometheus"
+      #   description: "Query and analyze Prometheus metrics with PromQL"
+      #   transport: "stdio"
+      #   command: "docker"
+      #   args: ["run", "-i", "--rm", "-e", "PROMETHEUS_URL", "ghcr.io/pab1it0/prometheus-mcp-server:latest"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     PROMETHEUS_URL: "${PROMETHEUS_URL:-http://prometheus.observability.svc:9090}"
 
       # --- Edge & CDN ---
-      cloudflare:
-        name: "Cloudflare"
-        description: "Cloudflare Workers, DNS, security, and edge computing management"
-        transport: "http"
-        url: "https://bindings.mcp.cloudflare.com/mcp"
-        workingDirectory: "/tmp"
-        headers:
-          # Token is loaded from cto-secrets and substituted at runtime by add_custom_headers()
-          Authorization: "Bearer ${CLOUDFLARE_API_TOKEN}"
+      # cloudflare: disabled - HTTP MCP server requires OAuth flow, not API token
+      # The bindings.mcp.cloudflare.com endpoint expects browser-based auth, not Bearer tokens
+      # cloudflare:
+      #   name: "Cloudflare"
+      #   description: "Cloudflare Workers, DNS, security, and edge computing management"
+      #   transport: "http"
+      #   url: "https://bindings.mcp.cloudflare.com/mcp"
+      #   workingDirectory: "/tmp"
+      #   headers:
+      #     Authorization: "Bearer ${CLOUDFLARE_API_TOKEN}"
 
       # --- AI Generation ---
-      minimax:
-        name: "MiniMax"
-        description: "MiniMax AI suite - text (M2 200k context), video (Hailuo), speech (40 languages), and music generation"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@5dlabs/minimax-mcp"]
-        workingDirectory: "/tmp"
-        env:
-          MINIMAX_API_KEY: "${MINIMAX_API_KEY}"
-          MINIMAX_GROUP_ID: "${MINIMAX_GROUP_ID}"
+      # minimax: disabled - @5dlabs/minimax-mcp package has connection issues
+      # minimax:
+      #   name: "MiniMax"
+      #   description: "MiniMax AI suite - text (M2 200k context), video (Hailuo), speech (40 languages), and music generation"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "@5dlabs/minimax-mcp"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     MINIMAX_API_KEY: "${MINIMAX_API_KEY}"
+      #     MINIMAX_GROUP_ID: "${MINIMAX_GROUP_ID}"
 
       # --- Web Search & Research ---
       modelcontextprotocol:
@@ -649,17 +666,18 @@ tools:
 
       # xcodebuild: removed - doesn't work on Ubuntu/Linux servers
 
-      appstore-connect:
-        name: "App Store Connect"
-        description: "App Store Connect API - manage apps, beta testers, bundle IDs, releases, and TestFlight"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "app-store-connect-mcp-server"]
-        workingDirectory: "/tmp"
-        env:
-          APP_STORE_KEY_ID: "${APP_STORE_KEY_ID}"
-          APP_STORE_ISSUER_ID: "${APP_STORE_ISSUER_ID}"
-          APP_STORE_P8_PATH: "${APP_STORE_P8_PATH:-/secrets/appstore/AuthKey.p8}"
+      # appstore-connect: disabled - requires p8 key file mount which isn't configured
+      # appstore-connect:
+      #   name: "App Store Connect"
+      #   description: "App Store Connect API - manage apps, beta testers, bundle IDs, releases, and TestFlight"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "app-store-connect-mcp-server"]
+      #   workingDirectory: "/workspace"
+      #   env:
+      #     APP_STORE_KEY_ID: "${APP_STORE_KEY_ID}"
+      #     APP_STORE_ISSUER_ID: "${APP_STORE_ISSUER_ID}"
+      #     APP_STORE_P8_PATH: "${APP_STORE_P8_PATH:-/secrets/appstore/AuthKey.p8}"
 
       # --- Database ---
       postgres:
@@ -674,15 +692,16 @@ tools:
 
       # redis: removed - should be client-side only, not on backend
 
-      mongodb:
-        name: "MongoDB"
-        description: "MongoDB database operations - queries, aggregations, collections, and Atlas integration"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "mongodb-mcp-server"]
-        workingDirectory: "/tmp"
-        env:
-          MONGODB_URI: "${MONGODB_URI:-mongodb://localhost:27017}"
+      # mongodb: disabled - no MongoDB instance configured
+      # mongodb:
+      #   name: "MongoDB"
+      #   description: "MongoDB database operations - queries, aggregations, collections, and Atlas integration"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "mongodb-mcp-server"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     MONGODB_URI: "${MONGODB_URI:-mongodb://localhost:27017}"
 
       # --- GitOps & CI/CD ---
       argocd:
@@ -696,30 +715,32 @@ tools:
           ARGOCD_BASE_URL: "${ARGOCD_BASE_URL:-https://argocd.platform.local}"
           ARGOCD_API_TOKEN: "${ARGOCD_API_TOKEN}"
 
-      argo-workflows:
-        name: "Argo Workflows"
-        description: "Argo Workflows management - list, monitor, submit workflows, manage templates and cron workflows"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "argo-workflow-mcp-server"]
-        workingDirectory: "/tmp"
-        env:
-          ARGO_BASE_URL: "${ARGO_WORKFLOWS_URL:-http://argo-workflows-server.automation.svc:2746}"
-          ARGO_TOKEN: "${ARGO_WORKFLOWS_TOKEN}"
+      # argo-workflows: disabled - package connection issues, use kubectl/API directly
+      # argo-workflows:
+      #   name: "Argo Workflows"
+      #   description: "Argo Workflows management - list, monitor, submit workflows, manage templates and cron workflows"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "argo-workflow-mcp-server"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     ARGO_BASE_URL: "${ARGO_WORKFLOWS_URL:-http://argo-workflows-server.automation.svc:2746}"
+      #     ARGO_TOKEN: "${ARGO_WORKFLOWS_TOKEN}"
 
       # --- Cloud Storage ---
-      s3:
-        name: "S3 Storage"
-        description: "S3-compatible storage - list buckets, list objects, get objects (supports AWS S3 and SeaweedFS)"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@geunoh/s3-mcp-server", "--region", "${AWS_REGION}", "--bucket", "${S3_BUCKET}"]
-        workingDirectory: "/tmp"
-        env:
-          AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
-          AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
-          AWS_REGION: "${AWS_REGION:-us-east-1}"
-          S3_BUCKET_NAME: "${S3_BUCKET:-default}"
+      # s3: disabled - no AWS credentials configured, SeaweedFS needs different approach
+      # s3:
+      #   name: "S3 Storage"
+      #   description: "S3-compatible storage - list buckets, list objects, get objects (supports AWS S3 and SeaweedFS)"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "@geunoh/s3-mcp-server", "--region", "${AWS_REGION}", "--bucket", "${S3_BUCKET}"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      #     AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
+      #     AWS_REGION: "${AWS_REGION:-us-east-1}"
+      #     S3_BUCKET_NAME: "${S3_BUCKET:-default}"
 
       # --- API Protocols ---
       graphql:
@@ -734,20 +755,27 @@ tools:
           ALLOW_MUTATIONS: "${GRAPHQL_ALLOW_MUTATIONS:-false}"
 
       # --- Message Queues ---
-      kafka:
-        name: "Kafka (Confluent)"
-        description: "Confluent Kafka and Confluent Cloud - produce, consume, and manage topics"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@mseep/mcp-confluent"]
-        workingDirectory: "/tmp"
-        env:
-          CONFLUENT_CLOUD_API_KEY: "${CONFLUENT_CLOUD_API_KEY}"
-          CONFLUENT_CLOUD_API_SECRET: "${CONFLUENT_CLOUD_API_SECRET}"
+      # kafka: disabled - no Confluent Cloud credentials configured
+      # kafka:
+      #   name: "Kafka (Confluent)"
+      #   description: "Confluent Kafka and Confluent Cloud - produce, consume, and manage topics"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "@mseep/mcp-confluent"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     CONFLUENT_CLOUD_API_KEY: "${CONFLUENT_CLOUD_API_KEY}"
+      #     CONFLUENT_CLOUD_API_SECRET: "${CONFLUENT_CLOUD_API_SECRET}"
 
       # --- Local Servers (run in agent containers, not proxied) ---
-      # rust-tools: removed - requires cursor-rust-tools binary which is only available locally
-      # Re-enable when a proper npm package or Docker image is available
+      rust-tools:
+        name: "Rust Development Tools"
+        description: "Rust analyzer integration"
+        transport: "stdio"
+        command: "/home/node/.cargo/bin/cursor-rust-tools"
+        args: ["--no-ui"]
+        workingDirectory: "/workspace"
+        local: true
 
 # =============================================================================
 # Healer - Self-Healing Monitor
