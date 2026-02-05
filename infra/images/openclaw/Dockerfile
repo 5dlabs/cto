@@ -11,11 +11,11 @@ ARG VERSION=latest
 RUN set -eo pipefail && \
     # Determine version to download (OpenClaw uses date-based versioning like 2026.2.3)
     if [ "$VERSION" = "latest" ]; then \
-        VERSION=$(curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/latest" | jq -r '.name' | sed 's/OpenClaw-//'); \
+        VERSION=$(curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/latest" | jq -r '.name' | sed 's/openclaw //'); \
     fi && \
     echo "📦 Installing OpenClaw version: $VERSION" && \
     # Download and extract OpenClaw binary (tgz format)
-    curl -fsSL "https://github.com/openclaw/openclaw/releases/download/OpenClaw-${VERSION}/openclaw-${VERSION}.tgz" | \
+    curl -fsSL "https://github.com/openclaw/openclaw/releases/download/v${VERSION}/openclaw-${VERSION}.tgz" | \
         tar -xzf - -C /usr/local/bin && \
     chmod +x /usr/local/bin/openclaw && \
     # Verify installation
