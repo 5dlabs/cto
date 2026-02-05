@@ -272,34 +272,67 @@ pub fn is_runtime_running(runtime: ContainerRuntime) -> bool {
 
     match runtime {
         ContainerRuntime::Docker => {
-            // Try docker info - returns 0 if daemon is running
-            // Note: docker info may return success but daemon not fully ready
-            // So we also verify we can list containers
-
-            // First check if Docker socket exists (common case for Docker Desktop)
-            let socket_path = std::path::Path::new("/var/run/docker.sock");
-            let user_socket_exists = dirs::home_dir()
-                .map(|home| home.join(".docker/run/docker.sock").exists())
-                .unwrap_or(false);
-            let socket_exists = socket_path.exists() || user_socket_exists;
-
-            if socket_exists {
-                // Socket exists, try docker info
-                let info_ok = Command::new(&cmd_path)
-                    .args(["info"])
+            // Check DOCKER_HOST first - this is the most reliable way
+            // If DOCKER_HOST is set, use it directly
+            if let Ok(host) = std::env::var("DOCKER_HOST") {
+                tracing::debug!("DOCKER_HOST is set to: {}", host);
+                // Try docker version to verify connection
+                let version_ok = Command::new(&cmd_path)
+                    .args(["version", "--format", "{{.Server.Version}}"])
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
                     .status()
                     .map(|s| s.success())
                     .unwrap_or(false);
-
-                if info_ok {
-                    tracing::debug!("Docker daemon detected via socket and docker info");
+                if version_ok {
+                    tracing::debug!("Docker daemon detected via DOCKER_HOST");
                     return true;
                 }
             }
 
-            // Fallback: try just docker ps
+            // Check common Docker socket locations
+            let socket_paths = [
+                "/var/run/docker.sock",
+                "/run/docker.sock",
+                // OrbStack uses its own socket location
+                std::env::var("DOCKER_HOME")
+                    .ok()
+                    .as_ref()
+                    .map(|p| format!("{}/docker.sock", p))
+                    .as_ref()
+                    .map(|s| s.as_str())
+                    .unwrap_or(""),
+            ];
+
+            for socket_path in socket_paths {
+                if socket_path.is_empty() {
+                    continue;
+                }
+                let path = std::path::Path::new(socket_path);
+                if path.exists() {
+                    tracing::debug!("Found Docker socket at: {}", socket_path);
+                    // Try docker version to verify
+                    let version_ok = Command::new(&cmd_path)
+                        .args(["version", "--format", "{{.Server.Version}}"])
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .status()
+                        .map(|s| s.success())
+                        .unwrap_or(false);
+                    if version_ok {
+                        tracing::debug!("Docker daemon detected via socket at {}", socket_path);
+                        return true;
+                    }
+                    // Socket exists but daemon not responding - keep looking
+                    tracing::debug!(
+                        "Docker socket exists at {} but daemon not responding",
+                        socket_path
+                    );
+                }
+            }
+
+            // Final fallback: try docker ps without checking socket first
+            // This handles cases where the socket is in an unexpected location
             let ps_ok = Command::new(&cmd_path)
                 .args(["ps"])
                 .stdout(std::process::Stdio::null())
@@ -308,6 +341,9 @@ pub fn is_runtime_running(runtime: ContainerRuntime) -> bool {
                 .map(|s| s.success())
                 .unwrap_or(false);
 
+            if ps_ok {
+                tracing::debug!("Docker daemon detected via docker ps");
+            }
             ps_ok
         }
         ContainerRuntime::OrbStack => {

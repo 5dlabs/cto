@@ -1101,46 +1101,8 @@ pub async fn smart_init(
         }
     }
 
-    // Step 5: If no CTO cluster, check for other usable clusters
-    if !result.cluster_ready {
-        tracing::info!("No CTO cluster found, checking for alternatives...");
-
-        // Look for running Docker Desktop K8s, OrbStack, etc.
-        let usable = existing
-            .clusters
-            .iter()
-            .filter(|c| c.is_running && c.cluster_type != ClusterType::Other)
-            .collect::<Vec<_>>();
-
-        if let Some(best) = usable.first() {
-            tracing::info!("Found alternative cluster: {}", best.context);
-            result.actions.push(format!(
-                "Using existing {} cluster",
-                match best.cluster_type {
-                    ClusterType::DockerDesktop => "Docker Desktop",
-                    ClusterType::OrbStack => "OrbStack",
-                    ClusterType::RancherDesktop => "Rancher Desktop",
-                    _ => "Kubernetes",
-                }
-            ));
-
-            // Switch to it
-            let output = Command::new("kubectl")
-                .args(["config", "use-context", &best.context])
-                .output();
-
-            if output.map(|o| o.status.success()).unwrap_or(false) {
-                result.cluster_ready = true;
-                result.context = best.context.clone();
-
-                // Save preference
-                let _ = db.set_config("prefer_existing_cluster", "true");
-                let _ = db.set_config("cluster_context", &best.context);
-            }
-        }
-    }
-
-    // Step 6: If still no cluster, create one
+    // Step 5: If no CTO cluster, create one with Kind
+    // CTO App only uses Kind for cluster management - no Docker Desktop K8s
     if !result.cluster_ready {
         tracing::info!("No usable cluster found, creating new CTO cluster...");
         result.actions.push("Creating new CTO cluster".to_string());
