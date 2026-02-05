@@ -11,6 +11,9 @@ use commands::cluster::*;
 use commands::{auto_provision_runtime, check_docker_running, get_docker_socket};
 
 fn main() {
+    // Initialize tracing subscriber for logging
+    tracing_subscriber::fmt::init();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
