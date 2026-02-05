@@ -47,7 +47,14 @@ pub async fn list_pods(namespace: Option<String>) -> Result<Vec<String>, AppErro
     let ns = namespace.unwrap_or_else(|| "default".to_string());
 
     let output = kubectl_command()
-        .args(&["get", "pods", "-n", &ns, "-o", "jsonpath={.items[*].metadata.name}"])
+        .args(&[
+            "get",
+            "pods",
+            "-n",
+            &ns,
+            "-o",
+            "jsonpath={.items[*].metadata.name}",
+        ])
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to run kubectl: {}", e)))?;
 
@@ -98,7 +105,8 @@ pub async fn list_pods_with_status(namespace: Option<String>) -> Result<Vec<PodI
                 Some(PodInfo {
                     name: parts[0].to_string(),
                     phase: parts[1].to_string(),
-                    containers: parts.get(2)
+                    containers: parts
+                        .get(2)
                         .map(|c| c.split_whitespace().map(String::from).collect())
                         .unwrap_or_else(Vec::new),
                 })
@@ -152,7 +160,12 @@ pub async fn stream_pod_logs(
 }
 
 /// Parse log lines into LogEntry structs
-fn parse_log_lines(content: &str, pod: &str, namespace: &str, container: Option<&str>) -> Vec<LogEntry> {
+fn parse_log_lines(
+    content: &str,
+    pod: &str,
+    namespace: &str,
+    container: Option<&str>,
+) -> Vec<LogEntry> {
     content
         .lines()
         .filter_map(|line| parse_log_line(line, pod, namespace, container))
@@ -160,7 +173,12 @@ fn parse_log_lines(content: &str, pod: &str, namespace: &str, container: Option<
 }
 
 /// Parse a single log line into a LogEntry
-fn parse_log_line(line: &str, pod: &str, namespace: &str, container: Option<&str>) -> Option<LogEntry> {
+fn parse_log_line(
+    line: &str,
+    pod: &str,
+    namespace: &str,
+    container: Option<&str>,
+) -> Option<LogEntry> {
     // Try to parse timestamp format: "2024-01-01T00:00:00.000000000Z message"
     let parts: Vec<&str> = line.splitn(2, ' ').collect();
     if parts.len() != 2 {
@@ -200,7 +218,12 @@ fn parse_log_line(line: &str, pod: &str, namespace: &str, container: Option<&str
 #[tauri::command]
 pub async fn list_namespaces() -> Result<Vec<String>, AppError> {
     let output = kubectl_command()
-        .args(&["get", "namespaces", "-o", "jsonpath={.items[*].metadata.name}"])
+        .args(&[
+            "get",
+            "namespaces",
+            "-o",
+            "jsonpath={.items[*].metadata.name}",
+        ])
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to run kubectl: {}", e)))?;
 

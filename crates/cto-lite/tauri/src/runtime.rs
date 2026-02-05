@@ -291,24 +291,23 @@ pub fn is_runtime_running(runtime: ContainerRuntime) -> bool {
             }
 
             // Check common Docker socket locations
-            let socket_paths = [
-                "/var/run/docker.sock",
-                "/run/docker.sock",
-                // OrbStack uses its own socket location
-                std::env::var("DOCKER_HOME")
-                    .ok()
-                    .as_ref()
-                    .map(|p| format!("{}/docker.sock", p))
-                    .as_ref()
-                    .map(|s| s.as_str())
-                    .unwrap_or(""),
+            let docker_home_socket = std::env::var("DOCKER_HOME")
+                .ok()
+                .map(|p| format!("{}/docker.sock", p));
+
+            let mut socket_paths = vec![
+                "/var/run/docker.sock".to_string(),
+                "/run/docker.sock".to_string(),
             ];
+            if let Some(socket) = docker_home_socket {
+                socket_paths.push(socket);
+            }
 
             for socket_path in socket_paths {
                 if socket_path.is_empty() {
                     continue;
                 }
-                let path = std::path::Path::new(socket_path);
+                let path = std::path::Path::new(&socket_path);
                 if path.exists() {
                     tracing::debug!("Found Docker socket at: {}", socket_path);
                     // Try docker version to verify
