@@ -289,20 +289,6 @@ export async function streamPodLogs(
   return invoke<LogEntry[]>('stream_pod_logs', { podName, namespace, container });
 }
 
-/** Start a log stream */
-export async function startLogStream(
-  namespace?: string,
-  podPattern?: string,
-  container?: string
-): Promise<string> {
-  return invoke<string>('start_log_stream', { namespace, podPattern, container });
-}
-
-/** Stop a log stream */
-export async function stopLogStream(streamId: string): Promise<void> {
-  return invoke('stop_log_stream', { streamId });
-}
-
 // ============================================================================
 // Helm Commands
 // ============================================================================
