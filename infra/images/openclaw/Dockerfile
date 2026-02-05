@@ -8,22 +8,14 @@ USER root
 # Downloads the latest release and extracts binaries
 ARG VERSION=latest
 
-RUN set -euo pipefail && \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in \
-        amd64) OPENCLAW_ARCH="x86_64" ;; \
-        arm64) OPENCLAW_ARCH="aarch64" ;; \
-        *) OPENCLAW_ARCH="$ARCH" ;; \
-    esac && \
-    # Determine version to download
+RUN set -eo pipefail && \
+    # Determine version to download (OpenClaw uses date-based versioning like 2026.2.3)
     if [ "$VERSION" = "latest" ]; then \
-        TAG=$(curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/latest" | jq -r '.tag_name'); \
-    else \
-        TAG="v${VERSION}"; \
+        VERSION=$(curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/latest" | jq -r '.name' | sed 's/OpenClaw-//'); \
     fi && \
-    echo "📦 Installing OpenClaw version: $TAG" && \
-    # Download and extract OpenClaw binaries
-    curl -fsSL "https://github.com/openclaw/openclaw/releases/download/${TAG}/openclaw-${OPENCLAW_ARCH}-unknown-linux-gnu.tar.gz" | \
+    echo "📦 Installing OpenClaw version: $VERSION" && \
+    # Download and extract OpenClaw binary (tgz format)
+    curl -fsSL "https://github.com/openclaw/openclaw/releases/download/OpenClaw-${VERSION}/openclaw-${VERSION}.tgz" | \
         tar -xzf - -C /usr/local/bin && \
     chmod +x /usr/local/bin/openclaw && \
     # Verify installation
@@ -31,9 +23,9 @@ RUN set -euo pipefail && \
     # Print changelog
     echo "" && \
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-    echo "📋 OpenClaw Changelog (${TAG})" && \
+    echo "📋 OpenClaw Changelog (${VERSION})" && \
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-    curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/tags/${TAG}" | \
+    curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/latest" | \
         jq -r '.body // "No changelog available"' | head -100 && \
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
