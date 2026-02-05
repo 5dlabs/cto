@@ -436,7 +436,9 @@ pub async fn handle_mention_webhook(
                 // Fall back to structure detection
                 if inner_payload.get("issue").is_some() && inner_payload.get("comment").is_some() {
                     "issue_comment".to_string()
-                } else if inner_payload.get("pull_request").is_some() && inner_payload.get("comment").is_some() {
+                } else if inner_payload.get("pull_request").is_some()
+                    && inner_payload.get("comment").is_some()
+                {
                     "pull_request_review_comment".to_string()
                 } else {
                     "unknown".to_string()
@@ -902,7 +904,7 @@ pub async fn handle_ci_failure_webhook(
     let files_url = format!(
         "https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files?per_page=100"
     );
-    
+
     let files_response = state
         .http_client
         .get(&files_url)
@@ -1006,7 +1008,7 @@ pub async fn handle_ci_failure_webhook(
 
     // Create the check run using GitHub API
     let check_run_url = format!("https://api.github.com/repos/{repo_full_name}/check-runs");
-    
+
     let check_response = state
         .http_client
         .post(&check_run_url)

@@ -163,6 +163,15 @@ impl Escalator {
         msg.push_str("*This issue requires manual intervention. ");
         msg.push_str("Please investigate and fix the root cause.*\n");
 
+        // Add acceptance criteria
+        msg.push_str("\n### Acceptance Criteria\n");
+        msg.push_str("To mark this issue as resolved:\n\n");
+        msg.push_str("- [ ] Root cause identified and documented\n");
+        msg.push_str("- [ ] Fix applied to the codebase\n");
+        msg.push_str("- [ ] All CI checks pass\n");
+        msg.push_str("- [ ] No regressions introduced\n");
+        msg.push_str("- [ ] PR merged (if applicable)\n");
+
         msg
     }
 
