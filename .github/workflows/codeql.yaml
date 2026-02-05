@@ -28,7 +28,11 @@ jobs:
     name: Analyze (${{ matrix.language }})
     # Only run on main branch - skip any stale runs from develop or other branches
     # This guards against queued runs from before develop was removed from triggers
-    if: github.ref == 'refs/heads/main'
+    # For push/schedule: check ref is main. For PRs: check base_ref is main (not develop)
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')
     runs-on: [k8s-runner]
     timeout-minutes: 60
     strategy:
