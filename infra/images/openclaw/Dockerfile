@@ -1,32 +1,26 @@
 # syntax=docker/dockerfile:1
+# OpenClaw Agent Image - CLI tool from npm
+# Based on runtime:minimal with OpenClaw CLI installed via npm
+
 ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:latest
 FROM ${BASE_IMAGE}
 
 USER root
 
-# Install OpenClaw from GitHub releases
-# Downloads the latest release and extracts binaries
+# Install OpenClaw CLI from npm
 ARG VERSION=latest
 
-RUN set -eo pipefail && \
-    # Determine version to download (OpenClaw uses date-based versioning like 2026.2.3)
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     if [ "$VERSION" = "latest" ]; then \
-        VERSION=$(curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/latest" | jq -r '.name' | sed 's/openclaw //'); \
+        npm install -g openclaw; \
+    else \
+        npm install -g openclaw@${VERSION}; \
     fi && \
-    echo "📦 Installing OpenClaw version: $VERSION" && \
-    # Download and extract OpenClaw binary (tgz format)
-    curl -fsSL "https://github.com/openclaw/openclaw/releases/download/v${VERSION}/openclaw-${VERSION}.tgz" | \
-        tar -xzf - -C /usr/local/bin && \
-    chmod +x /usr/local/bin/openclaw && \
-    # Verify installation
-    openclaw --version && \
-    # Print changelog
     echo "" && \
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-    echo "📋 OpenClaw Changelog (${VERSION})" && \
+    echo "📋 OpenClaw Changelog" && \
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-    curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/latest" | \
-        jq -r '.body // "No changelog available"' | head -100 && \
+    npm view openclaw changelog --json 2>/dev/null | head -50 || echo "Run 'openclaw --help' for usage" && \
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Create config and workspace directories
