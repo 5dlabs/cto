@@ -90,6 +90,7 @@ pub async fn check_docker() -> Result<DockerInfo, AppError> {
         } else {
             None
         },
+        runtime: "docker".to_string(),
     })
 }
 
