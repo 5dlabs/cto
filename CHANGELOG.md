@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.39](https://github.com/5dlabs/cto/compare/v0.2.38...v0.2.39) (2026-02-05)
+
+
+### 🐛 Bug Fixes
+
+* **tools:** correctly handle SYSTEM_CONFIG_PATH as file path ([a5375e6](https://github.com/5dlabs/cto/commit/a5375e62f7cde7014d6e621683af3cd89a25a33b))
+
 ## [0.2.38](https://github.com/5dlabs/cto/compare/v0.2.37...v0.2.38) (2026-02-05)
 
 
