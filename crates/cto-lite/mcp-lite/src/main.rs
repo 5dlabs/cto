@@ -2,7 +2,7 @@
 //!
 //! This binary runs the MCP server as a standalone process.
 
-use mcp_lite::run_server;
+use mcp_lite_lib::run_server;
 
 #[tokio::main]
 async fn main() {
