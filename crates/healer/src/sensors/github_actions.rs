@@ -705,7 +705,10 @@ fn generate_issue_acceptance_criteria(
 
     let mut criteria = String::new();
     let _ = writeln!(criteria, "### Acceptance Criteria\n");
-    let _ = writeln!(criteria, "Define what success looks like for this remediation:\n");
+    let _ = writeln!(
+        criteria,
+        "Define what success looks like for this remediation:\n"
+    );
 
     let _ = writeln!(criteria, "#### Root Cause");
     let _ = writeln!(criteria, "- [ ] Failure root cause identified");
@@ -764,11 +767,7 @@ fn generate_issue_acceptance_criteria(
 
     let _ = writeln!(criteria);
     let _ = writeln!(criteria, "#### Completion");
-    let _ = writeln!(
-        criteria,
-        "- [ ] Workflow {} passes",
-        failure.workflow_name
-    );
+    let _ = writeln!(criteria, "- [ ] Workflow {} passes", failure.workflow_name);
     let _ = writeln!(criteria, "- [ ] CI checks all green");
     let _ = writeln!(criteria, "- [ ] No new failures introduced");
 
