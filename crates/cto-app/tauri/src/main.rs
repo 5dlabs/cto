@@ -9,7 +9,6 @@ mod runtime;
 
 use commands::cluster::*;
 use commands::{auto_provision_runtime, check_docker_running, get_docker_socket};
-use pm_lite::github_app::{install_github_app, list_webhook_events, redeliver_webhook};
 
 fn main() {
     tauri::Builder::default()
@@ -24,10 +23,6 @@ fn main() {
             get_cluster_status,
             start_kind_cluster,
             delete_kind_cluster,
-            // PM-Lite: GitHub App commands
-            install_github_app,
-            list_webhook_events,
-            redeliver_webhook,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -677,35 +677,3 @@ pub fn auto_provision_runtime() -> Result<String, String> {
         Err(String::from_utf8_lossy(&create_output.stderr).to_string())
     }
 }
-
-// Re-export for use as tauri commands
-#[tauri::command]
-pub fn get_container_runtime_command() -> Result<ContainerRuntime, String> {
-    get_container_runtime()
-}
-
-#[tauri::command]
-pub fn get_runtime_info_command(runtime: String) -> Result<RuntimeInfo, String> {
-    get_runtime_info(&runtime)
-}
-
-#[tauri::command]
-pub fn ensure_kind_installed_command() -> Result<bool, String> {
-    ensure_kind_installed()
-}
-
-#[tauri::command]
-pub fn is_kind_cluster_running_command(name: String) -> Result<bool, String> {
-    is_kind_cluster_running(&name)
-}
-
-#[tauri::command]
-pub fn get_all_cluster_status_command() -> Result<Vec<ClusterStatus>, String> {
-    get_all_cluster_status()
-}
-
-pub use ensure_kind_installed_command as ensure_kind_installed;
-pub use get_all_cluster_status_command as get_all_cluster_status;
-pub use get_container_runtime_command as get_container_runtime;
-pub use get_runtime_info_command as get_runtime_info;
-pub use is_kind_cluster_running_command as is_kind_cluster_running;
