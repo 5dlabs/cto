@@ -1,14 +1,8 @@
 use std::path::PathBuf;
 
 use crate::providers::{
-    cherry::Cherry,
-    hetzner::Hetzner,
-    latitude::Latitude,
-    onprem::OnPrem,
-    ovh::Ovh,
-    scaleway::Scaleway,
-    vultr::Vultr,
-    Provider, ProviderError,
+    cherry::Cherry, hetzner::Hetzner, latitude::Latitude, onprem::OnPrem, ovh::Ovh,
+    scaleway::Scaleway, vultr::Vultr, Provider, ProviderError,
 };
 
 /// Supported bare-metal providers.
@@ -64,8 +58,11 @@ pub fn create_provider(config: ProviderConfig) -> Result<Box<dyn Provider>, Prov
     match config.kind {
         ProviderKind::Latitude => {
             let api_key = required(config.latitude_api_key, "latitude_api_key", "Latitude")?;
-            let project_id =
-                required(config.latitude_project_id, "latitude_project_id", "Latitude")?;
+            let project_id = required(
+                config.latitude_project_id,
+                "latitude_project_id",
+                "Latitude",
+            )?;
             Ok(Box::new(Latitude::new(api_key, project_id)?))
         }
         ProviderKind::Hetzner => {
@@ -93,11 +90,17 @@ pub fn create_provider(config: ProviderConfig) -> Result<Box<dyn Provider>, Prov
             Ok(Box::new(Vultr::new(api_key)?))
         }
         ProviderKind::Scaleway => {
-            let secret_key =
-                required(config.scaleway_secret_key, "scaleway_secret_key", "Scaleway")?;
+            let secret_key = required(
+                config.scaleway_secret_key,
+                "scaleway_secret_key",
+                "Scaleway",
+            )?;
             let org_id = required(config.scaleway_org_id, "scaleway_org_id", "Scaleway")?;
-            let project_id =
-                required(config.scaleway_project_id, "scaleway_project_id", "Scaleway")?;
+            let project_id = required(
+                config.scaleway_project_id,
+                "scaleway_project_id",
+                "Scaleway",
+            )?;
             let zone = required(config.scaleway_zone, "scaleway_zone", "Scaleway")?;
             Ok(Box::new(Scaleway::new(
                 secret_key, org_id, project_id, zone,
@@ -106,12 +109,25 @@ pub fn create_provider(config: ProviderConfig) -> Result<Box<dyn Provider>, Prov
         ProviderKind::Cherry => {
             let api_key = required(config.cherry_api_key, "cherry_api_key", "Cherry")?;
             let team_id = config.cherry_team_id.ok_or_else(|| {
-                ProviderError::Config(
-                    "cherry_team_id is required for Cherry provider".to_string(),
-                )
+                ProviderError::Config("cherry_team_id is required for Cherry provider".to_string())
             })?;
             Ok(Box::new(Cherry::new(api_key, team_id)?))
         }
         ProviderKind::OnPrem => Ok(Box::new(OnPrem::new(config.onprem_inventory_path)?)),
     }
+}
+
+/// Create a Cherry provider with frictionless initialization.
+///
+/// This helper:
+/// - Auto-detects SSH keys from ~/.ssh/ and uploads them
+/// - Creates a default project if none exists
+/// - Returns the provider plus project ID and SSH key IDs for server creation
+pub async fn create_cherry_with_init(
+    api_key: String,
+    team_id: i64,
+) -> Result<(Box<dyn Provider>, i64, Vec<i64>), ProviderError> {
+    let (provider, project_id, ssh_key_ids) =
+        Cherry::with_frictionless_init(api_key, team_id).await?;
+    Ok((Box::new(provider), project_id, ssh_key_ids))
 }

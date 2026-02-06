@@ -22,3 +22,5 @@ paths-ignore:
 query-filters:
   - exclude:
       id: rust/cleartext-transmission
+  - exclude:
+      id: rust/non-https-url

@@ -1,0 +1,123 @@
+{
+  "created_at": 1770266541,
+  "completed_at": 1770266551,
+  "id": "a2b7691c-6c0c-0616-1198-5f6dba1c552f",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_47651623",
+      "input": "{\"query\":\"(Kubernetes AI OR k8s AI OR Kubernetes agents OR container orchestration OR AI deployment kubernetes) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_a2b7691c-6c0c-0616-1198-5f6dba1c552f_xs_call_47651623",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_87282735",
+      "input": "{\"query\":\"(Kubernetes AI OR k8s AI OR Kubernetes agents OR container orchestration OR AI deployment kubernetes) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_a2b7691c-6c0c-0616-1198-5f6dba1c552f_xs_call_87282735",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the top English-language X posts matching your query on Kubernetes/AI topics, sorted by relevance and engagement:\n\nA case study details how a small team deployed 11 specialized AI agents as Kubernetes custom resources for tasks like network monitoring, observability, and deployment orchestration.[[1]](https://x.com/i/status/2018370339676328363)[[2]](https://x.com/i/status/2017579932537500096)\n\nThis thread highlights challenges in productionizing AI agents (deployment, scaling, observability, multi-agent orchestration) and spotlights \"KAgents on Kubernetes\" as a solution.[[2]](https://x.com/i/status/2017579932537500096)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018370339676328363",
+              "start_index": 306,
+              "end_index": 355,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017579932537500096",
+              "start_index": 355,
+              "end_index": 404,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017579932537500096",
+              "start_index": 586,
+              "end_index": 635,
+              "title": "2"
+            }
+          ]
+        }
+      ],
+      "id": "msg_a2b7691c-6c0c-0616-1198-5f6dba1c552f",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 7073,
+    "input_tokens_details": {
+      "cached_tokens": 4292
+    },
+    "output_tokens": 1341,
+    "output_tokens_details": {
+      "reasoning_tokens": 1037
+    },
+    "total_tokens": 8414,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 2,
+    "cost_in_usd_ticks": 114413000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 2,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

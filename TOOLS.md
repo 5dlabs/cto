@@ -1,49 +1,5 @@
 # TOOLS.md - Local Notes
 
-## CTO Repository
-
-- **Path:** /Users/jonathonfritz/.cursor/worktrees/cto/intake-agent
-- **Branch:** feat/intake-agent (tracks origin/main)
-- **Remote:** https://github.com/5dlabs/cto.git
-
-## Intake Agent Binary
-
-- **Source:** tools/intake-agent/src/
-- **Binary:** tools/intake-agent/dist/intake-agent
-- **Build:** `bun install && bun run build`
-
-## Test Data
-
-- **AlertHub Full:** tools/intake-agent/tests/alerthub-full/.tasks/ (50 tasks, 200 subtasks)
-- **E2E Structure:** tools/intake-agent/tests/e2e-full-structure/.tasks/
-
-## Environment Variables
-
-```bash
-export ANTHROPIC_API_KEY="..."     # Required
-export FIRECRAWL_API_KEY="..."     # Optional - web scraping
-export GITHUB_TOKEN="..."          # Optional - code search
-export TAVILY_API_KEY="..."        # Optional - web search
-```
-
-## Quick Reference
-
-```bash
-# Health check
-echo '{"operation":"ping"}' | ./dist/intake-agent
-
-# Check research capabilities
-echo '{"operation":"research_capabilities"}' | ./dist/intake-agent
-
-# Parse PRD
-echo '{"operation":"parse_prd","model":"claude-sonnet-4-20250514","payload":{"prd_content":"Build X","num_tasks":10}}' | ./dist/intake-agent
-```
-
-## Related Crates
-
-- `crates/intake/` - Rust CLI that calls intake-agent binary
-- `crates/intake/src/ai/sdk_provider.rs` - Binary invocation code
-
 
 ## Claude Code & Swarm Mode
 

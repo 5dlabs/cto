@@ -3,9 +3,9 @@ name: Code Quality
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
   schedule:
     # Run weekly on Monday at 9am PT
     - cron: '0 17 * * 1'

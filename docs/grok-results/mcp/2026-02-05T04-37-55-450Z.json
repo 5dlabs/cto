@@ -1,0 +1,267 @@
+{
+  "created_at": 1770266261,
+  "completed_at": 1770266275,
+  "id": "e00796c7-d0e1-1957-215c-e23b4aed4782",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_23662114",
+      "input": "{\"query\":\"(Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_e00796c7-d0e1-1957-215c-e23b4aed4782_xs_call_23662114",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_56762544",
+      "input": "{\"query\":\"(Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration) lang:en\",\"limit\":20,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_e00796c7-d0e1-1957-215c-e23b4aed4782_xs_call_56762544",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_73445976",
+      "input": "{\"query\":\"Model Context Protocol MCP Anthropic integration tools server\",\"limit\":20}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_e00796c7-d0e1-1957-215c-e23b4aed4782_xs_call_73445976",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_15322610",
+      "input": "{\"query\":\"(Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_e00796c7-d0e1-1957-215c-e23b4aed4782_xs_call_15322610",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_06420852",
+      "input": "{\"query\":\"(Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration) lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_e00796c7-d0e1-1957-215c-e23b4aed4782_xs_call_06420852",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_84621818",
+      "input": "{\"query\":\"Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration lang:en\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_e00796c7-d0e1-1957-215c-e23b4aed4782_xs_call_84621818",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "**Model Context Protocol (MCP)** is an open standard developed by Anthropic (now under the Linux Foundation) that standardizes how AI models like Claude connect to external tools, databases, APIs, file systems, and SaaS applications—often described as the \"USB-C of AI integrations.\"[[1]](https://x.com/i/status/2018225374786732247)[[2]](https://x.com/i/status/2018625550492094865)[[3]](https://x.com/i/status/2017524983355076938)\n\n### Key Features:\n- **Runtime Discovery**: AI models query available tools dynamically via endpoints like `tools/list`, adapting without custom code updates.[[1]](https://x.com/i/status/2018225374786732247)\n- **Deterministic Execution**: LLMs select tools, but wrapped code handles execution reliably, reducing hallucinations in API calls.[[1]](https://x.com/i/status/2018225374786732247)\n- **Bidirectional Communication**: Servers can request completions from the LLM, seek user input, or send notifications.[[1]](https://x.com/i/status/2018225374786732247)\n- **Simple Schema**: Unified JSON input/output for tools, unlike fragmented REST APIs.[[1]](https://x.com/i/status/2018225374786732247)\n- **Local-First Design**: Runs over stdio for local tools, enabling direct filesystem access without ports or CORS issues.[[1]](https://x.com/i/status/2018225374786732247)\n\n### Adoption & Ecosystem:\n- Supported by OpenAI, Google, Microsoft; used in Claude Desktop, Cursor, Windsurf, and tools like Zapier (8,000+ apps).[[1]](https://x.com/i/status/2018225374786732247)[[2]](https://x.com/i/status/2018625550492094865)\n- MCP servers exist for GitHub, Slack, Figma, Postgres, Google Drive, Blender, and more; open-source implementations like mcp-go (8k+ stars).[[4]](https://x.com/i/status/2018464205016633451)[[5]](https://x.com/i/status/2017889406791594103)\n- Over 10,000 MCP servers in production; simplifies agentic AI by solving N×M integration problems.[[1]](https://x.com/i/status/2018225374786732247)[[2]](https://x.com/i/status/2018625550492094865)\n\nSecurity relies on server-side implementation (no protocol-level auth), and it's not a full API replacement but an AI-friendly wrapper.[[1]](https://x.com/i/status/2018225374786732247)\n\nOfficial announcement: [Anthropic's MCP news](https://www.anthropic.com/news/model-context-protocol).[[6]](https://x.com/i/status/2018082792605892796)[[7]](https://x.com/i/status/2017887868551930355) It's gaining traction for building reliable, multimodal AI agents with real-world actions.[[8]](https://x.com/i/status/2018934292269969886)[[9]](https://x.com/i/status/2018399021447135652)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 283,
+              "end_index": 332,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018625550492094865",
+              "start_index": 332,
+              "end_index": 381,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017524983355076938",
+              "start_index": 381,
+              "end_index": 430,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 589,
+              "end_index": 638,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 771,
+              "end_index": 820,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 941,
+              "end_index": 990,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 1077,
+              "end_index": 1126,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 1249,
+              "end_index": 1298,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 1446,
+              "end_index": 1495,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018625550492094865",
+              "start_index": 1495,
+              "end_index": 1544,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018464205016633451",
+              "start_index": 1686,
+              "end_index": 1735,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017889406791594103",
+              "start_index": 1735,
+              "end_index": 1784,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 1884,
+              "end_index": 1933,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018625550492094865",
+              "start_index": 1933,
+              "end_index": 1982,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 2119,
+              "end_index": 2168,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018082792605892796",
+              "start_index": 2271,
+              "end_index": 2320,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017887868551930355",
+              "start_index": 2320,
+              "end_index": 2369,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018934292269969886",
+              "start_index": 2460,
+              "end_index": 2509,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018399021447135652",
+              "start_index": 2509,
+              "end_index": 2558,
+              "title": "9"
+            }
+          ]
+        }
+      ],
+      "id": "msg_e00796c7-d0e1-1957-215c-e23b4aed4782",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 13034,
+    "input_tokens_details": {
+      "cached_tokens": 6038
+    },
+    "output_tokens": 2147,
+    "output_tokens_details": {
+      "reasoning_tokens": 922
+    },
+    "total_tokens": 15181,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 6,
+    "cost_in_usd_ticks": 327746000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 6,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

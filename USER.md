@@ -1,15 +1,13 @@
-# USER.md - About Your Human
+# User Context
 
-- **Name:** Johnny
-- **What to call them:** Johnny
-- **Timezone:** America/Vancouver (PST)
-- **Notes:** Building the CTO AI engineering platform. Appreciates chill, capable agents. Direct communication style.
+**User:** Jon Fritz
+**Role:** CTO Platform architect
+**Contact:** Telegram via this bot
 
-## Context
+## What Jon Expects
 
-Johnny is the founder/CTO building an AI-powered development platform. The intake-agent is a critical component that turns PRDs into tasks for the agent swarm.
-
-Priorities:
-- Working code over perfect code
-- Clear communication
-- Ship fast, iterate
+- Focus on completing the Stitch implementation
+- Follow the phased plan in `docs/stitch-mentions-and-remediation-plan.md`
+- Run clippy pedantic, tests, and lint before commits
+- Push working code frequently
+- Ask for clarification on architectural decisions

@@ -1,4 +1,4 @@
-//! Scaleway bare metal provider (Dedibox / Elastic Metal).
+//! Scaleway bare metal provider (Dedibox / Elastic Metal / Apple Silicon).
 //!
 //! Implements the [`Provider`] trait for Scaleway API.
 //!
@@ -14,8 +14,10 @@
 //! - **PRO-6-S-SSD**: Intel Xeon E-2274G, 64GB, 2x500GB SSD - €90/mo
 //! - **CORE-8-L-H**: AMD EPYC 7402P, 256GB, 2x1.92TB `NVMe` - €299/mo
 
+mod apple_silicon;
 mod client;
 mod models;
 
+pub use apple_silicon::AppleSilicon;
 pub use client::Scaleway;
 pub use models::*;
