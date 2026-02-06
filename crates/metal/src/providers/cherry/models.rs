@@ -73,6 +73,26 @@ pub struct PlanSpecs {
     pub memory: Option<MemorySpec>,
     /// Storage info.
     pub storage: Option<Vec<StorageSpec>>,
+    /// NIC specifications.
+    #[serde(default)]
+    pub nics: Option<NicSpec>,
+    /// Bandwidth specifications.
+    #[serde(default)]
+    pub bandwidth: Option<BandwidthSpec>,
+}
+
+/// NIC specification.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NicSpec {
+    /// NIC name/type (e.g., "10Gbps").
+    pub name: String,
+}
+
+/// Bandwidth specification.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BandwidthSpec {
+    /// Bandwidth name (e.g., "100TB", "Unmetered").
+    pub name: String,
 }
 
 /// CPU specification.
@@ -123,12 +143,36 @@ pub struct CreateServerRequest {
     /// SSH key IDs.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub ssh_keys: Vec<i64>,
+    /// IP address IDs to assign.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ip_addresses: Vec<String>,
     /// Optional user data.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_data: Option<String>,
     /// Tags.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<serde_json::Value>,
+}
+
+/// Request body for creating an IP address.
+#[derive(Debug, Serialize)]
+pub struct CreateIpAddressRequest {
+    /// Region slug.
+    pub region: String,
+    /// IP type (e.g., "public", "private").
+    #[serde(rename = "type")]
+    pub address_type: String,
+    /// PTR record.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ptr_record: Option<String>,
+}
+
+/// Request body for assigning an IP address to a server.
+#[derive(Debug, Serialize)]
+pub struct AssignIpAddressRequest {
+    /// Server ID to assign to.
+    #[serde(rename = "targeted_to")]
+    pub server_id: i64,
 }
 
 // ============================================================================
@@ -185,6 +229,15 @@ pub struct SshKey {
 
 /// Create SSH key request.
 #[derive(Debug, Serialize)]
+pub struct CreateSshKey {
+    /// Key label.
+    pub label: String,
+    /// Public key content.
+    pub key: String,
+}
+
+/// Create SSH key request.
+#[derive(Debug, Serialize)]
 pub struct CreateSshKeyRequest {
     /// Key label.
     pub label: String,
@@ -214,4 +267,74 @@ pub struct ProjectBgp {
     pub enabled: bool,
     /// Local ASN.
     pub local_asn: Option<i64>,
+}
+
+// ============================================================================
+// IP Address types (for response)
+// ============================================================================
+
+/// IP address resource from API.
+#[derive(Debug, Clone, Deserialize)]
+pub struct IpAddressResource {
+    /// IP ID.
+    pub id: String,
+    /// IP address.
+    pub address: String,
+    /// CIDR notation.
+    pub cidr: Option<String>,
+    /// Gateway.
+    pub gateway: Option<String>,
+    /// Address type.
+    #[serde(rename = "type")]
+    pub address_type: Option<String>,
+    /// Address family (4 or 6).
+    pub address_family: Option<i32>,
+}
+
+// ============================================================================
+// Pricing types
+// ============================================================================
+
+/// Billing period for pricing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BillingPeriod {
+    Hourly,
+    Monthly,
+}
+
+/// Plan pricing information from API.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlanPricing {
+    /// Pricing ID.
+    pub id: String,
+    /// Unit (e.g., "hourly", "monthly").
+    pub unit: String,
+    /// Price in EUR.
+    pub price: f64,
+    /// Currency (e.g., "EUR").
+    pub currency: String,
+    /// Whether tax is applied.
+    pub taxed: bool,
+}
+
+/// Plan with pricing information.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlanWithPricing {
+    /// Plan ID.
+    pub id: i64,
+    /// Plan name.
+    pub name: String,
+    /// Plan slug.
+    pub slug: String,
+    /// Plan category (e.g., "middleweight", "high_performance").
+    pub category: String,
+    /// Plan specifications.
+    #[serde(default)]
+    pub specs: Option<PlanSpecs>,
+    /// Hourly pricing in EUR.
+    #[serde(default)]
+    pub hourly_eur: Option<f64>,
+    /// Monthly pricing in EUR.
+    #[serde(default)]
+    pub monthly_eur: Option<f64>,
 }

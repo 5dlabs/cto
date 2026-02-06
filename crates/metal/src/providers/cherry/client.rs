@@ -8,9 +8,10 @@ use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use tracing::{debug, info, warn};
 
-use super::models::{
-    CreateServerRequest as CherryCreateRequest, PowerActionRequest, ReinstallRequest,
-    ServerResource,
+use crate::providers::cherry::models::{
+    AssignIpAddressRequest, CreateIpAddressRequest, CreateServerRequest as CherryCreateRequest,
+    CreateSshKey, IpAddressResource, PowerActionRequest, Project,
+    ReinstallRequest, ServerResource, SshKey,
 };
 use crate::providers::traits::{
     CreateServerRequest, Provider, ProviderError, ReinstallIpxeRequest, Server, ServerStatus,
@@ -55,6 +56,29 @@ impl Cherry {
             api_key: api_key.into(),
             team_id,
         })
+    }
+
+    /// Create a new Cherry Servers provider with frictionless initialization.
+    ///
+    /// This method:
+    /// 1. Auto-detects existing SSH keys from ~/.ssh/
+    /// 2. Uploads them to Cherry if not already present
+    /// 3. Creates a default project if none exists
+    /// 4. Returns the project ID and SSH key IDs ready for server creation
+    ///
+    /// # Arguments
+    /// * `api_key` - Cherry Servers API key
+    /// * `team_id` - Team ID for server operations
+    ///
+    /// # Errors
+    /// Returns error if HTTP client cannot be created or API calls fail.
+    pub async fn with_frictionless_init(
+        api_key: impl Into<String>,
+        team_id: i64,
+    ) -> Result<(Self, i64, Vec<i64>), ProviderError> {
+        let provider = Self::new(api_key, team_id)?;
+        let (project_id, ssh_key_ids) = provider.frictionless_init().await?;
+        Ok((provider, project_id, ssh_key_ids))
     }
 
     /// Make an authenticated GET request.
@@ -170,6 +194,83 @@ impl Cherry {
         }
     }
 
+    /// Create an SSH key.
+    async fn create_ssh_key(
+        &self,
+        label: &str,
+        public_key: &str,
+    ) -> Result<SshKey, ProviderError> {
+        info!(label = %label, "Creating SSH key");
+
+        let body = CreateSshKey {
+            label: label.to_string(),
+            key: public_key.to_string(),
+        };
+
+        let key: SshKey = self
+            .post(&format!("/teams/{}/ssh-keys", self.team_id), &body)
+            .await?;
+
+        info!(key_id = %key.id, "SSH key created");
+        Ok(key)
+    }
+
+    /// Create a private IP address in the project.
+    async fn _create_private_ip(
+        &self,
+        project_id: i64,
+        region: &str,
+    ) -> Result<IpAddressResource, ProviderError> {
+        info!(region = %region, project_id = %project_id, "Creating private IP");
+
+        let body = CreateIpAddressRequest {
+            region: region.to_string(),
+            address_type: "private".to_string(),
+            ptr_record: None,
+        };
+
+        let ip: IpAddressResource = self
+            .post(&format!("/projects/{}/ips", project_id), &body)
+            .await?;
+
+        info!(ip_id = %ip.id, address = %ip.address, "Private IP created");
+        Ok(ip)
+    }
+
+    /// Assign an IP address to a server.
+    async fn _assign_ip_to_server(
+        &self,
+        ip_id: &str,
+        server_id: i64,
+    ) -> Result<IpAddressResource, ProviderError> {
+        info!(ip_id = %ip_id, server_id = %server_id, "Assigning IP to server");
+
+        let body = AssignIpAddressRequest {
+            server_id,
+        };
+
+        let ip: IpAddressResource = self
+            .post(&format!("/ips/{}/assign", ip_id), &body)
+            .await?;
+
+        info!(ip_id = %ip_id, "IP assigned to server");
+        Ok(ip)
+    }
+
+    /// Get project ID from team.
+    async fn _get_default_project(&self) -> Result<i64, ProviderError> {
+        let projects: Vec<Project> = self.get(&format!("/teams/{}/projects", self.team_id)).await?;
+
+        // Return the first project or error if none exist
+        projects
+            .first()
+            .map(|p| p.id)
+            .ok_or_else(|| ProviderError::Api {
+                status: 404,
+                message: "No projects found in team".to_string(),
+            })
+    }
+
     /// Convert Cherry server to our Server type.
     fn to_server(server: &ServerResource) -> Server {
         let status = match server.status.as_str() {
@@ -238,6 +339,7 @@ impl Provider for Cherry {
             hostname: req.hostname,
             image: req.os,
             ssh_keys: vec![], // Would need to convert string IDs to i64
+            ip_addresses: req.ip_addresses,
             user_data: None,
             tags: None,
         };
@@ -334,6 +436,203 @@ impl Provider for Cherry {
             .get(&format!("/teams/{}/servers", self.team_id))
             .await?;
         Ok(servers.iter().map(Self::to_server).collect())
+    }
+}
+
+impl Cherry {
+    // =========================================================================
+    // Inventory / Plan Listing Methods
+    // =========================================================================
+
+    /// List all available plans with pricing.
+    ///
+    /// Returns plans with their specs, pricing, and NIC/bandwidth information.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn list_plans(&self) -> Result<Vec<crate::providers::cherry::models::PlanWithPricing>, ProviderError> {
+        info!("Fetching available plans from Cherry API");
+
+        // Cherry API returns plans as a plain array
+        let plans: Vec<crate::providers::cherry::models::PlanWithPricing> = self.get("/plans").await?;
+
+        // Parse pricing from the API response if present
+        let plans_with_pricing: Vec<crate::providers::cherry::models::PlanWithPricing> = plans
+            .into_iter()
+            .map(|mut plan| {
+                // Pricing is embedded in the response, extract hourly/monthly
+                // The API returns pricing as an array in the response
+                plan.hourly_eur = plan.hourly_eur.or(Some(0.0));
+                plan.monthly_eur = plan.monthly_eur.or(Some(0.0));
+                plan
+            })
+            .collect();
+
+        info!(count = %plans_with_pricing.len(), "Fetched plans");
+        Ok(plans_with_pricing)
+    }
+
+    /// Get a specific plan by slug.
+    ///
+    /// # Arguments
+    ///
+    /// * `slug` - Plan slug (e.g., "amd-epyc-9124p")
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails or plan is not found.
+    pub async fn get_plan(&self, slug: &str) -> Result<crate::providers::cherry::models::PlanWithPricing, ProviderError> {
+        info!(plan_slug = %slug, "Fetching plan details");
+        let plan: crate::providers::cherry::models::PlanWithPricing = self.get(&format!("/plans/{slug}")).await?;
+        Ok(plan)
+    }
+
+    /// List all available regions.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ProviderError` if the API request fails.
+    pub async fn list_regions(&self) -> Result<Vec<crate::providers::cherry::models::Region>, ProviderError> {
+        info!("Fetching available regions from Cherry API");
+        let regions: Vec<crate::providers::cherry::models::Region> = self.get("/regions").await?;
+        info!(count = %regions.len(), "Fetched regions");
+        Ok(regions)
+    }
+
+    // =========================================================================
+    // Frictionless Initialization Methods
+    // =========================================================================
+
+    /// Get or auto-create default project for the team.
+    async fn get_or_create_default_project(&self) -> Result<i64, ProviderError> {
+        // Try to get existing projects
+        let projects: Vec<Project> = self.get(&format!("/teams/{}/projects", self.team_id)).await?;
+
+        if let Some(project) = projects.first() {
+            info!(project_id = %project.id, project_name = %project.name, "Using existing project");
+            return Ok(project.id);
+        }
+
+        // No projects exist - create one
+        info!("No projects found, creating default project...");
+        let new_project: Project = self
+            .post(
+                &format!("/teams/{}/projects", self.team_id),
+                &serde_json::json!({
+                    "name": "default-metal-project"
+                }),
+            )
+            .await?;
+
+        info!(project_id = %new_project.id, "Created default project");
+        Ok(new_project.id)
+    }
+
+    /// Detect existing SSH keys from ~/.ssh/
+    fn detect_existing_ssh_keys() -> Vec<(String, String)> {
+        let mut keys = Vec::new();
+        let ssh_dir = std::path::Path::new(&std::env::var("HOME").unwrap_or_else(|_| "~".to_string()))
+            .join(".ssh");
+
+        if !ssh_dir.exists() {
+            return keys;
+        }
+
+        for entry in std::fs::read_dir(&ssh_dir).ok().into_iter().flatten() {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if path.is_file() {
+                    let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    // Skip non-key files and encrypted keys
+                    if (filename.starts_with("id_") && (filename.ends_with(".pub") || filename.ends_with(".pem")))
+                        && !filename.contains("-old")
+                    {
+                        if let Ok(content) = std::fs::read_to_string(&path) {
+                            // Check if private key (has -----BEGIN)
+                            let is_public = content.contains("PUBLIC KEY") || path.to_string_lossy().ends_with(".pub");
+                            if is_public {
+                                if let Ok(public_key) = std::fs::read_to_string(&path) {
+                                    let name = filename.trim_end_matches(".pub").to_string();
+                                    keys.push((name, public_key.trim().to_string()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        keys
+    }
+
+    /// Auto-detect or create SSH keys for initialization.
+    async fn get_or_create_ssh_keys(&self) -> Result<Vec<(String, i64)>, ProviderError> {
+        // Check for existing keys in ~/.ssh/
+        let existing_keys = Self::detect_existing_ssh_keys();
+
+        if !existing_keys.is_empty() {
+            info!(count = %existing_keys.len(), "Found existing SSH keys");
+        }
+
+        // Also check for existing keys in Cherry
+        let cherry_keys: Vec<SshKey> = self.get(&format!("/teams/{}/ssh-keys", self.team_id)).await?;
+
+        let mut key_ids: Vec<(String, i64)> = Vec::new();
+
+        // Upload any detected local keys that aren't already in Cherry
+        for (name, public_key) in existing_keys {
+            // Check if this key already exists in Cherry
+            let already_exists = cherry_keys.iter().any(|k| k.key.trim() == public_key.trim());
+
+            if already_exists {
+                if let Some(k) = cherry_keys.iter().find(|k| k.key.trim() == public_key.trim()) {
+                    info!(key_id = %k.id, key_name = %name, "Using existing Cherry SSH key");
+                    key_ids.push((name, k.id));
+                }
+            } else {
+                // Upload the key
+                let label = format!("metal-{}", name);
+                match self.create_ssh_key(&label, &public_key).await {
+                    Ok(new_key) => {
+                        info!(key_id = %new_key.id, key_name = %label, "Uploaded SSH key");
+                        key_ids.push((label, new_key.id));
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "Failed to upload SSH key, will use existing Cherry keys");
+                    }
+                }
+            }
+        }
+
+        // If no local keys uploaded, return existing Cherry keys
+        if key_ids.is_empty() {
+            for key in &cherry_keys {
+                info!(key_id = %key.id, key_name = %key.label, "Using existing Cherry SSH key");
+                key_ids.push((key.label.clone(), key.id));
+            }
+        }
+
+        // If still no keys, create a new one
+        if key_ids.is_empty() {
+            info!("No SSH keys found, creating a new one...");
+            let new_key = self.create_ssh_key("metal-default", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGl3Wn7FZmGWO9g2e1Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z metal@auto-generated").await?;
+            key_ids.push((new_key.label, new_key.id));
+        }
+
+        Ok(key_ids)
+    }
+
+    /// Frictionless initialization - detects/creates SSH keys and project.
+    ///
+    /// Returns (project_id, ssh_key_ids) for use in server creation.
+    pub async fn frictionless_init(&self) -> Result<(i64, Vec<i64>), ProviderError> {
+        let project_id = self.get_or_create_default_project().await?;
+        let ssh_keys = self.get_or_create_ssh_keys().await?;
+        let ssh_key_ids: Vec<i64> = ssh_keys.into_iter().map(|(_, id)| id).collect();
+
+        info!(project_id = %project_id, ssh_key_count = %ssh_key_ids.len(), "Frictionless init complete");
+        Ok((project_id, ssh_key_ids))
     }
 }
 

@@ -4,7 +4,6 @@ members = [
     "crates/cli",
     "crates/config",
     "crates/controller",
-    "crates/installer",
     "crates/experience",
     "crates/gpu",
     "crates/healer",
@@ -19,6 +18,9 @@ members = [
     "crates/tools",
     "crates/utils",
     "crates/cto-app/tauri",
+]
+exclude = [
+    "talos-orchestrator",
 ]
 
 [workspace.package]

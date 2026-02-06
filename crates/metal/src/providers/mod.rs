@@ -20,7 +20,7 @@ pub use scaleway::Scaleway;
 pub use vultr::Vultr;
 
 // Re-export factory
-pub use factory::{create_provider, ProviderConfig, ProviderKind};
+pub use factory::{create_cherry_with_init, create_provider, ProviderConfig, ProviderKind};
 
 // Re-export common types
 pub use traits::{
