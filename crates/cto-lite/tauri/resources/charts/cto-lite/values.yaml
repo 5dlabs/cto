@@ -1,0 +1,93 @@
+# CTO Lite Default Values
+# Local Kind cluster deployment
+
+global:
+  imageRegistry: ghcr.io/5dlabs
+
+# Controller - reuse existing controller image
+controller:
+  enabled: true
+  image:
+    repository: ghcr.io/5dlabs/cto-controller
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# PM Lite - GitHub webhooks, no Linear
+pmLite:
+  enabled: true
+  image:
+    repository: ghcr.io/5dlabs/cto-pm-lite
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  # GitHub App config (populated at runtime)
+  github:
+    appId: ""
+    privateKeySecret: ""
+    webhookSecret: ""
+
+# Argo Workflows (subchart)
+argo-workflows:
+  enabled: true
+  controller:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  server:
+    enabled: true
+    replicas: 1
+    # Local auth for simplicity
+    extraArgs:
+      - --auth-mode=server
+
+# Agent images - which stack agents are available
+agents:
+  # Frontend agent (always included)
+  blaze:
+    image: ghcr.io/5dlabs/cto-agent-blaze:latest
+  # Quality agent (always included)  
+  cleo:
+    image: ghcr.io/5dlabs/cto-agent-cleo:latest
+  # Security agent (always included)
+  cipher:
+    image: ghcr.io/5dlabs/cto-agent-cipher:latest
+  # Testing agent (always included)
+  tess:
+    image: ghcr.io/5dlabs/cto-agent-tess:latest
+  # Deployment agent (always included)
+  bolt:
+    image: ghcr.io/5dlabs/cto-agent-bolt:latest
+  # Backend agents - user picks one
+  grizz:  # Rust/Go
+    image: ghcr.io/5dlabs/cto-agent-grizz:latest
+  nova:   # TypeScript
+    image: ghcr.io/5dlabs/cto-agent-nova:latest
+
+# Cloudflare tunnel for webhook ingress
+tunnel:
+  enabled: true
+  # Token provided by user via Tauri UI
+  tokenSecret: cloudflare-tunnel-token
+
+# Storage - local path for Kind
+storage:
+  class: standard  # Kind default
+  size: 10Gi

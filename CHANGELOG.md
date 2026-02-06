@@ -3,6 +3,121 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.39](https://github.com/5dlabs/cto/compare/v0.2.38...v0.2.39) (2026-02-05)
+
+
+### 🐛 Bug Fixes
+
+* **tools:** correctly handle SYSTEM_CONFIG_PATH as file path ([a5375e6](https://github.com/5dlabs/cto/commit/a5375e62f7cde7014d6e621683af3cd89a25a33b))
+
+## [0.2.38](https://github.com/5dlabs/cto/compare/v0.2.37...v0.2.38) (2026-02-05)
+
+
+### 🐛 Bug Fixes
+
+* **agents:** Add persistence logic to Atlas and Bolt agents ([#4290](https://github.com/5dlabs/cto/issues/4290)) ([9d6919d](https://github.com/5dlabs/cto/commit/9d6919d412e5a23b9ca2e35049f35c9d4edd31c8))
+* **codeql:** correct job condition and increase timeout ([#4325](https://github.com/5dlabs/cto/issues/4325)) ([c99a729](https://github.com/5dlabs/cto/commit/c99a7299640bb3210b638fb93b3bca208369a482))
+* **controller:** use TimeoutLayer::with_status_code for consistent 408 responses ([#4317](https://github.com/5dlabs/cto/issues/4317)) ([c329fda](https://github.com/5dlabs/cto/commit/c329fdab64b6c941e70573f1222a4a236e940a7a))
+* Preserve GitHub App private key for agent access ([#4316](https://github.com/5dlabs/cto/issues/4316)) ([66396d0](https://github.com/5dlabs/cto/commit/66396d0ee6c6c001a7391f5cb659f9ebf2d39946))
+* **tools:** release stdio semaphore permit immediately after init ([#4304](https://github.com/5dlabs/cto/issues/4304)) ([77b70cd](https://github.com/5dlabs/cto/commit/77b70cd83544567e828ce5aac9fadc36d761ff33))
+
+## [0.2.37](https://github.com/5dlabs/cto/compare/v0.2.36...v0.2.37) (2026-02-04)
+
+
+### ✨ Features
+
+* **cto-app:** React UI Scaffolding - Phase 1 ([#4245](https://github.com/5dlabs/cto/issues/4245)) ([de3fbfe](https://github.com/5dlabs/cto/commit/de3fbfe3db61564fd5c1dbadb3068f51055d7187))
+* **intake-agent:** add Anthropic API key support for Claude provider ([fadf37e](https://github.com/5dlabs/cto/commit/fadf37eaed0477ad080ebea44f819341b0d1886c))
+* **intake-agent:** implement 3-agent debate pattern with arbiter decision ([d4dff79](https://github.com/5dlabs/cto/commit/d4dff79040fed9bf970acf2a46aa9e33317e5dc4))
+* **tasks:** AlertHub intake output with 10 tasks and prompts ([#4242](https://github.com/5dlabs/cto/issues/4242)) ([53fff1c](https://github.com/5dlabs/cto/commit/53fff1c0ac567baf229667bb292152af17cf685c))
+* **tools:** add summary log for tool discovery ([#4219](https://github.com/5dlabs/cto/issues/4219)) ([c947dff](https://github.com/5dlabs/cto/commit/c947dff1bd258a48452272ed6d39b12bdc789db7))
+
+
+### 🐛 Bug Fixes
+
+* **ci:** remove frozen-lockfile flag for bun due to known issues ([#4279](https://github.com/5dlabs/cto/issues/4279)) ([9e24e7e](https://github.com/5dlabs/cto/commit/9e24e7e073178e458e3b566da78be47b90aca780))
+* **controller:** make GITHUB_APP_INSTALLATION_ID optional ([#4221](https://github.com/5dlabs/cto/issues/4221)) ([ce985c1](https://github.com/5dlabs/cto/commit/ce985c19fa09cf92699359bd033600f9fcece935))
+* **detection:** route Java/Ruby/PHP to Generic instead of Nova ([#4254](https://github.com/5dlabs/cto/issues/4254)) ([5996f56](https://github.com/5dlabs/cto/commit/5996f56cf3651ebd59bf49f6e5369566b200606a))
+* **intake-agent:** add --help and --version CLI flag support ([#4266](https://github.com/5dlabs/cto/issues/4266)) ([f62ddd3](https://github.com/5dlabs/cto/commit/f62ddd3184322f347ba993c22f3e08698f8dc9a6))
+* **intake-agent:** add missing @streamparser/json dependency ([#4261](https://github.com/5dlabs/cto/issues/4261)) ([e72ef24](https://github.com/5dlabs/cto/commit/e72ef24e1ed8a91a7e2cd53cb8168b480c72bf70))
+* **intake-agent:** enforce single-concern subtasks per SUBTASK-SPLITTING-GUIDE ([115f6e2](https://github.com/5dlabs/cto/commit/115f6e24be7ab863495e92bbc051fb5deafc1dc8))
+* **intake-agent:** improve single-concern validation accuracy ([8936f07](https://github.com/5dlabs/cto/commit/8936f074e386a7fb0ed7015dce0e081f6a7889b1))
+* **pm:** remove unnecessary hashes from raw string literal ([37faa29](https://github.com/5dlabs/cto/commit/37faa29268a8191f2d5669496a2115d96cf33673))
+* **pm:** resolve all clippy pedantic warnings in status-sync ([8e9b0f6](https://github.com/5dlabs/cto/commit/8e9b0f6af71d8a0dd03886293e0aa8936f5666c9))
+* **pm:** resolve clippy errors in agent_interactions and detection/utils ([#4211](https://github.com/5dlabs/cto/issues/4211)) ([96057d0](https://github.com/5dlabs/cto/commit/96057d01ac0642431bf9e2003df5916b21e13ab8))
+* **pm:** use GitHub API instead of gh CLI for CI failure handler ([#4208](https://github.com/5dlabs/cto/issues/4208)) ([9a0f78e](https://github.com/5dlabs/cto/commit/9a0f78eccb15df3eb6cfb844548ad7876acaa3a8))
+* **templates:** remove unnecessary DNS checks ([#4262](https://github.com/5dlabs/cto/issues/4262)) ([b72170e](https://github.com/5dlabs/cto/commit/b72170e198368f8be15de182b09a27fc5b978878))
+* **tools:** add timeout to stdio MCP init to prevent hanging ([706a17d](https://github.com/5dlabs/cto/commit/706a17d1a60d8cff0ab66a8bcf6a5932b988f497))
+* **tools:** limit concurrent stdio init + add smoke tests to prevent regressions ([#4224](https://github.com/5dlabs/cto/issues/4224)) ([e9556ab](https://github.com/5dlabs/cto/commit/e9556ab61a163f50d0d32d69bf4d8b1ee08821bd))
+* **tools:** LRU connection pool + lint fixes ([#4218](https://github.com/5dlabs/cto/issues/4218)) ([34ff24b](https://github.com/5dlabs/cto/commit/34ff24bcaea6d1aa34954c724ee039f61eaf2453))
+
+
+### 📚 Documentation
+
+* **prds:** add Morgan Coordinator PRD and ACP research notes ([#4214](https://github.com/5dlabs/cto/issues/4214)) ([ad3d84c](https://github.com/5dlabs/cto/commit/ad3d84cd3c7c1abe66c5e6bf40f3c2da7e33a3f4))
+* **prds:** Agent Capability PRDs - LSP, Self-Diagnosis, Recursive Learning ([#4225](https://github.com/5dlabs/cto/issues/4225)) ([5ddacec](https://github.com/5dlabs/cto/commit/5ddacece9fd645c2b5749151a587ce2e6775c2a7))
+
+
+### 🔧 Maintenance
+
+* **deps:** bump @types/node from 20.19.28 to 25.2.0 in /apps/web ([#4238](https://github.com/5dlabs/cto/issues/4238)) ([300a220](https://github.com/5dlabs/cto/commit/300a220ae3d28ed740dd6e7be04d7a29ba054953))
+* **deps:** bump jsdom from 27.4.0 to 28.0.0 in /apps/web ([#4237](https://github.com/5dlabs/cto/issues/4237)) ([7ce9421](https://github.com/5dlabs/cto/commit/7ce942187b883d334072269dc409a47742cb4d18))
+* **deps:** bump octocrab from 0.38.0 to 0.49.5 ([#4234](https://github.com/5dlabs/cto/issues/4234)) ([bb3415d](https://github.com/5dlabs/cto/commit/bb3415da16a1b77cac0c7e90de1a8a06fb713b0c))
+* **deps:** bump the marketing-npm group in /marketing with 7 updates ([#4230](https://github.com/5dlabs/cto/issues/4230)) ([2a35dc9](https://github.com/5dlabs/cto/commit/2a35dc951a35fd9c83c2b291f5637e0e7ba17b2b))
+* **deps:** bump the rust-minor group across 1 directory with 2 updates ([#4255](https://github.com/5dlabs/cto/issues/4255)) ([8c24c59](https://github.com/5dlabs/cto/commit/8c24c597dca3ea76fcbf125e8d774bece0778888))
+
+## [0.2.36](https://github.com/5dlabs/cto/compare/v0.2.35...v0.2.36) (2026-02-01)
+
+
+### ✨ Features
+
+* **intake-agent:** subagent-aware task expansion and dual-agent support ([#4136](https://github.com/5dlabs/cto/issues/4136)) ([2e447ac](https://github.com/5dlabs/cto/commit/2e447ace32adae6035a9ead52a1f9d548129eebe))
+* **intake:** add file analysis utilities ([#4148](https://github.com/5dlabs/cto/issues/4148)) ([9988fbb](https://github.com/5dlabs/cto/commit/9988fbb6698fab461308515b103ec4642a6204ec))
+* **linear-sink:** CLI-agnostic tool/skill discovery for Linear agent dialog ([#4129](https://github.com/5dlabs/cto/issues/4129)) ([f5923e9](https://github.com/5dlabs/cto/commit/f5923e9f3e44dd21735fe1e32001e5ba3807e88e))
+* Multi-provider LLM support ([#4191](https://github.com/5dlabs/cto/issues/4191)) ([8a16d02](https://github.com/5dlabs/cto/commit/8a16d02974fc3e7b981c8ea40d60362b3cff64e7))
+* **stitch:** Stitch implementation branch merge ([#4204](https://github.com/5dlabs/cto/issues/4204)) ([867b694](https://github.com/5dlabs/cto/commit/867b694869e984fe5e32a0166ee7998c3dbada3f))
+* **tests:** CLI agent testing infrastructure with Linear sidecar ([#4180](https://github.com/5dlabs/cto/issues/4180)) ([846a1a8](https://github.com/5dlabs/cto/commit/846a1a851b8e8ec5048614b911f831535fe77ed7))
+* **tools:** add per-MCP health status and metrics endpoints ([#4189](https://github.com/5dlabs/cto/issues/4189)) ([b7fe6f5](https://github.com/5dlabs/cto/commit/b7fe6f5a9bd78b4eb93156476d265c815cfe2e8f))
+* **tools:** LRU connection pool to prevent MCP subprocess OOM ([#4188](https://github.com/5dlabs/cto/issues/4188)) ([0c95319](https://github.com/5dlabs/cto/commit/0c95319432e380092704bb4d3cebc3e7d7787035))
+
+
+### 🐛 Bug Fixes
+
+* **tools:** add timeout and error handling for MCP server init ([#4187](https://github.com/5dlabs/cto/issues/4187)) ([b4ab5bd](https://github.com/5dlabs/cto/commit/b4ab5bd34ba63222b9438bb4639d8dc677ebd30f))
+* **tools:** remove redis from server config (client-side only) ([#4190](https://github.com/5dlabs/cto/issues/4190)) ([a202ae8](https://github.com/5dlabs/cto/commit/a202ae8802300de7b8c9e0c1f12f60404a775693))
+
+
+### 📚 Documentation
+
+* **intake:** add subtask splitting guide for intake agent ([#4199](https://github.com/5dlabs/cto/issues/4199)) ([03cca6c](https://github.com/5dlabs/cto/commit/03cca6c690ac753754df1705870c7d226ff53e3a))
+
+## [0.2.35](https://github.com/5dlabs/cto/compare/v0.2.34...v0.2.35) (2026-01-31)
+
+
+### ✨ Features
+
+* add Stitch agent config + detection-aware review template ([b0dd873](https://github.com/5dlabs/cto/commit/b0dd873b938fab78d062a324ce3e8333db94a7d1))
+* **examples:** AlertHub planning documents from intake-agent ([#4163](https://github.com/5dlabs/cto/issues/4163)) ([a3964f5](https://github.com/5dlabs/cto/commit/a3964f5385c35789436dca594165ce030e88cfd4))
+* remediation buttons Phase A + config fixes ([#4123](https://github.com/5dlabs/cto/issues/4123)) ([399aa40](https://github.com/5dlabs/cto/commit/399aa408961319294a83ac9fe7fee2aefb3d064d))
+* **stitch:** CI failure remediation buttons (webhook-based) ([#4166](https://github.com/5dlabs/cto/issues/4166)) ([3e3cc8d](https://github.com/5dlabs/cto/commit/3e3cc8d9e0372166fe18431e1a1e1d6a2dc9d3c9))
+
+
+### 🐛 Bug Fixes
+
+* define CURL_MAX_RETRIES before retry loops ([2ead8c3](https://github.com/5dlabs/cto/commit/2ead8c373073b2f2989743a75ba015f3ea328fdf))
+* **intake-agent:** Robust JSON parsing with jsonrepair ([#4164](https://github.com/5dlabs/cto/issues/4164)) ([4a8e899](https://github.com/5dlabs/cto/commit/4a8e89930932d1694787e6e15927307a76391fe1))
+* Stitch must use gh CLI for reviews to post as correct identity ([cb1d67d](https://github.com/5dlabs/cto/commit/cb1d67d20ce461a28c84784d2201aeb45c2211fc))
+* **stitch:** deduplicate CodeRuns using deterministic names ([#4143](https://github.com/5dlabs/cto/issues/4143)) ([dadc8a2](https://github.com/5dlabs/cto/commit/dadc8a248659b9d1f940993a40837629b3dc6491))
+* **stitch:** enforce gh CLI for reviews to use correct GitHub App identity ([#4157](https://github.com/5dlabs/cto/issues/4157)) ([015892a](https://github.com/5dlabs/cto/commit/015892a09560e658aa6996a37e732f881e18297b))
+* **tools:** bump memory limit 2Gi→4Gi to prevent OOM ([#4186](https://github.com/5dlabs/cto/issues/4186)) ([530fd5b](https://github.com/5dlabs/cto/commit/530fd5b295d913a1630825547346d950aa05d326))
+
+
+### 📚 Documentation
+
+* add CTO Lite freemium desktop application plan ([#4154](https://github.com/5dlabs/cto/issues/4154)) ([39a1e18](https://github.com/5dlabs/cto/commit/39a1e183032beb698dce43698052884ddc09fd83))
+* add remediation buttons implementation status ([#4131](https://github.com/5dlabs/cto/issues/4131)) ([bbcfbde](https://github.com/5dlabs/cto/commit/bbcfbde9afd9bf54b21dd563a01537a2b3005870))
+* AlertHub full task/subtask structure (50 tasks, 200 subtasks) ([#4145](https://github.com/5dlabs/cto/issues/4145)) ([cbf462b](https://github.com/5dlabs/cto/commit/cbf462b9de9587eff4968b52b88a450ed7c527ca))
+
 ## [0.2.34](https://github.com/5dlabs/cto/compare/v0.2.33...v0.2.34) (2026-01-30)
 
 

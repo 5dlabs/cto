@@ -39,6 +39,8 @@ spec:
           method: POST
           headers:
             Content-Type: application/json
+            # Note: Handler auto-detects event type from payload body (X-GitHub-Event field)
+            # or falls back to structure detection (issue vs pull_request fields)
           payload:
             - src:
                 dependencyName: comment-event

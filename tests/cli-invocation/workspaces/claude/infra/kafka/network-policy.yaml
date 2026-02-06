@@ -1,0 +1,67 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-cluster-network-policy
+  namespace: messaging
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/cluster: kafka-cluster
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from within the same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: messaging
+      ports:
+        - protocol: TCP
+          port: 9092  # Kafka plain
+        - protocol: TCP
+          port: 9093  # Kafka TLS
+        - protocol: TCP
+          port: 9094  # Kafka external
+        - protocol: TCP
+          port: 2181  # ZooKeeper
+        - protocol: TCP
+          port: 9404  # Metrics
+    # Allow traffic from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9404  # Metrics
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow traffic within the cluster
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: kafka-cluster
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9093
+        - protocol: TCP
+          port: 2181
+        - protocol: TCP
+          port: 2888
+        - protocol: TCP
+          port: 3888
+    # Allow outbound internet access for external integrations
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP

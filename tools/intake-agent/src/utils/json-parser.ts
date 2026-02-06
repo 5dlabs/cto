@@ -233,3 +233,81 @@ export function isValidComplexityAnalysis(item: unknown): item is { taskId: numb
   return typeof item === 'object' && item !== null && 'taskId' in item &&
     (typeof (item as any).taskId === 'number' || typeof (item as any).taskId === 'string');
 }
+
+// =============================================================================
+// Single-Concern Validation
+// =============================================================================
+
+/**
+ * Check if a subtask violates single-concern rule.
+ * Returns true if violation detected.
+ */
+export function hasCombinedConcerns(title: string, details: string): boolean {
+  const text = `${title} ${details}`.toLowerCase();
+  
+  // List of systems that should NOT be combined
+  const systems = ['postgresql', 'mongodb', 'redis', 'kafka', 'rabbitmq', 'mysql', 'postgres'];
+  
+  // Find which systems are mentioned
+  const found = systems.filter(s => text.includes(s));
+  
+  // Check for comma-separated lists (PostgreSQL, MongoDB, Redis)
+  const commaListMatch = text.match(/\b(\w+), (\w+)\b/);
+  if (commaListMatch && found.length >= 2) return true;
+  
+  // Check for "and" connecting multiple systems (Kafka and RabbitMQ)
+  if (found.length >= 2 && text.includes(' and ')) return true;
+  
+  // Check for "(X, Y, Z)" pattern
+  const parenListMatch = text.match(/\([^)]*\)/);
+  if (parenListMatch) {
+    const parenText = parenListMatch[0].toLowerCase();
+    const parenSystems = systems.filter(s => parenText.includes(s));
+    if (parenSystems.length >= 2) return true;
+  }
+  
+  // Check for "namespaces, policies, quotas" pattern (multiple K8s concepts)
+  const k8sPatterns = [
+    /\bnamespaces?\b.*\bpolicies?\b/,
+    /\bpolicies?\b.*\bquotas?\b/,
+    /\bnamespaces?\b.*\bquotas?\b/,
+    /\brbac\b.*\bnetwork policies?\b/,
+  ];
+  
+  for (const pattern of k8sPatterns) {
+    if (pattern.test(text)) return true;
+  }
+  
+  // Count K8s-related words
+  const k8sConcepts = ['namespaces', 'policies', 'quotas', 'rbac', 'network policy', 'security context'];
+  const k8sFound = k8sConcepts.filter(c => text.includes(c));
+  if (k8sFound.length >= 2) return true;
+  
+  return false;
+}
+
+/**
+ * Validate that all subtasks follow single-concern rule.
+ */
+export function validateSingleConcern(subtasks: Array<{ id: number; title: string; details?: string }>): {
+  valid: boolean;
+  violations: Array<{ id: number; title: string; reason: string }>;
+} {
+  const violations: Array<{ id: number; title: string; reason: string }> = [];
+  
+  for (const subtask of subtasks) {
+    const details = subtask.details || '';
+    if (hasCombinedConcerns(subtask.title, details)) {
+      violations.push({
+        id: subtask.id,
+        title: subtask.title,
+        reason: 'Subtask combines multiple systems - split into separate subtasks'
+      });
+    }
+  }
+  
+  return {
+    valid: violations.length === 0,
+    violations
+  };
+}

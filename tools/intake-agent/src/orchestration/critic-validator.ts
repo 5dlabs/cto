@@ -20,6 +20,9 @@ import {
   buildRefinerPrompt,
   REFINER_SYSTEM_PROMPT,
 } from '../prompts/critic-templates';
+import { createLogger, createTimer, logSeparator } from '../utils/logger';
+
+const logger = createLogger('multi-model');
 
 // =============================================================================
 // Types
@@ -89,22 +92,37 @@ function logDialogEntry(dialog: MultiModelDialog): void {
   const status = dialog.critic.approved ? '✓ APPROVED' : '✗ NEEDS REFINEMENT';
   const issueCount = dialog.critic.issues.length;
   
-  console.error(`[MULTI-MODEL] Round ${dialog.round}: ${status}`);
-  console.error(`  Generator (${dialog.generator.provider}/${dialog.generator.model}): ${dialog.generator.tokens} tokens, ${dialog.generator.latencyMs}ms`);
-  console.error(`  Critic (${dialog.critic.provider}/${dialog.critic.model}): confidence=${dialog.critic.confidence.toFixed(2)}, issues=${issueCount}, ${dialog.critic.tokens} tokens, ${dialog.critic.latencyMs}ms`);
+  logSeparator(`Round ${dialog.round}`, logger);
+  logger.info(`Round ${dialog.round}: ${status}`);
+  logger.debug('Generator', {
+    provider: dialog.generator.provider,
+    model: dialog.generator.model,
+    tokens: dialog.generator.tokens,
+    latency_ms: dialog.generator.latencyMs,
+  });
+  logger.debug('Critic', {
+    provider: dialog.critic.provider,
+    model: dialog.critic.model,
+    confidence: dialog.critic.confidence,
+    issues: issueCount,
+    tokens: dialog.critic.tokens,
+    latency_ms: dialog.critic.latencyMs,
+  });
   
   if (issueCount > 0 && !dialog.critic.approved) {
-    console.error(`  Issues:`);
     for (const issue of dialog.critic.issues.slice(0, 3)) {
-      console.error(`    - [${issue.severity}] ${issue.description.slice(0, 100)}${issue.description.length > 100 ? '...' : ''}`);
+      logger.info(`Issue [${issue.severity}]`, { 
+        location: issue.location,
+        description: issue.description.slice(0, 150),
+      });
     }
     if (issueCount > 3) {
-      console.error(`    ... and ${issueCount - 3} more issues`);
+      logger.debug(`... and ${issueCount - 3} more issues`);
     }
   }
   
-  if (dialog.critic.reasoning) {
-    console.error(`  Reasoning: ${dialog.critic.reasoning.slice(0, 150)}${dialog.critic.reasoning.length > 150 ? '...' : ''}`);
+  if (dialog.critic.reasoning && logger.isDebug()) {
+    logger.debug('Reasoning', { text: dialog.critic.reasoning.slice(0, 300) });
   }
 }
 
@@ -145,7 +163,7 @@ function addUsage(tracker: UsageTracker, response: ProviderResponse): void {
 /**
  * Parse critic JSON response.
  */
-function parseCriticResponse(text: string): CriticResult | null {
+export function parseCriticResponse(text: string): CriticResult | null {
   try {
     // Try to extract JSON from the response (it might have markdown code blocks)
     let jsonStr = text;
@@ -183,7 +201,7 @@ function parseCriticResponse(text: string): CriticResult | null {
 /**
  * Create a fallback critic result when parsing fails.
  */
-function createFallbackCriticResult(rawResponse: string): CriticResult {
+export function createFallbackCriticResult(rawResponse: string): CriticResult {
   return {
     approved: true, // Assume approved if we can't parse
     issues: [],
@@ -298,7 +316,13 @@ export async function generateWithCritic(
   let currentContent = '';
   let finalCriticResult: CriticResult | undefined;
   
-  console.error(`[MULTI-MODEL] Starting generation with critic (generator=${config.generator}, critic=${config.critic}, maxRefinements=${config.maxRefinements})`);
+  logSeparator('Generate with Critic', logger);
+  logger.info('Starting generation', { 
+    generator: config.generator, 
+    critic: config.critic, 
+    maxRefinements: config.maxRefinements,
+    criticThreshold: config.criticThreshold,
+  });
   
   try {
     // Step 1: Initial generation
@@ -321,7 +345,7 @@ export async function generateWithCritic(
     addUsage(usageTracker, generateResponse);
     
     if (!generateResponse.success || !generateResponse.text) {
-      console.error(`[MULTI-MODEL] Initial generation failed: ${generateResponse.error || 'unknown error'}`);
+      logger.error('Initial generation failed', { error: generateResponse.error || 'unknown error' });
       return {
         success: false,
         error: `Generation failed: ${generateResponse.error || 'unknown error'}`,
@@ -335,7 +359,10 @@ export async function generateWithCritic(
     }
     
     currentContent = generateResponse.text;
-    console.error(`[MULTI-MODEL] Initial generation complete: ${generateResponse.usage.total_tokens} tokens, ${genLatencyMs}ms`);
+    logger.info('Initial generation complete', { 
+      tokens: generateResponse.usage.total_tokens, 
+      latency_ms: genLatencyMs,
+    });
     
     // Step 2: Critic loop
     let round = 1;
@@ -382,22 +409,37 @@ export async function generateWithCritic(
       dialogHistory.push(dialogEntry);
       logDialogEntry(dialogEntry);
       
-      // Check if approved or meets confidence threshold
-      if (criticResult.approved || criticResult.confidence >= config.criticThreshold) {
-        console.error(`[MULTI-MODEL] Content approved (approved=${criticResult.approved}, confidence=${criticResult.confidence.toFixed(2)} >= threshold=${config.criticThreshold})`);
+      // Check if approved - only stop if critic actually approves
+      // High confidence with approved=false means critic is sure content needs work
+      if (criticResult.approved) {
+        logger.info('Content APPROVED', { confidence: criticResult.confidence });
         break;
+      }
+      
+      // If not approved but very high confidence, critic is certain issues exist
+      // Only stop if we've hit max refinements (checked in loop condition)
+      logger.info('Content NOT approved', { 
+        confidence: criticResult.confidence, 
+        threshold: config.criticThreshold,
+        issues: criticResult.issues.length,
+      });
+      
+      // Check for critical issues that might not be fixable
+      const criticalCount = criticResult.issues.filter(i => i.severity === 'critical').length;
+      if (criticalCount > 0 && criticResult.confidence >= 0.9) {
+        logger.warn('Critical issues detected', { criticalCount, confidence: criticResult.confidence });
       }
       
       // Check for critical issues that can't be refined
       const criticalIssues = criticResult.issues.filter(i => i.severity === 'critical');
       if (criticalIssues.length > 0 && refinements === config.maxRefinements - 1) {
-        console.error(`[MULTI-MODEL] Critical issues found on last refinement, attempting final fix`);
+        logger.warn('Critical issues on last refinement - final attempt');
       }
       
       // Step 3: Refine based on feedback
       refinements++;
       round++;
-      console.error(`[MULTI-MODEL] Starting refinement ${refinements}/${config.maxRefinements}`);
+      logger.info(`Starting refinement ${refinements}/${config.maxRefinements}`);
       
       const refineStartTime = Date.now();
       const refineResponse = await runRefiner(
@@ -411,11 +453,14 @@ export async function generateWithCritic(
       addUsage(usageTracker, refineResponse);
       
       if (!refineResponse.success || !refineResponse.text) {
-        console.error(`[MULTI-MODEL] Refinement ${refinements} failed: ${refineResponse.error || 'unknown error'}`);
+        logger.error(`Refinement ${refinements} failed`, { error: refineResponse.error || 'unknown error' });
         break;
       }
       
-      console.error(`[MULTI-MODEL] Refinement ${refinements} complete: ${refineResponse.usage.total_tokens} tokens, ${refineLatencyMs}ms`);
+      logger.info(`Refinement ${refinements} complete`, { 
+        tokens: refineResponse.usage.total_tokens, 
+        latency_ms: refineLatencyMs,
+      });
       currentContent = refineResponse.text;
       
       // Update the dialog entry with refiner info
@@ -428,7 +473,7 @@ export async function generateWithCritic(
     
     // Run final critic if we haven't yet (or if we hit max refinements)
     if (!finalCriticResult || refinements === config.maxRefinements) {
-      console.error(`[MULTI-MODEL] Running final critic evaluation`);
+      logger.info('Running final critic evaluation');
       const { result, response } = await runCritic(
         currentContent,
         options.criticContext || '',
@@ -442,7 +487,13 @@ export async function generateWithCritic(
     }
     
     const totalLatencyMs = Date.now() - startTime;
-    console.error(`[MULTI-MODEL] Complete: ${refinements} refinements, ${usageTracker.total.total_tokens} total tokens, ${totalLatencyMs}ms`);
+    logSeparator('Complete', logger);
+    logger.info('Generation complete', { 
+      refinements, 
+      total_tokens: usageTracker.total.total_tokens, 
+      total_latency_ms: totalLatencyMs,
+      approved: finalCriticResult?.approved,
+    });
     
     return {
       success: true,
@@ -457,7 +508,7 @@ export async function generateWithCritic(
     };
   } catch (e) {
     const error = e instanceof Error ? e.message : 'Unknown error';
-    console.error(`[MULTI-MODEL] Orchestration error: ${error}`);
+    logger.error('Orchestration error', { error });
     return {
       success: false,
       error: `Orchestration error: ${error}`,

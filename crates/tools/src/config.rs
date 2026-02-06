@@ -19,6 +19,9 @@ pub struct ClientConfig {
     /// Local servers to spawn in client context
     #[serde(rename = "localServers")]
     pub local_servers: HashMap<String, LocalServerConfig>,
+    /// Maximum number of concurrent MCP server connections (LRU eviction when exceeded)
+    #[serde(rename = "maxConnections", default)]
+    pub max_connections: Option<usize>,
 }
 
 /// Configuration for a local MCP server to be spawned by the client
@@ -142,15 +145,26 @@ pub struct SystemConfigManager {
 }
 
 impl SystemConfigManager {
-    pub fn new(project_dir: Option<PathBuf>) -> Result<Self> {
-        let config_path = if let Some(dir) = project_dir {
-            dir.join("mcp-servers.json")
+    pub fn new(config_path: Option<std::path::PathBuf>) -> Result<Self> {
+        // Determine the actual config file path
+        // If a path is provided:
+        //   - If it ends with ".json", use it directly as the file path
+        //   - Otherwise, treat it as a directory and join with "mcp-servers.json"
+        // If no path is provided, use "mcp-servers.json" in current directory
+        let actual_config_path = if let Some(path) = config_path {
+            if path.to_string_lossy().ends_with(".json") {
+                // It's a file path, use it directly
+                path
+            } else {
+                // It's a directory, join with config filename
+                path.join("mcp-servers.json")
+            }
         } else {
-            PathBuf::from("mcp-servers.json")
+            std::path::PathBuf::from("mcp-servers.json")
         };
 
-        let config = if config_path.exists() {
-            let config_content = std::fs::read_to_string(&config_path)?;
+        let config = if actual_config_path.exists() {
+            let config_content = std::fs::read_to_string(&actual_config_path)?;
             serde_json::from_str(&config_content)?
         } else {
             ServersConfig {
@@ -159,7 +173,7 @@ impl SystemConfigManager {
         };
 
         Ok(Self {
-            config_path,
+            config_path: actual_config_path,
             config,
         })
     }

@@ -22,15 +22,19 @@ import type {
 } from './types';
 import { validateRequest } from './types';
 import { parsePrd } from './operations/parse-prd';
+import { parsePrdIterative } from './operations/parse-prd-iterative';
 import { expandTask } from './operations/expand-task';
 import { analyzeComplexity } from './operations/analyze';
 import { generate, type GeneratePayload } from './operations/generate';
+import { generatePrompts, type GeneratePromptsPayload } from './operations/generate-prompts';
 import { research, getResearchCapabilities, type ResearchPayload } from './operations/research';
 import {
   generateWithCriticOperation,
   validateContentOperation,
   getProviderStatus,
 } from './operations/generate-with-critic';
+import { generateWithDebate } from './operations/generate-with-debate';
+import { generateDocs } from './operations/generate-docs';
 import type { GenerateWithCriticPayload, ProviderName } from './providers/types';
 
 /**
@@ -100,6 +104,14 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
       return parsePrd(payload, model, options);
     }
 
+    case 'parse_prd_iterative': {
+      const payload = request.payload as ParsePrdPayload;
+      if (!payload?.prd_content) {
+        return errorResponse('Missing prd_content in payload', 'validation_error');
+      }
+      return parsePrdIterative(payload, model, options);
+    }
+
     case 'expand_task': {
       const payload = request.payload as ExpandTaskPayload;
       if (!payload?.task) {
@@ -122,6 +134,14 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
         return errorResponse('Missing user_prompt in payload', 'validation_error');
       }
       return generate(payload, model, options);
+    }
+
+    case 'generate_prompts': {
+      const payload = request.payload as GeneratePromptsPayload;
+      if (!payload?.tasks || !Array.isArray(payload.tasks)) {
+        return errorResponse('Missing tasks array in payload', 'validation_error');
+      }
+      return generatePrompts(payload);
     }
 
     case 'research': {
@@ -161,6 +181,76 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
     case 'provider_status':
       return getProviderStatus();
 
+    case 'generate_docs': {
+      const payload = request.payload as {
+        tasks: Array<{
+          id: number;
+          title: string;
+          description: string;
+          status?: string;
+          priority?: string;
+          dependencies: number[];
+          details?: string;
+          test_strategy?: string;
+          subtasks?: Array<{
+            id: string;
+            title: string;
+            description: string;
+            status?: string;
+            dependencies?: number[];
+            details?: string;
+            test_strategy?: string;
+          }>;
+          decision_points?: Array<{
+            id: string;
+            category: string;
+            description: string;
+            options: string[];
+            requires_approval: boolean;
+            constraint_type: string;
+          }>;
+        }>;
+        base_path: string;
+        project_root?: string;
+      };
+      if (!payload?.tasks || !Array.isArray(payload.tasks)) {
+        return errorResponse('Missing tasks array in payload', 'validation_error');
+      }
+      if (!payload?.base_path) {
+        return errorResponse('Missing base_path in payload', 'validation_error');
+      }
+      return generateDocs(payload);
+    }
+
+    case 'generate_with_debate': {
+      const payload = request.payload as {
+        user_prompt: string;
+        system_prompt?: string;
+        prefill?: string;
+        context?: string;
+        content_type?: string;
+        config?: {
+          generator?: ProviderName;
+          critic?: ProviderName;
+          generator_model?: string;
+          critic_model?: string;
+          max_refinements?: number;
+          critic_threshold?: number;
+        };
+      };
+      if (!payload?.user_prompt) {
+        return errorResponse('Missing user_prompt in payload', 'validation_error');
+      }
+      return generateWithDebate({
+        systemPrompt: payload.system_prompt || 'You are a helpful assistant.',
+        userPrompt: payload.user_prompt,
+        prefill: payload.prefill,
+        context: payload.context,
+        contentType: payload.content_type,
+        config: payload.config,
+      });
+    }
+
     default:
       return errorResponse(`Unknown operation: ${request.operation}`, 'validation_error');
   }
@@ -199,9 +289,73 @@ function writeStdout(response: AgentResponse<unknown>): void {
 }
 
 /**
+ * Display help message.
+ */
+function printHelp(): void {
+  console.log(`intake-agent v${VERSION}
+
+PRD parsing and task generation agent using Claude Agent SDK.
+
+This binary reads JSON requests from stdin and writes JSON responses to stdout.
+
+Usage:
+  echo '{"operation":"ping"}' | intake-agent
+  cat request.json | intake-agent
+  intake-agent < request.json
+
+Operations:
+  ping                   Health check
+  parse_prd              Parse PRD into tasks
+  parse_prd_iterative    Parse PRD iteratively with streaming
+  expand_task            Expand task into subtasks
+  analyze_complexity     Analyze task complexity
+  generate               Generate content with AI
+  generate_prompts       Generate prompts for tasks
+  research               Perform research on a topic
+  research_capabilities  List research capabilities
+  generate_with_critic   Generate with critic feedback
+  validate_content       Validate content with AI
+  provider_status        Get provider status
+  generate_docs          Generate documentation for tasks
+  generate_with_debate   Generate with debate pattern
+
+Options:
+  -h, --help             Show this help message
+  -V, --version          Show version
+
+Environment:
+  ANTHROPIC_API_KEY      API key for Claude (optional with OAuth)
+
+Examples:
+  # Health check
+  echo '{"operation":"ping"}' | intake-agent
+
+  # Parse a PRD
+  echo '{"operation":"parse_prd","payload":{"prd_content":"..."}}' | intake-agent`);
+}
+
+/**
+ * Display version.
+ */
+function printVersion(): void {
+  console.log(`intake-agent ${VERSION}`);
+}
+
+/**
  * Main entry point.
  */
 async function main(): Promise<void> {
+  // Check for CLI flags first, before reading stdin
+  const args = process.argv.slice(2);
+  if (args.includes('-h') || args.includes('--help')) {
+    printHelp();
+    process.exit(0);
+  }
+  if (args.includes('-V') || args.includes('--version')) {
+    printVersion();
+    process.exit(0);
+  }
+
   try {
     // Read request from stdin
     const input = await readStdin();
@@ -226,7 +380,7 @@ async function main(): Promise<void> {
     if (!validateRequest(request)) {
       writeStdout(
         errorResponse(
-          'Invalid request structure. Expected { operation: "parse_prd" | "expand_task" | "analyze_complexity" | "generate" | "research" | "research_capabilities" | "ping", payload?: {...} }',
+          'Invalid request structure. Expected { operation: "parse_prd" | "expand_task" | "analyze_complexity" | "generate" | "research" | "research_capabilities" | "generate_docs" | "ping", payload?: {...} }',
           'validation_error'
         )
       );

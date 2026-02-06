@@ -33,6 +33,12 @@ export function Header() {
             Team
           </a>
           <a
+            href="/#stack"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Stack
+          </a>
+          <a
             href="/#infrastructure"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >

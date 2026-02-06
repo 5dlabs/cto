@@ -2,26 +2,38 @@
  * Provider Registry - Manages multi-model providers.
  * 
  * Provides a unified interface for accessing Claude, Minimax, and OpenAI/Codex providers.
+ * Supports both Claude Code SDK (OAuth) and Anthropic API (API key).
  */
 
 import type { ModelProvider, ProviderName, ProviderRegistry } from './types';
-import { claudeProvider } from './claude';
+import { createClaudeProvider } from './claude';
 import { minimaxProvider } from './minimax';
 import { codexProvider } from './codex';
 
 // Re-export types and providers
 export * from './types';
-export { claudeProvider } from './claude';
 export { minimaxProvider } from './minimax';
 export { codexProvider } from './codex';
 
 /**
- * Map of all registered providers.
+ * Lazy-initialized Claude provider to avoid side-effect logging at module load time.
+ * This is important for CLI flags like --help and --version to work without noise.
  */
-const providers = new Map<ProviderName, ModelProvider>([
-  ['claude', claudeProvider],
-  ['minimax', minimaxProvider],
-  ['codex', codexProvider],
+let _claudeProvider: ModelProvider | null = null;
+function getClaudeProvider(): ModelProvider {
+  if (_claudeProvider === null) {
+    _claudeProvider = createClaudeProvider();
+  }
+  return _claudeProvider;
+}
+
+/**
+ * Map of all registered providers (initialized lazily for claude).
+ */
+const providers = new Map<ProviderName, () => ModelProvider>([
+  ['claude', getClaudeProvider],
+  ['minimax', () => minimaxProvider],
+  ['codex', () => codexProvider],
 ]);
 
 /**
@@ -32,15 +44,16 @@ class ProviderRegistryImpl implements ProviderRegistry {
    * Get a provider by name.
    */
   get(name: ProviderName): ModelProvider | undefined {
-    return providers.get(name);
+    const factory = providers.get(name);
+    return factory ? factory() : undefined;
   }
   
   /**
    * Check if a provider is available (configured and ready).
    */
   isAvailable(name: ProviderName): boolean {
-    const provider = providers.get(name);
-    return provider?.isAvailable() ?? false;
+    const factory = providers.get(name);
+    return factory ? factory().isAvailable() : false;
   }
   
   /**
@@ -48,8 +61,8 @@ class ProviderRegistryImpl implements ProviderRegistry {
    */
   listAvailable(): ProviderName[] {
     const available: ProviderName[] = [];
-    for (const [name, provider] of providers) {
-      if (provider.isAvailable()) {
+    for (const [name, factory] of providers) {
+      if (factory().isAvailable()) {
         available.push(name);
       }
     }
@@ -60,7 +73,11 @@ class ProviderRegistryImpl implements ProviderRegistry {
    * Get all registered providers.
    */
   all(): Map<ProviderName, ModelProvider> {
-    return new Map(providers);
+    const result = new Map<ProviderName, ModelProvider>();
+    for (const [name, factory] of providers) {
+      result.set(name, factory());
+    }
+    return result;
   }
 }
 
@@ -75,7 +92,7 @@ export const providerRegistry: ProviderRegistry = new ProviderRegistryImpl();
 export function getProvider(name: ProviderName): ModelProvider {
   const provider = providerRegistry.get(name);
   if (!provider) {
-    throw new Error(`Unknown provider: ${name}`);
+    throw new Error(\`Unknown provider: \${name}\`);
   }
   return provider;
 }
@@ -86,7 +103,7 @@ export function getProvider(name: ProviderName): ModelProvider {
 export function getAvailableProvider(name: ProviderName): ModelProvider {
   const provider = getProvider(name);
   if (!provider.isAvailable()) {
-    throw new Error(`Provider ${name} is not available. Check API key configuration.`);
+    throw new Error(\`Provider \${name} is not available. Check API key configuration.\`);
   }
   return provider;
 }
@@ -97,7 +114,8 @@ export function getAvailableProvider(name: ProviderName): ModelProvider {
 export function checkProviderStatus(): Record<ProviderName, { available: boolean; model: string }> {
   const status: Record<ProviderName, { available: boolean; model: string }> = {} as Record<ProviderName, { available: boolean; model: string }>;
   
-  for (const [name, provider] of providers) {
+  for (const [name, factory] of providers) {
+    const provider = factory();
     status[name] = {
       available: provider.isAvailable(),
       model: provider.defaultModel,

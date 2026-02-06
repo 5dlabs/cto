@@ -11,11 +11,12 @@
 //! - Electron desktop → Spark
 //! - Elysia/Effect backend → Nova
 
-mod language;
-mod framework;
 mod agent;
+mod framework;
 #[cfg(test)]
 mod integration_tests;
+mod language;
+mod utils;
 
 pub use agent::Agent;
 pub use framework::Framework;
@@ -155,7 +156,7 @@ pub fn detect_full(files: &[ChangedFile], package_json: Option<&str>) -> (Detect
             if result.framework.is_none()
                 || matches!(
                     result.primary_language,
-                    Some(Language::TypeScript) | Some(Language::JavaScript)
+                    Some(Language::TypeScript | Language::JavaScript)
                 )
             {
                 result.framework = Some(framework);
@@ -189,11 +190,7 @@ fn calculate_confidence(result: &DetectionResult) -> f32 {
     let language_confidence = primary_count as f32 / total_files as f32;
 
     // Boost if we have framework detection
-    let framework_boost = if result.framework.is_some() {
-        0.2
-    } else {
-        0.0
-    };
+    let framework_boost = if result.framework.is_some() { 0.2 } else { 0.0 };
 
     (language_confidence + framework_boost).min(1.0)
 }

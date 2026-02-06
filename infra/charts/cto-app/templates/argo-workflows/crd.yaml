@@ -1,0 +1,17 @@
+# Placeholder for Argo Workflows CRD
+#
+# In production, install Argo Workflows CRDs via the official Helm chart:
+# helm repo add argo https://argoproj.github.io/argo-helm
+# helm install argo-workflows-crds argo/argo-workflows-crds -n argo --version 0.40.x
+#
+# For local Kind development, you can skip CRD installation and use:
+# kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-workflows/master/manifests/base/crds/minimal/argo-workflows-crds.yaml
+#
+# This template provides a reference to the required CRDs for Argo Workflows v3.5+
+#
+# Required CRDs:
+# - workflows.argoproj.io
+# - workflowtemplates.argoproj.io
+# - cronworkflows.argoproj.io
+# - workflowtaskresults.argoproj.io
+# - workflowtasklogs.argoproj.io

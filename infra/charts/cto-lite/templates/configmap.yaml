@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cto-lite.fullname" . }}-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "cto-lite.labels" . | nindent 4 }}
+data:
+  config.json: |
+    {
+      "version": "1.0.0",
+      "orgName": "CTO-Lite",
+      "tier": "{{ .Values.tier }}",
+      "defaults": {
+        "cli": "claude",
+        "model": "claude-sonnet-4-20250514",
+        "timeout": 1800
+      },
+      "agents": {
+        "morgan": {
+          "githubApp": "CTO-Lite-Morgan",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "free",
+          "description": "Intake agent - analyzes requests and creates tasks",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git"],
+            "localServers": {}
+          }
+        },
+        "grizz": {
+          "githubApp": "CTO-Lite-Grizz",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "free",
+          "description": "Go backend development",
+          "stack": "go",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git", "grep", "glob"],
+            "localServers": {}
+          }
+        },
+        "nova": {
+          "githubApp": "CTO-Lite-Nova",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "free",
+          "description": "TypeScript backend development",
+          "stack": "typescript",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git", "grep", "glob"],
+            "localServers": {}
+          }
+        },
+        "blaze": {
+          "githubApp": "CTO-Lite-Blaze",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "free",
+          "description": "React frontend development",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git", "grep", "glob"],
+            "localServers": {}
+          }
+        },
+        "cleo": {
+          "githubApp": "CTO-Lite-Cleo",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "free",
+          "description": "Code quality and review",
+          "tools": {
+            "remote": ["read", "edit", "bash", "git", "grep"],
+            "localServers": {}
+          }
+        },
+        "cipher": {
+          "githubApp": "CTO-Lite-Cipher",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "free",
+          "description": "Security analysis",
+          "tools": {
+            "remote": ["read", "bash", "grep"],
+            "localServers": {}
+          }
+        },
+        "tess": {
+          "githubApp": "CTO-Lite-Tess",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "free",
+          "description": "Test generation and coverage",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git", "grep"],
+            "localServers": {}
+          }
+        },
+        "bolt": {
+          "githubApp": "CTO-Lite-Bolt",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "free",
+          "description": "Local deployment (Docker)",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash"],
+            "localServers": {}
+          }
+        },
+        "rex": {
+          "githubApp": "CTO-Rex",
+          "cli": "claude",
+          "model": "claude-opus-4-20250514",
+          "tier": "pro",
+          "description": "Rust backend development",
+          "stack": "rust",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git", "grep", "glob", "cargo"],
+            "localServers": {}
+          }
+        },
+        "spark": {
+          "githubApp": "CTO-Spark",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "pro",
+          "description": "Python backend development",
+          "stack": "python",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git", "grep", "glob"],
+            "localServers": {}
+          }
+        },
+        "tap": {
+          "githubApp": "CTO-Tap",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "pro",
+          "description": "Ruby backend development",
+          "stack": "ruby",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git", "grep", "glob"],
+            "localServers": {}
+          }
+        },
+        "atlas": {
+          "githubApp": "CTO-Atlas",
+          "cli": "claude",
+          "model": "claude-opus-4-20250514",
+          "tier": "pro",
+          "description": "Integration and PR management",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git", "github"],
+            "localServers": {}
+          }
+        },
+        "healer": {
+          "githubApp": "CTO-Healer",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "pro",
+          "description": "Self-healing and CI remediation",
+          "tools": {
+            "remote": ["read", "write", "edit", "bash", "git", "github"],
+            "localServers": {}
+          }
+        },
+        "stitch": {
+          "githubApp": "CTO-Stitch",
+          "cli": "claude",
+          "model": "claude-sonnet-4-20250514",
+          "tier": "pro",
+          "description": "Advanced code review",
+          "tools": {
+            "remote": ["read", "edit", "bash", "git", "github"],
+            "localServers": {}
+          }
+        }
+      }
+    }

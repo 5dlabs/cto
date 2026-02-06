@@ -1,0 +1,81 @@
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    retention.ms: 604800000  # 7 days
+    segment.bytes: 1073741824
+    compression.type: producer
+    min.insync.replicas: 2
+    cleanup.policy: delete
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: commands
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+spec:
+  partitions: 3
+  replicas: 3
+  config:
+    retention.ms: 259200000  # 3 days
+    segment.bytes: 536870912
+    compression.type: producer
+    min.insync.replicas: 2
+    cleanup.policy: delete
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: logs
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+spec:
+  partitions: 12
+  replicas: 3
+  config:
+    retention.ms: 86400000  # 1 day
+    segment.bytes: 536870912
+    compression.type: gzip
+    min.insync.replicas: 2
+    cleanup.policy: delete
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: kafka-cluster-consumer-offsets
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+spec:
+  partitions: 50
+  replicas: 3
+  config:
+    cleanup.policy: compact
+    compression.type: producer
+    min.insync.replicas: 2
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: kafka-cluster-transaction-state
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+spec:
+  partitions: 50
+  replicas: 3
+  config:
+    cleanup.policy: compact
+    compression.type: producer
+    min.insync.replicas: 2

@@ -1,0 +1,362 @@
+# CTO Lite Play Workflow
+# Simplified agent pipeline for individual developers
+# No Atlas (auto-merge) - user reviews and merges PRs
+
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: play-workflow-lite
+  labels:
+    app.kubernetes.io/part-of: cto-lite
+spec:
+  entrypoint: play
+  arguments:
+    parameters:
+      - name: repo
+        description: "GitHub repository (owner/repo)"
+      - name: branch
+        description: "Target branch for PR"
+        default: "main"
+      - name: issue-number
+        description: "GitHub issue number (optional)"
+        default: ""
+      - name: pr-number
+        description: "GitHub PR number (optional)"
+        default: ""
+      - name: prompt
+        description: "User prompt/request"
+      - name: stack
+        description: "Backend stack: grizz (Rust/Go) or nova (TypeScript)"
+        default: "nova"
+      - name: anthropic-key-secret
+        description: "Secret name containing ANTHROPIC_API_KEY"
+        default: "api-keys"
+      - name: github-token-secret
+        description: "Secret name containing GITHUB_TOKEN"
+        default: "github-token"
+
+  templates:
+    # Main orchestration
+    - name: play
+      dag:
+        tasks:
+          # Step 1: Morgan (Intake) - analyzes and routes
+          - name: intake
+            template: morgan
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
+                - name: prompt
+                  value: "{{workflow.parameters.prompt}}"
+                - name: issue-number
+                  value: "{{workflow.parameters.issue-number}}"
+
+          # Step 2: Backend agent (user's choice)
+          - name: backend
+            depends: "intake"
+            template: "{{workflow.parameters.stack}}"
+            when: "'{{tasks.intake.outputs.parameters.needs-backend}}' == 'true'"
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
+                - name: branch
+                  value: "{{tasks.intake.outputs.parameters.feature-branch}}"
+                - name: spec
+                  value: "{{tasks.intake.outputs.parameters.backend-spec}}"
+
+          # Step 3: Frontend agent
+          - name: frontend
+            depends: "intake"
+            template: blaze
+            when: "'{{tasks.intake.outputs.parameters.needs-frontend}}' == 'true'"
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
+                - name: branch
+                  value: "{{tasks.intake.outputs.parameters.feature-branch}}"
+                - name: spec
+                  value: "{{tasks.intake.outputs.parameters.frontend-spec}}"
+
+          # Step 4: Testing (after implementation)
+          - name: testing
+            depends: "backend || frontend"
+            template: tess
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
+                - name: branch
+                  value: "{{tasks.intake.outputs.parameters.feature-branch}}"
+
+          # Step 5: Quality review
+          - name: quality
+            depends: "testing"
+            template: cleo
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
+                - name: branch
+                  value: "{{tasks.intake.outputs.parameters.feature-branch}}"
+                - name: pr-number
+                  value: "{{tasks.intake.outputs.parameters.pr-number}}"
+
+          # Step 6: Security scan
+          - name: security
+            depends: "quality"
+            template: cipher
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
+                - name: branch
+                  value: "{{tasks.intake.outputs.parameters.feature-branch}}"
+
+          # Step 7: Deploy preview (optional)
+          - name: deploy-preview
+            depends: "security"
+            template: bolt
+            when: "'{{tasks.intake.outputs.parameters.deploy-preview}}' == 'true'"
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
+                - name: branch
+                  value: "{{tasks.intake.outputs.parameters.feature-branch}}"
+
+    # Morgan - Intake/Router agent
+    - name: morgan
+      inputs:
+        parameters:
+          - name: repo
+          - name: prompt
+          - name: issue-number
+      outputs:
+        parameters:
+          - name: needs-backend
+            valueFrom:
+              path: /tmp/outputs/needs-backend
+          - name: needs-frontend
+            valueFrom:
+              path: /tmp/outputs/needs-frontend
+          - name: feature-branch
+            valueFrom:
+              path: /tmp/outputs/feature-branch
+          - name: backend-spec
+            valueFrom:
+              path: /tmp/outputs/backend-spec
+          - name: frontend-spec
+            valueFrom:
+              path: /tmp/outputs/frontend-spec
+          - name: pr-number
+            valueFrom:
+              path: /tmp/outputs/pr-number
+          - name: deploy-preview
+            valueFrom:
+              path: /tmp/outputs/deploy-preview
+      container:
+        image: ghcr.io/5dlabs/cto-agent-morgan:latest
+        command: ["/agent"]
+        args:
+          - "--mode=intake"
+          - "--repo={{inputs.parameters.repo}}"
+          - "--prompt={{inputs.parameters.prompt}}"
+          - "--issue={{inputs.parameters.issue-number}}"
+          - "--output-dir=/tmp/outputs"
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.anthropic-key-secret}}"
+                key: ANTHROPIC_API_KEY
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.github-token-secret}}"
+                key: token
+
+    # Grizz - Rust/Go backend agent
+    - name: grizz
+      inputs:
+        parameters:
+          - name: repo
+          - name: branch
+          - name: spec
+      container:
+        image: ghcr.io/5dlabs/cto-agent-grizz:latest
+        command: ["/agent"]
+        args:
+          - "--mode=implement"
+          - "--repo={{inputs.parameters.repo}}"
+          - "--branch={{inputs.parameters.branch}}"
+          - "--spec={{inputs.parameters.spec}}"
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.anthropic-key-secret}}"
+                key: ANTHROPIC_API_KEY
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.github-token-secret}}"
+                key: token
+
+    # Nova - TypeScript backend agent
+    - name: nova
+      inputs:
+        parameters:
+          - name: repo
+          - name: branch
+          - name: spec
+      container:
+        image: ghcr.io/5dlabs/cto-agent-nova:latest
+        command: ["/agent"]
+        args:
+          - "--mode=implement"
+          - "--repo={{inputs.parameters.repo}}"
+          - "--branch={{inputs.parameters.branch}}"
+          - "--spec={{inputs.parameters.spec}}"
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.anthropic-key-secret}}"
+                key: ANTHROPIC_API_KEY
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.github-token-secret}}"
+                key: token
+
+    # Blaze - Frontend agent
+    - name: blaze
+      inputs:
+        parameters:
+          - name: repo
+          - name: branch
+          - name: spec
+      container:
+        image: ghcr.io/5dlabs/cto-agent-blaze:latest
+        command: ["/agent"]
+        args:
+          - "--mode=implement"
+          - "--repo={{inputs.parameters.repo}}"
+          - "--branch={{inputs.parameters.branch}}"
+          - "--spec={{inputs.parameters.spec}}"
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.anthropic-key-secret}}"
+                key: ANTHROPIC_API_KEY
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.github-token-secret}}"
+                key: token
+
+    # Tess - Testing agent
+    - name: tess
+      inputs:
+        parameters:
+          - name: repo
+          - name: branch
+      container:
+        image: ghcr.io/5dlabs/cto-agent-tess:latest
+        command: ["/agent"]
+        args:
+          - "--mode=test"
+          - "--repo={{inputs.parameters.repo}}"
+          - "--branch={{inputs.parameters.branch}}"
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.anthropic-key-secret}}"
+                key: ANTHROPIC_API_KEY
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.github-token-secret}}"
+                key: token
+
+    # Cleo - Quality agent
+    - name: cleo
+      inputs:
+        parameters:
+          - name: repo
+          - name: branch
+          - name: pr-number
+      container:
+        image: ghcr.io/5dlabs/cto-agent-cleo:latest
+        command: ["/agent"]
+        args:
+          - "--mode=review"
+          - "--repo={{inputs.parameters.repo}}"
+          - "--branch={{inputs.parameters.branch}}"
+          - "--pr={{inputs.parameters.pr-number}}"
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.anthropic-key-secret}}"
+                key: ANTHROPIC_API_KEY
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.github-token-secret}}"
+                key: token
+
+    # Cipher - Security agent
+    - name: cipher
+      inputs:
+        parameters:
+          - name: repo
+          - name: branch
+      container:
+        image: ghcr.io/5dlabs/cto-agent-cipher:latest
+        command: ["/agent"]
+        args:
+          - "--mode=scan"
+          - "--repo={{inputs.parameters.repo}}"
+          - "--branch={{inputs.parameters.branch}}"
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.anthropic-key-secret}}"
+                key: ANTHROPIC_API_KEY
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.github-token-secret}}"
+                key: token
+
+    # Bolt - Deployment agent
+    - name: bolt
+      inputs:
+        parameters:
+          - name: repo
+          - name: branch
+      container:
+        image: ghcr.io/5dlabs/cto-agent-bolt:latest
+        command: ["/agent"]
+        args:
+          - "--mode=preview"
+          - "--repo={{inputs.parameters.repo}}"
+          - "--branch={{inputs.parameters.branch}}"
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.anthropic-key-secret}}"
+                key: ANTHROPIC_API_KEY
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "{{workflow.parameters.github-token-secret}}"
+                key: token

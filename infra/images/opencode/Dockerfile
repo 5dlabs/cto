@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # =============================================================================
 # OpenCode CLI Agent Image - Unified Dockerfile
 # =============================================================================
@@ -22,41 +21,44 @@ ENV DEVCONTAINER=true
 
 USER root
 
-# Create workspace and user directories
+# Create workspace and user directories (node user is uid 1001 in runtime image)
 RUN mkdir -p /workspace /home/node/.opencode /home/node/.cache/opencode && \
-    chown -R 1000:1000 /home/node/.opencode /home/node/.cache || true
+    chown -R node:ubuntu /workspace /home/node/.opencode /home/node/.cache
 
 WORKDIR /workspace
 
-# Install Open Code CLI with retries
-# Note: curl, bash, unzip, wget are already in runtime base image
+# Install Open Code CLI directly from GitHub releases
+# The installer script can fail in containers, so we download the binary directly
+# Asset naming: opencode-linux-{x64|arm64}.tar.gz
+ARG OPENCODE_VERSION=1.1.44
 RUN set -eux; \
-    for i in 1 2 3; do \
-        if curl -fsSL https://opencode.ai/install | bash; then \
-            echo "✅ OpenCode installation succeeded on attempt $i"; \
-            break; \
-        else \
-            echo "⚠️ OpenCode installation failed on attempt $i, retrying..."; \
-            sleep 5; \
-        fi; \
-    done; \
-    # Verify installation and install binary if it exists
-    if [ -f "/root/.opencode/bin/opencode" ]; then \
-        install -m 0755 "/root/.opencode/bin/opencode" /usr/local/bin/opencode; \
-        opencode --version || echo "OpenCode installed but version check failed"; \
-    else \
-        echo "⚠️ OpenCode binary not found, creating placeholder"; \
-        printf '#!/bin/bash\necho "OpenCode CLI placeholder - installation may have failed"' > /usr/local/bin/opencode; \
-        chmod +x /usr/local/bin/opencode; \
-    fi
+    # Detect architecture and map to OpenCode naming
+    ARCH=$(uname -m); \
+    case "$ARCH" in \
+        x86_64) ARCH_NAME="x64" ;; \
+        aarch64|arm64) ARCH_NAME="arm64" ;; \
+        *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+    esac; \
+    # Download from GitHub releases (format: opencode-linux-{arch}.tar.gz)
+    DOWNLOAD_URL="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-${ARCH_NAME}.tar.gz"; \
+    echo "Downloading OpenCode v${OPENCODE_VERSION} from ${DOWNLOAD_URL}"; \
+    curl -fsSL "${DOWNLOAD_URL}" -o /tmp/opencode.tar.gz; \
+    # Extract and install
+    tar -xzf /tmp/opencode.tar.gz -C /tmp; \
+    install -m 0755 /tmp/opencode /usr/local/bin/opencode; \
+    rm -rf /tmp/opencode.tar.gz /tmp/opencode; \
+    # Verify installation
+    opencode --version && echo "✅ OpenCode v${OPENCODE_VERSION} installed successfully"
 
 # Install OpenAI Node.js SDK for compatibility
 RUN npm install -g openai@latest && \
     echo "✅ OpenAI Node.js SDK installed" && \
     (node -e "console.log('OpenAI Node.js SDK version:', require('openai/package.json').version)" || echo "⚠️ Node.js SDK verification failed")
 
-# Ensure cache directory ownership
-RUN chown -R 1000:1000 /home/node/.cache || true
+# Ensure cache directory ownership (using node user uid 1001, group ubuntu gid 1000)
+RUN mkdir -p /home/node/.cache/opencode /home/node/.opencode && \
+    chown -R node:ubuntu /home/node/.cache /home/node/.opencode && \
+    chmod -R 755 /home/node/.cache /home/node/.opencode
 
 USER node
 

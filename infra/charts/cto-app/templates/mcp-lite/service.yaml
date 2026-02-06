@@ -1,0 +1,20 @@
+{{- if .Values.mcp.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-lite
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp
+spec:
+  type: {{ .Values.mcp.service.type }}
+  ports:
+    - port: {{ .Values.mcp.service.port }}
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cto-app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mcp
+{{- end }}

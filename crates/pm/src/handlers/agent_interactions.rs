@@ -16,8 +16,6 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-use std::path::Path;
-
 use super::callbacks::CallbackState;
 
 // =============================================================================
@@ -150,20 +148,16 @@ pub enum Language {
 impl Language {
     /// Detect language from file path
     #[must_use]
+    #[allow(clippy::case_sensitive_file_extension_comparisons)]
     pub fn from_path(path: &str) -> Self {
         let lower = path.to_lowercase();
-        let p = Path::new(path);
-        let ext = p
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(str::to_lowercase);
 
         // Check for React/React Native patterns first
         if lower.contains("/components/")
             || lower.contains("/pages/")
             || lower.contains("/app/")
-            || ext.as_deref() == Some("tsx")
-            || ext.as_deref() == Some("jsx")
+            || lower.ends_with(".tsx")
+            || lower.ends_with(".jsx")
         {
             if lower.contains("native") || lower.contains("/ios/") || lower.contains("/android/") {
                 return Self::ReactNative;
@@ -172,15 +166,27 @@ impl Language {
         }
 
         // Check by extension
-        match ext.as_deref() {
-            Some("rs") => Self::Rust,
-            Some("go") => Self::Go,
-            Some("ts" | "tsx") => Self::TypeScript,
-            Some("js" | "jsx") => Self::JavaScript,
-            Some("py") => Self::Python,
-            Some("cs") => Self::CSharp,
-            Some("cpp" | "cc" | "cxx" | "h" | "hpp") => Self::Cpp,
-            _ => Self::Unknown,
+        if lower.ends_with(".rs") {
+            Self::Rust
+        } else if lower.ends_with(".go") {
+            Self::Go
+        } else if lower.ends_with(".ts") || lower.ends_with(".tsx") {
+            Self::TypeScript
+        } else if lower.ends_with(".js") || lower.ends_with(".jsx") {
+            Self::JavaScript
+        } else if lower.ends_with(".py") {
+            Self::Python
+        } else if lower.ends_with(".cs") {
+            Self::CSharp
+        } else if lower.ends_with(".cpp")
+            || lower.ends_with(".cc")
+            || lower.ends_with(".cxx")
+            || lower.ends_with(".h")
+            || lower.ends_with(".hpp")
+        {
+            Self::Cpp
+        } else {
+            Self::Unknown
         }
     }
 
@@ -188,14 +194,14 @@ impl Language {
     #[must_use]
     pub fn recommended_agent(&self) -> Agent {
         match self {
+            Self::Rust => Agent::Rex,
             Self::Go => Agent::Grizz,
             Self::TypeScript | Self::JavaScript | Self::React => Agent::Blaze,
             Self::ReactNative => Agent::Tap,
             Self::CSharp => Agent::Vex,
             Self::Cpp => Agent::Forge,
-            Self::Python => Agent::Nova,
-            // Default to Rex for Rust and unknown languages
-            Self::Rust | Self::Unknown => Agent::Rex,
+            Self::Python => Agent::Nova, // Default to Nova for Python
+            Self::Unknown => Agent::Rex, // Default to Rex for unknown
         }
     }
 }
@@ -351,13 +357,13 @@ pub struct RequestedAction {
 ///
 /// # Panics
 ///
-/// Panics if the internal regex pattern is invalid (should never happen).
+/// Panics if the regex pattern is invalid (this is a compile-time constant).
 #[must_use]
 pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
     let re = Regex::new(
         r"(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)\s*(.*)",
     )
-    .expect("valid regex");
+    .unwrap();
 
     let mut mentions = Vec::new();
 
@@ -378,16 +384,14 @@ pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
 }
 
 /// Parse remediation button identifier
-///
-/// Format: `fix-<agent>-pr<number>-<check_run_id>`
+/// Format: fix-<agent>-pr<number>-<check_run_id>
 ///
 /// # Panics
 ///
-/// Panics if the internal regex pattern is invalid (should never happen).
+/// Panics if the regex pattern is invalid (this is a compile-time constant).
 #[must_use]
 pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
-    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-pr(\d+)-(\d+)$")
-        .expect("valid regex");
+    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-pr(\d+)-(\d+)$").unwrap();
 
     if let Some(cap) = re.captures(identifier) {
         let agent_name = cap.get(1)?.as_str();
@@ -409,15 +413,10 @@ pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
 #[allow(clippy::too_many_lines)]
 pub async fn handle_mention_webhook(
     State(state): State<Arc<CallbackState>>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, StatusCode> {
-    let mention_source = headers
-        .get("X-Mention-Source")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("unknown");
-
-    info!(source = %mention_source, "Received @mention webhook");
+    info!("Received @mention webhook");
 
     // Parse the payload
     let payload: Value = serde_json::from_slice(&body).map_err(|e| {
@@ -428,8 +427,30 @@ pub async fn handle_mention_webhook(
     // Extract nested payload (from Argo Events sensor)
     let inner_payload = payload.get("payload").unwrap_or(&payload);
 
+    // Detect event type: first try X-GitHub-Event from payload, then fall back to structure detection
+    let mention_source = inner_payload
+        .get("X-GitHub-Event")
+        .and_then(|v| v.as_str())
+        .map_or_else(
+            || {
+                // Fall back to structure detection
+                if inner_payload.get("issue").is_some() && inner_payload.get("comment").is_some() {
+                    "issue_comment".to_string()
+                } else if inner_payload.get("pull_request").is_some()
+                    && inner_payload.get("comment").is_some()
+                {
+                    "pull_request_review_comment".to_string()
+                } else {
+                    "unknown".to_string()
+                }
+            },
+            String::from,
+        );
+
+    info!(source = %mention_source, "Detected mention source");
+
     // Determine PR context based on event type
-    let (pr_context, comment_body, comment_url) = match mention_source {
+    let (pr_context, comment_body, comment_url) = match mention_source.as_str() {
         "issue_comment" => {
             let event: IssueCommentPayload = serde_json::from_value(inner_payload.clone())
                 .map_err(|e| {
@@ -834,11 +855,17 @@ pub fn select_agent_for_files(files: &[String]) -> Agent {
 /// Handle CI failure webhook - creates a check run with remediation buttons
 #[allow(clippy::too_many_lines)]
 pub async fn handle_ci_failure_webhook(
-    State(_state): State<Arc<CallbackState>>,
+    State(state): State<Arc<CallbackState>>,
     _headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, StatusCode> {
     info!("Received CI failure webhook");
+
+    // Get GitHub token (required for API calls)
+    let github_token = state.github_token.as_ref().ok_or_else(|| {
+        error!("No GitHub token configured for CI failure handler");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Parse the payload
     let payload: Value = serde_json::from_slice(&body).map_err(|e| {
@@ -873,28 +900,41 @@ pub async fn handle_ci_failure_webhook(
         "Processing CI failure for remediation buttons"
     );
 
-    // Get changed files from PR using gh CLI
-    let files_output = tokio::process::Command::new("gh")
-        .args([
-            "pr",
-            "view",
-            &pr_number.to_string(),
-            "--repo",
-            repo_full_name,
-            "--json",
-            "files",
-            "--jq",
-            ".files[].path",
-        ])
-        .output()
+    // Get changed files from PR using GitHub API
+    let files_url = format!(
+        "https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files?per_page=100"
+    );
+
+    let files_response = state
+        .http_client
+        .get(&files_url)
+        .header("Authorization", format!("Bearer {github_token}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "cto-pm-server")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
         .await
         .map_err(|e| {
-            error!("Failed to get PR files: {}", e);
+            error!("Failed to fetch PR files: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let files_str = String::from_utf8_lossy(&files_output.stdout);
-    let files: Vec<String> = files_str.lines().map(String::from).collect();
+    if !files_response.status().is_success() {
+        let status = files_response.status();
+        let body = files_response.text().await.unwrap_or_default();
+        error!("GitHub API error fetching PR files: {} - {}", status, body);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    let files_json: Vec<Value> = files_response.json().await.map_err(|e| {
+        error!("Failed to parse PR files response: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let files: Vec<String> = files_json
+        .iter()
+        .filter_map(|f| f.get("filename").and_then(|v| v.as_str()).map(String::from))
+        .collect();
 
     if files.is_empty() {
         warn!("No files found for PR #{}", pr_number);
@@ -966,42 +1006,28 @@ pub async fn handle_ci_failure_webhook(
         }]
     });
 
-    // Create the check run using gh CLI
-    let gh_output = tokio::process::Command::new("gh")
-        .args([
-            "api",
-            "--method",
-            "POST",
-            "-H",
-            "Accept: application/vnd.github+json",
-            &format!("/repos/{repo_full_name}/check-runs"),
-            "--input",
-            "-",
-        ])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+    // Create the check run using GitHub API
+    let check_run_url = format!("https://api.github.com/repos/{repo_full_name}/check-runs");
+
+    let check_response = state
+        .http_client
+        .post(&check_run_url)
+        .header("Authorization", format!("Bearer {github_token}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "cto-pm-server")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .json(&check_payload)
+        .send()
+        .await
         .map_err(|e| {
-            error!("Failed to spawn gh: {}", e);
+            error!("Failed to create check run: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let mut child = gh_output;
-    if let Some(mut stdin) = child.stdin.take() {
-        use tokio::io::AsyncWriteExt;
-        let payload_str = serde_json::to_string(&check_payload).unwrap_or_default();
-        stdin.write_all(payload_str.as_bytes()).await.ok();
-    }
-
-    let output = child.wait_with_output().await.map_err(|e| {
-        error!("Failed to wait for gh: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        error!("Failed to create check run: {}", stderr);
+    if !check_response.status().is_success() {
+        let status = check_response.status();
+        let body = check_response.text().await.unwrap_or_default();
+        error!("GitHub API error creating check run: {} - {}", status, body);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 

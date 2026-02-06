@@ -1,0 +1,98 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: alerthub-postgres
+  namespace: databases
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9187"
+spec:
+  instances: 3
+
+  # PostgreSQL configuration
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "512MB"
+      effective_cache_size: "1536MB"
+      maintenance_work_mem: "128MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      work_mem: "2621kB"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+
+  # Storage configuration
+  storage:
+    size: 10Gi
+    storageClass: standard
+
+  # WAL storage (optional but recommended for performance)
+  walStorage:
+    size: 5Gi
+    storageClass: standard
+
+  # Resource limits
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: alerthub
+      owner: alerthub
+      secret:
+        name: alerthub-postgres-user
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+        - CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+  # Monitoring configuration
+  monitoring:
+    enablePodMonitor: true
+    customQueriesConfigMap:
+      - name: alerthub-postgres-monitoring
+        key: custom-queries.yaml
+
+  # Backup configuration
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://postgresql-backups/alerthub
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+        maxParallel: 2
+      data:
+        compression: gzip
+        immediateCheckpoint: true
+        jobs: 2
+    retentionPolicy: "30d"
+
+  # High availability configuration
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  # Affinity rules for high availability
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: preferred
+
+  # Health check configuration
+  startDelay: 300
+  stopDelay: 300
+  switchoverDelay: 60

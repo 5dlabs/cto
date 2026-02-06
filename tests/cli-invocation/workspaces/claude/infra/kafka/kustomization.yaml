@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: messaging
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: kafka
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: messaging-platform
+
+resources:
+  - namespace.yaml
+  - metrics-config.yaml
+  - cluster.yaml
+  - topics.yaml
+  - users.yaml
+  - pod-disruption-budget.yaml
+  - network-policy.yaml
+
+# ConfigMap generator for additional configurations
+configMapGenerator:
+  - name: kafka-client-config
+    namespace: messaging
+    literals:
+      - bootstrap.servers=kafka-cluster-kafka-bootstrap:9092
+      - security.protocol=PLAINTEXT
+      - acks=all
+      - retries=3
+      - max.in.flight.requests.per.connection=5
+      - enable.idempotence=true
+
+# Add common annotations
+commonAnnotations:
+  documentation: "Strimzi Kafka Cluster for messaging platform"
+  contact: "platform-team@example.com"

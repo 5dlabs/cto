@@ -1,0 +1,30 @@
+# Agent images subchart values
+# Defaults - parent chart values will override these
+
+morgan:
+  enabled: false
+  replicaCount: 0
+
+grizz:
+  enabled: false
+  replicaCount: 0
+
+blaze:
+  enabled: false
+  replicaCount: 0
+
+cleo:
+  enabled: false
+  replicaCount: 0
+
+cipher:
+  enabled: false
+  replicaCount: 0
+
+tess:
+  enabled: false
+  replicaCount: 0
+
+bolt:
+  enabled: false
+  replicaCount: 0

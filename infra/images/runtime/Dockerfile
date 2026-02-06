@@ -89,25 +89,25 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 COPY .docker-binaries/ /tmp/binaries/
 
 ARG TOOLS_VERSION=skip
-RUN if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
+RUN if [ "${TOOLS_VERSION:-skip}" != "skip" ] && [ -n "${TOOLS_VERSION:-}" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
       mv /tmp/binaries/tools-client-linux-x86_64 /usr/local/bin/tools && \
       chmod +x /usr/local/bin/tools; \
     fi
 
 ARG PLAY_MONITOR_VERSION=skip
-RUN if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
+RUN if [ "${PLAY_MONITOR_VERSION:-skip}" != "skip" ] && [ -n "${PLAY_MONITOR_VERSION:-}" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
       mv /tmp/binaries/play-monitor-linux-x86_64 /usr/local/bin/play-monitor && \
       chmod +x /usr/local/bin/play-monitor; \
     fi
 
 ARG TASKS_VERSION=0.2.12
-RUN if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
+RUN if [ "${TASKS_VERSION:-skip}" != "skip" ] && [ -n "${TASKS_VERSION:-}" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
       mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && \
       chmod +x /usr/local/bin/intake; \
     fi
 
 ARG INTAKE_AGENT_VERSION=skip
-RUN if [ "$INTAKE_AGENT_VERSION" != "skip" ] && [ -n "$INTAKE_AGENT_VERSION" ] && [ -f /tmp/binaries/intake-agent-linux-x86_64 ]; then \
+RUN if [ "${INTAKE_AGENT_VERSION:-skip}" != "skip" ] && [ -n "${INTAKE_AGENT_VERSION:-}" ] && [ -f /tmp/binaries/intake-agent-linux-x86_64 ]; then \
       mv /tmp/binaries/intake-agent-linux-x86_64 /usr/local/bin/intake-agent && \
       chmod +x /usr/local/bin/intake-agent; \
     fi
@@ -411,21 +411,21 @@ ARG TOOLS_VERSION=skip
 ARG PLAY_MONITOR_VERSION=skip
 ARG TASKS_VERSION=0.2.12
 ARG INTAKE_AGENT_VERSION=skip
-RUN set -eux && \
+RUN set -e && \
     # tools client
-    if [ "$TOOLS_VERSION" != "skip" ] && [ -n "$TOOLS_VERSION" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
+    if [ "${TOOLS_VERSION:-skip}" != "skip" ] && [ -n "${TOOLS_VERSION:-}" ] && [ -f /tmp/binaries/tools-client-linux-x86_64 ]; then \
       mv /tmp/binaries/tools-client-linux-x86_64 /usr/local/bin/tools && chmod +x /usr/local/bin/tools; \
     fi && \
     # play-monitor
-    if [ "$PLAY_MONITOR_VERSION" != "skip" ] && [ -n "$PLAY_MONITOR_VERSION" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
+    if [ "${PLAY_MONITOR_VERSION:-skip}" != "skip" ] && [ -n "${PLAY_MONITOR_VERSION:-}" ] && [ -f /tmp/binaries/play-monitor-linux-x86_64 ]; then \
       mv /tmp/binaries/play-monitor-linux-x86_64 /usr/local/bin/play-monitor && chmod +x /usr/local/bin/play-monitor; \
     fi && \
     # intake CLI
-    if [ "$TASKS_VERSION" != "skip" ] && [ -n "$TASKS_VERSION" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
+    if [ "${TASKS_VERSION:-skip}" != "skip" ] && [ -n "${TASKS_VERSION:-}" ] && [ -f /tmp/binaries/intake-linux-x86_64 ]; then \
       mv /tmp/binaries/intake-linux-x86_64 /usr/local/bin/intake && chmod +x /usr/local/bin/intake; \
     fi && \
     # intake-agent (TypeScript/Bun compiled)
-    if [ "$INTAKE_AGENT_VERSION" != "skip" ] && [ -n "$INTAKE_AGENT_VERSION" ] && [ -f /tmp/binaries/intake-agent-linux-x86_64 ]; then \
+    if [ "${INTAKE_AGENT_VERSION:-skip}" != "skip" ] && [ -n "${INTAKE_AGENT_VERSION:-}" ] && [ -f /tmp/binaries/intake-agent-linux-x86_64 ]; then \
       mv /tmp/binaries/intake-agent-linux-x86_64 /usr/local/bin/intake-agent && chmod +x /usr/local/bin/intake-agent; \
     fi && \
     rm -rf /tmp/binaries
@@ -573,6 +573,36 @@ RUN echo '#!/bin/bash\n# Development helper script\nset -e\n\nif [ $# -eq 0 ]; t
 
 # Add helper script to PATH
 ENV PATH="/home/node:${PATH}"
+
+# =============================================================================
+# 1Password CLI (op) for headless secret access from agents
+# Agents use OP_SERVICE_ACCOUNT_TOKEN (injected via K8s secret) for auth
+# =============================================================================
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    set -eux; \
+    OP_VERSION="v2.30.3"; \
+    ARCH=$(dpkg --print-architecture); \
+    case "$ARCH" in \
+      amd64) OP_ARCH=amd64 ;; \
+      arm64) OP_ARCH=arm64 ;; \
+      *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    esac; \
+    curl -fsSL "https://cache.agilebits.com/dist/1P/op2/pkg/${OP_VERSION}/op_linux_${OP_ARCH}_${OP_VERSION}.zip" -o /tmp/op.zip && \
+    unzip -o /tmp/op.zip -d /usr/local/bin && \
+    rm -f /tmp/op.zip && \
+    chmod +x /usr/local/bin/op && \
+    op --version
+
+# =============================================================================
+# Claude Code CLI - pinned version for reproducible agent builds
+# Version is passed as a build arg; the GitHub Action detects latest via:
+#   npm view @anthropic-ai/claude-code version
+# =============================================================================
+ARG CLAUDE_CODE_VERSION=2.1.32
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} && \
+    claude --version && \
+    echo "Claude Code CLI ${CLAUDE_CODE_VERSION} installed"
 
 # Labels / defaults
 USER node

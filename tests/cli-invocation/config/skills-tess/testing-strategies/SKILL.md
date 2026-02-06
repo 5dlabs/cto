@@ -1,0 +1,231 @@
+---
+name: testing-strategies
+description: Testing patterns including unit, integration, E2E tests and language-specific frameworks.
+agents: [tess]
+triggers: [test, coverage, unit test, integration test, e2e]
+---
+
+# Testing Strategies
+
+Comprehensive testing patterns for ensuring code quality through automated tests.
+
+## Testing Approach
+
+1. **Unit Tests** - Test individual functions/methods
+2. **Integration Tests** - Test component interactions
+3. **E2E Tests** - Test full user flows
+4. **Edge Cases** - Cover boundary conditions
+5. **Error Handling** - Test failure scenarios
+
+## Testing Guidelines
+
+- Write tests that document behavior
+- Use descriptive test names
+- Follow AAA pattern (Arrange, Act, Assert)
+- Mock external dependencies appropriately
+- Keep tests fast and deterministic
+- Test edge cases and error paths
+- Aim for 80%+ coverage
+
+## Language-Specific Testing
+
+### Rust
+
+```bash
+cargo test --workspace
+cargo test --workspace -- --nocapture  # Show output
+cargo tarpaulin --out Html  # Coverage
+```
+
+**Unit Test Pattern:**
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    #[test]
+    fn test_user_creation() {
+        let user = User::new("test@example.com", "password123");
+        assert!(user.is_ok());
+    }
+
+    // Property-based testing
+    proptest! {
+        #[test]
+        fn test_email_validation(email in "[a-z]+@[a-z]+\\.[a-z]+") {
+            let result = validate_email(&email);
+            prop_assert!(result.is_ok());
+        }
+    }
+}
+```
+
+**Integration Test Pattern:**
+```rust
+// tests/integration_test.rs
+use sqlx::PgPool;
+
+#[sqlx::test]
+async fn test_user_repository(pool: PgPool) {
+    let repo = UserRepository::new(pool);
+    let user = repo.create("test@example.com").await.unwrap();
+    assert_eq!(user.email, "test@example.com");
+}
+```
+
+**Async Testing:**
+```rust
+#[tokio::test]
+async fn test_async_operation() {
+    let result = async_function().await;
+    assert!(result.is_ok());
+}
+```
+
+### TypeScript
+
+```bash
+# Bun projects
+bun test
+bun test --coverage
+
+# Next.js projects
+pnpm test
+pnpm test --coverage
+pnpm test:e2e  # Playwright
+```
+
+**Effect Service Testing:**
+```typescript
+import { Effect, Layer } from "effect"
+import { describe, it, expect } from "bun:test"
+
+describe("UserService", () => {
+  const TestDatabaseLayer = Layer.succeed(DatabaseService, {
+    query: () => Effect.succeed([{ id: "1", name: "Test" }]),
+  })
+
+  it("should fetch users", async () => {
+    const program = Effect.gen(function* () {
+      const db = yield* DatabaseService
+      return yield* db.query("SELECT * FROM users")
+    })
+
+    const result = await Effect.runPromise(
+      program.pipe(Effect.provide(TestDatabaseLayer))
+    )
+
+    expect(result).toHaveLength(1)
+  })
+})
+```
+
+**Schema Validation Testing:**
+```typescript
+import { Schema, Either } from "effect"
+
+describe("UserSchema", () => {
+  const UserSchema = Schema.Struct({
+    email: Schema.String.pipe(Schema.pattern(/^[^@]+@[^@]+\.[^@]+$/)),
+  })
+
+  it("should validate correct data", () => {
+    const result = Schema.decodeUnknownEither(UserSchema)({
+      email: "test@example.com",
+    })
+    expect(Either.isRight(result)).toBe(true)
+  })
+
+  it("should reject invalid email", () => {
+    const result = Schema.decodeUnknownEither(UserSchema)({
+      email: "invalid",
+    })
+    expect(Either.isLeft(result)).toBe(true)
+  })
+})
+```
+
+**React Component Testing:**
+```typescript
+import { render, screen, waitFor } from "@testing-library/react"
+
+describe("UserList", () => {
+  it("should display users", async () => {
+    render(<UserList />)
+    await waitFor(() => {
+      expect(screen.getByText("Test User")).toBeInTheDocument()
+    })
+  })
+})
+```
+
+### Go
+
+```bash
+go test ./... -v
+go test ./... -cover
+go test -race ./...  # Race detector
+go test -bench=. ./...  # Benchmarks
+```
+
+**Unit Test Pattern:**
+```go
+func TestUserCreation(t *testing.T) {
+    user, err := NewUser("test@example.com", "password")
+    if err != nil {
+        t.Fatalf("expected no error, got %v", err)
+    }
+    if user.Email != "test@example.com" {
+        t.Errorf("expected email %q, got %q", "test@example.com", user.Email)
+    }
+}
+```
+
+**Table-Driven Tests:**
+```go
+func TestValidateEmail(t *testing.T) {
+    tests := []struct {
+        name  string
+        email string
+        valid bool
+    }{
+        {"valid email", "test@example.com", true},
+        {"missing @", "testexample.com", false},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            err := validateEmail(tt.email)
+            if (err == nil) != tt.valid {
+                t.Errorf("validateEmail(%q) = %v, want valid=%v", tt.email, err, tt.valid)
+            }
+        })
+    }
+}
+```
+
+**Integration Test with testify:**
+```go
+import "github.com/stretchr/testify/assert"
+
+func TestUserRepository(t *testing.T) {
+    repo := NewUserRepository(testDB)
+    user, err := repo.Create(context.Background(), "test@example.com")
+    
+    assert.NoError(t, err)
+    assert.Equal(t, "test@example.com", user.Email)
+}
+```
+
+## Definition of Done
+
+Before completing:
+
+- All existing tests pass
+- New tests cover the implementation
+- Edge cases and error paths tested
+- Effect services tested with mock Layers
+- Schema validation tested with valid/invalid data
+- Coverage meets project threshold (80%+)
+- Tests are deterministic (no flakiness)

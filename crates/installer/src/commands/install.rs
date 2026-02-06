@@ -15,7 +15,7 @@ use crate::validator::PrerequisitesValidator;
 /// Install command arguments.
 #[derive(Args, Debug)]
 pub struct InstallCommand {
-    /// Bare metal provider (currently only "latitude" supported).
+    /// Bare metal provider (latitude, hetzner, ovh, vultr, scaleway, cherry, onprem).
     #[arg(long, default_value = "latitude")]
     provider: String,
 

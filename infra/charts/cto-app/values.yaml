@@ -1,0 +1,179 @@
+# Default configuration values for cto-app chart
+global:
+  domain: "localhost"
+  tunnel_id: ""
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+
+argo:
+  enabled: true
+  version: "v3.5.11"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  controller:
+    replicas: 1
+    args:
+      - "--namespaces"
+      - "cto-app"
+  server:
+    replicas: 1
+    args:
+      - "--namespaces"
+      - "cto-app"
+    service:
+      type: NodePort
+      port: 2746
+
+controller:
+  enabled: true
+  image:
+    repository: ghcr.io/cto/cto-controller
+    tag: "latest"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  replicas: 1
+  serviceAccount:
+    create: true
+    name: "cto-controller"
+
+agents:
+  enabled: true
+  global:
+    imageRepository: ghcr.io/cto
+    agentTag: "latest"
+  morgan:
+    enabled: true
+    replicas: 0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  grizz:
+    enabled: true
+    replicas: 0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  blaze:
+    enabled: true
+    replicas: 0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  cleo:
+    enabled: true
+    replicas: 0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  cipher:
+    enabled: true
+    replicas: 0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  tess:
+    enabled: true
+    replicas: 0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  bolt:
+    enabled: true
+    replicas: 0
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+pm:
+  enabled: true
+  image:
+    repository: ghcr.io/cto/pm-lite
+    tag: "latest"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8080
+  config:
+    github:
+      webhookSecret: ""
+      appId: ""
+      privateKey: ""
+    logLevel: "info"
+
+mcp:
+  enabled: true
+  image:
+    repository: ghcr.io/cto/mcp-lite
+    tag: "latest"
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 8080
+  config:
+    logLevel: "info"
+
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  hosts:
+    - host: localhost
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: argo.127.0.0.1.nip.io
+      paths:
+        - path: /
+          pathType: Prefix

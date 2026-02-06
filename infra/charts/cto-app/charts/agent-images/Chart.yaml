@@ -1,0 +1,33 @@
+apiVersion: v2
+name: agent-images
+description: Subchart for CTO agent images
+version: 0.1.0
+dependencies:
+  - name: morgan
+    version: "0.1.0"
+    repository: "file://../morgan"
+    condition: agents.morgan.enabled
+  - name: grizz
+    version: "0.1.0"
+    repository: "file://../grizz"
+    condition: agents.grizz.enabled
+  - name: blaze
+    version: "0.1.0"
+    repository: "file://../blaze"
+    condition: agents.blaze.enabled
+  - name: cleo
+    version: "0.1.0"
+    repository: "file://../cleo"
+    condition: agents.cleo.enabled
+  - name: cipher
+    version: "0.1.0"
+    repository: "file://../cipher"
+    condition: agents.cipher.enabled
+  - name: tess
+    version: "0.1.0"
+    repository: "file://../tess"
+    condition: agents.tess.enabled
+  - name: bolt
+    version: "0.1.0"
+    repository: "file://../bolt"
+    condition: agents.bolt.enabled

@@ -1,0 +1,27 @@
+{{- if .Values.pm.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pm-lite-config
+  namespace: cto-app
+  labels:
+    {{- include "cto-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pm
+data:
+  config.yaml: |
+    # PM Lite Configuration
+    server:
+      host: "0.0.0.0"
+      port: 8080
+    
+    github:
+      webhookSecret: {{ .Values.pm.config.github.webhookSecret | quote }}
+      appId: {{ .Values.pm.config.github.appId | quote }}
+      privateKey: {{ .Values.pm.config.github.privateKey | quote }}
+    
+    logLevel: {{ .Values.pm.config.logLevel | default "info" }}
+    
+    # Agent configuration
+    agents:
+      enabled: {{ .Values.agents.enabled }}
+{{- end }}

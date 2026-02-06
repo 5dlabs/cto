@@ -1,7 +1,8 @@
 # Remediation Buttons - Implementation Status
 
-**Date:** 2026-01-30
-**Branch:** `feat/remediation-buttons-phase-a`
+**Date:** 2026-02-01
+**Branch:** `stitch/remediation-buttons`
+**PR:** [#4208](https://github.com/5dlabs/cto/pull/4208)
 
 ## Overview
 
@@ -103,37 +104,53 @@ Created 8 test PRs for each agent type:
 
 **Workaround:** Delete the workspace PVC: `kubectl delete pvc workspace-cto-stitch -n cto`
 
-## 🚧 Outstanding Work
-
-### Phase B: Button Rendering
+## ✅ Phase B: Button Rendering - DONE
 
 When a GitHub check run fails, render a "Fix with @Agent" button in the check run summary.
 
-**Tasks:**
-1. Implement `check_run` webhook handler in pm-server
-2. On failure, detect language/framework from PR files
-3. Generate GitHub Check Run annotation with remediation button
-4. Button click triggers new comment with @mention
+**Completed Tasks:**
+1. ✅ Implemented `handle_ci_failure_webhook()` in `crates/pm/src/handlers/agent_interactions.rs`
+2. ✅ Created `ci-failure-button-sensor.yaml` Argo Events sensor
+3. ✅ Uses GitHub API (not gh CLI) to fetch PR files and create check runs
+4. ✅ Detects language from changed files → selects appropriate agent
+5. ✅ Creates check run with "Fix with <Agent>" button
 
-### Phase C: Click Handler
+**Fix Applied (PR #4208):**
+- Changed from `gh` CLI to direct GitHub API calls (reqwest HTTP client)
+- PM server container doesn't have `gh` installed, so this was required
+
+## ✅ Phase C: Click Handler - DONE
 
 Handle button clicks to trigger remediation.
 
-**Tasks:**
-1. Implement check run "requested_action" webhook handler
-2. Extract PR number and agent from action identifier
-3. Create CodeRun for the appropriate agent
-4. Agent fixes issue and pushes commit
+**Completed Tasks:**
+1. ✅ Implemented `handle_remediation_webhook()` handler
+2. ✅ Parses button identifier: `fix-<agent>-pr<number>-<check_run_id>`
+3. ✅ Creates CodeRun CR for the appropriate agent
+4. ✅ Created `remediation-button-sensor.yaml` for Argo Events
 
-### Phase D: Detection Integration
+## 🚧 Phase D: Detection Integration
 
 Integrate detection into Stitch review initialization.
 
 **Tasks:**
-1. Pass detection results to Stitch via template variables
-2. Stitch queries Context7 for detected frameworks
-3. Review output includes detection summary
-4. Remediation suggestion uses detected agent name
+1. [ ] Pass detection results to Stitch via template variables
+2. [ ] Stitch queries Context7 for detected frameworks
+3. [ ] Review output includes detection summary
+4. [ ] Remediation suggestion uses detected agent name
+
+## ⚡ Phase E: End-to-End Testing
+
+**Status:** Ready for testing once PR #4208 is merged and deployed
+
+**Test Steps:**
+1. Wait for CI to build new PM server image with API fix
+2. Redeploy PM server (or wait for auto-sync)
+3. Create a PR with failing CI
+4. Verify "🔧 Remediation Available" check run appears
+5. Click "Fix with Rex" button
+6. Verify CodeRun is created
+7. Verify agent spawns and pushes fix
 
 ## File Summary
 

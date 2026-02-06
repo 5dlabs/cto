@@ -1,0 +1,28 @@
+Usage: droid [options] [command] [prompt...]
+
+Droid - Factory's AI coding agent in your terminal
+
+Options:
+  -v, --version                 output the version number
+  -r, --resume [sessionId]      Resume a session (defaults to last modified)
+  --allow-background-processes  Allow spawning background processes that
+                                persist after CLI exits
+  -h, --help                    display help for command
+
+Commands:
+  exec [options] [prompt]       Execute a single command (non-interactive mode)
+  mcp                           Manage MCP servers
+  plugin                        Manage plugins
+  daemon [options]              Run the Factory daemon server
+
+Running 'droid' without any options starts interactive mode.
+Provide an inline prompt to start the session with initial context.
+
+Examples:
+  droid "review app.tsx"              Start interactive mode with an initial prompt
+  droid                               Start interactive mode (default)
+  droid exec "analyze this file"      Run non-interactively (for scripts/automation)
+  droid exec - < prompt.txt           Execute from stdin (non-interactive)
+  droid exec --help                   Show exec command options
+
+For more details, see: https://docs.factory.ai/cli/getting-started/overview

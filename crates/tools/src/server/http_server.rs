@@ -55,6 +55,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tools::config::{process_env_templates, TemplateContext};
 use tools::config::{ServerConfig, SystemConfigManager as ConfigManager};
+use tools::health_monitor::{HealthCheckConfig, HealthMonitor};
 use tools::resolve_working_directory;
 use tower_http::cors::CorsLayer;
 
@@ -556,7 +557,8 @@ impl ServerConnectionPool {
 
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
 
         // Set working directory (default to project directory if not specified)
         let working_dir = config.working_directory.as_ref().map_or_else(
@@ -700,7 +702,7 @@ impl ServerConnectionPool {
         Ok(())
     }
 
-    /// Initialize an MCP server with the required handshake
+    /// Initialize an MCP server with the required handshake (10s timeout)
     async fn initialize_server(
         &self,
         connection: Arc<Mutex<McpServerConnection>>,
@@ -710,8 +712,30 @@ impl ServerConnectionPool {
             conn.server_name.clone()
         };
 
-        tracing::info!("🔄 Initializing MCP server: {}", server_name);
+        tracing::info!("🔄 Initializing MCP server: {} (10s timeout)", server_name);
 
+        match tokio::time::timeout(
+            tokio::time::Duration::from_secs(10),
+            self.initialize_server_inner(connection, &server_name),
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                tracing::error!("⏰ [{server_name}] MCP server initialization timed out after 10s");
+                Err(anyhow::anyhow!(
+                    "MCP server '{server_name}' initialization timed out after 10s"
+                ))
+            }
+        }
+    }
+
+    /// Inner initialization logic (called within timeout wrapper)
+    async fn initialize_server_inner(
+        &self,
+        connection: Arc<Mutex<McpServerConnection>>,
+        server_name: &str,
+    ) -> anyhow::Result<()> {
         // Send initialize request
         let init_request = json!({
             "jsonrpc": "2.0",
@@ -735,12 +759,16 @@ impl ServerConnectionPool {
         self.send_request(connection.clone(), init_request).await?;
         tracing::info!("✅ [{}] Initialize request sent successfully", server_name);
 
-        // Read initialization response
-        tracing::info!(
-            "🔄 [{}] About to read initialize response (THIS MIGHT HANG)",
-            server_name
-        );
-        let _init_response = self.read_response(connection.clone()).await?;
+        // Read initialization response (with timeout to prevent hanging)
+        tracing::info!("🔄 [{}] About to read initialize response", server_name);
+        let _init_response = tokio::time::timeout(
+            tokio::time::Duration::from_secs(8),
+            self.read_response(connection.clone()),
+        )
+        .await
+        .map_err(|_| {
+            anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 8s")
+        })??;
         tracing::info!(
             "✅ [{}] Initialize response received successfully",
             server_name
@@ -1078,6 +1106,8 @@ pub struct BridgeState {
     current_working_dir: Arc<RwLock<Option<std::path::PathBuf>>>,
     // HTTP session IDs for StreamableHTTP servers (server_name -> Mcp-Session-Id)
     http_sessions: Arc<RwLock<HashMap<String, String>>>,
+    // Per-MCP server health monitor with periodic checks and metrics
+    health_monitor: Arc<tokio::sync::Mutex<HealthMonitor>>,
 }
 
 // JSON-RPC 2.0 message types
@@ -1132,6 +1162,11 @@ impl BridgeState {
             http_sessions.clone(),
         ));
 
+        // Create health monitor with default 30-second check interval
+        let health_monitor = Arc::new(tokio::sync::Mutex::new(HealthMonitor::new(
+            HealthCheckConfig::default(),
+        )));
+
         // Create the state
         let state = Self {
             system_config_manager,
@@ -1139,6 +1174,7 @@ impl BridgeState {
             connection_pool,
             current_working_dir: Arc::new(RwLock::new(None)),
             http_sessions,
+            health_monitor,
         };
 
         Ok(state)
@@ -1189,13 +1225,20 @@ impl BridgeState {
         let mut all_tools = HashMap::new();
 
         // Parallel initialization: spawn tasks for each server to avoid deadlock
+        // Limit concurrent stdio initializations to prevent resource exhaustion
         tracing::info!("🚀 Starting parallel server initialization...");
+
+        // Create semaphore to limit concurrent stdio server initializations
+        // This prevents overwhelming the system with too many concurrent npm/npx installs
+        let stdio_semaphore = Arc::new(tokio::sync::Semaphore::new(5)); // Max 5 concurrent stdio inits
+        tracing::info!("🔧 Limiting concurrent stdio initializations to 5");
 
         let tasks: Vec<_> = server_list
             .into_iter()
             .map(|(server_name, config)| {
                 let connection_pool = self.connection_pool.clone();
                 let self_clone = self.clone();
+                let stdio_sem = stdio_semaphore.clone();
 
                 tokio::spawn(async move {
                     tracing::info!(
@@ -1204,9 +1247,13 @@ impl BridgeState {
                         chrono::Utc::now().format("%H:%M:%S")
                     );
 
-                    // For stdio servers, initialize them permanently
+                    // For stdio servers, initialize them permanently with concurrency limit
                     if config.transport == "stdio" {
                         tracing::info!("🔄 [{}] Initializing stdio server...", server_name);
+
+                        // Acquire semaphore permit to limit concurrent inits
+                        let _permit = stdio_sem.acquire().await.unwrap();
+                        tracing::info!("🔓 [{}] Acquired stdio init permit", server_name);
 
                         match connection_pool.start_server(&server_name).await {
                             Ok(_) => {
@@ -1219,7 +1266,7 @@ impl BridgeState {
                                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                             }
                             Err(e) => {
-                                tracing::debug!(
+                                tracing::warn!(
                                     "⚠️ [{}] Failed to initialize server: {}",
                                     server_name,
                                     e
@@ -1230,6 +1277,7 @@ impl BridgeState {
                                 ));
                             }
                         }
+                        // Permit is automatically released when _permit is dropped
                     } else {
                         tracing::info!(
                             "🔄 [{}] Skipping initialization for {} server",
@@ -1239,10 +1287,10 @@ impl BridgeState {
                     }
 
                     // Discover tools with timeout
-                    // Increased to 180s to allow for first-time uvx installations from git repos
+                    // Increased to 300s (5 minutes) to allow for first-time uvx installations from git repos
                     tracing::info!("🔍 [{}] Starting tool discovery...", server_name);
                     let discovery_start = std::time::Instant::now();
-                    let discovery_timeout = tokio::time::Duration::from_secs(180);
+                    let discovery_timeout = tokio::time::Duration::from_secs(300);
 
                     match tokio::time::timeout(
                         discovery_timeout,
@@ -1287,10 +1335,16 @@ impl BridgeState {
         tracing::info!("⏳ Waiting for all servers to complete initialization...");
         let results = future::join_all(tasks).await;
 
+        // Track server-level results for reporting
+        let mut server_results: HashMap<String, usize> = HashMap::new();
+
         // Collect all tools from successful initializations
         for task_result in results {
             match task_result {
-                Ok(Ok((_server_name, tools))) => {
+                Ok(Ok((server_name, tools))) => {
+                    let tool_count = tools.len();
+                    server_results.insert(server_name.clone(), tool_count);
+
                     // Add tools to collection with server prefix
                     for tool in tools {
                         // Normalize server name: replace hyphens with underscores for consistent parsing
@@ -1315,18 +1369,193 @@ impl BridgeState {
 
         // Store discovered tools
         let mut available_tools = self.available_tools.write().await;
-        *available_tools = all_tools;
+        (*available_tools).clone_from(&all_tools);
         let total_elapsed = init_start.elapsed();
+
+        // Get all configured servers for comparison
+        let (all_configured_servers, transport_by_server) = {
+            let config_manager = self.system_config_manager.read().await;
+            let servers = config_manager.get_servers();
+            let all_names: Vec<String> = servers.keys().cloned().collect();
+            let transport_map: HashMap<String, String> = servers
+                .iter()
+                .map(|(name, config)| (name.clone(), config.transport.clone()))
+                .collect();
+            (all_names, transport_map)
+        };
+
+        // Find servers that didn't contribute any tools
+        let successful_servers: Vec<_> = server_results
+            .iter()
+            .filter(|(_, count)| **count > 0)
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        let missing_servers: Vec<String> = all_configured_servers
+            .iter()
+            .filter(|name| !successful_servers.contains(name))
+            .cloned()
+            .collect();
+
+        // Group tools by transport type for better debugging
+        let mut transport_counts: HashMap<String, (usize, Vec<String>)> = HashMap::new();
+        let mut transport_failed: HashMap<String, Vec<String>> = HashMap::new();
+
+        for tool in all_tools.values() {
+            if let Some(transport) = transport_by_server.get(&tool.server_name) {
+                let entry = transport_counts
+                    .entry(transport.clone())
+                    .or_insert((0, Vec::new()));
+                entry.0 += 1;
+                if !entry.1.contains(&tool.server_name) {
+                    entry.1.push(tool.server_name.clone());
+                }
+            }
+        }
+
+        for server_name in &missing_servers {
+            if let Some(transport) = transport_by_server.get(server_name) {
+                transport_failed
+                    .entry(transport.clone())
+                    .or_default()
+                    .push(server_name.clone());
+            }
+        }
+
+        // Log overall success/failure with configured server count
         tracing::info!(
-            "✅ Tool discovery complete in {:.2}s. Total tools available: {}",
-            total_elapsed.as_secs_f64(),
-            available_tools.len()
+            "📋 Server Summary: {}/{} servers provided tools",
+            successful_servers.len(),
+            all_configured_servers.len()
         );
+
+        if available_tools.is_empty() {
+            tracing::error!("❌ TOOL DISCOVERY FAILED: 0 tools discovered");
+            tracing::error!(
+                "⚠️  All {} configured servers failed to provide tools",
+                all_configured_servers.len()
+            );
+        } else {
+            tracing::info!(
+                "✅ TOOL DISCOVERY SUCCESS: {} total tools (discovered in {:.2}s)",
+                available_tools.len(),
+                total_elapsed.as_secs_f64()
+            );
+        }
+
+        // Log breakdown by transport type
+        tracing::info!("📊 Tools by transport type:");
+        let all_transports: std::collections::HashSet<String> =
+            transport_by_server.values().cloned().collect();
+        let mut transports: Vec<_> = all_transports.iter().collect();
+        transports.sort();
+
+        // Create static defaults for unwrap_or to avoid lifetime issues
+        let default_counts = (0, Vec::new());
+        let default_failed: Vec<String> = Vec::new();
+
+        for transport in transports {
+            let (tool_count, successful) =
+                transport_counts.get(transport).unwrap_or(&default_counts);
+            let failed = transport_failed.get(transport).unwrap_or(&default_failed);
+            let total_servers = successful.len() + failed.len();
+
+            if *tool_count == 0 {
+                tracing::error!(
+                    "   ❌ {}: 0 tools (0/{} servers succeeded)",
+                    transport,
+                    total_servers
+                );
+                if !failed.is_empty() {
+                    tracing::error!("      Failed servers: {}", failed.join(", "));
+                }
+            } else if !failed.is_empty() {
+                tracing::warn!(
+                    "   ⚠️  {}: {} tools ({}/{} servers succeeded)",
+                    transport,
+                    tool_count,
+                    successful.len(),
+                    total_servers
+                );
+                tracing::warn!("      Failed servers: {}", failed.join(", "));
+            } else {
+                tracing::info!(
+                    "   ✅ {}: {} tools ({}/{} servers)",
+                    transport,
+                    tool_count,
+                    successful.len(),
+                    total_servers
+                );
+            }
+        }
+
+        // If there are missing servers, log them as warnings (not errors)
+        // Only fail if ALL servers failed (no tools discovered at all)
+        if !missing_servers.is_empty() {
+            tracing::warn!(
+                "⚠️  {} servers failed to provide tools:",
+                missing_servers.len()
+            );
+            let unknown_transport = "unknown".to_string();
+            for server_name in &missing_servers {
+                let transport = transport_by_server
+                    .get(server_name)
+                    .unwrap_or(&unknown_transport);
+                tracing::warn!("   - {} ({})", server_name, transport);
+            }
+
+            // Only FAIL if NO tools were discovered at all
+            if available_tools.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Tool discovery failed: ALL {}/{} configured servers provided 0 tools. No tools available.",
+                    missing_servers.len(),
+                    all_configured_servers.len()
+                ));
+            }
+            
+            // Log warning but continue if some tools were discovered
+            tracing::warn!(
+                "⚠️  Continuing with {} tools from {} working servers ({} servers failed)",
+                available_tools.len(),
+                all_configured_servers.len() - missing_servers.len(),
+                missing_servers.len()
+            );
+        }
 
         // Create or update the tool catalog ConfigMap
         if let Err(e) = self.create_tool_catalog_configmap(&available_tools).await {
             tracing::debug!("⚠️ Failed to create tool catalog ConfigMap: {}", e);
             // Don't fail the entire startup if ConfigMap creation fails
+        }
+
+        // Register all discovered servers with the health monitor and start periodic checks.
+        // Servers that yielded tools are marked healthy; those that failed stay Unknown.
+        {
+            let config_manager = self.system_config_manager.read().await;
+            let servers = config_manager.get_servers();
+            let mut monitor = self.health_monitor.lock().await;
+
+            for server_name in servers.keys() {
+                if let Err(e) = monitor.start_monitoring_server(server_name.clone()).await {
+                    tracing::warn!(
+                        "⚠️ Failed to start health monitoring for {}: {:?}",
+                        server_name,
+                        e
+                    );
+                    continue;
+                }
+
+                // If the server contributed at least one tool, mark it healthy right away
+                let has_tools = available_tools
+                    .keys()
+                    .any(|k| k.starts_with(&format!("{}_", server_name.replace('-', "_"))));
+
+                if has_tools {
+                    monitor.mark_server_healthy(server_name).await;
+                }
+            }
+
+            tracing::info!("✅ Health monitoring started for {} servers", servers.len());
         }
 
         Ok(())
@@ -3102,8 +3331,10 @@ impl BridgeState {
                                             wd.clone()
                                         };
 
-                                        // Forward to the appropriate server with user context
-                                        match self
+                                        // Forward to the appropriate server with user context,
+                                        // recording metrics in the health monitor.
+                                        let call_start = tokio::time::Instant::now();
+                                        let call_result = self
                                             .connection_pool
                                             .forward_tool_call_with_context(
                                                 &parsed_tool.server_name,
@@ -3111,9 +3342,21 @@ impl BridgeState {
                                                 arguments,
                                                 user_working_dir.as_deref(),
                                             )
-                                            .await
-                                        {
+                                            .await;
+                                        let call_elapsed = call_start.elapsed();
+
+                                        match call_result {
                                             Ok(response) => {
+                                                // Record success in health monitor
+                                                let monitor = self.health_monitor.lock().await;
+                                                monitor
+                                                    .record_success(
+                                                        &parsed_tool.server_name,
+                                                        call_elapsed,
+                                                    )
+                                                    .await;
+                                                drop(monitor);
+
                                                 // Extract result from response or return the response directly
                                                 if let Some(result) = response.get("result") {
                                                     result.clone()
@@ -3122,6 +3365,16 @@ impl BridgeState {
                                                 }
                                             }
                                             Err(e) => {
+                                                // Record failure in health monitor
+                                                let monitor = self.health_monitor.lock().await;
+                                                monitor
+                                                    .record_failure(
+                                                        &parsed_tool.server_name,
+                                                        &e.to_string(),
+                                                    )
+                                                    .await;
+                                                drop(monitor);
+
                                                 json!({
                                                     "content": [{
                                                         "type": "text",
@@ -3235,6 +3488,56 @@ async fn readiness_check(State(state): State<BridgeState>) -> Result<Json<Value>
         "tools_available": tools_count,
         "timestamp": Utc::now().to_rfc3339()
     })))
+}
+
+// Per-MCP server health status — shows which MCPs are connected, their tool counts, and call metrics
+async fn servers_health(State(state): State<BridgeState>) -> Json<Value> {
+    // Build a map of server_name → number of tools from available_tools
+    let available_tools = state.available_tools.read().await;
+    let mut tool_counts: HashMap<String, usize> = HashMap::new();
+    for tool in available_tools.values() {
+        *tool_counts.entry(tool.server_name.clone()).or_default() += 1;
+    }
+    drop(available_tools);
+
+    let monitor = state.health_monitor.lock().await;
+    let servers = monitor.build_servers_health_response(&tool_counts).await;
+    drop(monitor);
+
+    Json(json!({
+        "servers": servers,
+        "timestamp": Utc::now().to_rfc3339()
+    }))
+}
+
+// Prometheus-compatible metrics endpoint
+async fn prometheus_metrics(
+    State(state): State<BridgeState>,
+) -> (
+    StatusCode,
+    [(axum::http::HeaderName, &'static str); 1],
+    String,
+) {
+    // Build tool counts the same way
+    let available_tools = state.available_tools.read().await;
+    let mut tool_counts: HashMap<String, usize> = HashMap::new();
+    for tool in available_tools.values() {
+        *tool_counts.entry(tool.server_name.clone()).or_default() += 1;
+    }
+    drop(available_tools);
+
+    let monitor = state.health_monitor.lock().await;
+    let body = monitor.render_prometheus_metrics(&tool_counts).await;
+    drop(monitor);
+
+    (
+        StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
+        body,
+    )
 }
 
 // Session initialization endpoint
@@ -3441,16 +3744,24 @@ async fn main() -> Result<()> {
     // Discover all available tools and initialize servers at startup
     tracing::info!("🔄 Initializing all MCP servers...");
     if let Err(e) = state.discover_all_tools().await {
-        tracing::debug!("❌ Failed to discover tools at startup: {}", e);
+        tracing::error!("❌ INITIALIZATION FAILED: {}", e);
         return Err(e);
     }
-    tracing::info!("✅ All MCP servers initialized and ready");
+
+    // Final readiness banner - if this is missing, something went wrong with initialization
+    tracing::info!("═══════════════════════════════════════════════════════════");
+    tracing::info!("✅ MCP TOOLS SERVER READY");
+    tracing::info!("   All servers initialized successfully");
+    tracing::info!("   Check logs above for tool discovery counts");
+    tracing::info!("═══════════════════════════════════════════════════════════");
 
     let app = Router::new()
         .route("/mcp", post(mcp_endpoint))
         .route("/client-config", get(client_config_endpoint))
         .route("/health", get(health_check))
+        .route("/health/servers", get(servers_health))
         .route("/ready", get(readiness_check))
+        .route("/metrics", get(prometheus_metrics))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
