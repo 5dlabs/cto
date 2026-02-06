@@ -1,4 +1,4 @@
-//! HTTP server for GitHub webhooks
+//! HTTP server for GitHub webhooks and OAuth callbacks
 
 use std::sync::Arc;
 
@@ -21,6 +21,7 @@ use crate::{
         extract_prompt, is_trigger_command, should_trigger_workflow, verify_signature, GitHubEvent,
         IssueCommentPayload, IssuePayload, PullRequestPayload,
     },
+    oauth::{handle_oauth_callback, handle_oauth_refresh, handle_oauth_start},
     workflow::{get_default_stack, trigger_workflow, WorkflowParams},
 };
 
@@ -55,6 +56,10 @@ impl Server {
             .route("/health", get(health))
             .route("/ready", get(ready))
             .route("/webhook/github", post(github_webhook))
+            // OAuth routes
+            .route("/oauth/start", get(handle_oauth_start))
+            .route("/oauth/callback", get(handle_oauth_callback))
+            .route("/oauth/refresh/{agent}", post(handle_oauth_refresh))
             .layer(TraceLayer::new_for_http())
             .with_state(state);
 

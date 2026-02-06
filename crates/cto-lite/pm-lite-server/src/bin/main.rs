@@ -18,8 +18,8 @@ async fn main() -> Result<()> {
     // Load dotenv for local development
     let _ = dotenvy::dotenv();
 
-    // Load configuration
-    let config = Config::from_env()?;
+    // Load configuration - try file first, then environment
+    let config = Config::load();
 
     // Run server
     Server::new(config).run().await
