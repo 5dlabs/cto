@@ -1,10 +1,13 @@
-# USER.md - About Your Human
+# User Context
 
-- **Name:** Jonathon
-- **What to call them:** Jonathon
-- **Timezone:** America/Vancouver (PST)
-- **Notes:** Founder/CTO, building the CTO platform
+**User:** Jon Fritz
+**Role:** CTO Platform architect
+**Contact:** Telegram via this bot
 
-## Context
+## What Jon Expects
 
-Working on CTO App as the unified desktop application for all tiers. Desktop app contains all platform functionality with feature flags controlling tier access (free/pro/enterprise).
+- Focus on completing the Stitch implementation
+- Follow the phased plan in `docs/stitch-mentions-and-remediation-plan.md`
+- Run clippy pedantic, tests, and lint before commits
+- Push working code frequently
+- Ask for clarification on architectural decisions

@@ -2,11 +2,11 @@
 //!
 //! This crate provides:
 //! - GitHub webhook handling (issues, PRs, comments)
+//! - OAuth callback handling for Linear
 //! - Workflow triggering via Argo Workflows
 //! - Simple state management
 //!
 //! Unlike the full PM server, this excludes:
-//! - Linear integration
 //! - Multi-tenant support
 //! - Complex onboarding flows
 
@@ -16,8 +16,9 @@
 
 pub mod config;
 pub mod github;
+pub mod oauth;
 pub mod server;
 pub mod workflow;
 
-pub use config::Config;
+pub use config::{Config, LinearAppConfig, LinearOAuthConfig};
 pub use server::Server;

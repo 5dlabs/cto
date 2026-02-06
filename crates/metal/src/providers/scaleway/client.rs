@@ -11,10 +11,9 @@ use tracing::{debug, info, warn};
 use super::models::{
     ActionRequest, CreateServerRequest as ScalewayCreateRequest, InstallRequest,
     ReinstallRequest as ScalewayReinstallRequest, Server as ScalewayServer, ServerListResponse,
-    ServerResponse,
 };
 use crate::providers::traits::{
-    CreateServerRequest, Provider, ProviderError, ReinstallIpxeRequest, Server, ServerStatus,
+    CreateServerRequest, Provider, ProviderError, ReinstallIpxeRequest, ServerStatus,
 };
 
 /// Base URL for Scaleway API.
@@ -189,7 +188,7 @@ impl Scaleway {
     }
 
     /// Convert Scaleway server to our Server type.
-    fn to_server(server: &ScalewayServer) -> Server {
+    fn to_server(server: &ScalewayServer) -> crate::providers::Server {
         let status = match server.status.as_str() {
             "ready" => ServerStatus::On,
             "delivering" | "ordered" => ServerStatus::Deploying,
@@ -217,7 +216,7 @@ impl Scaleway {
             .map(|o| o.name.clone())
             .unwrap_or_default();
 
-        Server {
+        crate::providers::Server {
             id: server.id.clone(),
             hostname: server.name.clone(),
             status,
@@ -236,7 +235,7 @@ impl Scaleway {
 
 #[async_trait]
 impl Provider for Scaleway {
-    async fn create_server(&self, req: CreateServerRequest) -> Result<Server, ProviderError> {
+    async fn create_server(&self, req: CreateServerRequest) -> Result<crate::providers::Server, ProviderError> {
         info!(
             hostname = %req.hostname,
             plan = %req.plan,
@@ -261,22 +260,22 @@ impl Provider for Scaleway {
             }),
         };
 
-        let response: ServerResponse = self.post("/servers", &body).await?;
+        let server: ScalewayServer = self.post("/servers", &body).await?;
 
         info!(
-            server_id = %response.server.id,
+            server_id = %server.id,
             "Server created"
         );
 
-        Ok(Self::to_server(&response.server))
+        Ok(Self::to_server(&server))
     }
 
-    async fn get_server(&self, id: &str) -> Result<Server, ProviderError> {
-        let response: ServerResponse = self.get(&format!("/servers/{id}")).await?;
-        Ok(Self::to_server(&response.server))
+    async fn get_server(&self, id: &str) -> Result<crate::providers::Server, ProviderError> {
+        let server: ScalewayServer = self.get(&format!("/servers/{id}")).await?;
+        Ok(Self::to_server(&server))
     }
 
-    async fn wait_ready(&self, id: &str, timeout_secs: u64) -> Result<Server, ProviderError> {
+    async fn wait_ready(&self, id: &str, timeout_secs: u64) -> Result<crate::providers::Server, ProviderError> {
         info!(server_id = %id, timeout_secs, "Waiting for server to be ready");
 
         let start = std::time::Instant::now();
@@ -346,7 +345,7 @@ impl Provider for Scaleway {
         Ok(())
     }
 
-    async fn list_servers(&self) -> Result<Vec<Server>, ProviderError> {
+    async fn list_servers(&self) -> Result<Vec<crate::providers::Server>, ProviderError> {
         let response: ServerListResponse = self.get("/servers").await?;
         Ok(response.servers.iter().map(Self::to_server).collect())
     }
