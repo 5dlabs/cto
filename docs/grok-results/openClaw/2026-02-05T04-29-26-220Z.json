@@ -1,0 +1,311 @@
+{
+  "created_at": 1770265746,
+  "completed_at": 1770265766,
+  "id": "c2287b00-1053-be12-c852-ad8dd3817fa3",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_67160723",
+      "input": "{\"query\":\"(OpenClaw OR clawdbot OR OpenClaw agents OR OpenClaw AI OR clawd bot) lang:en\",\"limit\":20,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2287b00-1053-be12-c852-ad8dd3817fa3_xs_call_67160723",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_24694518",
+      "input": "{\"query\":\"(OpenClaw OR clawdbot OR OpenClaw agents OR OpenClaw AI OR clawd bot) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2287b00-1053-be12-c852-ad8dd3817fa3_xs_call_24694518",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_63736213",
+      "input": "{\"query\":\"OpenClaw\",\"count\":10}",
+      "name": "x_user_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2287b00-1053-be12-c852-ad8dd3817fa3_xs_call_63736213",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_37708579",
+      "input": "{\"query\":\"clawdbot\",\"count\":5}",
+      "name": "x_user_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2287b00-1053-be12-c852-ad8dd3817fa3_xs_call_37708579",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_73781685",
+      "input": "{\"query\":\"(OpenClaw OR clawdbot OR OpenClaw agents OR OpenClaw AI OR clawd bot) lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2287b00-1053-be12-c852-ad8dd3817fa3_xs_call_73781685",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_72008809",
+      "input": "{\"query\":\"(OpenClaw OR clawdbot OR OpenClaw agents OR OpenClaw AI OR clawd bot) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2287b00-1053-be12-c852-ad8dd3817fa3_xs_call_72008809",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_67568988",
+      "input": "{\"query\":\"OpenClaw clawdbot OpenClaw agents OpenClaw AI clawd bot\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2287b00-1053-be12-c852-ad8dd3817fa3_xs_call_67568988",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_45841600",
+      "input": "{\"query\":\"from:openclaw_\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2287b00-1053-be12-c852-ad8dd3817fa3_xs_call_45841600",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "**OpenClaw** (formerly known as Clawdbot or MoltBot) is a viral open-source AI agent framework that's gained massive traction in early 2026, with over 100k GitHub stars.[[1]](https://x.com/i/status/2018560569780105583)[[2]](https://x.com/i/status/2017759836600164646) It's designed for local deployment (e.g., on VPS, Raspberry Pi, or Cloudflare Workers), privacy-focused, and enables autonomous agents that interact via familiar apps like Telegram, WhatsApp, or X.[[3]](https://x.com/i/status/2017404076850282531)[[4]](https://x.com/i/status/2019155501351628972)[[5]](https://x.com/i/status/2017811131427934448)\n\n### Key Features:\n- **Self-Extending Agents**: Agents can write their own \"skills,\" hot-reload them, handle channel routing, and branch session contexts without constant human prompts.[[2]](https://x.com/i/status/2017759836600164646)\n- **Autonomous Tasks**: Examples include scraping Twitter for AI predictions (e.g., ASI Doomsday Clock), researching podcasts, reading Sheets/ scraping data, mining crypto on Solana ($ORE), playing games like Forza Horizon, or even calling businesses.[[6]](https://x.com/i/status/2019198713798050244)[[7]](https://x.com/i/status/2019198556306092300)[[8]](https://x.com/i/status/2019183595915481403)[[9]](https://x.com/i/status/2019157598402982169)[[10]](https://x.com/i/status/2018453175246925912)[[11]](https://x.com/i/status/2019099220104605870)\n- **Ecosystem Tools**:\n  - **Moltbook**: Reddit-like platform for OpenClaw agents to post, comment, and create \"submolts.\"[[12]](https://x.com/i/status/2017696915853283725)\n  - **Clawtalk.dev**: Lets agents publish theories, vote, launch/trade tokens on Solana autonomously.[[13]](https://x.com/i/status/2017575828159074508)\n  - **SeeClaw, MoltBot**: Bots for monitoring discourse and orchestrating multi-agent analysis.[[6]](https://x.com/i/status/2019198713798050244)\n  - Integrations like Bankr for cross-chain trading, Crabspace for memory, or even GPIO for physical interactions (e.g., banging a table).[[14]](https://x.com/i/status/2018806543119261911)[[5]](https://x.com/i/status/2017811131427934448)\n- **Community & Hype**: USDC hackathon ($30k prizes) for clawdbots/moltbots/OpenClaw agents.[[15]](https://x.com/i/status/2018841601863512321) Tokens like $OPENCLAW, $CLAWSTR emerging. Services for VPS deployment ($550 setups). Compared favorably to Siri; used by execs like NEAR CPO.[[16]](https://x.com/i/status/2019190926531244478)[[8]](https://x.com/i/status/2019183595915481403)[[17]](https://x.com/i/status/2019179576149295424)\n\nRepo: Likely github.com/openclaw/openclaw. Discord: discord.com/invite/clawd. Architecture breakdowns emphasize agent loops, memory/context mgmt.[[14]](https://x.com/i/status/2018806543119261911)[[18]](https://x.com/i/status/2017752066513584183)\n\nPosts are buzzing (e.g., 2.6k likes on USDC announcement), focused on agentic workflows, on-chain autonomy, and real-world utility. 🦞",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018560569780105583",
+              "start_index": 169,
+              "end_index": 218,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017759836600164646",
+              "start_index": 218,
+              "end_index": 267,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017404076850282531",
+              "start_index": 465,
+              "end_index": 514,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019155501351628972",
+              "start_index": 514,
+              "end_index": 563,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017811131427934448",
+              "start_index": 563,
+              "end_index": 612,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017759836600164646",
+              "start_index": 798,
+              "end_index": 847,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019198713798050244",
+              "start_index": 1099,
+              "end_index": 1148,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019198556306092300",
+              "start_index": 1148,
+              "end_index": 1197,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019183595915481403",
+              "start_index": 1197,
+              "end_index": 1246,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019157598402982169",
+              "start_index": 1246,
+              "end_index": 1295,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018453175246925912",
+              "start_index": 1295,
+              "end_index": 1345,
+              "title": "10"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019099220104605870",
+              "start_index": 1345,
+              "end_index": 1395,
+              "title": "11"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017696915853283725",
+              "start_index": 1518,
+              "end_index": 1568,
+              "title": "12"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017575828159074508",
+              "start_index": 1670,
+              "end_index": 1720,
+              "title": "13"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019198713798050244",
+              "start_index": 1816,
+              "end_index": 1865,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018806543119261911",
+              "start_index": 2004,
+              "end_index": 2054,
+              "title": "14"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017811131427934448",
+              "start_index": 2054,
+              "end_index": 2103,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018841601863512321",
+              "start_index": 2196,
+              "end_index": 2246,
+              "title": "15"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019190926531244478",
+              "start_index": 2388,
+              "end_index": 2438,
+              "title": "16"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019183595915481403",
+              "start_index": 2438,
+              "end_index": 2487,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019179576149295424",
+              "start_index": 2487,
+              "end_index": 2537,
+              "title": "17"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018806543119261911",
+              "start_index": 2684,
+              "end_index": 2734,
+              "title": "14"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017752066513584183",
+              "start_index": 2734,
+              "end_index": 2784,
+              "title": "18"
+            }
+          ]
+        }
+      ],
+      "id": "msg_c2287b00-1053-be12-c852-ad8dd3817fa3",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 17526,
+    "input_tokens_details": {
+      "cached_tokens": 4655
+    },
+    "output_tokens": 2919,
+    "output_tokens_details": {
+      "reasoning_tokens": 1402
+    },
+    "total_tokens": 20445,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 8,
+    "cost_in_usd_ticks": 442664500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 8,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

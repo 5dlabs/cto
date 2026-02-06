@@ -290,8 +290,11 @@ impl Provider for Ovh {
         info!(cart_id = %cart.cart_id, "Created cart");
 
         // Step 2: Assign cart to account
-        self.post_empty(&format!("/order/cart/{}/assign", cart.cart_id), &serde_json::json!({}))
-            .await?;
+        self.post_empty(
+            &format!("/order/cart/{}/assign", cart.cart_id),
+            &serde_json::json!({}),
+        )
+        .await?;
         debug!(cart_id = %cart.cart_id, "Assigned cart to account");
 
         // Step 3: Get available plans and find matching one
@@ -314,7 +317,11 @@ impl Provider for Ovh {
                 ))
             })?;
 
-        let duration = product.duration.first().cloned().unwrap_or_else(|| "P1M".to_string());
+        let duration = product
+            .duration
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "P1M".to_string());
 
         // Step 4: Add server to cart
         let add_item_req = AddCartItemRequest {
@@ -324,7 +331,10 @@ impl Provider for Ovh {
             quantity: 1,
         };
         let item: CartItem = self
-            .post(&format!("/order/cart/{}/baremetalServers", cart.cart_id), &add_item_req)
+            .post(
+                &format!("/order/cart/{}/baremetalServers", cart.cart_id),
+                &add_item_req,
+            )
             .await?;
         info!(item_id = item.item_id, "Added server to cart");
 
@@ -335,7 +345,10 @@ impl Provider for Ovh {
         };
         let _: ConfigurationResponse = self
             .post(
-                &format!("/order/cart/{}/item/{}/configuration", cart.cart_id, item.item_id),
+                &format!(
+                    "/order/cart/{}/item/{}/configuration",
+                    cart.cart_id, item.item_id
+                ),
                 &dc_config,
             )
             .await?;
@@ -351,7 +364,10 @@ impl Provider for Ovh {
         };
         let _: ConfigurationResponse = self
             .post(
-                &format!("/order/cart/{}/item/{}/configuration", cart.cart_id, item.item_id),
+                &format!(
+                    "/order/cart/{}/item/{}/configuration",
+                    cart.cart_id, item.item_id
+                ),
                 &os_config,
             )
             .await?;
@@ -363,7 +379,10 @@ impl Provider for Ovh {
         };
         let _: ConfigurationResponse = self
             .post(
-                &format!("/order/cart/{}/item/{}/configuration", cart.cart_id, item.item_id),
+                &format!(
+                    "/order/cart/{}/item/{}/configuration",
+                    cart.cart_id, item.item_id
+                ),
                 &region_config,
             )
             .await?;
@@ -376,7 +395,10 @@ impl Provider for Ovh {
             waive_retractation_period: false,
         };
         let order: OrderResponse = self
-            .post(&format!("/order/cart/{}/checkout", cart.cart_id), &checkout_req)
+            .post(
+                &format!("/order/cart/{}/checkout", cart.cart_id),
+                &checkout_req,
+            )
             .await?;
 
         info!(
@@ -508,8 +530,8 @@ impl Provider for Ovh {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::models::*;
+    use super::*;
 
     #[test]
     fn test_server_status_mapping() {
@@ -658,13 +680,9 @@ mod tests {
     #[test]
     fn test_signature_generation() {
         // Create a test OVH client
-        let ovh = Ovh::with_subsidiary(
-            "test_app_key",
-            "test_app_secret",
-            "test_consumer_key",
-            "US",
-        )
-        .unwrap();
+        let ovh =
+            Ovh::with_subsidiary("test_app_key", "test_app_secret", "test_consumer_key", "US")
+                .unwrap();
 
         // Test signature format
         let signature = ovh.generate_signature(

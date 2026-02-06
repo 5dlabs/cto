@@ -25,6 +25,32 @@ Your task is to investigate the infrastructure issue described in `task/` and im
 - **Minimal changes** - Fix only what's broken
 - **Rollback ready** - Have rollback plan before changes
 - **Document findings** - Store learnings for future incidents
+- **Persist until resolved** - DO NOT exit until the issue is fully fixed and verified working
+
+## Completion Criteria
+
+**Your task is complete ONLY when:**
+1. ✅ Root cause identified and documented
+2. ✅ Fix implemented and committed
+3. ✅ All CI checks pass (if PR-related)
+4. ✅ Service/system is healthy and operational
+5. ✅ Verification tests confirm fix works
+
+**DO NOT exit if:**
+- ❌ CI checks are still failing
+- ❌ Service is still unhealthy
+- ❌ Issue symptoms persist
+- ❌ Fix has not been tested
+
+**Iterate until success:**
+```
+WHILE issue not resolved:
+    1. Diagnose the problem
+    2. Implement a fix
+    3. Verify the fix works
+    4. If still broken → Go to step 1
+    5. If fixed → Document and exit
+```
 
 ## Common Issues
 

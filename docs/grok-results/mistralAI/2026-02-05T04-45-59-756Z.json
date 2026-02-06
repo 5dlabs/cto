@@ -1,0 +1,226 @@
+{
+  "created_at": 1770266740,
+  "completed_at": 1770266759,
+  "id": "c2dd4929-d27a-19f0-5f48-4263a6a348e8",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_92291857",
+      "input": "{\"query\":\"(Voxtral OR \\\"Voxtral Transcribe\\\" OR \\\"speech-to-text\\\" OR \\\"speaker diarization\\\" OR \\\"real-time transcription\\\") lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2dd4929-d27a-19f0-5f48-4263a6a348e8_xs_call_92291857",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_59356644",
+      "input": "{\"query\":\"(Voxtral OR \\\"Voxtral Transcribe\\\" OR \\\"speech-to-text\\\" OR \\\"speaker diarization\\\" OR \\\"real-time transcription\\\") lang:en\",\"limit\":20,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2dd4929-d27a-19f0-5f48-4263a6a348e8_xs_call_59356644",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_99495538",
+      "input": "{\"query\":\"Voxtral Transcribe speech-to-text speaker diarization real-time transcription\",\"limit\":20,\"min_score_threshold\":0.2}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2dd4929-d27a-19f0-5f48-4263a6a348e8_xs_call_99495538",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_04900058",
+      "input": "{\"query\":\"(Voxtral OR \\\"Voxtral Transcribe\\\" OR \\\"speech-to-text\\\" OR \\\"speaker diarization\\\" OR \\\"real-time transcription\\\") lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2dd4929-d27a-19f0-5f48-4263a6a348e8_xs_call_04900058",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_86853485",
+      "input": "{\"query\":\"(Voxtral OR \\\"Voxtral Transcribe\\\" OR \\\"speech-to-text\\\" OR \\\"speaker diarization\\\" OR \\\"real-time transcription\\\") lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2dd4929-d27a-19f0-5f48-4263a6a348e8_xs_call_86853485",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_35661921",
+      "input": "{\"query\":\"Voxtral OR Voxtral Transcribe speech-to-text speaker diarization real-time transcription\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2dd4929-d27a-19f0-5f48-4263a6a348e8_xs_call_35661921",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_62150229",
+      "input": "{\"query\":\"Voxtral\",\"count\":5}",
+      "name": "x_user_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c2dd4929-d27a-19f0-5f48-4263a6a348e8_xs_call_62150229",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "**Voxtral Transcribe 2 by Mistral AI** dominates the top English-language X posts matching your query, with the official announcement thread from @MistralAI garnering over 2,400 likes just yesterday (Feb 4, 2026).[[1]](https://x.com/i/status/2019068826097213953)\n\nKey highlights from the release:\n- **Two models**: Voxtral Mini Transcribe 2 (batch processing with ~4% WER on FLEURS benchmark, $0.003/min, speaker diarization, word-level timestamps, context biasing, 13 languages) and Voxtral Realtime (sub-200ms configurable latency for live apps, Apache 2.0 open weights).[[2]](https://x.com/i/status/2019068832405443046)[[3]](https://x.com/i/status/2019097517569302840)[[4]](https://x.com/i/status/2019097525173850395)\n- New **Audio Playground** in Mistral Studio for instant testing (upload files, toggle diarization, etc.).[[5]](https://x.com/i/status/2019092166694383686)\n- Check the intro video and benchmarks in Mistral's thread.[[1]](https://x.com/i/status/2019068826097213953)\n\nRecent posts echo excitement: sub-200ms latency beats competitors like Whisper on cost/speed, ideal for voice agents.[[6]](https://x.com/i/status/2019094844153770143)[[7]](https://x.com/i/status/2019164546431090784) Full details: https://mistral.ai/news/voxtral-transcribe-2[[8]](https://x.com/i/status/2019184322540900726)\n\nOther hits include general speech-to-text apps (e.g., Expo voice templates[[9]](https://x.com/i/status/2018580548059312241), Raspberry Pi voice HAT[[10]](https://x.com/i/status/2017863062053851549)) and complaints about tools like Gboard.[[11]](https://x.com/i/status/2017573409916420501) No major unrelated spikes in speaker diarization or real-time transcription chatter.",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019068826097213953",
+              "start_index": 213,
+              "end_index": 262,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019068832405443046",
+              "start_index": 573,
+              "end_index": 622,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019097517569302840",
+              "start_index": 622,
+              "end_index": 671,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019097525173850395",
+              "start_index": 671,
+              "end_index": 720,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019092166694383686",
+              "start_index": 827,
+              "end_index": 876,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019068826097213953",
+              "start_index": 936,
+              "end_index": 985,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019094844153770143",
+              "start_index": 1104,
+              "end_index": 1153,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019164546431090784",
+              "start_index": 1153,
+              "end_index": 1202,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019184322540900726",
+              "start_index": 1261,
+              "end_index": 1310,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018580548059312241",
+              "start_index": 1386,
+              "end_index": 1435,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017863062053851549",
+              "start_index": 1459,
+              "end_index": 1509,
+              "title": "10"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017573409916420501",
+              "start_index": 1550,
+              "end_index": 1600,
+              "title": "11"
+            }
+          ]
+        }
+      ],
+      "id": "msg_c2dd4929-d27a-19f0-5f48-4263a6a348e8",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 16581,
+    "input_tokens_details": {
+      "cached_tokens": 4722
+    },
+    "output_tokens": 2575,
+    "output_tokens_details": {
+      "reasoning_tokens": 1481
+    },
+    "total_tokens": 19156,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 7,
+    "cost_in_usd_ticks": 388954000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 7,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

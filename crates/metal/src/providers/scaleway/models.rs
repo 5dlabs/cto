@@ -269,3 +269,72 @@ pub struct CreateSshKeyRequest {
     /// Project ID.
     pub project_id: String,
 }
+
+// ============================================================================
+// Apple Silicon types (Mac mini M2/M2 Pro)
+// ============================================================================
+
+/// Apple Silicon server (Mac mini M2/M2 Pro).
+#[derive(Debug, Clone, Deserialize)]
+pub struct AppleSiliconServer {
+    /// Server ID.
+    pub id: String,
+    /// Server name.
+    pub name: String,
+    /// Organization ID.
+    pub organization_id: String,
+    /// Project ID.
+    pub project_id: String,
+    /// Region/zone.
+    pub region: String,
+    /// Server status.
+    pub status: String,
+    /// Offer (plan) information.
+    pub offer: Option<AppleSiliconOffer>,
+    /// IP address.
+    pub ip: Option<String>,
+    /// Remote desktop URL (.novnc).
+    pub remote_desktop: Option<RemoteDesktop>,
+    /// Created at.
+    pub created_at: Option<String>,
+    /// Updated at.
+    pub updated_at: Option<String>,
+}
+
+/// Apple Silicon offer (plan).
+#[derive(Debug, Clone, Deserialize)]
+pub struct AppleSiliconOffer {
+    /// Offer ID.
+    pub id: String,
+    /// Offer name.
+    pub name: String,
+}
+
+/// Remote desktop access.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RemoteDesktop {
+    /// URL for remote access.
+    pub url: String,
+    /// Status.
+    pub status: String,
+}
+
+/// Apple Silicon server list response.
+#[derive(Debug, Deserialize)]
+pub struct AppleSiliconServerListResponse {
+    /// List of servers.
+    pub servers: Vec<AppleSiliconServer>,
+}
+
+/// Create Apple Silicon server request.
+#[derive(Debug, Serialize)]
+pub struct CreateAppleSiliconRequest {
+    /// Offer ID.
+    pub offer_id: String,
+    /// Server name.
+    pub name: String,
+    /// Project ID.
+    pub project_id: String,
+    /// Region.
+    pub region: String,
+}
