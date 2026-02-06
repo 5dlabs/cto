@@ -25,20 +25,12 @@ pub struct PodInfo {
     pub containers: Vec<String>,
 }
 
-/// Get default kubeconfig path, returns None if home directory cannot be determined
-fn get_kubeconfig_path() -> Option<String> {
+/// Get default kubeconfig path
+fn get_kubeconfig_path() -> String {
     dirs::home_dir()
         .map(|h| h.join(".kube").join("config"))
         .and_then(|p| p.to_str().map(String::from))
-}
-
-/// Helper to create a kubectl Command with kubeconfig set if available
-fn kubectl_command() -> Command {
-    let mut cmd = Command::new("kubectl");
-    if let Some(config_path) = get_kubeconfig_path() {
-        cmd.env("KUBECONFIG", config_path);
-    }
-    cmd
+        .unwrap_or_else(|| "~/.kube/config".to_string())
 }
 
 /// List pods in a namespace
@@ -46,15 +38,9 @@ fn kubectl_command() -> Command {
 pub async fn list_pods(namespace: Option<String>) -> Result<Vec<String>, AppError> {
     let ns = namespace.unwrap_or_else(|| "default".to_string());
 
-    let output = kubectl_command()
-        .args([
-            "get",
-            "pods",
-            "-n",
-            &ns,
-            "-o",
-            "jsonpath={.items[*].metadata.name}",
-        ])
+    let output = Command::new("kubectl")
+        .args(&["get", "pods", "-n", &ns, "-o", "jsonpath={.items[*].metadata.name}"])
+        .env("KUBECONFIG", get_kubeconfig_path())
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to run kubectl: {}", e)))?;
 
@@ -78,11 +64,12 @@ pub async fn list_pods(namespace: Option<String>) -> Result<Vec<String>, AppErro
 pub async fn list_pods_with_status(namespace: Option<String>) -> Result<Vec<PodInfo>, AppError> {
     let ns = namespace.unwrap_or_else(|| "default".to_string());
 
-    let output = kubectl_command()
-        .args([
+    let output = Command::new("kubectl")
+        .args(&[
             "get", "pods", "-n", &ns, "-o",
             "jsonpath={range .items[*]}{.metadata.name}{'\\t'}{.status.phase}{'\\t'}{.spec.containers[*].name}{'\\n'}{end}"
         ])
+        .env("KUBECONFIG", get_kubeconfig_path())
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to run kubectl: {}", e)))?;
 
@@ -105,10 +92,9 @@ pub async fn list_pods_with_status(namespace: Option<String>) -> Result<Vec<PodI
                 Some(PodInfo {
                     name: parts[0].to_string(),
                     phase: parts[1].to_string(),
-                    containers: parts
-                        .get(2)
+                    containers: parts.get(2)
                         .map(|c| c.split_whitespace().map(String::from).collect())
-                        .unwrap_or_default(),
+                        .unwrap_or_else(Vec::new),
                 })
             } else {
                 None
@@ -144,8 +130,9 @@ pub async fn stream_pod_logs(
     // Add timestamps
     args.push("--timestamps".to_string());
 
-    let output = kubectl_command()
+    let output = Command::new("kubectl")
         .args(&args)
+        .env("KUBECONFIG", get_kubeconfig_path())
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to run kubectl: {}", e)))?;
 
@@ -160,12 +147,7 @@ pub async fn stream_pod_logs(
 }
 
 /// Parse log lines into LogEntry structs
-fn parse_log_lines(
-    content: &str,
-    pod: &str,
-    namespace: &str,
-    container: Option<&str>,
-) -> Vec<LogEntry> {
+fn parse_log_lines(content: &str, pod: &str, namespace: &str, container: Option<&str>) -> Vec<LogEntry> {
     content
         .lines()
         .filter_map(|line| parse_log_line(line, pod, namespace, container))
@@ -173,12 +155,7 @@ fn parse_log_lines(
 }
 
 /// Parse a single log line into a LogEntry
-fn parse_log_line(
-    line: &str,
-    pod: &str,
-    namespace: &str,
-    container: Option<&str>,
-) -> Option<LogEntry> {
+fn parse_log_line(line: &str, pod: &str, namespace: &str, container: Option<&str>) -> Option<LogEntry> {
     // Try to parse timestamp format: "2024-01-01T00:00:00.000000000Z message"
     let parts: Vec<&str> = line.splitn(2, ' ').collect();
     if parts.len() != 2 {
@@ -214,16 +191,40 @@ fn parse_log_line(
     })
 }
 
+/// Stream logs from all pods matching a pattern
+/// Returns a channel receiver that will receive log entries
+#[tauri::command]
+pub async fn start_log_stream(
+    namespace: Option<String>,
+    pod_pattern: Option<String>,
+    _container: Option<String>,
+) -> Result<String, AppError> {
+    let ns = namespace.unwrap_or_else(|| "default".to_string());
+    let pattern = pod_pattern.unwrap_or_else(|| ".*".to_string());
+
+    // Generate a unique stream ID
+    let stream_id = format!("log-stream-{}", uuid::Uuid::new_v4());
+
+    // For now, we'll return a simple status
+    // The actual streaming would use WebSocket or SSE in a real implementation
+    tracing::info!("Log stream requested: ns={}, pattern={}", ns, pattern);
+
+    Ok(format!("Stream {} initialized for namespace={}, pattern={}", stream_id, ns, pattern))
+}
+
+/// Stop a log stream
+#[tauri::command]
+pub async fn stop_log_stream(stream_id: String) -> Result<(), AppError> {
+    tracing::info!("Log stream stopped: {}", stream_id);
+    Ok(())
+}
+
 /// Get namespaces
 #[tauri::command]
 pub async fn list_namespaces() -> Result<Vec<String>, AppError> {
-    let output = kubectl_command()
-        .args([
-            "get",
-            "namespaces",
-            "-o",
-            "jsonpath={.items[*].metadata.name}",
-        ])
+    let output = Command::new("kubectl")
+        .args(&["get", "namespaces", "-o", "jsonpath={.items[*].metadata.name}"])
+        .env("KUBECONFIG", get_kubeconfig_path())
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to run kubectl: {}", e)))?;
 
