@@ -32,6 +32,9 @@ futures = { workspace = true }
 # HTTP Client
 reqwest = { workspace = true }
 
+# Anthropic API for relevance scoring
+anthropic = "0.0.8"
+
 # Time handling
 chrono = { workspace = true }
 
@@ -59,7 +62,6 @@ tempfile = "3"
 url = "2"
 
 # Local crates
-intake = { path = "../intake" }
 scraper = "0.24.0"
 
 # Email sending

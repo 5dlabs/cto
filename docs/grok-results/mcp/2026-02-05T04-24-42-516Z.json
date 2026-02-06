@@ -1,0 +1,288 @@
+{
+  "created_at": 1770265464,
+  "completed_at": 1770265482,
+  "id": "edf873b8-0f3f-84e9-de12-d0bce216c241",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_24789863",
+      "input": "{\"query\":\"(Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration) lang:en\",\"limit\":20,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_edf873b8-0f3f-84e9-de12-d0bce216c241_xs_call_24789863",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_14336715",
+      "input": "{\"query\":\"(Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_edf873b8-0f3f-84e9-de12-d0bce216c241_xs_call_14336715",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_84633572",
+      "input": "{\"query\":\"Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration\",\"limit\":20}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_edf873b8-0f3f-84e9-de12-d0bce216c241_xs_call_84633572",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_86773272",
+      "input": "{\"query\":\"(Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration) lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_edf873b8-0f3f-84e9-de12-d0bce216c241_xs_call_86773272",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_19658265",
+      "input": "{\"query\":\"(Model Context Protocol OR MCP server OR MCP tools OR Anthropic MCP OR MCP integration) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_edf873b8-0f3f-84e9-de12-d0bce216c241_xs_call_19658265",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_59007294",
+      "input": "{\"query\":\"Model Context Protocol MCP server tools Anthropic integration\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_edf873b8-0f3f-84e9-de12-d0bce216c241_xs_call_59007294",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "**Model Context Protocol (MCP)** is an open standard developed by Anthropic (now under the Linux Foundation) that standardizes how AI models like Claude connect to external data sources, tools, databases, APIs, file systems, and SaaS applications—often described as \"USB-C for AI\" or the \"new API for agents.\"[[1]](https://x.com/i/status/2018225374786732247)[[2]](https://x.com/i/status/2018625550492094865)[[3]](https://x.com/i/status/2018354138258768005)\n\n### Key Features:\n- **Runtime Discovery**: AI can dynamically query available tools via `tools/list` without hardcoding or regenerating SDKs.[[1]](https://x.com/i/status/2018225374786732247)\n- **Deterministic Execution**: LLMs select tools, but actual execution uses wrapped, reliable code—avoiding hallucinations in API calls.[[1]](https://x.com/i/status/2018225374786732247)\n- **Bidirectional Communication**: Servers can request completions from the LLM, seek user input, or send progress updates.[[1]](https://x.com/i/status/2018225374786732247)\n- **Unified JSON Schema**: Simplifies inputs/outputs compared to scattered REST params.[[1]](https://x.com/i/status/2018225374786732247)\n- **Local-First Design**: Runs over stdio for local tools, inheriting host permissions for filesystem access, no ports/CORS issues.[[1]](https://x.com/i/status/2018225374786732247)\n\n### Adoption & Ecosystem:\n- Supported by OpenAI, Microsoft, Google.[[1]](https://x.com/i/status/2018225374786732247)[[2]](https://x.com/i/status/2018625550492094865)\n- Native in tools like Claude Desktop, Cursor, Windsurf; Zapier exposes 8,000+ apps via MCP.[[1]](https://x.com/i/status/2018225374786732247)\n- Open-source implementations: mcp-go (8k+ stars), servers for GitHub, Slack, Postgres, Figma, Blender, etc.[[4]](https://x.com/i/status/2018464205016633451)[[5]](https://x.com/i/status/2017889406791594103)\n- Released ~Nov 2024, now 10,000+ MCP servers in production.[[6]](https://x.com/i/status/2018399021447135652)[[2]](https://x.com/i/status/2018625550492094865)\n\n### Caveats:\nSecurity relies on server-side implementation (auth, validation)—no protocol-level enforcement.[[1]](https://x.com/i/status/2018225374786732247)\n\n### Getting Started:\n- Official site/docs: https://modelcontextprotocol.io (or Anthropic news).[[7]](https://x.com/i/status/2019060944102445206)\n- Build servers in Go, Node.js, C#.[[4]](https://x.com/i/status/2018464205016633451)[[8]](https://x.com/i/status/2018746829391990831)\n- Directories: https://a2ui.me/ (100+ MCP apps with UI).[[9]](https://x.com/i/status/2017442048107024586)\n\nThis solves the N×M integration problem: build once per tool, works across models.[[1]](https://x.com/i/status/2018225374786732247) Recent buzz (Jan-Feb 2026) highlights its role in agentic AI and production reliability.[[10]](https://x.com/i/status/2018282366511509817)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 309,
+              "end_index": 358,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018625550492094865",
+              "start_index": 358,
+              "end_index": 407,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018354138258768005",
+              "start_index": 407,
+              "end_index": 456,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 599,
+              "end_index": 648,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 785,
+              "end_index": 834,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 958,
+              "end_index": 1007,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 1095,
+              "end_index": 1144,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 1276,
+              "end_index": 1325,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 1394,
+              "end_index": 1443,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018625550492094865",
+              "start_index": 1443,
+              "end_index": 1492,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 1585,
+              "end_index": 1634,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018464205016633451",
+              "start_index": 1743,
+              "end_index": 1792,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017889406791594103",
+              "start_index": 1792,
+              "end_index": 1841,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018399021447135652",
+              "start_index": 1902,
+              "end_index": 1951,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018625550492094865",
+              "start_index": 1951,
+              "end_index": 2000,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 2110,
+              "end_index": 2159,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019060944102445206",
+              "start_index": 2256,
+              "end_index": 2305,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018464205016633451",
+              "start_index": 2341,
+              "end_index": 2390,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018746829391990831",
+              "start_index": 2390,
+              "end_index": 2439,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017442048107024586",
+              "start_index": 2496,
+              "end_index": 2545,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018225374786732247",
+              "start_index": 2629,
+              "end_index": 2678,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018282366511509817",
+              "start_index": 2767,
+              "end_index": 2817,
+              "title": "10"
+            }
+          ]
+        }
+      ],
+      "id": "msg_edf873b8-0f3f-84e9-de12-d0bce216c241",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 13093,
+    "input_tokens_details": {
+      "cached_tokens": 5895
+    },
+    "output_tokens": 2398,
+    "output_tokens_details": {
+      "reasoning_tokens": 1035
+    },
+    "total_tokens": 15491,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 6,
+    "cost_in_usd_ticks": 329333500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 6,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

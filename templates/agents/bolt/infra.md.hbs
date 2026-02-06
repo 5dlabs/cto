@@ -257,6 +257,34 @@ If provisioning fails:
 3. Check events: `kubectl get events -n databases --sort-by='.lastTimestamp'`
 4. Verify storage class exists: `kubectl get storageclass mayastor`
 
+**DO NOT exit until infrastructure is fully provisioned and healthy.**
+
+## Completion Criteria
+
+**Your task is complete ONLY when:**
+1. ✅ All infrastructure components provisioned
+2. ✅ All pods are Running and Ready
+3. ✅ All health checks pass
+4. ✅ ConfigMap created and applied
+5. ✅ Documentation complete
+6. ✅ PR created with all changes
+
+**DO NOT exit if:**
+- ❌ Any pods are Pending/CrashLooping
+- ❌ Resources not yet created
+- ❌ Health checks failing
+- ❌ ConfigMap missing
+
+**Iterate until success:**
+```
+WHILE infrastructure not ready:
+    1. Provision component
+    2. Check status
+    3. If issues → Debug and fix → Go to step 2
+    4. If healthy → Next component
+    5. When all ready → Create ConfigMap and docs
+```
+
 ## Deliverables
 
 1. **Kubernetes manifests** in `infra/` directory

@@ -1,0 +1,37 @@
+{{- if .Values.claudeCode.enabled }}
+# =============================================================================
+# Claude Code CLI Skills (.claude/skills/*.md)
+# =============================================================================
+# Mounted into the pod at /workspace/.claude/skills/
+# These .md files are auto-loaded by Claude Code CLI when invoked via `exec`.
+# Claude Code discovers skills from `.claude/skills/` in its config dir and
+# from any `--add-dir` directories.
+#
+# Skills define coding patterns, environment context, and guidelines that
+# the Claude Code CLI follows during coding sessions.
+#
+# These are SEPARATE from OpenClaw orchestrator skills.
+#
+# Naming convention:
+#   openclaw-*-claude-skills   → Claude Code CLI skills (.claude/skills/*.md)
+#   openclaw-*-openclaw-skills → OpenClaw orchestrator skills (agent instructions)
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-claude-skills
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: claude-code
+data:
+  {{- $files := .Files.Glob "skills/claude-code/*.md" }}
+  {{- if $files }}
+  {{- range $path, $content := $files }}
+  {{ base $path }}: |
+{{ $content | toString | indent 4 }}
+  {{- end }}
+  {{- else }}
+  _placeholder: "no skills defined"
+  {{- end }}
+{{- end }}

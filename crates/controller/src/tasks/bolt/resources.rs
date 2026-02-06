@@ -294,7 +294,7 @@ pub async fn create_bolt_job(
                         // BOLT-003: Inject credentials from ExternalSecret as env vars
                         env_from: Some(vec![EnvFromSource {
                             secret_ref: Some(SecretEnvSource {
-                                name: Some(bolt_run.external_secret_name()),
+                                name: bolt_run.external_secret_name(),
                                 optional: Some(false),
                             }),
                             ..Default::default()

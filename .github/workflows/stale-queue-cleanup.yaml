@@ -92,7 +92,6 @@ jobs:
             // ISSUE-012b: Include long-lived branches that don't have open PRs
             // These branches trigger workflows but never have PRs
             activeBranches.add('main');
-            activeBranches.add('develop');
             
             console.log(`Found ${allOpenPRs.length} open PRs with ${activeBranches.size} active branches`);
             

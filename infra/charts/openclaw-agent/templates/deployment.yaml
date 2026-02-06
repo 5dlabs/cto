@@ -1,0 +1,324 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "openclaw-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "openclaw-agent.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/openclaw-skills: {{ include (print $.Template.BasePath "/configmap-openclaw-skills.yaml") . | sha256sum }}
+        {{- if .Values.claudeCode.enabled }}
+        checksum/claude-settings: {{ include (print $.Template.BasePath "/configmap-claude-settings.yaml") . | sha256sum }}
+        checksum/claude-skills: {{ include (print $.Template.BasePath "/configmap-claude-skills.yaml") . | sha256sum }}
+        {{- if .Values.claudeCode.mcp.servers }}
+        checksum/claude-mcp: {{ include (print $.Template.BasePath "/configmap-claude-mcp.yaml") . | sha256sum }}
+        {{- end }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "openclaw-agent.fullname" . }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        # Ensure workspace directories exist and resolve the config with env vars
+        - name: init-workspace
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "=== Init: {{ .Values.agent.id }} ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ==="
+
+              # ---------------------------------------------------------------
+              # 1. Core workspace directories (idempotent)
+              # ---------------------------------------------------------------
+              mkdir -p /workspace/.openclaw/agents/{{ .Values.agent.id }}/agent
+              mkdir -p /workspace/memory
+              mkdir -p /workspace/sessions
+              echo "[dirs] Core workspace directories OK"
+
+              # ---------------------------------------------------------------
+              # 2. OpenClaw config (re-rendered every restart with fresh env)
+              # ---------------------------------------------------------------
+              envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
+              echo "[config] openclaw.json rendered"
+
+              # ---------------------------------------------------------------
+              # 3. OpenClaw orchestrator skills (always overwrite from ConfigMap)
+              # ---------------------------------------------------------------
+              mkdir -p /workspace/.openclaw/skills
+              cp /openclaw-skills-template/*.md /workspace/.openclaw/skills/ 2>/dev/null || true
+              echo "[skills] OpenClaw: $(ls /workspace/.openclaw/skills/*.md 2>/dev/null | wc -l) loaded"
+
+              {{- if .Values.claudeCode.enabled }}
+              # ---------------------------------------------------------------
+              # 4. Claude Code CLI setup (always overwrite from ConfigMaps)
+              # ---------------------------------------------------------------
+              mkdir -p /workspace/.claude/skills
+
+              cp /claude-settings-template/settings.json /workspace/.claude/settings.json
+              echo "[claude] settings.json written"
+
+              cp /claude-skills-template/*.md /workspace/.claude/skills/ 2>/dev/null || true
+              echo "[skills] Claude Code: $(ls /workspace/.claude/skills/*.md 2>/dev/null | wc -l) loaded"
+
+              {{- if .Values.claudeCode.mcp.servers }}
+              cp /claude-mcp-template/claude.json /workspace/.claude.json
+              echo "[claude] .claude.json (MCP config) written"
+              {{- end }}
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # 5. Git credential setup (for private repo access)
+              # ---------------------------------------------------------------
+              if [ -n "${GITHUB_TOKEN:-}" ]; then
+                git config --global credential.helper store
+                echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > /workspace/.git-credentials
+                git config --global credential.helper 'store --file=/workspace/.git-credentials'
+                git config --global user.email "bot@5dlabs.ai"
+                git config --global user.name "{{ .Values.agent.id }}"
+                echo "[git] Credentials configured for github.com"
+              else
+                echo "[git] WARNING: GITHUB_TOKEN not set — private repo clones may fail"
+              fi
+
+              # ---------------------------------------------------------------
+              # 6. Git repo health checks (idempotent clone + dirty-state audit)
+              # ---------------------------------------------------------------
+              WARNINGS=0
+              {{- range .Values.workspace.repos }}
+              REPO_DIR="/workspace/{{ .path }}"
+              echo ""
+              echo "[repo] Checking {{ .name }} → $REPO_DIR"
+
+              if [ -d "$REPO_DIR/.git" ]; then
+                echo "[repo] {{ .name }}: already cloned"
+
+                # Check for uncommitted changes
+                cd "$REPO_DIR"
+                if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+                  echo "⚠ WARNING: {{ .name }} has uncommitted changes!"
+                  git status --short 2>/dev/null || true
+                  WARNINGS=$((WARNINGS + 1))
+                fi
+
+                # Check for detached HEAD
+                BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "DETACHED")
+                if [ "$BRANCH" = "DETACHED" ]; then
+                  echo "⚠ WARNING: {{ .name }} is in detached HEAD state ($(git rev-parse --short HEAD))"
+                  WARNINGS=$((WARNINGS + 1))
+                else
+                  echo "[repo] {{ .name }}: on branch $BRANCH"
+                fi
+
+                # Check for unpushed commits
+                UNPUSHED=$(git log @{upstream}..HEAD --oneline 2>/dev/null | wc -l || echo "0")
+                if [ "$UNPUSHED" -gt 0 ] 2>/dev/null; then
+                  echo "⚠ WARNING: {{ .name }} has $UNPUSHED unpushed commit(s)"
+                  WARNINGS=$((WARNINGS + 1))
+                fi
+
+                cd /workspace
+              else
+                echo "[repo] {{ .name }}: cloning {{ .url }} (branch: {{ .branch | default "main" }})"
+                mkdir -p "$(dirname "$REPO_DIR")"
+                git clone --branch {{ .branch | default "main" }} --single-branch {{ .url }} "$REPO_DIR"
+                echo "[repo] {{ .name }}: clone complete"
+              fi
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # Summary
+              # ---------------------------------------------------------------
+              echo ""
+              if [ "$WARNINGS" -gt 0 ]; then
+                echo "=== Init complete with $WARNINGS warning(s) — review above ==="
+              else
+                echo "=== Init complete for {{ .Values.agent.id }} — all clean ==="
+              fi
+          env:
+            # Discord token
+            - name: DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.discordTokensSecret }}
+                  key: {{ .Values.discord.tokenSecretKey | default .Values.agent.id }}
+            # Provider API keys
+            - name: PROVIDER_ANTHROPIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: anthropic-api-key
+                  optional: true
+            - name: PROVIDER_OPENAI_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: openai-api-key
+                  optional: true
+            - name: PROVIDER_MINIMAX_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: minimax-api-key
+                  optional: true
+            - name: PROVIDER_NVIDIA_NIM_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: nvidia-nim-api-key
+                  optional: true
+            # GitHub PAT for private repo cloning
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: config-template
+              mountPath: /config-template
+            - name: openclaw-skills-template
+              mountPath: /openclaw-skills-template
+            {{- if .Values.claudeCode.enabled }}
+            - name: claude-settings-template
+              mountPath: /claude-settings-template
+            - name: claude-skills-template
+              mountPath: /claude-skills-template
+            {{- if .Values.claudeCode.mcp.servers }}
+            - name: claude-mcp-template
+              mountPath: /claude-mcp-template
+            {{- end }}
+            {{- end }}
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cd /workspace
+              export HOME=/workspace
+              export OPENCLAW_CONFIG=/workspace/.openclaw/openclaw.json
+              exec npx @anthropic/openclaw start
+          env:
+            - name: HOME
+              value: /workspace
+            - name: OPENCLAW_CONFIG
+              value: /workspace/.openclaw/openclaw.json
+            - name: NODE_ENV
+              value: production
+            # Provider API keys (available at runtime for dynamic use)
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: anthropic-api-key
+                  optional: true
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: openai-api-key
+                  optional: true
+            {{- if .Values.claudeCode.enabled }}
+            # Claude Code CLI settings path (settings.json with permissions + teams)
+            - name: CLAUDE_CONFIG_DIR
+              value: /workspace/.claude
+            {{- if .Values.claudeCode.agentTeams.enabled }}
+            # Enable Agent Teams experimental feature
+            - name: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+              value: "1"
+            {{- end }}
+            # Disable auto-updater (version pinned in Docker image)
+            - name: DISABLE_AUTOUPDATER
+              value: "1"
+            {{- if .Values.claudeCode.disableTelemetry }}
+            - name: DISABLE_TELEMETRY
+              value: "1"
+            {{- end }}
+            {{- end }}
+            # GitHub PAT for git operations at runtime (push, pull, etc.)
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: github-pat
+                  optional: true
+            # 1Password CLI (headless via service account token)
+            - name: OP_SERVICE_ACCOUNT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: op-service-account-token
+                  optional: true
+          ports:
+            - name: gateway
+              containerPort: {{ .Values.gateway.port }}
+              protocol: TCP
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            tcpSocket:
+              port: gateway
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          {{- end }}
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            tcpSocket:
+              port: gateway
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ include "openclaw-agent.fullname" . }}-workspace
+        - name: config-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-config
+        - name: openclaw-skills-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-openclaw-skills
+        {{- if .Values.claudeCode.enabled }}
+        - name: claude-settings-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-claude-settings
+        - name: claude-skills-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-claude-skills
+        {{- if .Values.claudeCode.mcp.servers }}
+        - name: claude-mcp-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-claude-mcp
+        {{- end }}
+        {{- end }}
