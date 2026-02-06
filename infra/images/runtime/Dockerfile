@@ -190,7 +190,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   # Process monitoring
   iotop \
   # Text processing
-  sd \
+  sd gettext-base \
   # Git enhancements
   git-lfs git-extras \
   # Build tools

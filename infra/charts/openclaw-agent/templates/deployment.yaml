@@ -220,7 +220,7 @@ spec:
               cd /workspace
               export HOME=/workspace
               export OPENCLAW_CONFIG=/workspace/.openclaw/openclaw.json
-              exec npx @anthropic/openclaw start
+              exec openclaw gateway
           env:
             - name: HOME
               value: /workspace

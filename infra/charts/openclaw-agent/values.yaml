@@ -12,8 +12,8 @@ createNamespace: false
 
 # -- Image configuration
 image:
-  repository: ghcr.io/5dlabs/runtime
-  tag: full
+  repository: ghcr.io/5dlabs/openclaw
+  tag: latest
   pullPolicy: IfNotPresent
 
 # -- Image pull secrets
