@@ -34,3 +34,35 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 ---
 
 Add whatever helps you do your job. This is your cheat sheet.
+
+## Credentials
+
+**IMPORTANT**: Before asking for credentials or searching 1Password, check:
+
+1. **Local credentials file**: `local/CREDENTIALS.md` or `~/.config/cto/credentials.md`
+2. **Environment variables**: Many tools auto-load from `.env` files
+3. **1Password CLI**: Use `op` if you need to fetch new credentials
+
+### Loading Credentials for Development
+
+```bash
+# Option 1: Source credentials (if shell exports)
+source ~/.config/cto/credentials.md
+
+# Option 2: Use direnv (auto-loads .envrc in directories)
+cd /Users/jonathonfritz/agents/conductor
+
+# Option 3: Load into current shell from local/CREDENTIALS.md
+set -a
+source /Users/jonathonfritz/agents/conductor/local/CREDENTIALS.md
+set +a
+```
+
+### Available Credentials (in local/CREDENTIALS.md)
+
+- GitHub App credentials (Morgan, Rex, etc.)
+- Linear OAuth app credentials
+- API keys (Anthropic, OpenAI)
+- Cloudflare tunnel tokens
+- Database connection strings
+- Kubernetes config
