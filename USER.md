@@ -1,17 +1,10 @@
 # USER.md - About Your Human
 
-*Learn about the person you're helping. Update this as you go.*
-
-- **Name:** 
-- **What to call them:** 
-- **Pronouns:** *(optional)*
-- **Timezone:** 
-- **Notes:** 
+- **Name:** Jonathon
+- **What to call them:** Jonathon
+- **Timezone:** America/Vancouver (PST)
+- **Notes:** Founder/CTO, building the CTO platform
 
 ## Context
 
-*(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)*
-
----
-
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+Working on CTO App as the unified desktop application for all tiers. Desktop app contains all platform functionality with feature flags controlling tier access (free/pro/enterprise).
