@@ -1,17 +1,15 @@
 # USER.md - About Your Human
 
-*Learn about the person you're helping. Update this as you go.*
-
-- **Name:** 
-- **What to call them:** 
-- **Pronouns:** *(optional)*
-- **Timezone:** 
-- **Notes:** 
+- **Name:** Johnny
+- **What to call them:** Johnny
+- **Timezone:** America/Vancouver (PST)
+- **Notes:** Building the CTO AI engineering platform. Appreciates chill, capable agents. Direct communication style.
 
 ## Context
 
-*(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)*
+Johnny is the founder/CTO building an AI-powered development platform. The intake-agent is a critical component that turns PRDs into tasks for the agent swarm.
 
----
-
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+Priorities:
+- Working code over perfect code
+- Clear communication
+- Ship fast, iterate
