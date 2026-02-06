@@ -123,14 +123,6 @@ discord:
       - "444519104808878090"
 
 # =============================================================================
-# Logging Configuration
-# =============================================================================
-# Controls OpenClaw gateway log verbosity.
-# Levels: error, warn, info, verbose, debug
-logging:
-  level: "verbose"
-
-# =============================================================================
 # Model Providers
 # =============================================================================
 # API keys are injected via environment variables from ExternalSecrets
