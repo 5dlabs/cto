@@ -1,10 +1,10 @@
-# CTO Lite
+# CTO
 
 AI-powered development for individual developers. Run the full CTO platform on your local machine.
 
 ## Overview
 
-CTO Lite is a desktop application that brings AI-assisted development to your workstation. It runs a local Kubernetes cluster (Kind) with the CTO agent system, allowing you to:
+CTO is a desktop application that brings AI-assisted development to your workstation. It runs a local Kubernetes cluster (Kind) with the CTO agent system, allowing you to:
 
 - **Develop with AI agents** - Morgan for intake, Grizz/Nova for backend, Blaze for frontend
 - **Quality assurance** - Cleo for code quality, Cipher for security, Tess for testing
@@ -23,14 +23,14 @@ Download from [cto.dev](https://cto.dev/download):
 
 | Platform | Download |
 |----------|----------|
-| macOS (Apple Silicon) | [CTO Lite.dmg](https://cto.dev/download/macos-arm64) |
-| macOS (Intel) | [CTO Lite.dmg](https://cto.dev/download/macos-x64) |
-| Windows | [CTO Lite.msi](https://cto.dev/download/windows) |
-| Linux | [CTO Lite.AppImage](https://cto.dev/download/linux) |
+| macOS (Apple Silicon) | [CTO.dmg](https://cto.dev/download/macos-arm64) |
+| macOS (Intel) | [CTO.dmg](https://cto.dev/download/macos-x64) |
+| Windows | [CTO.msi](https://cto.dev/download/windows) |
+| Linux | [CTO.AppImage](https://cto.dev/download/linux) |
 
 ### 3. Setup
 
-Launch CTO Lite and complete the setup wizard:
+Launch CTO and complete the setup wizard:
 
 1. **Runtime Check** - Verifies Docker is installed and running
 2. **Stack Selection** - Choose Go (Grizz) or TypeScript (Nova) backend
@@ -38,7 +38,7 @@ Launch CTO Lite and complete the setup wizard:
 4. **GitHub** - Connect for repository access (optional)
 5. **Cloudflare** - Enable webhook tunnels (optional)
 6. **Create Cluster** - Creates local Kind cluster (~1GB RAM)
-7. **Deploy** - Installs CTO Lite services
+7. **Deploy** - Installs CTO services
 
 ### 4. Use
 
@@ -76,7 +76,7 @@ Each step creates commits in a feature branch, culminating in a PR.
 
 ```
 ┌─────────────────────────────────────────────┐
-│              CTO Lite App                    │
+│              CTO App                    │
 │  ┌─────────────┐  ┌───────────────────────┐ │
 │  │ Setup       │  │ Dashboard             │ │
 │  │ Wizard      │  │ (Workflows, Logs)     │ │
@@ -171,7 +171,7 @@ npm run tauri dev
 
 ### API Key Storage
 
-CTO Lite uses your operating system's secure credential storage:
+CTO uses your operating system's secure credential storage:
 
 | Platform | Storage | Encryption |
 |----------|---------|------------|
@@ -183,7 +183,7 @@ CTO Lite uses your operating system's secure credential storage:
 - API keys are **never** stored in plain text files
 - Keys are encrypted at rest by the OS
 - On macOS, keys can be protected by Touch ID/Face ID
-- Keys are only accessible to the CTO Lite application
+- Keys are only accessible to the CTO application
 
 ### Kubernetes Secrets
 

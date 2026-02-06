@@ -1,0 +1,157 @@
+{
+  "created_at": 1770266372,
+  "completed_at": 1770266383,
+  "id": "a5d015b2-f3e0-7c70-4795-8aec0635e4a5",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_93601109",
+      "input": "{\"query\":\"(AI workflow OR automation pipeline OR CI/CD AI OR agent automation OR workflow automation) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_a5d015b2-f3e0-7c70-4795-8aec0635e4a5_xs_call_93601109",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the top recent X posts (sorted by relevance and engagement) matching your query on AI workflows, automation pipelines, CI/CD with AI, agent automation, and workflow automation—all in English. I've pulled the most relevant ones from the last week, focusing on practical examples, tools, and trends:\n\n### Key Highlights:\n- **Data Processing & Training Pipelines**: Poseidon describes a multi-stage automated pipeline for filtering high-quality voice data for AI training, combining semantic scoring, language checks, and human validation.[[1]](https://x.com/i/status/2019101692449509698) Cloudinary shows how their \"Refiners\" maintain quality control in generative AI production pipelines without manual slowdowns.[[2]](https://x.com/i/status/2018338831171281138)\n  \n- **Sales & Demand Gen Automation**: An AI-enhanced pipeline using tools like Clay, InstantlyAI, HeyReach, HubSpot, and Slack has generated $50M+ in pipeline value by automating enrichment, multi-channel outreach, scripting, and re-engagement loops.[[3]](https://x.com/i/status/2018376206807114045)\n\n- **Client & Project Management Workflows**: monday.com is praised for visualizing client pipelines with boards, automations (e.g., status notifications), Kanban views, and dashboards to track stages like leads to completion.[[4]](https://x.com/i/status/2019023301826212194)\n\n- **AI Agents & Data Science**: A GitHub repo for \"AI Data Science Team\" builds agents to automate data science workflows and pipelines.[[5]](https://x.com/i/status/2018411112237088892) Discussions also highlight agents for content workflows (e.g., scheduling/monitoring posts) and RAG pipelines using platforms like OpenRouter with N8n.[[6]](https://x.com/i/status/2017590748129137047)[[7]](https://x.com/i/status/2017722357377282303)\n\n- **DevOps/CI/CD & Skills Trends**: Multiple posts list high-demand 2026 skills like DevOps automation (CI/CD, IaC, GitOps), AI/ML integration (LLMs, RAG, MLOps), and ETL pipelines as top priorities for cloud engineers.[[8]](https://x.com/i/status/2018713904533438716)[[9]](https://x.com/i/status/2018654369722544355)\n\nThese reflect a surge in AI-driven automation for sales, data, devops, and no-code tools. Common themes: multi-tool integrations (e.g., Zapier, N8n, monday.com), agentic workflows, and quality gates in pipelines. If you want deeper dives (e.g., viewing images/videos from specific posts or Latest mode results), let me know!",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019101692449509698",
+              "start_index": 545,
+              "end_index": 594,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018338831171281138",
+              "start_index": 721,
+              "end_index": 770,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018376206807114045",
+              "start_index": 1023,
+              "end_index": 1072,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019023301826212194",
+              "start_index": 1299,
+              "end_index": 1348,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018411112237088892",
+              "start_index": 1486,
+              "end_index": 1535,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017590748129137047",
+              "start_index": 1687,
+              "end_index": 1736,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017722357377282303",
+              "start_index": 1736,
+              "end_index": 1785,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018713904533438716",
+              "start_index": 2006,
+              "end_index": 2055,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018654369722544355",
+              "start_index": 2055,
+              "end_index": 2104,
+              "title": "9"
+            }
+          ]
+        }
+      ],
+      "id": "msg_a5d015b2-f3e0-7c70-4795-8aec0635e4a5",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 7927,
+    "input_tokens_details": {
+      "cached_tokens": 2001
+    },
+    "output_tokens": 1616,
+    "output_tokens_details": {
+      "reasoning_tokens": 888
+    },
+    "total_tokens": 9543,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 70932500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

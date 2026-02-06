@@ -631,7 +631,7 @@ impl GitHubActionsSensor {
         }
     }
 
-    /// Generate issue body with failure details.
+    /// Generate issue body with failure details and acceptance criteria.
     fn generate_issue_body(
         failure: &WorkflowFailure,
         failure_type: &ci::types::CiFailureType,
@@ -642,6 +642,9 @@ impl GitHubActionsSensor {
         } else {
             logs.to_string()
         };
+
+        // Generate acceptance criteria based on failure type
+        let acceptance_criteria = generate_issue_acceptance_criteria(failure, failure_type);
 
         format!(
             r"## CI Failure Detected
@@ -656,6 +659,8 @@ impl GitHubActionsSensor {
 | **Run URL** | {} |
 | **Failure Type** | {:?} |
 | **Detected At** | {} |
+
+{}
 
 ### Log Excerpt
 
@@ -685,9 +690,88 @@ impl GitHubActionsSensor {
             failure.html_url,
             failure_type,
             failure.detected_at.format("%Y-%m-%d %H:%M:%S UTC"),
+            acceptance_criteria,
             log_excerpt
         )
     }
+}
+
+/// Generate acceptance criteria for the GitHub issue based on failure type.
+fn generate_issue_acceptance_criteria(
+    failure: &WorkflowFailure,
+    failure_type: &ci::types::CiFailureType,
+) -> String {
+    use std::fmt::Write as _;
+
+    let mut criteria = String::new();
+    let _ = writeln!(criteria, "### Acceptance Criteria\n");
+    let _ = writeln!(
+        criteria,
+        "Define what success looks like for this remediation:\n"
+    );
+
+    let _ = writeln!(criteria, "#### Root Cause");
+    let _ = writeln!(criteria, "- [ ] Failure root cause identified");
+    let _ = writeln!(criteria, "- [ ] Error message analyzed and understood");
+    let _ = writeln!(criteria, "- [ ] Affected code/configuration located");
+
+    let _ = writeln!(criteria);
+    let _ = writeln!(criteria, "#### Fix Requirements");
+
+    // Add failure-type-specific criteria
+    match failure_type {
+        ci::types::CiFailureType::RustBuild
+        | ci::types::CiFailureType::DockerBuild
+        | ci::types::CiFailureType::FrontendBuild
+        | ci::types::CiFailureType::HelmTemplate => {
+            let _ = writeln!(criteria, "- [ ] Build errors resolved");
+            let _ = writeln!(criteria, "- [ ] Compilation passes without errors");
+            let _ = writeln!(criteria, "- [ ] No new build warnings introduced");
+        }
+        ci::types::CiFailureType::RustTest | ci::types::CiFailureType::FrontendTest => {
+            let _ = writeln!(criteria, "- [ ] Failing tests identified and fixed");
+            let _ = writeln!(criteria, "- [ ] All tests pass");
+            let _ = writeln!(criteria, "- [ ] Test coverage maintained");
+        }
+        ci::types::CiFailureType::RustClippy | ci::types::CiFailureType::FrontendLint => {
+            let _ = writeln!(criteria, "- [ ] Linting errors corrected");
+            let _ = writeln!(criteria, "- [ ] Code passes all lint checks");
+            let _ = writeln!(criteria, "- [ ] Formatting applied consistently");
+        }
+        ci::types::CiFailureType::SecurityDependabot
+        | ci::types::CiFailureType::SecurityCodeScan
+        | ci::types::CiFailureType::SecuritySecret => {
+            let _ = writeln!(criteria, "- [ ] Security vulnerability addressed");
+            let _ = writeln!(criteria, "- [ ] Security scan passes");
+            let _ = writeln!(criteria, "- [ ] No new vulnerabilities introduced");
+        }
+        ci::types::CiFailureType::ArgoCdSync | ci::types::CiFailureType::K8sManifest => {
+            let _ = writeln!(criteria, "- [ ] Deployment configuration fixed");
+            let _ = writeln!(criteria, "- [ ] ArgoCD sync succeeds");
+            let _ = writeln!(criteria, "- [ ] Health checks pass");
+        }
+        _ => {
+            // General case for any other failure type
+            let _ = writeln!(criteria, "- [ ] Primary issue identified and fixed");
+            let _ = writeln!(criteria, "- [ ] Workflow completes successfully");
+            let _ = writeln!(criteria, "- [ ] No regressions introduced");
+        }
+    }
+
+    let _ = writeln!(criteria);
+    let _ = writeln!(criteria, "#### Verification");
+    let _ = writeln!(criteria, "- [ ] Code compiles/builds without errors");
+    let _ = writeln!(criteria, "- [ ] Tests pass (if applicable)");
+    let _ = writeln!(criteria, "- [ ] Changes pushed to repository");
+    let _ = writeln!(criteria, "- [ ] PR created with clear description");
+
+    let _ = writeln!(criteria);
+    let _ = writeln!(criteria, "#### Completion");
+    let _ = writeln!(criteria, "- [ ] Workflow {} passes", failure.workflow_name);
+    let _ = writeln!(criteria, "- [ ] CI checks all green");
+    let _ = writeln!(criteria, "- [ ] No new failures introduced");
+
+    criteria
 }
 
 #[cfg(test)]

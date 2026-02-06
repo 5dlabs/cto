@@ -12,7 +12,7 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use metal::providers::{
-    create_provider, latitude::Latitude, CreateServerRequest, Provider, ProviderConfig,
+    cherry, create_provider, latitude::Latitude, CreateServerRequest, Provider, ProviderConfig,
     ProviderKind, ReinstallIpxeRequest,
 };
 use metal::stack;
@@ -93,6 +93,10 @@ struct Cli {
     /// Cherry Servers team ID.
     #[arg(long, env = "CHERRY_TEAM_ID", default_value = "")]
     cherry_team_id: String,
+
+    /// Billing period: hourly or monthly (default: monthly).
+    #[arg(long, default_value = "monthly")]
+    billing: String,
 
     // ── On-prem inventory ──────────────────────────────────────────────
     /// Path to on-prem inventory file.
@@ -625,17 +629,223 @@ async fn main() -> Result<()> {
         }
 
         Commands::Plans {
-            region,
-            in_stock,
+            region: _,
+            in_stock: _,
             gen4,
         } => {
-            // Plans discovery is currently Latitude-specific
-            if !matches!(cli.provider, ProviderKind::Latitude) {
-                anyhow::bail!("Plans command is currently only supported for Latitude provider. Use --provider latitude");
+            match cli.provider {
+                ProviderKind::Latitude => {
+                    let latitude = Latitude::new(&api_key, &project_id)
+                        .context("Failed to create Latitude provider for plans")?;
+                    let plans = latitude.list_plans().await?;
+
+                    println!("\n📦 Available Plans (Latitude)");
+                    println!("{}", "=".repeat(100));
+
+                    for plan in plans {
+                        let slug = plan.attributes.slug.as_deref().unwrap_or("unknown");
+
+                        // Filter for Gen 4 plans (they start with m4, f4, rs4, etc.)
+                        if gen4
+                            && !slug.contains("4-metal")
+                            && !slug.starts_with("m4")
+                            && !slug.starts_with("f4")
+                            && !slug.starts_with("rs4")
+                        {
+                            continue;
+                        }
+
+                        let name = plan.attributes.name.as_deref().unwrap_or("Unknown");
+                        let specs = plan.attributes.specs.as_ref();
+
+                        // Format CPU
+                        let cpu_desc = specs.and_then(|s| s.cpu.as_ref()).map_or_else(
+                            || "N/A".to_string(),
+                            |c| {
+                                let cores = c.cores.unwrap_or(0);
+                                let clock = c.clock.unwrap_or(0.0);
+                                let cpu_type = c.cpu_type.as_deref().unwrap_or("Unknown");
+                                format!("{cores} cores @ {clock:.1}GHz ({cpu_type})")
+                            },
+                        );
+
+                        // Format RAM
+                        let ram = specs
+                            .and_then(|s| s.memory.as_ref())
+                            .and_then(|m| m.total)
+                            .map_or_else(|| "N/A".to_string(), |gb| format!("{gb} GB"));
+
+                        // Format Storage
+                        let storage = specs.and_then(|s| s.drives.as_ref()).map_or_else(
+                            || "N/A".to_string(),
+                            |drives| {
+                                drives
+                                    .iter()
+                                    .map(|d| {
+                                        let count = d.count.unwrap_or(1);
+                                        let size = d.size.as_deref().unwrap_or("?");
+                                        let dtype = d.drive_type.as_deref().unwrap_or("?");
+                                        format!("{count}x {size} {dtype}")
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(" + ")
+                            },
+                        );
+
+                        // Format NICs
+                        let nics = specs.and_then(|s| s.nics.as_ref()).map_or_else(
+                            || "N/A".to_string(),
+                            |nics| {
+                                nics.iter()
+                                    .map(|n| {
+                                        let count = n.count.unwrap_or(1);
+                                        let ntype = n.nic_type.as_deref().unwrap_or("?");
+                                        format!("{count}x {ntype}")
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            },
+                        );
+
+                        println!("\n{name} ({slug})");
+                        println!("  CPU:     {cpu_desc}");
+                        println!("  RAM:     {ram}");
+                        println!("  Storage: {storage}");
+                        println!("  Network: {nics}");
+
+                        // Show regions with stock
+                        if let Some(regions) = &plan.attributes.regions {
+                            let mut in_stock_regions = Vec::new();
+                            let mut out_of_stock_regions = Vec::new();
+
+                            for r in regions {
+                                let region_name = r.name.as_deref().unwrap_or("?");
+                                let stock_level = r.stock_level.as_deref().unwrap_or("unknown");
+                                let in_stock_sites = r
+                                    .locations
+                                    .as_ref()
+                                    .and_then(|l| l.in_stock.as_ref())
+                                    .map(|v| v.join(", "))
+                                    .unwrap_or_default();
+
+                                let is_in_stock = r
+                                    .locations
+                                    .as_ref()
+                                    .and_then(|l| l.in_stock.as_ref())
+                                    .is_some_and(|sites| !sites.is_empty());
+
+                                let price_hr = r
+                                    .pricing
+                                    .as_ref()
+                                    .and_then(|p| p.usd.as_ref())
+                                    .and_then(|u| u.hour)
+                                    .map_or_else(|| "N/A".to_string(), |h| format!("${h:.2}/hr"));
+
+                                let entry = if is_in_stock {
+                                    format!("{region_name} [{in_stock_sites}] {price_hr} ({stock_level})")
+                                } else {
+                                    format!("{region_name} {price_hr}")
+                                };
+
+                                if is_in_stock {
+                                    in_stock_regions.push(entry);
+                                } else {
+                                    out_of_stock_regions.push(entry);
+                                }
+                            }
+
+                            if !in_stock_regions.is_empty() {
+                                println!("  ✅ In Stock:");
+                                for r in in_stock_regions {
+                                    println!("     - {r}");
+                                }
+                            }
+                            if !out_of_stock_regions.is_empty() {
+                                println!("  ❌ Out of Stock:");
+                                for r in out_of_stock_regions {
+                                    println!("     - {r}");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ProviderKind::Cherry => {
+                    use metal::providers::cherry::Cherry;
+
+                    let cherry = Cherry::new(
+                        &cli.cherry_api_key,
+                        cli.cherry_team_id.parse::<i64>().unwrap_or_default(),
+                    )
+                    .context("Failed to create Cherry provider for plans")?;
+                    let plans = cherry.list_plans().await?;
+
+                    println!("\n📦 Available Plans (Cherry Servers)");
+                    println!("{}", "=".repeat(100));
+                    println!("Billing: {}", cli.billing);
+
+                    for plan in plans {
+                        // Filter for 10G plans if gen4 flag is set
+                        let nics = plan.nics.as_ref().map(|n| &n.name).unwrap_or("unknown");
+                        if gen4 && !nics.to_lowercase().contains("10") {
+                            continue;
+                        }
+
+                        // Format CPU
+                        let cpu_desc = plan.cpus.as_ref().map_or_else(
+                            || "N/A".to_string(),
+                            |c| {
+                                let cores = c.cores.unwrap_or(0);
+                                let freq = c.frequency.unwrap_or(0.0);
+                                let name = c.name.as_deref().unwrap_or("Unknown");
+                                format!("{cores} cores @ {freq:.1}GHz ({name})")
+                            },
+                        );
+
+                        // Format RAM
+                        let ram = plan
+                            .memory
+                            .as_ref()
+                            .and_then(|m| m.total)
+                            .map_or_else(|| "N/A".to_string(), |gb| format!("{gb} GB"));
+
+                        // Format Storage
+                        let storage = plan.storage.as_ref().map_or_else(
+                            || "N/A".to_string(),
+                            |drives| {
+                                drives
+                                    .iter()
+                                    .map(|d| {
+                                        let count = d.count.unwrap_or(1);
+                                        let size = d.size.unwrap_or(0);
+                                        let dtype = d.storage_type.as_deref().unwrap_or("?");
+                                        format!("{count}x {size}GB {dtype}")
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(" + ")
+                            },
+                        );
+
+                        println!("\n{} ({})", plan.name, plan.slug);
+                        println!("  Category: {}", plan.category);
+                        println!("  CPU:      {cpu_desc}");
+                        println!("  RAM:      {ram}");
+                        println!("  Storage:  {storage}");
+                        println!("  Network:  {nics}");
+                        if let Some(bw) = &plan.bandwidth {
+                            println!("  Bandwidth: {}", bw.name);
+                        }
+                        println!("  💰 Hourly: €{:.2}", plan.hourly_eur);
+                        println!("  💰 Monthly: €{:.2}", plan.monthly_eur);
+                    }
+
+                    println!("\n💡 To filter 10Gbps plans: metal plans --provider cherry --gen4");
+                }
+
+                _ => {
+                    anyhow::bail!("Plans command not supported for this provider");
+                }
             }
-            let latitude = Latitude::new(&api_key, &project_id)
-                .context("Failed to create Latitude provider for plans")?;
-            let plans = latitude.list_plans().await?;
 
             println!("\n📦 Available Plans");
             println!("{}", "=".repeat(100));
@@ -788,33 +998,57 @@ async fn main() -> Result<()> {
             }
         }
 
-        Commands::Regions => {
-            // Regions discovery is currently Latitude-specific
-            if !matches!(cli.provider, ProviderKind::Latitude) {
-                anyhow::bail!("Regions command is currently only supported for Latitude provider. Use --provider latitude");
+        Commands::Regions => match cli.provider {
+            ProviderKind::Latitude => {
+                let latitude = Latitude::new(&api_key, &project_id)
+                    .context("Failed to create Latitude provider for regions")?;
+                let regions = latitude.list_regions().await?;
+
+                println!("\n🌍 Available Regions (Latitude)");
+                println!("{}", "=".repeat(60));
+                println!("\n{:<10} {:<25} {:<20}", "SLUG", "NAME", "COUNTRY");
+                println!("{}", "-".repeat(60));
+
+                for region in regions {
+                    let slug = region.attributes.slug.as_deref().unwrap_or("?");
+                    let name = region.attributes.name.as_deref().unwrap_or("?");
+                    let country = region
+                        .attributes
+                        .country
+                        .as_ref()
+                        .and_then(|c| c.name.as_deref())
+                        .unwrap_or("?");
+
+                    println!("{slug:<10} {name:<25} {country:<20}");
+                }
             }
-            let latitude = Latitude::new(&api_key, &project_id)
-                .context("Failed to create Latitude provider for regions")?;
-            let regions = latitude.list_regions().await?;
 
-            println!("\n🌍 Available Regions");
-            println!("{}", "=".repeat(60));
-            println!("\n{:<10} {:<25} {:<20}", "SLUG", "NAME", "COUNTRY");
-            println!("{}", "-".repeat(60));
+            ProviderKind::Cherry => {
+                use metal::providers::cherry::Cherry;
 
-            for region in regions {
-                let slug = region.attributes.slug.as_deref().unwrap_or("?");
-                let name = region.attributes.name.as_deref().unwrap_or("?");
-                let country = region
-                    .attributes
-                    .country
-                    .as_ref()
-                    .and_then(|c| c.name.as_deref())
-                    .unwrap_or("?");
+                let cherry = Cherry::new(
+                    &cli.cherry_api_key,
+                    cli.cherry_team_id.parse::<i64>().unwrap_or_default(),
+                )
+                .context("Failed to create Cherry provider for regions")?;
+                let regions = cherry.list_regions().await?;
 
-                println!("{slug:<10} {name:<25} {country:<20}");
+                println!("\n🌍 Available Regions (Cherry Servers)");
+                println!("{}", "=".repeat(60));
+                println!("\n{:<15} {:<25}", "SLUG", "NAME");
+                println!("{}", "-".repeat(45));
+
+                for region in regions {
+                    let slug = &region.slug;
+                    let name = &region.name;
+                    println!("{slug:<15} {name:<25}");
+                }
             }
-        }
+
+            _ => {
+                anyhow::bail!("Regions command not supported for this provider");
+            }
+        },
 
         Commands::Get { id } => {
             let server = provider.get_server(&id).await?;

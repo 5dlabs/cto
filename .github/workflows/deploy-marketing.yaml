@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - develop
     paths:
       - 'marketing/**'
   workflow_dispatch: # Allow manual trigger

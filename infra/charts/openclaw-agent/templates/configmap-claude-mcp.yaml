@@ -1,0 +1,31 @@
+{{- if and .Values.claudeCode.enabled .Values.claudeCode.mcp.servers }}
+# =============================================================================
+# Claude Code CLI MCP Configuration (.claude.json)
+# =============================================================================
+# Mounted into the pod at /workspace/.claude.json
+# Defines MCP server connections available to Claude Code CLI sessions
+# invoked by the OpenClaw gateway via the `exec` tool.
+#
+# This is SEPARATE from the OpenClaw gateway's own MCP/tool configuration.
+# The OpenClaw gateway has its own tools defined in openclaw.json (configmap.yaml).
+# These MCP servers are for the Claude Code CLI that agents invoke for coding tasks.
+#
+# Naming convention:
+#   openclaw-*-config          → OpenClaw gateway config (openclaw.json)
+#   openclaw-*-claude-settings → Claude Code CLI settings (settings.json)
+#   openclaw-*-claude-mcp      → Claude Code CLI MCP connections (.claude.json)
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-claude-mcp
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: claude-code
+data:
+  claude.json: |
+    {
+      "mcpServers": {{ .Values.claudeCode.mcp.servers | toJson }}
+    }
+{{- end }}

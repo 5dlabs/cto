@@ -249,6 +249,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Build the HTTP router
+    #[allow(deprecated)]
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/ready", get(readiness_check))

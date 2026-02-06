@@ -1,0 +1,194 @@
+{
+  "created_at": 1770265962,
+  "completed_at": 1770265982,
+  "id": "5be2792f-5e08-7228-9edd-c2ad2776791b",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_86941940",
+      "input": "{\"query\":\"(research article scraping OR AI search OR web search AI OR article scraping OR research scraping) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_5be2792f-5e08-7228-9edd-c2ad2776791b_xs_call_86941940",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_52930976",
+      "input": "{\"query\":\"(research article scraping OR AI search OR web search AI OR article scraping OR research scraping) lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_5be2792f-5e08-7228-9edd-c2ad2776791b_xs_call_52930976",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_32169754",
+      "input": "{\"query\":\"research article scraping OR AI search OR web search AI OR article scraping OR research scraping\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_5be2792f-5e08-7228-9edd-c2ad2776791b_xs_call_32169754",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Recent discussions on X (formerly Twitter) about **research article scraping**, **AI-powered web search**, **article scraping**, and related tools highlight a growing ecosystem of LLM-native scraping solutions, agentic RAG systems, and specialized APIs for researchers and developers.[[1]](https://x.com/i/status/2019061395342622947)[[2]](https://x.com/i/status/2018912401262014676)\n\n### Key Tools and Projects Mentioned:\n- **AnyCrawl**: An open-source LLM-native web scraping tool (2.5k stars) where you describe what you want, and AI extracts structured data without selectors. Contrasts with traditional anti-bot methods.[[2]](https://x.com/i/status/2018912401262014676)\n- **Desearch.ai**: AI-powered search and scraping API (16x more affordable), optimized for real-time relevance in dynamic environments like news scraping. Built for devs and AI agents.[[3]](https://x.com/i/status/2018627541104558189)\n- **ScrapeGraphAI**: LLM-driven web scraping suite for extracting structured data from websites/HTML, now integrated with agentic payment APIs via Orthogonal (YC W26).[[4]](https://x.com/i/status/2017428603684982973)\n- **SerpApi**: Real-time API for scraping Google Search results (organic, news, images, etc.) in JSON. Includes \"Google Light Search API\" for fast critical data extraction.[[5]](https://x.com/i/status/2019169119547859017)[[6]](https://x.com/i/status/2018226399547633742)\n- **A-RAG**: Agentic Retrieval-Augmented Generation framework. Lets models autonomously choose tools like keyword_search, semantic_search, or chunk_read for hierarchical retrieval. Outperforms baselines on benchmarks like HotpotQA (94.5%).[[1]](https://x.com/i/status/2019061395342622947)\n\n### AI Workflows for Research Papers:\n- Researchers recommend Perplexity (Academic mode + Deep Research) → NotebookLM (for lit reviews, tables, audio) → ChatGPT for verification. Avoids tab overload.[[7]](https://x.com/i/status/2017591194826440879)\n- Tools for chatting with papers: \"Chat with Research Papers\" AI for explanations/inferences from pasted sections.[[8]](https://x.com/i/status/2018602867444363633)\n- Finding research gaps: Elicit, ResearchRabbit, ConnectedPapers, Litmaps, Scite.ai.[[9]](https://x.com/i/status/2018609923492598268)\n\nOther niches include web/data scraping for rural data gaps[[10]](https://x.com/i/status/2019004097953767493) and general web scraping practice abstracts.\n\nNo top-ranked posts matched your exact keyword query, but these semantically relevant recent posts (mostly Feb 2026) show active interest. For more, I can dive into specific threads or images/videos!",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019061395342622947",
+              "start_index": 284,
+              "end_index": 333,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018912401262014676",
+              "start_index": 333,
+              "end_index": 382,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018912401262014676",
+              "start_index": 624,
+              "end_index": 673,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018627541104558189",
+              "start_index": 858,
+              "end_index": 907,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017428603684982973",
+              "start_index": 1075,
+              "end_index": 1124,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019169119547859017",
+              "start_index": 1297,
+              "end_index": 1346,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018226399547633742",
+              "start_index": 1346,
+              "end_index": 1395,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019061395342622947",
+              "start_index": 1635,
+              "end_index": 1684,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017591194826440879",
+              "start_index": 1885,
+              "end_index": 1934,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018602867444363633",
+              "start_index": 2049,
+              "end_index": 2098,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018609923492598268",
+              "start_index": 2183,
+              "end_index": 2232,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019004097953767493",
+              "start_index": 2292,
+              "end_index": 2342,
+              "title": "10"
+            }
+          ]
+        }
+      ],
+      "id": "msg_5be2792f-5e08-7228-9edd-c2ad2776791b",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 10328,
+    "input_tokens_details": {
+      "cached_tokens": 4299
+    },
+    "output_tokens": 2153,
+    "output_tokens_details": {
+      "reasoning_tokens": 1227
+    },
+    "total_tokens": 12481,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 3,
+    "cost_in_usd_ticks": 174972500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 3,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}
