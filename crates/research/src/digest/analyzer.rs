@@ -2,73 +2,53 @@
 //!
 //! Analyzes research entries to generate actionable recommendations
 //! for the CTO platform.
+//!
+//! NOTE: Full AI analysis requires the intake crate. For now, returns
+//! basic summaries without AI enrichment.
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::fmt::Write;
-use std::path::Path;
-use std::sync::Arc;
-
-use intake::ai::{parse_ai_response, AIMessage, AIProvider, GenerateOptions};
 
 use crate::storage::{DigestContent, IndexEntry, MarkdownReader};
 
 /// Analysis result for a batch of research entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DigestAnalysis {
-    /// Executive summary of the research batch.
     pub summary: String,
-    /// High-priority items that should be implemented.
     pub high_priority: Vec<ActionItem>,
-    /// Items worth investigating further.
     pub worth_investigating: Vec<ActionItem>,
-    /// General tips and best practices discovered.
     pub tips_and_tricks: Vec<String>,
-    /// Overall recommendation for the platform.
     pub overall_recommendation: String,
 }
 
-/// An actionable item from the analysis.
+/// Action item from digest analysis.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionItem {
-    /// Title of the action item.
     pub title: String,
-    /// Description of what to implement.
     pub description: String,
-    /// Which entries this relates to.
     pub related_entries: Vec<String>,
-    /// Estimated effort (low/medium/high).
     pub effort: String,
-    /// Potential impact (low/medium/high).
     pub impact: String,
 }
 
 /// Analyzes research entries for the digest.
-pub struct DigestAnalyzer {
-    provider: Arc<dyn AIProvider>,
-    model: String,
-}
+pub struct DigestAnalyzer;
 
 /// Entry with optional rich content loaded from markdown file.
 pub struct RichEntry<'a> {
-    /// The index entry with basic metadata.
     pub entry: &'a IndexEntry,
-    /// Optional full content from the markdown file.
     pub content: Option<DigestContent>,
 }
 
 impl DigestAnalyzer {
     /// Create a new digest analyzer.
-    pub fn new(provider: Arc<dyn AIProvider>, model: String) -> Self {
-        Self { provider, model }
+    pub fn new() -> Self {
+        Self
     }
 
     /// Load rich content for entries by reading their markdown files.
-    ///
-    /// Returns entries paired with their full content (if readable).
     pub fn load_rich_entries<'a>(
         entries: &[&'a IndexEntry],
-        base_dir: &Path,
+        base_dir: &std::path::Path,
     ) -> Vec<RichEntry<'a>> {
         entries
             .iter()
@@ -84,180 +64,65 @@ impl DigestAnalyzer {
             .collect()
     }
 
-    /// Analyze entries with full document content for richer insights.
+    /// Analyze entries with full document content.
     ///
-    /// This method reads the full markdown files to include:
-    /// - Complete tweet text (not just 100 char preview)
-    /// - Implementation ideas from AI analysis
-    /// - Reasoning and context
-    /// - Enriched content from scraped links
-    pub async fn analyze_rich(&self, entries: &[RichEntry<'_>]) -> Result<DigestAnalysis> {
-        let entries_context: Vec<String> = entries
+    /// NOTE: AI analysis disabled (requires intake dependency).
+    /// Returns a basic summary without AI enrichment.
+    pub async fn analyze_rich(&self, entries: &[RichEntry<'_>]) -> Result<DigestAnalysis, anyhow::Error> {
+        let high_priority: Vec<ActionItem> = entries
             .iter()
-            .map(|rich| {
-                let e = rich.entry;
-                let categories: Vec<_> = e.categories.iter().map(ToString::to_string).collect();
-
-                // Use full content if available, otherwise fall back to preview
-                if let Some(content) = &rich.content {
-                    let text = if content.full_text.is_empty() {
-                        &e.preview
-                    } else {
-                        &content.full_text
-                    };
-
-                    let mut entry_str = format!(
-                        "### @{author} (score: {score:.2})\n**Categories**: {categories}\n\n**Tweet**: {text}",
-                        author = e.author,
-                        score = e.score,
-                        categories = categories.join(", "),
-                        text = text,
-                    );
-
-                    // Add implementation ideas if present
-                    if !content.implementation_ideas.is_empty() {
-                        entry_str.push_str("\n\n**Implementation Ideas**:\n");
-                        for idea in &content.implementation_ideas {
-                            let _ = writeln!(entry_str, "- {idea}");
-                        }
-                    }
-
-                    // Add reasoning if present
-                    if !content.reasoning.is_empty() {
-                        let _ = write!(entry_str, "\n**Analysis**: {}\n", content.reasoning);
-                    }
-
-                    // Add enriched content summary (first 500 chars)
-                    if !content.enriched_content.is_empty() {
-                        let enriched_summary: String = content
-                            .enriched_content
-                            .iter()
-                            .take(5)
-                            .map(String::as_str)
-                            .collect::<Vec<_>>()
-                            .join(" ");
-                        let truncated = if enriched_summary.len() > 500 {
-                            format!("{}...", &enriched_summary[..500])
-                        } else {
-                            enriched_summary
-                        };
-                        let _ = write!(entry_str, "\n**From linked content**: {truncated}\n");
-                    }
-
-                    entry_str
-                } else {
-                    // Fall back to basic format
-                    format!(
-                        "- @{author} (score: {score:.2}, categories: {categories}): {preview}",
-                        author = e.author,
-                        score = e.score,
-                        categories = categories.join(", "),
-                        preview = e.preview,
-                    )
-                }
+            .filter(|e| e.entry.score >= 0.7)
+            .map(|e| ActionItem {
+                title: format!("High-relevance entry from @{}", e.entry.author),
+                description: e.entry.preview.clone(),
+                related_entries: vec![e.entry.id.clone()],
+                effort: "unknown".to_string(),
+                impact: if e.entry.score >= 0.9 { "high".to_string() } else { "medium".to_string() },
             })
             .collect();
 
-        self.run_analysis(&entries_context.join("\n\n---\n\n"))
-            .await
-    }
-
-    /// Analyze a batch of research entries (basic mode - uses preview only).
-    pub async fn analyze(&self, entries: &[&IndexEntry]) -> Result<DigestAnalysis> {
-        // Build context from entries
-        let entries_context: Vec<String> = entries
+        let worth_investigating: Vec<ActionItem> = entries
             .iter()
-            .map(|e| {
-                let categories: Vec<_> = e.categories.iter().map(ToString::to_string).collect();
-                format!(
-                    "- @{author} (score: {score:.2}, categories: {categories}): {preview}",
-                    author = e.author,
-                    score = e.score,
-                    categories = categories.join(", "),
-                    preview = e.preview,
-                )
+            .filter(|e| e.entry.score >= 0.4 && e.entry.score < 0.7)
+            .map(|e| ActionItem {
+                title: format!("Entry from @{}", e.entry.author),
+                description: e.entry.preview.clone(),
+                related_entries: vec![e.entry.id.clone()],
+                effort: "unknown".to_string(),
+                impact: "low".to_string(),
             })
             .collect();
 
-        self.run_analysis(&entries_context.join("\n")).await
-    }
+        let tips: Vec<String> = vec![];
 
-    /// Run the AI analysis with the given entries context.
-    async fn run_analysis(&self, entries_context: &str) -> Result<DigestAnalysis> {
-        let prompt = format!(
-            r#"Analyze these research entries from Twitter/X bookmarks and provide actionable recommendations for the CTO platform.
-
-## Platform Context
-The CTO platform is a multi-agent software development system built with:
-- Rust for core services
-- Kubernetes for orchestration
-- Argo Workflows for task automation
-- MCP (Model Context Protocol) tools for AI integration
-- AI agents (Rex, Blaze, Tess, etc.) for automated coding
-
-## Research Entries to Analyze
-{entries_context}
-
-## Task
-Analyze these entries and identify:
-1. What can we BUILD or INTEGRATE into the CTO platform?
-2. What's worth investigating further?
-3. Any tips, tricks, or best practices we should adopt?
-
-Respond with JSON:
-{{
-  "summary": "<2-3 sentence executive summary of what was found>",
-  "high_priority": [
-    {{
-      "title": "<action item title>",
-      "description": "<what to implement and how>",
-      "related_entries": ["<@author references>"],
-      "effort": "<low|medium|high>",
-      "impact": "<low|medium|high>"
-    }}
-  ],
-  "worth_investigating": [
-    {{
-      "title": "<item title>",
-      "description": "<what to look into>",
-      "related_entries": ["<@author references>"],
-      "effort": "<low|medium|high>",
-      "impact": "<low|medium|high>"
-    }}
-  ],
-  "tips_and_tricks": ["<practical tips discovered>"],
-  "overall_recommendation": "<1-2 sentence recommendation for this batch>"
-}}
-
-Be specific and actionable. Focus on implementation potential, not just interesting reading."#
+        let summary = format!(
+            "Found {} research entries ({} high priority, {} worth investigating)",
+            entries.len(),
+            high_priority.len(),
+            worth_investigating.len()
         );
 
-        let messages = vec![AIMessage::system(SYSTEM_PROMPT), AIMessage::user(prompt)];
-
-        let options = GenerateOptions {
-            temperature: Some(0.4),
-            max_tokens: Some(2000),
-            json_mode: true,
-            ..Default::default()
+        let recommendation = if high_priority.is_empty() {
+            "No high-priority items this cycle.".to_string()
+        } else {
+            format!(
+                "Review {} high-priority items for potential implementation.",
+                high_priority.len()
+            )
         };
 
-        let response = self
-            .provider
-            .generate_text(&self.model, &messages, &options)
-            .await?;
-
-        let analysis: DigestAnalysis = parse_ai_response(&response)?;
-        Ok(analysis)
+        Ok(DigestAnalysis {
+            summary,
+            high_priority,
+            worth_investigating,
+            tips_and_tricks: tips,
+            overall_recommendation: recommendation,
+        })
     }
 }
 
-const SYSTEM_PROMPT: &str = r#"You are a CTO analyzing research content for implementation potential in a multi-agent software development platform.
-
-Your role is to:
-1. Identify actionable items that could improve the platform
-2. Prioritize based on effort vs impact
-3. Provide specific, implementable recommendations
-4. Distinguish between "build now" and "investigate later"
-
-Be concise, specific, and focus on what can actually be implemented.
-Always respond with valid JSON."#;
+impl Default for DigestAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}

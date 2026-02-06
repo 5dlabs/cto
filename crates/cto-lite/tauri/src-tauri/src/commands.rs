@@ -7,6 +7,201 @@ use crate::kind::{self, ClusterInfo, KindInfo};
 use crate::state::{AppState, SetupState};
 use crate::workflows::{self, WorkflowDetail, WorkflowParams, WorkflowStatus};
 use tauri::State;
+use tokio::process::{Child, Command};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use serde_json::{json, Value};
+use uuid::Uuid;
+
+// ============================================================================
+// MCP Server Management
+// ============================================================================
+
+/// Spawn the MCP server as a child process and initialize it
+#[tauri::command]
+pub async fn spawn_mcp_server(state: State<'_, AppState>) -> Result<String, String> {
+    let session_id = Uuid::new_v4().to_string();
+    
+    // Build the path to the mcp-lite binary
+    let binary_path = std::env::current_exe()
+        .map_err(|e| e.to_string())?
+        .parent()
+        .ok_or("Could not determine executable directory")?
+        .to_path_buf();
+    
+    // Try to find the mcp-lite binary
+    let mcp_binary = binary_path.join("mcp-lite");
+    
+    let child = Command::new(&mcp_binary)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|e| format!("Failed to spawn MCP server: {}", e))?;
+    
+    // Store the child process
+    {
+        let mut sessions = state.mcp_sessions.lock().await;
+        sessions.insert(session_id.clone(), child);
+    }
+    
+    Ok(session_id)
+}
+
+/// Send a request to the MCP server and get the response
+#[tauri::command]
+pub async fn mcp_call(
+    state: State<'_, AppState>,
+    session_id: String,
+    method: String,
+    params: Value,
+) -> Result<Value, String> {
+    let mut sessions = state.mcp_sessions.lock().await;
+    
+    let child = sessions.get_mut(&session_id)
+        .ok_or("Session not found")?;
+    
+    let stdin = child.stdin.as_mut()
+        .ok_or("MCP server stdin not available")?;
+    
+    let request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": method,
+        "params": params
+    });
+    
+    let request_str = serde_json::to_string(&request)
+        .map_err(|e| e.to_string())?;
+    
+    stdin.write_all((request_str + "\n").as_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    // Flush stdin to ensure the request is sent before reading response
+    stdin.flush()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let stdout = child.stdout.as_mut()
+        .ok_or("MCP server stdout not available")?;
+    
+    let mut reader = BufReader::new(stdout);
+    let mut response = String::new();
+    reader.read_line(&mut response)
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let response_value: Value = serde_json::from_str(&response)
+        .map_err(|e| e.to_string())?;
+    
+    Ok(response_value)
+}
+
+/// Get a list of available MCP tools
+#[tauri::command]
+pub async fn get_mcp_tools(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<Value, String> {
+    mcp_call(state, session_id, "tools/list", json!({})).await
+}
+
+/// Call an MCP tool
+#[tauri::command]
+pub async fn call_mcp_tool(
+    state: State<'_, AppState>,
+    session_id: String,
+    tool_name: String,
+    arguments: Value,
+) -> Result<Value, String> {
+    mcp_call(
+        state, 
+        session_id, 
+        "tools/call", 
+        json!({
+            "name": tool_name,
+            "arguments": arguments
+        })
+    ).await
+}
+
+/// Kill the MCP server for a session
+#[tauri::command]
+pub async fn kill_mcp_server(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<(), String> {
+    let mut sessions = state.mcp_sessions.lock().await;
+    
+    if let Some(mut child) = sessions.remove(&session_id) {
+        child.kill().await
+            .map_err(|e| format!("Failed to kill MCP server: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+// ============================================================================
+// MCP Task Commands (convenience wrappers)
+// ============================================================================
+
+/// Get tasks from the MCP server (wraps cto_jobs)
+#[tauri::command]
+pub async fn get_tasks(
+    state: State<'_, AppState>,
+    session_id: String,
+    limit: Option<i64>,
+) -> Result<Value, String> {
+    call_mcp_tool(
+        state,
+        session_id,
+        "cto_jobs".to_string(),
+        json!({
+            "limit": limit.unwrap_or(10)
+        })
+    ).await
+}
+
+/// Create a task by triggering a workflow (wraps cto_trigger)
+#[tauri::command]
+pub async fn create_task(
+    state: State<'_, AppState>,
+    session_id: String,
+    repo: String,
+    prompt: String,
+    issue_number: Option<i64>,
+    stack: Option<String>,
+) -> Result<Value, String> {
+    call_mcp_tool(
+        state,
+        session_id,
+        "cto_trigger".to_string(),
+        json!({
+            "repo": repo,
+            "prompt": prompt,
+            "issue_number": issue_number,
+            "stack": stack.unwrap_or_else(|| "nova".to_string())
+        })
+    ).await
+}
+
+/// Update task status (wraps cto_status)
+#[tauri::command]
+pub async fn update_task_status(
+    state: State<'_, AppState>,
+    session_id: String,
+    workflow_id: String,
+) -> Result<Value, String> {
+    call_mcp_tool(
+        state,
+        session_id,
+        "cto_status".to_string(),
+        json!({
+            "workflow_id": workflow_id
+        })
+    ).await
+}
 
 // ============================================================================
 // Setup Commands

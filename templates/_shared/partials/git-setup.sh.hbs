@@ -8,11 +8,23 @@ if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
   WORK_DIR="{{service}}"
 fi
 
-cd /workspace
+# Use WORKSPACE_DIR if set (provides isolation for concurrent CodeRuns)
+# Otherwise fall back to /workspace for backward compatibility
+if [ -n "$WORKSPACE_DIR" ] && [ -d "$WORKSPACE_DIR" ]; then
+  cd "$WORKSPACE_DIR"
+else
+  cd /workspace
+fi
 
 # Parse repo name from URL
 REPO_NAME=$(echo "$REPO_URL" | sed 's|.*/||' | sed 's|\.git$||')
-REPO_ROOT="/workspace/$REPO_NAME"
+
+# Determine the repo root - use WORKSPACE_DIR if set, otherwise /workspace
+if [ -n "$WORKSPACE_DIR" ] && [ -d "$WORKSPACE_DIR" ]; then
+  REPO_ROOT="$WORKSPACE_DIR/$REPO_NAME"
+else
+  REPO_ROOT="/workspace/$REPO_NAME"
+fi
 
 git config --global --add safe.directory "$REPO_ROOT"
 git config --global user.name "$GIT_AUTHOR_NAME"
@@ -33,6 +45,14 @@ if [ -d "$REPO_NAME/.git" ]; then
   # Also clean up any ref locks
   find .git/refs -name "*.lock" -delete 2>/dev/null || true
   
+  # Check for and fix corrupted git index
+  # "index file smaller than expected" means the index is corrupted
+  if ! git status >/dev/null 2>&1; then
+    echo "  ⚠️ Git index appears corrupted, rebuilding..."
+    rm -f .git/index
+    git reset 2>/dev/null || true
+  fi
+  
   # Clean any dirty state from previous runs before checkout
   # This prevents "Your local changes would be overwritten by checkout" errors
   if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
@@ -47,6 +67,8 @@ if [ -d "$REPO_NAME/.git" ]; then
     echo "  ⚠️ Fetch failed, resetting remote refs"
     # If fetch still fails, remove the corrupted refs and try again
     rm -rf .git/refs/remotes/origin/*
+    # Also try removing corrupted index if it wasn't caught earlier
+    rm -f .git/index
     git fetch --all --prune || true
   }
 else

@@ -1,122 +1,62 @@
 # TOOLS.md - Local Notes
 
-## Peekaboo (macOS Screenshot & UI Automation)
 
-**Path:** `/opt/homebrew/bin/peekaboo`
+## Claude Code & Swarm Mode
 
-Peekaboo captures screenshots, inspects UI elements, and automates macOS. Use `see` to get annotated snapshots with element IDs, then interact.
-
-### Quick Start
-```bash
-# Check permissions
-peekaboo permissions
-
-# Capture annotated screenshot (shows element IDs like B1, T2)
-peekaboo see --annotate --path /tmp/screenshot.png
-
-# Capture specific app window
-peekaboo see --app "Safari" --annotate --path /tmp/safari.png
-
-# Capture full screen
-peekaboo image --mode screen --retina --path /tmp/fullscreen.png
-
-# Capture frontmost window
-peekaboo image --mode frontmost --path /tmp/window.png
-```
-
-### Screenshot Workflow
-```bash
-# 1. See what's on screen (annotated)
-peekaboo see --annotate --path /tmp/see.png
-
-# 2. See specific app
-peekaboo see --app "Discord" --annotate --path /tmp/discord.png
-
-# 3. Analyze what you see
-peekaboo see --analyze "What's in this window?" --path /tmp/analysis.png
-```
-
-### Interaction (click, type, etc.)
-```bash
-# Click element by ID from `see` output
-peekaboo click --on B3
-
-# Type text
-peekaboo type "Hello world" --return
-
-# Keyboard shortcuts
-peekaboo hotkey --keys "cmd,shift,s"
-
-# Press special keys
-peekaboo press escape
-peekaboo press tab --count 3
-```
-
-### App & Window Control
-```bash
-# List apps/windows
-peekaboo list apps --json
-peekaboo list windows --app "Safari" --json
-
-# Launch/quit apps
-peekaboo app launch "Safari"
-peekaboo app quit --app "Safari"
-
-# Window management
-peekaboo window focus --app Safari
-peekaboo window set-bounds --app Safari --x 50 --y 50 --width 1200 --height 800
-```
-
-### Best Practice: See → Click → Type
-```bash
-peekaboo see --app Safari --annotate --path /tmp/see.png
-peekaboo click --on B3 --app Safari
-peekaboo type "user@example.com" --app Safari
-peekaboo press tab --app Safari
-peekaboo type "password" --app Safari --return
-```
-
-**Note:** Requires Screen Recording + Accessibility permissions in System Settings.
-
----
-
-## Workspace
-
-**Primary Worktree:** `/Users/jonathonfritz/clawd-pixel-worktree`
-- Branch: `pixel/dev`
-- Symlinked from: `/Users/jonathonfritz/clawd-pixel/cto`
-- Branched from: `main`
-
-⚠️ **DO NOT work on `ctoapp/` branches** — that's legacy territory. This worktree is for Pixel's independent development.
-
-## Coding Agents
-
-### Claude Code
-```bash
-claude --dangerously-skip-permissions
-```
-
-### Claude Code with Swarms (claudesp)
+### Binary Path
 ```bash
 /Users/jonathonfritz/.local/bin/claudesp
 ```
-Use for TeammateTool and parallel sub-agent orchestration.
 
-## Development
+Use `claudesp` (not `claude`) for swarm/TeammateTool features.
 
-### Working directory
+### One-Shot Coding Task
 ```bash
-cd /Users/jonathonfritz/clawd-pixel/cto
+# PTY required for interactive terminal
+exec pty:true workdir:/path/to/project command:"claudesp 'Your task here'"
 ```
 
-## Key References
+### Background Coding Task
+```bash
+# Start in background, get sessionId
+exec pty:true workdir:/path/to/project background:true command:"claudesp 'Your task here'"
 
-- Main CTO repo: `/Users/jonathonfritz/cto`
-- Agent directory: `/Users/jonathonfritz/.clawdbot/AGENT_DIRECTORY.md`
+# Monitor progress
+process action:log sessionId:XXX
 
-## Active Sub-Agents
+# Check if done
+process action:poll sessionId:XXX
+```
 
-Check with `sessions_list` to see spawned sub-agents currently working.
+### Swarm Mode (Parallel Sub-Agents)
+
+Use TeammateTool for parallel orchestration:
+
+```javascript
+// Create a team
+Teammate({ operation: "spawnTeam", team_name: "my-team" })
+
+// Spawn a worker
+Task({
+  team_name: "my-team",
+  name: "worker-1",
+  subagent_type: "general-purpose",
+  prompt: "Your task for the sub-agent",
+  run_in_background: true
+})
+
+// Check inbox for results
+Teammate({ operation: "getInbox", team_name: "my-team" })
+```
+
+### Auto-Notify on Completion
+
+For long tasks, append wake trigger:
+```
+... your task here.
+
+When finished, run: clawdbot gateway wake --text "Done: [summary]" --mode now
+```
 
 ## Agent Directory
 
@@ -125,7 +65,7 @@ See `/Users/jonathonfritz/.clawdbot/AGENT_DIRECTORY.md` for a list of all agents
 Quick reference:
 - **stitch** — code review
 - **metal** — infrastructure  
-- **pixel/ctoapp** — desktop app
+- **pixel/ctolite** — desktop app
 - **research** — web research
 - **holt** — bot deployment
 - **intake** — PRD processing

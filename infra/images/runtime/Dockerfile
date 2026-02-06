@@ -574,6 +574,36 @@ RUN echo '#!/bin/bash\n# Development helper script\nset -e\n\nif [ $# -eq 0 ]; t
 # Add helper script to PATH
 ENV PATH="/home/node:${PATH}"
 
+# =============================================================================
+# 1Password CLI (op) for headless secret access from agents
+# Agents use OP_SERVICE_ACCOUNT_TOKEN (injected via K8s secret) for auth
+# =============================================================================
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    set -eux; \
+    OP_VERSION="v2.30.3"; \
+    ARCH=$(dpkg --print-architecture); \
+    case "$ARCH" in \
+      amd64) OP_ARCH=amd64 ;; \
+      arm64) OP_ARCH=arm64 ;; \
+      *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    esac; \
+    curl -fsSL "https://cache.agilebits.com/dist/1P/op2/pkg/${OP_VERSION}/op_linux_${OP_ARCH}_${OP_VERSION}.zip" -o /tmp/op.zip && \
+    unzip -o /tmp/op.zip -d /usr/local/bin && \
+    rm -f /tmp/op.zip && \
+    chmod +x /usr/local/bin/op && \
+    op --version
+
+# =============================================================================
+# Claude Code CLI - pinned version for reproducible agent builds
+# Version is passed as a build arg; the GitHub Action detects latest via:
+#   npm view @anthropic-ai/claude-code version
+# =============================================================================
+ARG CLAUDE_CODE_VERSION=2.1.32
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} && \
+    claude --version && \
+    echo "Claude Code CLI ${CLAUDE_CODE_VERSION} installed"
+
 # Labels / defaults
 USER node
 WORKDIR /workspace

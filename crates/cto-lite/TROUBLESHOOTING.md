@@ -1,4 +1,4 @@
-# CTO Lite Troubleshooting Guide
+# CTO Troubleshooting Guide
 
 ## Setup Issues
 
@@ -245,7 +245,7 @@ rm -rf ~/.config/ai.5dlabs.cto-lite
 # 4. Restart Docker
 docker system prune -f
 
-# 5. Relaunch CTO Lite
+# 5. Relaunch CTO
 ```
 
 ## Getting Help
@@ -276,6 +276,6 @@ cat ~/Library/Logs/ai.5dlabs.cto-lite/cto-lite.log
 
 Include:
 - OS version
-- CTO Lite version
+- CTO version
 - Error messages
 - Steps to reproduce
