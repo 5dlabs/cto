@@ -1,0 +1,274 @@
+{
+  "created_at": 1770266778,
+  "completed_at": 1770266808,
+  "id": "c8e08f7a-8735-d9ff-d33b-80d654168426",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_00519612",
+      "input": "{\"query\":\"(ClawCredit OR ClawHub OR \\\"Minara AI\\\" OR \\\"Midir Solana\\\" OR Solend) lang:en\",\"limit\":20,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c8e08f7a-8735-d9ff-d33b-80d654168426_xs_call_00519612",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_15653284",
+      "input": "{\"query\":\"(ClawCredit OR ClawHub OR \\\"Minara AI\\\" OR \\\"Midir Solana\\\" OR Solend) lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c8e08f7a-8735-d9ff-d33b-80d654168426_xs_call_15653284",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_01737684",
+      "input": "{\"query\":\"(ClawCredit OR ClawHub OR \\\"Minara AI\\\" OR \\\"Midir Solana\\\" OR Solend) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c8e08f7a-8735-d9ff-d33b-80d654168426_xs_call_01737684",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_60578903",
+      "input": "{\"query\":\"ClawCredit lang:en\",\"limit\":5,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c8e08f7a-8735-d9ff-d33b-80d654168426_xs_call_60578903",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_93586769",
+      "input": "{\"query\":\"\\\"Midir Solana\\\" lang:en\",\"limit\":5,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c8e08f7a-8735-d9ff-d33b-80d654168426_xs_call_93586769",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_48751243",
+      "input": "{\"query\":\"ClawCredit ClawHub Minara AI Midir Solana Solend Solana projects\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c8e08f7a-8735-d9ff-d33b-80d654168426_xs_call_48751243",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "**Recent English-language mentions on X (as of February 4-5, 2026) for the queried terms:**\n\n### ClawHub\nClawHub.ai is a skill registry/marketplace for OpenClaw AI agents on Solana, enabling specialized capabilities like real-time data querying, video analysis, social graph mapping, and more via autonomous payments (x402).[[1]](https://x.com/i/status/2019094389637947782)[[2]](https://x.com/i/status/2019054017205461268)[[3]](https://x.com/i/status/2018855972144603389) Recent highlights include Teneo Protocol's specialist agent skills and Circle wallet integrations.[[1]](https://x.com/i/status/2019094389637947782)[[3]](https://x.com/i/status/2018855972144603389)\n\n**Security Alert:** Multiple reports of 300-341 malicious skills (12% of total at the time) designed to trick users into downloading malware, discovered Feb 1-2. Researchers from Gen Threat Labs, Oren Yomtov (Clawdex), and others highlighted the risks, with protections from Norton/Avast and calls for platform action.[[4]](https://x.com/i/status/2018323584834318419)[[5]](https://x.com/i/status/2018323558746014087)[[6]](https://x.com/i/status/2018069143652827332)\n\n### ClawCredit\nLaunched Feb 3 by @t54ai: Autonomous credit lines for OpenClaw AI agents on Solana. Agents apply for credit scores, borrow to spend on x402 services (e.g., compute, APIs) without human funding, repay to build reputation/limits. Install skill for pre-qualification.[[7]](https://x.com/i/status/2018686238526472220)[[8]](https://x.com/i/status/2018771516029096254)[[9]](https://x.com/i/status/2018911082736468319)\n\nAssociated memecoins/tokens pumped immediately via pump.fun/launchpads (e.g., CLAW, CLAWCREDIT, CC on Solana/Base), with bots like @bankrbot deploying contracts.[[10]](https://x.com/i/status/2018705759320834183)[[11]](https://x.com/i/status/2018705948748259504)[[12]](https://x.com/i/status/2019013509850554746)\n\n### Minara AI (@minara)\nAI co-pilot/autopilot for crypto/U.S. stocks trading (backed by Circle). Hit $100M+ volume in first month, with Autopilot outperforming manual mode (~60% win rate, $50K profit during crash). Now live on ClawHub with skills for chat analysis, swaps, perps suggestions, prediction markets.[[2]](https://x.com/i/status/2019054017205461268)[[13]](https://x.com/i/status/2018323570250912136)[[14]](https://x.com/i/status/2017655060180963812) Beginner guides circulating.[[15]](https://x.com/i/status/2019198616565608893)\n\n### Midir Solana\nNo recent results found.\n\n### Solend\nRebranded to Save Finance (@save_finance): Permissionless savings account on Solana (also Sui). Recent teaser: \"Starts with S and we all love it.\"[[16]](https://x.com/i/status/2019198407693435180)\n\nThese cluster around Solana's AI agent economy (OpenClaw ecosystem), with hype on autonomy/credit but caution on ClawHub security. For deeper dives, check linked sites like clawhub.ai, claw.credit.[[17]](https://x.com/i/status/2019196949946081401)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019094389637947782",
+              "start_index": 324,
+              "end_index": 373,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019054017205461268",
+              "start_index": 373,
+              "end_index": 422,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018855972144603389",
+              "start_index": 422,
+              "end_index": 471,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019094389637947782",
+              "start_index": 570,
+              "end_index": 619,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018855972144603389",
+              "start_index": 619,
+              "end_index": 668,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018323584834318419",
+              "start_index": 988,
+              "end_index": 1037,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018323558746014087",
+              "start_index": 1037,
+              "end_index": 1086,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018069143652827332",
+              "start_index": 1086,
+              "end_index": 1135,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018686238526472220",
+              "start_index": 1416,
+              "end_index": 1465,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018771516029096254",
+              "start_index": 1465,
+              "end_index": 1514,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018911082736468319",
+              "start_index": 1514,
+              "end_index": 1563,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018705759320834183",
+              "start_index": 1726,
+              "end_index": 1776,
+              "title": "10"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018705948748259504",
+              "start_index": 1776,
+              "end_index": 1826,
+              "title": "11"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019013509850554746",
+              "start_index": 1826,
+              "end_index": 1876,
+              "title": "12"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019054017205461268",
+              "start_index": 2189,
+              "end_index": 2238,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018323570250912136",
+              "start_index": 2238,
+              "end_index": 2288,
+              "title": "13"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017655060180963812",
+              "start_index": 2288,
+              "end_index": 2338,
+              "title": "14"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019198616565608893",
+              "start_index": 2367,
+              "end_index": 2417,
+              "title": "15"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019198407693435180",
+              "start_index": 2619,
+              "end_index": 2669,
+              "title": "16"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019196949946081401",
+              "start_index": 2868,
+              "end_index": 2918,
+              "title": "17"
+            }
+          ]
+        }
+      ],
+      "id": "msg_c8e08f7a-8735-d9ff-d33b-80d654168426",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 20036,
+    "input_tokens_details": {
+      "cached_tokens": 10029
+    },
+    "output_tokens": 3506,
+    "output_tokens_details": {
+      "reasoning_tokens": 2136
+    },
+    "total_tokens": 23542,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 6,
+    "cost_in_usd_ticks": 342558500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 6,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

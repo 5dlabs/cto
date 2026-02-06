@@ -230,6 +230,8 @@ impl DistributedLock {
             acquire_time: Some(MicroTime(now)),
             renew_time: Some(MicroTime(now)),
             lease_transitions: None,
+            preferred_holder: None,
+            strategy: None,
         }
     }
 

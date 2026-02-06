@@ -26,8 +26,15 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    # Only run on main branch - skip any stale runs from develop or other branches
+    # This guards against queued runs from before develop was removed from triggers
+    # For push/schedule: check ref is main. For PRs: check base_ref is main (not develop)
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')
     runs-on: [k8s-runner]
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -56,4 +63,3 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
-
