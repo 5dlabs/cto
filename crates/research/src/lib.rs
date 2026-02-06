@@ -21,6 +21,7 @@
 #![allow(clippy::unused_async)] // Async signature needed for interface consistency
 
 pub mod analysis;
+pub mod anthropic;
 pub mod auth;
 pub mod context;
 pub mod digest;
@@ -35,6 +36,7 @@ pub mod twitter;
 pub use analysis::{
     Category, FeatureScore, InstallableAsset, Priority, RelevanceAnalyzer, RelevanceResult,
 };
+pub use anthropic::AnthropicClient;
 pub use auth::Session;
 pub use context::{AgentProfile, AgentRole, PlatformContext};
 pub use digest::{

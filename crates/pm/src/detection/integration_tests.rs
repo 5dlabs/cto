@@ -218,8 +218,14 @@ mod agent_routing_tests {
     #[test]
     fn agent_id_roundtrip() {
         let agents = [
-            Agent::Rex, Agent::Grizz, Agent::Nova, Agent::Blaze,
-            Agent::Tap, Agent::Spark, Agent::Vex, Agent::Forge,
+            Agent::Rex,
+            Agent::Grizz,
+            Agent::Nova,
+            Agent::Blaze,
+            Agent::Tap,
+            Agent::Spark,
+            Agent::Vex,
+            Agent::Forge,
         ];
         for agent in agents {
             let parsed = Agent::from_id(agent.id());
@@ -238,40 +244,68 @@ mod agent_routing_tests {
             // Grizz
             ("Grizz", "cmd/server/main.go", None),
             // Nova (TS backend)
-            ("Nova", "src/index.ts", Some(r#"{"dependencies":{"elysia":"1.0.0"}}"#)),
-            ("Nova", "src/app.ts", Some(r#"{"dependencies":{"express":"4.0.0"}}"#)),
-            ("Nova", "src/server.ts", Some(r#"{"dependencies":{"hono":"4.0.0"}}"#)),
+            (
+                "Nova",
+                "src/index.ts",
+                Some(r#"{"dependencies":{"elysia":"1.0.0"}}"#),
+            ),
+            (
+                "Nova",
+                "src/app.ts",
+                Some(r#"{"dependencies":{"express":"4.0.0"}}"#),
+            ),
+            (
+                "Nova",
+                "src/server.ts",
+                Some(r#"{"dependencies":{"hono":"4.0.0"}}"#),
+            ),
             // Blaze (TS web)
-            ("Blaze", "app/page.tsx", Some(r#"{"dependencies":{"next":"15.0.0"}}"#)),
+            (
+                "Blaze",
+                "app/page.tsx",
+                Some(r#"{"dependencies":{"next":"15.0.0"}}"#),
+            ),
             ("Blaze", "src/utils.ts", None),
             // Tap (mobile)
-            ("Tap", "app/(tabs)/home.tsx", Some(r#"{"dependencies":{"expo":"52.0.0"}}"#)),
+            (
+                "Tap",
+                "app/(tabs)/home.tsx",
+                Some(r#"{"dependencies":{"expo":"52.0.0"}}"#),
+            ),
             ("Tap", "MyApp/ContentView.swift", None),
             ("Tap", "app/src/main/MainActivity.kt", None),
             // Spark (desktop)
-            ("Spark", "src/main/index.ts", Some(r#"{"dependencies":{"electron":"29.0.0"}}"#)),
-            ("Spark", "src-tauri/main.rs", Some(r#"{"dependencies":{"@tauri-apps/api":"2.0.0"}}"#)),
+            (
+                "Spark",
+                "src/main/index.ts",
+                Some(r#"{"dependencies":{"electron":"29.0.0"}}"#),
+            ),
+            (
+                "Spark",
+                "src-tauri/main.rs",
+                Some(r#"{"dependencies":{"@tauri-apps/api":"2.0.0"}}"#),
+            ),
             // Vex (Unity)
             ("Vex", "Assets/Scripts/Player.cs", None),
             // Forge (Unreal/C++)
             ("Forge", "Source/Game/Character.cpp", None),
             // Generic (no dedicated agent)
-            ("Rex", "app/main.py", None),  // Generic displays as Rex
+            ("Rex", "app/main.py", None), // Generic displays as Rex
             ("Rex", "src/App.java", None),
         ];
-        
+
         let mut failures: Vec<String> = Vec::new();
-        
+
         for (expected, path, pkg) in test_cases {
             let files = vec![file(path)];
             let (_result, agent) = detect_full(&files, pkg);
             let actual = agent.display_name();
-            
+
             if actual != expected {
                 failures.push(format!("{path} -> {actual} (expected {expected})"));
             }
         }
-        
+
         assert!(
             failures.is_empty(),
             "Detection failures:\n{}",

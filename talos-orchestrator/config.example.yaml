@@ -1,0 +1,25 @@
+# Talos Bare Metal Orchestrator - Config Example
+#
+# Credentials can be set in config OR via environment variables:
+#   SCW_ACCESS_KEY, SCW_SECRET_KEY, SCW_DEFAULT_PROJECT_ID
+# Environment variables take precedence over this file.
+
+scaleway:
+  # project_id: "865f8523-3641-46cc-8410-7e182e039e2e"  # Optional if env var set
+  # access_key: "SCW39T0FKCEWEREG1BSK"                  # Optional if env var set
+  # secret_key: "your-secret-key"                        # Optional if env var set
+
+server:
+  id: "ef39ba56-722e-4601-a3bb-72f4ad0e3131"  # talos-worker
+  # id: "a60a5ca7-2768-424e-8163-31e13d80621e"  # talos-cp
+  disk: "/dev/nvme0n1"
+
+talos:
+  version: "1.8.0"
+  architecture: "arm64"
+  cluster_name: "scaleway-metal"
+
+# Environment variable usage (recommended for CI/CD):
+# export SCW_ACCESS_KEY=SCW39T0FKCEWEREG1BSK
+# export SCW_SECRET_KEY=01cf2483-cc42-4591-be59-146c6175a49c
+# export SCW_DEFAULT_PROJECT_ID=865f8523-3641-46cc-8410-7e182e039e2e

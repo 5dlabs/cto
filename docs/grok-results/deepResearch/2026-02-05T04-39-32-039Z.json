@@ -1,0 +1,181 @@
+{
+  "created_at": 1770266352,
+  "completed_at": 1770266372,
+  "id": "ae573828-2e9b-a400-773d-4db80f3a88d1",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_82151837",
+      "input": "{\"query\":\"(AI evaluation OR benchmarking AI OR adversarial testing OR jailbreak detection OR AI safety testing) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ae573828-2e9b-a400-773d-4db80f3a88d1_xs_call_82151837",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_47314989",
+      "input": "{\"query\":\"AI evaluation OR benchmarking AI OR adversarial testing OR jailbreak detection OR AI safety testing\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ae573828-2e9b-a400-773d-4db80f3a88d1_xs_call_47314989",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_26932334",
+      "input": "{\"query\":\"\\\"AI evaluation\\\" OR \\\"benchmarking AI\\\" OR \\\"adversarial testing\\\" OR \\\"jailbreak detection\\\" OR \\\"AI safety testing\\\" lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ae573828-2e9b-a400-773d-4db80f3a88d1_xs_call_26932334",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_31676313",
+      "input": "{\"query\":\"(AI evaluation OR \\\"AI benchmarking\\\" OR \\\"adversarial testing\\\" OR \\\"jailbreak detection\\\" OR \\\"AI safety testing\\\") lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ae573828-2e9b-a400-773d-4db80f3a88d1_xs_call_31676313",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are some of the most relevant recent English-language posts on X (formerly Twitter) discussing AI evaluation, benchmarking, adversarial testing, jailbreak detection, and AI safety testing. I've focused on top and latest matches from semantic and keyword searches, highlighting key insights:\n\n### AI Agent Security & Adversarial Testing\n- Andrey is building **MoltRank**, an open benchmark for AI agent security where users submit agents for attack simulations and scoring. They're seeking contributors for adversarial test cases.[[1]](https://x.com/i/status/2018077848335249476)[[2]](https://x.com/i/status/2019198081527607574)\n- **AgentDoG** is a new diagnostic guardrail framework for AI agent safety, achieving state-of-the-art 82% accuracy in diagnosing issues like prompt injection and tool misuse.[[3]](https://x.com/i/status/2018980996528685464)\n- Alias Robotics tested AI agents in dynamic attack/defense cybersecurity scenarios beyond static CTF benchmarks, with results forthcoming.[[4]](https://x.com/i/status/2019121944293949513)\n\n### Jailbreak Detection & New Techniques\n- A fun new jailbreak prompts the AI to self-assess jailbreak risk via its \"memory\" and bet against itself, working across foundational models.[[5]](https://x.com/i/status/2018153690289373561)\n- **Semantic Chaining** is a stealthy jailbreak bypassing LLM guardrails by breaking malicious requests into benign semantic steps.[[6]](https://x.com/i/status/2017460021630525936)\n\n### Broader AI Evaluation & Benchmarking\n- Surge AI launched **Hemingway-bench**, a new writing leaderboard criticizing \"slop\" in current evals and emphasizing nuance (Gemini and Claude top it).[[7]](https://x.com/i/status/2019194504746541484)\n- Benchmarks now include adversarial testing pipelines: expert authoring, validation, and LLM/search attacks for tasks like spatial reasoning.[[8]](https://x.com/i/status/2019105741496610897)\n- Discussion on the \"evaluation gap\": pre-deployment tests aren't enough; runtime embedded safeguards are key for AI safety.[[9]](https://x.com/i/status/2018967278193439131)\n\nThese posts are from late Jan to early Feb 2026, reflecting active ongoing debates in AI safety. For full threads or media (e.g., images/videos in several), check the post IDs directly on X. If you want more details, expansions, or filters (e.g., by user/date), let me know!",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018077848335249476",
+              "start_index": 534,
+              "end_index": 583,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019198081527607574",
+              "start_index": 583,
+              "end_index": 632,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018980996528685464",
+              "start_index": 808,
+              "end_index": 857,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019121944293949513",
+              "start_index": 997,
+              "end_index": 1046,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018153690289373561",
+              "start_index": 1232,
+              "end_index": 1281,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017460021630525936",
+              "start_index": 1413,
+              "end_index": 1462,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019194504746541484",
+              "start_index": 1658,
+              "end_index": 1707,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019105741496610897",
+              "start_index": 1850,
+              "end_index": 1899,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018967278193439131",
+              "start_index": 2024,
+              "end_index": 2073,
+              "title": "9"
+            }
+          ]
+        }
+      ],
+      "id": "msg_ae573828-2e9b-a400-773d-4db80f3a88d1",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 16898,
+    "input_tokens_details": {
+      "cached_tokens": 5825
+    },
+    "output_tokens": 2263,
+    "output_tokens_details": {
+      "reasoning_tokens": 1341
+    },
+    "total_tokens": 19161,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 4,
+    "cost_in_usd_ticks": 236373500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 4,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

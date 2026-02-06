@@ -29,7 +29,66 @@
 
 ## Fixed Issues
 
-### 2026-02-04: GitHub App Key File Deletion (✅ RESOLVED)
+### 2026-02-04: Git Lock File Conflict Fix (IN PROGRESS)
+
+**Symptom:** Git lock file conflicts when multiple CodeRuns share the same PVC:
+```
+fatal: Unable to create '/workspace/cto/.git/index.lock': File exists.
+```
+
+**Root Cause:** Implementation agents (Atlas, Rex, Blaze, Vex) share the same PVC (`workspace-{service}`). When multiple pods run concurrently, they all mount the same PVC at `/workspace/cto` (the repository checkout), causing git lock conflicts.
+
+**Fix Applied:**
+1. **Controller Changes** (`crates/controller/src/tasks/code/resources.rs`):
+   - Generate unique workspace subdirectory per CodeRun: `/workspace/runs/{coderun-name}-{uid}/`
+   - Add `WORKSPACE_DIR` environment variable for agent isolation
+   - Update init container to create the unique subdirectory with proper permissions
+   - Set container's working directory to the unique subdirectory
+
+2. **Template Changes** (`templates/_shared/partials/git-setup.sh.hbs`):
+   - Use `WORKSPACE_DIR` environment variable when set
+   - Clone repository to the unique subdirectory: `$WORKSPACE_DIR/{repo_name}/`
+   - Falls back to `/workspace` for backward compatibility
+
+**How it works:**
+- Each CodeRun gets its own isolated directory: `/workspace/runs/coderun-abc123/`
+- Repository is cloned to: `/workspace/runs/coderun-abc123/cto/`
+- Multiple concurrent CodeRuns no longer conflict on git operations
+- Storage is still shared (single PVC), but workspaces are isolated
+
+**Files Modified:**
+- `crates/controller/src/tasks/code/resources.rs`
+- `templates/_shared/partials/git-setup.sh.hbs`
+
+**Status:** Code compiles, tests pending deployment
+
+---
+
+### 2026-02-04: GitHub Issue Acceptance Criteria Fix (COMPLETED)
+
+**Symptom:** When Healer creates GitHub issues for CI failures, the issue body says "no acceptance criteria prompt"
+
+**Root Cause:** The `generate_issue_body` function in `github_actions.rs` didn't include acceptance criteria in the issue body
+
+**Fix Applied:**
+1. **GitHub Actions Sensor** (`crates/healer/src/sensors/github_actions.rs`):
+   - Added `generate_issue_acceptance_criteria` function
+   - Updated `generate_issue_body` to include failure-type-specific acceptance criteria
+   - Criteria varies by failure type (build, test, lint, security, deploy, etc.)
+
+2. **Escalation Handler** (`crates/healer/src/ci/escalate.rs`):
+   - Added acceptance criteria section to escalation messages
+   - Provides checklist for manual resolution
+
+**Acceptance Criteria Sections:**
+- **Root Cause**: Identify and document failure root cause
+- **Fix Requirements**: Type-specific fixes (build errors, test failures, etc.)
+- **Verification**: Code compiles, tests pass, changes pushed
+- **Completion**: Workflow passes, CI checks green
+
+**Files Modified:**
+- `crates/healer/src/sensors/github_actions.rs`
+- `crates/healer/src/ci/escalate.rs`
 
 **Symptom:** 1,315+ coderun jobs failing with "Could not read private key from /tmp/github-app-key-15"
 

@@ -712,20 +712,19 @@ impl ServerConnectionPool {
             conn.server_name.clone()
         };
 
-        // 45s timeout: 30s for response read + 15s buffer for request/notification
-        tracing::info!("🔄 Initializing MCP server: {} (45s timeout)", server_name);
+        tracing::info!("🔄 Initializing MCP server: {} (10s timeout)", server_name);
 
         match tokio::time::timeout(
-            tokio::time::Duration::from_secs(45),
+            tokio::time::Duration::from_secs(10),
             self.initialize_server_inner(connection, &server_name),
         )
         .await
         {
             Ok(result) => result,
             Err(_) => {
-                tracing::error!("⏰ [{server_name}] MCP server initialization timed out after 45s");
+                tracing::error!("⏰ [{server_name}] MCP server initialization timed out after 10s");
                 Err(anyhow::anyhow!(
-                    "MCP server '{server_name}' initialization timed out after 45s"
+                    "MCP server '{server_name}' initialization timed out after 10s"
                 ))
             }
         }
@@ -761,15 +760,14 @@ impl ServerConnectionPool {
         tracing::info!("✅ [{}] Initialize request sent successfully", server_name);
 
         // Read initialization response (with timeout to prevent hanging)
-        // 30s timeout allows for Docker image pulls and npm package downloads
         tracing::info!("🔄 [{}] About to read initialize response", server_name);
         let _init_response = tokio::time::timeout(
-            tokio::time::Duration::from_secs(30),
+            tokio::time::Duration::from_secs(8),
             self.read_response(connection.clone()),
         )
         .await
         .map_err(|_| {
-            anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 30s")
+            anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 8s")
         })??;
         tracing::info!(
             "✅ [{}] Initialize response received successfully",
@@ -1254,31 +1252,18 @@ impl BridgeState {
                         tracing::info!("🔄 [{}] Initializing stdio server...", server_name);
 
                         // Acquire semaphore permit to limit concurrent inits
-                        // IMPORTANT: The permit is scoped to ONLY the initialization phase,
-                        // NOT the tool discovery phase. This allows other servers to start
-                        // initializing while this server does tool discovery.
-                        let init_result = {
-                            let _permit = stdio_sem.acquire().await.unwrap();
-                            tracing::info!("🔓 [{}] Acquired stdio init permit", server_name);
+                        let _permit = stdio_sem.acquire().await.unwrap();
+                        tracing::info!("🔓 [{}] Acquired stdio init permit", server_name);
 
-                            let result = connection_pool.start_server(&server_name).await;
-                            
-                            // Small delay to ensure connection is stored before releasing permit
-                            if result.is_ok() {
-                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                            }
-                            
-                            tracing::info!("🔓 [{}] Releasing stdio init permit", server_name);
-                            result
-                            // _permit is dropped here, releasing the semaphore
-                        };
-
-                        match init_result {
+                        match connection_pool.start_server(&server_name).await {
                             Ok(_) => {
                                 tracing::info!(
                                     "✅ [{}] Server initialized successfully",
                                     server_name
                                 );
+
+                                // Small delay to ensure connection is stored
+                                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                             }
                             Err(e) => {
                                 tracing::warn!(
@@ -1292,6 +1277,7 @@ impl BridgeState {
                                 ));
                             }
                         }
+                        // Permit is automatically released when _permit is dropped
                     } else {
                         tracing::info!(
                             "🔄 [{}] Skipping initialization for {} server",
@@ -1503,9 +1489,10 @@ impl BridgeState {
             }
         }
 
-        // If there are missing servers, log them explicitly and FAIL
+        // If there are missing servers, log them as warnings (not errors)
+        // Only fail if ALL servers failed (no tools discovered at all)
         if !missing_servers.is_empty() {
-            tracing::error!(
+            tracing::warn!(
                 "⚠️  {} servers failed to provide tools:",
                 missing_servers.len()
             );
@@ -1514,15 +1501,25 @@ impl BridgeState {
                 let transport = transport_by_server
                     .get(server_name)
                     .unwrap_or(&unknown_transport);
-                tracing::error!("   - {} ({})", server_name, transport);
+                tracing::warn!("   - {} ({})", server_name, transport);
             }
 
-            // FAIL initialization if any configured servers provided 0 tools
-            return Err(anyhow::anyhow!(
-                "Tool discovery failed: {}/{} configured servers provided 0 tools. This indicates a misconfiguration or initialization failure. See logs above for details.",
-                missing_servers.len(),
-                all_configured_servers.len()
-            ));
+            // Only FAIL if NO tools were discovered at all
+            if available_tools.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Tool discovery failed: ALL {}/{} configured servers provided 0 tools. No tools available.",
+                    missing_servers.len(),
+                    all_configured_servers.len()
+                ));
+            }
+            
+            // Log warning but continue if some tools were discovered
+            tracing::warn!(
+                "⚠️  Continuing with {} tools from {} working servers ({} servers failed)",
+                available_tools.len(),
+                all_configured_servers.len() - missing_servers.len(),
+                missing_servers.len()
+            );
         }
 
         // Create or update the tool catalog ConfigMap

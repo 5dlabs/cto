@@ -5,8 +5,5 @@ edition = "2021"
 description = "Shared utilities for CTO Lite components"
 license = "MIT"
 
-# Keep out of root workspace
-[workspace]
-
 [dependencies]
 anyhow = "1"

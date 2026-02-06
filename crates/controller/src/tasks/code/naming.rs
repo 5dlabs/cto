@@ -13,6 +13,7 @@ const REMEDIATE_JOB_PREFIX: &str = "remediate-";
 const INTAKE_JOB_PREFIX: &str = "intake-";
 const PLAY_JOB_PREFIX: &str = "play-";
 const MCP_JOB_PREFIX: &str = "mcp-";
+const WORKSPACE_CLEANUP_JOB_SUFFIX: &str = "-workspace-cleanup";
 
 pub struct ResourceNaming;
 
@@ -215,6 +216,30 @@ impl ResourceNaming {
         let trimmed = Self::ensure_k8s_name_length(&base_name, available);
 
         format!("{CODERUN_JOB_PREFIX}{trimmed}")
+    }
+
+    /// Generate cleanup job name with length compliance.
+    #[must_use]
+    pub fn cleanup_job_name(code_run: &CodeRun) -> String {
+        let base_name = Self::job_name(code_run);
+        let available = MAX_K8S_NAME_LENGTH.saturating_sub(WORKSPACE_CLEANUP_JOB_SUFFIX.len());
+
+        if base_name.len() <= available {
+            return format!("{base_name}{WORKSPACE_CLEANUP_JOB_SUFFIX}");
+        }
+
+        let hash = Self::hash_string(&base_name);
+        let max_prefix_len = available.saturating_sub(hash.len() + 1);
+        let mut prefix: String = base_name.chars().take(max_prefix_len).collect();
+        while prefix.ends_with('-') {
+            prefix.pop();
+        }
+
+        if prefix.is_empty() {
+            format!("{hash}{WORKSPACE_CLEANUP_JOB_SUFFIX}")
+        } else {
+            format!("{prefix}-{hash}{WORKSPACE_CLEANUP_JOB_SUFFIX}")
+        }
     }
 
     /// Generate job name for PR-related tasks (review, remediate)
@@ -533,6 +558,34 @@ mod tests {
         );
         assert!(job_name.contains("t42"));
         assert!(job_name.len() <= MAX_K8S_NAME_LENGTH);
+    }
+
+    #[test]
+    fn cleanup_job_name_appends_suffix_when_base_fits() {
+        let code_run = build_code_run();
+        let job_name = ResourceNaming::job_name(&code_run);
+        let cleanup_name = ResourceNaming::cleanup_job_name(&code_run);
+
+        assert_eq!(
+            cleanup_name,
+            format!("{job_name}{WORKSPACE_CLEANUP_JOB_SUFFIX}")
+        );
+        assert!(cleanup_name.len() <= MAX_K8S_NAME_LENGTH);
+    }
+
+    #[test]
+    fn cleanup_job_name_truncates_with_hash_when_needed() {
+        let mut code_run = build_code_run();
+        let long_agent = "aaaaaaaaaaaaaaaaaaaaaaaa";
+        code_run.spec.github_app = Some(format!("5DLabs-{long_agent}"));
+
+        let job_name = ResourceNaming::job_name(&code_run);
+        let available = MAX_K8S_NAME_LENGTH.saturating_sub(WORKSPACE_CLEANUP_JOB_SUFFIX.len());
+        assert!(job_name.len() > available);
+
+        let cleanup_name = ResourceNaming::cleanup_job_name(&code_run);
+        assert!(cleanup_name.ends_with(WORKSPACE_CLEANUP_JOB_SUFFIX));
+        assert!(cleanup_name.len() <= MAX_K8S_NAME_LENGTH);
     }
 
     #[test]
