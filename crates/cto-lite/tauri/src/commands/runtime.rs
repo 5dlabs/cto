@@ -63,3 +63,16 @@ pub async fn get_runtime_status() -> Result<Vec<RuntimeStatus>, AppError> {
 pub async fn check_docker_running() -> Result<bool, AppError> {
     Ok(rt::is_runtime_running(ContainerRuntime::Docker))
 }
+
+/// Fully automated runtime detection and startup
+/// Zero-touch: detects, starts if needed, and waits for ready
+#[tauri::command]
+pub async fn auto_detect_and_start_runtime() -> Result<RuntimeEnvironment, AppError> {
+    rt::fully_auto_runtime()
+}
+
+/// Auto-detect and start container runtime (legacy, kept for compatibility)
+#[tauri::command]
+pub async fn auto_start_runtime() -> Result<Option<ContainerRuntime>, AppError> {
+    rt::auto_start_runtime()
+}

@@ -3,14 +3,14 @@ name: PM CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - 'crates/pm/**'
       - 'infra/images/pm-server/**'
       - 'infra/images/linear-sidecar/**'
       - '.github/workflows/pm-ci.yaml'
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - 'crates/pm/**'
       - 'infra/images/pm-server/**'
@@ -174,13 +174,13 @@ jobs:
           dockerfile: infra/images/pm-server/Dockerfile
           failure-threshold: error
 
-  # Build and push Docker image (on push to main/develop or manual dispatch)
+  # Build and push Docker image (on push to main or manual dispatch)
   # Note: test-rust removed from needs to avoid blocking on slow/stuck tests
   build-docker:
     needs: [lint-rust, build-check]
     if: |
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+      github.ref == 'refs/heads/main'
     runs-on: [k8s-runner]
     permissions:
       contents: read
