@@ -3,6 +3,32 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.40](https://github.com/5dlabs/cto/compare/v0.2.39...v0.2.40) (2026-02-06)
+
+
+### ✨ Features
+
+* **agents:** add OpenClaw image to agent builds Add ([92176c4](https://github.com/5dlabs/cto/commit/92176c40f3b42dec2dd8c517c041d89a93fccb2c))
+* **agents:** enable dexter agent build ([1d2b036](https://github.com/5dlabs/cto/commit/1d2b0361f97518d6b44f3bf3d80a8f7543f33e82))
+* **clawd:** add clawd agent configuration and identity ([#4349](https://github.com/5dlabs/cto/issues/4349)) ([f0a03a9](https://github.com/5dlabs/cto/commit/f0a03a9853fb20d66f5fe23a35a70181a58fe1b7))
+* **cupid:** add cupid agent configuration and identity ([#4347](https://github.com/5dlabs/cto/issues/4347)) ([18da541](https://github.com/5dlabs/cto/commit/18da541cbc58aca9114aa0b380931f2991d9eace))
+* **keeper:** keeper agent configuration and identity ([#4355](https://github.com/5dlabs/cto/issues/4355)) ([0f22793](https://github.com/5dlabs/cto/commit/0f22793c00027fe239d86976f83fb3b2204c1120))
+* **marketing:** add managed services tech stack section ([#4357](https://github.com/5dlabs/cto/issues/4357)) ([d46b956](https://github.com/5dlabs/cto/commit/d46b956a9e31ead7809fc7ca8a4fbadf3e441052))
+* **openclaw:** deploy OpenClaw agents to Kubernetes in bots namespace ([#4335](https://github.com/5dlabs/cto/issues/4335)) ([d21537d](https://github.com/5dlabs/cto/commit/d21537dbe8262b22c0598f3ff2f26dbe18fbd107))
+* **openclaw:** use npm package instead of source build ([1126503](https://github.com/5dlabs/cto/commit/1126503e8482f8e39b7f326dab1bf50583ff887b))
+* **pixel-assistant:** add pixel-assistant agent configuration ([#4353](https://github.com/5dlabs/cto/issues/4353)) ([35bbccb](https://github.com/5dlabs/cto/commit/35bbccb4dd936f0a9b13faa465d1c0fd4b3861c2))
+* **review:** add review agent configuration and identity ([#4352](https://github.com/5dlabs/cto/issues/4352)) ([ce122e9](https://github.com/5dlabs/cto/commit/ce122e909968f8304d0a2c2769a52524e11a8cd8))
+* **scout:** add scout agent configuration and identity ([#4344](https://github.com/5dlabs/cto/issues/4344)) ([2cb26cd](https://github.com/5dlabs/cto/commit/2cb26cd1221f9639945588dc5a08a47feb27bb95))
+* **webapp:** add webapp agent configuration and identity ([#4354](https://github.com/5dlabs/cto/issues/4354)) ([d0ef4c4](https://github.com/5dlabs/cto/commit/d0ef4c4cf851cc3d02bea1cf001dd089af36720e))
+
+
+### 🐛 Bug Fixes
+
+* **agents:** fix unbound variable error in build-runtime ([aba9bd7](https://github.com/5dlabs/cto/commit/aba9bd785471b03cfd5b8e970b3e0d88f20f2da3))
+* **openclaw:** fix version extraction from release name ([4db156b](https://github.com/5dlabs/cto/commit/4db156b804c9fb737143c445a9e4b06ab8152c23))
+* **openclaw:** use correct URL format for OpenClaw releases ([a7d9e28](https://github.com/5dlabs/cto/commit/a7d9e28c35a4a34c827c0be53713129203f33954))
+* **release:** add play-monitor binary to release artifacts ([563059d](https://github.com/5dlabs/cto/commit/563059d2443a5805163a9a4e69255a0b1f0bba0a))
+
 ## [0.2.39](https://github.com/5dlabs/cto/compare/v0.2.38...v0.2.39) (2026-02-05)
 
 
