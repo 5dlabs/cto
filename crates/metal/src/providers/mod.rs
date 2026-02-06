@@ -7,8 +7,8 @@ pub mod latitude;
 pub mod onprem;
 pub mod ovh;
 pub mod scaleway;
-pub mod vultr;
 mod traits;
+pub mod vultr;
 
 // Re-export client structs for convenience
 pub use cherry::Cherry;

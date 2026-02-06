@@ -1,0 +1,108 @@
+{
+  "created_at": 1770265835,
+  "completed_at": 1770265844,
+  "id": "ad65c216-88ee-a913-760a-12fce3d3f80d",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_67960900",
+      "input": "{\"query\":\"(Kubernetes AI OR k8s AI OR Kubernetes agents OR container orchestration OR AI deployment kubernetes) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ad65c216-88ee-a913-760a-12fce3d3f80d_xs_call_67960900",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the top recent X posts (in English) matching your query on Kubernetes/K8s AI agents, orchestration, and deployment:\n\n- A case study on deploying 11 specialized AI agents as Kubernetes custom resources for tasks like network management, observability, and deployment orchestration.[[1]](https://x.com/i/status/2018370339676328363)\n\n- Thread starter on challenges of production AI agents (deployment, scaling, observability, multi-agent orchestration) and why KAgents on Kubernetes matters.[[2]](https://x.com/i/status/2017579932537500096)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018370339676328363",
+              "start_index": 289,
+              "end_index": 338,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017579932537500096",
+              "start_index": 497,
+              "end_index": 546,
+              "title": "2"
+            }
+          ]
+        }
+      ],
+      "id": "msg_ad65c216-88ee-a913-760a-12fce3d3f80d",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 4541,
+    "input_tokens_details": {
+      "cached_tokens": 3638
+    },
+    "output_tokens": 916,
+    "output_tokens_details": {
+      "reasoning_tokens": 710
+    },
+    "total_tokens": 5457,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 58205000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

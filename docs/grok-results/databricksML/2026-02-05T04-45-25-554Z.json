@@ -1,0 +1,165 @@
+{
+  "created_at": 1770266707,
+  "completed_at": 1770266725,
+  "id": "9978e50c-ed22-cd1f-a799-eb45e55284b0",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_75931839",
+      "input": "{\"query\":\"(Databricks OR MemAlign OR MLflow OR LLM judges OR continual learning) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_9978e50c-ed22-cd1f-a799-eb45e55284b0_xs_call_75931839",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_87438885",
+      "input": "{\"query\":\"(Databricks OR MemAlign OR MLflow OR LLM judges OR continual learning) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_9978e50c-ed22-cd1f-a799-eb45e55284b0_xs_call_87438885",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the top recent English-language X posts matching your advanced search query `(Databricks OR MemAlign OR MLflow OR LLM judges OR continual learning) lang:en`. I've pulled the highest-ranked results (sorted by \"Top\" relevance/engagement).[[1]](https://x.com/i/status/2019107960006537635)[[2]](https://x.com/i/status/2018706140108861779)[[3]](https://x.com/i/status/2018724971842068511)[[4]](https://x.com/i/status/2018033070880788555)\n\n### 1. **@matei_zaharia** (CTO @Databricks, Feb 4, 2026)\n\"Agent memory is a simple and powerful way to do continual learning! With the new MemAlign method from Databricks Research, we can build better LLM judges from examples of human ratings, and they scale with more data. Now in Databricks and @MLflow. https://www.databricks.com/blog/memalign-building-better-llm-judges-human-feedback-scalable-memory\"  \n*(121 likes, 8.4K views)*[[1]](https://x.com/i/status/2019107960006537635)\n\n### 2. **@rohan_subramani** (AI safety researcher, Feb 3, 2026)\n\"Just went on my first podcast! Enjoyed discussing continual learning for LLM agents and its safety implications... [Spotify/Apple links]\"  \n*(19 likes, 5K views)*[[2]](https://x.com/i/status/2018706140108861779)\n\n### 3. **@ZhijingJin** (UofT Asst. Prof, Feb 3, 2026, quoting the above)\n\"📢 Congrats to my PhD student @rohan_subramani for his first podcast on Continual Learning for LLM Agents and Its Safety Implications! Great contribution! 🎉\"[[3]](https://x.com/i/status/2018724971842068511)\n\n### 4. **@nintendobenzo** replying to **@andrewmccalip** (Feb 1, 2026)\nContext: Discussion on AGI takeoff and MoltBot. Reply: \"Continual learning is nowhere close to being solved though. If we were to allow that 'we’re so close' means at least 5 years out but more likely 10+ and requires completely new architecture not present in current LLM technology then ok maybe\"[[4]](https://x.com/i/status/2018033070880788555)\n\nThese cluster around recent buzz on **MemAlign** (a new Databricks technique for scalable LLM judge training via agent memory/continual learning) and **continual learning** for LLMs/agents. The Databricks blog linked in the top post dives deeper into MemAlign + MLflow integration.[[1]](https://x.com/i/status/2019107960006537635) If you want latest chronological posts, full threads, user profiles, or a refined search, let me know!",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019107960006537635",
+              "start_index": 245,
+              "end_index": 294,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018706140108861779",
+              "start_index": 294,
+              "end_index": 343,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018724971842068511",
+              "start_index": 343,
+              "end_index": 392,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018033070880788555",
+              "start_index": 392,
+              "end_index": 441,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019107960006537635",
+              "start_index": 876,
+              "end_index": 925,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018706140108861779",
+              "start_index": 1154,
+              "end_index": 1203,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018724971842068511",
+              "start_index": 1435,
+              "end_index": 1484,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018033070880788555",
+              "start_index": 1855,
+              "end_index": 1904,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019107960006537635",
+              "start_index": 2187,
+              "end_index": 2236,
+              "title": "1"
+            }
+          ]
+        }
+      ],
+      "id": "msg_9978e50c-ed22-cd1f-a799-eb45e55284b0",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 8303,
+    "input_tokens_details": {
+      "cached_tokens": 5999
+    },
+    "output_tokens": 2178,
+    "output_tokens_details": {
+      "reasoning_tokens": 1329
+    },
+    "total_tokens": 10481,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 2,
+    "cost_in_usd_ticks": 118497500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 2,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

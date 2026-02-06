@@ -7,7 +7,6 @@ on:
       - "docs/research/**"
     branches:
       - main
-      - develop
 
 permissions:
   contents: write

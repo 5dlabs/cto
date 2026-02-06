@@ -248,7 +248,5 @@ export function createClaudeProvider(): ModelProvider {
  */
 export class ClaudeProvider extends AnthropicApiProvider {}
 
-/**
- * @deprecated Use createClaudeProvider() instead
- */
-export const claudeProvider = createClaudeProvider();
+// NOTE: Removed eagerly initialized claudeProvider export to avoid side-effect logging.
+// Use createClaudeProvider() or get the provider from the registry in ./index.ts instead.

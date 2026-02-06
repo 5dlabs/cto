@@ -24,7 +24,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.2.36"
+version = "0.2.39"
 edition = "2021"
 authors = ["5D team"]
 license = "AGPL-3.0"
@@ -35,11 +35,11 @@ repository = "https://github.com/5dlabs/cto"
 axum = "0.8.8"
 tokio = { version = "1.49", features = ["full"] }
 tower = "0.5"
-tower-http = { version = "0.5", features = ["trace", "cors", "limit", "timeout"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "limit", "timeout"] }
 
 # Kubernetes
-kube = { version = "0.93", features = ["runtime", "derive", "client", "ws"] }
-k8s-openapi = { version = "0.22", features = ["v1_30"] }
+kube = { version = "0.98", features = ["runtime", "derive", "client", "ws"] }
+k8s-openapi = { version = "0.24.0", features = ["v1_31"] }
 schemars = "0.8"
 
 # Serialization
@@ -84,7 +84,7 @@ regex = "1.12"
 handlebars = "6.4.0"
 
 # Testing
-mockall = "0.13"
+mockall = "0.14"
 wiremock = "0.6"
 serial_test = "3.3"
 
