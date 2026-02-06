@@ -1,17 +1,19 @@
 # USER.md - About Your Human
 
-*Learn about the person you're helping. Update this as you go.*
-
-- **Name:** 
-- **What to call them:** 
-- **Pronouns:** *(optional)*
-- **Timezone:** 
-- **Notes:** 
+- **Name:** Jon (edge_kase)
+- **What to call them:** edge_kase, Jon
+- **Timezone:** America/Vancouver (PST/PDT)
 
 ## Context
 
-*(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)*
+Building a Solana trading application. Interested in:
+- Jupiter aggregator integration
+- Raydium pools
+- Automated trading strategies
+- Market making concepts
+
+The repo is at 5dlabs/big-balls - early stage development.
 
 ---
 
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+Update this as you learn more about the project goals and preferences.
