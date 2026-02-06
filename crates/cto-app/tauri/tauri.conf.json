@@ -4,7 +4,6 @@
   "version": "0.1.0",
   "identifier": "app.cto.desktop",
   "build": {
-    "frontendDist": "../../ui/dist",
     "devUrl": "http://localhost:5173"
   },
   "app": {

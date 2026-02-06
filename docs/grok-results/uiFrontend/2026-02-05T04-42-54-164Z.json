@@ -1,0 +1,122 @@
+{
+  "created_at": 1770266566,
+  "completed_at": 1770266574,
+  "id": "dc9022dc-2d60-7df4-dd43-a2f959e9d757",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_60528357",
+      "input": "{\"query\":\"(React Native OR React Native AI OR Shadcn UI OR Shadcn OR TanStack) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_dc9022dc-2d60-7df4-dd43-a2f959e9d757_xs_call_60528357",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the top recent English-language X posts matching your query on React Native, React Native AI, Shadcn UI, Shadcn, or TanStack:[[1]](https://x.com/i/status/2017488939196551474)[[2]](https://x.com/i/status/2017531772314259668)\n\n### 1. Hiring alert from INUA AI Group (@INUA_AI)\n\"We are hiring a Front End Developer (React & AI tools). Refine AI-generated apps, manage data flows, and build modern UI experiences. Apply 👉🏾 https://inuaai.com/front-end-developer-react-ai-native-tools/ #FrontendJobs #ReactDeveloper #NowHiring #RealizePossibilities #INUAAI\"[[1]](https://x.com/i/status/2017488939196551474)\n\n- **Posted**: Jan 31, 2026\n- **Engagement**: 15 likes, 2 reposts, 11 replies, 2K+ views\n- **Media**: Includes an image (job poster).\n\n### 2. Recommended tech stack by Pranav (@PranavDHQ)\n\"The ONLY Tech Stack you need to quickly build a $10K/Month, scalable mobile & web app. (BOOKMARK THIS) 💻 Frontend: Next.js, TailwindCSS, Shadcn UI, React Query 📱 Mobile: React Native (Expo), HeroUI, ExpoUI ... [full stack details including Supabase, NestJS, etc.] One stack. One language. 100% TypeScript.\"[[2]](https://x.com/i/status/2017531772314259668)\n\n- **Posted**: Jan 31, 2026\n- **Engagement**: 52 likes, 7 reposts, 27 replies, 2K+ views",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017488939196551474",
+              "start_index": 134,
+              "end_index": 183,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017531772314259668",
+              "start_index": 183,
+              "end_index": 232,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017488939196551474",
+              "start_index": 561,
+              "end_index": 610,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017531772314259668",
+              "start_index": 1106,
+              "end_index": 1155,
+              "title": "2"
+            }
+          ]
+        }
+      ],
+      "id": "msg_dc9022dc-2d60-7df4-dd43-a2f959e9d757",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 4741,
+    "input_tokens_details": {
+      "cached_tokens": 3637
+    },
+    "output_tokens": 1218,
+    "output_tokens_details": {
+      "reasoning_tokens": 742
+    },
+    "total_tokens": 5959,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 60116500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

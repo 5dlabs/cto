@@ -1,0 +1,165 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-config
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+data:
+  openclaw.json: |
+    {
+      "agents": {
+        "defaults": {
+          "compaction": {
+            "memoryFlush": {
+              "enabled": {{ .Values.agentDefaults.compaction.memoryFlush.enabled }},
+              "prompt": {{ .Values.agentDefaults.compaction.memoryFlush.prompt | default "Write any lasting notes, decisions, preferences, or task context to memory/YYYY-MM-DD.md. Include: ongoing tasks, user preferences learned, key decisions made, and important context that should persist. Reply with NO_REPLY if nothing to store." | quote }},
+              "softThresholdTokens": {{ .Values.agentDefaults.compaction.memoryFlush.softThresholdTokens }}
+            },
+            "mode": {{ .Values.agentDefaults.compaction.mode | quote }},
+            "reserveTokensFloor": {{ .Values.agentDefaults.compaction.reserveTokensFloor }}
+          },
+          "contextPruning": {
+            "mode": {{ .Values.agentDefaults.contextPruning.mode | quote }},
+            "ttl": {{ .Values.agentDefaults.contextPruning.ttl | quote }}
+          },
+          "elevatedDefault": {{ .Values.agentDefaults.elevatedDefault | quote }},
+          "heartbeat": {
+            "every": {{ .Values.agentDefaults.heartbeat.every | quote }},
+            "prompt": {{ .Values.agentDefaults.heartbeat.prompt | quote }}
+          },
+          "maxConcurrent": {{ .Values.agentDefaults.maxConcurrent }},
+          "memorySearch": {
+            "cache": {
+              "enabled": {{ .Values.memorySearch.cache.enabled }},
+              "maxEntries": {{ .Values.memorySearch.cache.maxEntries }}
+            },
+            "experimental": {
+              "sessionMemory": {{ .Values.memorySearch.sessionMemory }}
+            },
+            "model": {{ .Values.memorySearch.model | quote }},
+            "provider": {{ .Values.memorySearch.provider | quote }},
+            "query": {
+              "hybrid": {
+                "candidateMultiplier": {{ .Values.memorySearch.hybrid.candidateMultiplier }},
+                "enabled": {{ .Values.memorySearch.hybrid.enabled }},
+                "textWeight": {{ .Values.memorySearch.hybrid.textWeight }},
+                "vectorWeight": {{ .Values.memorySearch.hybrid.vectorWeight }}
+              }
+            },
+            "sources": {{ .Values.memorySearch.sources | toJson }},
+            "sync": {
+              "sessions": {
+                "deltaBytes": {{ .Values.memorySearch.sync.deltaBytes }},
+                "deltaMessages": {{ .Values.memorySearch.sync.deltaMessages }}
+              },
+              "watch": {{ .Values.memorySearch.sync.watch }}
+            }
+          },
+          "model": {
+            "fallbacks": {{ .Values.modelDefaults.fallbacks | toJson }},
+            "primary": {{ .Values.modelDefaults.primary | quote }}
+          }
+        },
+        "list": [
+          {
+            "agentDir": "/workspace/.openclaw/agents/{{ .Values.agent.id }}/agent",
+            "heartbeat": {
+              "every": {{ .Values.agent.heartbeat | quote }}
+            },
+            "id": {{ .Values.agent.id | quote }},
+            "model": {{ .Values.agent.model | quote }},
+            "name": {{ .Values.agent.name | quote }},
+            "sandbox": {
+              "mode": {{ .Values.agent.sandbox | quote }}
+            },
+            "tools": {
+              "allow": {{ .Values.agent.tools.allow | toJson }}
+            },
+            "workspace": "/workspace"
+          }
+        ]
+      },
+      "browser": {
+        "headless": true
+      },
+      "channels": {
+        "discord": {
+          "accounts": {
+            {{ .Values.discord.accountId | default .Values.agent.id | quote }}: {
+              "groupPolicy": {{ .Values.discord.groupPolicy | quote }},
+              "token": "${DISCORD_TOKEN}",
+              "guilds": {{ .Values.discord.guilds | toJson }}
+            }
+          },
+          "allowBots": {{ .Values.discord.allowBots | default true }},
+          "dm": {{ .Values.discord.dm | toJson }},
+          "enabled": {{ .Values.discord.enabled | default true }},
+          "groupPolicy": "allowlist"
+        }
+      },
+      "gateway": {
+        "bind": {{ .Values.gateway.bind | quote }},
+        "mode": {{ .Values.gateway.mode | quote }},
+        "port": {{ .Values.gateway.port }}
+      },
+      "memory": {
+        "citations": "auto"
+      },
+      "messages": {
+        "ackReactionScope": "group-mentions"
+      },
+      "models": {
+        {{- $first := true }}
+        {{- range $name, $provider := .Values.models.providers }}
+        {{- if not $first }},{{ end }}
+        {{ $name | quote }}: {
+          "apiKey": "${PROVIDER_{{ $name | upper | replace "-" "_" }}_KEY}",
+          "baseUrl": {{ $provider.baseUrl | quote }},
+          "models": {{ $provider.models | toJson }}
+        }
+        {{- $first = false }}
+        {{- end }}
+      },
+      "session": {
+        "agentToAgent": {
+          "maxPingPongTurns": {{ .Values.session.agentToAgent.maxPingPongTurns }}
+        },
+        "dmScope": {{ .Values.session.dmScope | quote }},
+        "reset": {
+          "atHour": {{ .Values.session.reset.atHour }},
+          "idleMinutes": {{ .Values.session.reset.idleMinutes }},
+          "mode": {{ .Values.session.reset.mode | quote }}
+        },
+        "resetByType": {
+          "dm": {
+            "idleMinutes": {{ .Values.session.resetByType.dm.idleMinutes }},
+            "mode": {{ .Values.session.resetByType.dm.mode | quote }}
+          },
+          "group": {
+            "idleMinutes": {{ .Values.session.resetByType.group.idleMinutes }},
+            "mode": {{ .Values.session.resetByType.group.mode | quote }}
+          },
+          "thread": {
+            "atHour": {{ .Values.session.resetByType.thread.atHour }},
+            "mode": {{ .Values.session.resetByType.thread.mode | quote }}
+          }
+        }
+      },
+      "tools": {
+        "agentToAgent": {
+          "enabled": {{ .Values.tools.agentToAgent.enabled }}
+        },
+        "allow": {{ .Values.agent.tools.allow | toJson }},
+        "elevated": {
+          "enabled": {{ .Values.tools.elevated.enabled }}
+        },
+        "exec": {
+          "pathPrepend": {{ .Values.tools.exec.pathPrepend | toJson }}
+        },
+        {{- if .Values.tools.mcpServers }}
+        "mcpServers": {{ .Values.tools.mcpServers | toJson }},
+        {{- end }}
+        "profile": {{ .Values.tools.profile | quote }}
+      }
+    }

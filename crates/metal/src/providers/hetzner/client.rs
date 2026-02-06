@@ -218,7 +218,10 @@ impl Hetzner {
     ///
     /// # Errors
     /// Returns error if the API request fails or transaction is not found.
-    pub async fn get_transaction(&self, transaction_id: &str) -> Result<OrderResponse, ProviderError> {
+    pub async fn get_transaction(
+        &self,
+        transaction_id: &str,
+    ) -> Result<OrderResponse, ProviderError> {
         self.get(&format!("/order/server/transaction/{transaction_id}"))
             .await
     }

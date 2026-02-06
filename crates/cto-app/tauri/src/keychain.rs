@@ -11,7 +11,7 @@ pub struct GitHubToken {
 #[tauri::command]
 pub fn get_github_token() -> Result<Option<GitHubToken>, String> {
     let entry = Entry::new("cto-app", "github_token");
-    
+
     match entry.get_password() {
         Ok(token) => Ok(Some(GitHubToken {
             access_token: token,
@@ -25,7 +25,7 @@ pub fn get_github_token() -> Result<Option<GitHubToken>, String> {
 #[tauri::command]
 pub fn set_github_token(token: &str) -> Result<(), String> {
     let entry = Entry::new("cto-app", "github_token");
-    
+
     entry
         .set_password(token)
         .map_err(|e| format!("Failed to save GitHub token: {}", e))
@@ -34,7 +34,7 @@ pub fn set_github_token(token: &str) -> Result<(), String> {
 #[tauri::command]
 pub fn delete_github_token() -> Result<(), String> {
     let entry = Entry::new("cto-app", "github_token");
-    
+
     entry
         .delete_password()
         .map_err(|e| format!("Failed to delete GitHub token: {}", e))
@@ -43,7 +43,7 @@ pub fn delete_github_token() -> Result<(), String> {
 #[tauri::command]
 pub fn get_cf_tunnel_token() -> Result<Option<String>, String> {
     let entry = Entry::new("cto-app", "cf_tunnel_token");
-    
+
     match entry.get_password() {
         Ok(token) => Ok(Some(token)),
         Err(keyring::Error::NoEntry) => Ok(None),
@@ -54,7 +54,7 @@ pub fn get_cf_tunnel_token() -> Result<Option<String>, String> {
 #[tauri::command]
 pub fn set_cf_tunnel_token(token: &str) -> Result<(), String> {
     let entry = Entry::new("cto-app", "cf_tunnel_token");
-    
+
     entry
         .set_password(token)
         .map_err(|e| format!("Failed to save Cloudflare tunnel token: {}", e))

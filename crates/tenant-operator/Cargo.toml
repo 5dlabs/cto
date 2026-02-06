@@ -12,8 +12,8 @@ path = "src/bin/operator.rs"
 
 [dependencies]
 # Kubernetes
-kube = { workspace = true }
-k8s-openapi = { workspace = true, features = ["v1_30"] }
+kube.workspace = true
+k8s-openapi.workspace = true
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: openclaw-agent
+description: Single OpenClaw agent deployment with Discord integration
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Jonathon Fritz
+    email: jonathon@5dlabs.ai

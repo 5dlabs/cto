@@ -276,7 +276,6 @@ impl LinearConfig {
     ///
     /// Uses `actor=app` to enable Actor authorization, which makes the app perform
     /// actions as itself (the Agent app identity) rather than as the authorizing user.
-    /// This gives proper "Agent" representation in Linear instead of user identity.
     #[must_use]
     pub fn oauth_url(&self, agent: &str) -> Option<String> {
         self.get_app(agent).map(|app| {

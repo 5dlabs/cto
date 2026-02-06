@@ -1,0 +1,337 @@
+# =============================================================================
+# OpenClaw Agent Helm Chart - Default Values
+# =============================================================================
+# Each agent is deployed as a separate Helm release via ArgoCD.
+# Per-agent overrides are provided via inline values in the ArgoCD Application.
+
+# -- Namespace for all resources
+namespace: bots
+
+# -- Create namespace (handled by ArgoCD syncOptions instead)
+createNamespace: false
+
+# -- Image configuration
+image:
+  repository: ghcr.io/5dlabs/runtime
+  tag: full
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets
+imagePullSecrets:
+  - name: ghcr-secret
+
+# -- Resource limits
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "2000m"
+    memory: "4Gi"
+
+# -- Storage configuration
+storage:
+  storageClass: mayastor
+  size: 10Gi
+
+# =============================================================================
+# Workspace Initialization
+# =============================================================================
+# Repos to clone into the agent's workspace on first boot.
+# On subsequent restarts, the init container checks for dirty state
+# (uncommitted changes, detached HEAD, etc.) and logs warnings instead
+# of clobbering existing work.
+workspace:
+  repos: []
+  # Example: clone the CTO repo for each agent
+  # repos:
+  #   - name: cto
+  #     url: "https://github.com/5dlabs/cto.git"
+  #     branch: "main"
+  #     path: "repos/cto"   # relative to /workspace
+
+# =============================================================================
+# Agent Configuration
+# =============================================================================
+agent:
+  # -- Unique agent identifier (e.g., "metal", "trader", "forge")
+  id: ""
+  # -- Display name (e.g., "Metal", "Trader", "Forge")
+  name: ""
+  # -- Primary model (e.g., "anthropic/claude-opus-4-6")
+  model: "anthropic/claude-opus-4-6"
+  # -- Heartbeat interval
+  heartbeat: "15m"
+  # -- Sandbox mode
+  sandbox: "off"
+  # -- Allowed tool groups
+  tools:
+    allow:
+      - "group:fs"
+      - "group:runtime"
+      - "group:web"
+      - "browser"
+      - "group:sessions"
+
+# =============================================================================
+# Discord Configuration
+# =============================================================================
+discord:
+  enabled: true
+  # -- Discord account ID (usually matches agent.id)
+  accountId: ""
+  # -- Key in the openclaw-discord-tokens Secret for this agent's token
+  tokenSecretKey: ""
+  # -- Group policy for this account
+  groupPolicy: "allowlist"
+  # -- Guild configuration
+  guilds:
+    # Wildcard guild (all servers)
+    "*":
+      requireMention: true
+      # -- User IDs allowed to interact
+      users:
+        - "444519104808878090"
+    # 5dlabs guild
+    "1409006087331512342":
+      requireMention: true
+      slug: "5dlabs"
+      channels:
+        "1409006087969177735":
+          allow: true
+          requireMention: true
+        "1445330230926381056":
+          allow: true
+          requireMention: true
+        "1467540094490640529":
+          allow: true
+          requireMention: true
+  # -- Allow bot interactions
+  allowBots: true
+  # -- DM allowlist
+  dm:
+    allowFrom:
+      - "444519104808878090"
+
+# =============================================================================
+# Model Providers
+# =============================================================================
+# API keys are injected via environment variables from ExternalSecrets
+models:
+  providers:
+    anthropic:
+      baseUrl: "https://api.anthropic.com"
+      models:
+        - id: "claude-3-5-haiku-latest"
+        - id: "claude-sonnet-4-20250514"
+        - id: "claude-opus-4-20250514"
+        - id: "claude-opus-4-6-20260201"
+    minimax:
+      baseUrl: "https://api.minimax.io/anthropic"
+      models:
+        - id: "MiniMax-M2.1"
+    nvidia-nim:
+      baseUrl: "https://integrate.api.nvidia.com/v1"
+      models:
+        - id: "moonshotai/kimi-k2-instruct"
+    openai:
+      baseUrl: "https://api.openai.com/v1"
+      models:
+        - id: "text-embedding-3-small"
+
+# =============================================================================
+# Agent Defaults (global across all agents)
+# =============================================================================
+agentDefaults:
+  compaction:
+    mode: "safeguard"
+    reserveTokensFloor: 25000
+    memoryFlush:
+      enabled: true
+      softThresholdTokens: 6000
+  contextPruning:
+    mode: "cache-ttl"
+    ttl: "1h"
+  elevatedDefault: "full"
+  maxConcurrent: 4
+  heartbeat:
+    every: "15m"
+    prompt: >-
+      Read HEARTBEAT.md if it exists. Follow it strictly.
+      AUTONOMY: When you have clear work to do, execute it.
+      Don't ask for permission to sequence tasks - determine logical priority
+      (dependencies, urgency, complexity) and proceed.
+      Ask only when genuinely blocked or when a decision requires user preferences
+      you cannot infer. Report results, not 'what should I do next?'.
+      Reply HEARTBEAT_OK only if nothing needs attention.
+
+# =============================================================================
+# Memory Search Configuration
+# =============================================================================
+memorySearch:
+  model: "text-embedding-3-small"
+  provider: "openai"
+  sources:
+    - "memory"
+    - "sessions"
+  cache:
+    enabled: true
+    maxEntries: 50000
+  hybrid:
+    enabled: true
+    textWeight: 0.3
+    vectorWeight: 0.7
+    candidateMultiplier: 4
+  sessionMemory: true
+  sync:
+    watch: true
+    deltaBytes: 50000
+    deltaMessages: 25
+
+# =============================================================================
+# Session Configuration
+# =============================================================================
+session:
+  dmScope: "per-channel-peer"
+  reset:
+    mode: "daily"
+    atHour: 4
+    idleMinutes: 240
+  resetByType:
+    dm:
+      mode: "idle"
+      idleMinutes: 480
+    group:
+      mode: "idle"
+      idleMinutes: 240
+    thread:
+      mode: "daily"
+      atHour: 4
+  agentToAgent:
+    maxPingPongTurns: 5
+
+# =============================================================================
+# Gateway Configuration (adapted for Kubernetes)
+# =============================================================================
+gateway:
+  bind: "0.0.0.0"
+  port: 18789
+  # In Kubernetes, gateway runs locally inside the pod (no remote SSH)
+  mode: "local"
+
+# =============================================================================
+# Model Fallback Configuration
+# =============================================================================
+modelDefaults:
+  primary: "minimax/MiniMax-M2.1"
+  fallbacks:
+    - "minimax/MiniMax-M2.1"
+    - "nvidia-nim/moonshotai/kimi-k2-instruct"
+    - "anthropic/claude-3-5-haiku-latest"
+    - "anthropic/claude-sonnet-4-5"
+
+# =============================================================================
+# Tools Configuration (Linux-adapted, no macOS paths)
+# =============================================================================
+tools:
+  profile: "coding"
+  agentToAgent:
+    enabled: true
+  elevated:
+    enabled: true
+  exec:
+    # Linux paths only - no macOS /opt/homebrew or /Users paths
+    pathPrepend:
+      - "/usr/local/bin"
+  # -- MCP servers available to the OpenClaw gateway (orchestrator agents)
+  # These are DISTINCT from Claude Code's MCP servers above.
+  # OpenClaw agents use these for planning, coordination, and memory.
+  mcpServers:
+    openmemory:
+      type: "sse"
+      url: "http://openmemory.openmemory.svc.cluster.local:8080/mcp/sse"
+
+# =============================================================================
+# Claude Code CLI Configuration
+# =============================================================================
+# Controls the Claude Code CLI sessions invoked by OpenClaw agents via `exec`.
+# Two separate ConfigMaps are generated:
+#   1. claude-settings → settings.json (permissions, agent teams, telemetry)
+#   2. claude-mcp      → .claude.json  (MCP server connections for coding tasks)
+#
+# These are DISTINCT from the OpenClaw gateway's own tool/MCP configuration
+# defined in the main configmap.yaml (openclaw.json).
+claudeCode:
+  # -- Enable Claude Code CLI integration
+  enabled: true
+  # -- Pinned version installed in the Docker image (set via Dockerfile ARG)
+  # This is informational only; the actual version is baked into the image.
+  version: "2.1.32"
+
+  # -- Permission settings for Claude Code CLI sessions
+  permissions:
+    # bypassPermissions = fully autonomous, no confirmation prompts
+    defaultMode: "bypassPermissions"
+    allow:
+      - "Bash"
+      - "Read"
+      - "Edit"
+      - "Write"
+      - "WebFetch"
+      - "WebSearch"
+      - "Task"
+
+  # -- Agent Teams (parallel sub-agent orchestration within Claude Code)
+  agentTeams:
+    enabled: true
+    # in-process = all teammates run within the same Node.js process (K8s-safe)
+    teammateMode: "in-process"
+
+  # -- Disable co-authored-by commit attribution
+  includeCoAuthoredBy: false
+
+  # -- Disable telemetry in Claude Code CLI
+  disableTelemetry: true
+
+  # -- MCP servers available to Claude Code CLI sessions
+  # These are the tools that the Claude Code coding agent can use when
+  # invoked by an OpenClaw agent. Separate from OpenClaw's own tools.
+  mcp:
+    servers:
+      # OpenMemory — persistent long-term agent memory (shared across all agents)
+      openmemory:
+        type: "sse"
+        url: "http://openmemory.openmemory.svc.cluster.local:8080/mcp/sse"
+      # Example: Connect Claude Code to the CTO tool server
+      # cto:
+      #   command: "npx"
+      #   args: ["-y", "@5dlabs/cto-mcp"]
+      #   env:
+      #     CTO_API_KEY: "${CTO_API_KEY}"
+
+# =============================================================================
+# Secrets Configuration
+# =============================================================================
+secrets:
+  # -- Name of the Secret containing Discord bot tokens (one key per agent)
+  discordTokensSecret: "openclaw-discord-tokens"
+  # -- Name of the Secret containing shared API keys (Anthropic, OpenAI, etc.)
+  apiKeysSecret: "openclaw-api-keys"
+
+# =============================================================================
+# Probes
+# =============================================================================
+probes:
+  # OpenClaw gateway exposes a health endpoint
+  liveness:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 60
+    timeoutSeconds: 10
+    failureThreshold: 5
+  readiness:
+    enabled: true
+    initialDelaySeconds: 15
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
