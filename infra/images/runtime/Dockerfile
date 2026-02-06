@@ -578,6 +578,7 @@ ENV PATH="/home/node:${PATH}"
 # 1Password CLI (op) for headless secret access from agents
 # Agents use OP_SERVICE_ACCOUNT_TOKEN (injected via K8s secret) for auth
 # =============================================================================
+USER root
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     set -eux; \
     OP_VERSION="v2.30.3"; \
