@@ -1,0 +1,29 @@
+# =============================================================================
+# Tools MCP Client Configuration (client-config.json)
+# =============================================================================
+# Mounted into the pod at /workspace/client-config.json
+# Read by the `tools` binary (via MCP_CLIENT_CONFIG env var) to control:
+#   - Which remote tools to expose from the CTO tool server
+#   - Which local MCP servers to spawn alongside
+#   - Connection pool limits (LRU eviction)
+#
+# Based on the ClientConfig struct in crates/tools/src/config.rs
+#
+# Naming convention:
+#   openclaw-*-tools-client → tools binary client config (client-config.json)
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-tools-client
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tools-client
+data:
+  client-config.json: |
+    {
+      "remoteTools": {{ .Values.tools.clientConfig.remoteTools | toJson }},
+      "localServers": {{ .Values.tools.clientConfig.localServers | toJson }},
+      "maxConnections": {{ .Values.tools.clientConfig.maxConnections }}
+    }
