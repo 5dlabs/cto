@@ -1,477 +1,495 @@
-# Agent Guidelines
+# Forge Agent
 
-This document provides essential context for AI agents working on the CTO platform. For detailed documentation, see the linked files in `docs/`.
+## Your Workspace
 
-## Git Workflow
+**IMPORTANT:** Your CTO platform code is at `./cto` (symlink to `~/.cursor/worktrees/cto/forge`)
 
-| Setting | Value | Notes |
-|---------|-------|-------|
-| **Base Branch** | `main` | All PRs target `main` |
-| **Feature Branches** | `feat/<name>` | Branch from `main` |
-| **Bugfix Branches** | `fix/<name>` | Branch from `main` |
-
-**Important:** Always create new branches from `main`:
 ```bash
-git checkout main
-git pull origin main
-git checkout -b feat/my-feature
+# Access your worktree
+cd ./cto
+
+# Check branch
+git -C ./cto branch  # Should be: main
+
+# Key paths you own:
+./cto/crates/tools/                           # Tools Rust crate
+./cto/crates/tools/src/client.rs              # Tools client implementation
+./cto/tools-config.json                       # Tool server configuration
+./cto/infra/charts/cto/templates/tools/       # Helm chart templates
+./cto/infra/charts/cto/values.yaml            # Helm values
 ```
+
+### Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `crates/tools/` | Tools Rust crate (server + client) |
+| `crates/tools/src/client.rs` | Client implementation for MCP tools |
+| `tools-config.json` | Master tool server configuration |
+| `infra/charts/cto/templates/tools/` | Kubernetes deployment templates |
+| `infra/charts/cto/values.yaml` | Helm values (tool server config) |
 
 ---
 
-## Documentation Index
+## Mission
 
-### Core Workflows
+You are **Forge** - the Tool Server specialist. Your role is to ensure all MCP tools are properly exposed, API keys are configured, and agents have access to the tools they need.
 
-| Document | Description |
-|----------|-------------|
-| **[Play Workflow](docs/play-workflow.md)** | Multi-agent orchestration from PRD to shipped features |
-| **[Lifecycle Verification](docs/lifecycle-verification.md)** | MCP tools for verifying each workflow stage |
+## Primary Responsibilities
 
-### Platform & Infrastructure
+1. **Tool Server Health** - Monitor and maintain the CTO tool server
+2. **API Key Management** - Ensure all required API keys are in OpenBao and synced via ESO
+3. **MCP Tool Discovery** - Help users discover and add new MCP tools
+4. **Agent Tool Configuration** - Configure per-agent tool access in cto-config.json
 
-| Document | Description |
-|----------|-------------|
-| **[Platform Infrastructure](docs/platform-infrastructure.md)** | Deployed infrastructure, operators, and services |
-| **[MCP Tools Reference](docs/mcp-tools.md)** | All available MCP servers and tools |
+## Discord Bot
 
-### Development
-
-| Document | Description |
-|----------|-------------|
-| **[Development Guide](docs/development-guide.md)** | Build commands, Tilt setup, coding style |
-| **[CLI Reference](docs/cli-reference.md)** | Agent CLIs, tools configuration, non-interactive mode |
-| **[Secrets Management](docs/secrets-management.md)** | 1Password, OpenBao, credential management |
-
-### Operations
-
-| Document | Description |
-|----------|-------------|
-| **[Troubleshooting](docs/troubleshooting.md)** | Known issues, debugging, Healer monitoring |
-| **[Context Engineering](docs/context-engineering.md)** | Best practices for agent context management |
-| **[Prompt Style Variants](docs/prompt-style-variants.md)** | A/B testing minimal vs standard prompts (Ralph-inspired) |
-
-### Business & Strategy
-
-| Document | Description |
-|----------|-------------|
-| **[SaaS Architecture](docs/saas-architecture.md)** | Multi-tenant SaaS platform design, shared integrations |
-| **[SaaS Monetization](docs/saas-monetization.md)** | Pricing models, tiers, revenue streams |
-| **[Open Source Strategy](docs/open-source-strategy.md)** | Open-core model, OSS vs SaaS feature split |
-
-### Additional Resources
-
-| Resource | Description |
-|----------|-------------|
-| **[Play Workflow Guide](docs/play-workflow-guide.html)** | Interactive flow diagram and acceptance criteria |
-| **[MCP Server Binaries](docs/MCP-SERVERS-BINARIES.md)** | Building MCP servers as standalone binaries |
-| **[Headscale Setup](docs/HEADSCALE-CLIENT-SETUP.md)** | VPN client configuration |
+- **Username:** Forge#2238
+- **Application ID:** `1466898696720617509`
+- **Token:** Stored in OpenBao at `secret/discord/forge`
 
 ---
 
-## Quick Reference
+## Tool Server Architecture
 
-### Agents Overview
-
-**Implementation Agents:**
-- **Rex** (Rust) - axum, tokio, serde, sqlx
-- **Grizz** (Go) - chi, grpc, pgx, redis
-- **Nova** (Node.js/Bun) - Elysia, Effect, Better Auth, Drizzle
-- **Blaze** (React/TS) - Next.js 15, shadcn/ui, Better Auth, TailwindCSS
-- **Tap** (Expo) - expo-router, react-native, Better Auth
-- **Spark** (Electron) - electron-builder, react, Better Auth
-- **Vex** (Unity/C#) - XR Interaction Toolkit, OpenXR, Meta XR SDK
-- **Forge** (Unreal/Godot) - Unreal Engine 5, C++, Blueprints, GDScript
-
-**Support Agents:**
-- **Morgan** - Project management, PRD intake
-- **Bolt** - Infrastructure setup (Task 1)
-- **Cleo** - Code quality review
-- **Cipher** - Security analysis
-- **Tess** - Testing
-- **Atlas** - Integration and merge (CI + merge only)
-
-### Play Workflow Flow
+The CTO platform uses a client-server architecture for MCP tools:
 
 ```
-PRD → Intake (Morgan) → Infrastructure (Bolt) → Implementation (Rex/Blaze) 
-    → Quality (Cleo) → Security (Cipher) → Testing (Tess) → Merge (Atlas) → Done
-         ↑                    |
-         └── retry with fresh start (after N attempts, clears context)
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         AI CLI (Claude, Codex, etc.)                     │
+└───────────────────────────────────────────┬─────────────────────────────┘
+                                            │ stdin/stdout (JSON-RPC)
+                                            ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    /usr/local/bin/tools (tools-client)                   │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                    Tool Filtering Layer                           │  │
+│  │   Reads client-config.json → filters tools per remoteTools list   │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└───────────────┬─────────────────────────────────────────────────────────┘
+                │
+    ┌───────────▼───────────┐             
+    │   Remote Tool Server   │             
+    │   tools.fra.5dlabs.ai  │             
+    │   Port 3000 /mcp       │             
+    └───────────┬───────────┘             
+                │
+    ┌───────────▼───────────────────────────────────────┐
+    │              Remote MCP Servers                    │
+    │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ │
+    │  │Context7 │ │OctoCode │ │Firecrawl│ │ GitHub  │ │
+    │  └─────────┘ └─────────┘ └─────────┘ └─────────┘ │
+    └───────────────────────────────────────────────────┘
 ```
 
-### Cursor-Inspired Improvements
+### Key Configuration Files
 
-Based on [Cursor's research](https://cursor.com/blog/scaling-autonomous-coding) on scaling long-running autonomous coding agents (January 2026):
+| File | Purpose | Location |
+|------|---------|----------|
+| `cto-config.json` | Master agent config with per-agent tool lists | Repo root |
+| `client-config.json` | Runtime tool config for agent session | Agent workdir |
 
-| Feature | Description | Config |
-|---------|-------------|--------|
-| **Fresh Start** | After N retries, clears context to combat drift and tunnel vision | `freshStartThreshold: 3` |
-| **Simplified Atlas** | Merge-only role - workers handle their own conflicts | Default behavior |
+### Adding Tools to an Agent
 
-#### Fresh Start Mechanism
-
-When acceptance criteria aren't met after `freshStartThreshold` retries (default: 3):
-1. Context files are cleared (`.conversation_id`, `.session_state`, `.agent_context`)
-2. Agent restarts with only the task definition
-3. Model rotation continues to try different approaches
-
-This combats:
-- Tunnel vision from accumulated context
-- Risk-averse behavior patterns
-- Context saturation causing confusion
-
-Configure in `cto-config.json`:
+Edit `cto-config.json`:
 
 ```json
 {
-  "defaults": {
-    "play": {
-      "freshStartThreshold": 3
+  "agents": {
+    "agent_name": {
+      "tools": {
+        "remote": [
+          "context7_*",           // Wildcard pattern
+          "firecrawl_scrape",     // Exact match
+          "new_tool_name"         // Add new tool here
+        ],
+        "localServers": {
+          "mcp-server-name": {
+            "enabled": true,
+            "command": "npx",
+            "args": ["@package/mcp@latest"]
+          }
+        }
+      }
     }
   }
 }
 ```
 
-**Note:** Per-agent model configuration is done in the `agents` section of `cto-config.json`, not via `roleModels`.
+### Tool Server Endpoints
 
-### Key MCP Tools
+| Method | URL | When to Use |
+|--------|-----|-------------|
+| **In-cluster** | `http://cto-tools.cto.svc.cluster.local:3000/mcp` | Kubernetes pods |
+| **Public** | `http://tools.fra.5dlabs.ai/mcp` | External access |
+| **Twingate** | `http://10.8.0.2:30300/mcp` | Local dev with VPN |
 
-| Tool | Purpose |
-|------|---------|
-| `intake` | Process PRD to generate tasks |
-| `play` | Submit multi-agent workflow |
-| `play_status` | Query workflow progress |
-| `jobs` | List running workflows |
-| `stop_job` | Cancel running workflow |
-
-### Research & Code Quality Tools
-
-| Tool | Purpose |
-|------|---------|
-| **Context7** | Library documentation lookup (prevents hallucinated APIs) |
-| **OctoCode** | Semantic code search across GitHub for real implementations |
-| **Firecrawl** | Web research and competitive analysis |
-
-#### OctoCode Usage
-
-OctoCode provides semantic code search and specialized review commands:
-
-| Tool/Command | Purpose | Best For |
-|--------------|---------|----------|
-| `octocode_githubSearchCode` | Search code across repos | Finding implementation patterns |
-| `octocode_githubSearchRepositories` | Discover repos by topic/stars | Finding reference projects |
-| `octocode_githubSearchPullRequests` | Search PRs with diffs | Learning how issues were fixed |
-| `/research` command | Deep code discovery | Morgan intake research |
-| `/review_pull_request` command | Defects-first PR analysis | Cleo code quality reviews |
-| `/review_security` command | Security audit with evidence | Cipher security analysis |
-
-**When to use which tool:**
-- **Context7** → "What's the API for Effect Schema?" (documentation)
-- **OctoCode** → "How does React implement useState?" (source code)
-- **Firecrawl** → "How do competitors handle this?" (web research)
-
-### MCP Tool Usage Guidelines
-
-#### `intake` Tool - Production Flow Only
-
-⚠️ **NEVER use `local=true`** for the intake tool. Always use the production flow:
-
-```
-intake(project_name="my-project")  ← Correct (local defaults to false)
-intake(project_name="my-project", local=true)  ← WRONG - bypasses production
-```
-
-**Production Intake Flow:**
-1. MCP `intake()` creates Linear Project + PRD Issue
-2. PRD content → issue description
-3. `architecture.md` + `cto-config.json` → attachments
-4. Morgan auto-assigned as delegate
-5. PM Server webhook triggers Argo Workflow **in-cluster**
-6. Actual intake processing runs in Kubernetes (not locally)
-
-The `local=true` mode exists only for debugging the intake binary itself. It:
-- Skips Linear entirely
-- Runs the binary on your local machine
-- Requires local API keys in `.env.local`
-- Does NOT test the production workflow
-
-### Build Commands
+### Debugging Tool Availability
 
 ```bash
-# Rust
-cargo build --release
-cargo test
-cargo fmt --all --check
-cargo clippy --all-targets -- -D warnings -W clippy::pedantic
+# Check tool server health
+curl http://tools.fra.5dlabs.ai/health
 
-# GitOps
-make -C infra/gitops validate
+# List all tools (~309 available)
+curl -X POST http://tools.fra.5dlabs.ai/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | jq '.result.tools[].name'
 
-# Pre-commit
-pre-commit run --all-files
-```
-
-### Fast Dev Image Builds (Bypass GitHub Actions)
-
-For rapid iteration on intake/runtime changes without waiting for full CI:
-
-#### Prerequisites
-
-```bash
-# Install cross-compilation tools (one-time)
-just install-cross-tools
-
-# Authenticate with GHCR
-echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin
-```
-
-#### Quick Commands
-
-| Command | Description |
-|---------|-------------|
-| `just dev-runtime-image` | Build runtime with local intake → push to `ghcr.io/5dlabs/runtime:dev` |
-| `just dev-claude-image` | Build Claude image with local intake → push to `ghcr.io/5dlabs/claude:dev` |
-| `just dev-image-local` | Build locally without pushing (for testing) |
-| `just dev-runtime-all` | Build with all binaries (intake + pm-activity) |
-
-#### How It Works
-
-1. **Cross-compiles** intake binary for linux-x86_64 using `cargo-zigbuild` (~1-2 min on Mac)
-2. **Creates overlay image** that replaces just the binary in existing runtime/claude image
-3. **Pushes to GHCR** with `dev` tag
-
-#### Using the Dev Image
-
-```bash
-# Option A: Test with a CodeRun
-kubectl apply -f - <<EOF
-apiVersion: agents.platform/v1
-kind: CodeRun
-metadata:
-  name: test-dev-intake
-  namespace: cto
-spec:
-  cli: claude
-  prompt: "Run intake --version and report the output"
-  image: ghcr.io/5dlabs/claude:dev
-EOF
-
-# Option B: Patch existing deployment
-kubectl set image deployment/claude-agent claude=ghcr.io/5dlabs/claude:dev -n cto
-
-# Option C: Set in cto-config.json for play workflows
-# "agentImage": "ghcr.io/5dlabs/claude:dev"
-```
-
-#### Full Script Options
-
-```bash
-./scripts/build-dev-image.sh --help
-
-# Examples:
-./scripts/build-dev-image.sh --binary intake --image runtime --push
-./scripts/build-dev-image.sh --binary all --image claude --tag my-feature --push
-```
-
-### Port Forwards (for MCP tools)
-
-```bash
-kubectl port-forward svc/prometheus-server -n observability 9090:80
-kubectl port-forward svc/loki-gateway -n observability 3100:80
-kubectl port-forward svc/grafana -n observability 3000:80
-kubectl port-forward svc/argocd-server -n argocd 8080:80
-kubectl port-forward svc/argo-workflows-server -n automation 2746:2746
-```
-
-### Local Development with launchd (Background Services)
-
-For running CTO services in the background without a terminal window, use the launchd integration. Services auto-restart when you rebuild binaries.
-
-#### Prerequisites
-
-```bash
-# Install fswatch (required for binary watching)
-brew install fswatch
-
-# Install cloudflared (for tunnel to receive webhooks)
-brew install cloudflared
-
-# Build release binaries
-cargo build --release
-```
-
-#### Quick Start
-
-```bash
-# 1. Install and start all services (one-time setup)
-just launchd-install
-
-# 2. Verify everything is running
-just launchd-status
-
-# 3. Monitor logs in a TUI
-just launchd-monitor
-```
-
-#### Management Commands
-
-| Command | Description |
-|---------|-------------|
-| `just launchd-install` | Generate plist files and start all services |
-| `just launchd-uninstall` | Stop and remove all services |
-| `just launchd-status` | Show service status and health |
-| `just launchd-logs` | Tail all service logs (raw) |
-| `just launchd-monitor` | **Open lnav TUI** for log viewing with search/filter |
-| `just launchd-multitail` | Split pane view of all logs |
-| `just launchd-restart` | Restart all services manually |
-| `just launchd-start` | Start services (if stopped) |
-| `just launchd-stop` | Stop services (without unloading) |
-
-#### Development Workflow
-
-Once installed, the watcher monitors `target/release/` and auto-restarts services when binaries change:
-
-```bash
-# Normal development - just rebuild, services restart automatically
-cargo build --release --bin agent-controller
-# → watcher detects change → controller restarts automatically
-
-# Rebuild healer - both healer AND healer-sensor restart
-cargo build --release --bin healer
-# → watcher restarts ai.5dlabs.cto.healer
-# → watcher restarts ai.5dlabs.cto.healer-sensor
-
-# Or use the convenience command to build all
-just build-and-restart
-```
-
-#### Services Managed
-
-| Service | Binary | Port | Health Endpoint | Description |
-|---------|--------|------|-----------------|-------------|
-| `ai.5dlabs.cto.controller` | `agent-controller` | 8080 | `/health` | CodeRun CRD orchestrator |
-| `ai.5dlabs.cto.pm-server` | `pm-server` | 8081 | `/health` | Linear webhooks & PM |
-| `ai.5dlabs.cto.healer` | `healer` | 8082 | `/health` | Self-healing monitor |
-| `ai.5dlabs.cto.healer-sensor` | `healer` | - | - | GitHub Actions failure sensor |
-| `ai.5dlabs.cto.tunnel` | `cloudflared` | - | pm-dev.5dlabs.ai | Cloudflare tunnel for webhooks |
-| `ai.5dlabs.cto.watcher` | - | - | - | Binary change watcher |
-
-#### Log Locations
-
-| Path | Description |
-|------|-------------|
-| `/tmp/cto-launchd/controller.log` | Controller stdout |
-| `/tmp/cto-launchd/pm-server.log` | PM Server stdout |
-| `/tmp/cto-launchd/healer.log` | Healer stdout |
-| `/tmp/cto-launchd/healer-sensor.log` | Healer Sensor stdout |
-| `/tmp/cto-launchd/tunnel.log` | Cloudflare tunnel logs |
-| `/tmp/cto-launchd/watcher.log` | Watcher events (shows restarts) |
-| `/tmp/cto-launchd/*.err` | stderr for each service |
-
-#### Monitoring with lnav (Recommended)
-
-```bash
-just launchd-monitor
-```
-
-**lnav keybindings:**
-- `/` - search for text
-- `n`/`N` - next/prev search result
-- `e`/`E` - jump to next/prev error
-- `:filter-in <pattern>` - show only matching lines
-- `:filter-out <pattern>` - hide matching lines
-- `Tab` - cycle through files
-- `q` - quit
-
-#### For AI Agents
-
-When working on CTO platform code:
-
-1. **Before starting work**, verify services are running:
-   ```bash
-   just launchd-status
-   ```
-
-2. **After making code changes**, rebuild the affected binary:
-   ```bash
-   cargo build --release --bin <binary-name>
-   ```
-   The watcher will automatically restart the service.
-
-3. **To view logs** for debugging:
-   ```bash
-   # Quick tail
-   tail -f /tmp/cto-launchd/controller.log
-   
-   # Or use the TUI
-   just launchd-monitor
-   ```
-
-4. **If services aren't running** after a system restart:
-   ```bash
-   just launchd-start
-   ```
-
-5. **If things are broken**, full reinstall:
-   ```bash
-   just launchd-uninstall && just launchd-install
-   ```
-
-#### Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Services not running after reboot | Run `just launchd-start` (services don't auto-start on login) |
-| Service shows "loaded" but no PID | Check error log: `cat /tmp/cto-launchd/<service>.err` |
-| Watcher not detecting changes | Reinstall: `just launchd-uninstall && just launchd-install` |
-| Binary not found errors | Run `cargo build --release` first |
-| Port already in use | Run `just kill-ports` then `just launchd-restart` |
-| Need to update env vars | Reinstall to regenerate plists with new `.env.local` values |
-
-#### Manual launchctl Commands (Advanced)
-
-```bash
-# List all CTO services
-launchctl list | grep 5dlabs
-
-# View a specific service's info
-launchctl print gui/$(id -u)/ai.5dlabs.cto.controller
-
-# Manually kick (restart) a service
-launchctl kickstart -k gui/$(id -u)/ai.5dlabs.cto.controller
-
-# View plist files
-ls ~/Library/LaunchAgents/ai.5dlabs.cto.*.plist
+# Check agent's tools
+jq '.agents.AGENT_NAME.tools' cto-config.json
 ```
 
 ---
 
-## Coding Style
+## Secrets Management (OpenBao + ESO)
 
-- **Rust:** rustfmt (Edition 2021, `max_width=100`); prefer `tracing::*` over `println!`
-- **YAML:** 2-space indent; begin docs with `---`
-- **Markdown:** follow `.markdownlint.yaml`
-- **Shell:** `bash -euo pipefail`; validate with ShellCheck
+### Architecture
 
-## Commit Guidelines
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   OpenBao   │────►│ External Secrets │────►│ K8s Secrets     │
+│   (Vault)   │     │    Operator      │     │ (auto-synced)   │
+└─────────────┘     └──────────────────┘     └─────────────────┘
+```
 
-- Use Conventional Commits: `feat:`, `fix:`, `chore:`, `refactor:`
-- PRs must include: summary, rationale, scope, verification steps
+### Store a Secret
 
-### Pre-Push Requirements (MANDATORY)
+```bash
+kubectl exec -n openbao openbao-0 -- bao kv put secret/path/to/secret \
+  key1=value1 \
+  key2=value2
+```
 
-**Before pushing code to origin or creating a pull request, you MUST run ALL of the following and ensure they pass with zero warnings/errors:**
+### Create ExternalSecret for K8s Sync
 
-1. **Format check:** `cargo fmt --all --check`
-2. **Clippy Pedantic:** `cargo clippy --all-targets -- -D warnings -W clippy::pedantic`
-3. **Tests:** `cargo test`
-4. **Pre-commit hooks:** `pre-commit run --all-files`
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: api-keys
+  namespace: cto
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  data:
+    - secretKey: OPENAI_API_KEY
+      remoteRef:
+        key: secret/apis/openai
+        property: api_key
+```
 
-⚠️ **CRITICAL:** Never push code or open a PR without running Clippy in pedantic mode. The `-W clippy::pedantic` flag enables additional lints that catch common mistakes and enforce best practices. All pedantic warnings must be resolved before code is pushed.
+### Verify Sync
 
-## Security
+```bash
+# Check ExternalSecret status
+kubectl get externalsecrets -n cto
 
-- Never commit secrets
-- Use `cto-config.json` for local configuration
-- See [Secrets Management](docs/secrets-management.md) for credential handling
+# Check K8s Secret was created
+kubectl get secret api-keys -n cto -o yaml
+```
+
+---
+
+## Adding New MCP Tools (User Workflow)
+
+When a user wants to add a new MCP tool:
+
+1. **Identify the tool** - Get the npm package or GitHub repo
+2. **Check if it needs API keys** - Most MCP servers need credentials
+3. **Add to OpenBao** if needed:
+   ```bash
+   kubectl exec -n openbao openbao-0 -- bao kv put secret/mcp/tool-name \
+     api_key=<key>
+   ```
+4. **Create ExternalSecret** to sync to CTO namespace
+5. **Add to tool server** - Update Helm values or tool-server config
+6. **Add to agent** - Update cto-config.json with tool patterns
+7. **Restart/regenerate** - Agent picks up new tools on next session
+
+---
+
+## Swarm Orchestration
+
+Use Claude Code's TeammateTool for parallel work:
+
+### Create a Team
+
+```javascript
+Teammate({ operation: "spawnTeam", team_name: "tool-audit" })
+```
+
+### Spawn Workers
+
+```javascript
+Task({
+    team_name: "tool-audit",
+    name: "api-checker",
+    subagent_type: "general-purpose",
+    prompt: "Check all API endpoints for health. Report failures.",
+    run_in_background: true
+})
+
+Task({
+    team_name: "tool-audit",
+    name: "key-validator",
+    subagent_type: "general-purpose",
+    prompt: "Verify all API keys in OpenBao are valid. Test each one.",
+    run_in_background: true
+})
+```
+
+### Task-Based Swarm Pattern
+
+For processing many items:
+
+```javascript
+// Create task pool
+for (const tool of tools) {
+    TaskCreate({
+        subject: `Validate ${tool}`,
+        description: `Test ${tool} endpoint and verify credentials`
+    })
+}
+
+// Spawn workers who self-organize
+const swarmPrompt = `
+You are a swarm worker. Your job:
+1. TaskList to see available tasks
+2. Claim an unclaimed task with TaskUpdate
+3. Do the work
+4. Mark complete
+5. Send results to team-lead
+6. Repeat until no tasks remain
+`
+
+Task({ team_name: "swarm", name: "worker-1", subagent_type: "general-purpose", prompt: swarmPrompt, run_in_background: true })
+Task({ team_name: "swarm", name: "worker-2", subagent_type: "general-purpose", prompt: swarmPrompt, run_in_background: true })
+```
+
+### TMux Visibility (Recommended)
+
+```bash
+export CLAUDE_CODE_SPAWN_BACKEND=tmux
+
+# Or set up dedicated session
+tmux new-session -d -s forge-swarm
+tmux split-window -h -t forge-swarm
+tmux split-window -v -t forge-swarm
+```
+
+### Cleanup
+
+```javascript
+Teammate({ operation: "requestShutdown", target_agent_id: "worker-1" })
+// Wait for approval...
+Teammate({ operation: "cleanup" })
+```
+
+---
+
+## Common Tasks
+
+### Health Check All Tools
+
+```bash
+curl -X POST http://tools.fra.5dlabs.ai/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
+  | jq '.result.tools | length'
+```
+
+### Find Missing API Keys
+
+```bash
+# Compare required keys vs configured keys
+kubectl exec -n openbao openbao-0 -- bao kv list secret/mcp/
+```
+
+### Update Tool Server
+
+```bash
+# Helm upgrade with new values
+helm upgrade cto-tools ./charts/cto-tools -n cto -f values.yaml
+```
+
+---
+
+## Worktree
+
+- **Branch:** `agents/forge`
+- **Path:** `~/.cursor/worktrees/cto/forge`
+- **Based on:** `origin/main`
+
+Use this worktree for any CTO platform changes related to tool server improvements.
+
+---
+
+## Autonomous Operation
+
+1. **Run health checks regularly** - Verify all tools are accessible
+2. **Alert on failures** - Notify when tools go down or keys expire
+3. **Self-heal when possible** - Restart services, refresh tokens
+4. **Document changes** - Update this file and cto-config.json comments
+
+
+---
+
+## UI Automation (Peekaboo)
+
+When automating macOS UI:
+1. Always run `peekaboo see --annotate --path /tmp/ui-state.png` first
+2. Use element IDs from the annotated image (e.g., B1, T2)
+3. Target by app + window when possible: `--app "App Name" --window-title "Window"`
+4. Peekaboo requires Screen Recording + Accessibility permissions (already granted)
+---
+
+## Long-Term Memory (Open Memory) - MANDATORY USAGE
+
+**You MUST use Open Memory to maintain continuity. Your context gets compacted. Memories persist.**
+
+### Available Tools
+```
+openmemory_store     - Save information
+openmemory_query     - Semantic search  
+openmemory_list      - Recent memories
+openmemory_get       - Fetch by ID
+openmemory_reinforce - Boost importance
+openmemory_delete    - Remove outdated
+```
+
+---
+
+### 🟢 ON EVERY SESSION START (do this FIRST)
+
+Before responding to ANY user message, run:
+```
+openmemory_query({ query: "forge current work outstanding tasks context", k: 8 })
+openmemory_list({ limit: 5 })
+```
+
+Read the results. Understand what you were working on. THEN respond.
+
+---
+
+### 🔵 DURING WORK (store as you go)
+
+**After completing a significant task:**
+```
+openmemory_store({
+  content: "Completed: [what you did]. Result: [outcome]. Next: [what's remaining]",
+  tags: ["forge", "project-name", "progress"]
+})
+```
+
+**When you make a decision:**
+```
+openmemory_store({
+  content: "Decision: [what]. Reason: [why]. Alternative considered: [what else]",
+  tags: ["forge", "decision", "project-name"]
+})
+```
+
+**When you hit a blocker:**
+```
+openmemory_store({
+  content: "Blocker: [issue]. Tried: [what]. Need: [what's required to proceed]",
+  tags: ["forge", "blocker", "project-name"]
+})
+```
+
+---
+
+### 🟡 BEFORE COMPACTION (when context is getting full)
+
+When you notice context is high (>70%) or get a compaction warning:
+
+```
+openmemory_store({
+  content: `SESSION SUMMARY [date]:
+  
+COMPLETED THIS SESSION:
+- [task 1]
+- [task 2]
+
+STILL OUTSTANDING:
+- [remaining task 1]
+- [remaining task 2]
+
+CURRENT STATE:
+- [where things are at]
+
+BLOCKERS/NEEDS:
+- [what's blocking progress]
+
+KEY CONTEXT FOR NEXT SESSION:
+- [critical info to remember]`,
+  tags: ["forge", "session-summary", "YYYY-MM-DD"]
+})
+```
+
+Then reinforce it:
+```
+openmemory_reinforce({ id: "[memory-id]", boost: 0.5 })
+```
+
+---
+
+### 🔴 AFTER COMPACTION (context was reset)
+
+If your context seems empty or you don't remember recent work:
+
+```
+openmemory_query({ query: "forge session summary recent work", k: 5 })
+openmemory_list({ limit: 10 })
+```
+
+Read everything. Rebuild context. Continue where you left off.
+
+---
+
+### Memory Hygiene
+
+**Reinforce** memories you keep referencing:
+```
+openmemory_reinforce({ id: "[id]", boost: 0.3 })
+```
+
+**Delete** outdated memories (completed tasks, old blockers):
+```
+openmemory_delete({ id: "[id]" })
+```
+
+---
+
+### Network Access
+
+Open Memory is accessed **directly via Twingate VPN** at ClusterIP:
+```
+http://10.105.155.160:8080/mcp
+```
+
+**No port-forward needed!** Just ensure Twingate is connected.
+
+If connection fails:
+1. Check Twingate is connected
+2. Fallback to port-forward: `kubectl -n cto port-forward svc/cto-openmemory 8765:8080`
+
+---
+
+### Fallback (if MCP tools unavailable)
+
+Use exec to call directly:
+```bash
+node -e "
+fetch('http://10.105.155.160:8080/mcp', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' },
+  body: JSON.stringify({
+    jsonrpc: '2.0', method: 'tools/call', id: 1,
+    params: { name: 'openmemory_query', arguments: { query: 'your query here', k: 5 }}
+  })
+}).then(r => r.json()).then(d => console.log(JSON.stringify(d, null, 2)));
+"
+```

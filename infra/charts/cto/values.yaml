@@ -329,16 +329,16 @@ pm:
     # Using Opus 4.5 with extended thinking for complex task generation
     models:
       # Primary model for task generation (PRD → tasks)
-      primary: "claude-opus-4-5-20251101"
+      primary: "claude-opus-4-6-20260205"
       primaryProvider: "anthropic"
       # Research model for analysis and context enrichment
-      research: "claude-opus-4-5-20251101"
+      research: "claude-opus-4-6-20260205"
       researchProvider: "anthropic"
       # Docs model for documentation generation
-      docs: "claude-opus-4-5-20251101"
+      docs: "claude-opus-4-6-20260205"
       docsProvider: "anthropic"
       # Fallback model if primary fails
-      fallback: "claude-sonnet-4-20250514"
+      fallback: "claude-opus-4-6-20260205"
       fallbackProvider: "anthropic"
 
   # Secrets
@@ -788,7 +788,7 @@ healer:
   config:
     # CI Remediation config
     cli: "claude"
-    model: "claude-opus-4-5-20251101"
+    model: "claude-opus-4-6-20260205"
     maxAttempts: 3
     # Time window for deduplication (increased from 10 to 30 mins to prevent rapid re-spawning)
     timeWindowMins: 30
@@ -813,7 +813,7 @@ healer:
     maxConcurrentCodeRuns: 5
     # Server config for healer's inline Factory usage (alert analysis/triage)
     server:
-      model: "claude-opus-4-5-20251101"
+      model: "claude-opus-4-6-20260205"
       autoLevel: "high"
       outputFormat: "text"
       remoteTools:
@@ -831,7 +831,7 @@ healer:
     coderun:
       namespace: "cto"
       githubApp: "5DLabs-Rex"
-      model: "claude-opus-4-5-20251101"
+      model: "claude-opus-4-6-20260205"
       repositoryUrl: "https://github.com/5dlabs/cto"
       docsRepositoryUrl: "https://github.com/5dlabs/cto"
       docsProjectDirectory: "docs"
@@ -852,7 +852,7 @@ healer:
       localTools: []
       cliConfig:
         cliType: "claude"
-        model: "claude-opus-4-5-20251101"
+        model: "claude-opus-4-6-20260205"
         settings:
           template: "heal/claude"
       memory:
