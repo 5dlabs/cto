@@ -83,6 +83,9 @@ data:
       "browser": {
         "headless": true
       },
+      "logging": {
+        "level": {{ .Values.logging.level | quote }}
+      },
       "channels": {
         "discord": {
           "accounts": {

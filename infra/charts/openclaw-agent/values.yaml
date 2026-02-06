@@ -113,10 +113,22 @@ discord:
           requireMention: true
   # -- Allow bot interactions
   allowBots: true
-  # -- DM allowlist
+  # -- DM configuration
+  # policy: "allowlist" ensures only listed users can DM the bot.
+  # OpenClaw's config migration may inject "pairing" policy which silently
+  # drops messages — always set explicitly.
   dm:
+    policy: "allowlist"
     allowFrom:
       - "444519104808878090"
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+# Controls OpenClaw gateway log verbosity.
+# Levels: error, warn, info, verbose, debug
+logging:
+  level: "verbose"
 
 # =============================================================================
 # Model Providers
