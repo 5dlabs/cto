@@ -3,14 +3,14 @@ name: Web App CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - 'apps/web/**'
       - 'infra/images/web/**'
       - 'infra/charts/cto/templates/web/**'
       - '.github/workflows/web-ci.yaml'
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - 'apps/web/**'
       - 'infra/images/web/**'
@@ -211,10 +211,10 @@ jobs:
           dockerfile: infra/images/web/Dockerfile
           failure-threshold: error
 
-  # Build and push Docker image (on push to main or develop)
+  # Build and push Docker image (on push to main)
   build-docker:
     needs: [lint-typescript, build-check, docker-lint, test]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [k8s-runner]
     permissions:
       contents: read

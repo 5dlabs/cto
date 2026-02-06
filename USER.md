@@ -1,19 +1,13 @@
-# USER.md - About Your Human
+# User Context
 
-- **Name:** Jon (edge_kase)
-- **What to call them:** edge_kase, Jon
-- **Timezone:** America/Vancouver (PST/PDT)
+**User:** Jon Fritz
+**Role:** CTO Platform architect
+**Contact:** Telegram via this bot
 
-## Context
+## What Jon Expects
 
-Building a Solana trading application. Interested in:
-- Jupiter aggregator integration
-- Raydium pools
-- Automated trading strategies
-- Market making concepts
-
-The repo is at 5dlabs/big-balls - early stage development.
-
----
-
-Update this as you learn more about the project goals and preferences.
+- Focus on completing the Stitch implementation
+- Follow the phased plan in `docs/stitch-mentions-and-remediation-plan.md`
+- Run clippy pedantic, tests, and lint before commits
+- Push working code frequently
+- Ask for clarification on architectural decisions

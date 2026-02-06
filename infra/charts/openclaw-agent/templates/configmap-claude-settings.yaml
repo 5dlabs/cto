@@ -1,0 +1,42 @@
+{{- if .Values.claudeCode.enabled }}
+# =============================================================================
+# Claude Code CLI Settings (settings.json)
+# =============================================================================
+# Mounted into the pod at /workspace/.claude/settings.json
+# Controls: permissions (bypassPermissions), agent teams, telemetry, auto-updater
+# This is SEPARATE from the OpenClaw gateway's own tool configuration.
+#
+# Naming convention:
+#   openclaw-*-config        → OpenClaw gateway config (openclaw.json)
+#   openclaw-*-claude-settings → Claude Code CLI settings (settings.json)
+#   openclaw-*-claude-mcp    → Claude Code CLI MCP connections (.claude.json)
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-claude-settings
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: claude-code
+data:
+  settings.json: |
+    {
+      "$schema": "https://json.schemastore.org/claude-code-settings.json",
+      "permissions": {
+        "defaultMode": {{ .Values.claudeCode.permissions.defaultMode | quote }},
+        "allow": {{ .Values.claudeCode.permissions.allow | toJson }}
+      },
+      {{- if .Values.claudeCode.agentTeams.enabled }}
+      "teammateMode": {{ .Values.claudeCode.agentTeams.teammateMode | quote }},
+      {{- end }}
+      "includeCoAuthoredBy": {{ .Values.claudeCode.includeCoAuthoredBy }},
+      "env": {
+        {{- if .Values.claudeCode.agentTeams.enabled }}
+        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+        {{- end }}
+        "DISABLE_AUTOUPDATER": "1",
+        "DISABLE_TELEMETRY": {{ .Values.claudeCode.disableTelemetry | ternary "\"1\"" "\"0\"" }}
+      }
+    }
+{{- end }}

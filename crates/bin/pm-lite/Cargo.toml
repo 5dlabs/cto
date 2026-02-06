@@ -1,0 +1,11 @@
+[package]
+name = "pm-lite-bin"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pm-lite-server = { path = "../../cto-lite/pm-lite-server" }
+tokio = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = "0.15"
+anyhow = "1"

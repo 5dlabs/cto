@@ -2,11 +2,9 @@
 
 use anyhow::Result;
 use std::path::PathBuf;
-use std::sync::Arc;
-
-use intake::ai::AIProvider;
 
 use crate::analysis::RelevanceAnalyzer;
+use crate::anthropic::AnthropicClient;
 use crate::auth::Session;
 use crate::digest::DigestState;
 use crate::enrichment::{EnrichedLink, LinkEnricher};
@@ -81,17 +79,17 @@ pub struct PollCycleResult {
 pub struct Pipeline {
     config: PipelineConfig,
     session: Session,
-    provider: Arc<dyn AIProvider>,
+    client: AnthropicClient,
 }
 
 impl Pipeline {
     /// Create a new pipeline.
     #[must_use]
-    pub fn new(config: PipelineConfig, session: Session, provider: Arc<dyn AIProvider>) -> Self {
+    pub fn new(config: PipelineConfig, session: Session, client: AnthropicClient) -> Self {
         Self {
             config,
             session,
-            provider,
+            client,
         }
     }
 
@@ -127,7 +125,7 @@ impl Pipeline {
             ..Default::default()
         };
         let poller = BookmarkPoller::new(self.session.clone(), poll_config);
-        let analyzer = RelevanceAnalyzer::new(self.provider.clone(), self.config.model.clone())?;
+        let analyzer = RelevanceAnalyzer::new(self.client.clone(), self.config.model.clone())?;
         let enricher = match LinkEnricher::from_env() {
             Ok(e) => Some(e),
             Err(e) => {

@@ -2,13 +2,17 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tokio::process::Child;
 use tokio::sync::RwLock;
+use tokio::sync::Mutex;
+use std::collections::HashMap;
 
 /// Global application state
 #[derive(Debug, Default)]
 pub struct AppState {
     pub setup: Arc<RwLock<SetupState>>,
     pub cluster: Arc<RwLock<ClusterState>>,
+    pub mcp_sessions: Arc<Mutex<HashMap<String, Child>>>,
 }
 
 impl AppState {

@@ -1,0 +1,122 @@
+{
+  "created_at": 1770266395,
+  "completed_at": 1770266412,
+  "id": "9f869f04-bf32-2484-c769-4c2e21fc4dd4",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_02536823",
+      "input": "{\"query\":\"(Cursor AI OR Cursor IDE OR AI IDE OR AI code editor OR AI programming) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_9f869f04-bf32-2484-c769-4c2e21fc4dd4_xs_call_02536823",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "**Top X posts matching your query \"(Cursor AI OR Cursor IDE OR AI IDE OR AI code editor OR AI programming) lang:en\" in Top mode:**\n\n1. **Lex Fridman (@lexfridman)** on Jan 31, 2026 (5.2K likes, 827K views):[[1]](https://x.com/i/status/2017735625227833850)\n   - Discusses a podcast on AI in 2026, highlighting Cursor alongside Claude Code as key programming & dev tools. Covers topics like best AI for coding (timestamp 21:38), scaling laws, AGI timelines, and more. Includes a ~4-hour video with guests Sebastian Raschka and Nathan Lambert.\n\n2. **Flo writes Code (@FloWritesCode)** on Feb 4, 2026:[[2]](https://x.com/i/status/2018992745218765204)\n   - Humorous take: \"Xcode Agents, Cursor, Codex, Antigravity, Claude Code. Turns out programming gets replaced with juggling in the AI era.\"\n\nThese are the top results. Cursor is frequently praised as a leading AI code editor (VS Code fork with built-in AI like Claude/GPT for autocompletion, editing, and debugging). For more recent or broader results, I can search in Latest mode or refine the query! [[1]](https://x.com/i/status/2017735625227833850)[[2]](https://x.com/i/status/2018992745218765204)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017735625227833850",
+              "start_index": 206,
+              "end_index": 255,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018992745218765204",
+              "start_index": 597,
+              "end_index": 646,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017735625227833850",
+              "start_index": 1050,
+              "end_index": 1100,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018992745218765204",
+              "start_index": 1100,
+              "end_index": 1149,
+              "title": "2"
+            }
+          ]
+        }
+      ],
+      "id": "msg_9f869f04-bf32-2484-c769-4c2e21fc4dd4",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 5143,
+    "input_tokens_details": {
+      "cached_tokens": 2001
+    },
+    "output_tokens": 1847,
+    "output_tokens_details": {
+      "reasoning_tokens": 1433
+    },
+    "total_tokens": 6990,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 66519500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

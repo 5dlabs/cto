@@ -1,0 +1,31 @@
+{
+  "action": "completed",
+  "check_run": {
+    "id": 4567890123,
+    "name": "Lint",
+    "head_sha": "abc123def456789",
+    "status": "completed",
+    "conclusion": "failure",
+    "pull_requests": [
+      {
+        "number": 4291,
+        "head": {
+          "ref": "develop",
+          "sha": "abc123def456789"
+        },
+        "base": {
+          "ref": "main",
+          "sha": "def456abc123789"
+        }
+      }
+    ]
+  },
+  "repository": {
+    "id": 123456789,
+    "name": "cto",
+    "full_name": "5dlabs/cto",
+    "clone_url": "https://github.com/5dlabs/cto.git",
+    "html_url": "https://github.com/5dlabs/cto"
+  },
+  "X-GitHub-Event": "check_run"
+}

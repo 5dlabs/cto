@@ -9,8 +9,8 @@ use reqwest::{Client, StatusCode};
 use tracing::{debug, info, warn};
 
 use super::models::{
-    CreateServerRequest as CherryCreateRequest, PowerActionRequest, ReinstallRequest,
-    ServerResource,
+    BandwidthSpec, CpuSpec, CreateServerRequest as CherryCreateRequest, MemorySpec, NicSpec,
+    PlanWithPricing, PowerActionRequest, Pricing, ReinstallRequest, ServerResource, StorageSpec,
 };
 use crate::providers::traits::{
     CreateServerRequest, Provider, ProviderError, ReinstallIpxeRequest, Server, ServerStatus,
@@ -219,6 +219,183 @@ impl Cherry {
                 .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                 .map(|dt| dt.with_timezone(&chrono::Utc)),
         }
+    }
+
+    /// Extract hourly and monthly rates from pricing list.
+    fn extract_pricing(pricing: &[Pricing]) -> (f64, f64) {
+        let hourly = pricing
+            .iter()
+            .find(|p| p.unit.to_lowercase() == "hourly")
+            .map_or(0.0, |p| p.price);
+        let monthly = pricing
+            .iter()
+            .find(|p| p.unit.to_lowercase() == "monthly")
+            .map_or(0.0, |p| p.price);
+        (hourly, monthly)
+    }
+
+    /// Convert API plan response to PlanWithPricing.
+    fn to_plan_with_pricing(data: &serde_json::Value) -> Option<PlanWithPricing> {
+        let id = data.get("id")?.as_i64()?;
+        let href = data.get("href")?.as_str()?.to_string();
+        let name = data.get("name")?.as_str()?.to_string();
+        let slug = data.get("slug")?.as_str()?.to_string();
+        let category = data.get("category")?.as_str()?.to_string();
+
+        let specs = data.get("specs");
+
+        let cpus = specs.and_then(|s| s.get("cpus")).map(|c| CpuSpec {
+            cores: c.get("cores").and_then(|v| v.as_i64()).map(|v| v as i32),
+            frequency: c.get("frequency").and_then(|v| v.as_f64()),
+            name: c
+                .get("name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+        });
+
+        let memory = specs.and_then(|s| s.get("memory")).map(|m| MemorySpec {
+            total: m.get("total").and_then(|v| v.as_i64()),
+        });
+
+        let storage = specs.and_then(|s| s.get("storage")).and_then(|arr| {
+            arr.as_array()?
+                .iter()
+                .map(|d| StorageSpec {
+                    count: d.get("count").and_then(|v| v.as_i64()).map(|v| v as i32),
+                    size: d.get("size").and_then(|v| v.as_i64()),
+                    storage_type: d
+                        .get("type")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                })
+                .collect::<Vec<_>>()
+                .into()
+        });
+
+        let nics = specs.and_then(|s| s.get("nics")).map(|n| NicSpec {
+            name: n
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+        });
+
+        let bandwidth = specs
+            .and_then(|s| s.get("bandwidth"))
+            .map(|b| BandwidthSpec {
+                name: b
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            });
+
+        // Get pricing
+        let pricing = data.get("pricing").and_then(|arr| {
+            arr.as_array()?
+                .iter()
+                .map(|p| Pricing {
+                    id: p.get("id")?.as_i64()?,
+                    unit: p.get("unit")?.as_str()?.to_string(),
+                    price: p.get("price")?.as_f64()?,
+                    currency: p.get("currency")?.as_str()?.to_string(),
+                    taxed: p.get("taxed")?.as_bool()?,
+                })
+                .collect::<Vec<_>>()
+                .into()
+        });
+
+        let (hourly, monthly) = pricing
+            .as_ref()
+            .map(|p| Self::extract_pricing(p))
+            .unwrap_or((0.0, 0.0));
+
+        Some(PlanWithPricing {
+            id,
+            href,
+            name,
+            slug,
+            category,
+            cpus,
+            memory,
+            storage,
+            nics,
+            bandwidth,
+            hourly_eur: hourly,
+            monthly_eur: monthly,
+        })
+    }
+
+    /// List all available plans with pricing.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if API call fails.
+    pub async fn list_plans(&self) -> Result<Vec<PlanWithPricing>, ProviderError> {
+        debug!("Fetching available plans from Cherry API");
+
+        #[derive(Debug, Clone, Deserialize)]
+        struct PlansResponse {
+            plans: Vec<serde_json::Value>,
+        }
+
+        let response: PlansResponse = self.get("/plans").await?;
+
+        let plans = response
+            .plans
+            .iter()
+            .filter_map(|p| Self::to_plan_with_pricing(p))
+            .collect();
+
+        info!("Found {} plans", plans.len());
+        Ok(plans)
+    }
+
+    /// Get a specific plan by slug.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if API call fails or plan not found.
+    pub async fn get_plan(&self, slug: &str) -> Result<PlanWithPricing, ProviderError> {
+        debug!(plan_slug = %slug, "Fetching plan details");
+
+        let data: serde_json::Value = self.get(&format!("/plans/{slug}")).await?;
+
+        Self::to_plan_with_pricing(&data)
+            .with_context(|| format!("Failed to parse plan: {slug}"))
+            .map_err(|e| ProviderError::Other(e.into()))
+    }
+
+    /// List available regions.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if API call fails.
+    pub async fn list_regions(&self) -> Result<Vec<super::models::Region>, ProviderError> {
+        debug!("Fetching available regions from Cherry API");
+
+        #[derive(Debug, Clone, Deserialize)]
+        struct RegionsResponse {
+            regions: Vec<super::models::Region>,
+        }
+
+        let response: RegionsResponse = self.get("/regions").await?;
+        Ok(response.regions)
+    }
+
+    /// Check if a plan is available in a specific region.
+    ///
+    /// Cherry Servers doesn't have per-region stock like Latitude.
+    /// All bare metal plans are available in all regions.
+    ///
+    /// Returns true if the plan exists.
+    pub async fn check_plan_availability(
+        &self,
+        plan_slug: &str,
+        _region: &str,
+    ) -> Result<bool, ProviderError> {
+        // Cherry doesn't have per-region stock - if the plan exists, it's available
+        self.get_plan(plan_slug).await.map(|_| true)
     }
 }
 
