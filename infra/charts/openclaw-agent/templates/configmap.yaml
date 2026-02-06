@@ -29,6 +29,7 @@ data:
             "prompt": {{ .Values.agentDefaults.heartbeat.prompt | quote }}
           },
           "maxConcurrent": {{ .Values.agentDefaults.maxConcurrent }},
+          "thinkingDefault": {{ .Values.agentDefaults.thinkingDefault | quote }},
           "memorySearch": {
             "cache": {
               "enabled": {{ .Values.memorySearch.cache.enabled }},
@@ -60,6 +61,9 @@ data:
             "fallbacks": {{ .Values.modelDefaults.fallbacks | toJson }},
             "primary": {{ .Values.modelDefaults.primary | quote }}
           }
+          {{- if .Values.cliBackends }},
+          "cliBackends": {{ .Values.cliBackends | toJson }}
+          {{- end }}
         },
         "list": [
           {
@@ -87,18 +91,20 @@ data:
         "discord": {
           "accounts": {
             {{ .Values.discord.accountId | default .Values.agent.id | quote }}: {
-              "groupPolicy": {{ .Values.discord.groupPolicy | quote }},
-              "token": "${DISCORD_TOKEN}",
-              "guilds": {{ .Values.discord.guilds | toJson }}
+              "token": "${DISCORD_TOKEN}"
             }
           },
           "allowBots": {{ .Values.discord.allowBots | default true }},
           "dm": {{ .Values.discord.dm | toJson }},
           "enabled": {{ .Values.discord.enabled | default true }},
-          "groupPolicy": "allowlist"
+          "groupPolicy": {{ .Values.discord.groupPolicy | quote }},
+          "guilds": {{ .Values.discord.guilds | toJson }}
         }
       },
       "gateway": {
+        "auth": {
+          "token": {{ .Values.gateway.auth.token | quote }}
+        },
         "bind": {{ .Values.gateway.bind | quote }},
         "mode": {{ .Values.gateway.mode | quote }},
         "port": {{ .Values.gateway.port }}
@@ -106,20 +112,37 @@ data:
       "memory": {
         "citations": "auto"
       },
+      "commands": {
+        "native": "auto",
+        "nativeSkills": "auto"
+      },
       "messages": {
         "ackReactionScope": "group-mentions"
       },
-      "models": {
-        {{- $first := true }}
-        {{- range $name, $provider := .Values.models.providers }}
-        {{- if not $first }},{{ end }}
-        {{ $name | quote }}: {
-          "apiKey": "${PROVIDER_{{ $name | upper | replace "-" "_" }}_KEY}",
-          "baseUrl": {{ $provider.baseUrl | quote }},
-          "models": {{ $provider.models | toJson }}
+      "plugins": {
+        "entries": {
+          "discord": {
+            "enabled": true
+          },
+          "memory-core": {
+            "enabled": true
+          }
         }
-        {{- $first = false }}
-        {{- end }}
+      },
+      "models": {
+        "providers": {
+          {{- $first := true }}
+          {{- range $name, $provider := .Values.models.providers }}
+          {{- if not $first }},{{ end }}
+          {{ $name | quote }}: {
+            "api": {{ $provider.api | quote }},
+            "apiKey": "${PROVIDER_{{ $name | upper | replace "-" "_" }}_KEY}",
+            "baseUrl": {{ $provider.baseUrl | quote }},
+            "models": {{ $provider.models | toJson }}
+          }
+          {{- $first = false }}
+          {{- end }}
+        }
       },
       "session": {
         "agentToAgent": {
@@ -157,9 +180,21 @@ data:
         "exec": {
           "pathPrepend": {{ .Values.tools.exec.pathPrepend | toJson }}
         },
-        {{- if .Values.tools.mcpServers }}
-        "mcpServers": {{ .Values.tools.mcpServers | toJson }},
-        {{- end }}
-        "profile": {{ .Values.tools.profile | quote }}
+        "profile": {{ .Values.tools.profile | quote }},
+        "web": {
+          "search": { "enabled": true },
+          "fetch": { "enabled": true, "firecrawl": { "enabled": true } }
+        }
+      },
+      {{- if .Values.logging }}
+      "logging": {
+        "level": {{ .Values.logging.level | quote }},
+        "file": {{ .Values.logging.file | quote }},
+        "consoleLevel": {{ .Values.logging.consoleLevel | quote }}
+      },
+      {{- end }}
+      "wizard": {
+        "lastRunCommand": "doctor",
+        "lastRunMode": "local"
       }
     }

@@ -58,20 +58,15 @@ agent:
   id: ""
   # -- Display name (e.g., "Metal", "Trader", "Forge")
   name: ""
-  # -- Primary model (e.g., "anthropic/claude-opus-4-6")
-  model: "anthropic/claude-opus-4-6"
+  # -- Primary model (e.g., "openai/gpt-5.3")
+  model: "openai/gpt-5.3"
   # -- Heartbeat interval
   heartbeat: "15m"
   # -- Sandbox mode
   sandbox: "off"
-  # -- Allowed tool groups
+  # -- Allowed tool groups (empty = all tools available, no restrictions)
   tools:
-    allow:
-      - "group:fs"
-      - "group:runtime"
-      - "group:web"
-      - "browser"
-      - "group:sessions"
+    allow: []
 
 # =============================================================================
 # Discord Configuration
@@ -103,13 +98,15 @@ discord:
         "1445330230926381056":
           allow: true
           requireMention: true
+        # Agent-to-agent coordination channel (no @mention required)
         "1467540094490640529":
           allow: true
-          requireMention: true
+          requireMention: false
   # -- Allow bot interactions
   allowBots: true
-  # -- DM allowlist
+  # -- DM policy (must be explicitly "allowlist" — see MEMORY.md)
   dm:
+    policy: "allowlist"
     allowFrom:
       - "444519104808878090"
 
@@ -120,29 +117,31 @@ discord:
 models:
   providers:
     anthropic:
+      api: "anthropic-messages"
       baseUrl: "https://api.anthropic.com"
       models:
         - id: "claude-3-5-haiku-latest"
+          name: "Claude 3.5 Haiku"
         - id: "claude-sonnet-4-20250514"
+          name: "Claude Sonnet 4"
         - id: "claude-opus-4-20250514"
+          name: "Claude Opus 4"
         - id: "claude-opus-4-6-20260201"
-    minimax:
-      baseUrl: "https://api.minimax.io/anthropic"
-      models:
-        - id: "MiniMax-M2.1"
-    nvidia-nim:
-      baseUrl: "https://integrate.api.nvidia.com/v1"
-      models:
-        - id: "moonshotai/kimi-k2-instruct"
+          name: "Claude Opus 4.6"
     openai:
+      api: "openai-responses"
       baseUrl: "https://api.openai.com/v1"
       models:
+        - id: "gpt-5.3"
+          name: "GPT-5.3"
         - id: "text-embedding-3-small"
+          name: "Text Embedding 3 Small"
 
 # =============================================================================
 # Agent Defaults (global across all agents)
 # =============================================================================
 agentDefaults:
+  thinkingDefault: "high"
   compaction:
     mode: "safeguard"
     reserveTokensFloor: 25000
@@ -214,27 +213,30 @@ session:
 # Gateway Configuration (adapted for Kubernetes)
 # =============================================================================
 gateway:
-  bind: "0.0.0.0"
+  bind: "lan"
   port: 18789
   # In Kubernetes, gateway runs locally inside the pod (no remote SSH)
   mode: "local"
+  # Pod-internal gateway — static token for health probes
+  auth:
+    token: "openclaw-internal"
 
 # =============================================================================
 # Model Fallback Configuration
 # =============================================================================
 modelDefaults:
-  primary: "minimax/MiniMax-M2.1"
+  primary: "openai/gpt-5.3"
   fallbacks:
-    - "minimax/MiniMax-M2.1"
-    - "nvidia-nim/moonshotai/kimi-k2-instruct"
+    - "openai/gpt-5.3"
+    - "anthropic/claude-opus-4-6-20260201"
+    - "anthropic/claude-sonnet-4-20250514"
     - "anthropic/claude-3-5-haiku-latest"
-    - "anthropic/claude-sonnet-4-5"
 
 # =============================================================================
 # Tools Configuration (Linux-adapted, no macOS paths)
 # =============================================================================
 tools:
-  profile: "coding"
+  profile: "full"
   agentToAgent:
     enabled: true
   elevated:
@@ -243,13 +245,46 @@ tools:
     # Linux paths only - no macOS /opt/homebrew or /Users paths
     pathPrepend:
       - "/usr/local/bin"
-  # -- MCP servers available to the OpenClaw gateway (orchestrator agents)
-  # These are DISTINCT from Claude Code's MCP servers above.
-  # OpenClaw agents use these for planning, coordination, and memory.
-  mcpServers:
-    openmemory:
-      type: "sse"
-      url: "http://openmemory.openmemory.svc.cluster.local:8080/mcp/sse"
+
+# =============================================================================
+# Kaniko Sidecar (daemonless container builds)
+# =============================================================================
+# Kaniko runs unprivileged container builds inside Kubernetes — no Docker socket.
+# The agent writes a Dockerfile to /workspace and execs into the sidecar to build.
+kaniko:
+  enabled: true
+  image: gcr.io/kaniko-project/executor:latest
+  # Registry to push built images
+  registry: "ghcr.io/5dlabs"
+  # Cache repo for layer caching
+  cacheRepo: "ghcr.io/5dlabs/kaniko-cache"
+  cache: true
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+
+# =============================================================================
+# CLI Backends (text-only fallback CLIs invoked by OpenClaw)
+# =============================================================================
+cliBackends:
+  claude-cli:
+    command: "/usr/local/bin/claude"
+  codex-cli:
+    command: "/usr/local/bin/codex"
+  droid-cli:
+    command: "/usr/local/bin/droid"
+    args:
+      - "--json"
+    output: "json"
+    modelArg: "--model"
+    sessionArg: "--session"
+    sessionMode: "existing"
+    systemPromptArg: "--system"
+    systemPromptWhen: "first"
 
 # =============================================================================
 # Claude Code CLI Configuration
@@ -302,12 +337,38 @@ claudeCode:
       openmemory:
         type: "sse"
         url: "http://openmemory.openmemory.svc.cluster.local:8080/mcp/sse"
-      # Example: Connect Claude Code to the CTO tool server
-      # cto:
-      #   command: "npx"
-      #   args: ["-y", "@5dlabs/cto-mcp"]
-      #   env:
-      #     CTO_API_KEY: "${CTO_API_KEY}"
+      # Firecrawl — web scraping and content extraction
+      firecrawl:
+        command: "npx"
+        args: ["-y", "firecrawl-mcp"]
+        env:
+          FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
+
+# =============================================================================
+# Tools Config (MCP tools for CLI backends)
+# =============================================================================
+# Rendered into a separate ConfigMap (tools-config.json) and mounted at
+# /workspace/tools-config.json. Provides remote and local MCP tools to CLI
+# backends (Claude Code, Codex, Droid).
+toolsConfig:
+  remoteTools:
+    - "firecrawl_*"
+  localServers:
+    memory:
+      command: "npx"
+      args:
+        - "-y"
+        - "@modelcontextprotocol/server-memory"
+      tools:
+        - "create_entities"
+        - "create_relations"
+        - "add_observations"
+        - "delete_entities"
+        - "delete_observations"
+        - "delete_relations"
+        - "read_graph"
+        - "search_nodes"
+        - "open_nodes"
 
 # =============================================================================
 # Secrets Configuration
@@ -335,3 +396,33 @@ probes:
     periodSeconds: 30
     timeoutSeconds: 5
     failureThreshold: 3
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+logging:
+  level: "debug"
+  file: "/workspace/.openclaw/logs/openclaw.log"
+  consoleLevel: "info"
+
+# =============================================================================
+# Control UI (accessible via Twingate)
+# =============================================================================
+controlUi:
+  enabled: true
+
+# =============================================================================
+# Telemetry (Promtail sidecar → Loki)
+# =============================================================================
+telemetry:
+  enabled: true
+  promtail:
+    image: grafana/promtail:latest
+    lokiUrl: "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
