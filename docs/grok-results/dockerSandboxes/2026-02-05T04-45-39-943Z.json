@@ -1,0 +1,137 @@
+{
+  "created_at": 1770266726,
+  "completed_at": 1770266739,
+  "id": "33453c08-01a1-1f42-2dbe-89edfad66760",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_10955250",
+      "input": "{\"query\":\"(Docker OR Docker microVM OR cloud sandbox OR stateful sandbox OR vmux) lang:en\",\"limit\":20,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_33453c08-01a1-1f42-2dbe-89edfad66760_xs_call_10955250",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_84555676",
+      "input": "{\"query\":\"(Docker OR Docker microVM OR stateful sandbox OR vmux OR \\\"cloud sandbox\\\") lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_33453c08-01a1-1f42-2dbe-89edfad66760_xs_call_84555676",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Recent discussions on X (latest posts in English) highlight **Docker Sandbox**, a new feature introducing **microVM isolation** for safely running multiple AI coding agents (like Claude) in parallel. This enhances developer workflows by providing controlled, unsupervised environments for testing AI models.[[1]](https://x.com/i/status/2017456334342623403)[[2]](https://x.com/i/status/2018504991304987131)\n\nKey points from posts:\n- Docker's blog details how sandboxes use microVMs per sandbox for better isolation, potentially improving on shared setups like WSL on Windows.[[2]](https://x.com/i/status/2018504991304987131)\n- Early reactions note it resembles advanced containerization but with VM-level security for AI tasks.[[3]](https://x.com/i/status/2018484098092941381)\n\nNo recent mentions of \"vmux\", \"stateful sandbox\", or \"cloud sandbox\" in these results, though Docker Sandbox aligns closely with the themes. For the full Docker announcement: [docker.com/blog/docker-sandboxes-run-claude-code-and-other-coding-agents-unsupervised-but-safely](https://www.docker.com/blog/docker-sandboxes-run-claude-code-and-other-coding-agents-unsupervised-but-safely/).[[1]](https://x.com/i/status/2017456334342623403)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017456334342623403",
+              "start_index": 307,
+              "end_index": 356,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018504991304987131",
+              "start_index": 356,
+              "end_index": 405,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018504991304987131",
+              "start_index": 574,
+              "end_index": 623,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018484098092941381",
+              "start_index": 726,
+              "end_index": 775,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017456334342623403",
+              "start_index": 1162,
+              "end_index": 1211,
+              "title": "1"
+            }
+          ]
+        }
+      ],
+      "id": "msg_33453c08-01a1-1f42-2dbe-89edfad66760",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 7497,
+    "input_tokens_details": {
+      "cached_tokens": 2716
+    },
+    "output_tokens": 1723,
+    "output_tokens_details": {
+      "reasoning_tokens": 1261
+    },
+    "total_tokens": 9220,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 2,
+    "cost_in_usd_ticks": 119535000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 2,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

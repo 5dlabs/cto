@@ -3,13 +3,13 @@
 #![allow(clippy::doc_markdown)] // CronJob etc. don't need backticks
 #![allow(clippy::unused_async)] // Async signature needed for interface consistency
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-use intake::ai::ProviderRegistry;
 use research::analysis::Category;
+use research::anthropic::AnthropicClient;
 use research::auth::{BrowserAuth, Session};
 use research::digest::{DigestAnalyzer, DigestConfig, DigestGenerator, DigestState, EmailSender};
 use research::pipeline::{Pipeline, PipelineConfig};
@@ -305,11 +305,9 @@ async fn run_poll(
         empty_state.save(&state_path)?;
     }
 
-    // Create AI provider
-    let registry = ProviderRegistry::with_defaults();
-    let provider = registry
-        .get_for_model(&model)
-        .ok_or_else(|| anyhow::anyhow!("No provider configured for model: {model}"))?;
+    // Create Anthropic API client (direct API calls - no intake-agent)
+    let client = AnthropicClient::new()
+        .context("Failed to create Anthropic client. Ensure ANTHROPIC_API_KEY is set.")?;
 
     // Configure pipeline
     let config = PipelineConfig {
@@ -325,7 +323,7 @@ async fn run_poll(
     };
 
     // Run pipeline
-    let pipeline = Pipeline::new(config, session, provider);
+    let pipeline = Pipeline::new(config, session, client);
     let result = pipeline.poll_cycle().await?;
 
     // Print summary
@@ -639,18 +637,12 @@ async fn run_digest(
 
     // Run AI analysis if not skipped
     let analysis = if skip_analysis {
-        println!("\n⏭️  Skipping AI analysis");
+        println!("\n⏭️  Skipping AI analysis (intake dependency not available)");
         None
     } else {
-        println!("\n🤖 Running AI analysis with {model}...");
+        println!("\n🤖 Running basic analysis...");
 
-        // Create AI provider
-        let registry = ProviderRegistry::with_defaults();
-        let provider = registry
-            .get_for_model(&model)
-            .ok_or_else(|| anyhow::anyhow!("No provider configured for model: {model}"))?;
-
-        let analyzer = DigestAnalyzer::new(provider, model.clone());
+        let analyzer = DigestAnalyzer::new();
 
         // Load rich content from markdown files for better analysis
         println!("   📖 Loading full document content...");

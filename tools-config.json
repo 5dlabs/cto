@@ -1,5 +1,8 @@
 {
-  "remoteTools": [],
+  "remoteTools": [
+    "tavily_*",
+    "firecrawl_*"
+  ],
   "localServers": {
     "filesystem": {
       "command": "/opt/homebrew/bin/npx",

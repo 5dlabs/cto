@@ -1,0 +1,237 @@
+{
+  "created_at": 1770266449,
+  "completed_at": 1770266473,
+  "id": "d9af64d9-3e94-e10a-9615-8be96ebb51c0",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_31728741",
+      "input": "{\"query\":\"(Solana agents OR Solana trading bot OR Solana DeFi OR blockchain AI agent OR crypto trading bot) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_d9af64d9-3e94-e10a-9615-8be96ebb51c0_xs_call_31728741",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_29810823",
+      "input": "{\"query\":\"Solana agents or Solana trading bot or Solana DeFi or blockchain AI agent or crypto trading bot\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_d9af64d9-3e94-e10a-9615-8be96ebb51c0_xs_call_29810823",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_32469974",
+      "input": "{\"query\":\"(Solana agents OR \\\"Solana trading bot\\\" OR \\\"Solana DeFi\\\" OR \\\"blockchain AI agent\\\" OR \\\"crypto trading bot\\\") lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_d9af64d9-3e94-e10a-9615-8be96ebb51c0_xs_call_32469974",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_43358741",
+      "input": "{\"query\":\"Solana (agents OR bot OR DeFi OR \\\"AI agent\\\") lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_d9af64d9-3e94-e10a-9615-8be96ebb51c0_xs_call_43358741",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "**Recent Top Posts on Solana AI Agents, Trading Bots, Solana DeFi, Blockchain AI Agents, and Crypto Trading Bots (English, as of Feb 5, 2026):**\n\nSolana is exploding with AI agent activity, particularly autonomous trading bots and DeFi tools. Official Solana accounts highlight agents \"loose onchain,\" listing projects like Moltbot (OpenClaw), SolSkill for DeFi swaps/lending, AgentPad launchpads, and infra like confidential VMs.[[1]](https://x.com/i/status/2018920649935192139)[[2]](https://x.com/i/status/2019039398030082468)[[3]](https://x.com/i/status/2018420233552175420)\n\n**Key Highlights:**\n- **Agent Hackathon by Solana & Colosseum**: $100K prizes for top AI agents building on Solana. Agents register and compete; direct OpenClaw agents to participate.[[4]](https://x.com/i/status/2018420230427496753)[[3]](https://x.com/i/status/2018420233552175420)\n- **Trading Bots & Agents**:\n  - @apexflowagent: Autonomous on-chain strategist turning natural language into trades.[[5]](https://x.com/i/status/2018257305641329128)\n  - $MOLTIMUS: Open-source AI agent for Solana memecoins via Axiom, with wallet monitoring, auto-trades, stop-loss.[[6]](https://x.com/i/status/2017401414784336207)\n  - Nosyt Labs: Production Solana trading agent managing $100K+ autonomously.[[7]](https://x.com/i/status/2018900834881343851)\n  - MoltBot: AI trading strategies boosting ROI by 15% on Solana.[[8]](https://x.com/i/status/2018728741208203512)\n- **DeFi & Agent Tools**:\n  - SolSkillClaw: Agent-native API for Jupiter swaps, Kamino yields, Raydium pools—self-custodial.[[2]](https://x.com/i/status/2019039398030082468)\n  - Bankr (@bankrbot): Agents deploy coins on Raydium bonding curves, earn fees.[[9]](https://x.com/i/status/2018227836163944686)\n  - AgentPad (@Agentpad_Solana): Autonomous token launchpad for agents to earn trading fees—no humans needed.[[10]](https://x.com/i/status/2019011549562536211)[[11]](https://x.com/i/status/2019011559985430685)\n  - @agentincdotfun: Tokenized AI agent \"startups\" as mini-CEOs on BagsApp.[[12]](https://x.com/i/status/2018221083166711986)\n- **Other Notables**: Cobot Arc for privacy-preserving prediction markets & agents; SQD Cloud for Solana DeFi analytics fed to agents; Clawpump launchpad.[[13]](https://x.com/i/status/2018399452277702708)[[14]](https://x.com/i/status/2019108221215207904)\n\nSolana's ecosystem is positioning as the go-to for on-chain AI agents in trading/DeFi, with hackathons and tools accelerating adoption. Check Solana's weekly recap for broader context.[[15]](https://x.com/i/status/2017976236811956603) For latest, monitor @solana, @OpenClaw, @colosseum. DYOR! 🚀",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018920649935192139",
+              "start_index": 430,
+              "end_index": 479,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019039398030082468",
+              "start_index": 479,
+              "end_index": 528,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018420233552175420",
+              "start_index": 528,
+              "end_index": 577,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018420230427496753",
+              "start_index": 762,
+              "end_index": 811,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018420233552175420",
+              "start_index": 811,
+              "end_index": 860,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018257305641329128",
+              "start_index": 978,
+              "end_index": 1027,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017401414784336207",
+              "start_index": 1143,
+              "end_index": 1192,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018900834881343851",
+              "start_index": 1270,
+              "end_index": 1319,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018728741208203512",
+              "start_index": 1385,
+              "end_index": 1434,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019039398030082468",
+              "start_index": 1559,
+              "end_index": 1608,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018227836163944686",
+              "start_index": 1689,
+              "end_index": 1738,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019011549562536211",
+              "start_index": 1848,
+              "end_index": 1898,
+              "title": "10"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019011559985430685",
+              "start_index": 1898,
+              "end_index": 1948,
+              "title": "11"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018221083166711986",
+              "start_index": 2024,
+              "end_index": 2074,
+              "title": "12"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018399452277702708",
+              "start_index": 2229,
+              "end_index": 2279,
+              "title": "13"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019108221215207904",
+              "start_index": 2279,
+              "end_index": 2329,
+              "title": "14"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017976236811956603",
+              "start_index": 2515,
+              "end_index": 2565,
+              "title": "15"
+            }
+          ]
+        }
+      ],
+      "id": "msg_d9af64d9-3e94-e10a-9615-8be96ebb51c0",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 17228,
+    "input_tokens_details": {
+      "cached_tokens": 4443
+    },
+    "output_tokens": 2789,
+    "output_tokens_details": {
+      "reasoning_tokens": 1602
+    },
+    "total_tokens": 20017,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 4,
+    "cost_in_usd_ticks": 241736500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 4,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}
