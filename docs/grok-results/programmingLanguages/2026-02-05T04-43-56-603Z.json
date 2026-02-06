@@ -1,0 +1,150 @@
+{
+  "created_at": 1770266625,
+  "completed_at": 1770266636,
+  "id": "cd818b3a-aaa3-8357-120c-2e6096859d64",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_35595059",
+      "input": "{\"query\":\"(Rust AI OR Go AI OR TypeScript AI OR Rust programming OR Go programming) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_cd818b3a-aaa3-8357-120c-2e6096859d64_xs_call_35595059",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the top recent X posts (sorted by Top) matching your advanced search query for English-language discussions on Rust AI, Go AI, TypeScript AI, Rust programming, or Go programming:[[1]](https://x.com/i/status/2018751274624418131)[[2]](https://x.com/i/status/2018568452131393817)\n\n### Key highlights:\n- A viral post recommends **Rust** and **Go** (alongside Python, JS/TS, SQL) as top languages to learn in 2026, while advising against PHP, Perl, and Ruby.[[1]](https://x.com/i/status/2018751274624418131)\n- Another shares ages of popular languages, noting **Rust** (14 years), **Go** (15 years), and **TypeScript** (12 years) as relatively young compared to veterans like C (52 years).[[2]](https://x.com/i/status/2018568452131393817)\n- Debate on AI agents: Critics argue against Ruby/Rails for AI (e.g., with Claude Code), pushing for performance langs like **Rust**, Zig, or **Go** instead.[[3]](https://x.com/i/status/2018719119286448428)[[4]](https://x.com/i/status/2018714110100115528)[[5]](https://x.com/i/status/2018368128108167344)\n- On AI programming safety: **Rust** is hailed as the future (over C) due to its strictness and \"guardrails\" needed for AI.[[6]](https://x.com/i/status/2017849397116342707)\n\nFor full threads/context or Latest mode results, let me know!",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018751274624418131",
+              "start_index": 187,
+              "end_index": 236,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018568452131393817",
+              "start_index": 236,
+              "end_index": 285,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018751274624418131",
+              "start_index": 462,
+              "end_index": 511,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018568452131393817",
+              "start_index": 692,
+              "end_index": 741,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018719119286448428",
+              "start_index": 899,
+              "end_index": 948,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018714110100115528",
+              "start_index": 948,
+              "end_index": 997,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018368128108167344",
+              "start_index": 997,
+              "end_index": 1046,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017849397116342707",
+              "start_index": 1170,
+              "end_index": 1219,
+              "title": "6"
+            }
+          ]
+        }
+      ],
+      "id": "msg_cd818b3a-aaa3-8357-120c-2e6096859d64",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 5857,
+    "input_tokens_details": {
+      "cached_tokens": 2545
+    },
+    "output_tokens": 1440,
+    "output_tokens_details": {
+      "reasoning_tokens": 939
+    },
+    "total_tokens": 7297,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 65096500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

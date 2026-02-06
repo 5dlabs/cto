@@ -1,0 +1,179 @@
+{
+  "created_at": 1770265721,
+  "completed_at": 1770265733,
+  "id": "e98d58cd-31b9-8130-1798-c353c7851b4d",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_78516396",
+      "input": "{\"query\":\"(Gemini AI OR Google Gemini OR Gemini 2.0 OR Gemini Pro OR Gemini Ultra) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_e98d58cd-31b9-8130-1798-c353c7851b4d_xs_call_78516396",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_92389274",
+      "input": "{\"query\":\"(Gemini AI OR Google Gemini OR Gemini 2.0 OR Gemini Pro OR Gemini Ultra) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_e98d58cd-31b9-8130-1798-c353c7851b4d_xs_call_92389274",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Top posts on X about Gemini AI, Google Gemini, Gemini 2.0, Pro, or Ultra (sorted by Top relevance, English language, recent as of early February 2026) highlight its integrations, high pricing, and creative AI generation uses.\n\n### Chrome & Gemini Integrations\nGoogle Chrome announced \"auto browse\" in Gemini, available to Google AI Pro and Ultra subscribers in the US, for handling tasks like shopping and scheduling while keeping users in the loop.[[1]](https://x.com/i/status/2018383919289151883)[[2]](https://x.com/i/status/2018746306101961080) A demo shows it planning a fun NYC trip effortlessly.[[2]](https://x.com/i/status/2018746306101961080)\n\n### Pricing Discussions\nGemini AI Ultra is priced at $250/month, drawing jokes and budget concerns alongside other top AI subs like Claude Max ($200) and ChatGPT Pro ($200).[[3]](https://x.com/i/status/2018061066853576816)[[4]](https://x.com/i/status/2018061297871417661)\n\n### AI Generation & Tools\n- Users are creating hyper-realistic videos with Google Veo 3.1 on Gemini, like high-speed Bugatti races or zombie survival scenes.[[5]](https://x.com/i/status/2017594518049305014)[[6]](https://x.com/i/status/2017506033913024975)\n- Luxe visuals, such as chocolate ads or surreal cat food stacks, via Gemini Nano Banana Pro (sometimes combined with other tools).[[7]](https://x.com/i/status/2018163221979677025)[[8]](https://x.com/i/status/2018963230207717443)\n- Project Genie generates explorable environments from prompts, blending Gemini with other models like Genie 3 and Nano Banana Pro (US Ultra subscribers).[[9]](https://x.com/i/status/2018403111573102976)\n\nSome frustration over no new Gemini Ultra models since 1.0.[[10]](https://x.com/i/status/2018599132269891860) Overall buzz focuses on premium features but steep costs.",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018383919289151883",
+              "start_index": 449,
+              "end_index": 498,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018746306101961080",
+              "start_index": 498,
+              "end_index": 547,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018746306101961080",
+              "start_index": 601,
+              "end_index": 650,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018061066853576816",
+              "start_index": 825,
+              "end_index": 874,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018061297871417661",
+              "start_index": 874,
+              "end_index": 923,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017594518049305014",
+              "start_index": 1082,
+              "end_index": 1131,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017506033913024975",
+              "start_index": 1131,
+              "end_index": 1180,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018163221979677025",
+              "start_index": 1312,
+              "end_index": 1361,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018963230207717443",
+              "start_index": 1361,
+              "end_index": 1410,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018403111573102976",
+              "start_index": 1565,
+              "end_index": 1614,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018599132269891860",
+              "start_index": 1675,
+              "end_index": 1725,
+              "title": "10"
+            }
+          ]
+        }
+      ],
+      "id": "msg_e98d58cd-31b9-8130-1798-c353c7851b4d",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 9953,
+    "input_tokens_details": {
+      "cached_tokens": 5936
+    },
+    "output_tokens": 1672,
+    "output_tokens_details": {
+      "reasoning_tokens": 971
+    },
+    "total_tokens": 11625,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 2,
+    "cost_in_usd_ticks": 119362000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 2,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

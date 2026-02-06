@@ -1,0 +1,129 @@
+{
+  "created_at": 1770266533,
+  "completed_at": 1770266540,
+  "id": "0f27496b-5bb4-870d-e9a1-e44281175dfb",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_94226350",
+      "input": "{\"query\":\"(Cloudflare OR Cloudflare Workers OR Vercel AI OR Vercel deployment OR AWS AI) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_0f27496b-5bb4-870d-e9a1-e44281175dfb_xs_call_94226350",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the top recent X posts (sorted by Top relevance) matching your query on Cloudflare, Cloudflare Workers, Vercel AI/deployment, or AWS AI, filtered to English:[[1]](https://x.com/i/status/2017487871431889138)[[2]](https://x.com/i/status/2018012503486124340)\n\n1. **Developer poll on backend hosting options** (Jan 31, 2026): A dev shares their backend is ready and asks where to host it—options include Vercel, Render, Netlify, Railway, Cloudflare, or AWS. Got 30 likes, 21 replies.[[1]](https://x.com/i/status/2017487871431889138)\n\n2. **Hosting comparison discussion** (Feb 1, 2026): In reply to a similar poll listing AWS, Vercel, Netlify, Render, and Cloudflare as hosting options, a system architect breaks it down: AWS for scalability (complex), Vercel/Netlify for frontend/serverless/JAMstack, Render for easy deploys, Cloudflare for performance/security. The original poll has 558 likes and 419 replies.[[2]](https://x.com/i/status/2018012503486124340)[[3]](https://x.com/i/status/2017974468992549339)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017487871431889138",
+              "start_index": 166,
+              "end_index": 215,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018012503486124340",
+              "start_index": 215,
+              "end_index": 264,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017487871431889138",
+              "start_index": 488,
+              "end_index": 537,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018012503486124340",
+              "start_index": 916,
+              "end_index": 965,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017974468992549339",
+              "start_index": 965,
+              "end_index": 1014,
+              "title": "3"
+            }
+          ]
+        }
+      ],
+      "id": "msg_0f27496b-5bb4-870d-e9a1-e44281175dfb",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 4662,
+    "input_tokens_details": {
+      "cached_tokens": 3638
+    },
+    "output_tokens": 1093,
+    "output_tokens_details": {
+      "reasoning_tokens": 701
+    },
+    "total_tokens": 5755,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 59332000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

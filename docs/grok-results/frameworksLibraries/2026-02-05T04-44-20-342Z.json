@@ -1,0 +1,216 @@
+{
+  "created_at": 1770266637,
+  "completed_at": 1770266660,
+  "id": "a0b15416-54ea-d591-6933-1c6daeb86634",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_87555658",
+      "input": "{\"query\":\"(Foundry AI OR Foundry framework OR Grok framework OR NotebookLM OR Momentum AI) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_a0b15416-54ea-d591-6933-1c6daeb86634_xs_call_87555658",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_37366973",
+      "input": "{\"query\":\"(Foundry AI OR Foundry framework OR Grok framework OR NotebookLM OR Momentum AI) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_a0b15416-54ea-d591-6933-1c6daeb86634_xs_call_37366973",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_17376777",
+      "input": "{\"query\":\"(Foundry AI OR Foundry framework OR Grok framework OR NotebookLM OR Momentum AI) lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_a0b15416-54ea-d591-6933-1c6daeb86634_xs_call_17376777",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_58314365",
+      "input": "{\"query\":\"Foundry AI OR Foundry framework OR Grok framework OR NotebookLM OR Momentum AI\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_a0b15416-54ea-d591-6933-1c6daeb86634_xs_call_58314365",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Recent top and latest X posts matching your query \"(Foundry AI OR Foundry framework OR Grok framework OR NotebookLM OR Momentum AI) lang:en\" primarily highlight developments around **Azure AI Foundry** and **Microsoft Foundry**, with some mentions of agent frameworks named Foundry, Google's NotebookLM integrations, and passing references to Grok models in AI workflows. No direct hits on \"Momentum AI\" or a specific \"Grok framework,\" though Grok models appear in comparisons.[[1]](https://x.com/i/status/2019127913409573195)[[2]](https://x.com/i/status/2018761773545881909)[[3]](https://x.com/i/status/2018055322485559305)\n\n### Key Highlights:\n- **Azure AI Foundry**: Google's Genkit framework announced official support for it (alongside Amazon Bedrock) in both Go and JS plugins. This enables \"build once, run anywhere\" cloud-native AI apps.[[1]](https://x.com/i/status/2019127913409573195)\n- **Microsoft Foundry**: Multiple posts promote a 6-week training course titled \"Mastering the Microsoft Agent Framework: Building Enterprise-Ready AI Agents with Microsoft Foundry\" (March 10–April 14, 2026), led by speaker Lino Tadros. Includes videos and enrollment links via Live! 360 events.[[2]](https://x.com/i/status/2018761773545881909)[[4]](https://x.com/i/status/2018761772040155174)[[5]](https://x.com/i/status/2018761755908800529)\n- **Foundry (AI Agent)**: @getFoundry introduced \"Foundry: the self-writing meta-extension for @openclaw,\" an AI agent that learns user workflows, researches docs, and extends itself. Backed by NVIDIA Inception, with a token $FDRY.[[6]](https://x.com/i/status/2017410944008085927)\n- **NotebookLM**: Featured in an AI tool selection guide as a top integration for Gemini (e.g., for research and contextual thinking), positioned as \"#1 in accuracy and intent alignment.\"[[3]](https://x.com/i/status/2018055322485559305)\n- **Grok-Related Mentions**: Grok models (e.g., Grok-4.1, grok-4-1-fast-reasoning) praised for real-time analysis, cultural insights, and agentic workflows alongside tools like OpenClaw/Moltbot. No dedicated \"Grok framework\" posts, but used in comparisons with Claude, Gemini, etc.[[7]](https://x.com/i/status/2017805370673201298)[[3]](https://x.com/i/status/2018055322485559305)[[8]](https://x.com/i/status/2017467488221728932)[[9]](https://x.com/i/status/2018296355312029812)\n\nThese are the most relevant from the top 10 latest/top results (as of Feb 5, 2026). Activity spikes around Microsoft/Azure integrations and agent tools. If you want deeper dives (e.g., threads, videos, or user profiles), provide more details! [[10]](https://x.com/i/status/2018825976856318256)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019127913409573195",
+              "start_index": 477,
+              "end_index": 526,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018761773545881909",
+              "start_index": 526,
+              "end_index": 575,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018055322485559305",
+              "start_index": 575,
+              "end_index": 624,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019127913409573195",
+              "start_index": 845,
+              "end_index": 894,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018761773545881909",
+              "start_index": 1190,
+              "end_index": 1239,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018761772040155174",
+              "start_index": 1239,
+              "end_index": 1288,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018761755908800529",
+              "start_index": 1288,
+              "end_index": 1337,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017410944008085927",
+              "start_index": 1569,
+              "end_index": 1618,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018055322485559305",
+              "start_index": 1806,
+              "end_index": 1855,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017805370673201298",
+              "start_index": 2137,
+              "end_index": 2186,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018055322485559305",
+              "start_index": 2186,
+              "end_index": 2235,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017467488221728932",
+              "start_index": 2235,
+              "end_index": 2284,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018296355312029812",
+              "start_index": 2284,
+              "end_index": 2333,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018825976856318256",
+              "start_index": 2577,
+              "end_index": 2628,
+              "title": "10"
+            }
+          ]
+        }
+      ],
+      "id": "msg_a0b15416-54ea-d591-6933-1c6daeb86634",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 14449,
+    "input_tokens_details": {
+      "cached_tokens": 8687
+    },
+    "output_tokens": 2686,
+    "output_tokens_details": {
+      "reasoning_tokens": 1614
+    },
+    "total_tokens": 17135,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 4,
+    "cost_in_usd_ticks": 229297500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 4,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

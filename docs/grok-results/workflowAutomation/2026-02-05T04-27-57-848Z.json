@@ -1,0 +1,192 @@
+{
+  "created_at": 1770265666,
+  "completed_at": 1770265677,
+  "id": "00b18b7e-891f-9b8f-05ae-22766220f4f2",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_85947353",
+      "input": "{\"query\":\"(AI workflow OR automation pipeline OR CI/CD AI OR agent automation OR workflow automation) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_00b18b7e-891f-9b8f-05ae-22766220f4f2_xs_call_85947353",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are some of the top English-language posts on X (formerly Twitter) matching your query on AI workflows, automation pipelines, CI/CD with AI, agent automation, and workflow automation. I've pulled the most relevant recent ones, focusing on practical examples, tools, and trends.[[1]](https://x.com/i/status/2019101692449509698)[[2]](https://x.com/i/status/2018376206807114045)[[3]](https://x.com/i/status/2019023301826212194)[[4]](https://x.com/i/status/2018338831171281138)[[5]](https://x.com/i/status/2018411112237088892)\n\n### Key Highlights:\n1. **AI Data Pipelines for Voice Training** (@psdnai): Poseidon uses a multi-stage automation pipeline for filtering AI training-grade voice data—semantic scoring, language checks, and human validation. \"Automation first. With humans in the loop.\"[[1]](https://x.com/i/status/2019101692449509698) (Includes image: https://pbs.twimg.com/media/HAVKEiZacAAAs4c.jpg)\n\n2. **AI-Enhanced Demand Gen Pipeline** (@gophillionaire): A full-stack automation using Clay, InstantlyAI, HeyReach, HubSpot, and Slack to generate $50M+ in pipeline. Steps include data enrichment, multi-channel outreach, AI scripts, and re-engagement loops.[[2]](https://x.com/i/status/2018376206807114045) (Includes image: https://pbs.twimg.com/media/HAK2cRmWQAACfAW.jpg)\n\n3. **Client Pipeline Visualization in monday.com** (@ChisomOkpareke_): Step-by-step guide to building boards with groups (e.g., Lead → Completed), automations, Kanban views, and dashboards for workflow tracking.[[3]](https://x.com/i/status/2019023301826212194)\n\n4. **GenAI Quality Control Pipeline** (@cloudinary): Cloudinary Refiners automate background fixes and crop adjustments in production pipelines without manual slowdowns. Demo video included.[[4]](https://x.com/i/status/2018338831171281138) (Video: https://video.twimg.com/ext_tw_video/2018338709372866560/pu/vid/avc1/480x270/ku4gbcwBtoxdCn79.mp4?tag=12)\n\n5. **Data Science Agents & Pipelines** (@tom_doerr): GitHub repo for \"Agents for data science workflows and pipeline automation\" – https://github.com/business-science/ai-data-science-team.[[5]](https://x.com/i/status/2018411112237088892) (Includes image)\n\nOther notable mentions include high-demand 2026 skills lists emphasizing DevOps/CI-CD automation, AI/ML pipelines, and MLOps,[[6]](https://x.com/i/status/2018713904533438716)[[7]](https://x.com/i/status/2018654369722544355) plus AI agents for content workflows and RAG setups.[[8]](https://x.com/i/status/2017590748129137047)[[9]](https://x.com/i/status/2017722357377282303)\n\nThese reflect buzzing topics like agentic AI, no-code tools (e.g., monday.com, n8n), and enterprise pipelines. Want deeper dives on any post, threads, or refined searches (e.g., Latest mode or specific dates)? Let me know!",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019101692449509698",
+              "start_index": 282,
+              "end_index": 331,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018376206807114045",
+              "start_index": 331,
+              "end_index": 380,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019023301826212194",
+              "start_index": 380,
+              "end_index": 429,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018338831171281138",
+              "start_index": 429,
+              "end_index": 478,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018411112237088892",
+              "start_index": 478,
+              "end_index": 527,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019101692449509698",
+              "start_index": 796,
+              "end_index": 845,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018376206807114045",
+              "start_index": 1171,
+              "end_index": 1220,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019023301826212194",
+              "start_index": 1499,
+              "end_index": 1548,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018338831171281138",
+              "start_index": 1740,
+              "end_index": 1789,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018411112237088892",
+              "start_index": 2093,
+              "end_index": 2142,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018713904533438716",
+              "start_index": 2286,
+              "end_index": 2335,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018654369722544355",
+              "start_index": 2335,
+              "end_index": 2384,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017590748129137047",
+              "start_index": 2437,
+              "end_index": 2486,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017722357377282303",
+              "start_index": 2486,
+              "end_index": 2535,
+              "title": "9"
+            }
+          ]
+        }
+      ],
+      "id": "msg_00b18b7e-891f-9b8f-05ae-22766220f4f2",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 7970,
+    "input_tokens_details": {
+      "cached_tokens": 3426
+    },
+    "output_tokens": 1797,
+    "output_tokens_details": {
+      "reasoning_tokens": 858
+    },
+    "total_tokens": 9767,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 69786000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

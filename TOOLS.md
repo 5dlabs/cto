@@ -1,83 +1,126 @@
-# TOOLS.md - Docs Agent Configuration
+# TOOLS.md - Local Notes
 
-## Important: MCP vs Direct API Access
 
-MCP tools (Context7, Firecrawl) run through Cursor/Claude Code, not directly in Discord sessions.
-For Discord interactions, use the **HTTP APIs** or **skills** below.
+## Claude Code & Swarm Mode
 
----
-
-## Firecrawl (Web Scraping)
-
-### Via Skill (Preferred)
-The Firecrawl skill is available. Read it at:
-`~/.clawdbot/skills/firecrawl/SKILL.md`
-
-Tools available: `firecrawl_scrape`, `firecrawl_crawl`, `firecrawl_map`, `firecrawl_search`, `firecrawl_agent`
-
-### Via HTTP API
+### Binary Path
 ```bash
-# Scrape a URL
-curl -X POST 'https://api.firecrawl.dev/v1/scrape' \
-  -H 'Authorization: Bearer fc-7b87b1fed629409f96387fbfa788e0de' \
-  -H 'Content-Type: application/json' \
-  -d '{"url": "https://example.com"}'
+/Users/jonathonfritz/.local/bin/claudesp
 ```
 
-API Key: `fc-7b87b1fed629409f96387fbfa788e0de`
-Docs: https://docs.firecrawl.dev
+Use `claudesp` (not `claude`) for swarm/TeammateTool features.
 
----
-
-## Context7 (Library Documentation)
-
-### Via HTTP API
+### One-Shot Coding Task
 ```bash
-# Resolve library ID
-curl -X POST 'https://api.context7.com/v1/resolve' \
-  -H 'Authorization: Bearer ctx7sk-ca506bef-1678-4809-9700-42ac21b35534' \
-  -H 'Content-Type: application/json' \
-  -d '{"name": "next.js"}'
-
-# Get library docs
-curl -X POST 'https://api.context7.com/v1/docs' \
-  -H 'Authorization: Bearer ctx7sk-ca506bef-1678-4809-9700-42ac21b35534' \
-  -H 'Content-Type: application/json' \
-  -d '{"context7_id": "/vercel/next.js", "topic": "middleware"}'
+# PTY required for interactive terminal
+exec pty:true workdir:/path/to/project command:"claudesp 'Your task here'"
 ```
 
-API Key: `ctx7sk-ca506bef-1678-4809-9700-42ac21b35534`
-Dashboard: https://context7.com/dashboard
-
-### Context7 Workflow
-1. **Resolve library ID**: Get the Context7 ID for a library name
-2. **Fetch docs**: Get documentation for specific topics
-3. **Use in responses**: Provide accurate, up-to-date code examples
-
----
-
-## Via Claude Code (MCP Access)
-
-For full MCP tool access, spawn a Claude Code session:
+### Background Coding Task
 ```bash
-claudesp "Use context7 to get Next.js middleware docs"
+# Start in background, get sessionId
+exec pty:true workdir:/path/to/project background:true command:"claudesp 'Your task here'"
+
+# Monitor progress
+process action:log sessionId:XXX
+
+# Check if done
+process action:poll sessionId:XXX
 ```
 
-The MCP config at `~/.clawdbot/agents/docs/mcp-config.json` configures Context7 and Firecrawl for Claude Code sessions.
+### Swarm Mode (Parallel Sub-Agents)
+
+Use TeammateTool for parallel orchestration:
+
+```javascript
+// Create a team
+Teammate({ operation: "spawnTeam", team_name: "my-team" })
+
+// Spawn a worker
+Task({
+  team_name: "my-team",
+  name: "worker-1",
+  subagent_type: "general-purpose",
+  prompt: "Your task for the sub-agent",
+  run_in_background: true
+})
+
+// Check inbox for results
+Teammate({ operation: "getInbox", team_name: "my-team" })
+```
+
+### Auto-Notify on Completion
+
+For long tasks, append wake trigger:
+```
+... your task here.
+
+When finished, run: clawdbot gateway wake --text "Done: [summary]" --mode now
+```
+
+## Agent Directory
+
+See `/Users/jonathonfritz/.clawdbot/AGENT_DIRECTORY.md` for a list of all agents and how to contact them.
+
+Quick reference:
+- **stitch** — code review
+- **metal** — infrastructure  
+- **pixel/ctolite** — desktop app
+- **research** — web research
+- **holt** — bot deployment
+- **intake** — PRD processing
+
 
 ---
 
-## Your Mission
+## Agent Browser (Headless Web Automation)
 
-As the Docs agent:
-1. Use Firecrawl to scrape implementation-specific docs
-2. Use Context7 to fetch current library documentation
-3. Create and maintain documentation for 5D Labs projects
-4. Add new libraries to Context7 as needed (see https://context7.com/docs/adding-libraries)
+**ALWAYS use `agent-browser` with `--state` for authenticated web automation.** Runs headless by default.
 
-## Skill Reference
+### Quick Start (Authenticated)
 
-The Context7 skill at `~/.clawdbot/skills/context7/SKILL.md` has detailed MCP usage instructions for Claude Code sessions.
+```bash
+# Linear - project management
+agent-browser --state ~/.agent-browser/linear-auth.json open https://linear.app
+
+# Discord - messaging  
+agent-browser --state ~/.agent-browser/discord-auth.json open https://discord.com/channels/@me
+
+# Get snapshot, interact, close
+agent-browser snapshot -i
+agent-browser click @e2
+agent-browser close
+```
+
+### Available Auth States
+
+| Service | State File | Example URL |
+|---------|-----------|-------------|
+| Linear | `~/.agent-browser/linear-auth.json` | `https://linear.app` |
+| Discord | `~/.agent-browser/discord-auth.json` | `https://discord.com/channels/@me` |
+
+### Workflow Pattern
+
+```bash
+# 1. Open with auth state
+agent-browser --state ~/.agent-browser/linear-auth.json open https://linear.app
+
+# 2. Get snapshot to see elements
+agent-browser snapshot -i
+
+# 3. Interact using @refs from snapshot
+agent-browser click @e5
+
+# 4. ALWAYS close when done
+agent-browser close
+```
+
+### Important Rules
+
+1. **ALWAYS use `--state`** for authenticated sites
+2. **ALWAYS `close` when done** - One browser at a time
+3. **Use @refs from snapshots** - More reliable than selectors
+
 
 # TOOLS.md - Standard Agent Tools
 

@@ -103,6 +103,9 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: automation
       server: https://kubernetes.default.svc
+    # OpenClaw agent bots
+    - namespace: bots
+      server: https://kubernetes.default.svc
     - namespace: argocd
       server: https://kubernetes.default.svc
     # Observability - metrics, logs, traces

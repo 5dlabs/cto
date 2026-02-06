@@ -196,10 +196,9 @@ pub fn verify_webhook_signature(payload: &[u8], signature: &str, secret: &str) -
         hex::encode(mac.finalize().into_bytes())
     };
 
-    let sig_bytes = hex::decode(sig)
-        .map_err(|_| anyhow!("Invalid hex signature"))?;
-    let expected_bytes = hex::decode(&expected_sig)
-        .map_err(|_| anyhow!("Invalid hex expected signature"))?;
+    let sig_bytes = hex::decode(sig).map_err(|_| anyhow!("Invalid hex signature"))?;
+    let expected_bytes =
+        hex::decode(&expected_sig).map_err(|_| anyhow!("Invalid hex expected signature"))?;
 
     if sig_bytes.len() != expected_bytes.len() {
         return Err(anyhow!("Signature length mismatch"));
@@ -623,7 +622,11 @@ pub async fn redeliver_webhook(event_id: String) -> Result<StoredEvent, String> 
     let event_clone = event_mut.clone();
     store.push(event_clone.clone()).await;
 
-    tracing::info!("Redelivered event {} (attempt {})", event_id, event_clone.redelivery_count);
+    tracing::info!(
+        "Redelivered event {} (attempt {})",
+        event_id,
+        event_clone.redelivery_count
+    );
 
     Ok(event_clone)
 }
@@ -695,7 +698,10 @@ impl GitHubAppClient {
             .context("Failed to request access token")?;
 
         if !response.status().is_success() {
-            let body = response.text().await.context("Failed to read error response")?;
+            let body = response
+                .text()
+                .await
+                .context("Failed to read error response")?;
             return Err(anyhow!("GitHub API error: {}", body));
         }
 
@@ -727,11 +733,7 @@ mod tests {
         mac.update(payload);
         let signature = hex::encode(mac.finalize().into_bytes());
 
-        let result = verify_webhook_signature(
-            payload,
-            &format!("sha256={}", signature),
-            secret,
-        );
+        let result = verify_webhook_signature(payload, &format!("sha256={}", signature), secret);
 
         assert!(result.is_ok());
     }

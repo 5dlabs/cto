@@ -3,9 +3,9 @@ name: Controller CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
   workflow_dispatch:
 
 # LESSON LEARNED: Without concurrency controls, multiple runs for the same branch
@@ -169,12 +169,12 @@ jobs:
           cargo install cargo-audit --version 0.21.2 2>/dev/null || true
           cd crates/controller && cargo audit || true
 
-  # Docker Build & Push (main and develop branches)
+  # Docker Build & Push (main branch only)
   # Runs on: push events when controller/templates files change, or manual workflow_dispatch
   build-and-push:
     needs: [changes, lint-rust, test-rust]
     if: |
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+      github.ref == 'refs/heads/main' &&
       (
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'push' && needs.changes.outputs.controller == 'true')
