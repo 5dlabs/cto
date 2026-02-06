@@ -593,17 +593,6 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     chmod +x /usr/local/bin/op && \
     op --version
 
-# =============================================================================
-# Claude Code CLI - pinned version for reproducible agent builds
-# Version is passed as a build arg; the GitHub Action detects latest via:
-#   npm view @anthropic-ai/claude-code version
-# =============================================================================
-ARG CLAUDE_CODE_VERSION=2.1.32
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} && \
-    claude --version && \
-    echo "Claude Code CLI ${CLAUDE_CODE_VERSION} installed"
-
 # Labels / defaults
 USER node
 WORKDIR /workspace

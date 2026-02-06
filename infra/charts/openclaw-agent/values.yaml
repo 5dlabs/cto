@@ -11,28 +11,33 @@ namespace: bots
 createNamespace: false
 
 # -- Image configuration
+# Uses the composable openclaw image which includes:
+#   - Runtime base (tools, git, node, npm, gh, ripgrep)
+#   - Claude Code CLI (COPY --from= ghcr.io/5dlabs/claude:latest)
+#   - OpenClaw CLI (npm install)
+#   - 1Password CLI (op)
 image:
-  repository: ghcr.io/5dlabs/runtime
+  repository: ghcr.io/5dlabs/openclaw
   tag: full
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 # -- Image pull secrets
 imagePullSecrets:
   - name: ghcr-secret
 
-# -- Resource limits
+# -- Resource limits (sized for production base + DinD + Rust compilation)
 resources:
   requests:
-    cpu: "200m"
-    memory: "512Mi"
+    cpu: "500m"
+    memory: "2Gi"
   limits:
-    cpu: "2000m"
-    memory: "4Gi"
+    cpu: "4000m"
+    memory: "8Gi"
 
 # -- Storage configuration
 storage:
   storageClass: mayastor
-  size: 10Gi
+  size: 20Gi
 
 # =============================================================================
 # Workspace Initialization
@@ -58,8 +63,8 @@ agent:
   id: ""
   # -- Display name (e.g., "Metal", "Trader", "Forge")
   name: ""
-  # -- Primary model (e.g., "anthropic/claude-opus-4-6")
-  model: "anthropic/claude-opus-4-6"
+  # -- Primary model (must match provider/model-id exactly from models.providers)
+  model: "anthropic/claude-opus-4-6-20260201"
   # -- Heartbeat interval
   heartbeat: "15m"
   # -- Sandbox mode
@@ -123,21 +128,28 @@ models:
       baseUrl: "https://api.anthropic.com"
       models:
         - id: "claude-3-5-haiku-latest"
+          name: "claude-3-5-haiku-latest"
         - id: "claude-sonnet-4-20250514"
+          name: "claude-sonnet-4-20250514"
         - id: "claude-opus-4-20250514"
+          name: "claude-opus-4-20250514"
         - id: "claude-opus-4-6-20260201"
+          name: "claude-opus-4-6-20260201"
     minimax:
       baseUrl: "https://api.minimax.io/anthropic"
       models:
         - id: "MiniMax-M2.1"
+          name: "MiniMax-M2.1"
     nvidia-nim:
       baseUrl: "https://integrate.api.nvidia.com/v1"
       models:
         - id: "moonshotai/kimi-k2-instruct"
+          name: "moonshotai/kimi-k2-instruct"
     openai:
       baseUrl: "https://api.openai.com/v1"
       models:
         - id: "text-embedding-3-small"
+          name: "text-embedding-3-small"
 
 # =============================================================================
 # Agent Defaults (global across all agents)
@@ -214,21 +226,23 @@ session:
 # Gateway Configuration (adapted for Kubernetes)
 # =============================================================================
 gateway:
-  bind: "0.0.0.0"
+  bind: "loopback"
   port: 18789
   # In Kubernetes, gateway runs locally inside the pod (no remote SSH)
   mode: "local"
+  # Auth token for the gateway (set via OPENCLAW_GATEWAY_TOKEN env var)
+  # For loopback-only gateways this is a simple static token.
+  token: "openclaw-k8s-gateway"
 
 # =============================================================================
 # Model Fallback Configuration
 # =============================================================================
 modelDefaults:
-  primary: "minimax/MiniMax-M2.1"
+  primary: "anthropic/claude-opus-4-6-20260201"
   fallbacks:
     - "minimax/MiniMax-M2.1"
     - "nvidia-nim/moonshotai/kimi-k2-instruct"
     - "anthropic/claude-3-5-haiku-latest"
-    - "anthropic/claude-sonnet-4-5"
 
 # =============================================================================
 # Tools Configuration (Linux-adapted, no macOS paths)
@@ -243,13 +257,44 @@ tools:
     # Linux paths only - no macOS /opt/homebrew or /Users paths
     pathPrepend:
       - "/usr/local/bin"
-  # -- MCP servers available to the OpenClaw gateway (orchestrator agents)
-  # These are DISTINCT from Claude Code's MCP servers above.
-  # OpenClaw agents use these for planning, coordination, and memory.
-  mcpServers:
-    openmemory:
-      type: "sse"
-      url: "http://openmemory.openmemory.svc.cluster.local:8080/mcp/sse"
+  # Note: OpenClaw does not support mcpServers natively in its config.
+  # External tools (OpenMemory, etc.) are accessed via the `tools` binary
+  # on the PATH, which proxies MCP calls through the CTO tool server.
+
+  # -- CTO tools server configuration (for the `tools` MCP client binary)
+  # The `tools` binary connects to this HTTP endpoint for remote MCP tools,
+  # then uses clientConfig for filtering which tools to expose.
+  serverUrl: "http://cto-tools.cto.svc.cluster.local:3000/mcp"
+
+  # -- Client-side tool configuration (rendered to client-config.json)
+  # Controls which remote tools the `tools` binary exposes and any local
+  # MCP servers to spawn. Based on config.rs ClientConfig struct.
+  # If remoteTools is empty, ALL remote tools are exposed (no filtering).
+  clientConfig:
+    # Remote tools to whitelist from the CTO tool server.
+    # Supports wildcard patterns: "mcp_tools_firecrawl_*"
+    # Empty list = expose ALL remote tools (no filtering)
+    remoteTools: []
+    # Example: only expose Firecrawl, OpenMemory, and Context7
+    # remoteTools:
+    #   - "user_firecrawl_*"
+    #   - "user_openmemory_*"
+    #   - "user_context7_*"
+    #   - "user_tools_*"
+
+    # Local MCP servers to spawn alongside remote tools
+    localServers: {}
+    # Example: spawn a local OpenMemory server
+    # localServers:
+    #   openmemory:
+    #     command: "npx"
+    #     args: ["-y", "@openmemory/mcp-server"]
+    #     tools: ["openmemory_*"]
+    #     env:
+    #       OPENMEMORY_API_KEY: "${OPENMEMORY_API_KEY}"
+
+    # Maximum concurrent MCP server connections (LRU eviction)
+    maxConnections: 10
 
 # =============================================================================
 # Claude Code CLI Configuration
@@ -268,6 +313,16 @@ claudeCode:
   # This is informational only; the actual version is baked into the image.
   version: "2.1.32"
 
+  # -- Model for Claude Code CLI sessions (alias works, e.g. "claude-opus-4-6")
+  model: "claude-opus-4-6"
+  # -- Model for sub-agents spawned by Claude Code (Agent Teams teammates)
+  subagentModel: "claude-sonnet-4-5"
+
+  # -- Effort level for adaptive thinking (Opus 4.6 only)
+  # Controls how deeply Claude reasons: low | medium | high (default) | max
+  # "max" = no constraints on thinking depth (most intelligent, most tokens)
+  effortLevel: "high"
+
   # -- Permission settings for Claude Code CLI sessions
   permissions:
     # bypassPermissions = fully autonomous, no confirmation prompts
@@ -284,7 +339,8 @@ claudeCode:
   # -- Agent Teams (parallel sub-agent orchestration within Claude Code)
   agentTeams:
     enabled: true
-    # in-process = all teammates run within the same Node.js process (K8s-safe)
+    # in-process = sub-agents run within the same Node.js process (K8s-safe)
+    # Agent-to-agent communication between separate Pods happens over Discord
     teammateMode: "in-process"
 
   # -- Disable co-authored-by commit attribution
@@ -296,18 +352,27 @@ claudeCode:
   # -- MCP servers available to Claude Code CLI sessions
   # These are the tools that the Claude Code coding agent can use when
   # invoked by an OpenClaw agent. Separate from OpenClaw's own tools.
+  # The `tools` binary requires two positional args: <TOOLS_URL> <WORKSPACE>
   mcp:
     servers:
-      # OpenMemory — persistent long-term agent memory (shared across all agents)
-      openmemory:
-        type: "sse"
-        url: "http://openmemory.openmemory.svc.cluster.local:8080/mcp/sse"
-      # Example: Connect Claude Code to the CTO tool server
-      # cto:
-      #   command: "npx"
-      #   args: ["-y", "@5dlabs/cto-mcp"]
-      #   env:
-      #     CTO_API_KEY: "${CTO_API_KEY}"
+      # CTO tool server — proxies all MCP tools (OpenMemory, Firecrawl, etc.)
+      # The `tools` binary is the standard MCP client for the CTO platform.
+      # It reads MCP_CLIENT_CONFIG for tool filtering, then proxies calls
+      # to the remote tool server and any configured local MCP servers.
+      tools:
+        command: "tools"
+        args:
+          - "http://cto-tools.cto.svc.cluster.local:3000/mcp"
+          - "/workspace"
+
+  # -- Plugins loaded into Claude Code CLI sessions
+  # Each plugin is mounted as a ConfigMap and loaded via --plugin-dir
+  # Plugins can contain skills/, agents/, hooks/, and .mcp.json
+  plugins: []
+  # Example:
+  # plugins:
+  #   - name: "coding-standards"
+  #     configMap: "openclaw-claude-plugin-coding-standards"
 
 # =============================================================================
 # Secrets Configuration
@@ -317,6 +382,30 @@ secrets:
   discordTokensSecret: "openclaw-discord-tokens"
   # -- Name of the Secret containing shared API keys (Anthropic, OpenAI, etc.)
   apiKeysSecret: "openclaw-api-keys"
+
+# =============================================================================
+# Docker-in-Docker Configuration
+# =============================================================================
+# Enables Docker build capability inside agent pods via a DinD sidecar.
+# When enabled, agents can build and push container images to GHCR.
+docker:
+  enabled: true
+  dind:
+    enabled: true
+    image: docker:dind
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+  buildkit:
+    enabled: true
+    host: "tcp://buildkit.buildkit.svc.cluster.local:1234"
+  # GHCR credentials (uses ghcr-secret already synced to bots namespace)
+  ghcr:
+    secretName: ghcr-secret
 
 # =============================================================================
 # Probes

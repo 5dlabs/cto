@@ -110,16 +110,22 @@ data:
         "ackReactionScope": "group-mentions"
       },
       "models": {
-        {{- $first := true }}
-        {{- range $name, $provider := .Values.models.providers }}
-        {{- if not $first }},{{ end }}
-        {{ $name | quote }}: {
-          "apiKey": "${PROVIDER_{{ $name | upper | replace "-" "_" }}_KEY}",
-          "baseUrl": {{ $provider.baseUrl | quote }},
-          "models": {{ $provider.models | toJson }}
+        "mode": "merge",
+        "providers": {
+          {{- $first := true }}
+          {{- range $name, $provider := .Values.models.providers }}
+          {{- if not $first }},{{ end }}
+          {{ $name | quote }}: {
+            "apiKey": "${PROVIDER_{{ $name | upper | replace "-" "_" }}_KEY}",
+            "baseUrl": {{ $provider.baseUrl | quote }},
+            {{- if $provider.api }}
+            "api": {{ $provider.api | quote }},
+            {{- end }}
+            "models": {{ $provider.models | toJson }}
+          }
+          {{- $first = false }}
+          {{- end }}
         }
-        {{- $first = false }}
-        {{- end }}
       },
       "session": {
         "agentToAgent": {
@@ -157,9 +163,6 @@ data:
         "exec": {
           "pathPrepend": {{ .Values.tools.exec.pathPrepend | toJson }}
         },
-        {{- if .Values.tools.mcpServers }}
-        "mcpServers": {{ .Values.tools.mcpServers | toJson }},
-        {{- end }}
         "profile": {{ .Values.tools.profile | quote }}
       }
     }

@@ -23,6 +23,8 @@ data:
   settings.json: |
     {
       "$schema": "https://json.schemastore.org/claude-code-settings.json",
+      "alwaysThinkingEnabled": true,
+      "effortLevel": {{ .Values.claudeCode.effortLevel | quote }},
       "permissions": {
         "defaultMode": {{ .Values.claudeCode.permissions.defaultMode | quote }},
         "allow": {{ .Values.claudeCode.permissions.allow | toJson }}
@@ -32,6 +34,7 @@ data:
       {{- end }}
       "includeCoAuthoredBy": {{ .Values.claudeCode.includeCoAuthoredBy }},
       "env": {
+        "CLAUDE_CODE_EFFORT_LEVEL": {{ .Values.claudeCode.effortLevel | quote }},
         {{- if .Values.claudeCode.agentTeams.enabled }}
         "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
         {{- end }}

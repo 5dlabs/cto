@@ -19,6 +19,8 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/openclaw-skills: {{ include (print $.Template.BasePath "/configmap-openclaw-skills.yaml") . | sha256sum }}
+        checksum/tools-client: {{ include (print $.Template.BasePath "/configmap-tools-client.yaml") . | sha256sum }}
+        checksum/cto-services: {{ include (print $.Template.BasePath "/configmap-systemd.yaml") . | sha256sum }}
         {{- if .Values.claudeCode.enabled }}
         checksum/claude-settings: {{ include (print $.Template.BasePath "/configmap-claude-settings.yaml") . | sha256sum }}
         checksum/claude-skills: {{ include (print $.Template.BasePath "/configmap-claude-skills.yaml") . | sha256sum }}
@@ -34,6 +36,10 @@ spec:
       {{- end }}
       securityContext:
         fsGroup: 1000
+        {{- if .Values.docker.enabled }}
+        # GID 2375 is the docker group used by docker:dind for the socket
+        supplementalGroups: [2375]
+        {{- end }}
       initContainers:
         # Ensure workspace directories exist and resolve the config with env vars
         - name: init-workspace
@@ -57,7 +63,12 @@ spec:
               # ---------------------------------------------------------------
               # 2. OpenClaw config (re-rendered every restart with fresh env)
               # ---------------------------------------------------------------
-              envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
+              node -e "
+                const fs = require('fs');
+                let cfg = fs.readFileSync('/config-template/openclaw.json', 'utf8');
+                cfg = cfg.replace(/\\\$\{([^}]+)\}/g, (_, v) => process.env[v] || '');
+                fs.writeFileSync('/workspace/.openclaw/openclaw.json', cfg);
+              "
               echo "[config] openclaw.json rendered"
 
               # ---------------------------------------------------------------
@@ -86,7 +97,35 @@ spec:
               {{- end }}
 
               # ---------------------------------------------------------------
-              # 5. Git credential setup (for private repo access)
+              # 4b. Tools client config (always overwrite from ConfigMap)
+              # ---------------------------------------------------------------
+              cp /tools-client-template/client-config.json /workspace/client-config.json
+              echo "[tools] client-config.json written"
+
+              # ---------------------------------------------------------------
+              # 5. CTO service manager script
+              # ---------------------------------------------------------------
+              mkdir -p /workspace/.cto-services
+              cp /cto-services-template/cto-services.sh /workspace/.cto-services/cto-services.sh
+              chmod +x /workspace/.cto-services/cto-services.sh
+              ln -sf /workspace/.cto-services/cto-services.sh /usr/local/bin/cto-services 2>/dev/null || true
+              echo "[services] cto-services script installed"
+
+              {{- if .Values.docker.enabled }}
+              # ---------------------------------------------------------------
+              # 5b. GHCR credentials for Docker push
+              # ---------------------------------------------------------------
+              mkdir -p /workspace/.docker
+              if [ -f /ghcr-secret/.dockerconfigjson ]; then
+                cp /ghcr-secret/.dockerconfigjson /workspace/.docker/config.json
+                echo "[docker] GHCR credentials installed"
+              else
+                echo "[docker] WARNING: GHCR secret not found — docker push may fail"
+              fi
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # 6. Git credential setup (for private repo access)
               # ---------------------------------------------------------------
               if [ -n "${GITHUB_TOKEN:-}" ]; then
                 git config --global credential.helper store
@@ -100,7 +139,7 @@ spec:
               fi
 
               # ---------------------------------------------------------------
-              # 6. Git repo health checks (idempotent clone + dirty-state audit)
+              # 7. Git repo health checks (idempotent clone + dirty-state audit)
               # ---------------------------------------------------------------
               WARNINGS=0
               {{- range .Values.workspace.repos }}
@@ -199,6 +238,15 @@ spec:
               mountPath: /config-template
             - name: openclaw-skills-template
               mountPath: /openclaw-skills-template
+            - name: tools-client-template
+              mountPath: /tools-client-template
+            - name: cto-services-template
+              mountPath: /cto-services-template
+            {{- if .Values.docker.enabled }}
+            - name: ghcr-secret
+              mountPath: /ghcr-secret
+              readOnly: true
+            {{- end }}
             {{- if .Values.claudeCode.enabled }}
             - name: claude-settings-template
               mountPath: /claude-settings-template
@@ -220,7 +268,7 @@ spec:
               cd /workspace
               export HOME=/workspace
               export OPENCLAW_CONFIG=/workspace/.openclaw/openclaw.json
-              exec npx @anthropic/openclaw start
+              exec npx openclaw gateway
           env:
             - name: HOME
               value: /workspace
@@ -228,6 +276,9 @@ spec:
               value: /workspace/.openclaw/openclaw.json
             - name: NODE_ENV
               value: production
+            # Gateway auth token (loopback only, no external exposure)
+            - name: OPENCLAW_GATEWAY_TOKEN
+              value: {{ .Values.gateway.token | quote }}
             # Provider API keys (available at runtime for dynamic use)
             - name: ANTHROPIC_API_KEY
               valueFrom:
@@ -241,10 +292,19 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: openai-api-key
                   optional: true
+            # Tools client config for the `tools` MCP binary
+            - name: MCP_CLIENT_CONFIG
+              value: /workspace/client-config.json
             {{- if .Values.claudeCode.enabled }}
             # Claude Code CLI settings path (settings.json with permissions + teams)
             - name: CLAUDE_CONFIG_DIR
               value: /workspace/.claude
+            # Claude Code CLI model (alias like "claude-opus-4-6" works)
+            - name: ANTHROPIC_MODEL
+              value: {{ .Values.claudeCode.model | quote }}
+            # Sub-agent model for Claude Code Agent Teams
+            - name: CLAUDE_CODE_SUBAGENT_MODEL
+              value: {{ .Values.claudeCode.subagentModel | quote }}
             {{- if .Values.claudeCode.agentTeams.enabled }}
             # Enable Agent Teams experimental feature
             - name: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
@@ -272,14 +332,33 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: op-service-account-token
                   optional: true
+            {{- if .Values.docker.enabled }}
+            # Docker host points to the DinD sidecar via shared socket
+            - name: DOCKER_HOST
+              value: "unix:///var/run/docker.sock"
+            # Docker config with GHCR credentials
+            - name: DOCKER_CONFIG
+              value: /workspace/.docker
+            {{- if .Values.docker.buildkit.enabled }}
+            # Remote BuildKit for faster builds
+            - name: BUILDKIT_HOST
+              value: {{ .Values.docker.buildkit.host | quote }}
+            {{- end }}
+            {{- end }}
+            # CTO service manager
+            - name: PATH
+              value: "/workspace/.cto-services:/usr/local/bin:/usr/bin:/bin:/home/node/.cargo/bin"
           ports:
             - name: gateway
               containerPort: {{ .Values.gateway.port }}
               protocol: TCP
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
-            tcpSocket:
-              port: gateway
+            exec:
+              command:
+                - sh
+                - -c
+                - "nc -z 127.0.0.1 {{ .Values.gateway.port }} || curl -sf http://127.0.0.1:{{ .Values.gateway.port }}/ > /dev/null 2>&1"
             initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
             timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
@@ -287,8 +366,11 @@ spec:
           {{- end }}
           {{- if .Values.probes.readiness.enabled }}
           readinessProbe:
-            tcpSocket:
-              port: gateway
+            exec:
+              command:
+                - sh
+                - -c
+                - "nc -z 127.0.0.1 {{ .Values.gateway.port }} || curl -sf http://127.0.0.1:{{ .Values.gateway.port }}/ > /dev/null 2>&1"
             initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
             timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
@@ -299,6 +381,27 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+            {{- if .Values.docker.enabled }}
+            - name: docker-sock-dir
+              mountPath: /var/run
+            {{- end }}
+      {{- if and .Values.docker.enabled .Values.docker.dind.enabled }}
+        # Docker-in-Docker sidecar for Docker build capability
+        - name: docker-daemon
+          image: {{ .Values.docker.dind.image }}
+          securityContext:
+            privileged: true
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          volumeMounts:
+            - name: docker-sock-dir
+              mountPath: /var/run
+            - name: docker-data
+              mountPath: /var/lib/docker
+          resources:
+            {{- toYaml .Values.docker.dind.resources | nindent 12 }}
+      {{- end }}
       volumes:
         - name: workspace
           persistentVolumeClaim:
@@ -309,6 +412,22 @@ spec:
         - name: openclaw-skills-template
           configMap:
             name: {{ include "openclaw-agent.fullname" . }}-openclaw-skills
+        - name: tools-client-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-tools-client
+        - name: cto-services-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-cto-services
+        {{- if .Values.docker.enabled }}
+        - name: docker-sock-dir
+          emptyDir: {}
+        - name: docker-data
+          emptyDir: {}
+        - name: ghcr-secret
+          secret:
+            secretName: {{ .Values.docker.ghcr.secretName }}
+            optional: true
+        {{- end }}
         {{- if .Values.claudeCode.enabled }}
         - name: claude-settings-template
           configMap:
