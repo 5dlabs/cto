@@ -329,16 +329,16 @@ pm:
     # Using Opus 4.5 with extended thinking for complex task generation
     models:
       # Primary model for task generation (PRD → tasks)
-      primary: "claude-opus-4-5-20251101"
+      primary: "claude-opus-4-6-20260205"
       primaryProvider: "anthropic"
       # Research model for analysis and context enrichment
-      research: "claude-opus-4-5-20251101"
+      research: "claude-opus-4-6-20260205"
       researchProvider: "anthropic"
       # Docs model for documentation generation
-      docs: "claude-opus-4-5-20251101"
+      docs: "claude-opus-4-6-20260205"
       docsProvider: "anthropic"
       # Fallback model if primary fails
-      fallback: "claude-sonnet-4-20250514"
+      fallback: "claude-opus-4-6-20260205"
       fallbackProvider: "anthropic"
 
   # Secrets
@@ -465,13 +465,8 @@ tools:
           GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 
       # --- UI Components ---
-      shadcn:
-        name: "shadcn/ui"
-        description: "Official shadcn/ui MCP server - browse, search, and install components"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "shadcn@latest", "mcp"]
-        workingDirectory: "/tmp"
+      # shadcn: removed - broken ESM dependencies, no working npm package
+      # ai-elements and better-auth are available for documentation needs
 
       ai-elements:
         name: "AI Elements"
@@ -520,24 +515,12 @@ tools:
         url: "https://mcp.exa.ai/mcp"
 
       # --- Web Scraping ---
-      firecrawl:
-        name: "Firecrawl"
-        description: "Web scraping, crawling, and content extraction with search capabilities"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@iflow-mcp/firecrawl-mcp"]
-        workingDirectory: "/tmp"
-        env:
-          FIRECRAWL_API_KEY: "${FIRECRAWL_API_KEY}"
+      # firecrawl: removed - broken zod dependencies, no working npm package
+      # tavily is available below for web scraping needs
 
       # --- Codebase Analysis ---
-      repomix:
-        name: "Repomix"
-        description: "Pack codebases into AI-friendly formats - compress, search, and analyze repositories for existing project context"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "repomix", "--mcp"]
-        workingDirectory: "/tmp"
+      # repomix: removed - missing ajv dependency, no working npm package
+      # octocode is available below for GitHub code search
 
       octocode:
         name: "Octocode"
@@ -577,7 +560,7 @@ tools:
         description: "Query and analyze Grafana Loki logs with LogQL"
         transport: "stdio"
         command: "docker"
-        args: ["run", "-i", "--rm", "-e", "LOKI_URL", "grafana/loki-mcp:latest"]
+        args: ["run", "-i", "--rm", "-e", "LOKI_URL", "ghcr.io/grafana/loki-mcp:latest"]
         workingDirectory: "/tmp"
         env:
           LOKI_URL: "${LOKI_URL:-http://loki.observability.svc:3100}"
@@ -604,16 +587,8 @@ tools:
           Authorization: "Bearer ${CLOUDFLARE_API_TOKEN}"
 
       # --- AI Generation ---
-      minimax:
-        name: "MiniMax"
-        description: "MiniMax AI suite - text (M2 200k context), video (Hailuo), speech (40 languages), and music generation"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@5dlabs/minimax-mcp"]
-        workingDirectory: "/tmp"
-        env:
-          MINIMAX_API_KEY: "${MINIMAX_API_KEY}"
-          MINIMAX_GROUP_ID: "${MINIMAX_GROUP_ID}"
+      # minimax: removed - internal/private npm package not available publicly
+      # exa-mcp and tavily are available for web search and research needs
 
       # --- Web Search & Research ---
       modelcontextprotocol:
@@ -649,40 +624,19 @@ tools:
 
       # xcodebuild: removed - doesn't work on Ubuntu/Linux servers
 
-      appstore-connect:
-        name: "App Store Connect"
-        description: "App Store Connect API - manage apps, beta testers, bundle IDs, releases, and TestFlight"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "app-store-connect-mcp-server"]
-        workingDirectory: "/tmp"
-        env:
-          APP_STORE_KEY_ID: "${APP_STORE_KEY_ID}"
-          APP_STORE_ISSUER_ID: "${APP_STORE_ISSUER_ID}"
-          APP_STORE_P8_PATH: "${APP_STORE_P8_PATH:-/secrets/appstore/AuthKey.p8}"
+      # appstore-connect: removed - wrong npm package name, no public package available
 
       # --- Database ---
-      postgres:
-        name: "PostgreSQL"
-        description: "Comprehensive PostgreSQL database management - queries, mutations, schema management, and performance analysis"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "@henkey/postgres-mcp-server", "--connection-string", "${POSTGRES_URL}"]
-        workingDirectory: "/tmp"
-        env:
-          POSTGRES_URL: "${POSTGRES_URL:-postgresql://localhost:5432/postgres}"
-
-      # redis: removed - should be client-side only, not on backend
-
-      mongodb:
-        name: "MongoDB"
-        description: "MongoDB database operations - queries, aggregations, collections, and Atlas integration"
-        transport: "stdio"
-        command: "npx"
-        args: ["-y", "mongodb-mcp-server"]
-        workingDirectory: "/tmp"
-        env:
-          MONGODB_URI: "${MONGODB_URI:-mongodb://localhost:27017}"
+      # mongodb: removed - broken ESM dependencies, no working npm package
+      # postgres:
+      #   name: "PostgreSQL"
+      #   description: "Comprehensive PostgreSQL database management - queries, mutations, schema management, and performance analysis"
+      #   transport: "stdio"
+      #   command: "npx"
+      #   args: ["-y", "@henkey/postgres-mcp-server", "--connection-string", "${POSTGRES_URL}"]
+      #   workingDirectory: "/tmp"
+      #   env:
+      #     POSTGRES_URL: "${POSTGRES_URL:-postgresql://localhost:5432/postgres}"
 
       # --- GitOps & CI/CD ---
       argocd:
@@ -776,7 +730,7 @@ healer:
   config:
     # CI Remediation config
     cli: "claude"
-    model: "claude-opus-4-5-20251101"
+    model: "claude-opus-4-6-20260205"
     maxAttempts: 3
     # Time window for deduplication (increased from 10 to 30 mins to prevent rapid re-spawning)
     timeWindowMins: 30
@@ -801,7 +755,7 @@ healer:
     maxConcurrentCodeRuns: 5
     # Server config for healer's inline Factory usage (alert analysis/triage)
     server:
-      model: "claude-opus-4-5-20251101"
+      model: "claude-opus-4-6-20260205"
       autoLevel: "high"
       outputFormat: "text"
       remoteTools:
@@ -819,7 +773,7 @@ healer:
     coderun:
       namespace: "cto"
       githubApp: "5DLabs-Rex"
-      model: "claude-opus-4-5-20251101"
+      model: "claude-opus-4-6-20260205"
       repositoryUrl: "https://github.com/5dlabs/cto"
       docsRepositoryUrl: "https://github.com/5dlabs/cto"
       docsProjectDirectory: "docs"
@@ -840,7 +794,7 @@ healer:
       localTools: []
       cliConfig:
         cliType: "claude"
-        model: "claude-opus-4-5-20251101"
+        model: "claude-opus-4-6-20260205"
         settings:
           template: "heal/claude"
       memory:

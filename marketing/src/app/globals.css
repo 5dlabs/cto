@@ -186,6 +186,25 @@
   animation: gradient-rotate 4s ease infinite;
 }
 
+/* Marquee animation for tech stack */
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-scroll linear infinite;
+  width: max-content;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
 /* Noise texture overlay */
 .noise-overlay::before {
   content: "";
