@@ -10163,3 +10163,9 @@ target/debug/deps/cto-194166ecea56f79c.d
 # CLI test secrets
 tests/cli-invocation/.env
 tests/cli-invocation/.build-info
+
+# Local credentials (private - never commit)
+local/
+CREDENTIALS.md
+credentials.md
+*.credentials.*

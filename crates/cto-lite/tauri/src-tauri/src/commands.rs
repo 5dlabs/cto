@@ -6,10 +6,10 @@ use crate::keychain::{self, ApiKeyType};
 use crate::kind::{self, ClusterInfo, KindInfo};
 use crate::state::{AppState, SetupState};
 use crate::workflows::{self, WorkflowDetail, WorkflowParams, WorkflowStatus};
-use serde_json::{json, Value};
 use tauri::State;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use serde_json::{json, Value};
 use uuid::Uuid;
 
 // ============================================================================
@@ -20,45 +20,31 @@ use uuid::Uuid;
 #[tauri::command]
 pub async fn spawn_mcp_server(state: State<'_, AppState>) -> Result<String, String> {
     let session_id = Uuid::new_v4().to_string();
-
+    
     // Build the path to the mcp-lite binary
     let binary_path = std::env::current_exe()
         .map_err(|e| e.to_string())?
         .parent()
         .ok_or("Could not determine executable directory")?
         .to_path_buf();
-
-    // Try to find the mcp-lite binary (with .exe on Windows)
-    #[cfg(target_os = "windows")]
-    let mcp_binary = binary_path.join("mcp-lite.exe");
-
-    #[cfg(not(target_os = "windows"))]
+    
+    // Try to find the mcp-lite binary
     let mcp_binary = binary_path.join("mcp-lite");
-
-    let mut child = Command::new(&mcp_binary)
+    
+    let child = Command::new(&mcp_binary)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .kill_on_drop(true)
         .spawn()
         .map_err(|e| format!("Failed to spawn MCP server: {}", e))?;
-
-    // Create buffered reader for stdout
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or("Failed to capture MCP server stdout")?;
-    let reader = BufReader::new(stdout);
-
-    // Store the child process with its reader
+    
+    // Store the child process
     {
         let mut sessions = state.mcp_sessions.lock().await;
-        sessions.insert(
-            session_id.clone(),
-            crate::state::McpSession { child, reader },
-        );
+        sessions.insert(session_id.clone(), child);
     }
-
+    
     Ok(session_id)
 }
 
@@ -71,59 +57,44 @@ pub async fn mcp_call(
     params: Value,
 ) -> Result<Value, String> {
     let mut sessions = state.mcp_sessions.lock().await;
-
-    let session = sessions.get_mut(&session_id).ok_or("Session not found")?;
-
-    let stdin = session
-        .child
-        .stdin
-        .as_mut()
+    
+    let child = sessions.get_mut(&session_id)
+        .ok_or("Session not found")?;
+    
+    let stdin = child.stdin.as_mut()
         .ok_or("MCP server stdin not available")?;
-
+    
     let request = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": method,
         "params": params
     });
-
-    let request_str = serde_json::to_string(&request).map_err(|e| e.to_string())?;
-
-    stdin
-        .write_all((request_str + "\n").as_bytes())
+    
+    let request_str = serde_json::to_string(&request)
+        .map_err(|e| e.to_string())?;
+    
+    stdin.write_all((request_str + "\n").as_bytes())
         .await
         .map_err(|e| e.to_string())?;
-
+    
     // Flush stdin to ensure the request is sent before reading response
-    stdin.flush().await.map_err(|e| e.to_string())?;
-
-    // Use the persistent reader to avoid losing buffered data
+    stdin.flush()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let stdout = child.stdout.as_mut()
+        .ok_or("MCP server stdout not available")?;
+    
+    let mut reader = BufReader::new(stdout);
     let mut response = String::new();
-
-    // Add timeout to prevent deadlock if MCP server hangs
-    let read_result = tokio::time::timeout(
-        tokio::time::Duration::from_secs(30),
-        session.reader.read_line(&mut response),
-    )
-    .await;
-
-    // If timeout occurs, remove the session to prevent stale data issues
-    let read_result = match read_result {
-        Err(_) => {
-            drop(sessions); // Drop the lock before removing
-            let mut sessions = state.mcp_sessions.lock().await;
-            sessions.remove(&session_id);
-            return Err("MCP server request timed out after 30 seconds".to_string());
-        }
-        Ok(result) => result.map_err(|e| e.to_string())?,
-    };
-
-    if read_result == 0 {
-        return Err("MCP server closed connection".to_string());
-    }
-
-    let response_value: Value = serde_json::from_str(&response).map_err(|e| e.to_string())?;
-
+    reader.read_line(&mut response)
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let response_value: Value = serde_json::from_str(&response)
+        .map_err(|e| e.to_string())?;
+    
     Ok(response_value)
 }
 
@@ -145,30 +116,29 @@ pub async fn call_mcp_tool(
     arguments: Value,
 ) -> Result<Value, String> {
     mcp_call(
-        state,
-        session_id,
-        "tools/call",
+        state, 
+        session_id, 
+        "tools/call", 
         json!({
             "name": tool_name,
             "arguments": arguments
-        }),
-    )
-    .await
+        })
+    ).await
 }
 
 /// Kill the MCP server for a session
 #[tauri::command]
-pub async fn kill_mcp_server(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
+pub async fn kill_mcp_server(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<(), String> {
     let mut sessions = state.mcp_sessions.lock().await;
-
-    if let Some(mut session) = sessions.remove(&session_id) {
-        session
-            .child
-            .kill()
-            .await
+    
+    if let Some(mut child) = sessions.remove(&session_id) {
+        child.kill().await
             .map_err(|e| format!("Failed to kill MCP server: {}", e))?;
     }
-
+    
     Ok(())
 }
 
@@ -189,9 +159,8 @@ pub async fn get_tasks(
         "cto_jobs".to_string(),
         json!({
             "limit": limit.unwrap_or(10)
-        }),
-    )
-    .await
+        })
+    ).await
 }
 
 /// Create a task by triggering a workflow (wraps cto_trigger)
@@ -213,9 +182,8 @@ pub async fn create_task(
             "prompt": prompt,
             "issue_number": issue_number,
             "stack": stack.unwrap_or_else(|| "nova".to_string())
-        }),
-    )
-    .await
+        })
+    ).await
 }
 
 /// Update task status (wraps cto_status)
@@ -231,9 +199,8 @@ pub async fn update_task_status(
         "cto_status".to_string(),
         json!({
             "workflow_id": workflow_id
-        }),
-    )
-    .await
+        })
+    ).await
 }
 
 // ============================================================================

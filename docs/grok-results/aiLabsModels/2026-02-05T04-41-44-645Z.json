@@ -1,0 +1,288 @@
+{
+  "created_at": 1770266473,
+  "completed_at": 1770266504,
+  "id": "42d5350e-a9a0-c27a-144f-4d016f35f863",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_86613561",
+      "input": "{\"query\":\"(Mistral AI OR Mistral models OR 11 Labs AI OR ElevenLabs OR Mistral API) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_42d5350e-a9a0-c27a-144f-4d016f35f863_xs_call_86613561",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_04547270",
+      "input": "{\"query\":\"(Mistral AI OR Mistral models OR 11 Labs AI OR ElevenLabs OR Mistral API) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_42d5350e-a9a0-c27a-144f-4d016f35f863_xs_call_04547270",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_23698257",
+      "input": "{\"query\":\"(Mistral AI OR Mistral models OR 11 Labs AI OR ElevenLabs OR Mistral API) lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_42d5350e-a9a0-c27a-144f-4d016f35f863_xs_call_23698257",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_76477140",
+      "input": "{\"query\":\"Mistral AI or Mistral models or ElevenLabs or 11 Labs AI or Mistral API\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_42d5350e-a9a0-c27a-144f-4d016f35f863_xs_call_76477140",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_23663930",
+      "input": "{\"query\":\"ElevenLabs OR 11 Labs AI OR ElevenLabs AI\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_42d5350e-a9a0-c27a-144f-4d016f35f863_xs_call_23663930",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_50637207",
+      "input": "{\"query\":\"\\\"ElevenLabs\\\" OR \\\"11 Labs\\\" lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_42d5350e-a9a0-c27a-144f-4d016f35f863_xs_call_50637207",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "### Recent X Posts on Mistral AI, Mistral Models/API, and ElevenLabs (lang:en)\n\nYour query targets English-language discussions on Mistral AI (French AI lab), its models and API, and ElevenLabs (voice AI, often \"11 Labs AI\"). Here's a curated summary of the **most relevant recent posts** (from Feb 1-4, 2026), grouped by topic. Activity is high, especially around **ElevenLabs' massive funding announcement** today.[[1]](https://x.com/i/status/2019048384011854087)[[2]](https://x.com/i/status/2019058569337868301)\n\n#### ElevenLabs (Dominating Buzz – $500M Raise at $11B Valuation)\n- ElevenLabs announced a $500M Series D at **$11B valuation** (led by Sequoia, a16z, etc.), positioning as key infrastructure for AI voice agents in 32+ languages (text-to-speech, cloning, dubbing). They're giving away **1K-11K free credits** via comments (\"11B\") on their post – over 15K replies in hours.[[1]](https://x.com/i/status/2019048384011854087)[[2]](https://x.com/i/status/2019058569337868301)[[3]](https://x.com/i/status/2019198795050102822)[[4]](https://x.com/i/status/2019196061341168002)\n- Users praise it for enterprise use (Meta, Epic Games, Revolut), AI agents, and quality; some note switching off improved automation rates.[[5]](https://x.com/i/status/2019101909148467434)[[6]](https://x.com/i/status/2019109855030857807)[[7]](https://x.com/i/status/2019092458664231312)\n- Careers push for agent-focused roles; seen as synonymous with AI voice.[[8]](https://x.com/i/status/2019058042290201064)[[9]](https://x.com/i/status/2018764620891299953)[[10]](https://x.com/i/status/2019178427472040043)\n\n#### Mistral AI & Models (Model Releases, Competition, Access)\n- **Mistral-7B-Instruct-v0.3** (7B params, Apache 2.0, safetensors): Fine-tuned for instructions/tasks; popular on Hugging Face for conversation.[[11]](https://x.com/i/status/2019091086694899866)[[12]](https://x.com/i/status/2019091110841446547)\n- **Mistral-Nemo-Instruct-2407** fine-tune (12B params): Strong conversational AI.[[13]](https://x.com/i/status/2018449382786695445)\n- French startup Mistral unveils new models rivaling OpenAI/Google (open-weight multimodal, robotics/drones); **Voxtral** for ultra-fast translation (\"Too many GPUs makes you lazy\").[[14]](https://x.com/i/status/2018614712020221983)[[15]](https://x.com/i/status/2019194260872942046)\n- Easy access via **chat.mistral.ai**; EU focus, open-source, speed/small models; some debate vs. retrained Chinese models like DeepSeek.[[16]](https://x.com/i/status/2017544892948303896)[[17]](https://x.com/i/status/2019127407823974860)[[18]](https://x.com/i/status/2018945728358305940)\n- Continuity across platforms (e.g., migrating from ChatGPT to Mistral).[[19]](https://x.com/i/status/2018074039055532418)\n\nNo direct \"Mistral API\" mentions in top results, but implied in model access/discussions (e.g., chat.mistral.ai). ElevenLabs dominates due to fresh news; Mistral chatter focuses on open models. For deeper dives (e.g., threads/videos), let me know! [[20]](https://x.com/i/status/2019051385971495395)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019048384011854087",
+              "start_index": 416,
+              "end_index": 465,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019058569337868301",
+              "start_index": 465,
+              "end_index": 514,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019048384011854087",
+              "start_index": 888,
+              "end_index": 937,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019058569337868301",
+              "start_index": 937,
+              "end_index": 986,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019198795050102822",
+              "start_index": 986,
+              "end_index": 1035,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019196061341168002",
+              "start_index": 1035,
+              "end_index": 1084,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019101909148467434",
+              "start_index": 1225,
+              "end_index": 1274,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019109855030857807",
+              "start_index": 1274,
+              "end_index": 1323,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019092458664231312",
+              "start_index": 1323,
+              "end_index": 1372,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019058042290201064",
+              "start_index": 1446,
+              "end_index": 1495,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018764620891299953",
+              "start_index": 1495,
+              "end_index": 1544,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019178427472040043",
+              "start_index": 1544,
+              "end_index": 1594,
+              "title": "10"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019091086694899866",
+              "start_index": 1804,
+              "end_index": 1854,
+              "title": "11"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019091110841446547",
+              "start_index": 1854,
+              "end_index": 1904,
+              "title": "12"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018449382786695445",
+              "start_index": 1987,
+              "end_index": 2037,
+              "title": "13"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018614712020221983",
+              "start_index": 2220,
+              "end_index": 2270,
+              "title": "14"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019194260872942046",
+              "start_index": 2270,
+              "end_index": 2320,
+              "title": "15"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017544892948303896",
+              "start_index": 2458,
+              "end_index": 2508,
+              "title": "16"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019127407823974860",
+              "start_index": 2508,
+              "end_index": 2558,
+              "title": "17"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018945728358305940",
+              "start_index": 2558,
+              "end_index": 2608,
+              "title": "18"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018074039055532418",
+              "start_index": 2681,
+              "end_index": 2731,
+              "title": "19"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019051385971495395",
+              "start_index": 2980,
+              "end_index": 3031,
+              "title": "20"
+            }
+          ]
+        }
+      ],
+      "id": "msg_42d5350e-a9a0-c27a-144f-4d016f35f863",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 28604,
+    "input_tokens_details": {
+      "cached_tokens": 17162
+    },
+    "output_tokens": 3726,
+    "output_tokens_details": {
+      "reasoning_tokens": 2273
+    },
+    "total_tokens": 32330,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 6,
+    "cost_in_usd_ticks": 350095000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 6,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

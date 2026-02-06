@@ -256,7 +256,7 @@ jobs:
         if: steps.check.outputs.exists == 'false' || inputs.force_rebuild == true
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
-      - name: Build and push base image (minimal)
+      - name: Build and push base image
         if: steps.check.outputs.exists == 'false' || inputs.force_rebuild == true
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
@@ -289,35 +289,6 @@ jobs:
           cache-to: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache,mode=max
             ${{ inputs.no_cache != true && 'type=gha,scope=runtime,mode=max' || '' }}
-
-      - name: Build and push base image (full/production)
-        if: steps.check.outputs.exists == 'false' || inputs.force_rebuild == true
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
-        with:
-          context: .
-          file: ./infra/images/runtime/Dockerfile
-          target: production
-          platforms: linux/amd64
-          pull: true
-          push: true
-          provenance: false
-          sbom: false
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:full
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ steps.tag.outputs.tag }}-full
-          build-args: |
-            TOOLS_VERSION=${{ steps.binaries-version.outputs.tools_version }}
-            PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
-            TASKS_VERSION=${{ steps.binaries-version.outputs.tasks_version }}
-            INTAKE_AGENT_VERSION=${{ steps.binaries-version.outputs.intake_agent_version }}
-            TASKMASTER_VERSION=${{ steps.taskmaster-version.outputs.version }}
-          no-cache: ${{ inputs.no_cache == true }}
-          cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache-full
-            ${{ inputs.no_cache != true && 'type=gha,scope=runtime-full' || '' }}
-          cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache-full,mode=max
-            ${{ inputs.no_cache != true && 'type=gha,scope=runtime-full,mode=max' || '' }}
 
       - name: Set build output
         id: set-built
@@ -489,12 +460,21 @@ jobs:
             context: ./infra/images/gemini
             file: ./infra/images/gemini/Dockerfile
             version_type: dir_hash
-          # openclaw is built in a separate job (build-openclaw) since it depends on claude:latest
-          - id: dexter
-            image: dexter
-            context: ./infra/images/dexter
-            file: ./infra/images/dexter/Dockerfile
-            version_type: dir_hash
+          - id: openclaw
+            image: openclaw
+            context: ./infra/images/openclaw
+            file: ./infra/images/openclaw/Dockerfile
+            version_type: github_release
+            version_repo: openclaw/openclaw
+          # NOTE: dexter is temporarily disabled until ghcr.io/5dlabs/dexter package is created
+          # by an org admin. The GITHUB_TOKEN cannot create new org packages without prior setup.
+          # Error: "permission_denied: write_package" when pushing to non-existent package.
+          # To re-enable: uncomment below and ensure package exists in GHCR.
+          # - id: dexter
+          #   image: dexter
+          #   context: ./infra/images/dexter
+          #   file: ./infra/images/dexter/Dockerfile
+          #   version_type: dir_hash
     steps:
       - uses: actions/checkout@v6
 
@@ -645,83 +625,9 @@ jobs:
             echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:v${{ steps.version.outputs.version }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # Separate openclaw build — depends on claude:latest from build-agents
-  # OpenClaw Dockerfile uses COPY --from=ghcr.io/5dlabs/claude:latest,
-  # so it must wait for the claude image to be pushed first.
-  build-openclaw:
-    needs: [build-runtime, build-agents]
-    runs-on: [k8s-runner]
-    timeout-minutes: 45
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-          check-latest: true
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Determine openclaw version
-        id: version
-        run: |
-          VERSION=$(curl -fsSL "https://api.github.com/repos/openclaw/openclaw/releases/latest" | jq -r '.tag_name' | sed 's/^v//')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "📦 openclaw GitHub release version: $VERSION"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
-
-      - name: Build and push openclaw image
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
-        with:
-          context: ./infra/images/openclaw
-          file: ./infra/images/openclaw/Dockerfile
-          platforms: linux/amd64
-          pull: true
-          push: true
-          provenance: false
-          sbom: false
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/openclaw:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/openclaw:full
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/openclaw:v${{ steps.version.outputs.version }}
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-            BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:full
-            VERSION=${{ steps.version.outputs.version }}
-          no-cache: ${{ inputs.no_cache == true }}
-          cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache-full
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/openclaw:buildcache
-            ${{ inputs.no_cache != true && 'type=gha,scope=openclaw' || '' }}
-          cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/openclaw:buildcache,mode=max
-            ${{ inputs.no_cache != true && 'type=gha,scope=openclaw,mode=max' || '' }}
-
-      - name: Append summary
-        run: |
-          {
-            echo "### openclaw"
-            echo "✅ Built version ${{ steps.version.outputs.version }} (full base)"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/openclaw:latest"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/openclaw:full"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/openclaw:v${{ steps.version.outputs.version }}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
   # Summary job
   summary:
-    needs: [warm-cache, build-agents, build-openclaw, build-sidecar]
+    needs: [warm-cache, build-agents, build-sidecar]
     if: always()
     runs-on: [k8s-runner]
     steps:

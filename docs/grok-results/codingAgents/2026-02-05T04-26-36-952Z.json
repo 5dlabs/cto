@@ -1,0 +1,188 @@
+{
+  "created_at": 1770265580,
+  "completed_at": 1770265596,
+  "id": "364be53a-30a0-d115-321f-6da2b00d2dc8",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_97513500",
+      "input": "{\"query\":\"(AI coding agent OR autonomous coding OR AI code generation OR agentic coding OR AI developer) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_364be53a-30a0-d115-321f-6da2b00d2dc8_xs_call_97513500",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_68734378",
+      "input": "{\"query\":\"(AI coding agent OR autonomous coding OR AI code generation OR agentic coding OR AI developer) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_364be53a-30a0-d115-321f-6da2b00d2dc8_xs_call_68734378",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_78072117",
+      "input": "{\"query\":\"(AI coding agent OR autonomous coding OR AI code generation OR agentic coding OR AI developer) lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_364be53a-30a0-d115-321f-6da2b00d2dc8_xs_call_78072117",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_87641268",
+      "input": "{\"query\":\"AI coding agent OR autonomous coding OR AI code generation OR agentic coding OR AI developer\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_364be53a-30a0-d115-321f-6da2b00d2dc8_xs_call_87641268",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Recent discussions on X (formerly Twitter) highlight the rise of **agentic coding** and **AI coding agents**, distinguishing them from simpler AI-assisted tools. Key themes include:\n\n- **Spectrum of AI coding models**: Many posts break down \"AI coding\" into three levels—AI-assisted (human-led), vibe coding (natural language to prototype), and agentic coding (autonomous goal achievement with planning and iteration).[[1]](https://x.com/i/status/2017718515877237222)[[2]](https://x.com/i/status/2017872547895706006)\n  \n- **Agentic AI definition**: IBM defines it as generative AI that decomposes prompts into tasks, assigns them to agents, and synthesizes results without human input.[[3]](https://x.com/i/status/2018315972709392476) Others contrast it with passive generative AI, emphasizing proactive planning, tool use, and self-correction.[[4]](https://x.com/i/status/2018133729332617250)\n\n- **Practical applications and tools**: Tools like Coder enable secure scaling of AI agents for code generation, refactoring, and PR reviews.[[5]](https://x.com/i/status/2019075729766392243) Projects such as JAT introduce \"ADE\" (agentic development environments).[[6]](https://x.com/i/status/2018295151643214145) In biosciences, AI agents even prompt coding agents like Claude Code.[[7]](https://x.com/i/status/2018593218695442587)\n\n- **Shifts in engineering**: Agentic tools move software dev \"up the abstraction stack,\" from writing code to steering systems.[[8]](https://x.com/i/status/2018300189589577910) \"Agentic engineering\" involves humans designing architecture and constraints while agents execute.[[9]](https://x.com/i/status/2019176952062701895)\n\n- **Critiques**: Some argue agents offload problem-solving to machines lacking true understanding.[[10]](https://x.com/i/status/2018006879440425400)\n\nThese posts are from late Jan to early Feb 2026, reflecting hype around autonomous dev workflows. For full threads or videos, more details available via post IDs.",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017718515877237222",
+              "start_index": 418,
+              "end_index": 467,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017872547895706006",
+              "start_index": 467,
+              "end_index": 516,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018315972709392476",
+              "start_index": 685,
+              "end_index": 734,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018133729332617250",
+              "start_index": 844,
+              "end_index": 893,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019075729766392243",
+              "start_index": 1036,
+              "end_index": 1085,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018295151643214145",
+              "start_index": 1158,
+              "end_index": 1207,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018593218695442587",
+              "start_index": 1277,
+              "end_index": 1326,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018300189589577910",
+              "start_index": 1455,
+              "end_index": 1504,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019176952062701895",
+              "start_index": 1603,
+              "end_index": 1652,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018006879440425400",
+              "start_index": 1752,
+              "end_index": 1802,
+              "title": "10"
+            }
+          ]
+        }
+      ],
+      "id": "msg_364be53a-30a0-d115-321f-6da2b00d2dc8",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 12269,
+    "input_tokens_details": {
+      "cached_tokens": 8367
+    },
+    "output_tokens": 2002,
+    "output_tokens_details": {
+      "reasoning_tokens": 1186
+    },
+    "total_tokens": 14271,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 4,
+    "cost_in_usd_ticks": 221997500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 4,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

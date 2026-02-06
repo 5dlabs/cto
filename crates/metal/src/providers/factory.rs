@@ -116,3 +116,18 @@ pub fn create_provider(config: ProviderConfig) -> Result<Box<dyn Provider>, Prov
         ProviderKind::OnPrem => Ok(Box::new(OnPrem::new(config.onprem_inventory_path)?)),
     }
 }
+
+/// Create a Cherry provider with frictionless initialization.
+///
+/// This helper:
+/// - Auto-detects SSH keys from ~/.ssh/ and uploads them
+/// - Creates a default project if none exists
+/// - Returns the provider plus project ID and SSH key IDs for server creation
+pub async fn create_cherry_with_init(
+    api_key: String,
+    team_id: i64,
+) -> Result<(Box<dyn Provider>, i64, Vec<i64>), ProviderError> {
+    let (provider, project_id, ssh_key_ids) =
+        Cherry::with_frictionless_init(api_key, team_id).await?;
+    Ok((Box::new(provider), project_id, ssh_key_ids))
+}

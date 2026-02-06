@@ -1,0 +1,230 @@
+{
+  "created_at": 1770266323,
+  "completed_at": 1770266343,
+  "id": "88068dbc-8c3b-5625-0e26-55075cbcee90",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_67091093",
+      "input": "{\"query\":\"(DeepSeek OR DeepSeek V3 OR DeepSeek R1 OR Kimi AI OR Kimi K2) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_88068dbc-8c3b-5625-0e26-55075cbcee90_xs_call_67091093",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_81454261",
+      "input": "{\"query\":\"(DeepSeek OR \\\"DeepSeek V3\\\" OR \\\"DeepSeek R1\\\" OR \\\"Kimi AI\\\" OR \\\"Kimi K2\\\") lang:en\",\"limit\":10,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_88068dbc-8c3b-5625-0e26-55075cbcee90_xs_call_81454261",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_16612025",
+      "input": "{\"query\":\"(DeepSeek OR \\\"DeepSeek V3\\\" OR \\\"DeepSeek R1\\\" OR \\\"Kimi AI\\\" OR \\\"Kimi K2\\\") lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_88068dbc-8c3b-5625-0e26-55075cbcee90_xs_call_16612025",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_82016851",
+      "input": "{\"query\":\"DeepSeek V3, DeepSeek R1, Kimi AI, Kimi K2\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_88068dbc-8c3b-5625-0e26-55075cbcee90_xs_call_82016851",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "DeepSeek (including V3, V3.2, and R1 variants) and Kimi AI (especially K2 and K2.5) are dominating recent English-language discussions on X as top-tier, cost-effective Chinese AI models challenging Western leaders like Claude, GPT, and Qwen in coding, reasoning, finance, vision, and agentic tasks.[[1]](https://x.com/i/status/2019199266879905950)[[2]](https://x.com/i/status/2018172906405282274)[[3]](https://x.com/i/status/2019023398912012765)\n\n### Key Highlights from Recent Posts (Feb 2026):\n- **Benchmarks & Performance**: Kimi K2.5 (Thinking) leads in corporate finance tasks, edging out Qwen3-Max-Thinking, with DeepSeek V3.2 praised for reasoning and long-context handling. Users recommend combos like GLM-4.7/MiniMax M2.1/Kimi K2.5 for coding, DeepSeek V3.2/Kimi K2 for writing/general queries.[[1]](https://x.com/i/status/2019199266879905950)[[4]](https://x.com/i/status/2019198806521237987)[[2]](https://x.com/i/status/2018172906405282274)\n- **Availability & Free Access**: DeepSeek-V3.2 (685B params) now on Nebius Token Factory alongside others; Kimi K2.5 free via Nvidia's build platform or OpenRouter (non-quantized via Parasail for best quality). DeepSeek often listed as a top free ChatGPT alternative for research/coding.[[4]](https://x.com/i/status/2019198806521237987)[[5]](https://x.com/i/status/2018710065239269785)[[6]](https://x.com/i/status/2019057952414659038)\n- **Tech Innovations**: DeepSeek-OCR 2 uses \"causal flow tokens\" to reorder image patches like human foveal vision for better OCR/multimodal. Kimi K2.5 built on DeepSeek V3 base, excelling in vision-to-code, agents, and deployment.[[7]](https://x.com/i/status/2018595653027549690)[[8]](https://x.com/i/status/2017642578855006307)\n- **User Sentiment**: \"2026 is the year of open-source AI\" with these closing the gap on closed models; ideal startup stacks (e.g., Kimi K2 for writer/dev, DeepSeek R1 for researcher). Some note quantization issues hurting non-official providers.[[2]](https://x.com/i/status/2018172906405282274)[[3]](https://x.com/i/status/2019023398912012765)[[9]](https://x.com/i/status/2017526637101768910)\n\nOverall, buzz positions them as \"cheat codes\" for devs—cheap, powerful, and rapidly improving, with Kimi K2.5 frequently called out for execution edge over pure coders like DeepSeek.[[10]](https://x.com/i/status/2019197711107711106) For hands-on, check deepseek.com or Moonshot AI's Kimi via free tiers.[[11]](https://x.com/i/status/2017817726602121403)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019199266879905950",
+              "start_index": 298,
+              "end_index": 347,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018172906405282274",
+              "start_index": 347,
+              "end_index": 396,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019023398912012765",
+              "start_index": 396,
+              "end_index": 445,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019199266879905950",
+              "start_index": 803,
+              "end_index": 852,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019198806521237987",
+              "start_index": 852,
+              "end_index": 901,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018172906405282274",
+              "start_index": 901,
+              "end_index": 950,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019198806521237987",
+              "start_index": 1239,
+              "end_index": 1288,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018710065239269785",
+              "start_index": 1288,
+              "end_index": 1337,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019057952414659038",
+              "start_index": 1337,
+              "end_index": 1386,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018595653027549690",
+              "start_index": 1618,
+              "end_index": 1667,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017642578855006307",
+              "start_index": 1667,
+              "end_index": 1716,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018172906405282274",
+              "start_index": 1963,
+              "end_index": 2012,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019023398912012765",
+              "start_index": 2012,
+              "end_index": 2061,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017526637101768910",
+              "start_index": 2061,
+              "end_index": 2110,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019197711107711106",
+              "start_index": 2294,
+              "end_index": 2344,
+              "title": "10"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017817726602121403",
+              "start_index": 2415,
+              "end_index": 2465,
+              "title": "11"
+            }
+          ]
+        }
+      ],
+      "id": "msg_88068dbc-8c3b-5625-0e26-55075cbcee90",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 18840,
+    "input_tokens_details": {
+      "cached_tokens": 4911
+    },
+    "output_tokens": 2514,
+    "output_tokens_details": {
+      "reasoning_tokens": 1368
+    },
+    "total_tokens": 21354,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 4,
+    "cost_in_usd_ticks": 242883500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 4,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

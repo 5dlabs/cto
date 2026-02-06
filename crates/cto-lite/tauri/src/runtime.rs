@@ -272,78 +272,23 @@ pub fn is_runtime_running(runtime: ContainerRuntime) -> bool {
 
     match runtime {
         ContainerRuntime::Docker => {
-            // Check DOCKER_HOST first - this is the most reliable way
-            // If DOCKER_HOST is set, use it directly
-            if let Ok(host) = std::env::var("DOCKER_HOST") {
-                tracing::debug!("DOCKER_HOST is set to: {}", host);
-                // Try docker version to verify connection
-                let version_ok = Command::new(&cmd_path)
-                    .args(["version", "--format", "{{.Server.Version}}"])
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .status()
-                    .map(|s| s.success())
-                    .unwrap_or(false);
-                if version_ok {
-                    tracing::debug!("Docker daemon detected via DOCKER_HOST");
-                    return true;
-                }
-            }
-
-            // Check common Docker socket locations
-            let docker_home_socket = std::env::var("DOCKER_HOME")
-                .ok()
-                .map(|p| format!("{}/docker.sock", p));
-
-            let mut socket_paths = vec![
-                "/var/run/docker.sock".to_string(),
-                "/run/docker.sock".to_string(),
-            ];
-            if let Some(socket) = docker_home_socket {
-                socket_paths.push(socket);
-            }
-
-            for socket_path in socket_paths {
-                if socket_path.is_empty() {
-                    continue;
-                }
-                let path = std::path::Path::new(&socket_path);
-                if path.exists() {
-                    tracing::debug!("Found Docker socket at: {}", socket_path);
-                    // Try docker version to verify
-                    let version_ok = Command::new(&cmd_path)
-                        .args(["version", "--format", "{{.Server.Version}}"])
-                        .stdout(std::process::Stdio::null())
-                        .stderr(std::process::Stdio::null())
-                        .status()
-                        .map(|s| s.success())
-                        .unwrap_or(false);
-                    if version_ok {
-                        tracing::debug!("Docker daemon detected via socket at {}", socket_path);
-                        return true;
-                    }
-                    // Socket exists but daemon not responding - keep looking
-                    tracing::debug!(
-                        "Docker socket exists at {} but daemon not responding",
-                        socket_path
-                    );
-                }
-            }
-
-            // Final fallback: try docker ps without checking socket first
-            // This handles cases where the socket is in an unexpected location
-            let ps_ok = Command::new(&cmd_path)
-                .args(["ps"])
+            // Try docker info - returns 0 if daemon is running
+            // Note: docker info may return success but daemon not fully ready
+            // So we also verify we can list containers
+            Command::new(&cmd_path)
+                .args(["info"])
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .status()
                 .map(|s| s.success())
-                .unwrap_or(false);
-
-            if ps_ok {
-                tracing::debug!("Docker daemon detected via docker ps");
-            }
-            ps_ok
+                .unwrap_or(false)
+                && Command::new(&cmd_path)
+                    .args(["ps"])
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .map(|s| s.success())
+                    .unwrap_or(false)
         }
         ContainerRuntime::OrbStack => {
             // OrbStack status check
@@ -430,7 +375,7 @@ pub fn is_docker_available() -> bool {
             return true;
         }
     }
-
+    
     // Check for docker binary
     find_binary("docker").is_some()
 }
@@ -789,15 +734,11 @@ pub fn auto_start_runtime() -> AppResult<Option<ContainerRuntime>> {
     for runtime in get_preferred_runtimes() {
         let status = get_runtime_status(runtime);
         if status.installed && status.kind_compatible {
-            tracing::info!(
-                "Found installed runtime: {} (status: installed={}, kind_compatible={})",
-                runtime,
-                status.installed,
-                status.kind_compatible
-            );
-
+            tracing::info!("Found installed runtime: {} (status: installed={}, kind_compatible={})", 
+                runtime, status.installed, status.kind_compatible);
+            
             start_runtime(runtime)?;
-
+            
             // Special handling for Docker Desktop - wait for daemon to be ready
             if runtime == ContainerRuntime::Docker {
                 tracing::info!("Waiting for Docker daemon to be ready...");
@@ -809,16 +750,13 @@ pub fn auto_start_runtime() -> AppResult<Option<ContainerRuntime>> {
                 // Other runtimes may need time to start
                 std::thread::sleep(std::time::Duration::from_secs(5));
             }
-
+            
             // Verify it's now running
             if is_runtime_running(runtime) {
                 tracing::info!("Successfully started: {}", runtime);
                 return Ok(Some(runtime));
             } else {
-                tracing::warn!(
-                    "Runtime reported started but not yet responding: {}",
-                    runtime
-                );
+                tracing::warn!("Runtime reported started but not yet responding: {}", runtime);
                 // Continue anyway - it may still be coming up
                 return Ok(Some(runtime));
             }
@@ -836,21 +774,21 @@ pub fn auto_start_runtime() -> AppResult<Option<ContainerRuntime>> {
 /// Returns a RuntimeEnvironment with all runtimes scanned and any started
 pub fn fully_auto_runtime() -> AppResult<RuntimeEnvironment> {
     tracing::info!("Starting fully automated runtime detection...");
-
+    
     // Try to auto-start if needed
     let started_runtime = auto_start_runtime()?;
-
+    
     if let Some(runtime) = started_runtime {
         tracing::info!("Auto-started container runtime: {}", runtime);
     }
-
+    
     // Scan the full environment
     let env = scan_runtime_environment();
-
+    
     // If Docker is now available, report it
     if env.docker_available {
         tracing::info!("Docker is available and ready");
     }
-
+    
     Ok(env)
 }

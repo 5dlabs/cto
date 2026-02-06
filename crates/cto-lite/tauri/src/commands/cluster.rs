@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 use tracing;
 
-const CLUSTER_NAME: &str = "cto";
+const CLUSTER_NAME: &str = "cto-lite";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ClusterType {
@@ -1006,7 +1006,7 @@ pub async fn smart_init(
     db: tauri::State<'_, crate::db::Database>,
 ) -> Result<SmartInitResult, AppError> {
     tracing::info!("Starting smart initialization...");
-
+    
     let mut result = SmartInitResult {
         docker_started: false,
         cluster_ready: false,
@@ -1023,13 +1023,9 @@ pub async fn smart_init(
         Ok(started) => {
             if started {
                 result.docker_started = true;
-                result
-                    .actions
-                    .push("Started Docker container runtime".to_string());
+                result.actions.push("Started Docker container runtime".to_string());
             } else {
-                result
-                    .actions
-                    .push("Docker was already running".to_string());
+                result.actions.push("Docker was already running".to_string());
             }
         }
         Err(e) => {
@@ -1043,9 +1039,7 @@ pub async fn smart_init(
         tracing::info!("Waiting for Docker daemon to be ready...");
         if let Err(e) = wait_for_docker_ready(30) {
             tracing::warn!("Docker ready check timed out: {}", e);
-            result
-                .actions
-                .push("Waiting for Docker (may still be starting)".to_string());
+            result.actions.push("Waiting for Docker (may still be starting)".to_string());
         }
     }
 
@@ -1053,9 +1047,7 @@ pub async fn smart_init(
     tracing::info!("Step 2: Checking Kind installation...");
     match ensure_kind_installed().await {
         Ok(true) => {
-            result
-                .actions
-                .push("Kind installed (or already present)".to_string());
+            result.actions.push("Kind installed (or already present)".to_string());
         }
         Ok(false) => {
             result.actions.push("Kind binary found".to_string());
@@ -1064,54 +1056,92 @@ pub async fn smart_init(
             tracing::error!("Failed to install Kind: {}", e);
             result.errors.push(format!("Kind installation: {}", e));
             result.needs_user_action = true;
-            result.user_message =
-                Some("Failed to install Kind. Please run: brew install kind".to_string());
+            result.user_message = Some(
+                "Failed to install Kind. Please run: brew install kind".to_string()
+            );
         }
     }
 
     // Step 4: Check for existing clusters
     tracing::info!("Step 3: Checking for existing clusters...");
     let existing = detect_existing_clusters().await?;
-
+    
     // Check if CTO cluster exists
     let cto_context = format!("kind-{}", CLUSTER_NAME);
-    let cto_cluster = existing.clusters.iter().find(|c| c.context == cto_context);
-
+    let cto_cluster = existing.clusters.iter()
+        .find(|c| c.context == cto_context);
+    
     if let Some(cluster) = cto_cluster {
         if cluster.is_running {
             tracing::info!("Found existing CTO cluster running");
             result.actions.push(format!(
-                "Using existing cluster '{}' (v{})",
-                cluster.context,
+                "Using existing cluster '{}' (v{})", 
+                cluster.context, 
                 cluster.kubernetes_version.as_deref().unwrap_or("unknown")
             ));
             result.cluster_ready = true;
             result.context = cluster.context.clone();
-
+            
             // Switch to it
             let _ = Command::new("kubectl")
                 .args(["config", "use-context", &cluster.context])
                 .output();
         } else {
             tracing::info!("Found existing CTO cluster (not running)");
-            result
-                .actions
-                .push("Found CTO cluster (not running)".to_string());
+            result.actions.push("Found CTO cluster (not running)".to_string());
             // For now, we'll still try to create a new one since this one isn't running
         }
     }
 
-    // Step 5: If no CTO cluster, create one with Kind
-    // CTO App only uses Kind for cluster management - no Docker Desktop K8s
+    // Step 5: If no CTO cluster, check for other usable clusters
+    if !result.cluster_ready {
+        tracing::info!("No CTO cluster found, checking for alternatives...");
+        
+        // Look for running Docker Desktop K8s, OrbStack, etc.
+        let usable = existing.clusters.iter()
+            .filter(|c| c.is_running && c.cluster_type != ClusterType::Other)
+            .collect::<Vec<_>>();
+        
+        if let Some(best) = usable.first() {
+            tracing::info!("Found alternative cluster: {}", best.context);
+            result.actions.push(format!(
+                "Using existing {} cluster", 
+                match best.cluster_type {
+                    ClusterType::DockerDesktop => "Docker Desktop",
+                    ClusterType::OrbStack => "OrbStack",
+                    ClusterType::RancherDesktop => "Rancher Desktop",
+                    _ => "Kubernetes",
+                }
+            ));
+            
+            // Switch to it
+            let output = Command::new("kubectl")
+                .args(["config", "use-context", &best.context])
+                .output();
+            
+            if output.map(|o| o.status.success()).unwrap_or(false) {
+                result.cluster_ready = true;
+                result.context = best.context.clone();
+                
+                // Save preference
+                let _ = db.set_config("prefer_existing_cluster", "true");
+                let _ = db.set_config("cluster_context", &best.context);
+            }
+        }
+    }
+
+    // Step 6: If still no cluster, create one
     if !result.cluster_ready {
         tracing::info!("No usable cluster found, creating new CTO cluster...");
         result.actions.push("Creating new CTO cluster".to_string());
-
+        
         // Check prerequisites first
         if !is_kind_installed() {
             result.errors.push("Kind is not installed".to_string());
             result.needs_user_action = true;
-            result.user_message = Some("Please install Kind: brew install kind".to_string());
+            result.user_message = Some(
+                "Please install Kind: brew install kind".to_string()
+            );
             return Ok(result);
         }
 
@@ -1121,20 +1151,16 @@ pub async fn smart_init(
                 if status.running {
                     result.cluster_ready = true;
                     result.context = cto_context.clone();
-                    result
-                        .actions
-                        .push("CTO cluster created and running".to_string());
-
+                    result.actions.push("CTO cluster created and running".to_string());
+                    
                     // Save preference
                     let _ = db.set_config("prefer_cto_cluster", "true");
                     let _ = db.set_config("cluster_context", &cto_context);
                 } else {
-                    result
-                        .errors
-                        .push("Cluster created but not running".to_string());
+                    result.errors.push("Cluster created but not running".to_string());
                     result.needs_user_action = true;
                     result.user_message = Some(
-                        "Cluster was created but is not yet ready. Please wait...".to_string(),
+                        "Cluster was created but is not yet ready. Please wait...".to_string()
                     );
                 }
             }
@@ -1142,8 +1168,9 @@ pub async fn smart_init(
                 tracing::error!("Failed to create cluster: {}", e);
                 result.errors.push(format!("Cluster creation: {}", e));
                 result.needs_user_action = true;
-                result.user_message =
-                    Some("Failed to create cluster. Check logs for details.".to_string());
+                result.user_message = Some(
+                    "Failed to create cluster. Check logs for details.".to_string()
+                );
             }
         }
     }
@@ -1162,7 +1189,7 @@ pub async fn smart_init(
 /// Check and start container runtime if needed
 async fn check_and_start_runtime() -> AppResult<bool> {
     use crate::runtime as rt;
-
+    
     // Check if Docker is already running
     if rt::is_runtime_running(rt::ContainerRuntime::Docker) {
         return Ok(false);
@@ -1171,14 +1198,14 @@ async fn check_and_start_runtime() -> AppResult<bool> {
     // Check if Docker is available (installed)
     if !rt::is_docker_available() {
         return Err(AppError::RuntimeNotFound(
-            "Docker not found. Please install Docker Desktop.".to_string(),
+            "Docker not found. Please install Docker Desktop.".to_string()
         ));
     }
 
     // Try to start Docker
     tracing::info!("Docker is installed but not running, attempting to start...");
     rt::start_runtime(rt::ContainerRuntime::Docker)?;
-
+    
     Ok(true)
 }
 
@@ -1190,9 +1217,8 @@ fn wait_for_docker_ready(timeout_secs: u64) -> AppResult<()> {
 
 /// Ensure Kind is installed, download if missing
 async fn ensure_kind_installed() -> AppResult<bool> {
-    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
-
+    
     if is_kind_installed() {
         return Ok(false);
     }
@@ -1225,65 +1251,46 @@ async fn ensure_kind_installed() -> AppResult<bool> {
 
     // Download to temp location
     let temp_dir = std::env::temp_dir();
-    let kind_filename = if cfg!(target_os = "windows") {
-        "kind.exe"
-    } else {
-        "kind"
-    };
-    let kind_path = temp_dir.join(kind_filename);
+    let kind_path = temp_dir.join("kind");
 
     let response = reqwest::Client::new()
         .get(&url)
         .send()
         .await
-        .map_err(AppError::HttpError)?;
+        .map_err(|e| AppError::HttpError(e))?;
 
     if !response.status().is_success() {
         return Err(AppError::HttpError(
-            response.error_for_status().unwrap_err(),
+            reqwest::Error::from(response.error_for_status().unwrap_err())
         ));
     }
 
-    let bytes = response.bytes().await.map_err(AppError::HttpError)?;
+    let bytes = response.bytes()
+        .await
+        .map_err(|e| AppError::HttpError(e))?;
 
     // Write to temp file
     std::fs::write(&kind_path, &bytes)?;
 
-    // Make executable (Unix only)
-    #[cfg(unix)]
-    {
-        let mut perms = std::fs::metadata(&kind_path)?.permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&kind_path, perms)?;
-    }
+    // Make executable
+    let mut perms = std::fs::metadata(&kind_path)?.permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&kind_path, perms)?;
 
-    // Determine installation directory based on platform
-    #[cfg(unix)]
-    let install_dir = dirs::home_dir()
+    // Move to ~/.local/bin (create if needed)
+    let local_bin = dirs::home_dir()
         .ok_or_else(|| AppError::CommandFailed("Cannot find home directory".to_string()))?
         .join(".local/bin");
+    
+    std::fs::create_dir_all(&local_bin)?;
+    
+    let final_path = local_bin.join("kind");
+    std::fs::rename(&kind_path, &final_path)?;
 
-    #[cfg(target_os = "windows")]
-    let install_dir = dirs::data_local_dir()
-        .ok_or_else(|| AppError::CommandFailed("Cannot find local data directory".to_string()))?
-        .join("Microsoft\\WindowsApps");
-
-    std::fs::create_dir_all(&install_dir)?;
-
-    let final_path = install_dir.join(kind_filename);
-    // Use copy + remove instead of rename to support cross-filesystem moves
-    std::fs::copy(&kind_path, &final_path)?;
-    std::fs::remove_file(&kind_path)?;
-
-    // Warn if install directory is not in PATH (Unix only)
-    #[cfg(unix)]
-    {
-        let path_var = std::env::var("PATH").unwrap_or_default();
-        if !path_var.contains(".local/bin") {
-            tracing::warn!(
-                "~/.local/bin is not in PATH. Consider adding it to your shell profile."
-            );
-        }
+    // Ensure ~/.local/bin is in PATH
+    let path_var = std::env::var("PATH").unwrap_or_default();
+    if !path_var.contains(".local/bin") {
+        tracing::warn!("~/.local/bin is not in PATH. Consider adding it to your shell profile.");
     }
 
     tracing::info!("Kind installed to: {:?}", final_path);
@@ -1294,7 +1301,7 @@ async fn ensure_kind_installed() -> AppResult<bool> {
 #[tauri::command]
 pub async fn quick_health_check() -> Result<serde_json::Value, AppError> {
     use crate::runtime as rt;
-
+    
     let docker_ready = rt::is_runtime_running(rt::ContainerRuntime::Docker);
     let kind_ready = is_kind_installed();
     let cluster = get_cluster_status().await.ok();
