@@ -1,0 +1,33 @@
+# =============================================================================
+# OpenClaw Orchestrator Skills (agent instruction files)
+# =============================================================================
+# Mounted into the pod at /workspace/.openclaw/skills/
+# These .md files provide instructions to OpenClaw orchestrator agents,
+# guiding how they plan, delegate, and coordinate work.
+#
+# OpenClaw agents can reference these via their SYSTEM.md or heartbeat prompts.
+# They are distinct from Claude Code CLI skills — these guide the ORCHESTRATOR,
+# not the coding agent.
+#
+# Naming convention:
+#   openclaw-*-openclaw-skills → OpenClaw orchestrator skills (agent instructions)
+#   openclaw-*-claude-skills   → Claude Code CLI skills (.claude/skills/*.md)
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-openclaw-skills
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: openclaw-gateway
+data:
+  {{- $files := .Files.Glob "skills/openclaw/*.md" }}
+  {{- if $files }}
+  {{- range $path, $content := $files }}
+  {{ base $path }}: |
+{{ $content | toString | indent 4 }}
+  {{- end }}
+  {{- else }}
+  _placeholder: "no skills defined"
+  {{- end }}

@@ -1,0 +1,198 @@
+{
+  "created_at": 1770265942,
+  "completed_at": 1770265962,
+  "id": "ecf497a5-9f35-9349-b2e3-4bf476c003e6",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_76405071",
+      "input": "{\"query\":\"(Foundry AI OR Foundry framework OR Grok framework OR NotebookLM OR Momentum AI) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ecf497a5-9f35-9349-b2e3-4bf476c003e6_xs_call_76405071",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_73233810",
+      "input": "{\"query\":\"(Foundry AI OR Foundry framework OR Grok framework OR NotebookLM OR Momentum AI) lang:en\",\"limit\":20,\"mode\":\"Latest\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ecf497a5-9f35-9349-b2e3-4bf476c003e6_xs_call_73233810",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_13058402",
+      "input": "{\"query\":\"Foundry AI framework or Grok framework or NotebookLM or Momentum AI\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ecf497a5-9f35-9349-b2e3-4bf476c003e6_xs_call_13058402",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_26109359",
+      "input": "{\"query\":\"Foundry AI\"}",
+      "name": "x_user_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ecf497a5-9f35-9349-b2e3-4bf476c003e6_xs_call_26109359",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_46641373",
+      "input": "{\"query\":\"Grok framework\"}",
+      "name": "x_user_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ecf497a5-9f35-9349-b2e3-4bf476c003e6_xs_call_46641373",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_59831016",
+      "input": "{\"query\":\"NotebookLM\"}",
+      "name": "x_user_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ecf497a5-9f35-9349-b2e3-4bf476c003e6_xs_call_59831016",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_53440881",
+      "input": "{\"query\":\"Momentum AI\"}",
+      "name": "x_user_search",
+      "type": "custom_tool_call",
+      "id": "ctc_ecf497a5-9f35-9349-b2e3-4bf476c003e6_xs_call_53440881",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "**Recent top and latest X posts matching your query \"(Foundry AI OR Foundry framework OR Grok framework OR NotebookLM OR Momentum AI) lang:en\":**\n\n### Top Posts:\n- **Genkit Framework announces support for Amazon Bedrock and Azure AI Foundry** in their Go and JS plugins, enabling cloud-native AI experiences.[[1]](https://x.com/i/status/2019127913409573195)\n\n### Latest Posts:\n- A user shared a Grok-generated comparison of two unnamed frameworks side-by-side.[[2]](https://x.com/i/status/2018825976856318256)\n- Developer @shuabe tested various AI agents/models (ClawDBot, MoltBot, OpenClaw, MoltBook) with models like Grok-4-1-fast-reasoning, GPT-5.1, and others, noting performance and costs.[[3]](https://x.com/i/status/2017467488221728932)\n- @colbyshark's AI tool guide highlights Grok 4.1 for cultural/market analysis, Gemini 3 with NotebookLM for research, Claude Opus 4.5, Manus/Kimi for agentic tasks.[[4]](https://x.com/i/status/2018055322485559305)\n- User compares Farns repo to OpenClaw/MoltBot, asking Grok for analysis.[[5]](https://x.com/i/status/2017488731188429236)\n- @JohnnyNel_ impressed by Gemini and Grok for cheap automation workflows.[[6]](https://x.com/i/status/2018296355312029812)\n- Suggestion to use Obsidian over \"Notebook\" (likely NotebookLM) for local AI plugins.[[7]](https://x.com/i/status/2017979588844904799)\n- @wolfe_jam discusses .FAF AI-Context format with Grok, Zig-WASM, across models like Claude/Gemini/Grok.[[8]](https://x.com/i/status/2018771874625286640)\n\n**Relevant X Accounts Found:**\n- **Foundry-related:** @FormalFoundry (AI with formal methods), @mithrilcompute (formerly Foundry, AI omnicloud), @truefoundry (enterprise AI platform).\n- **NotebookLM:** @NotebookLM (official, Google's AI notebook tool).\n- **Momentum AI:** @usemomentumapp (AI goal tracker), @dealmomentum (AI agents for GTM).\n- No direct \"Grok framework\" account, but frequent mentions in AI dev contexts.\n\nThese terms appear in discussions around AI frameworks, agents, models (e.g., Grok 4.x), and tools like NotebookLM. Azure AI Foundry and agent frameworks (OpenClaw, etc.) are hot topics. If you need deeper dives (e.g., post threads, images, or specific users), let me know!",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019127913409573195",
+              "start_index": 308,
+              "end_index": 357,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018825976856318256",
+              "start_index": 460,
+              "end_index": 509,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017467488221728932",
+              "start_index": 694,
+              "end_index": 743,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018055322485559305",
+              "start_index": 909,
+              "end_index": 958,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017488731188429236",
+              "start_index": 1032,
+              "end_index": 1081,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018296355312029812",
+              "start_index": 1156,
+              "end_index": 1205,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017979588844904799",
+              "start_index": 1292,
+              "end_index": 1341,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018771874625286640",
+              "start_index": 1447,
+              "end_index": 1496,
+              "title": "8"
+            }
+          ]
+        }
+      ],
+      "id": "msg_ecf497a5-9f35-9349-b2e3-4bf476c003e6",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 11534,
+    "input_tokens_details": {
+      "cached_tokens": 5961
+    },
+    "output_tokens": 2909,
+    "output_tokens_details": {
+      "reasoning_tokens": 1947
+    },
+    "total_tokens": 14443,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 7,
+    "cost_in_usd_ticks": 378671500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 7,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

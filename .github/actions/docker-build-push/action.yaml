@@ -7,7 +7,6 @@ description: |
   
   Supports branch-based tagging:
   - main branch: tagged as 'latest'
-  - develop branch: tagged as 'develop'
   - other branches: tagged with branch name (sanitized)
 
 inputs:
@@ -69,7 +68,7 @@ inputs:
     default: 'false'
   # New inputs for branch-based tagging
   branch-tag:
-    description: 'Branch-based tag (e.g., develop, feature-xyz). If empty, uses latest for main.'
+    description: 'Branch-based tag (e.g., feature-xyz). If empty, uses latest for main.'
     required: false
     default: ''
   tag-latest:
@@ -127,9 +126,6 @@ runs:
         elif [ "$GITHUB_REF" = "refs/heads/main" ]; then
           # Main branch - use 'latest'
           TAGS="${REGISTRY}/${BASE}/${IMAGE}:latest"
-        elif [ "$GITHUB_REF" = "refs/heads/develop" ]; then
-          # Develop branch - use 'develop'
-          TAGS="${REGISTRY}/${BASE}/${IMAGE}:develop"
         else
           # Other branches - sanitize branch name and use as tag
           SANITIZED_BRANCH=$(echo "$GITHUB_REF_NAME" | sed 's/[^a-zA-Z0-9._-]/-/g' | cut -c1-128)

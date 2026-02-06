@@ -1,56 +1,5 @@
 # TOOLS.md - Local Notes
 
-Skills define *how* tools work. This file is for *your* specifics — the stuff that's unique to your setup.
-
-## What Goes Here
-
-Things like:
-- Camera names and locations
-- SSH hosts and aliases  
-- Preferred voices for TTS
-- Speaker/room names
-- Device nicknames
-- Anything environment-specific
-
-## Examples
-
-```markdown
-### Cameras
-- living-room → Main area, 180° wide angle
-- front-door → Entrance, motion-triggered
-
-### SSH
-- home-server → 192.168.1.100, user: admin
-
-### TTS
-- Preferred voice: "Nova" (warm, slightly British)
-- Default speaker: Kitchen HomePod
-```
-
-## Why Separate?
-
-Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.
-
----
-
-Add whatever helps you do your job. This is your cheat sheet.
-
-## CTO Worktree
-
-My dedicated CTO worktree is at:
-```
-/Users/jonathonfritz/clawd-planner/cto
-```
-
-Branch: `planner`
-
-### Business Plan Location
-```
-/Users/jonathonfritz/clawd-planner/cto/documents/business-plan/
-```
-
-Other agents access via their own worktrees once changes merge to main.
-
 
 ## Claude Code & Swarm Mode
 
@@ -171,52 +120,6 @@ agent-browser close
 1. **ALWAYS use `--state`** for authenticated sites
 2. **ALWAYS `close` when done** - One browser at a time
 3. **Use @refs from snapshots** - More reliable than selectors
-
-
-## Gmail via gog CLI
-
-Access Gmail using the `gog` command (already authenticated).
-
-### Quick Reference
-
-```bash
-# List recent emails
-gog gmail list
-
-# List unread emails
-gog gmail list --unread
-
-# Search emails
-gog gmail list --query "from:someone@example.com"
-gog gmail list --query "subject:invoice"
-gog gmail list --query "is:unread after:2024/01/01"
-
-# Read specific email (use ID from list)
-gog gmail get <message-id>
-
-# Send email
-gog gmail send --to "recipient@example.com" --subject "Subject" --body "Message body"
-
-# Send with CC/BCC
-gog gmail send --to "to@example.com" --cc "cc@example.com" --subject "Subject" --body "Body"
-```
-
-### Common Queries
-
-| Query | Description |
-|-------|-------------|
-| `is:unread` | Unread emails |
-| `from:user@domain.com` | From specific sender |
-| `subject:keyword` | Subject contains keyword |
-| `has:attachment` | Has attachments |
-| `after:2024/01/01` | After date |
-| `before:2024/12/31` | Before date |
-| `label:important` | Has label |
-
-### Tips
-- Use `--format json` for machine-readable output
-- Combine query terms: `--query "is:unread from:boss@company.com"`
-- Email IDs from `list` are used with `get`
 
 
 # TOOLS.md - Standard Agent Tools

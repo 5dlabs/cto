@@ -289,9 +289,73 @@ function writeStdout(response: AgentResponse<unknown>): void {
 }
 
 /**
+ * Display help message.
+ */
+function printHelp(): void {
+  console.log(`intake-agent v${VERSION}
+
+PRD parsing and task generation agent using Claude Agent SDK.
+
+This binary reads JSON requests from stdin and writes JSON responses to stdout.
+
+Usage:
+  echo '{"operation":"ping"}' | intake-agent
+  cat request.json | intake-agent
+  intake-agent < request.json
+
+Operations:
+  ping                   Health check
+  parse_prd              Parse PRD into tasks
+  parse_prd_iterative    Parse PRD iteratively with streaming
+  expand_task            Expand task into subtasks
+  analyze_complexity     Analyze task complexity
+  generate               Generate content with AI
+  generate_prompts       Generate prompts for tasks
+  research               Perform research on a topic
+  research_capabilities  List research capabilities
+  generate_with_critic   Generate with critic feedback
+  validate_content       Validate content with AI
+  provider_status        Get provider status
+  generate_docs          Generate documentation for tasks
+  generate_with_debate   Generate with debate pattern
+
+Options:
+  -h, --help             Show this help message
+  -V, --version          Show version
+
+Environment:
+  ANTHROPIC_API_KEY      API key for Claude (optional with OAuth)
+
+Examples:
+  # Health check
+  echo '{"operation":"ping"}' | intake-agent
+
+  # Parse a PRD
+  echo '{"operation":"parse_prd","payload":{"prd_content":"..."}}' | intake-agent`);
+}
+
+/**
+ * Display version.
+ */
+function printVersion(): void {
+  console.log(`intake-agent ${VERSION}`);
+}
+
+/**
  * Main entry point.
  */
 async function main(): Promise<void> {
+  // Check for CLI flags first, before reading stdin
+  const args = process.argv.slice(2);
+  if (args.includes('-h') || args.includes('--help')) {
+    printHelp();
+    process.exit(0);
+  }
+  if (args.includes('-V') || args.includes('--version')) {
+    printVersion();
+    process.exit(0);
+  }
+
   try {
     // Read request from stdin
     const input = await readStdin();

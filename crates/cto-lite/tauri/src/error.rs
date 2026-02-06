@@ -1,4 +1,4 @@
-//! Error types for CTO Lite
+//! Error types for CTO
 
 use serde::Serialize;
 use thiserror::Error;
@@ -44,6 +44,9 @@ pub enum AppError {
 
     #[error("Not configured: {0}")]
     NotConfigured(String),
+
+    #[error("Other error: {0}")]
+    Other(String),
 }
 
 /// Serializable error response for Tauri commands
@@ -96,6 +99,7 @@ impl From<AppError> for CommandError {
             AppError::ConfigError(msg) => ("CONFIG_ERROR", msg.clone()),
             AppError::TunnelError(msg) => ("TUNNEL_ERROR", msg.clone()),
             AppError::NotConfigured(msg) => ("NOT_CONFIGURED", msg.clone()),
+            AppError::Other(msg) => ("OTHER", msg.clone()),
         };
 
         CommandError {

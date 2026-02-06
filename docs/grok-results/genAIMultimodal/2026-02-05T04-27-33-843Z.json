@@ -1,0 +1,115 @@
+{
+  "created_at": 1770265644,
+  "completed_at": 1770265653,
+  "id": "c619cf5f-3af4-624e-2149-447682d217a1",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_45283061",
+      "input": "{\"query\":\"(generative AI OR multimodal AI OR video AI OR image generation OR video understanding) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_c619cf5f-3af4-624e-2149-447682d217a1_xs_call_45283061",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "**Top X Posts on Generative AI, Multimodal AI, Video AI, Image Generation, or Video Understanding (English language, Top mode):**\n\nHere are the top matching posts:[[1]](https://x.com/i/status/2018396510275412301)\n\n1. **@HuggingModels** (Feb 2, 2026): \"Meet MOVA-720p: an image-to-video diffusion model that's turning still pictures into living scenes. It's not just adding motion, it's understanding context to generate coherent video sequences. This is the next frontier in generative AI.\" \n   - 72 likes, 7 reposts, 1 reply, 3.4K views.\n   - Includes 1 image: [View Image](https://pbs.twimg.com/media/HALI7f1bwAA3UK_.jpg)[[1]](https://x.com/i/status/2018396510275412301)\n\nThese are the highest-ranked results based on engagement. If you'd like more posts, latest ones, or details on a specific post/thread, let me know! [[1]](https://x.com/i/status/2018396510275412301)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018396510275412301",
+              "start_index": 163,
+              "end_index": 212,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018396510275412301",
+              "start_index": 623,
+              "end_index": 672,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018396510275412301",
+              "start_index": 821,
+              "end_index": 871,
+              "title": "1"
+            }
+          ]
+        }
+      ],
+      "id": "msg_c619cf5f-3af4-624e-2149-447682d217a1",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 4347,
+    "input_tokens_details": {
+      "cached_tokens": 3426
+    },
+    "output_tokens": 1171,
+    "output_tokens_details": {
+      "reasoning_tokens": 840
+    },
+    "total_tokens": 5518,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 59410000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

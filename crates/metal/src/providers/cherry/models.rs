@@ -3,6 +3,89 @@
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
+// Billing & Pricing types
+// ============================================================================
+
+/// Billing period for pricing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BillingPeriod {
+    /// Hourly billing (pay-as-you-go).
+    Hourly,
+    /// Monthly billing (committed).
+    Monthly,
+}
+
+impl BillingPeriod {
+    /// Parse from CLI string.
+    #[must_use]
+    pub fn parse(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "hourly" => Self::Hourly,
+            "monthly" | _ => Self::Monthly,
+        }
+    }
+}
+
+/// Pricing information for a plan.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Pricing {
+    /// Pricing ID.
+    pub id: i64,
+    /// Billing unit (Hourly, Monthly, etc.).
+    pub unit: String,
+    /// Price in EUR.
+    pub price: f64,
+    /// Currency code.
+    pub currency: String,
+    /// Whether tax is included.
+    pub taxed: bool,
+}
+
+/// Extended plan info with pricing.
+#[derive(Debug, Clone)]
+pub struct PlanWithPricing {
+    /// Plan ID.
+    pub id: i64,
+    /// Plan href.
+    pub href: String,
+    /// Plan name.
+    pub name: String,
+    /// Plan slug.
+    pub slug: String,
+    /// Plan category (baremetal, cloud, etc.).
+    pub category: String,
+    /// CPU specs.
+    pub cpus: Option<CpuSpec>,
+    /// Memory specs.
+    pub memory: Option<MemorySpec>,
+    /// Storage specs.
+    pub storage: Option<Vec<StorageSpec>>,
+    /// NIC info.
+    pub nics: Option<NicSpec>,
+    /// Bandwidth info.
+    pub bandwidth: Option<BandwidthSpec>,
+    /// Hourly price in EUR.
+    pub hourly_eur: f64,
+    /// Monthly price in EUR.
+    pub monthly_eur: f64,
+}
+
+/// NIC specification.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NicSpec {
+    /// NIC count and speed.
+    pub name: String,
+}
+
+/// Bandwidth specification.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BandwidthSpec {
+    /// Bandwidth amount.
+    pub name: String,
+}
+
+// ============================================================================
 // Server types
 // ============================================================================
 
@@ -73,6 +156,10 @@ pub struct PlanSpecs {
     pub memory: Option<MemorySpec>,
     /// Storage info.
     pub storage: Option<Vec<StorageSpec>>,
+    /// NIC info.
+    pub nics: Option<NicSpec>,
+    /// Bandwidth info.
+    pub bandwidth: Option<BandwidthSpec>,
 }
 
 /// CPU specification.

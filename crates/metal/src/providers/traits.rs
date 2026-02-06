@@ -101,7 +101,7 @@ pub struct Server {
 }
 
 /// Request to create a new server.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CreateServerRequest {
     /// Hostname for the server.
     pub hostname: String,
@@ -110,9 +110,14 @@ pub struct CreateServerRequest {
     /// Region/site to deploy in (e.g., "MIA2").
     pub region: String,
     /// Operating system slug (e.g., `ubuntu_24_04_x64_lts`).
+    #[serde(default)]
     pub os: String,
     /// SSH key IDs to add to the server.
+    #[serde(default)]
     pub ssh_keys: Vec<String>,
+    /// IP address IDs to assign.
+    #[serde(default)]
+    pub ip_addresses: Vec<String>,
 }
 
 /// Request to reinstall a server with iPXE.

@@ -7,8 +7,8 @@ pub mod latitude;
 pub mod onprem;
 pub mod ovh;
 pub mod scaleway;
-pub mod vultr;
 mod traits;
+pub mod vultr;
 
 // Re-export client structs for convenience
 pub use cherry::Cherry;
@@ -20,7 +20,7 @@ pub use scaleway::Scaleway;
 pub use vultr::Vultr;
 
 // Re-export factory
-pub use factory::{create_provider, ProviderConfig, ProviderKind};
+pub use factory::{create_cherry_with_init, create_provider, ProviderConfig, ProviderKind};
 
 // Re-export common types
 pub use traits::{

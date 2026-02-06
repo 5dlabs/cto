@@ -5,6 +5,7 @@ import { RainEffect } from "@/components/rain-effect";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { AgentGrid, type AgentSquad } from "@/components/agent-card";
 import { Header } from "@/components/header";
+import { TechStack } from "@/components/tech-stack";
 import { featureFlags } from "@/config/feature-flags";
 
 const squads: AgentSquad[] = [
@@ -280,6 +281,9 @@ export default function Home() {
             <AgentGrid squads={squads} />
           </div>
         </section>
+
+        {/* Tech Stack Section */}
+        <TechStack />
 
         {/* Ecosystem Section */}
         <section id="ecosystem" className="py-20 px-6 border-t border-border/30">

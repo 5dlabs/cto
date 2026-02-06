@@ -1,0 +1,28 @@
+# Build artifacts
+target/
+Cargo.lock
+
+# Generated files
+talosctl
+*.raw.img
+*.img.gz
+
+# Configuration
+config.yaml
+!config.example.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.pem
+*.key
+*.crt
+.env

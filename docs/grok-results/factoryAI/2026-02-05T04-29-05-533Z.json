@@ -1,0 +1,179 @@
+{
+  "created_at": 1770265733,
+  "completed_at": 1770265745,
+  "id": "5e4afea4-4064-7643-047a-1a5ef1d16862",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_93822578",
+      "input": "{\"query\":\"(Factory AI OR Factory agents OR AI code generation OR autonomous coding platform OR AI dev platform) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_5e4afea4-4064-7643-047a-1a5ef1d16862_xs_call_93822578",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_22525130",
+      "input": "{\"query\":\"Factory AI OR Factory agents OR AI code generation OR autonomous coding platform OR AI dev platform\",\"limit\":10}",
+      "name": "x_semantic_search",
+      "type": "custom_tool_call",
+      "id": "ctc_5e4afea4-4064-7643-047a-1a5ef1d16862_xs_call_22525130",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Recent top X posts matching your query on Factory AI, Factory agents, AI code generation, autonomous coding platforms, and AI dev platforms (in English) highlight emerging tools and companies like @FactoryAI, which focuses on high-quality coding agents and \"droids\" for enterprise code review, testing, and migrations.[[1]](https://x.com/i/status/2019100639612031195)[[2]](https://x.com/i/status/2018760519096901889)\n\nKey highlights:\n- @chamath discusses \"Software Factory\" as a disciplined approach where agents refine requirements before code generation to avoid poor outputs.[[3]](https://x.com/i/status/2018532243497783365)\n- @FactoryAI is praised for superior coding agents compared to alternatives like Claude, with emphasis on quality over speed.[[1]](https://x.com/i/status/2019100639612031195)[[4]](https://x.com/i/status/2017842034594484567)\n- Other mentions include multi-agent systems like AutoGen/LangChain/CrewAI ecosystems for real-world tasks,[[5]](https://x.com/i/status/2019025731938840628) DEV Agent for autonomous full-stack code from blueprints (with GitHub PRs),[[6]](https://x.com/i/status/2018587069925478554) self-improving AI agents like Foundry,[[7]](https://x.com/i/status/2017520131471983083) and AI Factory architectures with human oversight plus specialized agents.[[8]](https://x.com/i/status/2018187872092705084)[[9]](https://x.com/i/status/2017699540279718251)\n\nNo exact keyword matches in top/latest searches, but these semantically relevant posts from early February 2026 show active buzz around agentic AI for dev workflows.[[10]](https://x.com/i/status/2018701724806975786)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019100639612031195",
+              "start_index": 318,
+              "end_index": 367,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018760519096901889",
+              "start_index": 367,
+              "end_index": 416,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018532243497783365",
+              "start_index": 578,
+              "end_index": 627,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019100639612031195",
+              "start_index": 753,
+              "end_index": 802,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017842034594484567",
+              "start_index": 802,
+              "end_index": 851,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2019025731938840628",
+              "start_index": 959,
+              "end_index": 1008,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018587069925478554",
+              "start_index": 1084,
+              "end_index": 1133,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017520131471983083",
+              "start_index": 1172,
+              "end_index": 1221,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018187872092705084",
+              "start_index": 1296,
+              "end_index": 1345,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017699540279718251",
+              "start_index": 1345,
+              "end_index": 1394,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018701724806975786",
+              "start_index": 1561,
+              "end_index": 1611,
+              "title": "10"
+            }
+          ]
+        }
+      ],
+      "id": "msg_5e4afea4-4064-7643-047a-1a5ef1d16862",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 9217,
+    "input_tokens_details": {
+      "cached_tokens": 4280
+    },
+    "output_tokens": 1598,
+    "output_tokens_details": {
+      "reasoning_tokens": 968
+    },
+    "total_tokens": 10815,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 2,
+    "cost_in_usd_ticks": 120004000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 2,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}
