@@ -44,7 +44,7 @@ impl ProviderRegistry {
                 // Don't silently fallback - log the error clearly
                 tracing::error!(
                     error = %e,
-                    "Claude Agent SDK provider initialization failed. Build intake-agent: cd tools/intake-agent && bun run build"
+                    "Claude Agent SDK provider initialization failed. Build intake-agent: cd apps/intake-agent && bun run build"
                 );
             }
         }
@@ -139,7 +139,7 @@ impl ProviderRegistry {
             TasksError::Ai(
                 "No AI provider is configured. Ensure:\n\
                  1. ANTHROPIC_API_KEY is set\n\
-                 2. intake-agent binary is built: cd tools/intake-agent && bun run build"
+                 2. intake-agent binary is built: cd apps/intake-agent && bun run build"
                     .to_string(),
             )
         })

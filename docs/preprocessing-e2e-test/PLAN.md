@@ -319,7 +319,7 @@ claudesp-minimax --version
 just launchd-status
 
 # 7. Build intake-agent
-cd tools/intake-agent && bun run build
+cd apps/intake-agent && bun run build
 ```
 
 ## Swarm Operations Checklist
