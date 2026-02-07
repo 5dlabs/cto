@@ -156,20 +156,20 @@ intake *ARGS:
 # Build intake-agent TypeScript binary
 intake-agent-build:
     @echo "Building intake-agent TypeScript binary..."
-    cd tools/intake-agent && bun install && bun run build
-    @echo "Binary built: tools/intake-agent/dist/intake-agent"
+    cd apps/intake-agent && bun install && bun run build
+    @echo "Binary built: apps/intake-agent/dist/intake-agent"
 
 # Type check intake-agent
 intake-agent-typecheck:
-    cd tools/intake-agent && bun run typecheck
+    cd apps/intake-agent && bun run typecheck
 
 # Test intake-agent with ping
 intake-agent-ping:
-    echo '{"operation":"ping"}' | ./tools/intake-agent/dist/intake-agent
+    echo '{"operation":"ping"}' | ./apps/intake-agent/dist/intake-agent
 
 # Clean intake-agent build artifacts
 intake-agent-clean:
-    cd tools/intake-agent && bun run clean
+    cd apps/intake-agent && bun run clean
 
 # Run research CLI
 research *ARGS:

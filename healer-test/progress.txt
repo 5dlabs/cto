@@ -1,6 +1,0 @@
-# Ralph Ultra Progress Log
-Started: 2026-01-16
----
-
-## Codebase Patterns
-- (add reusable patterns here)
