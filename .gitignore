@@ -100,6 +100,9 @@ agent_*.md
 infra/images/heal/heal-linux
 infra/images/tools/tools-server-linux
 
+# Bun-compiled standalone binaries (CI build artifacts)
+grok-cron-*
+
 .claude/*
 
 *.private-key.pem

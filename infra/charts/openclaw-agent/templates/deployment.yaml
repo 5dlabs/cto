@@ -19,6 +19,12 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/openclaw-skills: {{ include (print $.Template.BasePath "/configmap-openclaw-skills.yaml") . | sha256sum }}
+        {{- if .Values.toolsConfig }}
+        checksum/tools-config: {{ include (print $.Template.BasePath "/configmap-tools-config.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.telemetry.enabled }}
+        checksum/promtail: {{ include (print $.Template.BasePath "/configmap-promtail.yaml") . | sha256sum }}
+        {{- end }}
         {{- if .Values.claudeCode.enabled }}
         checksum/claude-settings: {{ include (print $.Template.BasePath "/configmap-claude-settings.yaml") . | sha256sum }}
         checksum/claude-skills: {{ include (print $.Template.BasePath "/configmap-claude-skills.yaml") . | sha256sum }}
@@ -84,6 +90,30 @@ spec:
               echo "[claude] .claude.json (MCP config) written"
               {{- end }}
               {{- end }}
+
+              {{- if .Values.toolsConfig }}
+              # ---------------------------------------------------------------
+              # 4b. Tools config (MCP tools for CLI backends)
+              # ---------------------------------------------------------------
+              cp /tools-config-template/tools-config.json /workspace/tools-config.json
+              echo "[tools] tools-config.json written"
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # 4c. ClawdStrike security skill (idempotent install)
+              # ---------------------------------------------------------------
+              if [ ! -f /workspace/.openclaw/skills/clawdstrike.md ]; then
+                cd /workspace && npx skills add https://github.com/cantinaxyz/clawdstrike --skill clawdstrike 2>/dev/null || true
+                echo "[skills] ClawdStrike security skill installed"
+              else
+                echo "[skills] ClawdStrike already present"
+              fi
+
+              # ---------------------------------------------------------------
+              # 4d. Log directory setup
+              # ---------------------------------------------------------------
+              mkdir -p "$(dirname "{{ .Values.logging.file }}")"
+              echo "[dirs] Log directory OK"
 
               # ---------------------------------------------------------------
               # 5. Git credential setup (for private repo access)
@@ -173,17 +203,18 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: openai-api-key
                   optional: true
-            - name: PROVIDER_MINIMAX_KEY
+            # Web tools API keys
+            - name: BRAVE_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
-                  key: minimax-api-key
+                  key: brave-api-key
                   optional: true
-            - name: PROVIDER_NVIDIA_NIM_KEY
+            - name: FIRECRAWL_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
-                  key: nvidia-nim-api-key
+                  key: firecrawl-api-key
                   optional: true
             # GitHub PAT for private repo cloning
             - name: GITHUB_TOKEN
@@ -209,6 +240,10 @@ spec:
               mountPath: /claude-mcp-template
             {{- end }}
             {{- end }}
+            {{- if .Values.toolsConfig }}
+            - name: tools-config-template
+              mountPath: /tools-config-template
+            {{- end }}
       containers:
         - name: agent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -220,7 +255,7 @@ spec:
               cd /workspace
               export HOME=/workspace
               export OPENCLAW_CONFIG=/workspace/.openclaw/openclaw.json
-              exec npx @anthropic/openclaw start
+              exec openclaw gateway
           env:
             - name: HOME
               value: /workspace
@@ -241,6 +276,25 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: openai-api-key
                   optional: true
+            - name: FACTORY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: factory-api-key
+                  optional: true
+            # Web tools API keys (Brave search + Firecrawl scraping)
+            - name: BRAVE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: brave-api-key
+                  optional: true
+            - name: FIRECRAWL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: firecrawl-api-key
+                  optional: true
             {{- if .Values.claudeCode.enabled }}
             # Claude Code CLI settings path (settings.json with permissions + teams)
             - name: CLAUDE_CONFIG_DIR
@@ -257,6 +311,11 @@ spec:
             - name: DISABLE_TELEMETRY
               value: "1"
             {{- end }}
+            {{- end }}
+            {{- if .Values.toolsConfig }}
+            # Tools config path for CLI backends
+            - name: MCP_TOOLS_CONFIG
+              value: /workspace/tools-config.json
             {{- end }}
             # GitHub PAT for git operations at runtime (push, pull, etc.)
             - name: GITHUB_TOKEN
@@ -299,6 +358,36 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+        {{- if .Values.kaniko.enabled }}
+        - name: kaniko
+          image: {{ .Values.kaniko.image }}
+          command: ["/busybox/sleep", "infinity"]
+          env:
+            - name: DOCKER_CONFIG
+              value: /kaniko/.docker
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: kaniko-docker-config
+              mountPath: /kaniko/.docker
+              readOnly: true
+          resources:
+            {{- toYaml .Values.kaniko.resources | nindent 12 }}
+        {{- end }}
+        {{- if .Values.telemetry.enabled }}
+        - name: promtail
+          image: {{ .Values.telemetry.promtail.image }}
+          args:
+            - -config.file=/etc/promtail/promtail.yaml
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+              readOnly: true
+            - name: promtail-config
+              mountPath: /etc/promtail
+          resources:
+            {{- toYaml .Values.telemetry.resources | nindent 12 }}
+        {{- end }}
       volumes:
         - name: workspace
           persistentVolumeClaim:
@@ -321,4 +410,22 @@ spec:
           configMap:
             name: {{ include "openclaw-agent.fullname" . }}-claude-mcp
         {{- end }}
+        {{- end }}
+        {{- if .Values.toolsConfig }}
+        - name: tools-config-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-tools-config
+        {{- end }}
+        {{- if .Values.kaniko.enabled }}
+        - name: kaniko-docker-config
+          secret:
+            secretName: ghcr-secret
+            items:
+              - key: .dockerconfigjson
+                path: config.json
+        {{- end }}
+        {{- if .Values.telemetry.enabled }}
+        - name: promtail-config
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-promtail
         {{- end }}

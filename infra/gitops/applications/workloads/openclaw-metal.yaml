@@ -42,6 +42,7 @@ spec:
               - "group:fs"
               - "group:runtime"
               - "group:web"
+              - "group:memory"
               - "browser"
               - "group:sessions"
 
