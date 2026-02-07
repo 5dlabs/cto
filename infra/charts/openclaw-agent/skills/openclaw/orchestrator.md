@@ -26,10 +26,21 @@ claude --print "Break this into parallel tasks and use teammates: <description>"
 
 ## Agent-to-Agent Communication
 
-- Use `sessions_spawn` to create conversations with other agents
-- Use `sessions_send` to message agents within the same gateway (in-process)
-- Use Discord `#agent-coordination` channel for cross-agent visibility
-- Respect `maxPingPongTurns: 5` limit to avoid infinite loops
+Every agent runs in its own pod. Use the `nats` tool for all inter-agent messaging:
+
+- **`nats(action="publish", to="<agent>", message="...")`** — Send a message to another agent (fire-and-forget)
+- **`nats(action="request", to="<agent>", message="...")`** — Send and wait for a reply
+- **`nats(action="discover")`** — Find which agents are currently online
+- **`nats(action="publish", subject="agent.all.broadcast", message="...")`** — Broadcast to all agents
+
+Do NOT use `sessions_send()` or `sessions_spawn()` for cross-agent messaging — those only work
+in-process (same pod) and will silently fail. The `nats` tool is the default for all agent-to-agent
+communication. The tool description includes a full roster of known agents and their roles.
+
+Use Discord `#agent-coordination` channel for human-visible cross-agent updates.
+
+A ping-pong guard limits rapid back-and-forth exchanges (default 10 messages per 5-minute window
+per peer). If you hit the limit, wait for the window to reset or coordinate via Discord instead.
 
 ## Memory
 
