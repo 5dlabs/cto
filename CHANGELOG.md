@@ -3,6 +3,20 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.44](https://github.com/5dlabs/cto/compare/v0.2.43...v0.2.44) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** add kaniko container-builds skill ([#4374](https://github.com/5dlabs/cto/issues/4374)) ([8121730](https://github.com/5dlabs/cto/commit/8121730e4dfd64b0e3ed0f842f59f6d29f0713cb))
+
+
+### 🐛 Bug Fixes
+
+* **loki:** switch from SeaweedFS S3 to filesystem storage ([#4373](https://github.com/5dlabs/cto/issues/4373)) ([818d568](https://github.com/5dlabs/cto/commit/818d568898746c1d6e7ebe74f889c164b33f7546))
+* **openclaw:** correct Loki URL and add informational pod labels ([#4370](https://github.com/5dlabs/cto/issues/4370)) ([4fe5ce5](https://github.com/5dlabs/cto/commit/4fe5ce5d2ba9aa0d9826dd688d4301e69c9f4dda))
+* **openclaw:** move info fields from labels to pod annotations ([#4372](https://github.com/5dlabs/cto/issues/4372)) ([767fc77](https://github.com/5dlabs/cto/commit/767fc776a443a1aa077ee9fb1c4450da3e483cec))
+
 ## [0.2.43](https://github.com/5dlabs/cto/compare/v0.2.42...v0.2.43) (2026-02-07)
 
 
