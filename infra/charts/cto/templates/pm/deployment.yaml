@@ -85,6 +85,13 @@ spec:
                   name: tools-github-secrets
                   key: GITHUB_PERSONAL_ACCESS_TOKEN
                   optional: true
+            # GitHub webhook HMAC secret for verifying webhook payloads
+            - name: GITHUB_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: github-webhook-secret
+                  key: secret  # pragma: allowlist secret
+                  optional: true
             # Linear OAuth App credentials for each agent
             {{- $agents := list "morgan" "rex" "blaze" "grizz" "nova" "tap" "spark" "cleo" "cipher" "tess" "atlas" "bolt" }}
             {{- range $agents }}
