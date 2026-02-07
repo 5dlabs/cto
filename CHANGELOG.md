@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.42](https://github.com/5dlabs/cto/compare/v0.2.41...v0.2.42) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** memory optimization, group:memory allowlists, heartbeat autonomy ([#4362](https://github.com/5dlabs/cto/issues/4362)) ([1916f07](https://github.com/5dlabs/cto/commit/1916f073ca5195eac1ab6d8d803c9b863ffa7fe4))
+
 ## [0.2.41](https://github.com/5dlabs/cto/compare/v0.2.40...v0.2.41) (2026-02-07)
 
 
