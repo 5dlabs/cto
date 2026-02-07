@@ -66,7 +66,7 @@ jobs:
       - name: Configure npm for GitHub Packages
         run: |
           cat > .npmrc << 'NPMRC'
-          @jonathonfritz:registry=https://npm.pkg.github.com/
+          @5dlabs:registry=https://npm.pkg.github.com/
           NPMRC
           echo "//npm.pkg.github.com/:_authToken=$NODE_AUTH_TOKEN" >> .npmrc
         env:
@@ -137,7 +137,7 @@ jobs:
 
             ### MCP Server
             ```bash
-            npm install @jonathonfritz/grok-x-search@${{ steps.version.outputs.version }} --registry=https://npm.pkg.github.com
+            npm install @5dlabs/grok-x-search@${{ steps.version.outputs.version }} --registry=https://npm.pkg.github.com
             ```
 
             ### Cron Binary
