@@ -3,6 +3,24 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.47](https://github.com/5dlabs/cto/compare/v0.2.46...v0.2.47) (2026-02-07)
+
+
+### ✨ Features
+
+* **keeper:** add keeper agent configuration and identity ([03a2973](https://github.com/5dlabs/cto/commit/03a29738a6b44a2dd3143f994a079f2ecb31690d))
+* **nats:** NATS inter-agent messaging plugin and infrastructure ([#4387](https://github.com/5dlabs/cto/issues/4387)) ([7c13be1](https://github.com/5dlabs/cto/commit/7c13be1f1d8ae6d80e20ff32b3bc8b049b55e661))
+
+
+### 🐛 Bug Fixes
+
+* **nats:** align plugin with OpenClaw SDK conventions ([4754b84](https://github.com/5dlabs/cto/commit/4754b84748973451e99cfe443f1bad6861e2bce4))
+
+
+### 🔧 Maintenance
+
+* archive Argo Workflows and Argo Events infrastructure ([#4389](https://github.com/5dlabs/cto/issues/4389)) ([fc7d6ce](https://github.com/5dlabs/cto/commit/fc7d6ce4f13190783954139ed71425b5d1acae95))
+
 ## [0.2.46](https://github.com/5dlabs/cto/compare/v0.2.45...v0.2.46) (2026-02-07)
 
 
