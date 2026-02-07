@@ -3,7 +3,7 @@
 # Each pool is a dedicated NVMe device used for Mayastor volume provisioning
 
 # Control Plane - Samsung NVMe Drive 1 (~960GB)
-apiVersion: openebs.io/v1beta2
+apiVersion: openebs.io/v1beta3
 kind: DiskPool
 metadata:
   name: pool-cp-nvme1
@@ -13,7 +13,7 @@ spec:
   disks: ["/dev/nvme1n1"]
 ---
 # Control Plane - Samsung NVMe Drive 2 (~960GB)
-apiVersion: openebs.io/v1beta2
+apiVersion: openebs.io/v1beta3
 kind: DiskPool
 metadata:
   name: pool-cp-nvme2
@@ -23,7 +23,7 @@ spec:
   disks: ["/dev/nvme2n1"]
 ---
 # Control Plane - Samsung NVMe Drive 3 (~960GB)
-apiVersion: openebs.io/v1beta2
+apiVersion: openebs.io/v1beta3
 kind: DiskPool
 metadata:
   name: pool-cp-nvme3
