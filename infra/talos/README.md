@@ -272,7 +272,72 @@ talos-home/
 
 ## Storage
 
-The cluster uses Local Path Provisioner with a 100GB NVME volume on the worker node. Any PVC created will automatically provision storage from `/var/mnt/local-path-provisioner`.
+### Mayastor Distributed Storage (Recommended)
+
+The cluster uses OpenEBS Mayastor for high-performance distributed block storage. Mayastor pools are created on nodes with available NVMe drives.
+
+**Prerequisites:**
+- Nodes must have unused NVMe drives
+- Each node requires labeling: `openebs.io/engine=mayastor`
+- Cilium must have `socketLB.hostNamespaceOnly: false` (see infra/gitops/manifests/cilium/README.md)
+
+**Setup:**
+1. Label nodes for Mayastor:
+   ```bash
+   kubectl label node <node-name> openebs.io/engine=mayastor
+   ```
+
+2. Create disk pools (example for control plane with 3x Samsung NVMe drives):
+   ```bash
+   # Check available drives first
+   talosctl -n <node-ip> disks
+
+   # Create pool on each drive (adjust device names as needed)
+   kubectl apply -f - <<EOF
+   apiVersion: openebs.io/v1beta2
+   kind: DiskPool
+   metadata:
+     name: pool-cp-nvme1
+     namespace: mayastor
+   spec:
+     node: <node-name>
+     disks: ["/dev/nvme1n1"]
+   ---
+   apiVersion: openebs.io/v1beta2
+   kind: DiskPool
+   metadata:
+     name: pool-cp-nvme2
+     namespace: mayastor
+   spec:
+     node: <node-name>
+     disks: ["/dev/nvme2n1"]
+   ---
+   apiVersion: openebs.io/v1beta2
+   kind: DiskPool
+   metadata:
+     name: pool-cp-nvme3
+     namespace: mayastor
+   spec:
+     node: <node-name>
+     disks: ["/dev/nvme3n1"]
+   EOF
+   ```
+
+3. Verify pools are online:
+   ```bash
+   kubectl get diskpools -n mayastor
+   ```
+
+**Common Issues:**
+
+- **io-engine stuck in Init**: Check Cilium `socketLB.hostNamespaceOnly` is false (hostNetwork pods need service access)
+- **Node not labeled**: Mayastor DaemonSet won't schedule without `openebs.io/engine=mayastor` label
+- **Drive in use**: Ensure drives are not mounted or have existing partitions
+- **Worker at high CPU**: Add tolerations to allow scheduling on control plane if needed
+
+### Legacy: Local Path Provisioner
+
+Previously used Local Path Provisioner with a 100GB NVME volume on the worker node. PVCs provisioned storage from `/var/mnt/local-path-provisioner`.
 
 Example PVC:
 
