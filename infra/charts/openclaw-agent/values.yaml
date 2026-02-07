@@ -148,6 +148,16 @@ agentDefaults:
     memoryFlush:
       enabled: true
       softThresholdTokens: 6000
+      prompt: >-
+        Before this conversation is compacted, write lasting notes to
+        memory/YYYY-MM-DD.md using the following structure:
+        ## Ongoing Tasks (status, next steps, blockers)
+        ## Decisions Made (what was decided and why)
+        ## User Preferences Learned (new preferences or corrections)
+        ## Key Context (anything that should persist across sessions)
+        Be specific and concise. Include names, IDs, and URLs.
+        Update or amend existing entries rather than duplicating them.
+        If nothing meaningful to store, reply NO_REPLY.
   contextPruning:
     mode: "cache-ttl"
     ttl: "1h"
@@ -173,6 +183,8 @@ agentDefaults:
 memorySearch:
   model: "text-embedding-3-small"
   provider: "openai"
+  maxResults: 6
+  timeoutMs: 4000
   sources:
     - "memory"
     - "sessions"
@@ -188,7 +200,18 @@ memorySearch:
   sync:
     watch: true
     deltaBytes: 50000
-    deltaMessages: 25
+    deltaMessages: 10
+  gc:
+    enabled: true
+    retentionDays: 30
+    maxFiles: 90
+
+# =============================================================================
+# Memory Configuration
+# =============================================================================
+memory:
+  citations: "auto"
+  snippetMaxChars: 700
 
 # =============================================================================
 # Session Configuration

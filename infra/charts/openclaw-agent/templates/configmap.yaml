@@ -48,7 +48,9 @@ data:
                 "enabled": {{ .Values.memorySearch.hybrid.enabled }},
                 "textWeight": {{ .Values.memorySearch.hybrid.textWeight }},
                 "vectorWeight": {{ .Values.memorySearch.hybrid.vectorWeight }}
-              }
+              },
+              "maxResults": {{ .Values.memorySearch.maxResults | default 6 }},
+              "timeoutMs": {{ .Values.memorySearch.timeoutMs | default 4000 }}
             },
             "sources": {{ .Values.memorySearch.sources | toJson }},
             "sync": {
@@ -58,6 +60,13 @@ data:
               },
               "watch": {{ .Values.memorySearch.sync.watch }}
             }
+            {{- if .Values.memorySearch.gc }},
+            "gc": {
+              "enabled": {{ .Values.memorySearch.gc.enabled }},
+              "retentionDays": {{ .Values.memorySearch.gc.retentionDays }},
+              "maxFiles": {{ .Values.memorySearch.gc.maxFiles }}
+            }
+            {{- end }}
           },
           "model": {
             "fallbacks": {{ .Values.modelDefaults.fallbacks | toJson }},
@@ -112,7 +121,8 @@ data:
         "port": {{ .Values.gateway.port }}
       },
       "memory": {
-        "citations": "auto"
+        "citations": {{ .Values.memory.citations | default "auto" | quote }},
+        "snippetMaxChars": {{ .Values.memory.snippetMaxChars | default 700 }}
       },
       "commands": {
         "native": "auto",
