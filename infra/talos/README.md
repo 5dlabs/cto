@@ -279,7 +279,10 @@ The cluster uses OpenEBS Mayastor for high-performance distributed block storage
 **Prerequisites:**
 - Nodes must have unused NVMe drives
 - Each node requires labeling: `openebs.io/engine=mayastor`
-- Cilium must have `socketLB.hostNamespaceOnly: false` (see infra/gitops/manifests/cilium/README.md)
+- Cilium must have `socketLB.hostNamespaceOnly: false` and native routing mode
+- **Talos firewall must allow Mayastor ports** (50051, 50052, 10124)
+
+**IMPORTANT**: See [config/simple/MAYASTOR-SETUP.md](config/simple/MAYASTOR-SETUP.md) for complete setup instructions including required Talos configuration patches.
 
 **Setup:**
 1. Label nodes for Mayastor:
