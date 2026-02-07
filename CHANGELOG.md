@@ -3,6 +3,37 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.48](https://github.com/5dlabs/cto/compare/v0.2.47...v0.2.48) (2026-02-07)
+
+
+### ✨ Features
+
+* **helm:** add cloud provider support (Bedrock, Vertex AI, Foundry) ([#4396](https://github.com/5dlabs/cto/issues/4396)) ([252b168](https://github.com/5dlabs/cto/commit/252b168d9d669d6c9bb5a888e7b8d18063905c24))
+* **nats:** add discovery protocol, agent roster, and ping-pong guard ([4542490](https://github.com/5dlabs/cto/commit/4542490e60ce0596291b6dd8812cb464b9bbc83c))
+
+
+### 🐛 Bug Fixes
+
+* add ipv4NativeRoutingCIDR for Cilium native routing ([#4397](https://github.com/5dlabs/cto/issues/4397)) ([dd51e3a](https://github.com/5dlabs/cto/commit/dd51e3afd5af7c2eeb17fbd1aa91b0fbbb0a166b))
+* **ci:** stop redirecting stderr into scan-results.json ([1ed08aa](https://github.com/5dlabs/cto/commit/1ed08aa990b612b6dc549852231f152bf896ddf2))
+* disable WireGuard to unblock Mayastor hostNetwork connectivity ([#4398](https://github.com/5dlabs/cto/issues/4398)) ([fca9a40](https://github.com/5dlabs/cto/commit/fca9a40b88136b842fbe7f141854852b0810611a))
+* **dns:** switch CoreDNS to public DNS after Talos firewall blocked port 53 ([8907965](https://github.com/5dlabs/cto/commit/89079657e1d3268c7e02470dd0500338e98250ba))
+* enable Cilium native routing for hostNetwork pod connectivity ([#4395](https://github.com/5dlabs/cto/issues/4395)) ([631a32a](https://github.com/5dlabs/cto/commit/631a32a80017c7d17d9f0a4d6510e4f386403e73))
+* metrics-server containerPort and defaultArgs for port 4443 ([#4393](https://github.com/5dlabs/cto/issues/4393)) ([8f46b47](https://github.com/5dlabs/cto/commit/8f46b47f5d5819fa14bc907369c0529730307902))
+* metrics-server port conflict on hostNetwork ([#4392](https://github.com/5dlabs/cto/issues/4392)) ([5783b43](https://github.com/5dlabs/cto/commit/5783b438f3051611d6b31d0656fa94c131af72f9))
+* **nats:** add nats tool to agent allowlists and update skill guidance ([a1d35b8](https://github.com/5dlabs/cto/commit/a1d35b8dfd8c87a3641e1e553872067fb179bc9d))
+* **nats:** use standalone createInbox() import from nats module ([6a18a38](https://github.com/5dlabs/cto/commit/6a18a38a7152794f3f486fc0e40198c073f7ce71))
+
+
+### 🔧 Maintenance
+
+* upgrade OpenClaw to 2026.2.6-3, set imagePullPolicy Always ([#4391](https://github.com/5dlabs/cto/issues/4391)) ([e2e3960](https://github.com/5dlabs/cto/commit/e2e396040d218e8eb9bad3ef22078541c5fac05e))
+
+
+### 👷 CI/CD
+
+* add skills security scanning via mcp-scan on every push ([146d1b8](https://github.com/5dlabs/cto/commit/146d1b88d445fa4683e8bb44b1c3dd39f937886d))
+
 ## [0.2.47](https://github.com/5dlabs/cto/compare/v0.2.46...v0.2.47) (2026-02-07)
 
 
