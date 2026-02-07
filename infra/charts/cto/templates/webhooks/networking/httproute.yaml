@@ -1,10 +1,13 @@
-{{- if .Values.webhooks.enabled }}
+{{- if .Values.pm.enabled }}
 ---
+# HTTPRoute: GitHub Webhooks
+# Routes GitHub webhook traffic to the PM server's unified webhook handler.
+# Previously routed to Argo Events EventSource in automation namespace.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: github-webhooks
-  namespace: automation
+  namespace: {{ include "cto.namespace" . }}
   annotations:
     argocd.argoproj.io/ignore-differences: |
       jsonPointers:
@@ -16,18 +19,20 @@ spec:
     - group: gateway.networking.k8s.io
       kind: Gateway
       name: public-gateway
-      namespace: automation
+      namespace: {{ include "cto.namespace" . }}
   hostnames:
     - "github.public.5dlabs.ai"
   rules:
     - matches:
         - path:
             type: PathPrefix
+            # Path matches the URL configured in GitHub organization webhook settings.
+            # The PM server handles this path via a route alias.
             value: /github/webhook
       backendRefs:
         - group: ""
           kind: Service
-          name: github-eventsource-svc
-          port: 12000
+          name: {{ include "cto.pm.fullname" . }}
+          port: {{ .Values.pm.service.port }}
           weight: 1
 {{- end }}

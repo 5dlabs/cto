@@ -2,19 +2,19 @@
 name: Agent Images
 
 # Automatically build latest agent images (Claude Code, Grok, etc.)
-# Runs daily to ensure we always have the latest versions
-# Can also be triggered manually or on agent-related changes
+# Triggers: daily schedule, pushes to infra/images/**, or manual dispatch
 
 on:
   # Daily build to pick up new CLI versions (Claude Code, Codex, etc.)
   schedule:
     - cron: '0 6 * * *'  # 6 AM UTC
 
-  # Manual trigger only - no push trigger to avoid wasting runners
-  # Agent images only need rebuilding when:
-  # 1. Daily schedule picks up new CLI versions
-  # 2. Manual trigger for urgent updates
-  # 3. Dockerfile changes (trigger manually after merging)
+  # Rebuild on pushes that change image definitions
+  push:
+    branches: [main]
+    paths:
+      - 'infra/images/**'
+
   workflow_dispatch:
     inputs:
       force_rebuild:
@@ -466,11 +466,15 @@ jobs:
             file: ./infra/images/openclaw/Dockerfile
             version_type: github_release
             version_repo: openclaw/openclaw
-          - id: dexter
-            image: dexter
-            context: ./infra/images/dexter
-            file: ./infra/images/dexter/Dockerfile
-            version_type: dir_hash
+          # NOTE: dexter is temporarily disabled until ghcr.io/5dlabs/dexter package is created
+          # by an org admin. The GITHUB_TOKEN cannot create new org packages without prior setup.
+          # Error: "permission_denied: write_package" when pushing to non-existent package.
+          # To re-enable: uncomment below and ensure package exists in GHCR.
+          # - id: dexter
+          #   image: dexter
+          #   context: ./infra/images/dexter
+          #   file: ./infra/images/dexter/Dockerfile
+          #   version_type: dir_hash
     steps:
       - uses: actions/checkout@v6
 

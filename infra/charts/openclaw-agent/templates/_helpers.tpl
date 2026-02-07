@@ -34,3 +34,13 @@ Selector labels
 app.kubernetes.io/name: {{ include "openclaw-agent.fullname" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+Pod annotations — informational settings visible via kubectl describe pod
+*/}}
+{{- define "openclaw-agent.podAnnotations" -}}
+openclaw.io/model: {{ .Values.agent.model | quote }}
+openclaw.io/heartbeat: {{ .Values.agent.heartbeat | quote }}
+openclaw.io/sandbox: {{ .Values.agent.sandbox | quote }}
+openclaw.io/tools-profile: {{ .Values.tools.profile | quote }}
+{{- end }}

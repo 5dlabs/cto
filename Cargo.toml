@@ -4,7 +4,6 @@ members = [
     "crates/cli",
     "crates/config",
     "crates/controller",
-    "crates/installer",
     "crates/experience",
     "crates/gpu",
     "crates/healer",
@@ -19,10 +18,14 @@ members = [
     "crates/tools",
     "crates/utils",
     "crates/cto-app/tauri",
+    "crates/cto-lite/pm-lite-server",
+]
+exclude = [
+    "talos-orchestrator",
 ]
 
 [workspace.package]
-version = "0.2.39"
+version = "0.2.46"
 edition = "2021"
 authors = ["5D team"]
 license = "AGPL-3.0"

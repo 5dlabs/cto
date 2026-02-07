@@ -187,6 +187,7 @@ pub fn build_router(state: AppState) -> Router {
         namespace: state.config.namespace.clone(),
         play_config: state.config.play.clone(),
         kube_client: state.kube_client.clone(),
+        github_webhook_secret: state.config.github_webhook_secret.clone(),
     });
 
     Router::new()
@@ -196,7 +197,21 @@ pub fn build_router(state: AppState) -> Router {
             "/webhooks/github",
             post(handle_github_webhook).with_state(callback_state.clone()),
         )
-        // Agent interaction webhooks (from Argo Events sensors)
+        // Unified GitHub webhook endpoint (direct from GitHub, replaces Argo Events)
+        .route(
+            "/webhooks/github/events",
+            post(crate::handlers::github_events::handle_github_events)
+                .with_state(callback_state.clone()),
+        )
+        // Legacy path alias — GitHub org webhook settings send to /github/webhook;
+        // Cloudflare tunnel and HTTPRoute preserve the original path, so we must
+        // handle it here in addition to the canonical /webhooks/github/events path.
+        .route(
+            "/github/webhook",
+            post(crate::handlers::github_events::handle_github_events)
+                .with_state(callback_state.clone()),
+        )
+        // Agent interaction webhooks (from Argo Events sensors - legacy, will be removed)
         .route(
             "/webhooks/github/mention",
             post(crate::handlers::agent_interactions::handle_mention_webhook)

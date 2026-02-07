@@ -266,7 +266,7 @@ impl AgentSdkProvider {
     ///
     /// Search order:
     /// 1. `INTAKE_AGENT_PATH` environment variable
-    /// 2. `tools/intake-agent/dist/intake-agent` relative to crate root
+    /// 2. `apps/intake-agent/dist/intake-agent` relative to workspace root
     /// 3. `intake-agent` in PATH
     ///
     /// # Errors
@@ -289,9 +289,9 @@ impl AgentSdkProvider {
         // 2. Check relative path from workspace root
         // Try multiple possible locations
         let relative_paths = [
-            "tools/intake-agent/dist/intake-agent",
-            "../tools/intake-agent/dist/intake-agent",
-            "../../tools/intake-agent/dist/intake-agent",
+            "apps/intake-agent/dist/intake-agent",
+            "../apps/intake-agent/dist/intake-agent",
+            "../../apps/intake-agent/dist/intake-agent",
         ];
 
         for rel_path in relative_paths {
@@ -312,7 +312,7 @@ impl AgentSdkProvider {
         Err(TasksError::Ai(
             "intake-agent binary not found. Either:\n\
              1. Set INTAKE_AGENT_PATH environment variable\n\
-             2. Build it with: cd tools/intake-agent && bun run build\n\
+             2. Build it with: cd apps/intake-agent && bun run build\n\
              3. Add it to PATH"
                 .to_string(),
         ))

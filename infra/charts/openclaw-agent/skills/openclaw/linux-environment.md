@@ -17,10 +17,12 @@ You are running on Ubuntu Linux inside a Kubernetes pod. This is NOT macOS.
 - `claude` (Claude Code CLI — pinned version)
 - Headless Chromium (for browser automation)
 - `kubectl` (Kubernetes access)
+- Kaniko sidecar for container builds (see container-builds skill)
 
 ## Important Notes
 
 - No GUI — everything is headless
+- No Docker daemon — use kaniko sidecar for container builds
 - No macOS-specific tools (pbcopy, open, osascript, etc.)
 - Use `xclip` or file-based workflows instead of clipboard
 - Browser automation must use `--headless` flag

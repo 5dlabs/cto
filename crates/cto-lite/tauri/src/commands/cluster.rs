@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 use tracing;
 
-const CLUSTER_NAME: &str = "cto";
+const CLUSTER_NAME: &str = "cto-lite";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ClusterType {
@@ -1101,8 +1101,46 @@ pub async fn smart_init(
         }
     }
 
-    // Step 5: If no CTO cluster, create one with Kind
-    // CTO App only uses Kind for cluster management - no Docker Desktop K8s
+    // Step 5: If no CTO cluster, check for other usable clusters
+    if !result.cluster_ready {
+        tracing::info!("No CTO cluster found, checking for alternatives...");
+
+        // Look for running Docker Desktop K8s, OrbStack, etc.
+        let usable = existing
+            .clusters
+            .iter()
+            .filter(|c| c.is_running && c.cluster_type != ClusterType::Other)
+            .collect::<Vec<_>>();
+
+        if let Some(best) = usable.first() {
+            tracing::info!("Found alternative cluster: {}", best.context);
+            result.actions.push(format!(
+                "Using existing {} cluster",
+                match best.cluster_type {
+                    ClusterType::DockerDesktop => "Docker Desktop",
+                    ClusterType::OrbStack => "OrbStack",
+                    ClusterType::RancherDesktop => "Rancher Desktop",
+                    _ => "Kubernetes",
+                }
+            ));
+
+            // Switch to it
+            let output = Command::new("kubectl")
+                .args(["config", "use-context", &best.context])
+                .output();
+
+            if output.map(|o| o.status.success()).unwrap_or(false) {
+                result.cluster_ready = true;
+                result.context = best.context.clone();
+
+                // Save preference
+                let _ = db.set_config("prefer_existing_cluster", "true");
+                let _ = db.set_config("cluster_context", &best.context);
+            }
+        }
+    }
+
+    // Step 6: If still no cluster, create one
     if !result.cluster_ready {
         tracing::info!("No usable cluster found, creating new CTO cluster...");
         result.actions.push("Creating new CTO cluster".to_string());
@@ -1190,7 +1228,6 @@ fn wait_for_docker_ready(timeout_secs: u64) -> AppResult<()> {
 
 /// Ensure Kind is installed, download if missing
 async fn ensure_kind_installed() -> AppResult<bool> {
-    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
 
     if is_kind_installed() {
@@ -1225,12 +1262,7 @@ async fn ensure_kind_installed() -> AppResult<bool> {
 
     // Download to temp location
     let temp_dir = std::env::temp_dir();
-    let kind_filename = if cfg!(target_os = "windows") {
-        "kind.exe"
-    } else {
-        "kind"
-    };
-    let kind_path = temp_dir.join(kind_filename);
+    let kind_path = temp_dir.join("kind");
 
     let response = reqwest::Client::new()
         .get(&url)
@@ -1249,41 +1281,25 @@ async fn ensure_kind_installed() -> AppResult<bool> {
     // Write to temp file
     std::fs::write(&kind_path, &bytes)?;
 
-    // Make executable (Unix only)
-    #[cfg(unix)]
-    {
-        let mut perms = std::fs::metadata(&kind_path)?.permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&kind_path, perms)?;
-    }
+    // Make executable
+    let mut perms = std::fs::metadata(&kind_path)?.permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&kind_path, perms)?;
 
-    // Determine installation directory based on platform
-    #[cfg(unix)]
-    let install_dir = dirs::home_dir()
+    // Move to ~/.local/bin (create if needed)
+    let local_bin = dirs::home_dir()
         .ok_or_else(|| AppError::CommandFailed("Cannot find home directory".to_string()))?
         .join(".local/bin");
 
-    #[cfg(target_os = "windows")]
-    let install_dir = dirs::data_local_dir()
-        .ok_or_else(|| AppError::CommandFailed("Cannot find local data directory".to_string()))?
-        .join("Microsoft\\WindowsApps");
+    std::fs::create_dir_all(&local_bin)?;
 
-    std::fs::create_dir_all(&install_dir)?;
+    let final_path = local_bin.join("kind");
+    std::fs::rename(&kind_path, &final_path)?;
 
-    let final_path = install_dir.join(kind_filename);
-    // Use copy + remove instead of rename to support cross-filesystem moves
-    std::fs::copy(&kind_path, &final_path)?;
-    std::fs::remove_file(&kind_path)?;
-
-    // Warn if install directory is not in PATH (Unix only)
-    #[cfg(unix)]
-    {
-        let path_var = std::env::var("PATH").unwrap_or_default();
-        if !path_var.contains(".local/bin") {
-            tracing::warn!(
-                "~/.local/bin is not in PATH. Consider adding it to your shell profile."
-            );
-        }
+    // Ensure ~/.local/bin is in PATH
+    let path_var = std::env::var("PATH").unwrap_or_default();
+    if !path_var.contains(".local/bin") {
+        tracing::warn!("~/.local/bin is not in PATH. Consider adding it to your shell profile.");
     }
 
     tracing::info!("Kind installed to: {:?}", final_path);

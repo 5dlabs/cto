@@ -1,0 +1,72 @@
+name: intake
+description: "PRD intake pipeline with voting committee"
+inputs:
+  - name: prd_content
+    type: string
+  - name: prd_path
+    type: string
+  - name: num_tasks
+    type: number
+    default: 10
+  - name: project_name
+    type: string
+    default: "project"
+
+steps:
+  - name: parse-prd
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/parse-prd-system.md}}\n\n{{prompts/parse-prd-user.md}}",
+        "input": {
+          "prd_content": "{{inputs.prd_content}}",
+          "num_tasks": {{inputs.num_tasks}},
+          "next_id": 1
+        },
+        "schema": "{{schemas/generated-task.schema.json}}",
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514"
+      }'
+
+  - name: analyze-complexity
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/analyze-complexity-system.md}}",
+        "input": { "tasks": ${{ steps.parse-prd.output }} },
+        "schema": "{{schemas/complexity-analysis.schema.json}}",
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514"
+      }'
+
+  - name: review-tasks
+    approval:
+      message: "Review generated tasks and complexity analysis before expanding"
+      show:
+        - tasks: ${{ steps.parse-prd.output }}
+        - complexity: ${{ steps.analyze-complexity.output }}
+
+  - name: expand-tasks
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/expand-task-system.md}}",
+        "input": {
+          "tasks": ${{ steps.parse-prd.output }},
+          "complexity": ${{ steps.analyze-complexity.output }}
+        },
+        "schema": "{{schemas/generated-task.schema.json}}",
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514"
+      }'
+
+  - name: vote-on-quality
+    workflow: voting.lobster.yaml
+    inputs:
+      content_to_evaluate: ${{ steps.expand-tasks.output }}
+      evaluation_criteria: "task decomposition quality, dependency ordering, decision point coverage"
+
+  - name: generate-docs
+    command: >
+      echo '${{ steps.expand-tasks.output }}' | intake-util generate-docs --base-path .tasks/docs
+
+  - name: generate-prompts
+    command: >
+      echo '${{ steps.expand-tasks.output }}' | intake-util generate-prompts --output-dir .tasks/docs --project-name {{inputs.project_name}}

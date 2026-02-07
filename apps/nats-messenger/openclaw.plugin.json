@@ -1,0 +1,26 @@
+{
+  "id": "nats-messenger",
+  "name": "NATS Messenger",
+  "version": "1.0.0",
+  "description": "Inter-agent messaging over NATS for cross-pod communication",
+  "author": "5dlabs",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "enabled": { "type": "boolean", "default": true },
+      "url": { "type": "string", "default": "nats://nats.messaging.svc.cluster.local:4222" },
+      "agentName": { "type": "string" },
+      "subjects": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "reconnectWaitMs": { "type": "number", "default": 2000 },
+      "maxReconnectAttempts": { "type": "number", "default": -1 }
+    },
+    "required": ["url", "agentName"]
+  },
+  "uiHints": {
+    "category": "messaging",
+    "icon": "message-square"
+  }
+}

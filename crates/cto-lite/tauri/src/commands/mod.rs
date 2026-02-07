@@ -10,6 +10,7 @@ pub mod github;
 pub mod install;
 pub mod logs;
 pub mod mcp;
+pub mod openclaw;
 pub mod runtime;
 pub mod tunnel;
 pub mod updates;

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "decision-point.schema.json",
+  "title": "DecisionPoint",
+  "description": "A decision point capturing a discovered architectural or design choice that needs resolution.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "architecture",
+        "error-handling",
+        "data-model",
+        "api-design",
+        "ux-behavior",
+        "performance",
+        "security"
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requires_approval": {
+      "type": "boolean"
+    },
+    "constraint_type": {
+      "type": "string",
+      "enum": ["hard", "soft", "open", "escalation"]
+    }
+  },
+  "required": [
+    "id",
+    "category",
+    "description",
+    "options",
+    "requires_approval",
+    "constraint_type"
+  ],
+  "additionalProperties": false
+}

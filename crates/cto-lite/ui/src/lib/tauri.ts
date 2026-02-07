@@ -289,6 +289,20 @@ export async function streamPodLogs(
   return invoke<LogEntry[]>('stream_pod_logs', { podName, namespace, container });
 }
 
+/** Start a log stream */
+export async function startLogStream(
+  namespace?: string,
+  podPattern?: string,
+  container?: string
+): Promise<string> {
+  return invoke<string>('start_log_stream', { namespace, podPattern, container });
+}
+
+/** Stop a log stream */
+export async function stopLogStream(streamId: string): Promise<void> {
+  return invoke('stop_log_stream', { streamId });
+}
+
 // ============================================================================
 // Helm Commands
 // ============================================================================
@@ -365,4 +379,98 @@ export async function quickHealthCheck(): Promise<{
   message: string;
 }> {
   return invoke('quick_health_check');
+}
+
+// ============================================================================
+// OpenClaw Gateway Commands
+// ============================================================================
+
+/** Response from the OpenClaw agent */
+export interface OpenClawResponse {
+  content: string;
+  action?: {
+    type: 'oauth' | 'approve' | 'link' | 'confirm';
+    label: string;
+    description?: string;
+    url?: string;
+    workflowId?: string;
+    completed?: boolean;
+  };
+}
+
+/** Workflow start result */
+export interface WorkflowStartResult {
+  workflowId: string;
+  status: string;
+}
+
+/** OpenClaw gateway status */
+export interface OpenClawStatus {
+  connected: boolean;
+  version: string | null;
+  agents: string[];
+}
+
+/** Send a message to the OpenClaw PM agent (Morgan) */
+export async function openclawSendMessage(
+  sessionId: string,
+  message: string
+): Promise<OpenClawResponse> {
+  return invoke<OpenClawResponse>('openclaw_send_message', {
+    sessionId,
+    message,
+  });
+}
+
+/** Get message history for a session */
+export async function openclawGetMessages(
+  sessionId: string
+): Promise<OpenClawResponse[]> {
+  return invoke<OpenClawResponse[]>('openclaw_get_messages', { sessionId });
+}
+
+/** Start a Lobster workflow via OpenClaw */
+export async function openclawStartWorkflow(
+  workflowType: string,
+  params: Record<string, string>
+): Promise<WorkflowStartResult> {
+  return invoke<WorkflowStartResult>('openclaw_start_workflow', {
+    workflowType,
+    params,
+  });
+}
+
+/** Get workflow status */
+export async function openclawGetWorkflowStatus(
+  workflowId: string
+): Promise<WorkflowStartResult> {
+  return invoke<WorkflowStartResult>('openclaw_get_workflow_status', {
+    workflowId,
+  });
+}
+
+/** Approve a pending workflow step */
+export async function openclawApprove(workflowId: string): Promise<void> {
+  return invoke('openclaw_approve', { workflowId });
+}
+
+/** Reject a pending workflow step */
+export async function openclawReject(
+  workflowId: string,
+  reason: string
+): Promise<void> {
+  return invoke('openclaw_reject', { workflowId, reason });
+}
+
+/** Get OpenClaw gateway connection status */
+export async function openclawGetStatus(): Promise<OpenClawStatus> {
+  return invoke<OpenClawStatus>('openclaw_get_status');
+}
+
+/** Execute a CLI command through the OpenClaw proxy */
+export async function openclawExecCli(
+  cli: string,
+  args: string[]
+): Promise<string> {
+  return invoke<string>('openclaw_exec_cli', { cli, args });
 }

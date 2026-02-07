@@ -1,0 +1,151 @@
+{
+  "created_at": 1770265928,
+  "completed_at": 1770265941,
+  "id": "444c14cd-699b-597e-1d6a-d7a88437e71b",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_45287813",
+      "input": "{\"query\":\"(Rust AI OR Go AI OR TypeScript AI OR Rust programming OR Go programming) lang:en\",\"limit\":20,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_444c14cd-699b-597e-1d6a-d7a88437e71b_xs_call_45287813",
+      "status": "completed"
+    },
+    {
+      "call_id": "xs_call_98787041",
+      "input": "{\"query\":\"(Rust AI OR Go AI OR TypeScript AI OR Rust programming OR Go programming) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_444c14cd-699b-597e-1d6a-d7a88437e71b_xs_call_98787041",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the top English-language X posts matching your advanced search query `(Rust AI OR Go AI OR TypeScript AI OR Rust programming OR Go programming) lang:en` (sorted by Top relevance).[[1]](https://x.com/i/status/2018751274624418131)[[2]](https://x.com/i/status/2018568452131393817)[[3]](https://x.com/i/status/2018719119286448428)\n\n### Most Engaged Post:\n**Website Designer Nigeria (@webdesignerng)** · Feb 3, 2026  \n\"Programming Languages You Should Learn in 2026:  \n1.🐍 Python  \n2.🌐 JavaScript / TypeScript  \n3.⚡ Rust  \n4.☁️ Go (Golang)  \n5.📊 SQL  \n\n❌ Programming Languages You Shouldn’t Learn in 2026:  \n6.📉 PHP  \n7.🐪 Perl  \n8.💎 Ruby\"  \n*769 likes · 58K views*[[1]](https://x.com/i/status/2018751274624418131)\n\n### Other Notable Posts:\n- **Harshit Yadav (@HxrshitYadav)** · Feb 3, 2026  \n  A fun list of programming language ages, highlighting Rust (14 yrs), Go (15 yrs), TypeScript (12 yrs), among others like JavaScript (29 yrs).[[2]](https://x.com/i/status/2018568452131393817)\n\n- **Matuo (@Matuoht)** replying to a thread on AI agents/Ruby on Rails + Claude:  \n  \"Imagine claiming AI Agents are second coming of the Jesus, and can do anything. But not using any performance programming language like Rust or Zig or even Go is better than Ruby 😂\"[[3]](https://x.com/i/status/2018719119286448428)\n\n- **Zach Vorhies (@Perpetualmaniac)** on AI programming:  \n  \"Retard take. AI programming is the future but right now it needs guardrails. C has none. Rust - this is central to the core. The future is Rust.\"[[4]](https://x.com/i/status/2017849397116342707)\n\nThese focus heavily on Rust and Go for modern programming/AI contexts, with TypeScript tied to JS ecosystems. No direct \"TypeScript AI\" hits in top results, but strong Rust/Go programming buzz. If you want Latest mode, more results, or deeper threads, let me know!",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018751274624418131",
+              "start_index": 188,
+              "end_index": 237,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018568452131393817",
+              "start_index": 237,
+              "end_index": 286,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018719119286448428",
+              "start_index": 286,
+              "end_index": 335,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018751274624418131",
+              "start_index": 668,
+              "end_index": 717,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018568452131393817",
+              "start_index": 939,
+              "end_index": 988,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018719119286448428",
+              "start_index": 1257,
+              "end_index": 1306,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017849397116342707",
+              "start_index": 1515,
+              "end_index": 1564,
+              "title": "4"
+            }
+          ]
+        }
+      ],
+      "id": "msg_444c14cd-699b-597e-1d6a-d7a88437e71b",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 8139,
+    "input_tokens_details": {
+      "cached_tokens": 4027
+    },
+    "output_tokens": 1672,
+    "output_tokens_details": {
+      "reasoning_tokens": 952
+    },
+    "total_tokens": 9811,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 2,
+    "cost_in_usd_ticks": 118597500,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 2,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

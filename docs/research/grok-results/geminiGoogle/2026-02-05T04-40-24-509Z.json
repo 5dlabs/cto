@@ -1,0 +1,192 @@
+{
+  "created_at": 1770266413,
+  "completed_at": 1770266424,
+  "id": "7bb4ad4e-ed7f-66a8-9ee4-16a39d1e8331",
+  "max_output_tokens": null,
+  "model": "grok-4-1-fast-reasoning",
+  "object": "response",
+  "output": [
+    {
+      "call_id": "xs_call_01182942",
+      "input": "{\"query\":\"(Gemini AI OR Google Gemini OR Gemini 2.0 OR Gemini Pro OR Gemini Ultra) lang:en\",\"limit\":10,\"mode\":\"Top\"}",
+      "name": "x_keyword_search",
+      "type": "custom_tool_call",
+      "id": "ctc_7bb4ad4e-ed7f-66a8-9ee4-16a39d1e8331_xs_call_01182942",
+      "status": "completed"
+    },
+    {
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Here are the top recent English-language X posts discussing Gemini AI, Google Gemini, Gemini 2.0, Pro, Ultra, and related models:[[1]](https://x.com/i/status/2018403111573102976)[[2]](https://x.com/i/status/2018383919289151883)[[3]](https://x.com/i/status/2018746306101961080)\n\n### Key Highlights:\n- **Official Chrome updates on Gemini integration**: Google Chrome announced \"auto browse\" in Gemini, now available for Google AI Pro and Ultra subscribers in the US. It handles tasks like shopping or scheduling while seeking user approval.[[2]](https://x.com/i/status/2018383919289151883)[[3]](https://x.com/i/status/2018746306101961080) A demo video shows it planning a NYC trip effortlessly.[[3]](https://x.com/i/status/2018746306101961080)\n- **AI generation and tools**: Multiple creators shared videos made with Gemini-powered tools like Veo 3.1 (e.g., hyper-realistic racing scenes, zombie survival, luxury food ads) or \"Gemini Nano Banana Pro 3.0.\"[[4]](https://x.com/i/status/2017594518049305014)[[5]](https://x.com/i/status/2018163221979677025)[[6]](https://x.com/i/status/2017506033913024975)[[7]](https://x.com/i/status/2017938415627772122)\n- **Project Genie**: A new AI tool for generating explorable environments from prompts, blending Genie 3, Gemini, and Nano Banana Pro—initially for US Google AI Ultra subscribers.[[1]](https://x.com/i/status/2018403111573102976)\n- **Pricing and complaints**: Viral meme on high AI subscription costs, listing Gemini AI Ultra at $250/month alongside competitors.[[8]](https://x.com/i/status/2018061066853576816) Users lament the lack of new Ultra models post-Gemini 1 Ultra.[[9]](https://x.com/i/status/2018599132269891860)\n\nThese posts are from late Jan/early Feb 2026, showing buzz around Gemini's Pro/Ultra tiers in Chrome, content generation, and premium features.[[10]](https://x.com/i/status/2018061297871417661)",
+          "logprobs": [],
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018403111573102976",
+              "start_index": 129,
+              "end_index": 178,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018383919289151883",
+              "start_index": 178,
+              "end_index": 227,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018746306101961080",
+              "start_index": 227,
+              "end_index": 276,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018383919289151883",
+              "start_index": 538,
+              "end_index": 587,
+              "title": "2"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018746306101961080",
+              "start_index": 587,
+              "end_index": 636,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018746306101961080",
+              "start_index": 692,
+              "end_index": 741,
+              "title": "3"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017594518049305014",
+              "start_index": 953,
+              "end_index": 1002,
+              "title": "4"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018163221979677025",
+              "start_index": 1002,
+              "end_index": 1051,
+              "title": "5"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017506033913024975",
+              "start_index": 1051,
+              "end_index": 1100,
+              "title": "6"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2017938415627772122",
+              "start_index": 1100,
+              "end_index": 1149,
+              "title": "7"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018403111573102976",
+              "start_index": 1329,
+              "end_index": 1378,
+              "title": "1"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018061066853576816",
+              "start_index": 1511,
+              "end_index": 1560,
+              "title": "8"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018599132269891860",
+              "start_index": 1623,
+              "end_index": 1672,
+              "title": "9"
+            },
+            {
+              "type": "url_citation",
+              "url": "https://x.com/i/status/2018061297871417661",
+              "start_index": 1817,
+              "end_index": 1867,
+              "title": "10"
+            }
+          ]
+        }
+      ],
+      "id": "msg_7bb4ad4e-ed7f-66a8-9ee4-16a39d1e8331",
+      "role": "assistant",
+      "type": "message",
+      "status": "completed"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "x_search",
+      "from_date": "2026-01-31",
+      "to_date": "2026-02-05",
+      "enable_image_understanding": true,
+      "enable_video_understanding": true
+    }
+  ],
+  "top_p": 0.95,
+  "usage": {
+    "input_tokens": 7692,
+    "input_tokens_details": {
+      "cached_tokens": 2004
+    },
+    "output_tokens": 1598,
+    "output_tokens_details": {
+      "reasoning_tokens": 887
+    },
+    "total_tokens": 9290,
+    "num_sources_used": 0,
+    "num_server_side_tools_used": 1,
+    "cost_in_usd_ticks": 70368000,
+    "server_side_tool_usage_details": {
+      "web_search_calls": 0,
+      "x_search_calls": 1,
+      "code_interpreter_calls": 0,
+      "file_search_calls": 0,
+      "mcp_calls": 0,
+      "document_search_calls": 0
+    }
+  },
+  "user": null,
+  "incomplete_details": null,
+  "status": "completed",
+  "store": true,
+  "metadata": {},
+  "background": false,
+  "service_tier": "default",
+  "truncation": "disabled",
+  "top_logprobs": 0,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "prompt_cache_key": null,
+  "max_tool_calls": null,
+  "safety_identifier": null,
+  "error": null,
+  "instructions": null
+}

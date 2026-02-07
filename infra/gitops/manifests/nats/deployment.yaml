@@ -1,0 +1,84 @@
+---
+# NATS - High-performance cloud-native messaging system
+# License: Apache 2.0
+# Source: https://github.com/nats-io/nats-server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/component: message-bus
+    app.kubernetes.io/part-of: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nats
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nats
+        app.kubernetes.io/component: message-bus
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8222"
+        prometheus.io/path: "/varz"
+    spec:
+      containers:
+        - name: nats
+          image: nats:2.10-alpine
+          args:
+            - "--config"
+            - "/etc/nats/nats-server.conf"
+            - "-js"
+          ports:
+            - name: client
+              containerPort: 4222
+              protocol: TCP
+            - name: monitor
+              containerPort: 8222
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nats
+              readOnly: true
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: monitor
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: monitor
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: config
+          configMap:
+            name: nats-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: nats-data
+      securityContext:
+        fsGroup: 1000

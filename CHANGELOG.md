@@ -3,6 +3,106 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.46](https://github.com/5dlabs/cto/compare/v0.2.45...v0.2.46) (2026-02-07)
+
+
+### ✨ Features
+
+* **infra:** route GitHub webhooks directly to PM server ([#4384](https://github.com/5dlabs/cto/issues/4384)) ([0d145d8](https://github.com/5dlabs/cto/commit/0d145d83460350ec515375a3e48f66333548b5b1))
+* **intake:** Lobster intake migration with 5-model voting ([#4379](https://github.com/5dlabs/cto/issues/4379)) ([0c6b799](https://github.com/5dlabs/cto/commit/0c6b799b87f386fedbb9216c993bf0a76f2cf62b))
+
+
+### 🐛 Bug Fixes
+
+* **openclaw:** remove unsupported group:memory from agent tools allow lists ([#4386](https://github.com/5dlabs/cto/issues/4386)) ([0ad8144](https://github.com/5dlabs/cto/commit/0ad8144bd54e88549fb85ca2f771768fb7c67067))
+* **secrets:** update ExternalSecret with all 16 deployed bot tokens ([#4381](https://github.com/5dlabs/cto/issues/4381)) ([e1dfd3a](https://github.com/5dlabs/cto/commit/e1dfd3a3a1d37d60e53c78f276123bd0ee6ec31f))
+
+
+### 🔧 Maintenance
+
+* **openclaw:** remove pixel, scout, and pixel-assistant agents ([#4385](https://github.com/5dlabs/cto/issues/4385)) ([86e18d2](https://github.com/5dlabs/cto/commit/86e18d2a50479af921b3008afdf1aae45125a96a))
+
+## [0.2.45](https://github.com/5dlabs/cto/compare/v0.2.44...v0.2.45) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** deploy all 14 remaining agents to Kubernetes ([#4375](https://github.com/5dlabs/cto/issues/4375)) ([b6cf4b6](https://github.com/5dlabs/cto/commit/b6cf4b616d633be37466d8ba25c0b5ddeb706175))
+* **openclaw:** expand container-builds skill with Docker→Kaniko guide ([#4378](https://github.com/5dlabs/cto/issues/4378)) ([25aaaeb](https://github.com/5dlabs/cto/commit/25aaaeb8684f73e91a2c70845864599d96661c27))
+
+
+### 🐛 Bug Fixes
+
+* **openclaw:** add RBAC and kubectl for kaniko sidecar exec ([#4376](https://github.com/5dlabs/cto/issues/4376)) ([9e20498](https://github.com/5dlabs/cto/commit/9e204985e537c95f96fc988a0b5fc618fe58d84e))
+
+## [0.2.44](https://github.com/5dlabs/cto/compare/v0.2.43...v0.2.44) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** add kaniko container-builds skill ([#4374](https://github.com/5dlabs/cto/issues/4374)) ([8121730](https://github.com/5dlabs/cto/commit/8121730e4dfd64b0e3ed0f842f59f6d29f0713cb))
+
+
+### 🐛 Bug Fixes
+
+* **loki:** switch from SeaweedFS S3 to filesystem storage ([#4373](https://github.com/5dlabs/cto/issues/4373)) ([818d568](https://github.com/5dlabs/cto/commit/818d568898746c1d6e7ebe74f889c164b33f7546))
+* **openclaw:** correct Loki URL and add informational pod labels ([#4370](https://github.com/5dlabs/cto/issues/4370)) ([4fe5ce5](https://github.com/5dlabs/cto/commit/4fe5ce5d2ba9aa0d9826dd688d4301e69c9f4dda))
+* **openclaw:** move info fields from labels to pod annotations ([#4372](https://github.com/5dlabs/cto/issues/4372)) ([767fc77](https://github.com/5dlabs/cto/commit/767fc776a443a1aa077ee9fb1c4450da3e483cec))
+
+## [0.2.43](https://github.com/5dlabs/cto/compare/v0.2.42...v0.2.43) (2026-02-07)
+
+
+### 🐛 Bug Fixes
+
+* **openclaw:** correct kaniko debug image tag to :debug ([#4369](https://github.com/5dlabs/cto/issues/4369)) ([dbd08aa](https://github.com/5dlabs/cto/commit/dbd08aaa70257ea87b4e664fa4b8d7a6a1d874b2))
+* **openclaw:** correct repoURL and chart path in ArgoCD applications ([#4365](https://github.com/5dlabs/cto/issues/4365)) ([29e64cd](https://github.com/5dlabs/cto/commit/29e64cdac81396de4ec377c4c557a549bb1838e7))
+* **openclaw:** remove unsupported config keys and fix kaniko sidecar ([#4367](https://github.com/5dlabs/cto/issues/4367)) ([91f70ea](https://github.com/5dlabs/cto/commit/91f70eaf547cfcc25af9d4b321b22c167a695f4c))
+
+## [0.2.42](https://github.com/5dlabs/cto/compare/v0.2.41...v0.2.42) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** memory optimization, group:memory allowlists, heartbeat autonomy ([#4362](https://github.com/5dlabs/cto/issues/4362)) ([1916f07](https://github.com/5dlabs/cto/commit/1916f073ca5195eac1ab6d8d803c9b863ffa7fe4))
+
+## [0.2.41](https://github.com/5dlabs/cto/compare/v0.2.40...v0.2.41) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** Phase 2 golden copy — unified image, tools, skills, secrets ([#4358](https://github.com/5dlabs/cto/issues/4358)) ([04c78d0](https://github.com/5dlabs/cto/commit/04c78d09852c840bdc40b1ec7c988c16dfacd2ea))
+
+
+### ♻️ Refactoring
+
+* organize research docs and add Grok MCP server ([#4359](https://github.com/5dlabs/cto/issues/4359)) ([7aae2a2](https://github.com/5dlabs/cto/commit/7aae2a2e934fd6c219161c57477a2690148331be))
+
+## [0.2.40](https://github.com/5dlabs/cto/compare/v0.2.39...v0.2.40) (2026-02-06)
+
+
+### ✨ Features
+
+* **agents:** add OpenClaw image to agent builds Add ([92176c4](https://github.com/5dlabs/cto/commit/92176c40f3b42dec2dd8c517c041d89a93fccb2c))
+* **agents:** enable dexter agent build ([1d2b036](https://github.com/5dlabs/cto/commit/1d2b0361f97518d6b44f3bf3d80a8f7543f33e82))
+* **clawd:** add clawd agent configuration and identity ([#4349](https://github.com/5dlabs/cto/issues/4349)) ([f0a03a9](https://github.com/5dlabs/cto/commit/f0a03a9853fb20d66f5fe23a35a70181a58fe1b7))
+* **cupid:** add cupid agent configuration and identity ([#4347](https://github.com/5dlabs/cto/issues/4347)) ([18da541](https://github.com/5dlabs/cto/commit/18da541cbc58aca9114aa0b380931f2991d9eace))
+* **keeper:** keeper agent configuration and identity ([#4355](https://github.com/5dlabs/cto/issues/4355)) ([0f22793](https://github.com/5dlabs/cto/commit/0f22793c00027fe239d86976f83fb3b2204c1120))
+* **marketing:** add managed services tech stack section ([#4357](https://github.com/5dlabs/cto/issues/4357)) ([d46b956](https://github.com/5dlabs/cto/commit/d46b956a9e31ead7809fc7ca8a4fbadf3e441052))
+* **openclaw:** deploy OpenClaw agents to Kubernetes in bots namespace ([#4335](https://github.com/5dlabs/cto/issues/4335)) ([d21537d](https://github.com/5dlabs/cto/commit/d21537dbe8262b22c0598f3ff2f26dbe18fbd107))
+* **openclaw:** use npm package instead of source build ([1126503](https://github.com/5dlabs/cto/commit/1126503e8482f8e39b7f326dab1bf50583ff887b))
+* **pixel-assistant:** add pixel-assistant agent configuration ([#4353](https://github.com/5dlabs/cto/issues/4353)) ([35bbccb](https://github.com/5dlabs/cto/commit/35bbccb4dd936f0a9b13faa465d1c0fd4b3861c2))
+* **review:** add review agent configuration and identity ([#4352](https://github.com/5dlabs/cto/issues/4352)) ([ce122e9](https://github.com/5dlabs/cto/commit/ce122e909968f8304d0a2c2769a52524e11a8cd8))
+* **scout:** add scout agent configuration and identity ([#4344](https://github.com/5dlabs/cto/issues/4344)) ([2cb26cd](https://github.com/5dlabs/cto/commit/2cb26cd1221f9639945588dc5a08a47feb27bb95))
+* **webapp:** add webapp agent configuration and identity ([#4354](https://github.com/5dlabs/cto/issues/4354)) ([d0ef4c4](https://github.com/5dlabs/cto/commit/d0ef4c4cf851cc3d02bea1cf001dd089af36720e))
+
+
+### 🐛 Bug Fixes
+
+* **agents:** fix unbound variable error in build-runtime ([aba9bd7](https://github.com/5dlabs/cto/commit/aba9bd785471b03cfd5b8e970b3e0d88f20f2da3))
+* **openclaw:** fix version extraction from release name ([4db156b](https://github.com/5dlabs/cto/commit/4db156b804c9fb737143c445a9e4b06ab8152c23))
+* **openclaw:** use correct URL format for OpenClaw releases ([a7d9e28](https://github.com/5dlabs/cto/commit/a7d9e28c35a4a34c827c0be53713129203f33954))
+* **release:** add play-monitor binary to release artifacts ([563059d](https://github.com/5dlabs/cto/commit/563059d2443a5805163a9a4e69255a0b1f0bba0a))
+
 ## [0.2.39](https://github.com/5dlabs/cto/compare/v0.2.38...v0.2.39) (2026-02-05)
 
 

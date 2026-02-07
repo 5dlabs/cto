@@ -1,0 +1,104 @@
+{{- if .Values.grok.enabled }}
+---
+# PersistentVolumeClaim for grok research data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grok-data
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    app.kubernetes.io/name: grok-data
+    app.kubernetes.io/part-of: grok
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.grok.persistence.size | default "5Gi" }}
+  storageClassName: {{ .Values.grok.persistence.storageClass | default .Values.global.storageClass | default "mayastor" }}
+
+---
+# ServiceAccount for grok CronJob
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grok
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    app.kubernetes.io/name: grok
+    app.kubernetes.io/part-of: grok
+
+---
+# CronJob that searches X via Grok API for CTO-relevant content
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: grok-research
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    app.kubernetes.io/name: grok-research
+    app.kubernetes.io/part-of: grok
+spec:
+  schedule: {{ .Values.grok.schedule | default "0 */6 * * *" | quote }}
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: {{ .Values.grok.activeDeadlineSeconds | default 1800 }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: grok-research
+        spec:
+          serviceAccountName: grok
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          restartPolicy: OnFailure
+          {{- include "cto.imagePullSecrets" . | nindent 10 }}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.kubernetes.io/control-plane
+                        operator: DoesNotExist
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: grok-data
+          containers:
+            - name: grok
+              image: "{{ include "cto.imageRef" (dict "component" "grok" "image" .Values.grok.image "global" .Values.global) }}"
+              imagePullPolicy: {{ include "cto.imagePullPolicy" (dict "image" .Values.grok.image "global" .Values.global) }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+              {{- with .Values.grok.args }}
+              args:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+              env:
+                - name: GROK_OUTPUT_DIR
+                  value: /data
+                - name: XAI_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cto-secrets
+                      key: XAI_API_KEY
+              resources:
+                {{- toYaml .Values.grok.resources | nindent 16 }}
+{{- end }}

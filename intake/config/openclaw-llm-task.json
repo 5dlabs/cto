@@ -1,0 +1,31 @@
+{
+  "plugins": {
+    "entries": {
+      "llm-task": {
+        "enabled": true,
+        "config": {
+          "defaultProvider": "anthropic",
+          "defaultModel": "claude-sonnet-4-20250514",
+          "allowedModels": [
+            "anthropic/claude-sonnet-4-20250514",
+            "anthropic/claude-haiku-4-20250514",
+            "openai/gpt-4.1",
+            "openai/o3-mini",
+            "minimax/minimax-01"
+          ],
+          "maxTokens": 16000,
+          "timeoutMs": 120000
+        }
+      },
+      "lobster": { "enabled": true }
+    }
+  },
+  "agents": {
+    "list": [
+      {
+        "id": "intake",
+        "tools": { "allow": ["llm-task", "lobster"] }
+      }
+    ]
+  }
+}
