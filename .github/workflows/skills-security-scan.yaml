@@ -39,7 +39,7 @@ jobs:
             .factory/skills \
             templates/skills \
             /tmp/openclaw-skills-scan \
-            > scan-results.json 2>&1 || true
+            > scan-results.json || true
           cat scan-results.json
 
       - name: Check for critical findings
