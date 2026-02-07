@@ -1,0 +1,162 @@
+[
+  {
+    "id": 1,
+    "title": "Set up database schema (Rex - Rust/SQLx)",
+    "description": "Design and implement the core database schema for user management.",
+    "status": "pending",
+    "dependencies": [],
+    "priority": "high",
+    "details": "Create migrations for users, roles, and permissions tables. Use SQLx for compile-time query checking.",
+    "test_strategy": "Run migrations against test database; verify schema matches expected structure",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Create users table migration",
+        "description": "SQL migration for the users table with email, password_hash, created_at columns.",
+        "status": "pending",
+        "dependencies": [],
+        "details": "Include unique constraint on email, NOT NULL on required fields.",
+        "test_strategy": "Insert test user, verify constraints.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Create roles table migration",
+        "description": "SQL migration for roles and user_roles junction table.",
+        "status": "pending",
+        "dependencies": [1],
+        "details": "Roles: admin, editor, viewer. Junction table with composite primary key.",
+        "test_strategy": "Verify role assignment and cascade deletes.",
+        "subagent_type": "implementer",
+        "parallelizable": false
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "dp-1-1",
+        "category": "data-model",
+        "description": "UUID vs auto-increment for primary keys",
+        "options": ["UUID v7 - sortable, no collisions", "Auto-increment - simpler, faster joins"],
+        "requires_approval": true,
+        "constraint_type": "hard"
+      },
+      {
+        "id": "dp-1-2",
+        "category": "architecture",
+        "description": "Soft delete vs hard delete for user records",
+        "options": ["Soft delete with deleted_at column", "Hard delete with audit log table"],
+        "requires_approval": false,
+        "constraint_type": "soft"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "title": "Implement authentication service (Grizz - Go/JWT)",
+    "description": "Build JWT-based authentication with refresh token rotation.",
+    "status": "pending",
+    "dependencies": [1],
+    "priority": "high",
+    "details": "Use RS256 signing. Access tokens expire in 15 minutes, refresh tokens in 7 days. Store refresh tokens in database.",
+    "test_strategy": "Test token generation, validation, expiry; test refresh rotation",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Create JWT signing module",
+        "description": "Module for generating and validating JWTs with RS256.",
+        "status": "pending",
+        "dependencies": [],
+        "details": "Load RSA keys from environment. Support key rotation via kid header.",
+        "test_strategy": "Verify token claims, expiry, and signature validation.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Implement refresh token storage",
+        "description": "Database-backed refresh token storage with rotation tracking.",
+        "status": "pending",
+        "dependencies": [1],
+        "details": "Track token family for rotation detection. Revoke entire family on reuse.",
+        "test_strategy": "Test rotation, reuse detection, family revocation.",
+        "subagent_type": "implementer",
+        "parallelizable": false
+      },
+      {
+        "id": 3,
+        "title": "Add login and logout endpoints",
+        "description": "HTTP handlers for login, logout, and token refresh.",
+        "status": "pending",
+        "dependencies": [1, 2],
+        "details": "POST /auth/login, POST /auth/logout, POST /auth/refresh.",
+        "test_strategy": "Integration tests for each endpoint with valid and invalid credentials.",
+        "subagent_type": "implementer",
+        "parallelizable": false
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "dp-2-1",
+        "category": "security",
+        "description": "Token storage strategy on client side",
+        "options": ["HTTP-only cookies - XSS safe", "LocalStorage - simpler SPA integration", "In-memory only - most secure but lost on refresh"],
+        "requires_approval": true,
+        "constraint_type": "hard"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "title": "Build user management API (Grizz - Go/REST)",
+    "description": "CRUD API for user profiles with role-based access control.",
+    "status": "pending",
+    "dependencies": [1, 2],
+    "priority": "medium",
+    "details": "RESTful endpoints: GET/POST/PUT/DELETE /api/users. Admin-only for create and delete. Users can update own profile.",
+    "test_strategy": "Test RBAC enforcement; test CRUD operations; test pagination",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Implement user CRUD handlers",
+        "description": "HTTP handlers for user create, read, update, delete.",
+        "status": "pending",
+        "dependencies": [],
+        "details": "Use repository pattern. Return 404 for missing users, 409 for duplicate email.",
+        "test_strategy": "Unit tests for each handler with mocked repository.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "title": "Implement audit logging (Blaze - TypeScript/React)",
+    "description": "Create an audit log dashboard showing user actions and system events.",
+    "status": "pending",
+    "dependencies": [2, 3],
+    "priority": "low",
+    "details": "Display sortable, filterable table of audit events. Include timestamp, actor, action, and resource columns.",
+    "test_strategy": "Verify table renders with mock data; test sorting and filtering"
+  },
+  {
+    "id": 5,
+    "title": "Write integration test suite (Tess - Testing)",
+    "description": "End-to-end test suite covering authentication and user management flows.",
+    "status": "pending",
+    "dependencies": [1, 2, 3, 4],
+    "priority": "medium",
+    "details": "Use test containers for database. Cover happy path and error scenarios for all endpoints.",
+    "test_strategy": "All tests must pass in CI; coverage target 80%",
+    "decision_points": [
+      {
+        "id": "dp-5-1",
+        "category": "performance",
+        "description": "Test parallelization strategy",
+        "options": ["Parallel with isolated databases per test", "Sequential with shared database and cleanup"],
+        "requires_approval": false,
+        "constraint_type": "open"
+      }
+    ]
+  }
+]
