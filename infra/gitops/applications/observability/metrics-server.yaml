@@ -56,6 +56,9 @@ spec:
           enabled: true
           minAvailable: 1
 
+        # Override the default containerPort to match our custom secure-port
+        containerPort: 4443
+
         # Metrics server arguments
         args:
           - --secure-port=4443
@@ -68,6 +71,9 @@ spec:
           - --kubelet-insecure-tls
           # Increase timeout for kubelet scraping (default 10s is too tight for busy nodes)
           - --kubelet-request-timeout=30s
+
+        # Override default args to prevent the chart from also setting --secure-port=10250
+        defaultArgs: []
 
         # Service monitor for Prometheus-compatible monitoring
         serviceMonitor:
