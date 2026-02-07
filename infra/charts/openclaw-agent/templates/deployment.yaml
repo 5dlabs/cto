@@ -258,6 +258,41 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: github-pat
                   optional: true
+            {{- if .Values.cloudProviders.bedrock.enabled }}
+            # AWS Bedrock credentials (used by OpenClaw gateway + Claude Code CLI)
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: aws-access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: aws-secret-access-key
+                  optional: true
+            - name: AWS_REGION
+              value: {{ .Values.cloudProviders.bedrock.region | quote }}
+            {{- end }}
+            {{- if .Values.cloudProviders.vertex.enabled }}
+            # GCP Vertex AI credentials
+            - name: CLOUD_ML_REGION
+              value: {{ .Values.cloudProviders.vertex.region | quote }}
+            - name: ANTHROPIC_VERTEX_PROJECT_ID
+              value: {{ .Values.cloudProviders.vertex.projectId | quote }}
+            {{- end }}
+            {{- if .Values.cloudProviders.foundry.enabled }}
+            # Microsoft Foundry credentials
+            - name: ANTHROPIC_FOUNDRY_RESOURCE
+              value: {{ .Values.cloudProviders.foundry.resource | quote }}
+            - name: ANTHROPIC_FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: foundry-api-key
+                  optional: true
+            {{- end }}
           volumeMounts:
             - name: workspace
               mountPath: /workspace
@@ -371,6 +406,41 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: op-service-account-token
                   optional: true
+            {{- if .Values.cloudProviders.bedrock.enabled }}
+            # AWS Bedrock credentials (used by OpenClaw gateway + Claude Code CLI)
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: aws-access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: aws-secret-access-key
+                  optional: true
+            - name: AWS_REGION
+              value: {{ .Values.cloudProviders.bedrock.region | quote }}
+            {{- end }}
+            {{- if .Values.cloudProviders.vertex.enabled }}
+            # GCP Vertex AI credentials
+            - name: CLOUD_ML_REGION
+              value: {{ .Values.cloudProviders.vertex.region | quote }}
+            - name: ANTHROPIC_VERTEX_PROJECT_ID
+              value: {{ .Values.cloudProviders.vertex.projectId | quote }}
+            {{- end }}
+            {{- if .Values.cloudProviders.foundry.enabled }}
+            # Microsoft Foundry credentials
+            - name: ANTHROPIC_FOUNDRY_RESOURCE
+              value: {{ .Values.cloudProviders.foundry.resource | quote }}
+            - name: ANTHROPIC_FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: foundry-api-key
+                  optional: true
+            {{- end }}
           ports:
             - name: gateway
               containerPort: {{ .Values.gateway.port }}

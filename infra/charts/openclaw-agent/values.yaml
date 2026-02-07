@@ -457,6 +457,59 @@ telemetry:
       memory: "128Mi"
 
 # =============================================================================
+# Cloud Provider Configuration
+# =============================================================================
+# Configure cloud-specific model providers (Bedrock, Vertex AI, Foundry).
+# When a cloud provider is enabled, its models and credentials are injected
+# into both the OpenClaw gateway (openclaw.json) and Claude Code CLI sessions.
+# Only one cloud provider should be enabled at a time.
+cloudProviders:
+  # -- Amazon Bedrock (Claude via AWS)
+  bedrock:
+    enabled: true
+    region: "us-east-2"
+    # OpenClaw gateway provider config (renders into openclaw.json models.providers)
+    openclaw:
+      api: "bedrock-converse-stream"
+      auth: "aws-sdk"
+      models:
+        - id: "us.anthropic.claude-opus-4-6-v1:0"
+          name: "Claude Opus 4.6 (Bedrock)"
+          reasoning: true
+          input: ["text", "image"]
+          contextWindow: 200000
+          maxTokens: 8192
+        - id: "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+          name: "Claude Sonnet 4.5 (Bedrock)"
+        - id: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+          name: "Claude Haiku 4.5 (Bedrock)"
+    # Claude Code CLI env vars (renders into settings.json env block)
+    claudeCode:
+      model: "global.anthropic.claude-opus-4-6-v1"
+      opusModel: "global.anthropic.claude-opus-4-6-v1"
+      sonnetModel: "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+      haikuModel: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+      subagentModel: "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+  # -- Google Vertex AI (Claude via GCP)
+  vertex:
+    enabled: false
+    region: "global"
+    projectId: ""
+    claudeCode:
+      model: ""
+      sonnetModel: ""
+      haikuModel: ""
+
+  # -- Microsoft Foundry (Claude via Azure)
+  foundry:
+    enabled: false
+    resource: ""
+    apiKeySecret: ""
+    claudeCode:
+      model: ""
+
+# =============================================================================
 # NATS Inter-Agent Messaging
 # =============================================================================
 # Enables cross-pod agent communication via NATS publish/subscribe.

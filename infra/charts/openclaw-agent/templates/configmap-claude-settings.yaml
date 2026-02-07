@@ -35,6 +35,31 @@ data:
         {{- if .Values.claudeCode.agentTeams.enabled }}
         "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
         {{- end }}
+        {{- if .Values.cloudProviders.bedrock.enabled }}
+        "CLAUDE_CODE_USE_BEDROCK": "1",
+        "AWS_REGION": {{ .Values.cloudProviders.bedrock.region | quote }},
+        "AWS_PROFILE": "default",
+        "ANTHROPIC_MODEL": {{ .Values.cloudProviders.bedrock.claudeCode.model | quote }},
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": {{ .Values.cloudProviders.bedrock.claudeCode.opusModel | quote }},
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": {{ .Values.cloudProviders.bedrock.claudeCode.sonnetModel | quote }},
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": {{ .Values.cloudProviders.bedrock.claudeCode.haikuModel | quote }},
+        "CLAUDE_CODE_SUBAGENT_MODEL": {{ .Values.cloudProviders.bedrock.claudeCode.subagentModel | quote }},
+        {{- end }}
+        {{- if .Values.cloudProviders.vertex.enabled }}
+        "CLAUDE_CODE_USE_VERTEX": "1",
+        "CLOUD_ML_REGION": {{ .Values.cloudProviders.vertex.region | quote }},
+        "ANTHROPIC_VERTEX_PROJECT_ID": {{ .Values.cloudProviders.vertex.projectId | quote }},
+        {{- if .Values.cloudProviders.vertex.claudeCode.model }}
+        "ANTHROPIC_MODEL": {{ .Values.cloudProviders.vertex.claudeCode.model | quote }},
+        {{- end }}
+        {{- end }}
+        {{- if .Values.cloudProviders.foundry.enabled }}
+        "CLAUDE_CODE_USE_FOUNDRY": "1",
+        "ANTHROPIC_FOUNDRY_RESOURCE": {{ .Values.cloudProviders.foundry.resource | quote }},
+        {{- if .Values.cloudProviders.foundry.claudeCode.model }}
+        "ANTHROPIC_MODEL": {{ .Values.cloudProviders.foundry.claudeCode.model | quote }},
+        {{- end }}
+        {{- end }}
         "DISABLE_AUTOUPDATER": "1",
         "DISABLE_TELEMETRY": {{ .Values.claudeCode.disableTelemetry | ternary "\"1\"" "\"0\"" }}
       }

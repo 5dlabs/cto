@@ -170,6 +170,14 @@ data:
           }
           {{- $first = false }}
           {{- end }}
+          {{- if .Values.cloudProviders.bedrock.enabled }},
+          "amazon-bedrock": {
+            "api": {{ .Values.cloudProviders.bedrock.openclaw.api | quote }},
+            "auth": {{ .Values.cloudProviders.bedrock.openclaw.auth | quote }},
+            "baseUrl": "https://bedrock-runtime.{{ .Values.cloudProviders.bedrock.region }}.amazonaws.com",
+            "models": {{ .Values.cloudProviders.bedrock.openclaw.models | toJson }}
+          }
+          {{- end }}
         }
       },
       "session": {
