@@ -282,7 +282,7 @@ tools:
 # The agent writes a Dockerfile to /workspace and execs into the sidecar to build.
 kaniko:
   enabled: true
-  image: gcr.io/kaniko-project/executor:latest-debug
+  image: gcr.io/kaniko-project/executor:debug
   # Registry to push built images
   registry: "ghcr.io/5dlabs"
   # Cache repo for layer caching
