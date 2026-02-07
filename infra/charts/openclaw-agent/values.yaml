@@ -447,7 +447,7 @@ telemetry:
   enabled: true
   promtail:
     image: grafana/promtail:latest
-    lokiUrl: "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+    lokiUrl: "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
   resources:
     requests:
       cpu: "50m"
