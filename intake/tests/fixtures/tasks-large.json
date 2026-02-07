@@ -1,0 +1,434 @@
+[
+  {
+    "id": 1,
+    "title": "Initialize monorepo structure (Bolt - DevOps/Turborepo)",
+    "description": "Set up a Turborepo-based monorepo with shared packages and applications.",
+    "status": "done",
+    "dependencies": [],
+    "priority": "high",
+    "details": "Create apps/ and packages/ directories. Configure turbo.json with build, test, and lint pipelines. Add root tsconfig.json with path aliases.",
+    "test_strategy": "Verify turbo build succeeds; verify workspace resolution works across packages",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Create root configuration files",
+        "description": "Set up turbo.json, root package.json with workspaces, and base tsconfig.",
+        "status": "done",
+        "dependencies": [],
+        "details": "Use pnpm workspaces. Set turbo cache to local only for now.",
+        "test_strategy": "Run turbo build from root, verify it discovers all workspaces.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Configure shared ESLint and Prettier",
+        "description": "Create shared lint configuration package used by all workspaces.",
+        "status": "done",
+        "dependencies": [1],
+        "details": "packages/eslint-config with flat config format. Include TypeScript, React, and Node.js rule sets.",
+        "test_strategy": "Run lint across all workspaces, verify no config errors.",
+        "subagent_type": "implementer",
+        "parallelizable": false
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "dp-1-1",
+        "category": "architecture",
+        "description": "Package manager selection for monorepo",
+        "options": ["pnpm - fast, disk efficient", "yarn berry - plug-n-play", "npm - most compatible"],
+        "requires_approval": false,
+        "constraint_type": "soft"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "title": "Create shared UI component library (Blaze - TypeScript/React)",
+    "description": "Build a design system with reusable React components using Tailwind CSS.",
+    "status": "in_progress",
+    "dependencies": [1],
+    "priority": "high",
+    "details": "Create packages/ui with Button, Input, Modal, Table, and Card components. Use Radix UI primitives. Export both ESM and CJS.",
+    "test_strategy": "Storybook visual tests for each component; unit tests for interactive behavior",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Set up component library scaffold",
+        "description": "Initialize the UI package with build tooling and Storybook.",
+        "status": "done",
+        "dependencies": [],
+        "details": "Use tsup for building. Configure Storybook 8 with Vite builder.",
+        "test_strategy": "Verify build outputs ESM and CJS; Storybook launches without errors.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Implement Button component",
+        "description": "Fully styled Button with variants: primary, secondary, ghost, destructive.",
+        "status": "in_progress",
+        "dependencies": [1],
+        "details": "Support size variants (sm, md, lg), loading state, disabled state, and icon slots.",
+        "test_strategy": "Test all variant combinations render correctly; test click handlers fire.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 3,
+        "title": "Implement Modal component",
+        "description": "Accessible modal dialog built on Radix Dialog primitive.",
+        "status": "pending",
+        "dependencies": [1],
+        "details": "Support title, description, close button, and custom content. Trap focus. Close on Escape.",
+        "test_strategy": "Test focus trapping, keyboard navigation, and aria attributes.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "dp-2-1",
+        "category": "ux-behavior",
+        "description": "CSS framework for component styling",
+        "options": ["Tailwind CSS - utility first", "CSS Modules - scoped by default", "Vanilla Extract - type-safe CSS"],
+        "requires_approval": true,
+        "constraint_type": "hard"
+      },
+      {
+        "id": "dp-2-2",
+        "category": "api-design",
+        "description": "Component API style",
+        "options": ["Compound components pattern", "Single component with many props", "Headless with render props"],
+        "requires_approval": false,
+        "constraint_type": "open"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "title": "Set up PostgreSQL with migrations (Rex - Rust/SQLx)",
+    "description": "Configure PostgreSQL database with migration system and connection pooling.",
+    "status": "pending",
+    "dependencies": [1],
+    "priority": "high",
+    "details": "Use SQLx CLI for migrations. Configure connection pool with min 2, max 10 connections. Add health check query.",
+    "test_strategy": "Verify migrations run forward and backward cleanly; test pool exhaustion handling"
+  },
+  {
+    "id": 4,
+    "title": "Build GraphQL API gateway (Grizz - Go/gqlgen)",
+    "description": "Implement a GraphQL API gateway that federates multiple backend services.",
+    "status": "pending",
+    "dependencies": [1, 3],
+    "priority": "high",
+    "details": "Use gqlgen for type-safe GraphQL. Implement dataloaders for N+1 prevention. Add query complexity analysis.",
+    "test_strategy": "Test each resolver; test dataloader batching; test complexity limits",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Define GraphQL schema",
+        "description": "Write .graphql schema files for User, Post, and Comment types.",
+        "status": "pending",
+        "dependencies": [],
+        "details": "Include Query and Mutation root types. Add pagination with cursor-based connections.",
+        "test_strategy": "Schema validation passes; introspection returns expected types.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Implement resolvers with dataloaders",
+        "description": "Write resolvers for all types with dataloader integration.",
+        "status": "pending",
+        "dependencies": [1],
+        "details": "Use per-request dataloader instances. Batch user lookups and post lookups.",
+        "test_strategy": "Verify batching reduces queries; test with concurrent requests.",
+        "subagent_type": "implementer",
+        "parallelizable": false
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "dp-4-1",
+        "category": "architecture",
+        "description": "GraphQL execution strategy",
+        "options": ["Schema-first with gqlgen", "Code-first with graphql-go", "Federation with Apollo Router"],
+        "requires_approval": true,
+        "constraint_type": "hard"
+      },
+      {
+        "id": "dp-4-2",
+        "category": "performance",
+        "description": "Query complexity limiting approach",
+        "options": ["Static analysis at parse time", "Runtime tracking with budget", "Both with configurable thresholds"],
+        "requires_approval": false,
+        "constraint_type": "soft"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "title": "Implement event sourcing system (Rex - Rust/Tokio)",
+    "description": "Build an event store with append-only log and projection rebuilding.",
+    "status": "pending",
+    "dependencies": [3],
+    "priority": "medium",
+    "details": "Events stored in PostgreSQL with JSONB payload. Support snapshots every 100 events. Implement async projection workers.",
+    "test_strategy": "Test event append, replay, snapshot creation; test projection consistency",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Create event store module",
+        "description": "Core event store with append, read, and snapshot operations.",
+        "status": "pending",
+        "dependencies": [],
+        "details": "Use advisory locks for aggregate-level concurrency. Store events with version numbers.",
+        "test_strategy": "Test concurrent appends; verify ordering guarantees.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Build projection engine",
+        "description": "Async workers that process events and build read models.",
+        "status": "pending",
+        "dependencies": [1],
+        "details": "Support checkpoint-based resumption. Handle projection failures with dead letter queue.",
+        "test_strategy": "Test checkpoint persistence; test failure recovery.",
+        "subagent_type": "implementer",
+        "parallelizable": false
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "dp-5-1",
+        "category": "data-model",
+        "description": "Event serialization format",
+        "options": ["JSON - human readable, flexible schema", "Protobuf - compact, schema evolution", "MessagePack - fast, compact"],
+        "requires_approval": false,
+        "constraint_type": "open"
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "title": "Create CLI tool for operations (Grizz - Go/Cobra)",
+    "description": "Build a CLI tool for database management, migrations, and service health checks.",
+    "status": "blocked",
+    "dependencies": [3, 4],
+    "priority": "medium",
+    "details": "Use Cobra for command structure. Subcommands: db migrate, db seed, health check, config validate.",
+    "test_strategy": "Test each subcommand with captured stdout; test error exit codes",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Scaffold Cobra CLI structure",
+        "description": "Set up root command with version flag and subcommand registration.",
+        "status": "pending",
+        "dependencies": [],
+        "details": "Use persistent flags for --config and --verbose. Add bash completion generation.",
+        "test_strategy": "Verify help output; test flag parsing.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "title": "Build real-time notification service (Blaze - TypeScript/WebSocket)",
+    "description": "WebSocket-based notification service with channel subscriptions and presence.",
+    "status": "pending",
+    "dependencies": [2, 4],
+    "priority": "medium",
+    "details": "Use ws library with Redis pub/sub for horizontal scaling. Support user channels, topic channels, and broadcast.",
+    "test_strategy": "Test connection lifecycle; test message delivery; test reconnection handling",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Implement WebSocket server",
+        "description": "Core WebSocket server with authentication and heartbeat.",
+        "status": "pending",
+        "dependencies": [],
+        "details": "Authenticate via JWT in connection upgrade. Send ping every 30s, disconnect after 3 missed pongs.",
+        "test_strategy": "Test auth rejection; test heartbeat timeout.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Add Redis pub/sub integration",
+        "description": "Bridge WebSocket channels to Redis pub/sub for multi-instance support.",
+        "status": "pending",
+        "dependencies": [1],
+        "details": "Each server instance subscribes to relevant Redis channels. Fan out messages to local WebSocket connections.",
+        "test_strategy": "Test cross-instance message delivery with two server instances.",
+        "subagent_type": "implementer",
+        "parallelizable": false
+      },
+      {
+        "id": 3,
+        "title": "Implement presence tracking",
+        "description": "Track online/offline status and last-seen timestamps.",
+        "status": "pending",
+        "dependencies": [1, 2],
+        "details": "Use Redis sorted sets with TTL for presence. Broadcast presence changes to subscribers.",
+        "test_strategy": "Test presence updates on connect/disconnect; test TTL expiry.",
+        "subagent_type": "researcher",
+        "parallelizable": false
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "dp-7-1",
+        "category": "architecture",
+        "description": "WebSocket library choice",
+        "options": ["ws - lightweight, performant", "Socket.IO - feature rich, auto-reconnect", "uWebSockets.js - highest performance"],
+        "requires_approval": false,
+        "constraint_type": "soft"
+      },
+      {
+        "id": "dp-7-2",
+        "category": "performance",
+        "description": "Message queue for guaranteed delivery",
+        "options": ["Redis Streams - built-in with pub/sub", "RabbitMQ - mature, feature rich", "In-memory with WAL - simplest"],
+        "requires_approval": true,
+        "constraint_type": "escalation"
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "title": "Implement rate limiting middleware (Grizz - Go/Redis)",
+    "description": "Token bucket rate limiter with per-user and per-IP limits.",
+    "status": "pending",
+    "dependencies": [4],
+    "priority": "low",
+    "details": "Use Redis for distributed rate limiting. Support configurable limits per endpoint. Return Retry-After header on 429.",
+    "test_strategy": "Test rate limit enforcement; test header values; test Redis failure fallback",
+    "decision_points": [
+      {
+        "id": "dp-8-1",
+        "category": "security",
+        "description": "Rate limit algorithm",
+        "options": ["Token bucket - smooth, bursty", "Sliding window - predictable", "Fixed window - simplest"],
+        "requires_approval": false,
+        "constraint_type": "open"
+      },
+      {
+        "id": "dp-8-2",
+        "category": "error-handling",
+        "description": "Behavior when Redis is unavailable",
+        "options": ["Fail open - allow all requests", "Fail closed - reject all requests", "Fallback to in-memory limiter"],
+        "requires_approval": true,
+        "constraint_type": "hard"
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "title": "Set up observability stack (Bolt - DevOps/Kubernetes)",
+    "description": "Deploy Prometheus, Grafana, and Loki for metrics, dashboards, and log aggregation.",
+    "status": "deferred",
+    "dependencies": [1, 4, 7],
+    "priority": "low",
+    "details": "Use Helm charts for deployment. Configure service discovery for Prometheus. Create default Grafana dashboards for API latency, error rates, and resource usage.",
+    "test_strategy": "Verify Prometheus scrapes all targets; verify Grafana dashboards load; verify Loki receives logs",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Deploy Prometheus with Helm",
+        "description": "Install kube-prometheus-stack with custom values.",
+        "status": "pending",
+        "dependencies": [],
+        "details": "Configure 15-day retention. Add service monitors for all application pods.",
+        "test_strategy": "Verify targets are UP in Prometheus UI.",
+        "subagent_type": "implementer",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Create Grafana dashboards",
+        "description": "Build dashboards for API, database, and infrastructure metrics.",
+        "status": "pending",
+        "dependencies": [1],
+        "details": "Use dashboard-as-code with grafana-operator. Include alert rules for SLOs.",
+        "test_strategy": "Import dashboards, verify panels render with test data.",
+        "subagent_type": "documenter",
+        "parallelizable": false
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "title": "Write end-to-end test suite (Tess - Testing/Playwright)",
+    "description": "Comprehensive E2E tests covering critical user journeys through the application.",
+    "status": "pending",
+    "dependencies": [2, 3, 4, 5, 7, 8],
+    "priority": "medium",
+    "details": "Use Playwright for browser automation. Test login flow, CRUD operations, real-time notifications, and error handling. Run in CI with retry on flaky tests.",
+    "test_strategy": "All E2E tests pass in CI; maximum 2% flake rate; tests complete under 5 minutes",
+    "subtasks": [
+      {
+        "id": 1,
+        "title": "Set up Playwright test infrastructure",
+        "description": "Configure Playwright with test fixtures, authentication helpers, and CI integration.",
+        "status": "pending",
+        "dependencies": [],
+        "details": "Use global setup for authenticated state. Configure 3 browser projects: chromium, firefox, webkit.",
+        "test_strategy": "Verify all 3 browsers launch and can navigate to the app.",
+        "subagent_type": "tester",
+        "parallelizable": true
+      },
+      {
+        "id": 2,
+        "title": "Write authentication flow tests",
+        "description": "E2E tests for login, logout, token refresh, and session expiry.",
+        "status": "pending",
+        "dependencies": [1],
+        "details": "Test valid login, invalid credentials, account lockout, password reset flow.",
+        "test_strategy": "Each test isolated with fresh user; verify redirect and token state.",
+        "subagent_type": "tester",
+        "parallelizable": true
+      },
+      {
+        "id": 3,
+        "title": "Write CRUD operation tests",
+        "description": "E2E tests for creating, reading, updating, and deleting resources.",
+        "status": "pending",
+        "dependencies": [1, 2],
+        "details": "Cover user profile CRUD, post CRUD, and comment CRUD. Test optimistic updates.",
+        "test_strategy": "Verify UI updates match API responses; test undo functionality.",
+        "subagent_type": "tester",
+        "parallelizable": false
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "dp-10-1",
+        "category": "performance",
+        "description": "Test parallelization strategy for CI",
+        "options": ["Shard across workers with shared database", "Fully isolated with per-test containers", "Sequential with fast cleanup"],
+        "requires_approval": false,
+        "constraint_type": "open"
+      },
+      {
+        "id": "dp-10-2",
+        "category": "architecture",
+        "description": "Test data management approach",
+        "options": ["Factory pattern with faker.js", "Static seed data with known IDs", "API-driven setup in beforeEach"],
+        "requires_approval": false,
+        "constraint_type": "soft"
+      },
+      {
+        "id": "dp-10-3",
+        "category": "ux-behavior",
+        "description": "Visual regression testing inclusion",
+        "options": ["Full visual regression with Percy", "Component-level snapshots only", "No visual regression - rely on unit tests"],
+        "requires_approval": true,
+        "constraint_type": "escalation"
+      }
+    ]
+  }
+]

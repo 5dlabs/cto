@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "generated-subtask.schema.json",
+  "title": "GeneratedSubtask",
+  "description": "A subtask generated from expanding a parent task.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "in_progress", "done", "blocked", "deferred"]
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "details": {
+      "type": "string"
+    },
+    "test_strategy": {
+      "type": "string"
+    },
+    "subagent_type": {
+      "type": "string",
+      "enum": ["implementer", "reviewer", "tester", "researcher", "documenter"]
+    },
+    "parallelizable": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "description",
+    "dependencies"
+  ],
+  "additionalProperties": false
+}

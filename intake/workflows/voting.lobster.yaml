@@ -1,0 +1,68 @@
+name: voting
+description: "5-model voting committee for task quality evaluation"
+inputs:
+  - name: content_to_evaluate
+    type: string
+  - name: evaluation_criteria
+    type: string
+
+steps:
+  - name: voter-1
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/vote-system.md}}",
+        "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
+        "schema": "{{schemas/vote-ballot.schema.json}}",
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514"
+      }'
+
+  - name: voter-2
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/vote-system.md}}",
+        "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
+        "schema": "{{schemas/vote-ballot.schema.json}}",
+        "provider": "openai",
+        "model": "gpt-4.1"
+      }'
+
+  - name: voter-3
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/vote-system.md}}",
+        "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
+        "schema": "{{schemas/vote-ballot.schema.json}}",
+        "provider": "anthropic",
+        "model": "claude-haiku-4-20250514"
+      }'
+
+  - name: voter-4
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/vote-system.md}}",
+        "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
+        "schema": "{{schemas/vote-ballot.schema.json}}",
+        "provider": "minimax",
+        "model": "minimax-01"
+      }'
+
+  - name: voter-5
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/vote-system.md}}",
+        "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
+        "schema": "{{schemas/vote-ballot.schema.json}}",
+        "provider": "openai",
+        "model": "o3-mini"
+      }'
+
+  - name: tally
+    command: >
+      intake-util tally --ballots-json <(echo '[
+        ${{ steps.voter-1.output }},
+        ${{ steps.voter-2.output }},
+        ${{ steps.voter-3.output }},
+        ${{ steps.voter-4.output }},
+        ${{ steps.voter-5.output }}
+      ]')

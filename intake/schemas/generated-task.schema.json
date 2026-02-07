@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "generated-task.schema.json",
+  "title": "GeneratedTaskArray",
+  "description": "An array of generated tasks from parse_prd output.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/generated_task"
+  },
+  "$defs": {
+    "generated_task": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in_progress", "done", "blocked", "deferred"]
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["high", "medium", "low"]
+        },
+        "details": {
+          "type": "string"
+        },
+        "test_strategy": {
+          "type": "string"
+        },
+        "subtasks": {
+          "type": "array",
+          "items": {
+            "$ref": "./generated-subtask.schema.json"
+          }
+        },
+        "decision_points": {
+          "type": "array",
+          "items": {
+            "$ref": "./decision-point.schema.json"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "dependencies"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
