@@ -3,6 +3,25 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.46](https://github.com/5dlabs/cto/compare/v0.2.45...v0.2.46) (2026-02-07)
+
+
+### ✨ Features
+
+* **infra:** route GitHub webhooks directly to PM server ([#4384](https://github.com/5dlabs/cto/issues/4384)) ([0d145d8](https://github.com/5dlabs/cto/commit/0d145d83460350ec515375a3e48f66333548b5b1))
+* **intake:** Lobster intake migration with 5-model voting ([#4379](https://github.com/5dlabs/cto/issues/4379)) ([0c6b799](https://github.com/5dlabs/cto/commit/0c6b799b87f386fedbb9216c993bf0a76f2cf62b))
+
+
+### 🐛 Bug Fixes
+
+* **openclaw:** remove unsupported group:memory from agent tools allow lists ([#4386](https://github.com/5dlabs/cto/issues/4386)) ([0ad8144](https://github.com/5dlabs/cto/commit/0ad8144bd54e88549fb85ca2f771768fb7c67067))
+* **secrets:** update ExternalSecret with all 16 deployed bot tokens ([#4381](https://github.com/5dlabs/cto/issues/4381)) ([e1dfd3a](https://github.com/5dlabs/cto/commit/e1dfd3a3a1d37d60e53c78f276123bd0ee6ec31f))
+
+
+### 🔧 Maintenance
+
+* **openclaw:** remove pixel, scout, and pixel-assistant agents ([#4385](https://github.com/5dlabs/cto/issues/4385)) ([86e18d2](https://github.com/5dlabs/cto/commit/86e18d2a50479af921b3008afdf1aae45125a96a))
+
 ## [0.2.45](https://github.com/5dlabs/cto/compare/v0.2.44...v0.2.45) (2026-02-07)
 
 
