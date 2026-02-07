@@ -14,7 +14,7 @@ createNamespace: false
 image:
   repository: ghcr.io/5dlabs/openclaw
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 # -- Image pull secrets
 imagePullSecrets:

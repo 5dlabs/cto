@@ -58,11 +58,7 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     && echo "npm CLIs installed: claude, codex, code, gemini, openai"
 
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    if [ "$VERSION" = "latest" ]; then \
-        npm install -g openclaw; \
-    else \
-        npm install -g openclaw@${VERSION}; \
-    fi
+    npm install -g openclaw@${VERSION}
 
 # ---------------------------------------------------------------------------
 # Cursor Agent CLI - curl installer + system-wide placement
