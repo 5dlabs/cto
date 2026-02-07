@@ -455,3 +455,16 @@ telemetry:
     limits:
       cpu: "200m"
       memory: "128Mi"
+
+# =============================================================================
+# NATS Inter-Agent Messaging
+# =============================================================================
+# Enables cross-pod agent communication via NATS publish/subscribe.
+# Each agent subscribes to agent.<id>.inbox and agent.all.broadcast.
+# agentName defaults to agent.id — no per-agent override needed.
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  extraSubjects: []
+  reconnectWaitMs: 2000
+  maxReconnectAttempts: -1

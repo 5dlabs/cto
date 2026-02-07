@@ -1,0 +1,26 @@
+{{- if .Values.nats.enabled }}
+# =============================================================================
+# NATS Messenger Plugin (inter-agent messaging extension)
+# =============================================================================
+# Mounted into the init container at /nats-plugin-template/ and copied to
+# /workspace/.openclaw/extensions/nats-messenger/ during init.
+# npm install runs once; node_modules are cached on the PVC.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-nats-plugin
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nats-plugin
+data:
+  {{- $files := .Files.Glob "extensions/nats-messenger/*" }}
+  {{- if $files }}
+  {{- range $path, $content := $files }}
+  {{ base $path }}: |
+{{ $content | toString | indent 4 }}
+  {{- end }}
+  {{- else }}
+  _placeholder: "no plugin files found"
+  {{- end }}
+{{- end }}
