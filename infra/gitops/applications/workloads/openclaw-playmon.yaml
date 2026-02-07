@@ -1,0 +1,112 @@
+---
+# OpenClaw Agent: PlayMon
+# =============================================================================
+# Play workflow monitor — watches workflow execution, reports status, alerts.
+# Deploys as a single Pod with its own PVC in the 'bots' namespace.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openclaw-playmon
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: openclaw-playmon
+    app.kubernetes.io/part-of: openclaw
+    openclaw.io/agent: playmon
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/charts/openclaw-agent
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        namespace: bots
+        createNamespace: false
+
+        agent:
+          id: "playmon"
+          name: "PlayMon"
+          model: "anthropic/claude-opus-4-5"
+          heartbeat: "15m"
+          sandbox: "off"
+          tools:
+            allow:
+              - "group:fs"
+              - "group:runtime"
+              - "group:web"
+              - "group:memory"
+              - "browser"
+              - "group:sessions"
+
+        discord:
+          enabled: true
+          accountId: "playmon"
+          tokenSecretKey: "DISCORD_TOKEN_PLAYMON"
+          groupPolicy: "allowlist"
+          guilds:
+            "*":
+              requireMention: true
+              users:
+                - "444519104808878090"
+            "1409006087331512342":
+              requireMention: true
+              slug: "5dlabs"
+              channels:
+                "1409006087969177735":
+                  allow: true
+                  requireMention: true
+                "1445330230926381056":
+                  allow: true
+                  requireMention: true
+                "1467540094490640529":
+                  allow: true
+                  requireMention: true
+
+        workspace:
+          repos:
+            - name: cto
+              url: "https://github.com/5dlabs/cto.git"
+              branch: "main"
+              path: "repos/cto"
+
+        storage:
+          size: 10Gi
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bots
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+
+  revisionHistoryLimit: 5
