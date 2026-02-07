@@ -110,8 +110,23 @@ spec:
                 echo "[skills] ClawdStrike already present"
               fi
 
+              {{- if .Values.kaniko.enabled }}
               # ---------------------------------------------------------------
-              # 4d. Log directory setup
+              # 4d. kubectl (for kaniko sidecar exec)
+              # ---------------------------------------------------------------
+              if [ ! -f /workspace/.local/bin/kubectl ]; then
+                mkdir -p /workspace/.local/bin
+                curl -sLo /workspace/.local/bin/kubectl \
+                  "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
+                chmod +x /workspace/.local/bin/kubectl
+                echo "[tools] kubectl v1.31.0 installed"
+              else
+                echo "[tools] kubectl already present"
+              fi
+              {{- end }}
+
+              # ---------------------------------------------------------------
+              # 4e. Log directory setup
               # ---------------------------------------------------------------
               mkdir -p "$(dirname "{{ .Values.logging.file }}")"
               echo "[dirs] Log directory OK"
@@ -255,6 +270,7 @@ spec:
             - |
               cd /workspace
               export HOME=/workspace
+              export PATH="/workspace/.local/bin:$PATH"
               export OPENCLAW_CONFIG=/workspace/.openclaw/openclaw.json
               exec openclaw gateway
           env:
