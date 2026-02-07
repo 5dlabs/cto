@@ -34,6 +34,8 @@ pub struct Config {
     pub linear: Arc<RwLock<LinearConfig>>,
     /// Skip webhook signature verification (for local development only).
     pub skip_signature_verification: bool,
+    /// GitHub webhook secret for HMAC-SHA256 signature verification.
+    pub github_webhook_secret: Option<String>,
 }
 
 // =============================================================================
@@ -355,6 +357,9 @@ impl Default for Config {
             skip_signature_verification: env::var("LINEAR_SKIP_SIGNATURE_VERIFICATION")
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),
+            github_webhook_secret: env::var("GITHUB_WEBHOOK_SECRET")
+                .ok()
+                .filter(|s| !s.is_empty()),
         }
     }
 }

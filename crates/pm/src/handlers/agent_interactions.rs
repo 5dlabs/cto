@@ -427,17 +427,35 @@ pub async fn handle_mention_webhook(
     // Extract nested payload (from Argo Events sensor)
     let inner_payload = payload.get("payload").unwrap_or(&payload);
 
-    // Detect event type: first try X-GitHub-Event from payload, then fall back to structure detection
-    let mention_source = inner_payload
+    handle_mention_webhook_impl(&state, inner_payload).await
+}
+
+/// Inner implementation for mention webhook (callable from unified handler).
+///
+/// Accepts raw GitHub event bytes (no Argo Events wrapping).
+pub async fn handle_mention_webhook_inner(
+    state: &CallbackState,
+    body: &[u8],
+) -> Result<Json<Value>, StatusCode> {
+    let payload: Value = serde_json::from_slice(body).map_err(|e| {
+        error!("Failed to parse mention payload: {}", e);
+        StatusCode::BAD_REQUEST
+    })?;
+    handle_mention_webhook_impl(state, &payload).await
+}
+
+/// Shared implementation for mention webhook processing.
+/// Detect the mention source event type from a GitHub webhook payload.
+fn detect_mention_source(payload: &Value) -> String {
+    payload
         .get("X-GitHub-Event")
         .and_then(|v| v.as_str())
         .map_or_else(
             || {
-                // Fall back to structure detection
-                if inner_payload.get("issue").is_some() && inner_payload.get("comment").is_some() {
+                if payload.get("issue").is_some() && payload.get("comment").is_some() {
                     "issue_comment".to_string()
-                } else if inner_payload.get("pull_request").is_some()
-                    && inner_payload.get("comment").is_some()
+                } else if payload.get("pull_request").is_some()
+                    && payload.get("comment").is_some()
                 {
                     "pull_request_review_comment".to_string()
                 } else {
@@ -445,46 +463,45 @@ pub async fn handle_mention_webhook(
                 }
             },
             String::from,
-        );
+        )
+}
 
-    info!(source = %mention_source, "Detected mention source");
-
-    // Determine PR context based on event type
-    let (pr_context, comment_body, comment_url) = match mention_source.as_str() {
+/// Extract PR context, comment body, and comment URL from a mention webhook payload.
+///
+/// Returns `None` if the comment is on an issue (not a PR).
+fn extract_mention_context(
+    source: &str,
+    payload: &Value,
+) -> Result<Option<(PrContext, String, String)>, StatusCode> {
+    match source {
         "issue_comment" => {
-            let event: IssueCommentPayload = serde_json::from_value(inner_payload.clone())
-                .map_err(|e| {
+            let event: IssueCommentPayload =
+                serde_json::from_value(payload.clone()).map_err(|e| {
                     error!("Failed to parse issue_comment payload: {}", e);
                     StatusCode::BAD_REQUEST
                 })?;
 
-            // Ensure this is a PR comment (not just an issue)
             if event.issue.pull_request.is_none() {
                 debug!("Comment is on issue, not PR - ignoring");
-                return Ok(Json(json!({
-                    "status": "ignored",
-                    "reason": "not a PR comment"
-                })));
+                return Ok(None);
             }
 
-            // We need to fetch PR details to get head SHA etc.
-            // For now, construct what we can from the issue
             let pr_context = PrContext {
                 number: event.issue.number,
                 title: event.issue.title.clone(),
                 repo_full_name: event.repository.full_name.clone(),
                 clone_url: event.repository.clone_url.clone(),
-                head_branch: String::new(), // Need to fetch from PR API
-                head_sha: String::new(),    // Need to fetch from PR API
-                base_branch: String::new(), // Need to fetch from PR API
+                head_branch: String::new(),
+                head_sha: String::new(),
+                base_branch: String::new(),
                 html_url: format!("{}/pull/{}", event.repository.html_url, event.issue.number),
             };
 
-            (pr_context, event.comment.body, event.comment.html_url)
+            Ok(Some((pr_context, event.comment.body, event.comment.html_url)))
         }
         "pull_request_review_comment" => {
-            let event: ReviewCommentPayload = serde_json::from_value(inner_payload.clone())
-                .map_err(|e| {
+            let event: ReviewCommentPayload =
+                serde_json::from_value(payload.clone()).map_err(|e| {
                     error!("Failed to parse review_comment payload: {}", e);
                     StatusCode::BAD_REQUEST
                 })?;
@@ -500,12 +517,29 @@ pub async fn handle_mention_webhook(
                 html_url: event.pull_request.html_url.clone(),
             };
 
-            (pr_context, event.comment.body, event.comment.html_url)
+            Ok(Some((pr_context, event.comment.body, event.comment.html_url)))
         }
         _ => {
-            warn!(source = %mention_source, "Unknown mention source");
-            return Err(StatusCode::BAD_REQUEST);
+            warn!(source = %source, "Unknown mention source");
+            Err(StatusCode::BAD_REQUEST)
         }
+    }
+}
+
+async fn handle_mention_webhook_impl(
+    state: &CallbackState,
+    inner_payload: &Value,
+) -> Result<Json<Value>, StatusCode> {
+    let mention_source = detect_mention_source(inner_payload);
+    info!(source = %mention_source, "Detected mention source");
+
+    let Some((pr_context, comment_body, comment_url)) =
+        extract_mention_context(&mention_source, inner_payload)?
+    else {
+        return Ok(Json(json!({
+            "status": "ignored",
+            "reason": "not a PR comment"
+        })));
     };
 
     // Parse mentions from comment
@@ -530,7 +564,7 @@ pub async fn handle_mention_webhook(
         );
 
         // Create CodeRun CR for this mention
-        match create_mention_coderun(&state, &mention, &pr_context, &comment_url).await {
+        match create_mention_coderun(state, &mention, &pr_context, &comment_url).await {
             Ok(run_name) => {
                 info!(run_name = %run_name, "Created CodeRun for mention");
                 created_runs.push(run_name);
@@ -549,7 +583,7 @@ pub async fn handle_mention_webhook(
     })))
 }
 
-/// Handle remediation button click webhook
+/// Handle remediation button click webhook (Axum handler).
 pub async fn handle_remediation_webhook(
     State(state): State<Arc<CallbackState>>,
     _headers: HeaderMap,
@@ -566,6 +600,28 @@ pub async fn handle_remediation_webhook(
     // Extract nested payload (from Argo Events sensor)
     let inner_payload = payload.get("payload").unwrap_or(&payload);
 
+    handle_remediation_webhook_impl(&state, inner_payload).await
+}
+
+/// Inner implementation for remediation webhook (callable from unified handler).
+///
+/// Accepts raw GitHub event bytes (no Argo Events wrapping).
+pub async fn handle_remediation_webhook_inner(
+    state: &CallbackState,
+    body: &[u8],
+) -> Result<Json<Value>, StatusCode> {
+    let payload: Value = serde_json::from_slice(body).map_err(|e| {
+        error!("Failed to parse remediation payload: {}", e);
+        StatusCode::BAD_REQUEST
+    })?;
+    handle_remediation_webhook_impl(state, &payload).await
+}
+
+/// Shared implementation for remediation webhook processing.
+async fn handle_remediation_webhook_impl(
+    state: &CallbackState,
+    inner_payload: &Value,
+) -> Result<Json<Value>, StatusCode> {
     let event: CheckRunPayload = serde_json::from_value(inner_payload.clone()).map_err(|e| {
         error!("Failed to parse check_run payload: {}", e);
         StatusCode::BAD_REQUEST
@@ -614,7 +670,7 @@ pub async fn handle_remediation_webhook(
 
     // Create CodeRun for remediation
     let run_name = create_remediation_coderun(
-        &state,
+        state,
         agent,
         &pr_context,
         &event.check_run.name,
@@ -861,12 +917,6 @@ pub async fn handle_ci_failure_webhook(
 ) -> Result<Json<Value>, StatusCode> {
     info!("Received CI failure webhook");
 
-    // Get GitHub token (required for API calls)
-    let github_token = state.github_token.as_ref().ok_or_else(|| {
-        error!("No GitHub token configured for CI failure handler");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
     // Parse the payload
     let payload: Value = serde_json::from_slice(&body).map_err(|e| {
         error!("Failed to parse CI failure payload: {}", e);
@@ -876,12 +926,140 @@ pub async fn handle_ci_failure_webhook(
     // Extract nested payload (from Argo Events sensor)
     let inner_payload = payload.get("payload").unwrap_or(&payload);
 
+    handle_ci_failure_webhook_impl(&state, inner_payload).await
+}
+
+/// Inner implementation for CI failure webhook (callable from unified handler).
+///
+/// Accepts raw GitHub event bytes (no Argo Events wrapping).
+pub async fn handle_ci_failure_webhook_inner(
+    state: &CallbackState,
+    body: &[u8],
+) -> Result<Json<Value>, StatusCode> {
+    let payload: Value = serde_json::from_slice(body).map_err(|e| {
+        error!("Failed to parse CI failure payload: {}", e);
+        StatusCode::BAD_REQUEST
+    })?;
+    handle_ci_failure_webhook_impl(state, &payload).await
+}
+
+/// Shared implementation for CI failure webhook processing.
+/// Fetch the list of changed file paths from a GitHub PR.
+async fn fetch_pr_files(
+    client: &reqwest::Client,
+    token: &str,
+    repo: &str,
+    pr_number: u64,
+) -> Result<Vec<String>, StatusCode> {
+    let url = format!("https://api.github.com/repos/{repo}/pulls/{pr_number}/files?per_page=100");
+
+    let resp = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "cto-pm-server")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
+        .await
+        .map_err(|e| {
+            error!("Failed to fetch PR files: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        error!("GitHub API error fetching PR files: {} - {}", status, body);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    let files_json: Vec<Value> = resp.json().await.map_err(|e| {
+        error!("Failed to parse PR files response: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(files_json
+        .iter()
+        .filter_map(|f| f.get("filename").and_then(|v| v.as_str()).map(String::from))
+        .collect())
+}
+
+/// Return a user-facing label for a remediation agent.
+const fn remediation_label(agent: Agent) -> &'static str {
+    match agent {
+        Agent::Rex => "🛠️ Fix with Rex",
+        Agent::Grizz => "🐻 Fix with Grizz",
+        Agent::Blaze => "⚡ Fix with Blaze",
+        Agent::Nova => "✨ Fix with Nova",
+        Agent::Tap => "📱 Fix with Tap",
+        Agent::Spark => "💻 Fix with Spark",
+        Agent::Vex => "🎮 Fix with Vex",
+        Agent::Forge => "🔥 Fix with Forge",
+        _ => "🤖 Fix with Agent",
+    }
+}
+
+/// Return a description string for a remediation agent.
+const fn remediation_description(agent: Agent) -> &'static str {
+    match agent {
+        Agent::Rex => "Rex will analyze and fix Rust issues",
+        Agent::Grizz => "Grizz will analyze and fix Go issues",
+        Agent::Blaze => "Blaze will analyze and fix TypeScript/React issues",
+        Agent::Nova => "Nova will analyze and fix Node.js issues",
+        Agent::Tap => "Tap will analyze and fix React Native issues",
+        Agent::Spark => "Spark will analyze and fix Electron issues",
+        Agent::Vex => "Vex will analyze and fix Unity/C# issues",
+        Agent::Forge => "Forge will analyze and fix Unreal/C++ issues",
+        _ => "Agent will analyze and fix issues",
+    }
+}
+
+/// Post a GitHub Check Run with the remediation button action.
+async fn post_remediation_check_run(
+    client: &reqwest::Client,
+    token: &str,
+    repo: &str,
+    payload: &Value,
+) -> Result<(), StatusCode> {
+    let url = format!("https://api.github.com/repos/{repo}/check-runs");
+
+    let resp = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "cto-pm-server")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .json(payload)
+        .send()
+        .await
+        .map_err(|e| {
+            error!("Failed to create check run: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        error!("GitHub API error creating check run: {} - {}", status, body);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    Ok(())
+}
+
+async fn handle_ci_failure_webhook_impl(
+    state: &CallbackState,
+    inner_payload: &Value,
+) -> Result<Json<Value>, StatusCode> {
+    let github_token = state.github_token.as_ref().ok_or_else(|| {
+        error!("No GitHub token configured for CI failure handler");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     let event: CheckRunPayload = serde_json::from_value(inner_payload.clone()).map_err(|e| {
         error!("Failed to parse check_run payload: {}", e);
         StatusCode::BAD_REQUEST
     })?;
 
-    // Get PR info
     let pr = event.check_run.pull_requests.first().ok_or_else(|| {
         warn!("No PR associated with check_run");
         StatusCode::BAD_REQUEST
@@ -893,93 +1071,24 @@ pub async fn handle_ci_failure_webhook(
     let check_name = &event.check_run.name;
 
     info!(
-        pr = %pr_number,
-        repo = %repo_full_name,
-        check_name = %check_name,
-        check_run_id = %check_run_id,
+        pr = %pr_number, repo = %repo_full_name,
+        check_name = %check_name, check_run_id = %check_run_id,
         "Processing CI failure for remediation buttons"
     );
 
-    // Get changed files from PR using GitHub API
-    let files_url = format!(
-        "https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files?per_page=100"
-    );
-
-    let files_response = state
-        .http_client
-        .get(&files_url)
-        .header("Authorization", format!("Bearer {github_token}"))
-        .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "cto-pm-server")
-        .header("X-GitHub-Api-Version", "2022-11-28")
-        .send()
-        .await
-        .map_err(|e| {
-            error!("Failed to fetch PR files: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    if !files_response.status().is_success() {
-        let status = files_response.status();
-        let body = files_response.text().await.unwrap_or_default();
-        error!("GitHub API error fetching PR files: {} - {}", status, body);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
-    }
-
-    let files_json: Vec<Value> = files_response.json().await.map_err(|e| {
-        error!("Failed to parse PR files response: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    let files: Vec<String> = files_json
-        .iter()
-        .filter_map(|f| f.get("filename").and_then(|v| v.as_str()).map(String::from))
-        .collect();
-
+    let files = fetch_pr_files(&state.http_client, github_token, repo_full_name, pr_number).await?;
     if files.is_empty() {
         warn!("No files found for PR #{}", pr_number);
-        return Ok(Json(json!({
-            "status": "skipped",
-            "reason": "no files in PR"
-        })));
+        return Ok(Json(json!({ "status": "skipped", "reason": "no files in PR" })));
     }
 
-    // Detect language and select agent
     let agent = select_agent_for_files(&files);
     let agent_name = agent.as_str();
+    let label = remediation_label(agent);
+    let description = remediation_description(agent);
+    info!(agent = %agent_name, files_count = %files.len(), "Detected agent for remediation");
 
-    info!(
-        agent = %agent_name,
-        files_count = %files.len(),
-        "Detected agent for remediation"
-    );
-
-    // Build remediation button action
     let identifier = format!("fix-{agent_name}-pr{pr_number}-{check_run_id}");
-    let label = match agent {
-        Agent::Rex => "🛠️ Fix with Rex",
-        Agent::Grizz => "🐻 Fix with Grizz",
-        Agent::Blaze => "⚡ Fix with Blaze",
-        Agent::Nova => "✨ Fix with Nova",
-        Agent::Tap => "📱 Fix with Tap",
-        Agent::Spark => "💻 Fix with Spark",
-        Agent::Vex => "🎮 Fix with Vex",
-        Agent::Forge => "🔥 Fix with Forge",
-        _ => "🤖 Fix with Agent",
-    };
-    let description = match agent {
-        Agent::Rex => "Rex will analyze and fix Rust issues",
-        Agent::Grizz => "Grizz will analyze and fix Go issues",
-        Agent::Blaze => "Blaze will analyze and fix TypeScript/React issues",
-        Agent::Nova => "Nova will analyze and fix Node.js issues",
-        Agent::Tap => "Tap will analyze and fix React Native issues",
-        Agent::Spark => "Spark will analyze and fix Electron issues",
-        Agent::Vex => "Vex will analyze and fix Unity/C# issues",
-        Agent::Forge => "Forge will analyze and fix Unreal/C++ issues",
-        _ => "Agent will analyze and fix issues",
-    };
-
-    // Create a new check run with remediation button
     let check_run_name = format!("🔧 Remediation Available - {check_name}");
     let head_sha = &event.check_run.head_sha;
 
@@ -990,51 +1099,20 @@ pub async fn handle_ci_failure_webhook(
         "conclusion": "action_required",
         "output": {
             "title": "AI Agent Ready to Fix",
-            "summary": format!("The **{}** check failed. Click the button below to launch **{}** to automatically fix the issue.", check_name, label),
+            "summary": format!("The **{check_name}** check failed. Click the button below to launch **{label}** to automatically fix the issue."),
             "text": format!(
-                "## Detected Language\n\nBased on the PR files, the primary language is **{}**.\n\n## Available Agent\n\n**{}** is ready to analyze the failure and push a fix.\n\n## How It Works\n\n1. Click the \"{}\" button\n2. {} will clone the repo and analyze the failure\n3. The agent will push a fix commit to this PR\n4. CI will re-run automatically",
+                "## Detected Language\n\nBased on the PR files, the primary language is **{}**.\n\n## Available Agent\n\n**{label}** is ready to analyze the failure and push a fix.\n\n## How It Works\n\n1. Click the \"{label}\" button\n2. {label} will clone the repo and analyze the failure\n3. The agent will push a fix commit to this PR\n4. CI will re-run automatically",
                 agent.primary_language().unwrap_or("unknown"),
-                label,
-                label,
-                label
             )
         },
-        "actions": [{
-            "label": label,
-            "description": description,
-            "identifier": identifier
-        }]
+        "actions": [{ "label": label, "description": description, "identifier": identifier }]
     });
 
-    // Create the check run using GitHub API
-    let check_run_url = format!("https://api.github.com/repos/{repo_full_name}/check-runs");
-
-    let check_response = state
-        .http_client
-        .post(&check_run_url)
-        .header("Authorization", format!("Bearer {github_token}"))
-        .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "cto-pm-server")
-        .header("X-GitHub-Api-Version", "2022-11-28")
-        .json(&check_payload)
-        .send()
-        .await
-        .map_err(|e| {
-            error!("Failed to create check run: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    if !check_response.status().is_success() {
-        let status = check_response.status();
-        let body = check_response.text().await.unwrap_or_default();
-        error!("GitHub API error creating check run: {} - {}", status, body);
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
-    }
+    post_remediation_check_run(&state.http_client, github_token, repo_full_name, &check_payload)
+        .await?;
 
     info!(
-        pr = %pr_number,
-        check_name = %check_run_name,
-        agent = %agent_name,
+        pr = %pr_number, check_name = %check_run_name, agent = %agent_name,
         "Created remediation check run with button"
     );
 
