@@ -1,34 +1,33 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# OpenClaw Agent Image - Composable multi-CLI agent image
+# OpenClaw Agent Image - Unified multi-CLI agent image
 # =============================================================================
 #
-# Composes multiple CLI tools into a single agent image using Docker
-# multi-stage COPY --from= to pull binaries from pre-built images.
-# Each CLI image is built independently by agents-build.yaml and
-# referenced here by tag. No Dockerfile chaining or workflow changes needed.
+# Bundles ALL coding agent CLIs into a single image so OpenClaw agents can
+# invoke any backend (Claude, Codex, Cursor, Factory, OpenCode, Every Code).
 #
-# Includes:
-#   - Runtime base (tools binary, git, node, npm, gh, ripgrep, jq, curl)
-#   - Claude Code CLI (copied from ghcr.io/5dlabs/claude:latest)
-#   - OpenClaw CLI (installed via npm)
-#   - 1Password CLI (op) for headless secret access
+# CLIs included:
+#   - Claude Code    (@anthropic-ai/claude-code)   — npm
+#   - OpenAI Codex   (@openai/codex)               — npm
+#   - Every Code     (@just-every/code)             — npm
+#   - Cursor Agent   (cursor-agent)                 — curl installer
+#   - Factory Droid  (droid)                        — curl installer
+#   - Gemini CLI     (@google/gemini-cli)            — npm
+#   - OpenCode       (opencode)                     — GitHub release binary
+#   - OpenClaw       (openclaw)                     — npm (orchestrator)
+#   - 1Password CLI  (op)                           — zip download
 #
 # =============================================================================
 
-# Pull Claude Code CLI from pre-built image (updated daily by agents-build.yaml)
-# Uses the *previous* build's :latest tag since both build in parallel
-FROM ghcr.io/5dlabs/claude:latest AS claude-cli
-
-# Main image extends the runtime base
+# ARG before any FROM so it's available for FROM instructions and --build-arg
 ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:full
+
 FROM ${BASE_IMAGE}
 
 USER root
 
 # ---------------------------------------------------------------------------
 # 1Password CLI (op) - headless secret access for agents
-# Agents use OP_SERVICE_ACCOUNT_TOKEN (injected via K8s secret) for auth
 # ---------------------------------------------------------------------------
 RUN set -eux; \
     OP_VERSION="v2.30.3"; \
@@ -45,43 +44,91 @@ RUN set -eux; \
     op --version
 
 # ---------------------------------------------------------------------------
-# Claude Code CLI - copied from pre-built image layer
-# Avoids separate npm install; version tracks the daily claude:latest build
-# ---------------------------------------------------------------------------
-COPY --from=claude-cli /usr/local/lib/node_modules/@anthropic-ai /usr/local/lib/node_modules/@anthropic-ai
-RUN ln -sf /usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js /usr/local/bin/claude && \
-    chmod +x /usr/local/bin/claude /usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js
-
-# ---------------------------------------------------------------------------
-# OpenClaw CLI - installed via npm
+# npm CLIs - Claude Code, Codex, Every Code, OpenAI SDK, OpenClaw
 # ---------------------------------------------------------------------------
 ARG VERSION=latest
+
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g \
+      @anthropic-ai/claude-code \
+      @openai/codex \
+      @just-every/code \
+      @google/gemini-cli \
+      openai@latest \
+    && echo "npm CLIs installed: claude, codex, code, gemini, openai"
 
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     if [ "$VERSION" = "latest" ]; then \
         npm install -g openclaw; \
     else \
         npm install -g openclaw@${VERSION}; \
-    fi && \
-    echo "" && \
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-    echo "📋 OpenClaw Changelog" && \
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-    npm view openclaw changelog --json 2>/dev/null | head -50 || echo "Run 'openclaw --help' for usage" && \
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    fi
+
+# ---------------------------------------------------------------------------
+# Cursor Agent CLI - curl installer + system-wide placement
+# ---------------------------------------------------------------------------
+RUN set -eux; \
+    curl https://cursor.com/install -fsS | bash; \
+    export PATH="$HOME/.local/bin:$PATH"; \
+    CURSOR_SHARE="$HOME/.local/share/cursor-agent"; \
+    VERSION_DIR="$(cd "$CURSOR_SHARE/versions" && ls -1 | sort | tail -n1)"; \
+    install -d /usr/local/lib/cursor-agent; \
+    cp -r "$CURSOR_SHARE/versions/$VERSION_DIR"/. /usr/local/lib/cursor-agent/; \
+    ln -sf /usr/bin/node /usr/local/lib/cursor-agent/node; \
+    printf '#!/bin/bash\nexec /usr/local/lib/cursor-agent/cursor-agent "$@"\n' > /usr/local/bin/cursor-agent; \
+    chmod +x /usr/local/bin/cursor-agent; \
+    ln -sf cursor-agent /usr/local/bin/cursor; \
+    chown -R 1000:1000 /usr/local/lib/cursor-agent; \
+    rm -rf "$CURSOR_SHARE"; \
+    cursor-agent --version || echo "Warning: cursor-agent version check failed"
+
+# ---------------------------------------------------------------------------
+# Factory Droid CLI - curl installer
+# ---------------------------------------------------------------------------
+RUN set -eux; \
+    curl -fsSL https://app.factory.ai/cli | sh; \
+    install -m 0755 /root/.local/bin/droid /usr/local/bin/droid; \
+    rm -f /root/.local/bin/droid; \
+    install -d -m 0755 /home/node/.factory/bin /home/node/.factory/logs /home/node/.factory/cache; \
+    ln -sf /usr/local/bin/rg /home/node/.factory/bin/rg 2>/dev/null || true; \
+    printf '{}' > /home/node/.factory/settings.json; \
+    chown -R 1000:1000 /home/node/.factory; \
+    FACTORY_DISABLE_TELEMETRY=1 droid --version
+
+# ---------------------------------------------------------------------------
+# OpenCode CLI - binary from GitHub releases
+# ---------------------------------------------------------------------------
+ARG OPENCODE_VERSION=1.1.44
+RUN set -eux; \
+    ARCH=$(uname -m); \
+    case "$ARCH" in \
+        x86_64) ARCH_NAME="x64" ;; \
+        aarch64|arm64) ARCH_NAME="arm64" ;; \
+        *) echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-${ARCH_NAME}.tar.gz" -o /tmp/opencode.tar.gz; \
+    tar -xzf /tmp/opencode.tar.gz -C /tmp; \
+    install -m 0755 /tmp/opencode /usr/local/bin/opencode; \
+    rm -rf /tmp/opencode.tar.gz /tmp/opencode; \
+    opencode --version
 
 # ---------------------------------------------------------------------------
 # inotify-tools (Linux file watcher for cto-services watch command)
 # ---------------------------------------------------------------------------
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends inotify-tools && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      inotify-tools gettext-base && \
     rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
-# Workspace and home directory setup (for both OpenClaw and Claude Code)
+# Workspace and home directory setup
 # ---------------------------------------------------------------------------
-RUN mkdir -p /home/node/.openclaw /home/node/.claude /home/node/.config /home/node/.cache /workspace && \
-    chown -R 1000:1000 /home/node/.openclaw /home/node/.claude /home/node/.config /home/node/.cache /workspace
+RUN mkdir -p /home/node/.openclaw /home/node/.claude /home/node/.code \
+             /home/node/.codex /home/node/.cursor /home/node/.gemini /home/node/.opencode \
+             /home/node/.config /home/node/.cache /workspace && \
+    chown -R 1000:1000 /home/node/.openclaw /home/node/.claude /home/node/.code \
+                       /home/node/.codex /home/node/.cursor /home/node/.gemini /home/node/.opencode \
+                       /home/node/.factory /home/node/.config /home/node/.cache /workspace
 
 # Configure git identity (system-wide for all users)
 RUN git config --system user.name "5D Labs Agent" && \
@@ -94,8 +141,15 @@ USER node
 WORKDIR /workspace
 
 # Verify all CLIs are installed
-RUN openclaw --version && echo "✅ OpenClaw CLI ready" && \
-    claude --version 2>/dev/null && echo "✅ Claude Code CLI ready" && \
-    op --version && echo "✅ 1Password CLI ready"
+RUN set -e; \
+    openclaw --version  && echo "openclaw       OK"; \
+    claude --version    && echo "claude         OK"; \
+    codex --version     && echo "codex          OK"; \
+    code --version      && echo "code           OK"; \
+    gemini --version    && echo "gemini         OK"; \
+    cursor-agent --version 2>/dev/null && echo "cursor-agent   OK" || echo "cursor-agent   SKIP"; \
+    FACTORY_DISABLE_TELEMETRY=1 droid --version && echo "droid          OK"; \
+    opencode --version  && echo "opencode       OK"; \
+    op --version        && echo "op             OK"
 
 CMD ["openclaw", "--help"]

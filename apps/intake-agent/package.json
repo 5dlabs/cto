@@ -1,0 +1,44 @@
+{
+  "name": "intake-agent",
+  "version": "1.0.0",
+  "description": "Claude Agent SDK wrapper for intake PRD parsing and task generation",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "bun build ./src/index.ts --compile --outfile ./dist/intake-agent",
+    "build:dev": "bun build ./src/index.ts --outdir ./dist",
+    "dev": "bun run ./src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.0",
+    "@streamparser/json": "^0.0.22",
+    "handlebars": "^4.7.8",
+    "jsonrepair": "^3.13.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "files": [
+    "dist/intake-agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/5dlabs/cto.git",
+    "directory": "apps/intake-agent"
+  },
+  "keywords": [
+    "claude",
+    "agent",
+    "prd",
+    "task-generation",
+    "mcp"
+  ],
+  "license": "MIT"
+}

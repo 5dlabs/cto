@@ -21,9 +21,9 @@ spec:
   project: platform
 
   source:
-    repoURL: https://github.com/5dlabs/agents
+    repoURL: https://github.com/5dlabs/cto
     targetRevision: main
-    path: infra/infra/charts/openclaw-agent
+    path: infra/charts/openclaw-agent
     helm:
       valueFiles:
         - values.yaml
@@ -42,6 +42,7 @@ spec:
               - "group:fs"
               - "group:runtime"
               - "group:web"
+              - "group:memory"
               - "browser"
               - "group:sessions"
 

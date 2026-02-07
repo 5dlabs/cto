@@ -3,6 +3,61 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.45](https://github.com/5dlabs/cto/compare/v0.2.44...v0.2.45) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** deploy all 14 remaining agents to Kubernetes ([#4375](https://github.com/5dlabs/cto/issues/4375)) ([b6cf4b6](https://github.com/5dlabs/cto/commit/b6cf4b616d633be37466d8ba25c0b5ddeb706175))
+* **openclaw:** expand container-builds skill with Docker→Kaniko guide ([#4378](https://github.com/5dlabs/cto/issues/4378)) ([25aaaeb](https://github.com/5dlabs/cto/commit/25aaaeb8684f73e91a2c70845864599d96661c27))
+
+
+### 🐛 Bug Fixes
+
+* **openclaw:** add RBAC and kubectl for kaniko sidecar exec ([#4376](https://github.com/5dlabs/cto/issues/4376)) ([9e20498](https://github.com/5dlabs/cto/commit/9e204985e537c95f96fc988a0b5fc618fe58d84e))
+
+## [0.2.44](https://github.com/5dlabs/cto/compare/v0.2.43...v0.2.44) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** add kaniko container-builds skill ([#4374](https://github.com/5dlabs/cto/issues/4374)) ([8121730](https://github.com/5dlabs/cto/commit/8121730e4dfd64b0e3ed0f842f59f6d29f0713cb))
+
+
+### 🐛 Bug Fixes
+
+* **loki:** switch from SeaweedFS S3 to filesystem storage ([#4373](https://github.com/5dlabs/cto/issues/4373)) ([818d568](https://github.com/5dlabs/cto/commit/818d568898746c1d6e7ebe74f889c164b33f7546))
+* **openclaw:** correct Loki URL and add informational pod labels ([#4370](https://github.com/5dlabs/cto/issues/4370)) ([4fe5ce5](https://github.com/5dlabs/cto/commit/4fe5ce5d2ba9aa0d9826dd688d4301e69c9f4dda))
+* **openclaw:** move info fields from labels to pod annotations ([#4372](https://github.com/5dlabs/cto/issues/4372)) ([767fc77](https://github.com/5dlabs/cto/commit/767fc776a443a1aa077ee9fb1c4450da3e483cec))
+
+## [0.2.43](https://github.com/5dlabs/cto/compare/v0.2.42...v0.2.43) (2026-02-07)
+
+
+### 🐛 Bug Fixes
+
+* **openclaw:** correct kaniko debug image tag to :debug ([#4369](https://github.com/5dlabs/cto/issues/4369)) ([dbd08aa](https://github.com/5dlabs/cto/commit/dbd08aaa70257ea87b4e664fa4b8d7a6a1d874b2))
+* **openclaw:** correct repoURL and chart path in ArgoCD applications ([#4365](https://github.com/5dlabs/cto/issues/4365)) ([29e64cd](https://github.com/5dlabs/cto/commit/29e64cdac81396de4ec377c4c557a549bb1838e7))
+* **openclaw:** remove unsupported config keys and fix kaniko sidecar ([#4367](https://github.com/5dlabs/cto/issues/4367)) ([91f70ea](https://github.com/5dlabs/cto/commit/91f70eaf547cfcc25af9d4b321b22c167a695f4c))
+
+## [0.2.42](https://github.com/5dlabs/cto/compare/v0.2.41...v0.2.42) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** memory optimization, group:memory allowlists, heartbeat autonomy ([#4362](https://github.com/5dlabs/cto/issues/4362)) ([1916f07](https://github.com/5dlabs/cto/commit/1916f073ca5195eac1ab6d8d803c9b863ffa7fe4))
+
+## [0.2.41](https://github.com/5dlabs/cto/compare/v0.2.40...v0.2.41) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** Phase 2 golden copy — unified image, tools, skills, secrets ([#4358](https://github.com/5dlabs/cto/issues/4358)) ([04c78d0](https://github.com/5dlabs/cto/commit/04c78d09852c840bdc40b1ec7c988c16dfacd2ea))
+
+
+### ♻️ Refactoring
+
+* organize research docs and add Grok MCP server ([#4359](https://github.com/5dlabs/cto/issues/4359)) ([7aae2a2](https://github.com/5dlabs/cto/commit/7aae2a2e934fd6c219161c57477a2690148331be))
+
 ## [0.2.40](https://github.com/5dlabs/cto/compare/v0.2.39...v0.2.40) (2026-02-06)
 
 

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "complexity-analysis.schema.json",
+  "title": "TaskComplexityAnalysis",
+  "description": "Complexity analysis result for a single task.",
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "integer"
+    },
+    "task_title": {
+      "type": "string"
+    },
+    "complexity_score": {
+      "type": "number"
+    },
+    "recommended_subtasks": {
+      "type": "integer"
+    },
+    "expansion_prompt": {
+      "type": "string"
+    },
+    "reasoning": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "task_title",
+    "complexity_score",
+    "recommended_subtasks",
+    "expansion_prompt",
+    "reasoning"
+  ],
+  "additionalProperties": false
+}

@@ -1,3 +1,4 @@
+{{- if .Values.tools.clientConfig }}
 # =============================================================================
 # Tools MCP Client Configuration (client-config.json)
 # =============================================================================
@@ -27,3 +28,4 @@ data:
       "localServers": {{ .Values.tools.clientConfig.localServers | toJson }},
       "maxConnections": {{ .Values.tools.clientConfig.maxConnections }}
     }
+{{- end }}
