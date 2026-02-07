@@ -4,3 +4,4 @@ kind: Kustomization
 
 resources:
   - mayastor-storageclass.yaml
+  - mayastor-diskpools.yaml
