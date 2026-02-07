@@ -39,7 +39,7 @@ pub async fn list_pods(namespace: Option<String>) -> Result<Vec<String>, AppErro
     let ns = namespace.unwrap_or_else(|| "default".to_string());
 
     let output = Command::new("kubectl")
-        .args(&[
+        .args([
             "get",
             "pods",
             "-n",
@@ -72,7 +72,7 @@ pub async fn list_pods_with_status(namespace: Option<String>) -> Result<Vec<PodI
     let ns = namespace.unwrap_or_else(|| "default".to_string());
 
     let output = Command::new("kubectl")
-        .args(&[
+        .args([
             "get", "pods", "-n", &ns, "-o",
             "jsonpath={range .items[*]}{.metadata.name}{'\\t'}{.status.phase}{'\\t'}{.spec.containers[*].name}{'\\n'}{end}"
         ])
@@ -102,7 +102,7 @@ pub async fn list_pods_with_status(namespace: Option<String>) -> Result<Vec<PodI
                     containers: parts
                         .get(2)
                         .map(|c| c.split_whitespace().map(String::from).collect())
-                        .unwrap_or_else(Vec::new),
+                        .unwrap_or_default(),
                 })
             } else {
                 None
@@ -244,7 +244,7 @@ pub async fn stop_log_stream(stream_id: String) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn list_namespaces() -> Result<Vec<String>, AppError> {
     let output = Command::new("kubectl")
-        .args(&[
+        .args([
             "get",
             "namespaces",
             "-o",

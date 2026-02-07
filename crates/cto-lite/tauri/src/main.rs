@@ -129,6 +129,11 @@ fn main() {
             commands::openclaw::openclaw_reject,
             commands::openclaw::openclaw_get_status,
             commands::openclaw::openclaw_exec_cli,
+            // Smart initialization & runtime
+            commands::cluster::smart_init,
+            commands::cluster::quick_health_check,
+            commands::runtime::auto_detect_and_start_runtime,
+            commands::runtime::auto_start_runtime,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

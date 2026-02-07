@@ -212,7 +212,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./crates/cto-lite/pm-lite -> target"
+          workspaces: "./crates/cto-lite/pm-lite-server -> target"
 
       - name: Format check
         run: cargo fmt --check

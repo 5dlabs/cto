@@ -53,6 +53,7 @@ fn default_namespace() -> String {
 }
 
 impl Config {
+    #[must_use]
     pub fn from_env() -> Self {
         let redirect_uri = env::var("LINEAR_REDIRECT_URI")
             .unwrap_or_else(|_| "http://localhost:8080/oauth/callback".to_string());
@@ -64,18 +65,24 @@ impl Config {
             env::var("LINEAR_APP_MORGAN_CLIENT_ID"),
             env::var("LINEAR_APP_MORGAN_CLIENT_SECRET"),
         ) {
-            apps.insert("morgan".to_string(), LinearAppConfig {
-                client_id: app_id,
-                client_secret,
-                webhook_secret: "".to_string(),
-                access_token: None,
-                refresh_token: env::var("LINEAR_REFRESH_TOKEN_MORGAN").ok(),
-                expires_at: None,
-            });
+            apps.insert(
+                "morgan".to_string(),
+                LinearAppConfig {
+                    client_id: app_id,
+                    client_secret,
+                    webhook_secret: String::new(),
+                    access_token: None,
+                    refresh_token: env::var("LINEAR_REFRESH_TOKEN_MORGAN").ok(),
+                    expires_at: None,
+                },
+            );
         }
 
         Self {
-            port: env::var("PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(8080),
+            port: env::var("PORT")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(8080),
             github: GitHubConfig {
                 app_id: env::var("GITHUB_APP_ID").ok(),
                 private_key: env::var("GITHUB_PRIVATE_KEY").ok(),
@@ -125,7 +132,7 @@ impl Config {
         let config_file = config_dir.join("pm-lite.json");
         let content = serde_json::to_string_pretty(self).map_err(|e| format!("Serialize: {e}"))?;
         std::fs::write(&config_file, content).map_err(|e| format!("Write: {e}"))?;
-        
+
         tracing::info!(path = %config_file.display(), "Config saved");
         Ok(())
     }

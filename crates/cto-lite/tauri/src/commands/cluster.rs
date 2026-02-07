@@ -1268,15 +1268,15 @@ async fn ensure_kind_installed() -> AppResult<bool> {
         .get(&url)
         .send()
         .await
-        .map_err(|e| AppError::HttpError(e))?;
+        .map_err(AppError::HttpError)?;
 
     if !response.status().is_success() {
-        return Err(AppError::HttpError(reqwest::Error::from(
+        return Err(AppError::HttpError(
             response.error_for_status().unwrap_err(),
-        )));
+        ));
     }
 
-    let bytes = response.bytes().await.map_err(|e| AppError::HttpError(e))?;
+    let bytes = response.bytes().await.map_err(AppError::HttpError)?;
 
     // Write to temp file
     std::fs::write(&kind_path, &bytes)?;
