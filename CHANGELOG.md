@@ -3,6 +3,15 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.43](https://github.com/5dlabs/cto/compare/v0.2.42...v0.2.43) (2026-02-07)
+
+
+### 🐛 Bug Fixes
+
+* **openclaw:** correct kaniko debug image tag to :debug ([#4369](https://github.com/5dlabs/cto/issues/4369)) ([dbd08aa](https://github.com/5dlabs/cto/commit/dbd08aaa70257ea87b4e664fa4b8d7a6a1d874b2))
+* **openclaw:** correct repoURL and chart path in ArgoCD applications ([#4365](https://github.com/5dlabs/cto/issues/4365)) ([29e64cd](https://github.com/5dlabs/cto/commit/29e64cdac81396de4ec377c4c557a549bb1838e7))
+* **openclaw:** remove unsupported config keys and fix kaniko sidecar ([#4367](https://github.com/5dlabs/cto/issues/4367)) ([91f70ea](https://github.com/5dlabs/cto/commit/91f70eaf547cfcc25af9d4b321b22c167a695f4c))
+
 ## [0.2.42](https://github.com/5dlabs/cto/compare/v0.2.41...v0.2.42) (2026-02-07)
 
 
