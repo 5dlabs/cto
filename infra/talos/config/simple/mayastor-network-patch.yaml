@@ -1,0 +1,31 @@
+---
+# Mayastor network firewall patch - allows required ports for Mayastor communication
+# Apply to ALL nodes (control plane and workers) with:
+# talosctl patch machineconfig -n <node-ip> --patch @mayastor-network-patch.yaml
+
+machine:
+  network:
+    firewall:
+      defaultAction: block
+      rules:
+        # Allow Mayastor agent-core gRPC API (port 50051)
+        - portSelector:
+            ports:
+              - 50051
+            protocol: tcp
+          ingress:
+            - subnet: 10.0.0.0/8  # Allow from pod and service CIDRs
+        # Allow Mayastor agent-core HA cluster (port 50052)
+        - portSelector:
+            ports:
+              - 50052
+            protocol: tcp
+          ingress:
+            - subnet: 10.0.0.0/8
+        # Allow Mayastor io-engine NVMe-oF target (port 10124)
+        - portSelector:
+            ports:
+              - 10124
+            protocol: tcp
+          ingress:
+            - subnet: 10.0.0.0/8
