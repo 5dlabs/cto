@@ -16,10 +16,10 @@ import { CTO_KEYWORDS } from "./keywords";
 
 const CONFIG = {
   // Paths
-  RESULTS_DIR: "./docs/grok-results",
-  SUMMARIES_DIR: "./docs/grok-summaries",
+  RESULTS_DIR: "./docs/research/grok-results",
+  SUMMARIES_DIR: "./docs/research/grok-summaries",
   PRDS_DIR: "./docs/prds",
-  STATE_FILE: "./docs/grok-summaries/.research-state.json",
+  STATE_FILE: "./docs/research/grok-summaries/.research-state.json",
   
   // Categories for routing
   CATEGORIES: {

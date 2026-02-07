@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'marketing/**'
+      - 'apps/marketing/**'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
@@ -25,14 +25,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: marketing/package-lock.json
+          cache-dependency-path: apps/marketing/package-lock.json
 
       - name: Install dependencies
-        working-directory: marketing
+        working-directory: apps/marketing
         run: npm ci
 
       - name: Build
-        working-directory: marketing
+        working-directory: apps/marketing
         run: npm run build
 
       - name: Deploy to Cloudflare Pages
@@ -40,7 +40,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: marketing
+          workingDirectory: apps/marketing
           wranglerVersion: "4"
           command: pages deploy out --project-name=cto-marketing --commit-dirty=true
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}

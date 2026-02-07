@@ -7,14 +7,14 @@ on:
     paths:
       - 'crates/research/**'
       - 'infra/images/research/**'
-      - 'tools/intake-agent/**'
+      - 'apps/intake-agent/**'
       - '.github/workflows/research-ci.yaml'
   pull_request:
     branches: [main]
     paths:
       - 'crates/research/**'
       - 'infra/images/research/**'
-      - 'tools/intake-agent/**'
+      - 'apps/intake-agent/**'
       - '.github/workflows/research-ci.yaml'
   workflow_dispatch:
 
@@ -161,7 +161,7 @@ jobs:
 
       - name: Build intake-agent
         run: |
-          cd tools/intake-agent
+          cd apps/intake-agent
           # Note: Using regular install instead of --frozen-lockfile due to known
           # issues with bun 1.3.x and text-based lockfiles (see oven-sh/bun#12801)
           bun install

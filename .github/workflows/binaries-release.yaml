@@ -276,11 +276,11 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        working-directory: tools/intake-agent
+        working-directory: apps/intake-agent
         run: bun install
 
       - name: Build intake-agent binary
-        working-directory: tools/intake-agent
+        working-directory: apps/intake-agent
         run: |
           bun build ./src/index.ts --compile --target ${{ matrix.target }} --outfile ./dist/intake-agent
           ls -lh ./dist/
@@ -288,7 +288,7 @@ jobs:
       - name: Prepare artifact
         run: |
           mkdir -p dist
-          cp tools/intake-agent/dist/intake-agent "dist/intake-agent-${{ matrix.suffix }}"
+          cp apps/intake-agent/dist/intake-agent "dist/intake-agent-${{ matrix.suffix }}"
           chmod +x "dist/intake-agent-${{ matrix.suffix }}"
           ls -lh dist/
 

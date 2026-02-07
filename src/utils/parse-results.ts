@@ -6,8 +6,8 @@
 import fs from "fs/promises";
 import path from "path";
 
-const RESULTS_DIR = "./docs/grok-results";
-const OUTPUT_DIR = "./docs/grok-summaries";
+const RESULTS_DIR = "./docs/research/grok-results";
+const OUTPUT_DIR = "./docs/research/grok-summaries";
 
 interface GrokResult {
   id: string;

@@ -8,8 +8,8 @@
 #   CI/GHCR build (default - expects pre-built binaries in context):
 #     cargo build --release --package research
 #     cp target/release/research research
-#     cd tools/intake-agent && bun run build
-#     cp tools/intake-agent/dist/intake-agent intake-agent
+#     cd apps/intake-agent && bun run build
+#     cp apps/intake-agent/dist/intake-agent intake-agent
 #     docker build -f infra/images/research/Dockerfile -t ghcr.io/5dlabs/research .
 #
 #   Local/Kind build (compiles from source):
@@ -48,9 +48,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 # =============================================================================
 FROM oven/bun:1.1-debian AS intake-builder
 WORKDIR /build
-COPY tools/intake-agent/package.json tools/intake-agent/bun.lock ./
+COPY apps/intake-agent/package.json apps/intake-agent/bun.lock ./
 RUN bun install --frozen-lockfile
-COPY tools/intake-agent/ ./
+COPY apps/intake-agent/ ./
 RUN bun run build
 
 # =============================================================================
