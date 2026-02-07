@@ -993,10 +993,39 @@ web:
       memory: 256Mi
 
 # =============================================================================
-# Research - Twitter/X Research Pipeline
+# Grok - X Search Research Pipeline (replaces crates/research)
+# =============================================================================
+grok:
+  enabled: true
+
+  image:
+    repository: ghcr.io/5dlabs/grok
+    pullPolicy: Always
+    tag: "latest"
+
+  # CronJob schedule (every 6 hours)
+  schedule: "0 */6 * * *"
+
+  # Maximum job runtime in seconds (30 min — 30 categories)
+  activeDeadlineSeconds: 1800
+
+  persistence:
+    size: 5Gi
+    storageClass: ""  # Uses global.storageClass if empty
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# =============================================================================
+# Research - Twitter/X Research Pipeline (DEPRECATED — replaced by grok)
 # =============================================================================
 research:
-  enabled: true
+  enabled: false  # Deprecated: use grok section above
 
   image:
     repository: ghcr.io/5dlabs/research

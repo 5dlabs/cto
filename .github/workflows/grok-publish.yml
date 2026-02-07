@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "apps/grok/**"
+      - "infra/images/grok/**"
       - ".github/workflows/grok-publish.yml"
   pull_request:
     paths:
       - "apps/grok/**"
+      - "infra/images/grok/**"
       - ".github/workflows/grok-publish.yml"
 
 permissions:
@@ -64,7 +66,7 @@ jobs:
       - name: Configure npm for GitHub Packages
         run: |
           cat > .npmrc << 'NPMRC'
-          @jonathonfritz:registry=https://npm.pkg.github.com/
+          @5dlabs:registry=https://npm.pkg.github.com/
           NPMRC
           echo "//npm.pkg.github.com/:_authToken=$NODE_AUTH_TOKEN" >> .npmrc
         env:
@@ -135,7 +137,7 @@ jobs:
 
             ### MCP Server
             ```bash
-            npm install @jonathonfritz/grok-x-search@${{ steps.version.outputs.version }} --registry=https://npm.pkg.github.com
+            npm install @5dlabs/grok-x-search@${{ steps.version.outputs.version }} --registry=https://npm.pkg.github.com
             ```
 
             ### Cron Binary
@@ -151,3 +153,41 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: false
+
+  # ─── Build and push Docker image to GHCR ─────────────────────────
+  publish-docker:
+    name: Publish Docker Image
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Read package version
+        id: version
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build standalone cron binary for Docker
+        run: |
+          bun build src/cron.ts \
+            --compile \
+            --target=bun-linux-x64 \
+            --outfile=../../grok-cron
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: grok
+          context: .
+          dockerfile: infra/images/grok/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ github.sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

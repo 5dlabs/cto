@@ -22,8 +22,8 @@ import {
   getCtoCategoryNames,
 } from './lib/index.js';
 
-const RESULTS_DIR = './docs/research/grok-results';
-const STATE_FILE = './docs/research/grok-results/.last-run.json';
+const RESULTS_DIR = process.env['GROK_OUTPUT_DIR'] ?? './docs/research/grok-results';
+const STATE_FILE = `${RESULTS_DIR}/.last-run.json`;
 
 // ---------------------------------------------------------------------------
 // Category lookup (supports camelCase and kebab-case)

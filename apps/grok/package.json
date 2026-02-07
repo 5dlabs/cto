@@ -1,5 +1,5 @@
 {
-  "name": "@jonathonfritz/grok-x-search",
+  "name": "@5dlabs/grok-x-search",
   "version": "0.2.0",
   "description": "Unified Grok X Search: MCP server and cron job for investor, startup credit, and CTO research",
   "type": "module",
