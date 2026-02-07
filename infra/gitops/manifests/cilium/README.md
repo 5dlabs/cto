@@ -120,6 +120,43 @@ kubectl -n kube-system logs -l k8s-app=clustermesh-apiserver
 cilium encrypt status
 ```
 
+### hostNetwork Pods Cannot Reach ClusterIP Services
+
+**Symptoms:**
+- Pods using `hostNetwork: true` (like Mayastor io-engine, metrics-server, etc.) cannot connect to ClusterIP services
+- Connection attempts timeout or fail with "Connection refused"
+- Cilium service mappings exist but eBPF socket load balancing doesn't work for hostNetwork pods
+
+**Root Cause:**
+When `socketLB.hostNamespaceOnly: true` is set in Cilium values, eBPF socket load balancing only applies to the root host network namespace. Pods running with `hostNetwork: true` run in their own network namespaces and cannot benefit from socket load balancing to reach services.
+
+**Fix:**
+Set `socketLB.hostNamespaceOnly: false` in `values.yaml` (infra/gitops/manifests/cilium/values.yaml:116):
+
+```yaml
+# Enable socket load balancing for better performance
+# hostNamespaceOnly must be false to allow hostNetwork pods (like Mayastor io-engine)
+# to reach ClusterIP services via eBPF socket load balancing
+socketLB:
+  enabled: true
+  hostNamespaceOnly: false
+```
+
+**Verification:**
+```bash
+# Check ConfigMap value after sync
+kubectl get configmap cilium-config -n kube-system -o jsonpath='{.data.bpf-lb-sock-hostns-only}'
+# Should output: false
+
+# Test connectivity from hostNetwork pod
+kubectl exec -n <namespace> <hostnetwork-pod> -- curl http://<service-name>.<namespace>.svc.cluster.local
+```
+
+**Important:** This configuration is critical for:
+- Mayastor storage (io-engine and mayastor-agent-ha-node DaemonSets use hostNetwork)
+- metrics-server (uses hostNetwork to bypass Cilium pod-to-host hairpin issue)
+- Any other infrastructure components that require hostNetwork and need to reach services
+
 ## References
 
 - [Cilium Documentation](https://docs.cilium.io/)

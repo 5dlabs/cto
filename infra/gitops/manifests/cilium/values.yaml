@@ -111,9 +111,11 @@ bandwidthManager:
   bbr: true
 
 # Enable socket load balancing for better performance
+# hostNamespaceOnly must be false to allow hostNetwork pods (like Mayastor io-engine)
+# to reach ClusterIP services via eBPF socket load balancing
 socketLB:
   enabled: true
-  hostNamespaceOnly: true
+  hostNamespaceOnly: false
 
 # Enable host firewall for node protection
 hostFirewall:
