@@ -1,5 +1,6 @@
 import {
   connect,
+  createInbox,
   type NatsConnection,
   type Subscription,
   type Msg,
@@ -126,7 +127,7 @@ export async function createNatsClient(
 
     async discoverPeers(timeoutMs = 3000): Promise<AgentMessage[]> {
       if (!nc) throw new Error("NATS client not connected");
-      const inbox = nc.createInbox();
+      const inbox = createInbox();
       const peers: AgentMessage[] = [];
       const sub = nc.subscribe(inbox);
 
