@@ -71,6 +71,8 @@ pub struct CallbackState {
     pub play_config: crate::config::PlayConfig,
     /// Kubernetes client for CRD operations.
     pub kube_client: kube::Client,
+    /// GitHub webhook secret for HMAC-SHA256 signature verification.
+    pub github_webhook_secret: Option<String>,
 }
 
 /// Handle intake workflow completion callback.

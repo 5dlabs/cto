@@ -6,6 +6,7 @@ pub mod agent_session;
 pub mod callbacks;
 pub mod document;
 pub mod github;
+pub mod github_events;
 pub mod intake;
 pub mod oauth;
 pub mod play;

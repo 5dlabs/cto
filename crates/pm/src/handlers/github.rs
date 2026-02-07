@@ -128,14 +128,17 @@ pub struct IntakeMetadata {
     pub project_dir: Option<String>,
 }
 
-/// Handle GitHub webhook
-#[allow(clippy::too_many_lines)] // Complex function not easily split
+/// Handle GitHub webhook (Axum handler).
+///
+/// This is the legacy endpoint at `/webhooks/github` used by Argo Events.
+/// New code should use the unified `/webhooks/github/events` endpoint which
+/// calls [`handle_github_webhook_inner`] for intake PR processing.
+#[allow(clippy::too_many_lines)]
 pub async fn handle_github_webhook(
     State(state): State<Arc<CallbackState>>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, StatusCode> {
-    // Get event type from header
     let event_type = headers
         .get("X-GitHub-Event")
         .and_then(|v| v.to_str().ok())
@@ -149,10 +152,9 @@ pub async fn handle_github_webhook(
     info!(
         event_type = %event_type,
         delivery_id = %delivery_id,
-        "Received GitHub webhook"
+        "Received GitHub webhook (legacy endpoint)"
     );
 
-    // Only process pull_request events
     if event_type != "pull_request" {
         debug!(event_type = %event_type, "Ignoring non-pull_request event");
         return Ok(Json(json!({
@@ -161,8 +163,20 @@ pub async fn handle_github_webhook(
         })));
     }
 
-    // Parse payload
-    let payload: PullRequestEvent = serde_json::from_slice(&body).map_err(|e| {
+    handle_github_webhook_inner(&state, &body).await
+}
+
+/// Inner handler for intake PR merges, callable from both the legacy Axum
+/// endpoint and the unified GitHub Events handler.
+///
+/// Processes merged intake PRs: creates Linear project + issues, then
+/// triggers the play CodeRun.
+#[allow(clippy::too_many_lines)]
+pub async fn handle_github_webhook_inner(
+    state: &CallbackState,
+    body: &[u8],
+) -> Result<Json<Value>, StatusCode> {
+    let payload: PullRequestEvent = serde_json::from_slice(body).map_err(|e| {
         error!(error = %e, "Failed to parse GitHub webhook payload");
         StatusCode::BAD_REQUEST
     })?;
@@ -181,9 +195,7 @@ pub async fn handle_github_webhook(
     }
 
     // Check if this is an intake PR (has cto-intake label or branch pattern)
-    let is_intake_pr = is_intake_pr(&payload);
-
-    if !is_intake_pr {
+    if !is_intake_pr(&payload) {
         debug!(
             pr_number = payload.pull_request.number,
             branch = %payload.pull_request.head.ref_name,
@@ -202,7 +214,15 @@ pub async fn handle_github_webhook(
         "Processing merged intake PR"
     );
 
-    // Get Linear client
+    handle_intake_pr_impl(state, &payload).await
+}
+
+/// Core intake PR processing: Linear project creation + play CodeRun trigger.
+#[allow(clippy::too_many_lines)]
+async fn handle_intake_pr_impl(
+    state: &CallbackState,
+    payload: &PullRequestEvent,
+) -> Result<Json<Value>, StatusCode> {
     let Some(client) = &state.linear_client else {
         error!("Linear client not configured");
         return Ok(Json(json!({
@@ -211,8 +231,7 @@ pub async fn handle_github_webhook(
         })));
     };
 
-    // Extract metadata from PR
-    let Some(metadata) = extract_intake_metadata(&payload) else {
+    let Some(metadata) = extract_intake_metadata(payload) else {
         warn!(
             pr_number = payload.pull_request.number,
             "Could not extract intake metadata from PR"
@@ -223,8 +242,7 @@ pub async fn handle_github_webhook(
         })));
     };
 
-    // Create project and issues
-    match create_project_from_intake(&state, client, &payload, &metadata).await {
+    match create_project_from_intake(state, client, payload, &metadata).await {
         Ok(result) => {
             info!(
                 project_id = %result.project_id,
@@ -232,7 +250,6 @@ pub async fn handle_github_webhook(
                 "Created Linear project from intake PR"
             );
 
-            // Emit activity to Linear session
             if let Err(e) = client
                 .emit_response(
                     &metadata.session_id,
@@ -254,9 +271,8 @@ pub async fn handle_github_webhook(
                 warn!(error = %e, "Failed to emit completion activity");
             }
 
-            // Trigger play workflow for the project
             let play_result =
-                trigger_play_workflow(&state, client, &payload, &metadata, &result).await;
+                trigger_play_workflow(state, client, payload, &metadata, &result).await;
 
             let workflow_info = match &play_result {
                 Ok(wf) => {
@@ -271,7 +287,6 @@ pub async fn handle_github_webhook(
                 }
                 Err(e) => {
                     warn!(error = %e, "Failed to submit play workflow");
-                    // Emit error but don't fail the whole request
                     let _ = client
                         .emit_error(
                             &metadata.session_id,
@@ -296,7 +311,6 @@ pub async fn handle_github_webhook(
         Err(e) => {
             error!(error = %e, "Failed to create project from intake PR");
 
-            // Emit error to Linear session
             let _ = client
                 .emit_error(
                     &metadata.session_id,
@@ -388,7 +402,7 @@ struct IntakeProjectResult {
 /// Create a Linear project from a merged intake PR
 #[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn create_project_from_intake(
-    state: &Arc<CallbackState>,
+    state: &CallbackState,
     client: &LinearClient,
     payload: &PullRequestEvent,
     metadata: &IntakeMetadata,
@@ -924,7 +938,7 @@ pub struct PlayTriggerResult {
 /// is mounted, providing the correct agent assignments and settings.
 #[allow(clippy::too_many_lines)] // Complex function not easily split
 async fn trigger_play_workflow(
-    state: &Arc<CallbackState>,
+    state: &CallbackState,
     client: &LinearClient,
     payload: &PullRequestEvent,
     metadata: &IntakeMetadata,
@@ -932,7 +946,6 @@ async fn trigger_play_workflow(
 ) -> anyhow::Result<PlayTriggerResult> {
     use anyhow::Context;
 
-    let timestamp = chrono::Utc::now().timestamp();
     let namespace = &state.namespace;
 
     let repository = format!("https://github.com/{}", payload.repository.full_name);
@@ -971,14 +984,23 @@ async fn trigger_play_workflow(
         project_dir.clone()
     };
 
-    // Generate CodeRun name
+    // Generate deterministic CodeRun name using PR number + merge SHA so that
+    // duplicate webhook deliveries are idempotent (Kubernetes rejects duplicates).
+    let merge_sha7 = payload
+        .pull_request
+        .merge_commit_sha
+        .as_deref()
+        .map_or("unknown", |s| &s[..7.min(s.len())]);
     let name_suffix = project_dir
         .chars()
         .take(20)
         .collect::<String>()
         .trim_matches('-')
         .to_string();
-    let coderun_name = format!("play-{name_suffix}-{timestamp}");
+    let coderun_name = format!(
+        "play-{name_suffix}-pr{}-{merge_sha7}",
+        payload.pull_request.number
+    );
 
     info!(
         coderun_name = %coderun_name,
@@ -1055,16 +1077,27 @@ async fn trigger_play_workflow(
     let coderun_obj: kube::api::DynamicObject =
         serde_json::from_value(coderun_json).context("Failed to parse CodeRun JSON")?;
 
-    coderuns
+    match coderuns
         .create(&PostParams::default(), &coderun_obj)
         .await
-        .context("Failed to create play CodeRun")?;
-
-    info!(
-        coderun_name = %coderun_name,
-        project_id = %project_result.project_id,
-        "Play CodeRun created successfully (ConfigMap will be mounted)"
-    );
+    {
+        Ok(_) => {
+            info!(
+                coderun_name = %coderun_name,
+                project_id = %project_result.project_id,
+                "Play CodeRun created successfully (ConfigMap will be mounted)"
+            );
+        }
+        Err(kube::Error::Api(ref api_err)) if api_err.reason == "AlreadyExists" => {
+            // Duplicate webhook delivery — CodeRun already created from a prior
+            // delivery of the same event. This is expected and safe to ignore.
+            info!(
+                coderun_name = %coderun_name,
+                "Play CodeRun already exists (duplicate webhook delivery — idempotent)"
+            );
+        }
+        Err(e) => return Err(e).context("Failed to create play CodeRun"),
+    }
 
     Ok(PlayTriggerResult {
         workflow_name: coderun_name,
