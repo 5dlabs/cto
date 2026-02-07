@@ -25,6 +25,10 @@ helm.sh/chart: {{ include "openclaw-agent.name" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/part-of: openclaw
 openclaw.io/agent: {{ .Values.agent.id }}
+openclaw.io/model: {{ .Values.agent.model | quote }}
+openclaw.io/heartbeat: {{ .Values.agent.heartbeat | quote }}
+openclaw.io/sandbox: {{ .Values.agent.sandbox | quote }}
+openclaw.io/tools-profile: {{ .Values.tools.profile | quote }}
 {{- end }}
 
 {{/*
