@@ -3,6 +3,18 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.41](https://github.com/5dlabs/cto/compare/v0.2.40...v0.2.41) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** Phase 2 golden copy — unified image, tools, skills, secrets ([#4358](https://github.com/5dlabs/cto/issues/4358)) ([04c78d0](https://github.com/5dlabs/cto/commit/04c78d09852c840bdc40b1ec7c988c16dfacd2ea))
+
+
+### ♻️ Refactoring
+
+* organize research docs and add Grok MCP server ([#4359](https://github.com/5dlabs/cto/issues/4359)) ([7aae2a2](https://github.com/5dlabs/cto/commit/7aae2a2e934fd6c219161c57477a2690148331be))
+
 ## [0.2.40](https://github.com/5dlabs/cto/compare/v0.2.39...v0.2.40) (2026-02-06)
 
 
