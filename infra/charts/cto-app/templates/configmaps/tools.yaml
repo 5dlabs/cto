@@ -90,9 +90,4 @@ data:
           - "configmaps"
           - "secrets"
       
-      # Argo Workflows
-      argo:
-        enabled: {{ .Values.argo.enabled }}
-        endpoint: "http://argo-workflows-server:2746"
-        namespace: "cto-app"
 {{- end }}

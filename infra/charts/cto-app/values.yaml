@@ -6,28 +6,7 @@ global:
   imagePullSecrets: []
 
 argo:
-  enabled: true
-  version: "v3.5.11"
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-  controller:
-    replicas: 1
-    args:
-      - "--namespaces"
-      - "cto-app"
-  server:
-    replicas: 1
-    args:
-      - "--namespaces"
-      - "cto-app"
-    service:
-      type: NodePort
-      port: 2746
+  enabled: false
 
 controller:
   enabled: true
@@ -170,10 +149,6 @@ ingress:
   annotations: {}
   hosts:
     - host: localhost
-      paths:
-        - path: /
-          pathType: Prefix
-    - host: argo.127.0.0.1.nip.io
       paths:
         - path: /
           pathType: Prefix

@@ -19,23 +19,6 @@ spec:
   duration: 2160h  # 90 days
   renewBefore: 360h  # 15 days
 ---
-# Argo Workflows Certificate
-# Uses self-signed - external access via Cloudflare Tunnel (Cloudflare handles TLS)
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: argo-workflows-server-tls
-  namespace: automation
-spec:
-  secretName: argo-workflows-server-tls
-  issuerRef:
-    name: selfsigned-issuer
-    kind: ClusterIssuer
-  dnsNames:
-    - workflows.5dlabs.ai
-  duration: 2160h
-  renewBefore: 360h
----
 # Headscale Certificate
 # Uses self-signed - includes both external and internal DNS names
 # Internal names needed for Tailscale subnet router to connect via HTTPS
