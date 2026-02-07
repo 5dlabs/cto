@@ -1,0 +1,223 @@
+# =============================================================================
+# Auto-Recovery Workflow
+# =============================================================================
+#
+# Triggered when any stage in a parent workflow fails. Combines deterministic
+# error classification with model-driven diagnosis and fix generation.
+#
+# Replaces the current Healer's mix of deterministic detection + manual
+# intervention with a fully automated recovery loop.
+
+name: auto-recover
+description: "Automatic error recovery for failed workflow stages"
+version: "1.0.0"
+
+# ---------------------------------------------------------------------------
+# Inputs
+# ---------------------------------------------------------------------------
+inputs:
+  parent_workflow_id:
+    type: string
+    description: "ID of the workflow that experienced the failure"
+  failed_stage:
+    type: string
+    description: "Name of the stage that failed"
+  error_output:
+    type: string
+    description: "Captured stderr/stdout from the failed operation"
+  error_code:
+    type: integer
+    description: "Exit code from the failed command"
+  retry_count:
+    type: integer
+    description: "Number of times this stage has been retried"
+    default: 0
+  max_retries:
+    type: integer
+    description: "Maximum number of retry attempts"
+    default: 3
+
+# ---------------------------------------------------------------------------
+# Stages
+# ---------------------------------------------------------------------------
+stages:
+
+  # ─── Stage 1: Error Classification (Deterministic) ──────────────────────
+  classify-error:
+    description: "Classify the error type using pattern matching"
+    steps:
+      - type: deterministic
+        name: extract-error-patterns
+        command: |
+          echo '{{error_output}}' | openclaw diagnose classify \
+            --stage '{{failed_stage}}' \
+            --exit-code '{{error_code}}'
+        on_success:
+          set:
+            error_class: "{{stdout}}"
+        on_failure:
+          set:
+            error_class: "unknown"
+
+      - type: deterministic
+        name: gather-context
+        command: |
+          openclaw diagnose context \
+            --workflow '{{parent_workflow_id}}' \
+            --stage '{{failed_stage}}'
+        on_success:
+          set:
+            diagnostic_context: "{{stdout}}"
+        on_failure:
+          set:
+            diagnostic_context: "No additional context available"
+
+  # ─── Stage 2: Diagnosis (Model-Driven) ──────────────────────────────────
+  diagnose:
+    description: "Use LLM to diagnose root cause and generate fix"
+    depends_on: [classify-error]
+    steps:
+      - type: llm-task
+        name: analyze-failure
+        prompt: |
+          A workflow stage failed and needs recovery.
+
+          **Failed stage**: {{failed_stage}}
+          **Error class**: {{error_class}}
+          **Exit code**: {{error_code}}
+          **Error output**:
+          ```
+          {{error_output}}
+          ```
+
+          **Diagnostic context**:
+          {{diagnostic_context}}
+
+          **Retry attempt**: {{retry_count}} of {{max_retries}}
+
+          Analyze the error and determine:
+          1. Root cause (be specific)
+          2. Whether this is automatically recoverable
+          3. If recoverable, what fix commands to run
+          4. If not recoverable, what the user should do
+
+          Respond with a JSON object:
+          {
+            "root_cause": "...",
+            "recoverable": true/false,
+            "fix_commands": ["cmd1", "cmd2"],
+            "user_message": "friendly explanation"
+          }
+        output_schema:
+          type: object
+          properties:
+            root_cause:
+              type: string
+            recoverable:
+              type: boolean
+            fix_commands:
+              type: array
+              items:
+                type: string
+            user_message:
+              type: string
+        on_success:
+          set:
+            diagnosis: "{{output}}"
+
+  # ─── Stage 3: Apply Fix (Deterministic) ─────────────────────────────────
+  apply-fix:
+    description: "Execute the model-generated fix commands"
+    depends_on: [diagnose]
+    condition: "diagnosis.recoverable && retry_count < max_retries"
+    steps:
+      - type: chat
+        name: notify-user
+        message: "Detected issue: {{diagnosis.user_message}}. Attempting automatic fix..."
+
+      - type: deterministic
+        name: run-fix-commands
+        command: |
+          {{#each diagnosis.fix_commands}}
+          echo ">>> Running: {{this}}"
+          {{this}}
+          {{/each}}
+        timeout: 120
+        on_success:
+          set:
+            fix_applied: true
+        on_failure:
+          set:
+            fix_applied: false
+            fix_error: "{{stderr}}"
+
+  # ─── Stage 4: Retry Failed Stage (Deterministic) ────────────────────────
+  retry-stage:
+    description: "Retry the originally failed stage"
+    depends_on: [apply-fix]
+    condition: "fix_applied"
+    steps:
+      - type: deterministic
+        name: retry-original
+        command: |
+          openclaw workflow retry \
+            --workflow '{{parent_workflow_id}}' \
+            --stage '{{failed_stage}}'
+        timeout: 300
+        on_success:
+          set:
+            recovery_success: true
+        on_failure:
+          set:
+            recovery_success: false
+
+      - type: chat
+        name: report-retry-success
+        condition: "recovery_success"
+        message: "Successfully recovered from the error. The workflow is continuing."
+
+  # ─── Stage 5: Escalate to User (Model-Driven) ──────────────────────────
+  escalate:
+    description: "If recovery fails, explain to user and ask for guidance"
+    depends_on: [retry-stage]
+    condition: "!recovery_success || !fix_applied || !diagnosis.recoverable || retry_count >= max_retries"
+    steps:
+      - type: llm-task
+        name: explain-to-user
+        prompt: |
+          Automatic recovery was not successful for this error.
+
+          **Original error**: {{error_output}}
+          **Root cause**: {{diagnosis.root_cause}}
+          **Fix attempted**: {{diagnosis.recoverable}}
+          **Fix applied**: {{fix_applied}}
+          **Retry succeeded**: {{recovery_success}}
+          **Attempts**: {{retry_count}} of {{max_retries}}
+          {{#if fix_error}}
+          **Fix error**: {{fix_error}}
+          {{/if}}
+
+          Compose a helpful message for the user that:
+          1. Explains what went wrong in plain language
+          2. Summarizes what was tried automatically
+          3. Provides 2-3 specific actions the user can take
+          4. Offers to try a different approach if they give guidance
+
+          Be empathetic but concise. Don't dump raw logs.
+        action:
+          type: confirm
+          label: "Need your help"
+          description: "Automatic recovery couldn't resolve this"
+
+# ---------------------------------------------------------------------------
+# Completion
+# ---------------------------------------------------------------------------
+on_complete:
+  type: chat
+  message: "Recovery workflow complete for stage '{{failed_stage}}'."
+
+on_failure:
+  type: chat
+  message: |
+    The recovery workflow itself encountered an error. This is unusual.
+    Please check the platform logs or reach out for support.

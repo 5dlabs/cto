@@ -120,6 +120,15 @@ fn main() {
             commands::install::run_installation,
             commands::install::get_install_status,
             commands::install::reset_installation,
+            // OpenClaw gateway
+            commands::openclaw::openclaw_send_message,
+            commands::openclaw::openclaw_get_messages,
+            commands::openclaw::openclaw_start_workflow,
+            commands::openclaw::openclaw_get_workflow_status,
+            commands::openclaw::openclaw_approve,
+            commands::openclaw::openclaw_reject,
+            commands::openclaw::openclaw_get_status,
+            commands::openclaw::openclaw_exec_cli,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
