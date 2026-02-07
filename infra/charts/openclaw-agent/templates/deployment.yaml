@@ -17,6 +17,7 @@ spec:
       labels:
         {{- include "openclaw-agent.labels" . | nindent 8 }}
       annotations:
+        {{- include "openclaw-agent.podAnnotations" . | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/openclaw-skills: {{ include (print $.Template.BasePath "/configmap-openclaw-skills.yaml") . | sha256sum }}
         {{- if .Values.toolsConfig }}
