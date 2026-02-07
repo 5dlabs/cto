@@ -1,0 +1,24 @@
+{{- if .Values.controlUi.enabled }}
+# =============================================================================
+# Control UI Service
+# =============================================================================
+# Exposes the OpenClaw gateway (which serves the Control UI SPA) as a
+# ClusterIP service. Accessible via Twingate for remote management.
+# Auth is handled by the gateway's token (gateway.auth.token).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.gateway.port }}
+      targetPort: gateway
+      protocol: TCP
+      name: gateway
+  selector:
+    {{- include "openclaw-agent.selectorLabels" . | nindent 4 }}
+{{- end }}

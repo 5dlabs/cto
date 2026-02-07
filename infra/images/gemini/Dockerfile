@@ -8,7 +8,6 @@ ENV TZ="$TZ"
 ARG USERNAME=node
 ENV DEVCONTAINER=true
 
-# Switch to root for all setup (base image ends as USER node)
 USER root
 
 # Setup workspace and user environment
@@ -19,37 +18,19 @@ RUN mkdir -p /workspace /home/node/.gemini /home/node/.config /home/node/.cache 
 WORKDIR /workspace
 
 # Install Google Gemini CLI
-# Note: Gemini CLI installation method - using npm global install
-# The actual package name may need to be updated based on Google's official release
-# Use BuildKit cache mount for npm to speed up repeated builds
+# https://geminicli.com/docs/get-started/installation/
 ARG VERSION=latest
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    set -eux; \
-    # Install Gemini CLI (adjust package name when official package is available)
-    # For now, creating a placeholder that can be updated
-    npm install -g @google-cloud/generative-ai@${VERSION} || \
-    npm install -g @google/generative-ai@${VERSION} || \
-    echo "⚠️ Gemini CLI package not found - may need manual installation"; \
-    # Create gemini-cli wrapper if needed
-    if ! command -v gemini-cli >/dev/null 2>&1 && ! command -v gemini >/dev/null 2>&1; then \
-      echo '#!/bin/bash' > /usr/local/bin/gemini-cli; \
-      echo 'echo "Gemini CLI placeholder - update Dockerfile with correct package"' >> /usr/local/bin/gemini-cli; \
-      echo 'exit 1' >> /usr/local/bin/gemini-cli; \
-      chmod +x /usr/local/bin/gemini-cli; \
-    fi
+    npm install -g @google/gemini-cli@${VERSION} && \
+    echo "Gemini CLI installed"
 
-# Configure Gemini-specific environment
+# Configure git identity (system-wide for all users)
+RUN git config --system user.name "5D Labs Agent" && \
+    git config --system user.email "agent@5dlabs.com"
+
 USER node
-
-# Configure Gemini-specific git identity
-RUN git config --global user.name "5D Labs Agent" && \
-    git config --global user.email "agent@5dlabs.com"
 
 # Verify installation
-RUN gemini-cli --version 2>/dev/null || gemini --version 2>/dev/null || \
-    echo "⚠️ Gemini CLI verification skipped - needs proper package"
+RUN gemini --version && echo "Gemini CLI ready"
 
-# Final setup
-USER node
-
-
+CMD ["gemini", "--help"]
