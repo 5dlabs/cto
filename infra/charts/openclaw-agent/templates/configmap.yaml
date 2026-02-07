@@ -131,7 +131,31 @@ data:
           "memory-core": {
             "enabled": true
           }
+          {{- if .Values.nats.enabled }},
+          "nats-messenger": {
+            "enabled": true,
+            "config": {
+              "enabled": true,
+              "url": {{ .Values.nats.url | quote }},
+              "agentName": {{ .Values.agent.id | quote }},
+              "subjects": [
+                "agent.{{ .Values.agent.id }}.inbox",
+                "agent.all.broadcast"
+                {{- range .Values.nats.extraSubjects }},
+                {{ . | quote }}
+                {{- end }}
+              ],
+              "reconnectWaitMs": {{ .Values.nats.reconnectWaitMs }},
+              "maxReconnectAttempts": {{ .Values.nats.maxReconnectAttempts }}
+            }
+          }
+          {{- end }}
         }
+        {{- if .Values.nats.enabled }},
+        "load": {
+          "paths": ["/workspace/.openclaw/extensions/nats-messenger"]
+        }
+        {{- end }}
       },
       "models": {
         "providers": {

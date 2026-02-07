@@ -23,6 +23,9 @@ spec:
         {{- if .Values.toolsConfig }}
         checksum/tools-config: {{ include (print $.Template.BasePath "/configmap-tools-config.yaml") . | sha256sum }}
         {{- end }}
+        {{- if .Values.nats.enabled }}
+        checksum/nats-plugin: {{ include (print $.Template.BasePath "/configmap-nats-plugin.yaml") . | sha256sum }}
+        {{- end }}
         {{- if .Values.telemetry.enabled }}
         checksum/promtail: {{ include (print $.Template.BasePath "/configmap-promtail.yaml") . | sha256sum }}
         {{- end }}
@@ -110,9 +113,25 @@ spec:
                 echo "[skills] ClawdStrike already present"
               fi
 
+              {{- if .Values.nats.enabled }}
+              # ---------------------------------------------------------------
+              # 4d. NATS Messenger plugin
+              # ---------------------------------------------------------------
+              NATS_EXT="/workspace/.openclaw/extensions/nats-messenger"
+              mkdir -p "$NATS_EXT"
+              cp /nats-plugin-template/* "$NATS_EXT/"
+              if [ ! -d "$NATS_EXT/node_modules/nats" ]; then
+                cd "$NATS_EXT" && npm install --production --no-audit --no-fund 2>&1 | tail -3
+                echo "[plugin] nats-messenger: installed"
+              else
+                echo "[plugin] nats-messenger: cached"
+              fi
+              cd /workspace
+              {{- end }}
+
               {{- if .Values.kaniko.enabled }}
               # ---------------------------------------------------------------
-              # 4d. kubectl (for kaniko sidecar exec)
+              # 4e. kubectl (for kaniko sidecar exec)
               # ---------------------------------------------------------------
               if [ ! -f /workspace/.local/bin/kubectl ]; then
                 mkdir -p /workspace/.local/bin
@@ -259,6 +278,10 @@ spec:
             {{- if .Values.toolsConfig }}
             - name: tools-config-template
               mountPath: /tools-config-template
+            {{- end }}
+            {{- if .Values.nats.enabled }}
+            - name: nats-plugin-template
+              mountPath: /nats-plugin-template
             {{- end }}
       containers:
         - name: agent
@@ -432,6 +455,11 @@ spec:
         - name: tools-config-template
           configMap:
             name: {{ include "openclaw-agent.fullname" . }}-tools-config
+        {{- end }}
+        {{- if .Values.nats.enabled }}
+        - name: nats-plugin-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-nats-plugin
         {{- end }}
         {{- if .Values.kaniko.enabled }}
         - name: kaniko-docker-config
