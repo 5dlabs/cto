@@ -54,9 +54,15 @@ MCP servers spawned locally alongside CLI sessions. Each entry defines:
 The OpenClaw gateway organizes tools into groups:
 - `group:runtime` — exec, shell, process management
 - `group:fs` — file read/write/search
-- `group:sessions` — session management, agent-to-agent messaging
+- `group:sessions` — session management (in-process only)
 - `group:memory` — memory read/write/search
 - `group:web` — web_search, web_fetch, browser
 - `group:ui` — Control UI interactions
 
 The `tools.profile: "full"` setting enables all groups with no restrictions.
+
+## Plugin Tools
+
+Plugin-registered tools are separate from tool groups and must be explicitly added to `tools.allow`:
+
+- `nats` — Cross-pod inter-agent messaging via NATS. Supports publish, request, and discover actions. This is the primary mechanism for agent-to-agent communication since each agent runs in its own pod.

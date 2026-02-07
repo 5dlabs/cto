@@ -1,5 +1,6 @@
 import {
   connect,
+  createInbox,
   type NatsConnection,
   type Subscription,
   type Msg,
@@ -12,6 +13,7 @@ const sc = StringCodec();
 export interface NatsClientHandle {
   publish(subject: string, msg: AgentMessage): void;
   request(subject: string, msg: AgentMessage, timeoutMs: number): Promise<AgentMessage>;
+  discoverPeers(timeoutMs?: number): Promise<AgentMessage[]>;
   close(): Promise<void>;
   isConnected(): boolean;
 }
@@ -71,6 +73,24 @@ export async function createNatsClient(
           // Skip messages from self
           if (data.from === config.agentName) continue;
 
+          // Discovery protocol: auto-respond to pings, skip pongs on broadcast
+          if (data.type === "discovery_ping") {
+            if (msg.reply) {
+              const pong: AgentMessage = {
+                from: config.agentName,
+                subject: msg.reply,
+                message: "",
+                priority: "normal",
+                timestamp: new Date().toISOString(),
+                type: "discovery_pong",
+                role: config.agentRole ?? "general",
+              };
+              msg.respond(sc.encode(JSON.stringify(pong)));
+            }
+            continue;
+          }
+          if (data.type === "discovery_pong") continue;
+
           // Handle request-reply: if the inbound message has a reply subject,
           // attach it so the processor can respond
           if (msg.reply) {
@@ -103,6 +123,41 @@ export async function createNatsClient(
         { timeout: timeoutMs },
       );
       return JSON.parse(sc.decode(reply.data));
+    },
+
+    async discoverPeers(timeoutMs = 3000): Promise<AgentMessage[]> {
+      if (!nc) throw new Error("NATS client not connected");
+      const inbox = createInbox();
+      const peers: AgentMessage[] = [];
+      const sub = nc.subscribe(inbox);
+
+      const ping: AgentMessage = {
+        from: config.agentName,
+        subject: "agent.all.broadcast",
+        message: "",
+        priority: "normal",
+        timestamp: new Date().toISOString(),
+        type: "discovery_ping",
+      };
+
+      nc.publish("agent.all.broadcast", sc.encode(JSON.stringify(ping)), {
+        reply: inbox,
+      });
+
+      // Collect replies until timeout
+      const timer = setTimeout(() => sub.unsubscribe(), timeoutMs);
+      for await (const msg of sub) {
+        try {
+          const data: AgentMessage = JSON.parse(sc.decode(msg.data));
+          if (data.type === "discovery_pong") {
+            peers.push(data);
+          }
+        } catch {
+          // skip malformed replies
+        }
+      }
+      clearTimeout(timer);
+      return peers;
     },
 
     async close(): Promise<void> {

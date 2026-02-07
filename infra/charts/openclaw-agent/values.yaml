@@ -468,3 +468,21 @@ nats:
   extraSubjects: []
   reconnectWaitMs: 2000
   maxReconnectAttempts: -1
+  agentRole: "general"
+  maxPingPongTurns: 10
+  pingPongWindowMs: 300000
+  roster:
+    - { id: alert, role: "Alerting & monitoring" }
+    - { id: conductor, role: "Orchestration coordinator" }
+    - { id: forge, role: "DevOps, K8s, CI/CD" }
+    - { id: holt, role: "Backend engineering" }
+    - { id: infra, role: "Cluster management" }
+    - { id: keeper, role: "Security & secrets" }
+    - { id: metal, role: "Lead engineering, architecture" }
+    - { id: pitch, role: "Sales & marketing" }
+    - { id: planner, role: "Task breakdown, scheduling" }
+    - { id: playmon, role: "Workflow monitoring" }
+    - { id: pm, role: "Project management" }
+    - { id: research, role: "Web research" }
+    - { id: stitch, role: "Code review" }
+    - { id: trader, role: "Market research & trading" }

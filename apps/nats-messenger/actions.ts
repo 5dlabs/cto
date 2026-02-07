@@ -13,14 +13,27 @@ export function deliverToAgent(
   logger: { info: Function; warn: Function; error: Function },
 ): void {
   try {
-    runtime.system.enqueueSystemEvent(processed.eventText, {
-      sessionKey: processed.sessionKey,
-    });
+    if (typeof runtime?.system?.enqueueSystemEvent === "function") {
+      runtime.system.enqueueSystemEvent(processed.eventText, {
+        sessionKey: processed.sessionKey,
+      });
+    } else {
+      logger.warn(
+        `enqueueSystemEvent not available — message from ${processed.raw.from} logged but not delivered to session`,
+      );
+      return;
+    }
 
     if (processed.priority === "urgent") {
-      runtime.system.requestHeartbeatNow({
-        reason: `Urgent NATS message from ${processed.raw.from}`,
-      });
+      if (typeof runtime?.system?.requestHeartbeatNow === "function") {
+        runtime.system.requestHeartbeatNow({
+          reason: `Urgent NATS message from ${processed.raw.from}`,
+        });
+      } else {
+        logger.warn(
+          "requestHeartbeatNow not available — urgent message delivered but agent not woken",
+        );
+      }
     }
 
     logger.info(

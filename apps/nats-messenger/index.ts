@@ -9,7 +9,7 @@ const plugin = {
   name: "NATS Messenger",
 
   register(api: any) {
-    const rawConfig: Partial<NatsConfig> = api.config ?? {};
+    const rawConfig: Partial<NatsConfig> = api.pluginConfig ?? {};
     const config = resolveConfig(rawConfig);
 
     if (!config.enabled) {
@@ -17,13 +17,26 @@ const plugin = {
       return;
     }
 
-    const { service, handle } = createService(config, api.runtime, api.logger);
+    const { service, handle, checkPingPong, recordPingPong } = createService(
+      config,
+      api.runtime,
+      api.logger,
+    );
 
     api.registerService(service);
-    api.registerTool(createNatsTool(config.agentName, handle));
+    api.registerTool(
+      createNatsTool(
+        config.agentName,
+        handle,
+        config.roster ?? [],
+        checkPingPong,
+        recordPingPong,
+      ),
+    );
 
+    const rosterCount = config.roster?.length ?? 0;
     api.logger.info(
-      `nats-messenger: registered (agent=${config.agentName}, subjects=${config.subjects.length})`,
+      `nats-messenger: registered (agent=${config.agentName}, roster=${rosterCount} agents, maxPingPong=${config.maxPingPongTurns}, subjects=${config.subjects.length})`,
     );
   },
 };
