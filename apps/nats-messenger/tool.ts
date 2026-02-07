@@ -64,24 +64,35 @@ export function createNatsTool(
       required: ["action", "message"],
     },
 
-    async execute(params: {
-      action: "publish" | "request";
-      to?: string;
-      subject?: string;
-      message: string;
-      priority?: MessagePriority;
-      timeoutMs?: number;
-    }): Promise<string> {
+    async execute(
+      _toolCallId: string,
+      params: {
+        action: "publish" | "request";
+        to?: string;
+        subject?: string;
+        message: string;
+        priority?: MessagePriority;
+        timeoutMs?: number;
+      },
+    ): Promise<{ content: { type: string; text: string }[] }> {
+      const result = (text: string) => ({
+        content: [{ type: "text", text }],
+      });
+
       const client = getClient();
       if (!client || !client.isConnected()) {
-        return "Error: NATS client is not connected. The nats-messenger service may not have started.";
+        return result(
+          "Error: NATS client is not connected. The nats-messenger service may not have started.",
+        );
       }
 
       const resolvedSubject =
         params.subject ?? (params.to ? `agent.${params.to}.inbox` : null);
 
       if (!resolvedSubject) {
-        return 'Error: Either "to" (agent name) or "subject" (raw NATS subject) is required.';
+        return result(
+          'Error: Either "to" (agent name) or "subject" (raw NATS subject) is required.',
+        );
       }
 
       const msg: AgentMessage = {
@@ -95,7 +106,9 @@ export function createNatsTool(
 
       if (params.action === "publish") {
         client.publish(resolvedSubject, msg);
-        return `Published to ${resolvedSubject} (priority=${msg.priority})`;
+        return result(
+          `Published to ${resolvedSubject} (priority=${msg.priority})`,
+        );
       }
 
       if (params.action === "request") {
@@ -105,13 +118,15 @@ export function createNatsTool(
             msg,
             params.timeoutMs ?? 10000,
           );
-          return `Reply from ${reply.from}: ${reply.message}`;
+          return result(`Reply from ${reply.from}: ${reply.message}`);
         } catch (err) {
-          return `Request to ${resolvedSubject} failed: ${err}`;
+          return result(`Request to ${resolvedSubject} failed: ${err}`);
         }
       }
 
-      return `Error: Unknown action "${params.action}". Use "publish" or "request".`;
+      return result(
+        `Error: Unknown action "${params.action}". Use "publish" or "request".`,
+      );
     },
   };
 }

@@ -9,7 +9,7 @@ const plugin = {
   name: "NATS Messenger",
 
   register(api: any) {
-    const rawConfig: Partial<NatsConfig> = api.config ?? {};
+    const rawConfig: Partial<NatsConfig> = api.pluginConfig ?? {};
     const config = resolveConfig(rawConfig);
 
     if (!config.enabled) {

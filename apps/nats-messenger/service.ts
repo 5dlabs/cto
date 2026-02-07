@@ -8,8 +8,8 @@ export interface NatsServiceResult {
   service: {
     id: string;
     name: string;
-    start(): Promise<void>;
-    stop(): Promise<void>;
+    start(ctx?: any): Promise<void>;
+    stop(ctx?: any): Promise<void>;
   };
   /** Client handle for the tool to publish/request */
   handle: () => NatsClientHandle | null;
@@ -26,7 +26,7 @@ export function createService(
     id: "nats-messenger-service",
     name: "NATS Messenger",
 
-    async start(): Promise<void> {
+    async start(_ctx?: any): Promise<void> {
       if (!config.enabled) {
         logger.info("NATS messenger disabled by config");
         return;
@@ -49,7 +49,7 @@ export function createService(
       );
     },
 
-    async stop(): Promise<void> {
+    async stop(_ctx?: any): Promise<void> {
       if (client) {
         logger.info("Stopping NATS messenger");
         await client.close();
