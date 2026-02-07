@@ -3,6 +3,19 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.45](https://github.com/5dlabs/cto/compare/v0.2.44...v0.2.45) (2026-02-07)
+
+
+### ✨ Features
+
+* **openclaw:** deploy all 14 remaining agents to Kubernetes ([#4375](https://github.com/5dlabs/cto/issues/4375)) ([b6cf4b6](https://github.com/5dlabs/cto/commit/b6cf4b616d633be37466d8ba25c0b5ddeb706175))
+* **openclaw:** expand container-builds skill with Docker→Kaniko guide ([#4378](https://github.com/5dlabs/cto/issues/4378)) ([25aaaeb](https://github.com/5dlabs/cto/commit/25aaaeb8684f73e91a2c70845864599d96661c27))
+
+
+### 🐛 Bug Fixes
+
+* **openclaw:** add RBAC and kubectl for kaniko sidecar exec ([#4376](https://github.com/5dlabs/cto/issues/4376)) ([9e20498](https://github.com/5dlabs/cto/commit/9e204985e537c95f96fc988a0b5fc618fe58d84e))
+
 ## [0.2.44](https://github.com/5dlabs/cto/compare/v0.2.43...v0.2.44) (2026-02-07)
 
 
