@@ -33,9 +33,10 @@ ipam:
 # Symptoms: intermittent "Resource temporarily unavailable" errors to external APIs
 mtu: 1420
 
-# WireGuard encryption for pod-to-pod traffic
+# WireGuard encryption disabled - conflicts with hostNetwork-to-hostNetwork service connections
+# TODO: Re-enable once Mayastor moves away from hostNetwork or Cilium fixes WireGuard + hostNetwork
 encryption:
-  enabled: true
+  enabled: false
   type: wireguard
   # Node-to-node encryption (includes control plane traffic)
   nodeEncryption: false
