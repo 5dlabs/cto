@@ -1,0 +1,413 @@
+# =============================================================================
+# Desktop Setup Workflow
+# =============================================================================
+#
+# Replaces the 7-step SetupWizard with a Lobster workflow that combines
+# deterministic CLI operations with model-driven error handling and user
+# communication through the PM agent (Morgan).
+#
+# Each stage follows the pattern:
+#   1. Deterministic: run CLI / check system state
+#   2. Model: if error, diagnose and fix or guide user
+#   3. Report: friendly status message via chat (not raw output)
+
+name: desktop-setup
+description: "Interactive setup of CTO development environment"
+version: "1.0.0"
+
+# ---------------------------------------------------------------------------
+# Inputs -- provided by the desktop app when the user opens it for the first time
+# ---------------------------------------------------------------------------
+inputs:
+  session_id:
+    type: string
+    description: "Chat session ID for communicating with the user"
+  preferred_cli:
+    type: string
+    description: "Preferred coding CLI (claude, cursor, codex)"
+    default: "claude"
+
+# ---------------------------------------------------------------------------
+# Stages
+# ---------------------------------------------------------------------------
+stages:
+
+  # ─── Stage 1: Container Runtime Detection ────────────────────────────────
+  detect-runtime:
+    description: "Detect available container runtime"
+    steps:
+      - type: deterministic
+        name: check-docker
+        command: "docker info --format '{{.ServerVersion}}'"
+        on_success:
+          set:
+            runtime: docker
+            runtime_version: "{{stdout}}"
+        on_failure:
+          continue: true
+
+      - type: deterministic
+        name: check-orbstack
+        condition: "!runtime"
+        command: "orbctl version"
+        on_success:
+          set:
+            runtime: orbstack
+            runtime_version: "{{stdout}}"
+        on_failure:
+          continue: true
+
+      - type: deterministic
+        name: check-colima
+        condition: "!runtime"
+        command: "colima version"
+        on_success:
+          set:
+            runtime: colima
+            runtime_version: "{{stdout}}"
+        on_failure:
+          continue: true
+
+      - type: deterministic
+        name: check-podman
+        condition: "!runtime"
+        command: "podman version --format '{{.Version}}'"
+        on_success:
+          set:
+            runtime: podman
+            runtime_version: "{{stdout}}"
+        on_failure:
+          continue: true
+
+      - type: llm-task
+        name: handle-no-runtime
+        condition: "!runtime"
+        prompt: |
+          No container runtime was detected on this system. The user needs
+          Docker, OrbStack, Colima, or Podman to run the agent platform.
+
+          Suggest the best option for their operating system and provide
+          clear installation instructions. Be friendly and concise.
+        action:
+          type: link
+          label: "Install container runtime"
+          description: "A container runtime is required to continue"
+
+      - type: chat
+        name: report-runtime
+        condition: "runtime"
+        message: "Found {{runtime}} {{runtime_version}}. Container runtime is ready."
+
+  # ─── Stage 2: Kind CLI ───────────────────────────────────────────────────
+  check-kind:
+    description: "Verify Kind cluster tool is available"
+    depends_on: [detect-runtime]
+    steps:
+      - type: deterministic
+        name: check-kind-binary
+        command: "kind version"
+        on_success:
+          set:
+            kind_installed: true
+            kind_version: "{{stdout}}"
+        on_failure:
+          continue: true
+
+      - type: deterministic
+        name: install-kind
+        condition: "!kind_installed"
+        command: |
+          if command -v brew &>/dev/null; then
+            brew install kind
+          elif command -v go &>/dev/null; then
+            go install sigs.k8s.io/kind@latest
+          else
+            curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)
+            chmod +x ./kind
+            sudo mv ./kind /usr/local/bin/kind
+          fi
+        on_success:
+          set:
+            kind_installed: true
+        on_failure:
+          continue: true
+
+      - type: llm-task
+        name: handle-kind-install-failure
+        condition: "!kind_installed"
+        prompt: |
+          Failed to install Kind automatically. The error was:
+          {{last_error}}
+
+          Help the user install Kind manually. Provide clear instructions
+          for their operating system.
+
+      - type: chat
+        name: report-kind
+        condition: "kind_installed"
+        message: "Kind cluster tool is ready."
+
+  # ─── Stage 3: API Keys ──────────────────────────────────────────────────
+  store-api-keys:
+    description: "Collect and validate API keys"
+    depends_on: [check-kind]
+    steps:
+      - type: deterministic
+        name: check-existing-keys
+        command: "openclaw config check-keys"
+        on_success:
+          set:
+            keys_present: true
+        on_failure:
+          continue: true
+
+      - type: llm-task
+        name: request-anthropic-key
+        condition: "!keys_present"
+        prompt: |
+          Ask the user for their Anthropic API key. Explain that this is
+          needed for the AI agents to function. The key will be stored
+          securely in the system keychain, never in plaintext files.
+
+          If they don't have one, provide a link to create one at
+          https://console.anthropic.com/
+        action:
+          type: confirm
+          label: "Enter API Key"
+          description: "Your Anthropic API key (stored in keychain)"
+
+      - type: deterministic
+        name: validate-key
+        condition: "!keys_present"
+        command: "openclaw config validate-key --provider anthropic"
+        on_failure:
+          continue: true
+
+      - type: llm-task
+        name: handle-bad-key
+        condition: "last_exit_code != 0 && !keys_present"
+        prompt: |
+          The API key validation failed with: {{last_error}}
+
+          This usually means the key is expired, revoked, or incorrectly
+          copied. Ask the user to try again and explain common issues
+          (extra spaces, wrong key type, etc.).
+
+      - type: chat
+        name: report-keys
+        condition: "keys_present"
+        message: "API keys are configured and validated."
+
+  # ─── Stage 4: GitHub Authentication ──────────────────────────────────────
+  github-auth:
+    description: "Authenticate with GitHub"
+    depends_on: [store-api-keys]
+    steps:
+      - type: deterministic
+        name: check-github-auth
+        command: "gh auth status"
+        on_success:
+          set:
+            github_authed: true
+        on_failure:
+          continue: true
+
+      - type: deterministic
+        name: start-github-oauth
+        condition: "!github_authed"
+        command: "openclaw auth github --device-flow"
+        on_success:
+          set:
+            github_authed: true
+        on_failure:
+          continue: true
+
+      - type: llm-task
+        name: handle-github-auth-failure
+        condition: "!github_authed"
+        prompt: |
+          GitHub authentication failed: {{last_error}}
+
+          Help the user authenticate. Common issues include:
+          - Corporate firewall blocking OAuth
+          - Browser not opening automatically
+          - Token permissions insufficient
+
+          Offer alternatives (PAT token, SSH key).
+        action:
+          type: oauth
+          label: "Authenticate with GitHub"
+
+      - type: chat
+        name: report-github
+        condition: "github_authed"
+        message: "GitHub authentication is set up."
+
+  # ─── Stage 5: Cloudflare Authentication ──────────────────────────────────
+  cloudflare-auth:
+    description: "Authenticate with Cloudflare (optional)"
+    depends_on: [github-auth]
+    steps:
+      - type: deterministic
+        name: check-cloudflare
+        command: "cloudflared tunnel list"
+        on_success:
+          set:
+            cloudflare_authed: true
+        on_failure:
+          continue: true
+
+      - type: llm-task
+        name: offer-cloudflare
+        condition: "!cloudflare_authed"
+        prompt: |
+          Cloudflare tunnel authentication is optional but enables
+          secure webhook delivery and external access to development
+          services. Ask the user if they'd like to set it up now or
+          skip it for later.
+        action:
+          type: confirm
+          label: "Set up Cloudflare tunnel?"
+          description: "Optional: enables webhook delivery"
+
+      - type: chat
+        name: report-cloudflare
+        message: "Cloudflare setup {{cloudflare_authed ? 'complete' : 'skipped (can configure later)'}}."
+
+  # ─── Stage 6: Create Kind Cluster ────────────────────────────────────────
+  create-cluster:
+    description: "Create local Kubernetes cluster"
+    depends_on: [cloudflare-auth]
+    steps:
+      - type: deterministic
+        name: check-existing-cluster
+        command: "kind get clusters | grep -q cto-local"
+        on_success:
+          set:
+            cluster_exists: true
+        on_failure:
+          continue: true
+
+      - type: deterministic
+        name: create-kind-cluster
+        condition: "!cluster_exists"
+        command: "kind create cluster --name cto-local --config kind-config.yaml"
+        timeout: 300
+        on_success:
+          set:
+            cluster_exists: true
+        on_failure:
+          continue: true
+
+      - type: llm-task
+        name: handle-cluster-failure
+        condition: "!cluster_exists"
+        prompt: |
+          Cluster creation failed with: {{last_error}}
+
+          Common causes:
+          - Docker daemon not running
+          - Insufficient disk space
+          - Port conflicts (API server port 6443)
+          - Previous cluster remnants
+
+          Diagnose the issue and attempt to fix it. If a stale cluster
+          exists, offer to delete and recreate it.
+
+      - type: deterministic
+        name: verify-cluster
+        condition: "cluster_exists"
+        command: "kubectl cluster-info --context kind-cto-local"
+        on_failure:
+          continue: true
+
+      - type: chat
+        name: report-cluster
+        condition: "cluster_exists"
+        message: "Local Kubernetes cluster is running."
+
+  # ─── Stage 7: Deploy Platform Stack ──────────────────────────────────────
+  deploy-stack:
+    description: "Deploy the agent platform to the cluster"
+    depends_on: [create-cluster]
+    steps:
+      - type: deterministic
+        name: add-helm-repos
+        command: |
+          helm repo add cto https://charts.5dlabs.dev || true
+          helm repo update
+        on_failure:
+          continue: true
+
+      - type: deterministic
+        name: deploy-platform
+        command: |
+          helm upgrade --install cto-platform cto/cto-platform \
+            --namespace cto --create-namespace \
+            --values values-local.yaml \
+            --wait --timeout 10m
+        timeout: 600
+        on_success:
+          set:
+            stack_deployed: true
+        on_failure:
+          continue: true
+
+      - type: llm-task
+        name: handle-deploy-failure
+        condition: "!stack_deployed"
+        prompt: |
+          Platform deployment failed: {{last_error}}
+
+          Check for:
+          - Pods in CrashLoopBackOff or ImagePullBackOff
+          - Missing secrets or config maps
+          - Resource quota exceeded
+          - PVC binding issues
+
+          Run diagnostic commands and attempt to fix. If a pod is
+          failing, check its logs and events.
+
+      - type: deterministic
+        name: verify-pods
+        condition: "stack_deployed"
+        command: "kubectl get pods -n cto --no-headers | grep -v Running | grep -v Completed | wc -l"
+        on_success:
+          set:
+            unhealthy_pods: "{{stdout}}"
+
+      - type: llm-task
+        name: handle-unhealthy-pods
+        condition: "stack_deployed && unhealthy_pods > 0"
+        prompt: |
+          {{unhealthy_pods}} pods are not in a healthy state. Investigate
+          each one, check logs and events, and attempt to resolve.
+          Report a summary of any issues to the user.
+
+      - type: chat
+        name: report-deploy
+        condition: "stack_deployed"
+        message: "Platform is deployed and ready. Your agents are standing by."
+
+# ---------------------------------------------------------------------------
+# Completion
+# ---------------------------------------------------------------------------
+on_complete:
+  type: chat
+  message: |
+    Setup is complete! Here's what's ready:
+    - Container runtime: {{runtime}}
+    - Kubernetes cluster: cto-local
+    - GitHub: authenticated
+    - Platform: deployed
+
+    You can now create or import a PRD and launch your first project.
+    Just paste a PRD or say "help" to get started.
+
+on_failure:
+  type: llm-task
+  prompt: |
+    The setup workflow encountered an unrecoverable error at stage
+    {{failed_stage}}. Summarize what was completed, what failed,
+    and suggest next steps the user can take to resolve the issue.
+    Be empathetic and helpful.

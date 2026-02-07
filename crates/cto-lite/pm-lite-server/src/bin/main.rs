@@ -1,7 +1,7 @@
 //! PM Lite binary entry point
 
 use anyhow::Result;
-use pm_lite::{Config, Server};
+use pm_lite_server::{Config, Server};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]

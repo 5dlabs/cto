@@ -44,11 +44,14 @@ struct TokenErrorResponse {
 /// Handle OAuth callback from Linear.
 #[allow(clippy::too_many_lines)]
 pub async fn handle_oauth_callback(
-    State(state): State<ServerState>,
+    State(_state): State<ServerState>,
     Query(params): Query<OAuthCallback>,
 ) -> impl IntoResponse {
     if let Some(error) = &params.error {
-        let description = params.error_description.as_deref().unwrap_or("No description");
+        let description = params
+            .error_description
+            .as_deref()
+            .unwrap_or("No description");
         error!(error = %error, description = %description, "OAuth authorization failed");
         return Html(format!(
             r#"<!DOCTYPE html>
@@ -99,7 +102,9 @@ pub async fn handle_oauth_callback(
                 if let Some(rt) = &token_response.refresh_token {
                     app.refresh_token = Some(rt.clone());
                 }
-                app.expires_at = token_response.expires_in.map(|secs| Utc::now().timestamp() + secs);
+                app.expires_at = token_response
+                    .expires_in
+                    .map(|secs| Utc::now().timestamp() + secs);
             }
 
             if let Err(e) = updated_config.save() {
@@ -107,11 +112,11 @@ pub async fn handle_oauth_callback(
             }
 
             Html(format!(
-                r#"<!DOCTYPE html>
+                r"<!DOCTYPE html>
 <html><head><title>Authorization Successful</title></head>
 <body><h1>✅ Authorization Successful</h1>
 <p>Agent <strong>{agent_name}</strong> authorized.</p>
-<p>Token saved. Close this window.</p></body></html>"#
+<p>Token saved. Close this window.</p></body></html>"
             ))
             .into_response()
         }
@@ -158,12 +163,19 @@ async fn exchange_code_for_token(
             .json()
             .await
             .map_err(|e| format!("Failed to parse: {e}"))?;
-        debug!(has_refresh = token_response.refresh_token.is_some(), "Token exchange successful");
+        debug!(
+            has_refresh = token_response.refresh_token.is_some(),
+            "Token exchange successful"
+        );
         Ok(token_response)
     } else {
         let error_body = response.text().await.unwrap_or_default();
         if let Ok(error_response) = serde_json::from_str::<TokenErrorResponse>(&error_body) {
-            Err(format!("{} ({})", error_response.error, error_response.error_description.unwrap_or_default()))
+            Err(format!(
+                "{} ({})",
+                error_response.error,
+                error_response.error_description.unwrap_or_default()
+            ))
         } else {
             Err(format!("Failed with status {status}: {error_body}"))
         }
@@ -193,7 +205,8 @@ pub async fn refresh_access_token(
 
     let status = response.status();
     if status.is_success() {
-        let token_response: TokenResponse = response.json().await.map_err(|e| format!("Failed: {e}"))?;
+        let token_response: TokenResponse =
+            response.json().await.map_err(|e| format!("Failed: {e}"))?;
         Ok(token_response)
     } else {
         let error_body = response.text().await.unwrap_or_default();
@@ -202,21 +215,27 @@ pub async fn refresh_access_token(
 }
 
 pub async fn handle_oauth_refresh(
-    State(state): State<ServerState>,
+    State(_state): State<ServerState>,
     axum::extract::Path(agent): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     info!(agent = %agent, "Manual token refresh");
 
     let config = Config::load();
     let Some(app_config) = config.linear.apps.get(&agent) else {
-        return (StatusCode::NOT_FOUND, format!("Unknown agent")).into_response();
+        return (StatusCode::NOT_FOUND, "Unknown agent".to_string()).into_response();
     };
 
     let Some(refresh_token) = &app_config.refresh_token else {
         return (StatusCode::BAD_REQUEST, "No refresh token").into_response();
     };
 
-    match refresh_access_token(refresh_token, &app_config.client_id, &app_config.client_secret).await {
+    match refresh_access_token(
+        refresh_token,
+        &app_config.client_id,
+        &app_config.client_secret,
+    )
+    .await
+    {
         Ok(token_response) => {
             let mut updated_config = config;
             if let Some(app) = updated_config.linear.apps.get_mut(&agent) {
@@ -224,27 +243,31 @@ pub async fn handle_oauth_refresh(
                 if let Some(rt) = token_response.refresh_token {
                     app.refresh_token = Some(rt);
                 }
-                app.expires_at = token_response.expires_in.map(|secs| Utc::now().timestamp() + secs);
+                app.expires_at = token_response
+                    .expires_in
+                    .map(|secs| Utc::now().timestamp() + secs);
             }
             if let Err(e) = updated_config.save() {
-                return (StatusCode::INTERNAL_SERVER_ERROR, format!("Save failed: {e}")).into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Save failed: {e}"),
+                )
+                    .into_response();
             }
             (StatusCode::OK, "Token refreshed".to_string()).into_response()
         }
-        Err(e) => {
-            (StatusCode::BAD_REQUEST, format!("Refresh failed: {e}")).into_response()
-        }
+        Err(e) => (StatusCode::BAD_REQUEST, format!("Refresh failed: {e}")).into_response(),
     }
 }
 
 pub async fn handle_oauth_start(
-    State(state): State<ServerState>,
+    State(_state): State<ServerState>,
     Query(params): Query<OAuthStartParams>,
 ) -> impl IntoResponse {
     let agent = params.agent.as_deref().unwrap_or("morgan");
     let config = Config::load();
     let Some(app_config) = config.linear.apps.get(agent) else {
-        return (StatusCode::NOT_FOUND, format!("Unknown agent")).into_response();
+        return (StatusCode::NOT_FOUND, "Unknown agent".to_string()).into_response();
     };
 
     let url = format!(
