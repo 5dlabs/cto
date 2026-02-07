@@ -16,6 +16,7 @@ kubeProxyReplacement: true
 # Previously: tunnel (VXLAN) - didn't support hostNetwork-to-pod connectivity
 routingMode: native
 autoDirectNodeRoutes: true
+ipv4NativeRoutingCIDR: 10.244.0.0/16
 
 # Talos-specific: Use KubePrism for API server access
 k8sServiceHost: localhost
