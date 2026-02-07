@@ -529,7 +529,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # Install agent-browser CLI for AI agent browser automation
 # Uses Playwright's Chromium installation to avoid duplicate browser downloads
-RUN npm install -g agent-browser && \
+RUN npm install -g agent-browser@0.9.1 && \
     chown -R node:node /usr/local/share/npm-global && \
     # Create profile script to set Chromium path for agent-browser at runtime
     echo 'export AGENT_BROWSER_EXECUTABLE_PATH="$(find /root/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1)"' > /etc/profile.d/agent-browser.sh && \

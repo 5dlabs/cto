@@ -8,7 +8,8 @@ You have four distinct web tools. Choose the right one for the job.
 |------|----------|------------|-------|
 | `web_search` | Finding URLs, quick answers, current events | N/A | Fast |
 | `web_fetch` | Reading articles, docs, APIs (static HTML) | No | Fast |
-| `browser` | JS-heavy sites, logins, interactive pages | Yes (Playwright) | Slow |
+| `agent-browser` | JS-heavy sites, logins, interactive pages, form fills | Yes (Playwright) | Medium |
+| `browser` | Raw Playwright API (prefer `agent-browser` CLI instead) | Yes (Playwright) | Slow |
 | Firecrawl | `web_fetch` fails due to anti-bot protection | Partial | Medium |
 
 ## web_search (Brave/Perplexity)
@@ -50,4 +51,4 @@ When `web_fetch` returns empty/blocked content, retry with Firecrawl. It handles
 1. Need to find something? → `web_search`
 2. Know the URL, static page? → `web_fetch`
 3. `web_fetch` blocked/empty? → Firecrawl
-4. Need JS, login, or interaction? → `browser`
+4. Need JS, login, or interaction? → `agent-browser` (see agent-browser skill)

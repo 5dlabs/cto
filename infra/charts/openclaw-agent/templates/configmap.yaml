@@ -26,6 +26,8 @@ data:
           "elevatedDefault": {{ .Values.agentDefaults.elevatedDefault | quote }},
           "heartbeat": {
             "every": {{ .Values.agentDefaults.heartbeat.every | quote }},
+            "target": {{ .Values.agentDefaults.heartbeat.target | quote }},
+            "ackMaxChars": {{ .Values.agentDefaults.heartbeat.ackMaxChars }},
             "prompt": {{ .Values.agentDefaults.heartbeat.prompt | quote }}
           },
           "maxConcurrent": {{ .Values.agentDefaults.maxConcurrent }},
@@ -178,7 +180,10 @@ data:
           "enabled": {{ .Values.tools.elevated.enabled }}
         },
         "exec": {
-          "pathPrepend": {{ .Values.tools.exec.pathPrepend | toJson }}
+          "pathPrepend": {{ .Values.tools.exec.pathPrepend | toJson }},
+          "timeoutSec": {{ .Values.tools.exec.timeoutSec }},
+          "backgroundMs": {{ .Values.tools.exec.backgroundMs }},
+          "notifyOnExit": {{ .Values.tools.exec.notifyOnExit }}
         },
         "profile": {{ .Values.tools.profile | quote }},
         "web": {

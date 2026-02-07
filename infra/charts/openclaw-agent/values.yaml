@@ -155,6 +155,8 @@ agentDefaults:
   maxConcurrent: 4
   heartbeat:
     every: "15m"
+    target: "last"
+    ackMaxChars: 500
     prompt: >-
       Read HEARTBEAT.md if it exists. Follow it strictly.
       AUTONOMY: When you have clear work to do, execute it.
@@ -162,6 +164,7 @@ agentDefaults:
       (dependencies, urgency, complexity) and proceed.
       Ask only when genuinely blocked or when a decision requires user preferences
       you cannot infer. Report results, not 'what should I do next?'.
+      If a background process exited unexpectedly, investigate and restart it.
       Reply HEARTBEAT_OK only if nothing needs attention.
 
 # =============================================================================
@@ -245,6 +248,9 @@ tools:
     # Linux paths only - no macOS /opt/homebrew or /Users paths
     pathPrepend:
       - "/usr/local/bin"
+    timeoutSec: 0          # No auto-kill — CLIs are long-lived services
+    backgroundMs: 5000     # Auto-background after 5s (default 10s)
+    notifyOnExit: true     # Agent gets system event when a CLI exits/crashes
 
 # =============================================================================
 # Kaniko Sidecar (daemonless container builds)
