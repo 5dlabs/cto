@@ -15,5 +15,9 @@ export function resolveConfig(raw: Partial<NatsConfig>): NatsConfig {
     ],
     reconnectWaitMs: raw.reconnectWaitMs ?? 2000,
     maxReconnectAttempts: raw.maxReconnectAttempts ?? -1,
+    agentRole: raw.agentRole ?? "general",
+    roster: raw.roster ?? [],
+    maxPingPongTurns: raw.maxPingPongTurns ?? 10,
+    pingPongWindowMs: raw.pingPongWindowMs ?? 300000,
   };
 }

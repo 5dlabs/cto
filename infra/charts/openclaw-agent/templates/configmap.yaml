@@ -146,7 +146,11 @@ data:
                 {{- end }}
               ],
               "reconnectWaitMs": {{ .Values.nats.reconnectWaitMs }},
-              "maxReconnectAttempts": {{ .Values.nats.maxReconnectAttempts }}
+              "maxReconnectAttempts": {{ .Values.nats.maxReconnectAttempts }},
+              "agentRole": {{ .Values.nats.agentRole | default "general" | quote }},
+              "maxPingPongTurns": {{ .Values.nats.maxPingPongTurns | default 10 }},
+              "pingPongWindowMs": {{ .Values.nats.pingPongWindowMs | default 300000 }},
+              "roster": {{ .Values.nats.roster | default list | toJson }}
             }
           }
           {{- end }}
