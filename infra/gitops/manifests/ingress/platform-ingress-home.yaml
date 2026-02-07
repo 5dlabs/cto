@@ -1,6 +1,6 @@
 ---
 # Platform Ingress Configuration - Home Cluster
-# Exposes ArgoCD, Argo Workflows, and Headscale via ingress-nginx
+# Exposes ArgoCD and Headscale via ingress-nginx
 # DNS: *.home.5dlabs.ai
 
 # ArgoCD Ingress
@@ -41,39 +41,6 @@ spec:
     - hosts:
         - argocd.home.5dlabs.ai
       secretName: argocd-server-tls
----
-# Argo Workflows Ingress
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: argo-workflows-server
-  namespace: automation
-  labels:
-    app.kubernetes.io/name: argo-workflows-ingress
-    app.kubernetes.io/part-of: platform
-    app.kubernetes.io/instance: platform-ingress
-  annotations:
-    external-dns.alpha.kubernetes.io/exclude: "true"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization"
-    cert-manager.io/cluster-issuer: "selfsigned-issuer"
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: workflows.home.5dlabs.ai
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: argo-workflows-server
-                port:
-                  number: 2746
-  tls:
-    - hosts:
-        - workflows.home.5dlabs.ai
-      secretName: argo-workflows-server-tls
 ---
 # Headscale Ingress
 apiVersion: networking.k8s.io/v1

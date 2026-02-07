@@ -170,18 +170,6 @@ spec:
                 Add                 service.name        kube-state-metrics
                 Add                 service.component   metrics-exporter
 
-            # Enrich logs from automation namespace (Argo)
-            [FILTER]
-                Name                modify
-                Match               kube.var.log.containers.*argo-workflows*_automation_*
-                Add                 service.name        argo-workflows
-                Add                 service.component   workflow-engine
-
-            [FILTER]
-                Name                modify
-                Match               kube.var.log.containers.*argo-events*_automation_*
-                Add                 service.name        argo-events
-                Add                 service.component   event-bus
 
             # Enrich logs from argocd namespace
             [FILTER]

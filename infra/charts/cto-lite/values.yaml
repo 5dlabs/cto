@@ -187,9 +187,9 @@ agents:
         memory: "512Mi"
         cpu: "500m"
 
-# Argo Workflows configuration
+# Argo Workflows configuration (archived - replaced with new orchestration)
 argo-workflows:
-  enabled: true
+  enabled: false
   
   # Use minimal install
   singleNamespace: true
