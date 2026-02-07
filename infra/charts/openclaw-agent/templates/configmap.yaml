@@ -49,8 +49,7 @@ data:
                 "textWeight": {{ .Values.memorySearch.hybrid.textWeight }},
                 "vectorWeight": {{ .Values.memorySearch.hybrid.vectorWeight }}
               },
-              "maxResults": {{ .Values.memorySearch.maxResults | default 6 }},
-              "timeoutMs": {{ .Values.memorySearch.timeoutMs | default 4000 }}
+              "maxResults": {{ .Values.memorySearch.maxResults | default 6 }}
             },
             "sources": {{ .Values.memorySearch.sources | toJson }},
             "sync": {
@@ -60,13 +59,7 @@ data:
               },
               "watch": {{ .Values.memorySearch.sync.watch }}
             }
-            {{- if .Values.memorySearch.gc }},
-            "gc": {
-              "enabled": {{ .Values.memorySearch.gc.enabled }},
-              "retentionDays": {{ .Values.memorySearch.gc.retentionDays }},
-              "maxFiles": {{ .Values.memorySearch.gc.maxFiles }}
-            }
-            {{- end }}
+            {{- /* gc block removed — not supported by current OpenClaw build */ -}}
           },
           "model": {
             "fallbacks": {{ .Values.modelDefaults.fallbacks | toJson }},
@@ -121,8 +114,7 @@ data:
         "port": {{ .Values.gateway.port }}
       },
       "memory": {
-        "citations": {{ .Values.memory.citations | default "auto" | quote }},
-        "snippetMaxChars": {{ .Values.memory.snippetMaxChars | default 700 }}
+        "citations": {{ .Values.memory.citations | default "auto" | quote }}
       },
       "commands": {
         "native": "auto",
@@ -191,14 +183,13 @@ data:
         },
         "exec": {
           "pathPrepend": {{ .Values.tools.exec.pathPrepend | toJson }},
-          "timeoutSec": {{ .Values.tools.exec.timeoutSec }},
           "backgroundMs": {{ .Values.tools.exec.backgroundMs }},
           "notifyOnExit": {{ .Values.tools.exec.notifyOnExit }}
         },
         "profile": {{ .Values.tools.profile | quote }},
         "web": {
           "search": { "enabled": true },
-          "fetch": { "enabled": true, "firecrawl": { "enabled": true } }
+          "fetch": { "enabled": true }
         }
       },
       {{- if .Values.logging }}
