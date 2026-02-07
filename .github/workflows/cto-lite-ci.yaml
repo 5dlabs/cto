@@ -216,16 +216,16 @@ jobs:
 
       - name: Format check
         run: cargo fmt --check
-        working-directory: crates/cto-lite/pm-lite
+        working-directory: crates/cto-lite/pm-lite-server
 
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
-        working-directory: crates/cto-lite/pm-lite
+        working-directory: crates/cto-lite/pm-lite-server
 
       - name: Build
         run: cargo build --release
-        working-directory: crates/cto-lite/pm-lite
+        working-directory: crates/cto-lite/pm-lite-server
 
       - name: Test
         run: cargo test
-        working-directory: crates/cto-lite/pm-lite
+        working-directory: crates/cto-lite/pm-lite-server

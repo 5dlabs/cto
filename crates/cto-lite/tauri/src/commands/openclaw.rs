@@ -138,9 +138,10 @@ pub async fn openclaw_start_workflow(
         )));
     }
 
-    let result: WorkflowStartResult = resp.json().await.map_err(|e| {
-        AppError::CommandFailed(format!("Invalid workflow start response: {e}"))
-    })?;
+    let result: WorkflowStartResult = resp
+        .json()
+        .await
+        .map_err(|e| AppError::CommandFailed(format!("Invalid workflow start response: {e}")))?;
 
     tracing::info!(
         "Started workflow {} (type={})",
@@ -180,9 +181,10 @@ pub async fn openclaw_get_status() -> Result<OpenClawStatus, AppError> {
 
     match http_client().get(&url).send().await {
         Ok(resp) if resp.status().is_success() => {
-            let status: OpenClawStatus = resp.json().await.map_err(|e| {
-                AppError::CommandFailed(format!("Invalid status response: {e}"))
-            })?;
+            let status: OpenClawStatus = resp
+                .json()
+                .await
+                .map_err(|e| AppError::CommandFailed(format!("Invalid status response: {e}")))?;
             GATEWAY_CONNECTED.store(true, Ordering::Relaxed);
             Ok(status)
         }
@@ -202,9 +204,7 @@ pub async fn openclaw_get_status() -> Result<OpenClawStatus, AppError> {
 
 /// Get message history for a session.
 #[tauri::command]
-pub async fn openclaw_get_messages(
-    session_id: String,
-) -> Result<Vec<OpenClawResponse>, AppError> {
+pub async fn openclaw_get_messages(session_id: String) -> Result<Vec<OpenClawResponse>, AppError> {
     let url = format!("{}/api/chat/{}/messages", gateway_url(), session_id);
 
     let resp = http_client()
@@ -221,19 +221,17 @@ pub async fn openclaw_get_messages(
         )));
     }
 
-    let messages: Vec<OpenClawResponse> = resp.json().await.map_err(|e| {
-        AppError::CommandFailed(format!("Invalid messages response: {e}"))
-    })?;
+    let messages: Vec<OpenClawResponse> = resp
+        .json()
+        .await
+        .map_err(|e| AppError::CommandFailed(format!("Invalid messages response: {e}")))?;
 
     Ok(messages)
 }
 
 /// Reject a pending workflow approval gate.
 #[tauri::command]
-pub async fn openclaw_reject(
-    workflow_id: String,
-    reason: String,
-) -> Result<(), AppError> {
+pub async fn openclaw_reject(workflow_id: String, reason: String) -> Result<(), AppError> {
     let url = format!("{}/api/workflows/{}/reject", gateway_url(), workflow_id);
 
     let body = serde_json::json!({ "reason": reason });
@@ -278,9 +276,10 @@ pub async fn openclaw_get_workflow_status(
         )));
     }
 
-    let result: WorkflowStartResult = resp.json().await.map_err(|e| {
-        AppError::CommandFailed(format!("Invalid workflow status response: {e}"))
-    })?;
+    let result: WorkflowStartResult = resp
+        .json()
+        .await
+        .map_err(|e| AppError::CommandFailed(format!("Invalid workflow status response: {e}")))?;
 
     Ok(result)
 }
@@ -314,9 +313,10 @@ pub async fn openclaw_exec_cli(cli: String, args: Vec<String>) -> Result<String,
         )));
     }
 
-    let output = resp.text().await.map_err(|e| {
-        AppError::CommandFailed(format!("Failed to read CLI output: {e}"))
-    })?;
+    let output = resp
+        .text()
+        .await
+        .map_err(|e| AppError::CommandFailed(format!("Failed to read CLI output: {e}")))?;
 
     Ok(output)
 }
