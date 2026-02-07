@@ -11,6 +11,12 @@ cluster:
 # Kube-proxy replacement using eBPF
 kubeProxyReplacement: true
 
+# Routing mode: native uses direct routing between nodes via host routing table
+# This allows hostNetwork pods to reach remote pod IPs (required for Mayastor)
+# Previously: tunnel (VXLAN) - didn't support hostNetwork-to-pod connectivity
+routingMode: native
+autoDirectNodeRoutes: true
+
 # Talos-specific: Use KubePrism for API server access
 k8sServiceHost: localhost
 k8sServicePort: 7445
