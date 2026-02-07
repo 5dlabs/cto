@@ -93,19 +93,28 @@ spec:
           logs.platform.5dlabs.io/collect: "true"
           logs.platform.5dlabs.io/service: metrics-server
 
-        # Affinity for pod distribution
+        # Use host network to bypass Cilium pod-to-host hairpin issue
+        # This allows metrics-server to reach kubelet on all nodes reliably
+        hostNetwork:
+          enabled: true
+
+        # Tolerate control-plane taint so pods can schedule on all nodes
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+
+        # Affinity for pod distribution - require spreading across nodes
         affinity:
           podAntiAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-              - weight: 100
-                podAffinityTerm:
-                  labelSelector:
-                    matchExpressions:
-                      - key: app.kubernetes.io/name
-                        operator: In
-                        values:
-                          - metrics-server
-                  topologyKey: kubernetes.io/hostname
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - metrics-server
+                topologyKey: kubernetes.io/hostname
 
   # Destination configuration - deploy to kube-system namespace
   destination:

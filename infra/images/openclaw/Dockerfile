@@ -46,7 +46,7 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # npm CLIs - Claude Code, Codex, Every Code, OpenAI SDK, OpenClaw
 # ---------------------------------------------------------------------------
-ARG VERSION=2026.2.6-3
+ARG VERSION=latest
 
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     npm install -g \
