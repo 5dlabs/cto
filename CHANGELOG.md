@@ -3,6 +3,13 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.49](https://github.com/5dlabs/cto/compare/v0.2.48...v0.2.49) (2026-02-08)
+
+
+### ✨ Features
+
+* **mcp:** add toggle_app tool for enabling/disabling ArgoCD applications ([#4403](https://github.com/5dlabs/cto/issues/4403)) ([57b8384](https://github.com/5dlabs/cto/commit/57b83848b41220a3badb26d3690cc6bd37b286ed))
+
 ## [0.2.48](https://github.com/5dlabs/cto/compare/v0.2.47...v0.2.48) (2026-02-07)
 
 
