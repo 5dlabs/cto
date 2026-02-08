@@ -1,0 +1,31 @@
+---
+# Talos firewall for admin-cto cluster - VPN-only access
+# Apply to control plane and worker nodes with:
+# talosctl patch machineconfig -n <node-ip> --patch @admin-cto-firewall-patch.yaml
+
+machine:
+  network:
+    firewall:
+      defaultAction: block
+      rules:
+        # Allow Kilo VPN (WireGuard) from anywhere
+        - portSelector:
+            ports:
+              - 51820
+            protocol: udp
+          ingress:
+            - subnet: 0.0.0.0/0
+
+        # Allow traffic from internal subnets (pod and service CIDRs)
+        - ingress:
+            - subnet: 10.0.0.0/8
+
+        # Mayastor ports (agent-core gRPC API, HA cluster, NVMe-oF target)
+        - portSelector:
+            ports:
+              - 50051
+              - 50052
+              - 10124
+            protocol: tcp
+          ingress:
+            - subnet: 10.0.0.0/8

@@ -127,7 +127,7 @@ socketLB:
 
 # Enable host firewall for node protection
 hostFirewall:
-  enabled: false
+  enabled: true
 
 # External workloads support (for VMs or bare metal outside K8s)
 externalWorkloads:

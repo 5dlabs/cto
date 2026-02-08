@@ -1,0 +1,47 @@
+---
+# Cilium Host Firewall - VPN-Only Access
+# This policy restricts all inbound traffic to cluster nodes except from:
+# - Kilo VPN (WireGuard UDP 51820)
+# - Internal pod, service, and node networks
+# - Kubernetes API server and remote-node traffic
+
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: host-firewall-vpn-only
+spec:
+  description: "Allow only VPN and internal traffic to cluster nodes"
+  nodeSelector: {}
+
+  ingress:
+    # Allow Kilo VPN (WireGuard) from anywhere
+    - fromEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "51820"
+              protocol: UDP
+
+    # Allow all traffic from pod CIDR
+    - fromCIDR:
+        - 10.244.0.0/16
+
+    # Allow all traffic from service CIDR
+    - fromCIDR:
+        - 10.96.0.0/12
+
+    # Allow node-to-node traffic (admin-cto cluster internal network)
+    - fromCIDR:
+        - 10.8.0.0/24
+
+    # Allow from cluster entities
+    - fromEntities:
+        - remote-node
+        - kube-apiserver
+
+  egress:
+    # Allow all outbound traffic
+    - toEntities:
+        - world
+        - cluster
+        - host

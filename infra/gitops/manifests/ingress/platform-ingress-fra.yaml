@@ -14,8 +14,8 @@ metadata:
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/instance: platform-ingress
   annotations:
-    # Let external-dns create Cloudflare DNS records
-    external-dns.alpha.kubernetes.io/target: "67.213.113.187"
+    # External DNS removed - services now only accessible via VPN
+    # external-dns.alpha.kubernetes.io/target: "67.213.113.187"
     # NGINX ingress configuration - TLS terminates at ingress, plain HTTP to backend
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # Increase timeouts for git operations
@@ -53,7 +53,8 @@ metadata:
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/instance: platform-ingress
   annotations:
-    external-dns.alpha.kubernetes.io/target: "67.213.113.187"
+    # External DNS removed - services now only accessible via VPN
+    # external-dns.alpha.kubernetes.io/target: "67.213.113.187"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/proxy-set-headers: "headscale/nginx-headers"
@@ -101,7 +102,8 @@ metadata:
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/instance: platform-ingress
   annotations:
-    external-dns.alpha.kubernetes.io/target: "67.213.113.187"
+    # External DNS removed - services now only accessible via VPN
+    # external-dns.alpha.kubernetes.io/target: "67.213.113.187"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/cluster-issuer: "selfsigned-issuer"
 spec:
