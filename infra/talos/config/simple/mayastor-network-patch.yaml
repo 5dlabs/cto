@@ -1,20 +1,37 @@
 ---
-# Mayastor network firewall patch - allows required ports for Mayastor communication
+# Cluster network firewall patch - allows required ports for all cluster services
 # Apply to ALL nodes (control plane and workers) with:
 # talosctl patch machineconfig -n <node-ip> --patch @mayastor-network-patch.yaml
+#
+# Ports opened:
+#   10124/tcp  - Mayastor io-engine gRPC + NVMe-oF target
+#   50051/tcp  - Mayastor agent-core gRPC API
+#   50052/tcp  - Mayastor agent-core HA cluster
+#   4421/tcp   - Mayastor NVMe-oF target listener
+#   8420/tcp   - Mayastor NVMe discovery service
+#   4244/tcp   - Cilium Hubble peer (for hubble-relay observability)
+#   4240/tcp   - Cilium health checks (inter-node)
+#   10250/tcp  - Kubelet API (metrics-server, kube-apiserver)
 
 machine:
   network:
     firewall:
       defaultAction: block
       rules:
+        # Allow Mayastor io-engine gRPC + NVMe-oF target (port 10124)
+        - portSelector:
+            ports:
+              - 10124
+            protocol: tcp
+          ingress:
+            - subnet: 10.0.0.0/8  # Pod CIDR, service CIDR, and node IPs
         # Allow Mayastor agent-core gRPC API (port 50051)
         - portSelector:
             ports:
               - 50051
             protocol: tcp
           ingress:
-            - subnet: 10.0.0.0/8  # Allow from pod and service CIDRs
+            - subnet: 10.0.0.0/8
         # Allow Mayastor agent-core HA cluster (port 50052)
         - portSelector:
             ports:
@@ -22,10 +39,38 @@ machine:
             protocol: tcp
           ingress:
             - subnet: 10.0.0.0/8
-        # Allow Mayastor io-engine NVMe-oF target (port 10124)
+        # Allow Mayastor NVMe-oF target listener (port 4421)
         - portSelector:
             ports:
-              - 10124
+              - 4421
+            protocol: tcp
+          ingress:
+            - subnet: 10.0.0.0/8
+        # Allow Mayastor NVMe discovery service (port 8420)
+        - portSelector:
+            ports:
+              - 8420
+            protocol: tcp
+          ingress:
+            - subnet: 10.0.0.0/8
+        # Allow Cilium Hubble peer gRPC (port 4244)
+        - portSelector:
+            ports:
+              - 4244
+            protocol: tcp
+          ingress:
+            - subnet: 10.0.0.0/8
+        # Allow Cilium health checks (port 4240)
+        - portSelector:
+            ports:
+              - 4240
+            protocol: tcp
+          ingress:
+            - subnet: 10.0.0.0/8
+        # Allow Kubelet API (port 10250) - needed by metrics-server
+        - portSelector:
+            ports:
+              - 10250
             protocol: tcp
           ingress:
             - subnet: 10.0.0.0/8
