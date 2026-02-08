@@ -17,7 +17,8 @@ pub fn get_tool_schemas() -> Value {
             get_remove_mcp_server_schema(),
             get_update_mcp_server_schema(),
             get_check_setup_schema(),
-            get_add_skills_schema()
+            get_add_skills_schema(),
+            get_toggle_app_schema()
         ]
     })
 }
@@ -38,7 +39,8 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
             get_remove_mcp_server_schema(),
             get_update_mcp_server_schema(),
             get_check_setup_schema(),
-            get_add_skills_schema()
+            get_add_skills_schema(),
+            get_toggle_app_schema()
         ]
     })
 }
@@ -423,6 +425,32 @@ fn get_check_setup_schema() -> Value {
                 }
             },
             "required": []
+        }
+    })
+}
+
+fn get_toggle_app_schema() -> Value {
+    json!({
+        "name": "toggle_app",
+        "description": "Enable or disable an ArgoCD application deployment without deleting it. Uses the skip-reconcile annotation to pause/resume reconciliation. When disabled, ArgoCD stops all processing for the application but preserves its configuration. Supports listing all applications with their current enabled/disabled status.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["enable", "disable", "status", "list"],
+                    "description": "Action to perform: 'enable' removes the skip-reconcile annotation to resume syncing, 'disable' adds it to pause all reconciliation, 'status' shows the current state of a specific application, 'list' shows all applications with their enabled/disabled status."
+                },
+                "application_name": {
+                    "type": "string",
+                    "description": "Name of the ArgoCD Application resource (e.g., 'cloudnative-pg-operator', 'grafana', 'ai-ingress'). Required for enable, disable, and status actions. Not needed for list."
+                },
+                "namespace": {
+                    "type": "string",
+                    "description": "Namespace where ArgoCD Application resources live (default: 'argocd')"
+                }
+            },
+            "required": ["action"]
         }
     })
 }
