@@ -16,19 +16,24 @@ function buildDescription(agentName: string, roster: RosterEntry[]): string {
     "Actions:",
     '  publish  — Fire-and-forget message. Use `to` for direct or `subject` for custom routing.',
     '  request  — Send and wait for a reply. Returns the response message.',
+    '  reply    — Reply to a pending request-reply message from another agent.',
     '  discover — Find which agents are currently online. No other params needed.',
     "",
     "Parameters:",
-    '  action   — "publish", "request", or "discover"',
+    '  action   — "publish", "request", "reply", or "discover"',
     "  to       — Target agent name (resolves to agent.<name>.inbox)",
     "  subject  — Raw NATS subject (overrides `to`)",
-    "  message  — Message body text (required for publish/request)",
+    "  message  — Message body text (required for publish/request/reply)",
     '  priority — "normal" (default) or "urgent" (wakes recipient immediately)',
     "  timeoutMs — Timeout for request/discover (default 10000/3000)",
+    "",
+    "Conversation lifecycle:",
+    '  Include "[END_CONVERSATION]" in a message to signal the end of a conversation.',
     "",
     "Examples:",
     '  nats(action="publish", to="forge", message="deploy the staging build")',
     '  nats(action="request", to="planner", message="what tasks are pending?")',
+    '  nats(action="reply", to="planner", message="here are the pending tasks: ...")',
     '  nats(action="publish", subject="agent.all.broadcast", message="status check")',
     '  nats(action="discover")',
   ];
@@ -54,6 +59,7 @@ export function createNatsTool(
   roster: RosterEntry[],
   checkPingPong: (peer: string) => PingPongCheck,
   recordPingPong: (peer: string) => void,
+  getReplyContext: (peer: string) => string | undefined,
 ) {
   return {
     id: "nats",
@@ -64,8 +70,8 @@ export function createNatsTool(
       properties: {
         action: {
           type: "string",
-          enum: ["publish", "request", "discover"],
-          description: "publish (fire-and-forget), request (wait for reply), or discover (find online agents)",
+          enum: ["publish", "request", "reply", "discover"],
+          description: "publish (fire-and-forget), request (wait for reply), reply (respond to a pending request), or discover (find online agents)",
         },
         to: {
           type: "string",
@@ -95,7 +101,7 @@ export function createNatsTool(
     async execute(
       _toolCallId: string,
       params: {
-        action: "publish" | "request" | "discover";
+        action: "publish" | "request" | "reply" | "discover";
         to?: string;
         subject?: string;
         message?: string;
@@ -128,6 +134,44 @@ export function createNatsTool(
         } catch (err) {
           return result(`Discovery failed: ${err}`);
         }
+      }
+
+      // --- reply action ---
+      if (params.action === "reply") {
+        if (!params.to) {
+          return result('Error: "to" parameter is required for reply action.');
+        }
+        if (!params.message) {
+          return result('Error: "message" parameter is required for reply action.');
+        }
+        const replySubject = getReplyContext(params.to);
+        if (!replySubject) {
+          return result(
+            `No pending reply context for "${params.to}". The request may have timed out or no request was made. ` +
+            `Use action="publish" instead for async messaging.`,
+          );
+        }
+        const peer = params.to;
+        const check = checkPingPong(peer);
+        if (!check.allowed) {
+          return result(
+            `Ping-pong limit reached for ${peer} (${check.count}/${check.limit} messages in window). ` +
+            `Wait for the window to reset or message a different agent.`,
+          );
+        }
+        recordPingPong(peer);
+
+        const msg: AgentMessage = {
+          from: agentName,
+          to: params.to,
+          subject: replySubject,
+          message: params.message,
+          priority: params.priority ?? "normal",
+          timestamp: new Date().toISOString(),
+          type: "message",
+        };
+        client.publish(replySubject, msg);
+        return result(`Replied to ${params.to} via request-reply (subject=${replySubject})`);
       }
 
       // --- publish / request require message ---
@@ -188,7 +232,7 @@ export function createNatsTool(
       }
 
       return result(
-        `Error: Unknown action "${params.action}". Use "publish", "request", or "discover".`,
+        `Error: Unknown action "${params.action}". Use "publish", "request", "reply", or "discover".`,
       );
     },
   };
