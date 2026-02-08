@@ -4185,6 +4185,12 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         }]
                     })))
                 }
+                Ok("toggle_app") => Some(handle_toggle_app(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
                 Ok(unknown) => Some(Err(anyhow!("Unknown tool: {unknown}"))),
                 Err(e) => Some(Err(e)),
             }
@@ -4227,6 +4233,444 @@ fn run_kubectl_json(args: &[&str]) -> Result<Value> {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(anyhow!("kubectl failed: {stderr}"))
     }
+}
+
+fn run_kubectl(args: &[&str]) -> Result<String> {
+    let kubectl_cmd = find_command("kubectl");
+    let output = std::process::Command::new(&kubectl_cmd)
+        .args(args)
+        .output()
+        .context("Failed to execute kubectl command")?;
+    if output.status.success() {
+        Ok(String::from_utf8(output.stdout)?.trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(anyhow!("kubectl failed: {stderr}"))
+    }
+}
+
+// =============================================================================
+// ArgoCD Application Toggle (enable/disable via skip-reconcile annotation)
+// =============================================================================
+
+const SKIP_RECONCILE_ANNOTATION: &str = "argocd.argoproj.io/skip-reconcile";
+
+/// Handle the `toggle_app` tool - enable/disable `ArgoCD` applications
+fn handle_toggle_app(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let action = arguments
+        .get("action")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("action is required"))?;
+    let namespace = arguments
+        .get("namespace")
+        .and_then(|v| v.as_str())
+        .unwrap_or("argocd");
+
+    match action {
+        "list" => toggle_app_list(namespace),
+        "status" => {
+            let app_name = arguments
+                .get("application_name")
+                .and_then(|v| v.as_str())
+                .ok_or(anyhow!("application_name is required for status action"))?;
+            toggle_app_status(app_name, namespace)
+        }
+        "enable" => {
+            let app_name = arguments
+                .get("application_name")
+                .and_then(|v| v.as_str())
+                .ok_or(anyhow!("application_name is required for enable action"))?;
+            toggle_app_enable(app_name, namespace)
+        }
+        "disable" => {
+            let app_name = arguments
+                .get("application_name")
+                .and_then(|v| v.as_str())
+                .ok_or(anyhow!("application_name is required for disable action"))?;
+            toggle_app_disable(app_name, namespace)
+        }
+        other => Err(anyhow!(
+            "Unknown action: {other}. Supported: enable, disable, status, list"
+        )),
+    }
+}
+
+/// List all `ArgoCD` applications with their enabled/disabled status
+fn toggle_app_list(namespace: &str) -> Result<Value> {
+    let apps = run_kubectl_json(&[
+        "get",
+        "applications",
+        "-n",
+        namespace,
+        "-o",
+        "json",
+    ])?;
+
+    let items = apps
+        .get("items")
+        .and_then(|v| v.as_array())
+        .ok_or(anyhow!("No applications found"))?;
+
+    let mut app_list: Vec<Value> = Vec::new();
+    for item in items {
+        let name = item
+            .pointer("/metadata/name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let skip_reconcile = item
+            .pointer("/metadata/annotations/argocd.argoproj.io~1skip-reconcile")
+            .and_then(|v| v.as_str())
+            .unwrap_or("false");
+        let health = item
+            .pointer("/status/health/status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown");
+        let sync = item
+            .pointer("/status/sync/status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown");
+        let dest_namespace = item
+            .pointer("/spec/destination/namespace")
+            .and_then(|v| v.as_str())
+            .unwrap_or("default");
+
+        let enabled = skip_reconcile != "true";
+
+        app_list.push(json!({
+            "name": name,
+            "enabled": enabled,
+            "health": health,
+            "sync": sync,
+            "destination_namespace": dest_namespace,
+            "skip_reconcile": skip_reconcile
+        }));
+    }
+
+    // Sort by name for consistent output
+    app_list.sort_by(|a, b| {
+        let a_name = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let b_name = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        a_name.cmp(b_name)
+    });
+
+    let enabled_count = app_list.iter().filter(|a| a.get("enabled") == Some(&json!(true))).count();
+    let disabled_count = app_list.len() - enabled_count;
+
+    Ok(json!({
+        "total": app_list.len(),
+        "enabled": enabled_count,
+        "disabled": disabled_count,
+        "applications": app_list
+    }))
+}
+
+/// Get the status of a specific `ArgoCD` application
+fn toggle_app_status(app_name: &str, namespace: &str) -> Result<Value> {
+    let app = run_kubectl_json(&[
+        "get",
+        "application",
+        app_name,
+        "-n",
+        namespace,
+        "-o",
+        "json",
+    ])?;
+
+    let skip_reconcile = app
+        .pointer("/metadata/annotations/argocd.argoproj.io~1skip-reconcile")
+        .and_then(|v| v.as_str())
+        .unwrap_or("false");
+    let health = app
+        .pointer("/status/health/status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Unknown");
+    let sync = app
+        .pointer("/status/sync/status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Unknown");
+    let dest_namespace = app
+        .pointer("/spec/destination/namespace")
+        .and_then(|v| v.as_str())
+        .unwrap_or("default");
+    let auto_sync = app
+        .pointer("/spec/syncPolicy/automated")
+        .is_some();
+
+    let enabled = skip_reconcile != "true";
+
+    Ok(json!({
+        "name": app_name,
+        "enabled": enabled,
+        "health": health,
+        "sync": sync,
+        "auto_sync": auto_sync,
+        "destination_namespace": dest_namespace,
+        "skip_reconcile": skip_reconcile,
+        "message": if enabled {
+            format!("Application '{app_name}' is ENABLED and actively reconciling")
+        } else {
+            format!("Application '{app_name}' is DISABLED (skip-reconcile annotation is set)")
+        }
+    }))
+}
+
+/// Disable an `ArgoCD` application by adding the skip-reconcile annotation,
+/// deleting managed resources, and monitoring cleanup for up to 2 minutes.
+#[allow(clippy::too_many_lines)]
+fn toggle_app_disable(app_name: &str, namespace: &str) -> Result<Value> {
+    // First check current state and get app details
+    let app = run_kubectl_json(&[
+        "get", "application", app_name, "-n", namespace, "-o", "json",
+    ])?;
+
+    let skip_reconcile = app
+        .pointer("/metadata/annotations/argocd.argoproj.io~1skip-reconcile")
+        .and_then(|v| v.as_str())
+        .unwrap_or("false");
+
+    if skip_reconcile == "true" {
+        return Ok(json!({
+            "success": true,
+            "name": app_name,
+            "action": "disable",
+            "already_disabled": true,
+            "message": format!("Application '{app_name}' is already disabled")
+        }));
+    }
+
+    let dest_namespace = app
+        .pointer("/spec/destination/namespace")
+        .and_then(|v| v.as_str())
+        .unwrap_or("default")
+        .to_string();
+
+    // Collect managed resources from the app status before disabling
+    let managed_resources: Vec<Value> = app
+        .pointer("/status/resources")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    // Step 1: Set skip-reconcile annotation (prevents ArgoCD from re-creating resources)
+    let annotation = format!("{SKIP_RECONCILE_ANNOTATION}=true");
+    run_kubectl(&[
+        "annotate", "application", app_name, "-n", namespace,
+        &annotation, "--overwrite",
+    ])?;
+
+    // Step 2: Delete each managed resource from the app's resource tree
+    let mut deleted_count = 0;
+    let mut delete_errors: Vec<String> = Vec::new();
+
+    for resource in &managed_resources {
+        let kind = resource.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+        let name = resource.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let res_ns = resource
+            .get("namespace")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&dest_namespace);
+        let group = resource.get("group").and_then(|v| v.as_str()).unwrap_or("");
+
+        if kind.is_empty() || name.is_empty() {
+            continue;
+        }
+
+        // Build the resource type identifier (e.g., "deployment.apps" or "service")
+        let resource_type = if group.is_empty() {
+            kind.to_lowercase()
+        } else {
+            format!("{}.{}", kind.to_lowercase(), group)
+        };
+
+        // Use namespace flag for namespaced resources, skip for cluster-scoped
+        let result = if res_ns.is_empty() {
+            run_kubectl(&["delete", &resource_type, name, "--ignore-not-found"])
+        } else {
+            run_kubectl(&[
+                "delete", &resource_type, name, "-n", res_ns, "--ignore-not-found",
+            ])
+        };
+
+        match result {
+            Ok(_) => deleted_count += 1,
+            Err(e) => delete_errors.push(format!("{kind}/{name}: {e}")),
+        }
+    }
+
+    // Step 3: Monitor for up to 2 minutes, checking every 10 seconds
+    let interval_secs = 10;
+    let timeout_secs = 120;
+    let mut elapsed = 0u64;
+    let mut force_deleted = false;
+
+    while elapsed < timeout_secs {
+        std::thread::sleep(std::time::Duration::from_secs(interval_secs));
+        elapsed += interval_secs;
+
+        // Check for remaining pods in the destination namespace with ArgoCD tracking label
+        let label = format!("app.kubernetes.io/instance={app_name}");
+        let pods_result = run_kubectl_json(&[
+            "get", "pods", "-l", &label, "-n", &dest_namespace, "-o", "json",
+        ]);
+
+        match pods_result {
+            Ok(pods) => {
+                let items = pods.get("items").and_then(|v| v.as_array());
+                if items.is_none_or(Vec::is_empty) {
+                    return Ok(json!({
+                        "success": true,
+                        "name": app_name,
+                        "action": "disable",
+                        "resources_deleted": deleted_count,
+                        "resources_cleaned_up": true,
+                        "elapsed_seconds": elapsed,
+                        "message": format!(
+                            "Application '{app_name}' disabled. {deleted_count} resources deleted, all pods terminated in {elapsed}s."
+                        )
+                    }));
+                }
+            }
+            Err(_) => {
+                // Namespace may already be gone — that counts as clean
+                return Ok(json!({
+                    "success": true,
+                    "name": app_name,
+                    "action": "disable",
+                    "resources_deleted": deleted_count,
+                    "resources_cleaned_up": true,
+                    "elapsed_seconds": elapsed,
+                    "message": format!(
+                        "Application '{app_name}' disabled. {deleted_count} resources deleted, namespace no longer accessible after {elapsed}s."
+                    )
+                }));
+            }
+        }
+    }
+
+    // Step 4: Force-delete any remaining pods after timeout
+    let label = format!("app.kubernetes.io/instance={app_name}");
+    if let Ok(msg) = run_kubectl(&[
+        "delete", "pods", "--all", "-l", &label, "-n", &dest_namespace,
+        "--force", "--grace-period=0",
+    ]) {
+        force_deleted = true;
+        let _ = msg; // consumed
+    }
+
+    Ok(json!({
+        "success": true,
+        "name": app_name,
+        "action": "disable",
+        "resources_deleted": deleted_count,
+        "resources_cleaned_up": false,
+        "force_deleted": force_deleted,
+        "elapsed_seconds": elapsed,
+        "delete_errors": delete_errors,
+        "message": format!(
+            "Application '{app_name}' disabled. {deleted_count} resources deleted. \
+             Some pods did not terminate within {timeout_secs}s — force-deleted: {force_deleted}."
+        )
+    }))
+}
+
+/// Enable an `ArgoCD` application by removing the skip-reconcile annotation,
+/// triggering a sync, and monitoring health for up to 2 minutes.
+#[allow(clippy::too_many_lines)]
+fn toggle_app_enable(app_name: &str, namespace: &str) -> Result<Value> {
+    // First check current state
+    let current = toggle_app_status(app_name, namespace)?;
+    if current.get("enabled") == Some(&json!(true)) {
+        return Ok(json!({
+            "success": true,
+            "name": app_name,
+            "action": "enable",
+            "already_enabled": true,
+            "message": format!("Application '{app_name}' is already enabled")
+        }));
+    }
+
+    // Step 1: Remove the skip-reconcile annotation
+    let annotation_remove = format!("{SKIP_RECONCILE_ANNOTATION}-");
+    run_kubectl(&[
+        "annotate", "application", app_name, "-n", namespace, &annotation_remove,
+    ])?;
+
+    // Step 2: Trigger a manual sync by setting the refresh annotation
+    let _ = run_kubectl(&[
+        "annotate", "application", app_name, "-n", namespace,
+        "argocd.argoproj.io/refresh=normal", "--overwrite",
+    ]);
+
+    // Also patch the operation to trigger an actual sync
+    let sync_patch = json!({
+        "operation": {
+            "initiatedBy": { "username": "cto-mcp-toggle" },
+            "sync": {
+                "prune": true,
+                "syncStrategy": { "apply": { "force": false } }
+            }
+        }
+    });
+    let patch_str = serde_json::to_string(&sync_patch).unwrap_or_default();
+    let _ = run_kubectl(&[
+        "patch", "application", app_name, "-n", namespace,
+        "--type", "merge", "-p", &patch_str,
+    ]);
+
+    // Step 3: Monitor health and sync status for up to 2 minutes
+    let interval_secs = 10;
+    let timeout_secs = 120;
+    let mut elapsed = 0u64;
+    let mut last_health = String::from("Unknown");
+    let mut last_sync = String::from("Unknown");
+
+    while elapsed < timeout_secs {
+        std::thread::sleep(std::time::Duration::from_secs(interval_secs));
+        elapsed += interval_secs;
+
+        if let Ok(status) = toggle_app_status(app_name, namespace) {
+            last_health = status
+                .get("health")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown")
+                .to_string();
+            last_sync = status
+                .get("sync")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown")
+                .to_string();
+
+            if last_health == "Healthy" && last_sync == "Synced" {
+                return Ok(json!({
+                    "success": true,
+                    "name": app_name,
+                    "action": "enable",
+                    "healthy": true,
+                    "health": last_health,
+                    "sync": last_sync,
+                    "elapsed_seconds": elapsed,
+                    "message": format!(
+                        "Application '{app_name}' enabled and healthy after {elapsed}s."
+                    )
+                }));
+            }
+        }
+    }
+
+    // Return partial success — app is enabled but not yet fully healthy
+    Ok(json!({
+        "success": true,
+        "name": app_name,
+        "action": "enable",
+        "healthy": false,
+        "health": last_health,
+        "sync": last_sync,
+        "elapsed_seconds": elapsed,
+        "message": format!(
+            "Application '{app_name}' enabled and sync triggered, but not yet healthy after {timeout_secs}s. \
+             Current state: health={last_health}, sync={last_sync}. It may still be converging."
+        )
+    }))
 }
 
 fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Value {
