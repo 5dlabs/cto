@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     title: "CTO by 5D Labs | AI Engineering Collective",
     description:
       "Thirteen AI specialists. Multi-agent orchestration on self-healing bare metal. 60-80% less than cloud.",
-    images: ["/og-image.png"],
+    images: ["/twitter-image.png"],
     creator: "@5dlabs",
   },
   robots: {
