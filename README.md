@@ -1,5 +1,7 @@
 <div align="center">
 
+> **Note:** This project is under active development and is not yet ready for production use. APIs, configurations, and documentation may change without notice. Contributions and feedback are welcome!
+
 <img src="assets/46de8cb0-c4ee-4982-94c4-180f5da96bc4.jpg" alt="5D Labs Logo" width="400px">
 
 # **Cognitive Task Orchestrator**
