@@ -963,7 +963,7 @@ checksum = "c3e64b0cc0439b12df2fa678eae89a1c56a529fd067a9115f7827f1fffd22b32"
 
 [[package]]
 name = "cli"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1033,7 +1033,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "serde",
  "serde_json",
@@ -1129,14 +1129,14 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "async-trait",
  "axum",
  "base64 0.22.1",
  "chrono",
- "config 0.2.45",
+ "config 0.2.49",
  "dashmap",
  "futures",
  "handlebars",
@@ -2217,7 +2217,7 @@ dependencies = [
 
 [[package]]
 name = "experience"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2801,7 +2801,7 @@ dependencies = [
 
 [[package]]
 name = "gpu"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3011,7 +3011,7 @@ dependencies = [
 
 [[package]]
 name = "healer"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "axum",
@@ -3553,7 +3553,7 @@ dependencies = [
 
 [[package]]
 name = "intake"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3563,7 +3563,7 @@ dependencies = [
  "cli",
  "colored",
  "comfy-table",
- "config 0.2.45",
+ "config 0.2.49",
  "dialoguer",
  "futures",
  "handlebars",
@@ -4095,7 +4095,7 @@ dependencies = [
 
 [[package]]
 name = "linear-sink"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4283,7 +4283,7 @@ dependencies = [
 
 [[package]]
 name = "metal"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4488,7 +4488,7 @@ dependencies = [
 
 [[package]]
 name = "notify"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5515,7 +5515,7 @@ dependencies = [
 
 [[package]]
 name = "pm"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5523,7 +5523,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
- "config 0.2.45",
+ "config 0.2.49",
  "hex",
  "hmac",
  "k8s-openapi",
@@ -6269,7 +6269,7 @@ dependencies = [
 
 [[package]]
 name = "research"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anthropic",
  "anyhow",
@@ -8008,9 +8008,9 @@ dependencies = [
 
 [[package]]
 name = "tempfile"
-version = "3.24.0"
+version = "3.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "655da9c7eb6305c55742045d5a8d2037996d61d8de95806335c7c86ce0f82e9c"
+checksum = "0136791f7c95b1f6dd99f9cc786b91bb81c3800b639b3478e561ddb7be95e5f1"
 dependencies = [
  "fastrand 2.3.0",
  "getrandom 0.3.4",
@@ -8421,7 +8421,7 @@ dependencies = [
 
 [[package]]
 name = "tools"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "axum",
@@ -8841,7 +8841,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "0.2.45"
+version = "0.2.49"
 dependencies = [
  "anyhow",
  "clap",
