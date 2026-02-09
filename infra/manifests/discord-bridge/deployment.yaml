@@ -1,0 +1,118 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bots
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: discord-bridge
+  namespace: bots
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discord-bridge
+  namespace: bots
+  labels:
+    app: discord-bridge
+    app.kubernetes.io/name: discord-bridge
+    app.kubernetes.io/component: messaging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discord-bridge
+  template:
+    metadata:
+      labels:
+        app: discord-bridge
+    spec:
+      serviceAccountName: discord-bridge
+      containers:
+        - name: bridge
+          image: ghcr.io/5dlabs/discord-bridge:latest
+          imagePullPolicy: Always
+          env:
+            # Discord bot token from OpenBao secret
+            - name: DISCORD_BRIDGE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: openclaw-discord
+                  key: DISCORD_TOKEN_BRIDGE
+                  optional: false
+
+            # Discord guild ID (5dlabs server)
+            - name: GUILD_ID
+              value: "1409006087331512342"
+
+            # NATS server URL
+            - name: NATS_URL
+              value: "nats://nats.messaging.svc.cluster.local:4222"
+
+            # Category name for bot conversations
+            - name: CATEGORY_NAME
+              value: "Bot Conversations"
+
+            # Inactivity timeout (1 hour = 3600000ms)
+            - name: INACTIVITY_TIMEOUT_MS
+              value: "3600000"
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # Liveness probe
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "ps aux | grep -v grep | grep node"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # Readiness probe
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "ps aux | grep -v grep | grep node"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      restartPolicy: Always
+---
+# ExternalSecret to pull Discord token from OpenBao
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: discord-bridge-token
+  namespace: bots
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: openclaw-discord
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        DISCORD_TOKEN_BRIDGE: "{{ .token }}"
+  data:
+    - secretKey: token
+      remoteRef:
+        key: secret/openclaw-discord
+        property: DISCORD_TOKEN_BRIDGE
