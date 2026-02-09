@@ -21,6 +21,9 @@ export function processInboundMessage(
     lines.push(`  Priority: URGENT`);
   }
   lines.push(`  ${msg.message}`);
+  if (msg.replyTo) {
+    lines.push(`  [Reply expected - use nats(action="reply", to="${msg.from}", message="your reply")]`);
+  }
 
   // Session key — route to the agent's primary session
   const sessionKey = `nats:${selfName}`;

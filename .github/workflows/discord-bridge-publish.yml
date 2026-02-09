@@ -1,0 +1,64 @@
+name: Discord Bridge – Build and Publish Docker Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/discord-bridge/**"
+      - ".github/workflows/discord-bridge-publish.yml"
+  pull_request:
+    paths:
+      - "apps/discord-bridge/**"
+      - ".github/workflows/discord-bridge-publish.yml"
+
+permissions:
+  contents: read
+  packages: write # for publishing to GitHub Container Registry
+
+defaults:
+  run:
+    working-directory: apps/discord-bridge
+
+jobs:
+  # ─── Test & Build (runs on PRs and pushes) ────────────────────────
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check and build
+        run: npm run build
+
+  # ─── Build and push Docker image to GHCR (main only) ──────────────
+  publish-docker:
+    name: Publish Docker Image
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read package version
+        id: version
+        working-directory: apps/discord-bridge
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: discord-bridge
+          context: apps/discord-bridge
+          dockerfile: apps/discord-bridge/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ github.sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

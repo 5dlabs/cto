@@ -23,6 +23,8 @@ export interface NatsServiceResult {
   checkPingPong: (peer: string) => PingPongCheck;
   /** Record an outbound message to peer */
   recordPingPong: (peer: string) => void;
+  /** Get the most recent NATS reply subject for a peer (for request-reply) */
+  getReplyContext: (peer: string) => string | undefined;
 }
 
 export function createService(
@@ -37,6 +39,20 @@ export function createService(
   const maxTurns = config.maxPingPongTurns ?? 10;
   const windowMs = config.pingPongWindowMs ?? 300000;
   let gcInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Reply context: maps peer name -> most recent NATS reply subject
+  const replyContextMap = new Map<string, { subject: string; timestamp: number }>();
+
+  function getReplyContext(peer: string): string | undefined {
+    const ctx = replyContextMap.get(peer);
+    if (!ctx) return undefined;
+    // Expire stale reply contexts (same window as ping-pong)
+    if (Date.now() - ctx.timestamp > windowMs) {
+      replyContextMap.delete(peer);
+      return undefined;
+    }
+    return ctx.subject;
+  }
 
   function getOrCreateState(peer: string): PingPongState {
     let state = pingPongMap.get(peer);
@@ -92,6 +108,11 @@ export function createService(
           }
           recordPingPong(msg.from);
 
+          // Store reply context so the agent can reply to request-reply messages
+          if (msg.replyTo) {
+            replyContextMap.set(msg.from, { subject: msg.replyTo, timestamp: Date.now() });
+          }
+
           const processed = processInboundMessage(
             subject,
             msg,
@@ -102,12 +123,17 @@ export function createService(
         logger,
       );
 
-      // Periodic GC for stale ping-pong entries
+      // Periodic GC for stale ping-pong and reply context entries
       gcInterval = setInterval(() => {
         const now = Date.now();
         for (const [peer, state] of pingPongMap) {
           if (now - state.lastReset > windowMs) {
             pingPongMap.delete(peer);
+          }
+        }
+        for (const [peer, ctx] of replyContextMap) {
+          if (now - ctx.timestamp > windowMs) {
+            replyContextMap.delete(peer);
           }
         }
       }, windowMs);
@@ -131,5 +157,6 @@ export function createService(
     handle: () => client,
     checkPingPong,
     recordPingPong,
+    getReplyContext,
   };
 }

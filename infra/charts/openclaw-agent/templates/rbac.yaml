@@ -1,33 +1,84 @@
-{{- if .Values.kaniko.enabled }}
-# Role granting the agent permission to exec into its own pod's kaniko sidecar
+# ClusterRole granting agent pods full admin access to the cluster
+# This allows agents to manage Kubernetes resources, ArgoCD apps, CRDs, etc.
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: {{ include "openclaw-agent.fullname" . }}
-  namespace: {{ .Values.namespace | default .Release.Namespace }}
   labels:
     {{- include "openclaw-agent.labels" . | nindent 4 }}
 rules:
+  # Full access to core resources
   - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get"]
-  - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to apps
+  - apiGroups: ["apps"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to batch jobs
+  - apiGroups: ["batch"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to networking
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to RBAC (allows agents to manage permissions)
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to ArgoCD
+  - apiGroups: ["argoproj.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to CTO platform CRDs
+  - apiGroups: ["agents.platform", "cto.5dlabs.ai"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to storage
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to cert-manager
+  - apiGroups: ["cert-manager.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to external-secrets
+  - apiGroups: ["external-secrets.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to custom metrics
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to API extensions (CRDs)
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to policy
+  - apiGroups: ["policy"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to Cilium networking
+  - apiGroups: ["cilium.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Full access to Gateway API
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["*"]
+    verbs: ["*"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: {{ include "openclaw-agent.fullname" . }}
-  namespace: {{ .Values.namespace | default .Release.Namespace }}
   labels:
     {{- include "openclaw-agent.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
+  kind: ClusterRole
   name: {{ include "openclaw-agent.fullname" . }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "openclaw-agent.fullname" . }}
     namespace: {{ .Values.namespace | default .Release.Namespace }}
-{{- end }}

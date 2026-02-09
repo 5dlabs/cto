@@ -17,7 +17,7 @@ const plugin = {
       return;
     }
 
-    const { service, handle, checkPingPong, recordPingPong } = createService(
+    const { service, handle, checkPingPong, recordPingPong, getReplyContext } = createService(
       config,
       api.runtime,
       api.logger,
@@ -31,6 +31,7 @@ const plugin = {
         config.roster ?? [],
         checkPingPong,
         recordPingPong,
+        getReplyContext,
       ),
     );
 
