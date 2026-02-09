@@ -23,8 +23,8 @@ imagePullSecrets:
 # -- Resource requests (no CPU limits — let agents burst freely)
 resources:
   requests:
-    cpu: "200m"
-    memory: "512Mi"
+    cpu: "50m"
+    memory: "256Mi"
   limits:
     memory: "4Gi"
 
@@ -295,8 +295,8 @@ kaniko:
   cache: true
   resources:
     requests:
-      cpu: "100m"
-      memory: "256Mi"
+      cpu: "25m"
+      memory: "128Mi"
     limits:
       memory: "4Gi"
 
@@ -454,10 +454,9 @@ telemetry:
     lokiUrl: "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
   resources:
     requests:
-      cpu: "50m"
-      memory: "64Mi"
+      cpu: "10m"
+      memory: "32Mi"
     limits:
-      cpu: "200m"
       memory: "128Mi"
 
 # =============================================================================
