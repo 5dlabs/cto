@@ -20,14 +20,19 @@ image:
 imagePullSecrets:
   - name: ghcr-secret
 
-# -- Resource limits
+# -- Resource requests (no CPU limits — let agents burst freely)
 resources:
   requests:
     cpu: "200m"
     memory: "512Mi"
   limits:
-    cpu: "2000m"
     memory: "4Gi"
+
+# -- Node selector (schedule agents onto specific nodes)
+nodeSelector: {}
+# Example: schedule onto worker nodes only
+# nodeSelector:
+#   node-role.kubernetes.io/worker: ""
 
 # -- Storage configuration
 storage:
@@ -293,7 +298,6 @@ kaniko:
       cpu: "100m"
       memory: "256Mi"
     limits:
-      cpu: "2000m"
       memory: "4Gi"
 
 # =============================================================================
