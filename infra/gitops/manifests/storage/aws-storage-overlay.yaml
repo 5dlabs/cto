@@ -4,10 +4,10 @@
 # This allows all existing manifests that reference storageClass: "mayastor"
 # to work on AWS without modification.
 #
-# When switching back to bare metal:
-# 1. Delete this overlay: kubectl delete storageclass mayastor
-# 2. Enable the real Mayastor operator via toggle_app
-# 3. Mayastor will recreate the StorageClass with its own provisioner
+# When switching back to bare metal (do not modify any Mayastor app or Helm values):
+# 1. Disable this overlay app in Argo (toggle_app disable aws-storage-overlay); Argo prunes this StorageClass
+# 2. Enable the Mayastor app (toggle_app enable mayastor); it recreates StorageClass "mayastor"
+# This overlay does not touch Mayastor operator config or applications/storage/mayastor.yaml
 #
 # Note: Using gp3 (not gp2) for better baseline performance (3000 IOPS, 125 MiB/s)
 

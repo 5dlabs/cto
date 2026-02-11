@@ -105,6 +105,8 @@ Deploy CTO on any infrastructure—bare-metal, on-premises, or cloud:
 
 | Provider | Description | Regions |
 |----------|-------------|---------|
+| **🌟 Sidero Metal** | **Bare-metal provisioning for Talos Linux** — API-driven Cluster API integration for automated server lifecycle management | **Any infrastructure** |
+| **🌟 Omni** | **Managed Kubernetes SaaS** — API-driven cluster management on bare-metal, edge, or cloud with Talos Linux | **Global SaaS** |
 | **Latitude.sh** | Global bare-metal cloud with Gen4 10G+ networking | Americas, Europe, Asia-Pacific |
 | **Hetzner** | European dedicated servers with excellent price/performance | Germany, Finland |
 | **OVH** | European cloud & bare-metal with global reach | Europe, Americas, Asia-Pacific |
@@ -652,6 +654,8 @@ helm install cto 5dlabs/cto --namespace cto --create-namespace
 ```
 
 **Supported Bare-Metal Providers:**
+- **🌟 Sidero Metal** - Native Talos Linux bare-metal provisioning (API-driven Cluster API)
+- **🌟 Omni** - Managed Kubernetes SaaS on any hardware (Talos-powered)
 - **Latitude.sh** - Global bare-metal cloud
 - **Hetzner** - European dedicated servers
 - **OVH** - European cloud & bare-metal
