@@ -18,6 +18,8 @@ metadata:
   annotations:
     # Deploy after storage class is available
     argocd.argoproj.io/sync-wave: "1"
+    # Disabled by default - enable via toggle_app MCP tool when ready
+    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -70,6 +72,9 @@ spec:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
               effect: NoSchedule
+          # Keep stateful storage components on worker nodes
+          nodeSelector:
+            node-role.kubernetes.io/worker: ""
           # Default replication strategy
           # 000 = no replication
           # 001 = replicate once on different rack
@@ -89,6 +94,9 @@ spec:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
               effect: NoSchedule
+          # Keep stateful storage components on worker nodes
+          nodeSelector:
+            node-role.kubernetes.io/worker: ""
           port: 8080
           grpcPort: 18080
           # Persistence for actual data storage
@@ -153,6 +161,9 @@ spec:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
               effect: NoSchedule
+          # Keep stateful storage components on worker nodes
+          nodeSelector:
+            node-role.kubernetes.io/worker: ""
 
         # S3 API gateway (uses filer's S3 capability)
         s3:

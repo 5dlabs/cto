@@ -33,7 +33,7 @@ spec:
       # Exclude: docs, nested CRD directories, and optional/disabled apps managed elsewhere
       # Note: Use explicit paths relative to source.path (infra/gitops) to match include pattern
       # yamllint disable-line rule:line-length
-      exclude: "{*.md,applications/ai-models/ingress/*,applications/ai-models/llamastack-distributions/*,applications/ai-models/ollama-model-crds/*,applications/networking/headscale.yaml,applications/networking/headscale-namespace.yaml,applications/networking/platform-ingress.yaml,applications/networking/tailscale-subnet-router.yaml,applications/networking/kilo.yaml,applications/workloads/buildkit.yaml,applications/operators/seaweedfs-operator.yaml,applications/operators/jaeger-operator.yaml,applications/operators/opentelemetry-operator.yaml,applications/operators/twingate-operator.yaml}"
+      exclude: "{*.md,applications/ai-models/ingress/*,applications/ai-models/llamastack-distributions/*,applications/ai-models/ollama-model-crds/*,applications/networking/headscale.yaml,applications/networking/headscale-namespace.yaml,applications/networking/platform-ingress.yaml,applications/networking/tailscale-subnet-router.yaml,applications/networking/kilo.yaml,applications/workloads/buildkit.yaml}"
 
   # Destination configuration
   destination:

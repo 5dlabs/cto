@@ -16,6 +16,8 @@ metadata:
   annotations:
     # Deploy after cert-manager but before workloads that need auto-instrumentation
     argocd.argoproj.io/sync-wave: "-2"
+    # Disabled by default - enable via toggle_app MCP tool when ready
+    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -92,6 +94,10 @@ spec:
           create: true
         clusterRole:
           create: true
+
+        # Keep operator on worker nodes
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
 
         # Auto-instrumentation configuration
         # The operator will manage Instrumentation CRs to inject auto-instrumentation

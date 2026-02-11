@@ -15,6 +15,9 @@ metadata:
   annotations:
     # Deploy early - other apps depend on ingress
     argocd.argoproj.io/sync-wave: "-2"
+    # Disabled by default - bare metal config (NodePort + externalIPs)
+    # Enable via toggle_app MCP tool when running on bare metal
+    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

@@ -16,6 +16,9 @@ metadata:
     app.kubernetes.io/name: redis-operator
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: database
+  annotations:
+    # Disabled by default - enable via toggle_app MCP tool when ready
+    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -50,6 +53,10 @@ spec:
           limits:
             cpu: 500m
             memory: 512Mi
+
+        # Keep operator on worker nodes
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
 
         # Service account
         serviceAccount:
