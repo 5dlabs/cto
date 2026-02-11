@@ -30,6 +30,8 @@ spec:
         app: discord-bridge
     spec:
       serviceAccountName: discord-bridge
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
       containers:
         - name: bridge
           image: ghcr.io/5dlabs/discord-bridge:latest

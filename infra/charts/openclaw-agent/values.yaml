@@ -29,10 +29,9 @@ resources:
     memory: "4Gi"
 
 # -- Node selector (schedule agents onto specific nodes)
-nodeSelector: {}
-# Example: schedule onto worker nodes only
-# nodeSelector:
-#   node-role.kubernetes.io/worker: ""
+# Default to worker nodes only (keeps bots off control-plane nodes)
+nodeSelector:
+  node-role.kubernetes.io/worker: ""
 
 # -- Storage configuration
 storage:

@@ -475,6 +475,8 @@ export default function Home() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
+                { name: "Sidero Metal", region: "Any infrastructure", desc: "Bare-metal provisioning for Talos", featured: true },
+                { name: "Omni", region: "Global SaaS", desc: "Managed Kubernetes on any hardware", featured: true },
                 { name: "Latitude.sh", region: "Americas, Europe, Asia", desc: "Global bare-metal cloud" },
                 { name: "Hetzner", region: "Germany, Finland", desc: "European dedicated servers" },
                 { name: "OVH", region: "Europe, Americas, Asia", desc: "Global bare-metal & cloud" },
@@ -490,9 +492,9 @@ export default function Home() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: index * 0.05 }}
-                  className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center hover:border-cyan/30 transition-colors"
+                  className={`p-4 rounded-xl border ${provider.featured ? 'border-cyan/50 bg-cyan/10' : 'border-border/50 bg-card/30'} backdrop-blur-sm text-center hover:border-cyan/30 transition-colors`}
                 >
-                  <h4 className="font-semibold text-foreground mb-1">{provider.name}</h4>
+                  <h4 className={`font-semibold mb-1 ${provider.featured ? 'text-cyan' : 'text-foreground'}`}>{provider.name}</h4>
                   <p className="text-xs text-cyan mb-1">{provider.region}</p>
                   <p className="text-xs text-muted-foreground">{provider.desc}</p>
                 </motion.div>
