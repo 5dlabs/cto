@@ -79,6 +79,17 @@ kubectl apply -f infra/gitops/app-of-apps.yaml
 - **Chart**: `infra/charts/pm`
 - **Namespace**: `cto`
 
+### Bots namespace (OpenClaw agents)
+
+All agents that deploy to the `bots` namespace are **disabled by default** in GitOps (`argocd.argoproj.io/skip-reconcile: "true"`) so they don’t collide with the same agents when deployed via the OpenClaw Helm chart. You can enable or disable them on the cluster with the CTO MCP **toggle_app** tool without changing Git.
+
+**Application names** (for `toggle_app`):
+
+- `openclaw-alert`, `openclaw-conductor`, `openclaw-forge`, `openclaw-holt`, `openclaw-infra`, `openclaw-keeper`, `openclaw-metal`, `openclaw-pitch`, `openclaw-planner`, `openclaw-playmon`, `openclaw-pm`, `openclaw-research`, `openclaw-stitch`, `openclaw-trader`
+- `discord-bridge`
+
+**Example (MCP):** `toggle_app` with `action: "disable"` and `application_name: "openclaw-alert"` to disable; `action: "enable"` to turn an app back on.
+
 ## Access
 
 ### Argo CD UI
