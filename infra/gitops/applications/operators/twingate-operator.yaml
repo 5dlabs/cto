@@ -29,6 +29,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
     notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+    # Disabled by default - enable via toggle_app MCP tool when ready
+    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -71,6 +73,10 @@ spec:
           serviceAccount:
             create: true
             name: twingate-operator
+
+        # Keep operator on worker nodes
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
 
   destination:
     server: https://kubernetes.default.svc

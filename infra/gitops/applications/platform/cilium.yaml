@@ -15,6 +15,9 @@ metadata:
   annotations:
     # Cilium should be deployed before other network-dependent apps
     argocd.argoproj.io/sync-wave: "-10"
+    # Disabled by default - bare metal eBPF CNI, not needed on AWS (VPC CNI handles networking)
+    # Enable via toggle_app MCP tool when running on bare metal
+    argocd.argoproj.io/skip-reconcile: "true"
 spec:
   project: platform
   # Multi-source: Helm chart + values from private Git repo

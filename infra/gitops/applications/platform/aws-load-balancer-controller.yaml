@@ -1,0 +1,119 @@
+---
+# AWS Load Balancer Controller
+# Manages AWS Elastic Load Balancers for Kubernetes Ingress and Service resources
+# Source: https://kubernetes-sigs.github.io/aws-load-balancer-controller/
+#
+# Prerequisites:
+# - IAM OIDC provider for EKS cluster
+# - IAM role with AWSLoadBalancerControllerIAMPolicy attached
+# - Service account annotated with the IAM role ARN
+#
+# This controller provisions:
+# - ALB for Ingress resources with ingressClassName: alb
+# - NLB for Service resources with type: LoadBalancer
+#
+# Note: When switching back to bare metal, disable this and enable ingress-nginx instead
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: networking
+  annotations:
+    # Deploy early - other apps depend on ingress
+    argocd.argoproj.io/sync-wave: "-2"
+    # Disabled by default - enable via toggle_app MCP tool on AWS clusters
+    argocd.argoproj.io/skip-reconcile: "true"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://aws.github.io/eks-charts
+    chart: aws-load-balancer-controller
+    targetRevision: 1.11.0
+    helm:
+      values: |
+        # Cluster name - MUST be set to your EKS cluster name
+        clusterName: ""  # TODO: Set to your EKS cluster name
+
+        # Service account configuration
+        # The IAM role ARN should be set via IRSA (IAM Roles for Service Accounts)
+        serviceAccount:
+          create: true
+          name: aws-load-balancer-controller
+          annotations: {}
+            # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/AWSLoadBalancerControllerRole
+
+        # Replica count
+        replicaCount: 2
+
+        # Resource limits
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # Pod labels for log collection
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+
+        # Pod annotations
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: aws-load-balancer-controller
+
+        # Default tags applied to all AWS resources created by the controller
+        defaultTags: {}
+          # Environment: development
+          # ManagedBy: argocd
+
+        # IngressClass configuration
+        # Creates an IngressClass named 'alb' that can be used by Ingress resources
+        ingressClass: alb
+        createIngressClassResource: true
+
+        # Enable WAFv2 and Shield support
+        enableWaf: false
+        enableWafv2: false
+        enableShield: false
+
+        # Webhook configuration
+        enableCertManager: false
+        webhookTLS:
+          caCert: ""
+          cert: ""
+          key: ""
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

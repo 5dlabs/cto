@@ -49,6 +49,8 @@ spec:
     - 'https://openbao.github.io/openbao-helm'
     # Ingress-NGINX Helm chart repository
     - 'https://kubernetes.github.io/ingress-nginx'
+    # AWS Load Balancer Controller Helm chart repository
+    - 'https://aws.github.io/eks-charts'
     # Cert-Manager Helm chart repository
     - 'https://charts.jetstack.io'
     # ClickHouse Operator (Altinity)
@@ -244,6 +246,9 @@ spec:
     # Cilium CNI CRDs
     - group: 'cilium.io'
       kind: '*'
+    # AWS Load Balancer Controller CRDs
+    - group: 'elbv2.k8s.aws'
+      kind: '*'
     # Storage resources (StorageClass is cluster-scoped)
     - group: 'storage.k8s.io'
       kind: StorageClass
@@ -358,6 +363,9 @@ spec:
       kind: '*'
     # Cilium CNI CRDs
     - group: 'cilium.io'
+      kind: '*'
+    # AWS Load Balancer Controller CRDs
+    - group: 'elbv2.k8s.aws'
       kind: '*'
 
   # Roles for access control
