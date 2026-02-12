@@ -32,6 +32,7 @@ set -euo pipefail
 
 DRY_RUN=false
 CATEGORY=""
+OP_VAULT=""
 
 # Agent list (used for GitHub Apps and Linear Apps)
 AGENTS=(atlas blaze bolt cipher cleo grizz morgan nova rex spark stitch tap tess vex)
@@ -52,6 +53,19 @@ log_success() { echo -e "${GREEN}✓${NC} $1"; }
 log_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 log_header() { echo -e "\n${BLUE}═══════════════════════════════════════════════════════════════${NC}\n$1\n${BLUE}═══════════════════════════════════════════════════════════════${NC}"; }
+
+# Capitalize first character in a bash-3-compatible way (macOS default bash)
+capitalize_first() {
+    local s="$1"
+    if [[ -z "$s" ]]; then
+        echo ""
+        return
+    fi
+    local first rest
+    first=$(printf '%s' "${s:0:1}" | tr '[:lower:]' '[:upper:]')
+    rest="${s:1}"
+    printf '%s%s' "$first" "$rest"
+}
 
 show_help() {
     head -30 "$0" | grep -E "^#" | sed 's/^# \?//'
@@ -123,7 +137,7 @@ bao_put() {
 
 # Check if 1Password item exists
 op_item_exists() {
-    op item get "$1" --format json >/dev/null 2>&1
+    op item get "$1" --vault "$OP_VAULT" --format json >/dev/null 2>&1
 }
 
 # Get field from 1Password item
@@ -131,7 +145,7 @@ op_item_exists() {
 op_get_field() {
     local item=$1
     local field=$2
-    op item get "$item" --format json 2>/dev/null | jq -r ".fields[] | select(.label == \"$field\") | .value" 2>/dev/null || echo ""
+    op item get "$item" --vault "$OP_VAULT" --format json 2>/dev/null | jq -r ".fields[] | select(.label == \"$field\") | .value" 2>/dev/null || echo ""
 }
 
 # Get field from 1Password item by section
@@ -139,7 +153,7 @@ op_get_field_section() {
     local item=$1
     local section=$2
     local field=$3
-    op item get "$item" --format json 2>/dev/null | jq -r ".fields[] | select(.section.label == \"$section\" and .label == \"$field\") | .value" 2>/dev/null || echo ""
+    op item get "$item" --vault "$OP_VAULT" --format json 2>/dev/null | jq -r ".fields[] | select(.section.label == \"$section\" and .label == \"$field\") | .value" 2>/dev/null || echo ""
 }
 
 # =============================================================================
@@ -153,8 +167,9 @@ seed_github_apps() {
     local failed=0
     
     for agent in "${AGENTS[@]}"; do
-        # Capitalize first letter (bash-native, portable)
-        local agent_title="${agent^}"
+        # Capitalize first letter (bash 3 compatible)
+        local agent_title
+        agent_title=$(capitalize_first "$agent")
         local op_item="GitHub-App-${agent_title}"
         
         if ! op_item_exists "$op_item"; then
@@ -198,8 +213,9 @@ seed_linear_apps() {
     local failed=0
     
     for agent in "${AGENTS[@]}"; do
-        # Capitalize first letter (bash-native, portable)
-        local agent_title="${agent^}"
+        # Capitalize first letter (bash 3 compatible)
+        local agent_title
+        agent_title=$(capitalize_first "$agent")
         
         # Get client_id and client_secret from the agent's section
         local client_id client_secret webhook_secret access_token
@@ -211,7 +227,7 @@ seed_linear_apps() {
         # If client_id is missing, check if it's stored differently
         if [[ -z "$client_id" ]]; then
             # Try getting from a different field name
-            client_id=$(op item get "$op_item" --format json 2>/dev/null | jq -r ".fields[] | select(.section.label == \"$agent_title\") | select(.label | test(\"client.*id\"; \"i\")) | .value" 2>/dev/null | head -1 || echo "")
+            client_id=$(op item get "$op_item" --vault "$OP_VAULT" --format json 2>/dev/null | jq -r ".fields[] | select(.section.label == \"$agent_title\") | select(.label | test(\"client.*id\"; \"i\")) | .value" 2>/dev/null | head -1 || echo "")
         fi
         
         if [[ -z "$client_secret" ]]; then
@@ -237,54 +253,56 @@ seed_linear_apps() {
 
 seed_api_keys() {
     log_header "API Keys (combined secret)"
-    
-    # Map of API key name -> 1Password item name -> field name
-    declare -A API_KEYS=(
-        ["ANTHROPIC_API_KEY"]="Anthropic API Key:credential"  # pragma: allowlist secret
-        ["OPENAI_API_KEY"]="OpenAI API Key:credential"  # pragma: allowlist secret
-        ["GEMINI_API_KEY"]="Google-Gemini API Key:credential"  # pragma: allowlist secret
-        ["GOOGLE_API_KEY"]="Google API Key:credential"  # pragma: allowlist secret
-        ["CURSOR_API_KEY"]="Cursor API Key:credential"  # pragma: allowlist secret
-        ["CONTEXT7_API_KEY"]="Context7 API Key:credential"  # pragma: allowlist secret
-        ["PERPLEXITY_API_KEY"]="Perplexity API Key:credential"  # pragma: allowlist secret
-        ["XAI_API_KEY"]="xAI API Key:credential"  # pragma: allowlist secret
-        ["FACTORY_API_KEY"]="Factory API Key:credential"  # pragma: allowlist secret
-        ["BRAVE_API_KEY"]="Brave Search API Key:credential"  # pragma: allowlist secret
-        ["MINIMAX_API_KEY"]="MiniMax API Keys:credential"  # pragma: allowlist secret
-        ["MINIMAX_GROUP_ID"]="MiniMax API Keys:Group ID"
-    )
-    
+
+    # Bash 3.x-compatible mapping list: KEY|1PASSWORD_ITEM|FIELD
+    local mappings
+    mappings=$(cat <<'EOF'
+ANTHROPIC_API_KEY|Anthropic API Key|credential
+OPENAI_API_KEY|OpenAI API Key|credential
+GEMINI_API_KEY|Google-Gemini API Key|credential
+GOOGLE_API_KEY|Google API Key|credential
+CURSOR_API_KEY|Cursor API Key|credential
+CONTEXT7_API_KEY|Context7 API Key|credential
+PERPLEXITY_API_KEY|Perplexity API Key|credential
+XAI_API_KEY|xAI API Key|credential
+FACTORY_API_KEY|Factory API Key|credential
+BRAVE_API_KEY|Brave Search API Key|credential
+MINIMAX_API_KEY|MiniMax API Keys|credential
+MINIMAX_GROUP_ID|MiniMax API Keys|Group ID
+EOF
+)
+
     # Build array of key-value pairs for bao_put
     local kv_args=()
     local success=0
     local failed=0
-    
-    for key in "${!API_KEYS[@]}"; do
-        IFS=':' read -r item field <<< "${API_KEYS[$key]}"
-        
+
+    while IFS='|' read -r key item field; do
+        [[ -z "$key" ]] && continue
+
         if ! op_item_exists "$item"; then
             log_warning "1Password item not found: $item (for $key)"
             ((failed++))
             continue
         fi
-        
+
         local value
         value=$(op_get_field "$item" "$field")
-        
+
         if [[ -z "$value" ]]; then
             log_warning "Empty value for $key from $item:$field"
             ((failed++))
             continue
         fi
-        
+
         kv_args+=("$key" "$value")
         ((success++))
-    done
-    
+    done <<< "$mappings"
+
     if [[ ${#kv_args[@]} -gt 0 ]]; then
         bao_put "api-keys" "${kv_args[@]}"
     fi
-    
+
     log_info "API Keys: $success found, $failed missing"
 }
 
@@ -367,8 +385,8 @@ seed_infrastructure() {
     
     # cloudflare
     local cf_email cf_key
-    cf_email=$(op item get "Cloudflare API" --fields "username" --reveal 2>/dev/null || echo "")
-    cf_key=$(op item get "Cloudflare API" --fields "credential" --reveal 2>/dev/null || echo "")
+    cf_email=$(op item get "Cloudflare API" --vault "$OP_VAULT" --fields "username" --reveal 2>/dev/null || echo "")
+    cf_key=$(op item get "Cloudflare API" --vault "$OP_VAULT" --fields "credential" --reveal 2>/dev/null || echo "")
     if [[ -n "$cf_email" && -n "$cf_key" ]]; then
         bao_put "cloudflare" "email" "$cf_email" "api-key" "$cf_key"
     else
@@ -377,8 +395,8 @@ seed_infrastructure() {
     
     # ghcr-secret (Docker config JSON format)
     local ghcr_user ghcr_pass
-    ghcr_user=$(op item get "GHCR Pull Secret" --fields "username" --reveal 2>/dev/null || echo "")
-    ghcr_pass=$(op item get "GHCR Pull Secret" --fields "credential" --reveal 2>/dev/null || echo "")
+    ghcr_user=$(op item get "GHCR Pull Secret" --vault "$OP_VAULT" --fields "username" --reveal 2>/dev/null || echo "")
+    ghcr_pass=$(op item get "GHCR Pull Secret" --vault "$OP_VAULT" --fields "credential" --reveal 2>/dev/null || echo "")
     if [[ -n "$ghcr_user" && -n "$ghcr_pass" ]]; then
         # Create dockerconfigjson format
         local auth
@@ -391,7 +409,7 @@ seed_infrastructure() {
     
     # alertmanager-discord
     local discord_webhook
-    discord_webhook=$(op item get "Discord Alertmanager Webhook" --fields "credential" --reveal 2>/dev/null || echo "")
+    discord_webhook=$(op item get "Discord Alertmanager Webhook" --vault "$OP_VAULT" --fields "credential" --reveal 2>/dev/null || echo "")
     if [[ -n "$discord_webhook" ]]; then
         bao_put "alertmanager-discord" "webhook-url" "$discord_webhook"
     else
@@ -401,7 +419,7 @@ seed_infrastructure() {
     # github-webhook - GitHub organization webhook secret for Argo Events
     # Used by the GitHub EventSource to verify webhook payloads from GitHub
     local github_webhook_secret
-    github_webhook_secret=$(op item get "GitHub Organization Webhook" --fields "credential" --reveal 2>/dev/null || echo "")
+    github_webhook_secret=$(op item get "GitHub Organization Webhook" --vault "$OP_VAULT" --fields "credential" --reveal 2>/dev/null || echo "")
     if [[ -n "$github_webhook_secret" ]]; then
         bao_put "github-webhook" "secret" "$github_webhook_secret"
     else
@@ -410,15 +428,15 @@ seed_infrastructure() {
     
     # linear-sync (Linear API for the platform)
     local linear_api_key linear_webhook_secret
-    linear_api_key=$(op item get "Linear API Credentials" --fields "credential" --reveal 2>/dev/null || echo "")
-    linear_webhook_secret=$(op item get "Linear API Credentials" --fields "Webhook Signing Secret" --reveal 2>/dev/null || echo "")
+    linear_api_key=$(op item get "Linear API Credentials" --vault "$OP_VAULT" --fields "credential" --reveal 2>/dev/null || echo "")
+    linear_webhook_secret=$(op item get "Linear API Credentials" --vault "$OP_VAULT" --fields "Webhook Signing Secret" --reveal 2>/dev/null || echo "")
     if [[ -n "$linear_api_key" ]]; then
         # Get additional fields if they exist
         local linear_client_id linear_client_secret linear_oauth_token github_pat
-        linear_client_id=$(op item get "Linear API Credentials" --fields "client_id" --reveal 2>/dev/null || echo "")
-        linear_client_secret=$(op item get "Linear API Credentials" --fields "client_secret" --reveal 2>/dev/null || echo "")
-        linear_oauth_token=$(op item get "Linear API Credentials" --fields "oauth_token" --reveal 2>/dev/null || echo "")
-        github_pat=$(op item get "GitHub PAT - Tools MCP Server" --fields "credential" --reveal 2>/dev/null || echo "")
+        linear_client_id=$(op item get "Linear API Credentials" --vault "$OP_VAULT" --fields "client_id" --reveal 2>/dev/null || echo "")
+        linear_client_secret=$(op item get "Linear API Credentials" --vault "$OP_VAULT" --fields "client_secret" --reveal 2>/dev/null || echo "")
+        linear_oauth_token=$(op item get "Linear API Credentials" --vault "$OP_VAULT" --fields "oauth_token" --reveal 2>/dev/null || echo "")
+        github_pat=$(op item get "GitHub PAT - Tools MCP Server" --vault "$OP_VAULT" --fields "credential" --reveal 2>/dev/null || echo "")
         
         bao_put "linear-sync" \
             "LINEAR_API_KEY" "$linear_api_key" \
@@ -447,8 +465,8 @@ seed_research() {
     # research-twitter
     if op_item_exists "Twitter/X Research Auth"; then
         local auth_token ct0
-        auth_token=$(op item get "Twitter/X Research Auth" --fields "auth_token" --reveal 2>/dev/null || echo "")
-        ct0=$(op item get "Twitter/X Research Auth" --fields "ct0" --reveal 2>/dev/null || echo "")
+        auth_token=$(op item get "Twitter/X Research Auth" --vault "$OP_VAULT" --fields "auth_token" --reveal 2>/dev/null || echo "")
+        ct0=$(op item get "Twitter/X Research Auth" --vault "$OP_VAULT" --fields "ct0" --reveal 2>/dev/null || echo "")
         
         if [[ -n "$auth_token" ]]; then
             bao_put "research-twitter" "TWITTER_AUTH_TOKEN" "$auth_token" "TWITTER_CT0" "${ct0:-}"
@@ -474,6 +492,10 @@ main() {
             --dry-run)
                 DRY_RUN=true
                 shift
+                ;;
+            --vault)
+                OP_VAULT="$2"
+                shift 2
                 ;;
             --category)
                 CATEGORY="$2"
@@ -508,6 +530,11 @@ main() {
         log_warning "1Password not signed in. Running: eval \$(op signin)"
         eval "$(op signin)"
     fi
+
+    if [[ -z "$OP_VAULT" ]]; then
+        OP_VAULT=$(op vault list --format=json | jq -r '.[0].name')
+    fi
+    log_info "Using 1Password vault: $OP_VAULT"
     
     if ! kubectl get pods -n openbao &> /dev/null; then
         log_error "Cannot access OpenBao namespace. Check kubectl configuration."

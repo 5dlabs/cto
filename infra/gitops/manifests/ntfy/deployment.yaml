@@ -33,9 +33,11 @@ spec:
             - serve
             - --config
             - /etc/ntfy/server.yml
+            - --listen-http
+            - :8080
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
               protocol: TCP
             - name: metrics
               containerPort: 9090

@@ -15,7 +15,7 @@ data:
     base-url: "https://push.5dlabs.ai"
 
     # Listen address for HTTP
-    listen-http: ":80"
+    listen-http: ":8080"
 
     # Cache settings for offline delivery
     cache-file: "/var/lib/ntfy/cache.db"
