@@ -894,6 +894,21 @@ webhooks:
   enabled: true
   # EventSource and sensors for GitHub events
   namespace: automation
+  # How GitHub webhooks are exposed externally:
+  # - gateway: Gateway API HTTPRoute (default)
+  # - ingress: Kubernetes Ingress (nginx or compatible controller)
+  # - cloudflare: Cloudflare TunnelBinding
+  exposure:
+    mode: gateway
+    host: github.public.5dlabs.ai
+    path: /github/webhook
+    gateway:
+      name: public-gateway
+      namespace: cto
+    ingress:
+      className: nginx
+      annotations: {}
+      tls: []
 
 # =============================================================================
 # TweakCN - Theme Editor

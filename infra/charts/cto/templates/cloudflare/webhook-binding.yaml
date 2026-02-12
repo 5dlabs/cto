@@ -1,4 +1,4 @@
-{{- if and .Values.cloudflare.enabled .Values.pm.enabled }}
+{{- if and .Values.cloudflare.enabled .Values.webhooks.enabled .Values.pm.enabled (eq .Values.webhooks.exposure.mode "cloudflare") }}
 ---
 # TunnelBinding: GitHub Webhooks
 # Routes GitHub webhook traffic directly to the PM server's unified webhook handler.
@@ -18,10 +18,10 @@ tunnelRef:
 subjects:
   - name: {{ include "cto.pm.fullname" . }}
     spec:
-      fqdn: {{ .Values.cloudflare.bindings.webhooks.hostname }}
+      fqdn: {{ .Values.webhooks.exposure.host }}
       # Path matches the URL configured in GitHub organization webhook settings.
       # The PM server handles this path via a route alias.
-      path: /github/webhook
+      path: {{ .Values.webhooks.exposure.path }}
       target: http://{{ include "cto.pm.fullname" . }}.{{ include "cto.namespace" . }}.svc:{{ .Values.pm.service.port }}
 {{- end }}
 

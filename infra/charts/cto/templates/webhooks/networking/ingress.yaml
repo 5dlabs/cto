@@ -1,0 +1,33 @@
+{{- if and .Values.webhooks.enabled .Values.pm.enabled (eq .Values.webhooks.exposure.mode "ingress") }}
+---
+# Ingress: GitHub Webhooks
+# Routes GitHub webhook traffic to the PM server's unified webhook handler.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: github-webhooks
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+  {{- with .Values.webhooks.exposure.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.webhooks.exposure.ingress.className | quote }}
+  {{- if .Values.webhooks.exposure.ingress.tls }}
+  tls:
+    {{- toYaml .Values.webhooks.exposure.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.webhooks.exposure.host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.webhooks.exposure.path | quote }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "cto.pm.fullname" . }}
+                port:
+                  number: {{ .Values.pm.service.port }}
+{{- end }}

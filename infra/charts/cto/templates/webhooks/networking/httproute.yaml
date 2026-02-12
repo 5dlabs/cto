@@ -1,4 +1,4 @@
-{{- if .Values.pm.enabled }}
+{{- if and .Values.webhooks.enabled .Values.pm.enabled (eq .Values.webhooks.exposure.mode "gateway") }}
 ---
 # HTTPRoute: GitHub Webhooks
 # Routes GitHub webhook traffic to the PM server's unified webhook handler.
@@ -18,17 +18,17 @@ spec:
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: public-gateway
-      namespace: {{ include "cto.namespace" . }}
+      name: {{ .Values.webhooks.exposure.gateway.name | quote }}
+      namespace: {{ .Values.webhooks.exposure.gateway.namespace | quote }}
   hostnames:
-    - "github.public.5dlabs.ai"
+    - {{ .Values.webhooks.exposure.host | quote }}
   rules:
     - matches:
         - path:
             type: PathPrefix
             # Path matches the URL configured in GitHub organization webhook settings.
             # The PM server handles this path via a route alias.
-            value: /github/webhook
+            value: {{ .Values.webhooks.exposure.path | quote }}
       backendRefs:
         - group: ""
           kind: Service
