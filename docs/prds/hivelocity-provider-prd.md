@@ -98,6 +98,44 @@ This blocks us from using lower-cost hardware options that are now available and
 - Custom iPXE on provision: use `customIPXEScriptURL` / related fields
 - VLAN create (future): `POST /vlan`
 
+## API Contract Matrix (MVP)
+
+| Provider Trait Method | Hivelocity Endpoint | Notes |
+| --- | --- | --- |
+| `list_servers` | `GET /device` (or equivalent list route) | Normalize status and networking into `Server`. |
+| `get_server` | `GET /device/{id}` | Must return canonical ID, hostname, plan, state, IPv4/IPv6 if present. |
+| `create_server` | `POST /bare-metal-devices` | Requires `productId`, `locationName`, `osName`, `hostname`, `period`. |
+| `wait_ready` | poll `GET /device/{id}` and/or `GET /order/{id}` | Treat ready as provider active + reachable provisioning state. |
+| `delete_server` | `DELETE /bare-metal-devices/{id}` | Handle already-deleted as idempotent success. |
+| `reinstall_ipxe` | update/reinstall API using `customIPXEScriptURL` | Must support Talos URL chain boot flow. |
+
+## Milestones
+
+### Milestone 1: Provider Skeleton
+
+- Add `ProviderKind::Hivelocity` and config fields.
+- Add `providers/hivelocity/` module with client, models, and error mapping.
+- Wire CLI/env (`HIVELOCITY_API_KEY`) and provider construction.
+- Add compile-time and basic unit tests for config validation.
+
+### Milestone 2: Lifecycle Parity
+
+- Implement `create`, `get`, `list`, `wait_ready`, and `delete`.
+- Add response normalization tests for status transitions.
+- Add retry/backoff handling for transient 429/5xx conditions.
+
+### Milestone 3: Talos iPXE
+
+- Implement `reinstall_ipxe` with URL-based custom iPXE field.
+- Validate request/response handling for reinstall path.
+- Add smoke workflow docs and example commands.
+
+### Milestone 4: Hardening
+
+- Add richer error messages for invalid facility/product/OS combinations.
+- Add structured debug logging with redaction.
+- Confirm end-to-end `metal cluster` and `metal join` runbook on Hivelocity.
+
 ## Architecture Changes
 
 - `crates/metal/src/providers/mod.rs`
@@ -170,4 +208,19 @@ This blocks us from using lower-cost hardware options that are now available and
 3. Run smoke validation in one facility.
 4. Enable provider usage in internal runbooks.
 5. Add optional VLAN automation in follow-up PR.
+
+## Operator Runbook Snippets (Target)
+
+```bash
+# List facilities and stock (planning)
+metal --provider hivelocity regions
+metal --provider hivelocity plans --region TPA1
+
+# Provision single Talos node
+metal --provider hivelocity talos \
+  --hostname cto-hv-cp1 \
+  --plan <hivelocity-product-slug-or-id-mapping> \
+  --region TPA1 \
+  --talos-version v1.9.0
+```
 
