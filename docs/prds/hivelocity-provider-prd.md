@@ -223,4 +223,3 @@ metal --provider hivelocity talos \
   --region TPA1 \
   --talos-version v1.9.0
 ```
-

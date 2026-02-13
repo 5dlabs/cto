@@ -26,7 +26,7 @@
 #
 # Build:
 #   docker build -t ghcr.io/5dlabs/agents .
-#   docker build --build-arg VERSION=1.2.3 -t ghcr.io/5dlabs/agents:1.2.3 .
+#   docker build --build-arg OPENCLAW_VERSION=1.2.3 -t ghcr.io/5dlabs/agents:1.2.3 .
 #
 # =============================================================================
 
@@ -56,11 +56,10 @@ RUN set -eux; \
 # =============================================================================
 # npm CLIs - All coding agent backends
 # =============================================================================
-ARG VERSION=latest
 
 # Core coding CLIs (claude, codex, every-code, gemini, openai SDK)
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    npm install -g \
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    npm install -g --no-audit --no-fund \
       @anthropic-ai/claude-code \
       @openai/codex \
       @just-every/code \
@@ -68,13 +67,18 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
       openai@latest \
     && echo "npm CLIs installed: claude, codex, code, gemini, openai"
 
-# OpenClaw orchestrator
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    if [ "$VERSION" = "latest" ]; then \
-        npm install -g openclaw; \
+# =============================================================================
+# OpenClaw (agent CLI) - orchestrator that delegates to claude/codex/cursor/etc.
+# =============================================================================
+ARG OPENCLAW_VERSION=latest
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    if [ "$OPENCLAW_VERSION" = "latest" ]; then \
+        npm install -g --no-audit --no-fund openclaw; \
     else \
-        npm install -g openclaw@${VERSION}; \
-    fi
+        npm install -g --no-audit --no-fund openclaw@${OPENCLAW_VERSION}; \
+    fi && \
+    echo "--- OpenClaw (agent CLI) included ---" && \
+    openclaw --version
 
 # =============================================================================
 # Cursor Agent CLI
