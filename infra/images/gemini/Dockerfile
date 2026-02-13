@@ -20,9 +20,9 @@ WORKDIR /workspace
 # Install Google Gemini CLI
 # https://geminicli.com/docs/get-started/installation/
 # Pin to a stable version for reproducible builds; override with build-arg if needed.
+# No cache mount here to avoid CI npm cache corruption; --ignore-scripts skips postinstall that can fail in containers.
 ARG VERSION=0.28.2
-RUN --mount=type=cache,target=/root/.npm,sharing=shared \
-    npm install -g --no-audit --no-fund @google/gemini-cli@${VERSION} && \
+RUN npm install -g --no-audit --no-fund --ignore-scripts "@google/gemini-cli@${VERSION}" && \
     echo "Gemini CLI installed"
 
 # Configure git identity (system-wide for all users)

@@ -46,10 +46,10 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # npm CLIs - Claude Code, Codex, Every Code, OpenAI SDK, OpenClaw
 # ---------------------------------------------------------------------------
-ARG VERSION=latest
+ARG VERSION=2026.2.12
 
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    npm install -g \
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    npm install -g --no-audit --no-fund \
       @anthropic-ai/claude-code \
       @openai/codex \
       @just-every/code \
@@ -57,8 +57,8 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
       openai@latest \
     && echo "npm CLIs installed: claude, codex, code, gemini, openai"
 
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    npm install -g openclaw@${VERSION}
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    npm install -g --no-audit --no-fund openclaw@${VERSION}
 
 # ---------------------------------------------------------------------------
 # Cursor Agent CLI - curl installer + system-wide placement
