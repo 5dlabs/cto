@@ -13,7 +13,7 @@ createNamespace: false
 # -- Image configuration
 image:
   repository: ghcr.io/5dlabs/openclaw
-  tag: latest
+  tag: "2026.2.12"
   pullPolicy: Always
 
 # -- Image pull secrets
