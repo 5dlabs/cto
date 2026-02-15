@@ -78,10 +78,10 @@ export function Footer() {
             &copy; {new Date().getFullYear()} 5D Labs. Building the future in parallel.
           </p>
           <a
-            href="mailto:hello@5dlabs.io"
+            href="mailto:hello@5dlabs.ai"
             className="text-sm text-cyan hover:text-cyan/80 transition-colors"
           >
-            hello@5dlabs.io
+            hello@5dlabs.ai
           </a>
         </div>
       </div>

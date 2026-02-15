@@ -51,7 +51,7 @@ Our open-source agent orchestration platform. It coordinates AI agents across:
 
 ## Links
 
-- Website: https://5dlabs.io
+- Website: https://5dlabs.ai
 - CTO Platform: https://cto.5dlabs.ai
 - GitHub: https://github.com/5dlabs
 - Discord: https://discord.gg/5dlabs
@@ -60,6 +60,6 @@ Our open-source agent orchestration platform. It coordinates AI agents across:
 
 ## Contact
 
-- General: hello@5dlabs.io
-- Investor Inquiries: https://5dlabs.io/investors/
+- General: hello@5dlabs.ai
+- Investor Inquiries: https://5dlabs.ai/investors/
 - GitHub: https://github.com/5dlabs

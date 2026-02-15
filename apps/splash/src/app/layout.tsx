@@ -39,18 +39,18 @@ export const metadata: Metadata = {
     "machine learning",
     "artificial intelligence",
   ],
-  authors: [{ name: "5D Labs", url: "https://5dlabs.io" }],
+  authors: [{ name: "5D Labs", url: "https://5dlabs.ai" }],
   creator: "5D Labs",
   publisher: "5D Labs",
-  metadataBase: new URL("https://5dlabs.io"),
+  metadataBase: new URL("https://5dlabs.ai"),
   alternates: {
-    canonical: "https://5dlabs.io",
+    canonical: "https://5dlabs.ai",
   },
   openGraph: {
     title: "5D Labs | OpenClaw-First AI Startup Studio",
     description:
       "Build and validate multiple ventures in parallel. OpenClaw-first, crypto-first, AI-first.",
-    url: "https://5dlabs.io",
+    url: "https://5dlabs.ai",
     siteName: "5D Labs",
     locale: "en_US",
     type: "website",
@@ -96,12 +96,12 @@ const jsonLd = {
   "@graph": [
     {
       "@type": "Organization",
-      "@id": "https://5dlabs.io/#organization",
+      "@id": "https://5dlabs.ai/#organization",
       name: "5D Labs",
-      url: "https://5dlabs.io",
+      url: "https://5dlabs.ai",
       logo: {
         "@type": "ImageObject",
-        url: "https://5dlabs.io/5dlabs-logo-header-v2.png",
+        url: "https://5dlabs.ai/5dlabs-logo-header-v2.png",
       },
       description:
         "OpenClaw-first, crypto-first, AI-first startup studio building and validating multiple ventures in parallel.",
@@ -119,13 +119,13 @@ const jsonLd = {
     },
     {
       "@type": "WebSite",
-      "@id": "https://5dlabs.io/#website",
-      url: "https://5dlabs.io",
+      "@id": "https://5dlabs.ai/#website",
+      url: "https://5dlabs.ai",
       name: "5D Labs",
       description:
         "OpenClaw-first, crypto-first, AI-first startup studio",
       publisher: {
-        "@id": "https://5dlabs.io/#organization",
+        "@id": "https://5dlabs.ai/#organization",
       },
     },
     {
@@ -136,7 +136,7 @@ const jsonLd = {
         "Multi-agent AI engineering platform with 13 specialized agents for autonomous software development.",
       url: "https://cto.5dlabs.ai",
       author: {
-        "@id": "https://5dlabs.io/#organization",
+        "@id": "https://5dlabs.ai/#organization",
       },
     },
   ],

@@ -90,7 +90,7 @@ export default function FounderPage() {
                     </svg>
                   </a>
                   <a
-                    href="mailto:hello@5dlabs.io"
+                    href="mailto:hello@5dlabs.ai"
                     className="text-muted-foreground hover:text-foreground transition-colors"
                     aria-label="Email"
                   >

@@ -316,7 +316,7 @@ export default function InvestorsPage() {
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <a
-                href="mailto:hello@5dlabs.io"
+                href="mailto:hello@5dlabs.ai"
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
               >
                 Contact Us
