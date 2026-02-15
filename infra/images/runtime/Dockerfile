@@ -382,24 +382,47 @@ RUN npm install -g effect-solutions@latest
 # - oracle: Bundle prompts + files for second-model review (GPT-5 Pro, Claude, Gemini)
 # - summarize: Point at URL/file/media, get the gist (streaming, YouTube, podcasts)
 # - mcporter: Call MCPs via TypeScript or package as CLI; discover/list/call tools
+# - poltergeist: Universal hot-reload & file watcher for builds
+# - markdansi: Render Markdown with ANSI colors/links in terminal output
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     npm install -g --no-fund \
       @steipete/oracle \
       @steipete/summarize \
       mcporter \
-    && command -v oracle && command -v summarize && command -v mcporter && echo "steipete npm tools OK"
+      @steipete/poltergeist \
+      markdansi \
+    && command -v oracle && command -v summarize && command -v mcporter \
+    && command -v poltergeist && command -v markdansi \
+    && echo "steipete npm tools OK"
 
 # gogcli (gog) - Google CLI: Gmail, Calendar, Drive, Contacts, Docs, Sheets, etc.
+# goplaces  - Google Places API client + CLI
+# tmuxwatch - TUI to watch tmux sessions (useful for agent session monitoring)
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     set -eux && \
-    GOG_VERSION=$(curl -s https://api.github.com/repos/steipete/gogcli/releases/latest | jq -r '.tag_name') && \
     ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) GOG_ARCH=amd64 ;; arm64) GOG_ARCH=arm64 ;; *) GOG_ARCH=$ARCH ;; esac && \
+    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    # --- gogcli ---
+    GOG_VERSION=$(curl -s https://api.github.com/repos/steipete/gogcli/releases/latest | jq -r '.tag_name') && \
     mkdir -p /tmp/gog_extract && \
-    curl -fsSL "https://github.com/steipete/gogcli/releases/download/${GOG_VERSION}/gogcli_${GOG_VERSION#v}_linux_${GOG_ARCH}.tar.gz" | tar -xzf - -C /tmp/gog_extract && \
+    curl -fsSL "https://github.com/steipete/gogcli/releases/download/${GOG_VERSION}/gogcli_${GOG_VERSION#v}_linux_${DL_ARCH}.tar.gz" | tar -xzf - -C /tmp/gog_extract && \
     install -m 755 /tmp/gog_extract/gog /usr/local/bin/gog && \
     rm -rf /tmp/gog_extract && \
-    gog --version
+    gog --version && \
+    # --- goplaces ---
+    GP_VERSION=$(curl -s https://api.github.com/repos/steipete/goplaces/releases/latest | jq -r '.tag_name') && \
+    mkdir -p /tmp/gp_extract && \
+    curl -fsSL "https://github.com/steipete/goplaces/releases/download/${GP_VERSION}/goplaces_${GP_VERSION#v}_linux_${DL_ARCH}.tar.gz" | tar -xzf - -C /tmp/gp_extract && \
+    install -m 755 /tmp/gp_extract/goplaces /usr/local/bin/goplaces && \
+    rm -rf /tmp/gp_extract && \
+    goplaces --version && \
+    # --- tmuxwatch ---
+    TW_VERSION=$(curl -s https://api.github.com/repos/steipete/tmuxwatch/releases/latest | jq -r '.tag_name') && \
+    mkdir -p /tmp/tw_extract && \
+    curl -fsSL "https://github.com/steipete/tmuxwatch/releases/download/${TW_VERSION}/tmuxwatch_${TW_VERSION#v}_linux_${DL_ARCH}.tar.gz" | tar -xzf - -C /tmp/tw_extract && \
+    install -m 755 /tmp/tw_extract/tmuxwatch /usr/local/bin/tmuxwatch && \
+    rm -rf /tmp/tw_extract && \
+    tmuxwatch --version
 
 # Install Rust toolchain for root
 RUN --mount=type=cache,target=/root/.cache \
