@@ -265,6 +265,100 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Crypto Vision Section */}
+        <section className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-5xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="text-center mb-16"
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1, duration: 0.6 }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[oklch(0.7_0.25_320)]/20 bg-[oklch(0.7_0.25_320)]/5 mb-6"
+              >
+                <span className="text-xs text-[oklch(0.7_0.25_320)] font-medium uppercase tracking-wider">
+                  Crypto Native
+                </span>
+              </motion.div>
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Building for the <span className="gradient-text">New Economy</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                We believe AI agents and crypto rails are converging into
+                something bigger — an agent economy where software transacts,
+                earns, and operates autonomously on-chain.
+              </p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6 }}
+                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+              >
+                <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-7 h-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Stablecoins &amp; Bitcoin</h3>
+                <p className="text-sm text-muted-foreground">
+                  The foundation of the agent economy. Programmable money that
+                  agents can hold, send, and settle — without intermediaries.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+              >
+                <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-7 h-7 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Multi-Chain</h3>
+                <p className="text-sm text-muted-foreground">
+                  Solana for speed, Ethereum and Base for composability, Near
+                  for AI-native smart contracts. We go where the opportunity
+                  is.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+              >
+                <div className="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-7 h-7 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">The Agent Economy</h3>
+                <p className="text-sm text-muted-foreground">
+                  Agents that don&apos;t just write code — they trade, settle
+                  payments, and coordinate on-chain. AI and crypto aren&apos;t
+                  separate bets; they&apos;re one thesis.
+                </p>
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
         {/* OpenClaw Section */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
