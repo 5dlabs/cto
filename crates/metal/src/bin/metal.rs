@@ -12,7 +12,7 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use metal::providers::{
-    cherry, create_provider, latitude::Latitude, CreateServerRequest, Provider, ProviderConfig,
+    create_provider, latitude::Latitude, CreateServerRequest, Provider, ProviderConfig,
     ProviderKind, ReinstallIpxeRequest,
 };
 use metal::stack;
@@ -570,7 +570,9 @@ async fn main() -> Result<()> {
 
     // Resolve Latitude credentials (optionally via 1Password) when using Latitude provider
     let (api_key, project_id) = match cli.provider {
-        ProviderKind::Latitude => resolve_latitude_creds(&cli)?,
+        ProviderKind::Latitude => {
+            resolve_latitude_creds(&cli)?
+        }
         _ => (cli.api_key.clone(), cli.project_id.clone()),
     };
 
@@ -786,7 +788,11 @@ async fn main() -> Result<()> {
 
                     for plan in plans {
                         // Filter for 10G plans if gen4 flag is set
-                        let nics = plan.nics.as_ref().map(|n| &n.name).unwrap_or("unknown");
+                        let nics = plan
+                            .nics
+                            .as_ref()
+                            .map(|n| n.name.as_str())
+                            .unwrap_or("unknown");
                         if gen4 && !nics.to_lowercase().contains("10") {
                             continue;
                         }
@@ -844,156 +850,6 @@ async fn main() -> Result<()> {
 
                 _ => {
                     anyhow::bail!("Plans command not supported for this provider");
-                }
-            }
-
-            println!("\n📦 Available Plans");
-            println!("{}", "=".repeat(100));
-
-            for plan in plans {
-                let slug = plan.attributes.slug.as_deref().unwrap_or("unknown");
-
-                // Filter for Gen 4 plans (they start with m4, f4, rs4, etc.)
-                if gen4
-                    && !slug.contains("4-metal")
-                    && !slug.starts_with("m4")
-                    && !slug.starts_with("f4")
-                    && !slug.starts_with("rs4")
-                {
-                    continue;
-                }
-
-                let name = plan.attributes.name.as_deref().unwrap_or("Unknown");
-                let specs = plan.attributes.specs.as_ref();
-
-                // Format CPU
-                let cpu_desc = specs.and_then(|s| s.cpu.as_ref()).map_or_else(
-                    || "N/A".to_string(),
-                    |c| {
-                        let cores = c.cores.unwrap_or(0);
-                        let clock = c.clock.unwrap_or(0.0);
-                        let cpu_type = c.cpu_type.as_deref().unwrap_or("Unknown");
-                        format!("{cores} cores @ {clock:.1}GHz ({cpu_type})")
-                    },
-                );
-
-                // Format RAM
-                let ram = specs
-                    .and_then(|s| s.memory.as_ref())
-                    .and_then(|m| m.total)
-                    .map_or_else(|| "N/A".to_string(), |gb| format!("{gb} GB"));
-
-                // Format Storage
-                let storage = specs.and_then(|s| s.drives.as_ref()).map_or_else(
-                    || "N/A".to_string(),
-                    |drives| {
-                        drives
-                            .iter()
-                            .map(|d| {
-                                let count = d.count.unwrap_or(1);
-                                let size = d.size.as_deref().unwrap_or("?");
-                                let dtype = d.drive_type.as_deref().unwrap_or("?");
-                                format!("{count}x {size} {dtype}")
-                            })
-                            .collect::<Vec<_>>()
-                            .join(" + ")
-                    },
-                );
-
-                // Format NICs
-                let nics = specs.and_then(|s| s.nics.as_ref()).map_or_else(
-                    || "N/A".to_string(),
-                    |nics| {
-                        nics.iter()
-                            .map(|n| {
-                                let count = n.count.unwrap_or(1);
-                                let ntype = n.nic_type.as_deref().unwrap_or("?");
-                                format!("{count}x {ntype}")
-                            })
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    },
-                );
-
-                println!("\n{name} ({slug})");
-                println!("  CPU:     {cpu_desc}");
-                println!("  RAM:     {ram}");
-                println!("  Storage: {storage}");
-                println!("  Network: {nics}");
-
-                // Show regions with stock
-                if let Some(regions) = &plan.attributes.regions {
-                    let mut in_stock_regions = Vec::new();
-                    let mut out_of_stock_regions = Vec::new();
-
-                    for r in regions {
-                        let region_name = r.name.as_deref().unwrap_or("?");
-                        let stock_level = r.stock_level.as_deref().unwrap_or("unknown");
-                        let in_stock_sites = r
-                            .locations
-                            .as_ref()
-                            .and_then(|l| l.in_stock.as_ref())
-                            .map(|v| v.join(", "))
-                            .unwrap_or_default();
-
-                        // Check if any sites are in stock
-                        let is_in_stock = r
-                            .locations
-                            .as_ref()
-                            .and_then(|l| l.in_stock.as_ref())
-                            .is_some_and(|sites| !sites.is_empty());
-
-                        // Apply region filter (check if any site slug matches)
-                        if let Some(ref filter_region) = region {
-                            let matches = r
-                                .locations
-                                .as_ref()
-                                .and_then(|l| l.available.as_ref())
-                                .is_some_and(|sites| {
-                                    sites.iter().any(|s| s.eq_ignore_ascii_case(filter_region))
-                                });
-                            if !matches {
-                                continue;
-                            }
-                        }
-
-                        // Apply in_stock filter
-                        if in_stock && !is_in_stock {
-                            continue;
-                        }
-
-                        let price_hr = r
-                            .pricing
-                            .as_ref()
-                            .and_then(|p| p.usd.as_ref())
-                            .and_then(|u| u.hour)
-                            .map_or_else(|| "N/A".to_string(), |h| format!("${h:.2}/hr"));
-
-                        let entry = if is_in_stock {
-                            format!("{region_name} [{in_stock_sites}] {price_hr} ({stock_level})")
-                        } else {
-                            format!("{region_name} {price_hr}")
-                        };
-
-                        if is_in_stock {
-                            in_stock_regions.push(entry);
-                        } else {
-                            out_of_stock_regions.push(entry);
-                        }
-                    }
-
-                    if !in_stock_regions.is_empty() {
-                        println!("  ✅ In Stock:");
-                        for r in in_stock_regions {
-                            println!("     - {r}");
-                        }
-                    }
-                    if !out_of_stock_regions.is_empty() && !in_stock {
-                        println!("  ❌ Out of Stock:");
-                        for r in out_of_stock_regions {
-                            println!("     - {r}");
-                        }
-                    }
                 }
             }
         }
@@ -1076,6 +932,7 @@ async fn main() -> Result<()> {
                     region,
                     os,
                     ssh_keys,
+                    ip_addresses: vec![],
                 })
                 .await?;
 
@@ -1110,6 +967,7 @@ async fn main() -> Result<()> {
                     region,
                     os: "ubuntu_24_04_x64_lts".to_string(),
                     ssh_keys,
+                    ip_addresses: vec![],
                 })
                 .await?;
 
@@ -1260,6 +1118,7 @@ async fn main() -> Result<()> {
                     region,
                     os: "ubuntu_24_04_x64_lts".to_string(),
                     ssh_keys,
+                    ip_addresses: vec![],
                 })
                 .await?;
 
@@ -1411,6 +1270,7 @@ async fn main() -> Result<()> {
                         region: region.clone(),
                         os: "ubuntu_24_04_x64_lts".to_string(),
                         ssh_keys: ssh_keys.clone(),
+                        ip_addresses: vec![],
                     };
                     let worker_req = CreateServerRequest {
                         hostname: worker_hostname.clone(),
@@ -1418,6 +1278,7 @@ async fn main() -> Result<()> {
                         region,
                         os: "ubuntu_24_04_x64_lts".to_string(),
                         ssh_keys,
+                        ip_addresses: vec![],
                     };
 
                     // Use retry for API calls
@@ -1800,6 +1661,7 @@ async fn main() -> Result<()> {
                     region,
                     os: "ubuntu_24_04_x64_lts".to_string(),
                     ssh_keys,
+                    ip_addresses: vec![],
                 })
                 .await?;
 
@@ -1973,9 +1835,9 @@ async fn main() -> Result<()> {
                     // Unseal OpenBao with the first key
                     if let Some(key) = openbao_creds.unseal_keys.first() {
                         stack::unseal_openbao(&kubeconfig, key)?;
-                        println!("\n🔐 OpenBao initialized and unsealed!");
+                        println!("\n🔓 OpenBao unsealed successfully!");
                     } else {
-                        println!("\n🔐 OpenBao initialized (no unseal keys returned)!");
+                        println!("\n🔓 OpenBao unsealed (no unseal keys returned)!");
                     }
                     println!("\n🔑 OpenBao Credentials:");
                     println!(
@@ -2045,6 +1907,7 @@ async fn main() -> Result<()> {
                 region: region.clone(),
                 os: "ubuntu_24_04_x64_lts".to_string(),
                 ssh_keys: ssh_keys.clone(),
+                ip_addresses: vec![],
             };
             let w1_req = CreateServerRequest {
                 hostname: worker1_hostname.clone(),
@@ -2052,6 +1915,7 @@ async fn main() -> Result<()> {
                 region: region.clone(),
                 os: "ubuntu_24_04_x64_lts".to_string(),
                 ssh_keys: ssh_keys.clone(),
+                ip_addresses: vec![],
             };
             let w2_req = CreateServerRequest {
                 hostname: worker2_hostname.clone(),
@@ -2059,6 +1923,7 @@ async fn main() -> Result<()> {
                 region,
                 os: "ubuntu_24_04_x64_lts".to_string(),
                 ssh_keys,
+                ip_addresses: vec![],
             };
 
             let provider2: Box<dyn Provider> = create_provider(provider_config.clone())
@@ -2192,6 +2057,7 @@ async fn main() -> Result<()> {
                 .with_output_dir(&output_dir)
                 .with_talos_version(&talos_version);
             let configs = talos::generate_config(&config)?;
+            let kubeconfig_path = output_dir.join("kubeconfig");
 
             // Step 6: Apply config to control plane
             println!("\n🚀 Step 6/12: Applying control plane config (install + reboot)...");
@@ -2209,6 +2075,7 @@ async fn main() -> Result<()> {
 
             let kubeconfig_path = output_dir.join("kubeconfig");
             talos::get_kubeconfig(&cp_addr, &configs.talosconfig, &kubeconfig_path)?;
+            println!("   ✅ Control plane bootstrapped!");
 
             // Step 10: Apply worker config to both workers
             println!("\n🔄 Step 10/12: Applying worker configs (install + reboot)...");

@@ -448,6 +448,6 @@ mod tests {
         assert!(names.contains(&"rex"));
         assert!(names.contains(&"blaze"));
         assert!(names.contains(&"bolt"));
-        assert_eq!(names.len(), 12);
+        assert_eq!(names.len(), 13);
     }
 }

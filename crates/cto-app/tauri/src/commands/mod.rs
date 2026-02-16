@@ -16,3 +16,25 @@ pub use cluster::{
     delete_cluster, get_cluster_info, get_clusters_status, list_clusters, restart_cluster,
     start_cluster, stop_cluster, ClusterInfo, ClusterStatus, NodeInfo,
 };
+
+#[tauri::command]
+pub async fn install_github_app(
+    app_id: String,
+    private_key: String,
+) -> Result<pm_lite::github_app::GitHubAppConfig, String> {
+    pm_lite::github_app::install_github_app(app_id, private_key).await
+}
+
+#[tauri::command]
+pub async fn list_webhook_events(
+    limit: u32,
+) -> Result<Vec<pm_lite::github_app::StoredEvent>, String> {
+    pm_lite::github_app::list_webhook_events(limit).await
+}
+
+#[tauri::command]
+pub async fn redeliver_webhook(
+    event_id: String,
+) -> Result<pm_lite::github_app::StoredEvent, String> {
+    pm_lite::github_app::redeliver_webhook(event_id).await
+}
