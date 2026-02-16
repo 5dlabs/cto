@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { featureFlags } from "@/config/feature-flags";
 
 const navLinks = [
@@ -39,13 +40,13 @@ export function Header() {
     >
       <nav className="flex items-center gap-1 px-2 py-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.3)]">
         {/* Logo */}
-        <a
+        <Link
           href="/"
           className="flex items-center justify-center h-8 px-3 rounded-full bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
           aria-label="CTO Home"
         >
           <span className="text-xs font-bold text-cyan">CTO</span>
-        </a>
+        </Link>
 
         {/* Divider */}
         <div className="w-px h-4 bg-white/[0.08] mx-1" />
@@ -53,21 +54,21 @@ export function Header() {
         {/* Nav links */}
         <div className="hidden sm:flex items-center gap-0.5">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.name}
               href={link.href}
               className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all"
             >
               {link.name}
-            </a>
+            </Link>
           ))}
           {featureFlags.showPricingLink && (
-            <a
+            <Link
               href="/pricing"
               className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all"
             >
               Pricing
-            </a>
+            </Link>
           )}
         </div>
 

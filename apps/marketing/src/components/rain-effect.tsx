@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 interface RainDrop {
   id: number;
   left: number;
@@ -10,28 +8,26 @@ interface RainDrop {
   opacity: number;
 }
 
+function seededValue(seed: number): number {
+  const x = Math.sin(seed * 9301 + 49297) * 233280;
+  return Math.round((x - Math.floor(x)) * 10000) / 10000;
+}
+
+const drops: RainDrop[] = Array.from({ length: 20 }, (_, i) => ({
+  id: i,
+  left: seededValue(i * 4) * 100,
+  delay: seededValue(i * 4 + 1) * 12,
+  duration: 4 + seededValue(i * 4 + 2) * 5,
+  opacity: 0.03 + seededValue(i * 4 + 3) * 0.08,
+}));
+
 export function RainEffect() {
-  const [drops, setDrops] = useState<RainDrop[]>([]);
-
-  useEffect(() => {
-    const newDrops: RainDrop[] = [];
-    for (let i = 0; i < 40; i++) {
-      newDrops.push({
-        id: i,
-        left: Math.random() * 100,
-        delay: Math.random() * 8,
-        duration: 2 + Math.random() * 3,
-        opacity: 0.05 + Math.random() * 0.15,
-      });
-    }
-    setDrops(newDrops);
-  }, []);
-
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" suppressHydrationWarning>
       {drops.map((drop) => (
         <div
           key={drop.id}
+          suppressHydrationWarning
           className="absolute w-px bg-gradient-to-b from-transparent via-cyan to-transparent rain-drop"
           style={{
             left: `${drop.left}%`,
