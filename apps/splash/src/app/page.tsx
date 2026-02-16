@@ -56,18 +56,18 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 1.2 }}
             className="max-w-4xl mx-auto text-center"
           >
             {/* Badge */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2, duration: 0.8, ease: "easeOut" }}
+              transition={{ delay: 0.4, duration: 1.2, ease: "easeOut" }}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8"
             >
               <span className="text-sm text-cyan font-semibold tracking-wide">
-                OpenClaw &middot; Crypto &middot; AI
+                Crypto-Native &middot; AI-Native
               </span>
             </motion.div>
 
@@ -75,7 +75,7 @@ export default function Home() {
             <motion.h1
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 1, ease: "easeOut" }}
+              transition={{ delay: 0.7, duration: 1.4, ease: "easeOut" }}
               className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6"
             >
               <span className="gradient-text glow-text-cyan">Build in Parallel.</span>
@@ -87,7 +87,7 @@ export default function Home() {
             <motion.p
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 1, ease: "easeOut" }}
+              transition={{ delay: 1.0, duration: 1.4, ease: "easeOut" }}
               className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10"
             >
               5D Labs is a startup studio that leverages OpenClaw and autonomous
@@ -99,7 +99,7 @@ export default function Home() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7, duration: 0.8 }}
+              transition={{ delay: 1.3, duration: 1.2 }}
               className="flex flex-col sm:flex-row justify-center gap-4 mb-16"
             >
               <a
@@ -120,7 +120,7 @@ export default function Home() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.9, duration: 0.8 }}
+              transition={{ delay: 1.6, duration: 1.2 }}
               className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground"
             >
               <div className="flex items-center gap-2">
@@ -142,7 +142,7 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 1.2, duration: 1 }}
+            transition={{ delay: 2.0, duration: 1.2 }}
             className="absolute bottom-10 left-1/2 -translate-x-1/2"
           >
             <motion.div
