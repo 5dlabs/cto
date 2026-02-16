@@ -10,6 +10,20 @@ pub struct ClusterStatus {
     pub kubernetes_version: Option<String>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct NodeInfo {
+    pub name: String,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ClusterInfo {
+    pub name: String,
+    pub status: String,
+    pub nodes: Vec<NodeInfo>,
+    pub kubernetes_version: Option<String>,
+}
+
 fn check_command_exists(cmd: &str) -> bool {
     Command::new("sh")
         .arg("-c")
@@ -162,4 +176,46 @@ pub fn list_clusters() -> Result<Vec<ClusterStatus>, String> {
     }
 
     Ok(statuses)
+}
+
+#[tauri::command]
+pub fn start_cluster(name: &str) -> Result<String, String> {
+    start_kind_cluster(name)
+}
+
+#[tauri::command]
+pub fn stop_cluster(_name: &str) -> Result<String, String> {
+    Err("Stopping a kind cluster is not supported (delete it instead)".to_string())
+}
+
+#[tauri::command]
+pub fn restart_cluster(_name: &str) -> Result<String, String> {
+    Err("Restarting a kind cluster is not supported (delete and recreate)".to_string())
+}
+
+#[tauri::command]
+pub fn delete_cluster(name: &str) -> Result<String, String> {
+    delete_kind_cluster(name)
+}
+
+#[tauri::command]
+pub fn get_cluster_info(name: &str) -> Result<ClusterInfo, String> {
+    let status = get_cluster_status(name)?;
+
+    Ok(ClusterInfo {
+        name: status.name,
+        status: status.status,
+        nodes: (0..status.nodes)
+            .map(|i| NodeInfo {
+                name: format!("node-{i}"),
+                status: "ready".to_string(),
+            })
+            .collect(),
+        kubernetes_version: status.kubernetes_version,
+    })
+}
+
+#[tauri::command]
+pub fn get_clusters_status() -> Result<Vec<ClusterStatus>, String> {
+    list_clusters()
 }

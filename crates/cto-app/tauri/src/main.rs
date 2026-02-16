@@ -8,7 +8,7 @@ mod keychain;
 mod runtime;
 
 use commands::cluster::*;
-use pm_lite::github_app::{install_github_app, list_webhook_events, redeliver_webhook};
+use commands::{install_github_app, list_webhook_events, redeliver_webhook};
 
 fn main() {
     tauri::Builder::default()

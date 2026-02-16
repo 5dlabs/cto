@@ -9,8 +9,8 @@ use reqwest::{Client, StatusCode};
 use tracing::{debug, info};
 
 use super::models::{
-    AppleSiliconServer, AppleSiliconServerListResponse, CreateAppleSiliconRequest,
-    RemoteDesktop,
+    AppleSiliconOffer, AppleSiliconServer, AppleSiliconServerListResponse,
+    CreateAppleSiliconRequest, RemoteDesktop,
 };
 use crate::providers::traits::{Provider, ProviderError, Server, ServerStatus};
 

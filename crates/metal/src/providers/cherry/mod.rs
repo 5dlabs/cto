@@ -26,7 +26,7 @@
 //! ## iPXE Support
 //!
 //! Cherry Servers supports custom iPXE boot via user_data field:
-//! ```rust
+//! ```text
 //! user_data: Some("#!ipxe\nchain http://example.com/ipxe".to_string())
 //! ```
 //!

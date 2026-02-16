@@ -234,6 +234,25 @@ impl Cherry {
         (hourly, monthly)
     }
 
+    /// Create a Cherry provider with frictionless initialization.
+    ///
+    /// NOTE: This is a placeholder until we implement:
+    /// - SSH key discovery/upload
+    /// - Project auto-creation
+    ///
+    /// # Errors
+    ///
+    /// Always returns a configuration error for now.
+    pub async fn with_frictionless_init(
+        api_key: String,
+        team_id: i64,
+    ) -> Result<(Self, i64, Vec<i64>), ProviderError> {
+        let _ = (api_key, team_id);
+        Err(ProviderError::Config(
+            "Cherry frictionless init is not implemented yet".to_string(),
+        ))
+    }
+
     /// Convert API plan response to PlanWithPricing.
     fn to_plan_with_pricing(data: &serde_json::Value) -> Option<PlanWithPricing> {
         let id = data.get("id")?.as_i64()?;
@@ -294,12 +313,14 @@ impl Cherry {
         let pricing = data.get("pricing").and_then(|arr| {
             arr.as_array()?
                 .iter()
-                .map(|p| Pricing {
-                    id: p.get("id")?.as_i64()?,
-                    unit: p.get("unit")?.as_str()?.to_string(),
-                    price: p.get("price")?.as_f64()?,
-                    currency: p.get("currency")?.as_str()?.to_string(),
-                    taxed: p.get("taxed")?.as_bool()?,
+                .filter_map(|p| {
+                    Some(Pricing {
+                        id: p.get("id")?.as_i64()?,
+                        unit: p.get("unit")?.as_str()?.to_string(),
+                        price: p.get("price")?.as_f64()?,
+                        currency: p.get("currency")?.as_str()?.to_string(),
+                        taxed: p.get("taxed")?.as_bool()?,
+                    })
                 })
                 .collect::<Vec<_>>()
                 .into()
@@ -334,14 +355,14 @@ impl Cherry {
     pub async fn list_plans(&self) -> Result<Vec<PlanWithPricing>, ProviderError> {
         debug!("Fetching available plans from Cherry API");
 
-        #[derive(Debug, Clone, Deserialize)]
+        #[derive(Debug, Clone, serde::Deserialize)]
         struct PlansResponse {
             plans: Vec<serde_json::Value>,
         }
 
         let response: PlansResponse = self.get("/plans").await?;
 
-        let plans = response
+        let plans: Vec<PlanWithPricing> = response
             .plans
             .iter()
             .filter_map(|p| Self::to_plan_with_pricing(p))
@@ -361,9 +382,9 @@ impl Cherry {
 
         let data: serde_json::Value = self.get(&format!("/plans/{slug}")).await?;
 
-        Self::to_plan_with_pricing(&data)
-            .with_context(|| format!("Failed to parse plan: {slug}"))
-            .map_err(|e| ProviderError::Other(e.into()))
+        Self::to_plan_with_pricing(&data).ok_or_else(|| {
+            ProviderError::Config(format!("Failed to parse plan: {slug}"))
+        })
     }
 
     /// List available regions.
@@ -374,7 +395,7 @@ impl Cherry {
     pub async fn list_regions(&self) -> Result<Vec<super::models::Region>, ProviderError> {
         debug!("Fetching available regions from Cherry API");
 
-        #[derive(Debug, Clone, Deserialize)]
+        #[derive(Debug, Clone, serde::Deserialize)]
         struct RegionsResponse {
             regions: Vec<super::models::Region>,
         }
