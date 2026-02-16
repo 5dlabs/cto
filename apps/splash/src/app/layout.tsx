@@ -56,10 +56,11 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/5dlabs-logo-header-v2.png",
+        url: "/og-image-v2.jpg",
         width: 1200,
         height: 630,
         alt: "5D Labs - OpenClaw-First AI Startup Studio",
+        type: "image/jpeg",
       },
     ],
   },
@@ -68,7 +69,7 @@ export const metadata: Metadata = {
     title: "5D Labs | OpenClaw-First AI Startup Studio",
     description:
       "Build and validate multiple ventures in parallel. OpenClaw-first, crypto-first, AI-first.",
-    images: ["/5dlabs-logo-header-v2.png"],
+    images: ["/og-image-v2.jpg"],
     creator: "@5dlabs",
   },
   robots: {
@@ -101,7 +102,7 @@ const jsonLd = {
       url: "https://5dlabs.ai",
       logo: {
         "@type": "ImageObject",
-        url: "https://5dlabs.ai/5dlabs-logo-header-v2.png",
+        url: "https://5dlabs.ai/og-image-v2.jpg",
       },
       description:
         "OpenClaw-first, crypto-first, AI-first startup studio building and validating multiple ventures in parallel.",
