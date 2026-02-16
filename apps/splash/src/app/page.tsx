@@ -67,7 +67,7 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8"
             >
               <span className="text-sm text-cyan font-semibold tracking-wide">
-                Crypto-Native &middot; AI-Native
+                Agentic &middot; On-Chain
               </span>
             </motion.div>
 
