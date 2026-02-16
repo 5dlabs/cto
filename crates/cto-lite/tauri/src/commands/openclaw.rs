@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// URL for the `OpenClaw` gateway. In production this will be discovered
-/// via the Kind cluster; for now we default to localhost.
-const DEFAULT_GATEWAY_URL: &str = "http://localhost:3100";
+/// URL for the `OpenClaw` gateway. Matches OpenClaw's default port (18789).
+/// Override with `OPENCLAW_GATEWAY_URL` (e.g. `http://localhost:3100`) if you run the gateway on another port.
+const DEFAULT_GATEWAY_URL: &str = "http://localhost:18789";
 
 /// Whether the gateway has been connected at least once.
 static GATEWAY_CONNECTED: AtomicBool = AtomicBool::new(false);

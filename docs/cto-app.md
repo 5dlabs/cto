@@ -71,6 +71,8 @@ The CTO App is a desktop application built with Tauri that runs the CTO platform
                 └─────────────────────────────┘
 ```
 
+**Connecting the desktop toolbar to OpenClaw:** See [OpenClaw local setup](openclaw-local-setup.md) to run the OpenClaw gateway locally and connect the CTO app.
+
 ---
 
 ## Current State Analysis
