@@ -64,14 +64,17 @@ export default function Home() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.8, ease: "easeOut" }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8"
+              className="inline-flex items-center gap-2 mb-8"
             >
-              <span className="flex flex-col items-center leading-tight">
-                <span className="text-sm text-cyan font-semibold tracking-wide">
-                  OpenClaw &middot; Crypto &middot; AI
+              <span className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan/10 text-[11px] text-cyan font-semibold tracking-wide border border-cyan/20">
+                  OpenClaw
                 </span>
-                <span className="text-xs text-cyan/50 uppercase tracking-[0.25em] font-bold">
-                  Native
+                <span className="px-2.5 py-0.5 rounded-full bg-[oklch(0.7_0.25_320)]/10 text-[11px] text-[oklch(0.7_0.25_320)] font-semibold tracking-wide border border-[oklch(0.7_0.25_320)]/20">
+                  Crypto
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-yellow-500/10 text-[11px] text-yellow-400 font-semibold tracking-wide border border-yellow-500/20">
+                  AI
                 </span>
               </span>
             </motion.div>
@@ -157,6 +160,24 @@ export default function Home() {
             >
               <div className="w-1 h-2 rounded-full bg-cyan" />
             </motion.div>
+          </motion.div>
+        </section>
+
+        {/* Disruptor Manifesto */}
+        <section className="py-16 px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="max-w-3xl mx-auto text-center"
+          >
+            <p className="text-xl sm:text-2xl text-muted-foreground leading-relaxed">
+              Cloud providers love your margins. VCs love your burn rate.
+              <br className="hidden sm:block" />
+              We thought there might be a{" "}
+              <span className="text-foreground font-semibold">better way</span>.
+            </p>
           </motion.div>
         </section>
 
