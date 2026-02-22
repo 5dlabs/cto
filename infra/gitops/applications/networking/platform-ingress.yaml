@@ -48,4 +48,16 @@ spec:
         factor: 2
         maxDuration: 1m
 
+  ignoreDifferences:
+    # cert-manager manages Certificate spec/status; ignore spec drift to prevent renewal loops
+    - group: cert-manager.io
+      kind: Certificate
+      namespace: headscale
+      name: headscale-tls
+      jqPathExpressions:
+        - .spec
+        - .status
+        - .metadata.annotations
+        - .metadata.resourceVersion
+
   revisionHistoryLimit: 5

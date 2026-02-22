@@ -225,5 +225,12 @@ spec:
       jqPathExpressions:
         - .subjects
         - .tunnelRef
+    # cto namespace is also managed by platform-namespaces; ignore label/annotation drift
+    - group: ""
+      kind: Namespace
+      name: cto
+      jqPathExpressions:
+        - .metadata.labels
+        - .metadata.annotations
 
   revisionHistoryLimit: 5
