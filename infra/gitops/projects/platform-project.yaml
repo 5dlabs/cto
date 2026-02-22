@@ -35,6 +35,7 @@ spec:
     - 'https://github.com/actions/actions-runner-controller'
     # ARC OCI Helm charts
     - 'oci://ghcr.io/actions/actions-runner-controller-charts'
+    - 'oci://ghcr.io/twingate/helmcharts'
     - 'https://github.com/kubernetes-sigs/gateway-api'
     - 'https://kubernetes-sigs.github.io/external-dns/'
     - 'https://kubernetes-sigs.github.io/metrics-server/'

@@ -65,9 +65,6 @@ spec:
           podAnnotations:
             logs.platform.5dlabs.io/collect: "true"
             logs.platform.5dlabs.io/service: seaweedfs-master
-          # Keep stateful storage components on worker nodes
-          nodeSelector:
-            node-role.kubernetes.io/worker: ""
           # Default replication strategy
           # 000 = no replication
           # 001 = replicate once on different rack
@@ -82,9 +79,6 @@ spec:
           replicas: 1  # Single node setup - increase when adding worker nodes
           # Disable anti-affinity for single-node cluster
           affinity: ""
-          # Keep stateful storage components on worker nodes
-          nodeSelector:
-            node-role.kubernetes.io/worker: ""
           port: 8080
           grpcPort: 18080
           # Persistence for actual data storage
@@ -144,9 +138,6 @@ spec:
           podAnnotations:
             logs.platform.5dlabs.io/collect: "true"
             logs.platform.5dlabs.io/service: seaweedfs-filer
-          # Keep stateful storage components on worker nodes
-          nodeSelector:
-            node-role.kubernetes.io/worker: ""
 
         # S3 API gateway (uses filer's S3 capability)
         s3:
