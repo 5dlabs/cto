@@ -259,6 +259,134 @@ Base images: distroless or scratch — no shell, no package manager in the conta
 
 ---
 
+## Talos + Cilium — Responsibilities & Overlap
+
+This is the most important thing to get right before deploying. Both touch networking and
+security, and running them in conflict will break the cluster silently.
+
+### Who owns what
+
+| Concern | Talos | Cilium |
+|---|---|---|
+| OS / immutable filesystem | ✅ owns | — |
+| Physical interfaces (bond0.x, VLANs, IPs) | ✅ owns | — |
+| Kernel modules & sysctls at boot | ✅ owns | — |
+| kubelet, etcd, control plane | ✅ owns | — |
+| Node-level host firewall | ✅ owns | — |
+| CNI / pod networking | ❌ set to `none` — hands off to Cilium | ✅ owns |
+| Pod IP allocation (IPAM) | — | ✅ owns |
+| kube-proxy (service VIPs) | ❌ must be **disabled** | ✅ replaces via eBPF |
+| NetworkPolicy (pod/namespace) | — | ✅ owns |
+| WireGuard mesh (KubeSpan) | ⚠️ available, see below | ⚠️ available, see below |
+| Observable network flows | — | ✅ Hubble |
+| Cluster mesh / multi-cluster | — | ✅ ClusterMesh |
+| Load balancing / DSR | — | ✅ eBPF maglev |
+
+### The three things you must get right
+
+**1. Disable kube-proxy in Talos**
+
+Talos deploys kube-proxy by default. Cilium replaces it entirely with an eBPF
+implementation that is faster and more observable. Running both causes conflicts.
+
+In your Talos machine config:
+```yaml
+cluster:
+  proxy:
+    disabled: true
+```
+
+And in the Cilium Helm values:
+```yaml
+kubeProxyReplacement: true
+k8sServiceHost: <talos-api-ip>
+k8sServicePort: 6443
+```
+
+**2. Set CNI to `none` in Talos**
+
+Talos will try to install a default CNI (flannel) unless told not to. Let Cilium own it:
+
+```yaml
+cluster:
+  network:
+    cni:
+      name: none
+```
+
+**3. Cilium needs specific cgroup config for Talos**
+
+Talos mounts cgroups differently from standard Linux. Cilium's auto-mount will conflict:
+
+```yaml
+# Required Cilium Helm values for Talos
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+securityContext:
+  capabilities:
+    ciliumAgent: [CHOWN, KILL, NET_ADMIN, NET_RAW, IPC_LOCK, SYS_ADMIN, SYS_RESOURCE, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    cleanCiliumState: [NET_ADMIN, SYS_ADMIN, SYS_RESOURCE]
+```
+
+### WireGuard — pick one, not both
+
+This is the main overlap trap:
+
+- **Talos KubeSpan** — WireGuard mesh at the **node level**. Connects Talos nodes across
+  different networks (e.g., across datacenters). Requires both clusters to run Talos.
+  Not applicable for single-node clusters.
+
+- **Cilium WireGuard** — WireGuard encryption at the **pod level**. Encrypts pod-to-pod
+  traffic within a cluster. Works with any k8s distro.
+
+**For this cluster (single-node, same-datacenter as RPC node):**
+- KubeSpan: irrelevant — there's only one Talos node, no mesh needed
+- Cilium WireGuard: optional — pod traffic is already on a private datacenter network,
+  encryption adds ~5–10% overhead. Reasonable to skip for the hot latency path, enable
+  if regulatory/compliance requirements apply later.
+
+**Do not enable both simultaneously.** The WireGuard interfaces will conflict.
+
+### Talos host firewall + Cilium NetworkPolicy — complementary, not conflicting
+
+These operate at different layers and should both be used:
+
+```
+Internet
+    │
+    ▼
+Talos host firewall (machine.network level)
+    │   • Blocks at OS/kernel before anything reaches pods
+    │   • Rules: allow 8001/tcp, 8000-10000/udp; deny everything else inbound
+    ▼
+Cilium NetworkPolicy (pod/namespace level)
+        • Default-deny all ingress + egress on bot namespaces
+        • Explicit egress allow per bot (exchange API IPs only)
+        • No pod-to-pod cross-namespace unless declared
+```
+
+The Talos firewall is your outer wall. Cilium is your inner wall. Defense in depth.
+
+### Required kernel modules (Talos machine config)
+
+Cilium's eBPF datapath needs these loaded at boot:
+
+```yaml
+machine:
+  kernel:
+    modules:
+      - name: br_netfilter
+      - name: xt_socket
+  sysctls:
+    net.core.bpf_jit_enable: "1"
+    net.ipv4.conf.all.forwarding: "1"
+    net.ipv6.conf.all.forwarding: "1"
+```
+
+---
+
 ## Multi-Cluster & Connectivity
 
 ### Current plan: standalone
