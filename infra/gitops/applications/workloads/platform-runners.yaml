@@ -1,6 +1,7 @@
 ---
-# GitHub Actions Runner Scale Set for 5D Labs Platform
+# GitHub Actions Runner Scale Set for 5D Labs CTO repo
 # Uses the new official ARC runner scale sets
+# Deployed on EKS - runners auto-scale based on queued workflow jobs
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -33,32 +34,26 @@ spec:
 
     helm:
       values: |
-        githubConfigUrl: "https://github.com/5dlabs"
+        # Scoped to the CTO repo (previously org-level)
+        githubConfigUrl: "https://github.com/5dlabs/cto"
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
-        minRunners: 8  # Keep 8 runners always available to avoid queue buildup
+        # Elastic scaling: keep 2 warm runners, burst to 8 for concurrent PRs
         # LESSON LEARNED: With 5 maxRunners, queued jobs piled up repeatedly
-        # when multiple PRs triggered workflows simultaneously. Increased to 8
-        # to provide more capacity headroom and prevent queue buildup.
-        # See: pr-merge-loop/lessons-learned.md#ISSUE-004
-        maxRunners: 8  # Increased from 5 to handle concurrent PR workflows
+        # when multiple PRs triggered workflows simultaneously. Max of 8
+        # provides capacity headroom. See: pr-merge-loop/lessons-learned.md#ISSUE-004
+        minRunners: 2
+        maxRunners: 8
         runnerGroup: "Default"
 
         # Docker-in-Docker configuration for container builds
-        # Note: MTU is configured in Cilium values.yaml (mtu: 1420) to account for
-        # WireGuard encryption overhead. This prevents intermittent connectivity
-        # issues when downloading large files (e.g., GitHub Actions tarballs).
         containerMode:
           type: "dind"
 
         # Listener configuration for stable runner management
+        # Note: No control plane tolerations needed on EKS (managed control plane)
         listenerTemplate:
           spec:
-            # Allow listener to run on control plane if needed (critical for runners)
-            tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
             containers:
             - name: listener
               env:
@@ -73,7 +68,7 @@ spec:
           name: "arc-gha-rs-controller"
           namespace: "arc-systems"
 
-        # Force persistent runner behavior with explicit configuration
+        # Runner pod template
         # Note: Don't override app.kubernetes.io/component - it's part of the
         # selector and can't be changed on existing resources
         template:
@@ -85,11 +80,10 @@ spec:
               logs.platform.5dlabs.io/service: github-runner
           spec:
             restartPolicy: OnFailure
-            # Increased from 3600 to 7200 (2 hours) to support long-running builds
-            # Agent builds can take 45-90 minutes, and pods need time before starting jobs
+            # 2-hour deadline to support long-running builds
+            # Agent builds can take 45-90 minutes, plus pod startup time
             activeDeadlineSeconds: 7200
-            # Explicit DNS configuration to avoid transient CoreDNS/host DNS issues
-            # Uses public DNS servers directly for reliable external domain resolution
+            # Explicit DNS configuration for reliable external resolution
             dnsPolicy: "None"
             dnsConfig:
               nameservers:
@@ -114,7 +108,6 @@ spec:
               image: ghcr.io/5dlabs/rust-builder:latest
               imagePullPolicy: Always
               command: ["/home/runner/run.sh"]
-              # Resource limits to prevent OOM on the node
               resources:
                 requests:
                   cpu: "500m"
@@ -129,9 +122,8 @@ spec:
               - name: work
                 mountPath: /home/runner/_work
             volumes:
-            # Use emptyDir for runner workspace - each runner gets isolated storage
+            # emptyDir for runner workspace - each runner gets isolated storage
             # Build caching should use GitHub Actions' actions/cache instead of shared PVCs
-            # This avoids Multi-Attach errors when multiple runners scale up simultaneously
             - name: work
               emptyDir:
                 sizeLimit: 20Gi
