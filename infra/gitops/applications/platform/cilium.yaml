@@ -15,7 +15,7 @@ metadata:
   annotations:
     # Cilium should be deployed before other network-dependent apps
     argocd.argoproj.io/sync-wave: "-10"
-    argocd.argoproj.io/skip-reconcile: "true"  # Requires k3s reinstall with --flannel-backend=none; skip until cluster migration
+    argocd.argoproj.io/skip-reconcile: "true"  # removed after k3s flannel migration completes
     # Enable via toggle_app MCP tool when running on bare metal
 spec:
   project: platform

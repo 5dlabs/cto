@@ -1,66 +1,42 @@
 ---
-# Cilium Helm values for Talos Kubernetes clusters
-# This configuration is optimized for ClusterMesh multi-cluster networking
+# Cilium Helm values for k3s on OVH Public Cloud (BHS5)
+# Replaces flannel CNI — k3s started with --flannel-backend=none --disable-network-policy
 
-# Cluster identity - MUST be unique per cluster
-# Override these values per-cluster using ArgoCD ApplicationSet or environment-specific values
+# Cluster identity
 cluster:
-  name: default-cluster
-  id: 1  # Must be unique 1-255 for ClusterMesh
+  name: cto-ovh
+  id: 1
 
-# Kube-proxy replacement using eBPF
-kubeProxyReplacement: true
+# k3s API server (control-plane public IP)
+k8sServiceHost: "51.79.26.198"
+k8sServicePort: "6443"
 
-# Routing mode: native uses direct routing between nodes via host routing table
-# This allows hostNetwork pods to reach remote pod IPs (required for Mayastor)
-# Previously: tunnel (VXLAN) - didn't support hostNetwork-to-pod connectivity
-routingMode: native
-autoDirectNodeRoutes: true
-ipv4NativeRoutingCIDR: 10.244.0.0/16
+# k3s includes kube-proxy — keep partial replacement mode initially
+# Set to false so cilium handles pod routing but kube-proxy handles Services
+kubeProxyReplacement: false
 
-# Talos-specific: Use KubePrism for API server access
-k8sServiceHost: localhost
-k8sServicePort: 7445
+# Tunnel mode (VXLAN) — safe default for cloud VMs without BGP/direct-routing support
+# OVH VMs may not support native routing without extra cloud config
+routingMode: tunnel
+tunnelProtocol: vxlan
 
-# Enable IPAM (IP Address Management)
+# MTU: OVH uses 1500 on physical NIC; VXLAN overhead = 50 bytes → pod MTU 1450
+mtu: 1450
+
+# IPAM — use kubernetes mode (respects k3s --cluster-cidr=10.42.0.0/16)
 ipam:
   mode: kubernetes
 
-# MTU Configuration - CRITICAL for WireGuard encryption
-# WireGuard adds 80 bytes overhead (40 byte header + 40 byte authentication)
-# Physical MTU (1500) - WireGuard overhead (80) = 1420
-# Without this, pods send 1500 byte packets that get dropped at the WireGuard tunnel
-# Symptoms: intermittent "Resource temporarily unavailable" errors to external APIs
-mtu: 1420
-
-# WireGuard encryption disabled - conflicts with hostNetwork-to-hostNetwork service connections
-# TODO: Re-enable once Mayastor moves away from hostNetwork or Cilium fixes WireGuard + hostNetwork
-encryption:
-  enabled: false
-  type: wireguard
-  # Node-to-node encryption (includes control plane traffic)
-  nodeEncryption: false
-  # Strict mode requires all traffic to be encrypted
-  strictMode:
-    enabled: false
+# k3s pod CIDR
+# Note: k3s default is 10.42.0.0/16; services 10.43.0.0/16
+ipv4NativeRoutingCIDR: 10.42.0.0/16
 
 # Hubble observability
 hubble:
   enabled: true
-  # Hubble relay for aggregating flows
   relay:
     enabled: true
     replicas: 1
-    # Use host network to access Cilium agents (required for Talos)
-    # Talos Linux has strict host network policies that prevent pods
-    # from reaching host network ports by default
-    hostNetwork: true
-    # Use cluster DNS even on host network
-    dnsPolicy: ClusterFirstWithHostNet
-    # Remove pod affinity since we're using host network
-    affinity:
-      podAffinity: {}
-  # Hubble UI for visualization
   ui:
     enabled: true
     replicas: 1
@@ -68,7 +44,6 @@ hubble:
       server:
         ipv6:
           enabled: false
-  # Metrics export
   metrics:
     enabled:
       - dns
@@ -77,12 +52,10 @@ hubble:
       - flow
       - port-distribution
       - icmp
-      - httpV2:context=source;sourceContext=pod
 
-# Cilium Operator settings
+# Operator — 1 replica is fine for this cluster size
 operator:
   replicas: 1
-  # Resource limits
   resources:
     limits:
       cpu: 1000m
@@ -91,105 +64,82 @@ operator:
       cpu: 100m
       memory: 128Mi
 
-# Cilium Agent settings
+# Agent resources
 resources:
   limits:
-    cpu: 4000m
-    memory: 4Gi
+    cpu: 2000m
+    memory: 2Gi
   requests:
     cpu: 100m
-    memory: 512Mi
+    memory: 256Mi
 
-# Enable BPF masquerading (required for kube-proxy replacement)
+# BPF masquerading
 bpf:
   masquerade: true
-  # Enable host routing for better performance
   hostLegacyRouting: false
 
-# Endpoint health checking
-endpointHealthChecking:
-  enabled: true
+# CNI config paths — same for k3s and Talos
+cni:
+  install: true
+  confPath: /etc/cni/net.d
+  binPath: /opt/cni/bin
+  exclusive: true
 
-# Enable local redirect policy for node-local DNS
-localRedirectPolicy: true
+# Run on all nodes including control-plane
+tolerations:
+  - operator: Exists
 
-# Enable bandwidth manager for better QoS
-bandwidthManager:
-  enabled: true
-  bbr: true
+# Security — needs privileged for eBPF
+securityContext:
+  privileged: true
 
-# Enable socket load balancing for better performance
-# hostNamespaceOnly must be false to allow hostNetwork pods (like Mayastor io-engine)
-# to reach ClusterIP services via eBPF socket load balancing
-socketLB:
-  enabled: true
-  hostNamespaceOnly: false
-
-# Enable host firewall for node protection
-hostFirewall:
-  enabled: true
-
-# External workloads support (for VMs or bare metal outside K8s)
-externalWorkloads:
-  enabled: false
-
-# BGP support (disabled by default)
-bgp:
-  enabled: false
-
-# Gateway API support
-gatewayAPI:
-  enabled: false
-
-# Ingress controller (use dedicated ingress instead)
-ingressController:
-  enabled: false
-
-# Node init container for compatibility
-nodeinit:
+# Encryption disabled (WireGuard conflicts with some k3s networking)
+encryption:
   enabled: false
 
 # Prometheus metrics
 prometheus:
   enabled: true
   serviceMonitor:
-    enabled: false  # Enable if Prometheus Operator is installed
+    enabled: false
 
-# Install CNI configuration
-cni:
-  install: true
-  # Talos uses /etc/cni/net.d
-  confPath: /etc/cni/net.d
-  binPath: /opt/cni/bin
-  # Use exclusive mode to prevent conflicts
-  exclusive: true
-
-# Image settings
-image:
-  pullPolicy: IfNotPresent
-
-# Security context
-securityContext:
-  privileged: true
-
-# Tolerations for control plane nodes
-tolerations:
-  - operator: Exists
-
-# Update strategy
+# Rolling update — allow 1 unavailable at a time
 updateStrategy:
   type: RollingUpdate
   rollingUpdate:
-    maxUnavailable: 2
+    maxUnavailable: 1
 
-# Pod disruption budget
-podDisruptionBudget:
+# Host firewall
+hostFirewall:
+  enabled: false  # start disabled; enable after verifying connectivity
+
+# Disable features not needed initially
+localRedirectPolicy: false
+bandwidthManager:
+  enabled: false
+socketLB:
   enabled: true
-  maxUnavailable: 2
+  hostNamespaceOnly: false
 
-# Enable debug if needed
+gatewayAPI:
+  enabled: false
+ingressController:
+  enabled: false
+nodeinit:
+  enabled: false
+externalWorkloads:
+  enabled: false
+bgp:
+  enabled: false
+
+endpointHealthChecking:
+  enabled: true
+
 debug:
   enabled: false
 
-# NOTE: Do NOT set `devices` explicitly - nodes have different interface names
-# (eno1 vs enp3s0f0). Let Cilium auto-detect devices with runtime detection.
+image:
+  pullPolicy: IfNotPresent
+
+podDisruptionBudget:
+  enabled: false  # disabled during initial install
