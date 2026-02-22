@@ -85,7 +85,7 @@ spec:
           dataDirs:
             - name: data
               type: persistentVolumeClaim
-              size: 100Gi
+              size: 50Gi
               storageClass: "mayastor"
               maxVolumes: 100
           # Disable hostPath logs (not available on Talos read-only filesystem)
