@@ -46,4 +46,12 @@ spec:
         factor: 2
         maxDuration: 2m
 
+  ignoreDifferences:
+    # Namespaces accumulate labels/annotations from other controllers; ignore drift
+    - group: ""
+      kind: Namespace
+      jqPathExpressions:
+        - .metadata.labels
+        - .metadata.annotations
+
   revisionHistoryLimit: 5
