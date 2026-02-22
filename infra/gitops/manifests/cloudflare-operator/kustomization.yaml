@@ -10,20 +10,6 @@ resources:
 
 # Add log collection labels to the operator deployment
 patches:
-  # Patch TunnelBinding CRD to preserve unknown fields in subjects spec
-  # Required for headscale-tunnel which uses originRequest (not in schema of v0.13.1)
-  - patch: |-
-      apiVersion: apiextensions.k8s.io/v1
-      kind: CustomResourceDefinition
-      metadata:
-        name: tunnelbindings.networking.cfargotunnel.com
-      spec:
-        versions:
-          - name: v1alpha1
-            schema:
-              openAPIV3Schema:
-                type: object
-                x-kubernetes-preserve-unknown-fields: true
   - patch: |-
       apiVersion: apps/v1
       kind: Deployment
