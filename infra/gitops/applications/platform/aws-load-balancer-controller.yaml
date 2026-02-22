@@ -26,8 +26,6 @@ metadata:
   annotations:
     # Deploy early - other apps depend on ingress
     argocd.argoproj.io/sync-wave: "-2"
-    # Disabled by default - enable via toggle_app MCP tool on AWS clusters
-    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -39,8 +37,8 @@ spec:
     targetRevision: 1.11.0
     helm:
       values: |
-        # Cluster name - MUST be set to your EKS cluster name
-        clusterName: ""  # TODO: Set to your EKS cluster name
+        # Cluster name - set to OVH cluster name (non-AWS, controller won't provision ALBs)
+        clusterName: "cto-ovh"
 
         # Service account configuration
         # The IAM role ARN should be set via IRSA (IAM Roles for Service Accounts)

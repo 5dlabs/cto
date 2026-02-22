@@ -15,8 +15,6 @@ metadata:
     openclaw.io/agent: trader
   annotations:
     argocd.argoproj.io/sync-wave: "2"
-    # Disabled by default — same agents deployed via OpenClaw Helm chart; enable via toggle_app when not using chart
-    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

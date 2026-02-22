@@ -17,8 +17,6 @@ metadata:
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: database
   annotations:
-    # Disabled by default - enable via toggle_app MCP tool when ready
-    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

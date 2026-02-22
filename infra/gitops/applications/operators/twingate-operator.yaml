@@ -29,8 +29,6 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
     notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
-    # Disabled by default - enable via toggle_app MCP tool when ready
-    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

@@ -24,8 +24,6 @@ metadata:
     app.kubernetes.io/component: storage
   annotations:
     argocd.argoproj.io/sync-wave: "-5"
-    # Disabled by default — enable on EKS via toggle_app; on bare metal Mayastor provides "mayastor"
-    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

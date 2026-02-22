@@ -16,8 +16,6 @@ metadata:
   annotations:
     # Deploy after cert-manager but before workloads that need auto-instrumentation
     argocd.argoproj.io/sync-wave: "-2"
-    # Disabled by default - enable via toggle_app MCP tool when ready
-    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -85,7 +83,6 @@ spec:
           # Use cert-manager for certificate management
           certManager:
             enabled: true
-            issuerRef: {}  # Use default self-signed issuer
           # Webhook failure policy
           failurePolicy: Fail
 

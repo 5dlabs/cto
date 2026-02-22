@@ -9,9 +9,7 @@ metadata:
     app.kubernetes.io/part-of: platform
   annotations:
     argocd.argoproj.io/sync-wave: "5"
-    # Disabled by default - depends on Cilium CNI (bare metal only)
     # Enable via toggle_app MCP tool when running on bare metal
-    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

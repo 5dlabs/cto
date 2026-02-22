@@ -14,8 +14,6 @@ metadata:
     app.kubernetes.io/part-of: openclaw
   annotations:
     argocd.argoproj.io/sync-wave: "3"
-    # Disabled by default — same as OpenClaw agents; enable via toggle_app when not using OpenClaw Helm chart
-    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

@@ -18,8 +18,6 @@ metadata:
   annotations:
     # Deploy after storage class is available
     argocd.argoproj.io/sync-wave: "1"
-    # Disabled by default - enable via toggle_app MCP tool when ready
-    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
