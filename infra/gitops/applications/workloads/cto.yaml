@@ -232,5 +232,10 @@ spec:
       jqPathExpressions:
         - .metadata.labels
         - .metadata.annotations
+    # HTTPRoute for github webhooks references public-gateway which may not exist yet
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      jqPathExpressions:
+        - .status
 
   revisionHistoryLimit: 5
