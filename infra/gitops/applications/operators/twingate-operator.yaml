@@ -34,7 +34,8 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: oci://ghcr.io/twingate/helmcharts/twingate-operator
+    repoURL: oci://ghcr.io/twingate/helmcharts
+    chart: twingate-operator
     # LESSON LEARNED: Always pin helm chart versions for reproducible deployments
     # See: pr-merge-loop/lessons-learned.md#ISSUE-006
     targetRevision: v0.28.0

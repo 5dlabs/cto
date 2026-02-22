@@ -55,9 +55,6 @@ spec:
             logs.platform.5dlabs.io/collect: "true"
             logs.platform.5dlabs.io/service: opentelemetry-operator
 
-          # Feature gates for the operator
-          featureGates: ""
-
           # Service account for the manager
           serviceAccount:
             create: true
