@@ -398,17 +398,16 @@ Standalone is simpler, more secure, and easier to reason about when private keys
 
 The existing ArgoCD on OVH manages the CTO platform. For the trading cluster:
 
-**Option A — Single ArgoCD (recommended for now):**
-- Register the PhoenixNAP cluster as an external destination in the OVH ArgoCD
-- One GitOps control plane, two cluster destinations
-- Requires VPN tunnel (WireGuard/Twingate) between ArgoCD and PhoenixNAP API server
+**✅ Decision: Single ArgoCD (OVH) manages both clusters.**
 
-**Option B — Dedicated ArgoCD on trading cluster:**
-- Fully isolated, no network dependency on OVH
-- More operational overhead (two ArgoCD instances to maintain)
+- PhoenixNAP cluster registered as an external destination in the existing OVH ArgoCD
+- One GitOps control plane, two kubeconfig destinations
+- `argocd cluster add <trading-kubeconfig>` registers the cluster; ArgoCD then communicates
+  with it via Twingate (trading cluster's talosctl/API endpoint is a Twingate resource)
+- New GitOps path: `infra/trading/` in the `5dlabs/cto` repo
 
-Option A is cleaner until you need strict isolation. If the trading cluster ever handles
-production funds at scale, Option B gives you stronger blast-radius containment.
+If the trading cluster ever needs to be fully air-gapped from OVH (e.g., stricter blast-radius
+isolation when handling large positions), promote to its own ArgoCD at that point.
 
 ### Future: Cilium ClusterMesh (if needed)
 
@@ -422,12 +421,28 @@ trading signals), Cilium ClusterMesh is the right answer — but requires:
 
 Not needed now. Design PodCIDRs to not overlap so the migration path stays open.
 
-**Suggested CIDR allocation:**
+**CIDR allocation — non-overlapping, non-default:**
 
 | Cluster | Node CIDR | Pod CIDR | Service CIDR |
 |---|---|---|---|
 | OVH (k3s, existing) | 10.0.0.0/24 | 10.42.0.0/16 | 10.43.0.0/16 |
-| PhoenixNAP (Talos, new) | 10.2.0.0/24 | 10.44.0.0/16 | 10.45.0.0/16 |
+| PhoenixNAP (Talos, new) | 10.2.0.0/24 | **10.44.0.0/16** | **10.45.0.0/16** |
+
+These are intentionally non-default. The Talos/Cilium default pod CIDR is `10.244.0.0/16`
+and default service CIDR is `10.96.0.0/12` — both conflict with common cloud VPC ranges and
+each other if you ever peer networks. The OVH cluster uses k3s defaults (`10.42/43`).
+The PhoenixNAP cluster uses `10.44/45` — non-overlapping with both.
+
+**Set these explicitly at Talos install time** (cannot be changed later without rebuilding):
+```yaml
+# Talos machineconfig cluster section
+cluster:
+  network:
+    podSubnets:
+      - 10.44.0.0/16
+    serviceSubnets:
+      - 10.45.0.0/16
+```
 
 ---
 
@@ -499,20 +514,96 @@ shannon scan --target https://grafana.internal.5dlabs.ai --repo ./cto
 
 ---
 
-## Open Items / Decisions Needed
+## Decisions
 
-- [ ] **PhoenixNAP BMC API credentials** — needed to query server SKUs (Singapore) and
-      configure network-level firewall
-- [ ] **Server SKU** — confirm budget/size; recommendation: ≥ 64 GB RAM, ≥ 2 TB NVMe,
-      Singapore datacenter (same as Solana node for internal network colocation)
-- [ ] **Twingate connector** — provision connector for trading cluster (same Twingate
-      account as OVH); define resources (Grafana, talosctl endpoint, kubectl)
-- [ ] **ArgoCD approach** — Option A (single, OVH-hosted) vs Option B (dedicated on trading
-      cluster). Recommendation: Option A to start
-- [ ] **PodCIDR allocation** — confirm non-overlapping CIDRs now even if ClusterMesh is
-      not immediate (avoids painful migration later)
-- [ ] **Solana exporter deploy** — once RPC is back up; scrape via internal IP from
-      trading cluster Prometheus
-- [ ] **OpenBao Transit vs KV** for bot private keys — Transit is strongly preferred
-      (key never leaves OpenBao), but requires the bot to support a sign API call
-      rather than loading a keypair file
+| Decision | Resolution |
+|---|---|
+| Private access | ✅ **Twingate** — connector deployed in-cluster, same account as OVH |
+| ArgoCD | ✅ **Shared (OVH)** — PhoenixNAP cluster registered as external destination |
+| Cloudflare tunnels | ✅ **No** — Twingate covers all private access |
+| Bot private keys | ✅ **OpenBao Transit** — see implementation notes below |
+| WireGuard | ✅ **Off** — single-node, same-DC, no overhead needed on hot path |
+| PodCIDRs | ✅ **Non-default** — see CIDR table, avoids k3s + Talos defaults |
+
+## Open Items
+
+- [ ] **PhoenixNAP BMC credentials** — not in workspace, Henry offline. Jon to provide
+      or ask Henry. Needed for: exact Singapore SKU availability, server pricing, and
+      BMC network firewall configuration.
+      > Current Solana node reference: `d2.m1.xlarge` = 16c / 512 GB / 2×4 TB NVMe /
+      > 50 Gbps = **$1.10/hr ($435/mo at 36-month)**. Trading cluster will need less RAM
+      > but similar NVMe for QuestDB — likely a mid-tier SKU in the $300–500/mo range.
+- [ ] **Solana exporter** — deploy once RPC is back up; scrape via `10.2.0.11:9179`
+- [ ] **Twingate connector** — provision for trading cluster; define resources
+      (Grafana, talosctl endpoint, kubectl proxy)
+- [ ] **BMC network firewall** — configure UDP rate-limit rules once credentials available
+
+---
+
+## OpenBao Transit — Private Key Implementation
+
+> **Decision: use Transit, not KV.** The additional lift is small; the security gain is
+> significant. A container escape or memory dump cannot exfiltrate a key that never exists
+> in process memory.
+
+### How it works
+
+```
+Bot process                          OpenBao (Transit engine)
+    │                                        │
+    │  1. Exchange SA token for Vault token  │
+    │ ─────────────────────────────────────► │
+    │                                        │  Key: ed25519, never exportable
+    │  2. POST /v1/transit/sign/bot-key      │
+    │     body: { input: base64(tx_bytes) }  │
+    │ ─────────────────────────────────────► │
+    │                                        │  Signs internally
+    │  3. Returns: { signature: base64(...) }│
+    │ ◄───────────────────────────────────── │
+    │                                        │
+    │  4. Attach signature to transaction    │
+    │     and submit to RPC                  │
+```
+
+The key is created once in OpenBao with `exportable=false` and `allow_plaintext_backup=false`.
+It cannot be extracted by anyone — not even with root access to OpenBao, without the unseal
+keys. Every signing operation is logged in the OpenBao audit trail.
+
+### OpenBao setup (per bot)
+
+```bash
+# Create ed25519 signing key for bot (non-exportable)
+vault write transit/keys/bot-alpha type=ed25519
+
+# Policy: bot-alpha can only sign with its own key
+vault policy write bot-alpha-policy - <<EOF
+path "transit/sign/bot-alpha" { capabilities = ["update"] }
+path "transit/verify/bot-alpha" { capabilities = ["update"] }
+EOF
+
+# Kubernetes auth role: pod in bot-alpha namespace gets this policy
+vault write auth/kubernetes/role/bot-alpha \
+  bound_service_account_names=bot-alpha \
+  bound_service_account_namespaces=bot-alpha \
+  policies=bot-alpha-policy \
+  ttl=1h
+```
+
+### Bot code change (Solana / Rust example)
+
+Instead of:
+```rust
+let keypair = Keypair::read_from_file("~/.config/solana/id.json")?;
+transaction.sign(&[&keypair], recent_blockhash);
+```
+
+The bot calls the Transit API and injects the signature:
+```rust
+// 1. Get vault token via k8s auth
+// 2. POST to /v1/transit/sign/bot-alpha with base64(message_bytes)
+// 3. Decode signature, attach to transaction manually
+// Solana transactions accept pre-computed signatures
+```
+
+This is ~50-100 lines of code per bot, straightforward HTTP client calls. No special
+libraries needed — OpenBao's API is plain JSON over HTTPS.
