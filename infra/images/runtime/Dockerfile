@@ -365,7 +365,8 @@ RUN --mount=type=cache,target=/root/.cache \
         dotenv-cli \
         zx \
         shadcn@latest \
-        wrangler || true
+        wrangler \
+        @xdevplatform/xurl || true
 
 # Install Expo / React Native tooling (Tap mobile agent)
 # EAS CLI is essential for cloud builds, submissions, and OTA updates
