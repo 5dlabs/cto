@@ -1,6 +1,6 @@
 # Trading Cluster Architecture & Security Plan
 
-> **Status:** Draft — 2026-02-22  
+> **Status:** Draft — 2026-02-22 (updated: Cloudflare tunnels removed, Twingate for all private access)  
 > **Owner:** Jon Fritz / 5DLabs  
 > **Location:** PhoenixNAP Singapore (collocated with Solana RPC node)
 
@@ -23,6 +23,8 @@ trading infrastructure only.
 ```
 PhoenixNAP Singapore — internal 10.2.0.0/24 (bond0.2, 50 Gbps bonded 2×25GbE)
 ┌─────────────────────────────────────────────────────────────────────┐
+│  PhoenixNAP network-level firewall (BMC API)                        │
+│  └── DDoS scrubbing + rate-limit rules at infra layer               │
 │                                                                     │
 │  Solana RPC node          10.2.0.11                                 │
 │  ├── Gossip/TVU           public (8001/tcp, 8000-10000/udp)         │
@@ -32,15 +34,17 @@ PhoenixNAP Singapore — internal 10.2.0.0/24 (bond0.2, 50 Gbps bonded 2×25GbE)
 │  ├── Trading bots    ──────────────────────► 10.2.0.11:8899        │
 │  ├── Paper trader    ──────────────────────► 10.2.0.11:8899        │
 │  ├── Birdeye replacement ──────────────────► 10.2.0.11:8899        │
+│  ├── Twingate connector (outbound dial-out)                         │
 │  └── All internal services on cluster-local DNS                    │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
-              │ Cloudflare tunnel (outbound-only, selected services)
+              │ Twingate (outbound connector, zero-trust overlay)
               ▼
-        Cloudflare edge (WAF, Access, Zero Trust)
-              │ Twingate / VPN (private admin access)
+        Twingate control plane
+              │
               ▼
-        Jon only — no public UI
+        Jon only — admin access to cluster services via Twingate client
+        (Grafana, talosctl, kubectl — all private, no public ports)
 ```
 
 ### Key principle: colocation = zero-latency RPC
@@ -64,7 +68,7 @@ microseconds. No Cloudflare, no public internet, no NAT on the hot path.
 | **Prometheus + Alertmanager** | Metrics + alerting | Moderate | Scrapes all cluster services |
 | **Loki** | Log aggregation | Moderate | All pod logs |
 | **Grafana** | Dashboards | — | Private, access via Twingate |
-| **Cloudflare operator** | Tunnel management | — | Outbound only |
+| **Twingate connector** | Private admin access | — | Outbound dial-out, no open ports |
 | **Cilium** | CNI + NetworkPolicy enforcement | — | Default-deny egress |
 | **Falco** | Runtime anomaly detection | — | Watches for unexpected syscalls |
 
@@ -87,14 +91,19 @@ Recommend a server with **≥ 2 TB NVMe** and **≥ 64 GB RAM** for comfortable 
 
 | Access type | Method | Who |
 |---|---|---|
-| Admin (kubectl, talosctl) | Twingate or Headscale | Jon only |
-| Grafana / dashboards | Cloudflare Access + tunnel | Jon only |
+| Admin (kubectl, talosctl) | Twingate | Jon only |
+| Grafana / dashboards | Twingate | Jon only |
 | SSH to Talos nodes | N/A — Talos has no SSH | — |
 | RPC (8899) | Internal 10.2.0.0/24 only | In-cluster services |
-| Any other UI | Cloudflare Access (mTLS or OTP) | Jon only |
+| Any other cluster service | Twingate | Jon only |
+
+Twingate works via an outbound-only connector running in-cluster — no listening ports on
+the host. The connector dials out to the Twingate control plane. Access is authenticated
+via the Twingate client (device cert + IdP). Nothing is exposed on the public interface.
 
 Talos has no SSH or shell on nodes by default — the API surface is `talosctl` only over
-mTLS. This dramatically reduces the attack surface compared to Ubuntu/k3s.
+mTLS. Combined with Twingate this means the entire administrative surface is zero-trust
+and has no open inbound ports whatsoever.
 
 ---
 
@@ -103,9 +112,17 @@ mTLS. This dramatically reduces the attack surface compared to Ubuntu/k3s.
 ### Gossip — the honest answer
 
 Solana gossip is a peer-to-peer UDP protocol. The node **must** be reachable on the
-public internet for gossip to work — there is no way to hide it behind a proxy or WAF
-(Cloudflare Spectrum/Magic Transit are TCP/enterprise-grade, respectively, and don't help
-UDP gossip in practice at this scale).
+public internet for gossip to work — you cannot proxy, WAF, or tunnel it.
+
+**Can Cloudflare help here?** No, not practically:
+- **Cloudflare Spectrum** — TCP only; gossip is UDP
+- **Cloudflare Magic Transit** — can scrub UDP DDoS, but requires your own ASN and IP
+  block announced via BGP. Enterprise-only, not applicable to a single rented server.
+- **Cloudflare CDN / Tunnel** — HTTP/S only, irrelevant for gossip
+
+The perimeter control that *does* work at this layer is the
+**PhoenixNAP network-level firewall** (BMC API) — applied at the infrastructure layer
+before packets hit the OS — combined with kernel-level UDP rate limiting on the host.
 
 **What we can and should do:**
 
@@ -344,8 +361,8 @@ shannon scan --target https://grafana.internal.5dlabs.ai --repo ./cto
       configure network-level firewall
 - [ ] **Server SKU** — confirm budget/size; recommendation: ≥ 64 GB RAM, ≥ 2 TB NVMe,
       Singapore datacenter (same as Solana node for internal network colocation)
-- [ ] **Twingate vs Headscale** for private admin access — Twingate already deployed on
-      OVH; either works, just need to provision a connector on the trading cluster
+- [ ] **Twingate connector** — provision connector for trading cluster (same Twingate
+      account as OVH); define resources (Grafana, talosctl endpoint, kubectl)
 - [ ] **ArgoCD approach** — Option A (single, OVH-hosted) vs Option B (dedicated on trading
       cluster). Recommendation: Option A to start
 - [ ] **PodCIDR allocation** — confirm non-overlapping CIDRs now even if ClusterMesh is
