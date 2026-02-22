@@ -71,9 +71,8 @@ subjects:
     spec:
       fqdn: {{ $bindings.headscale.hostname }}
       target: {{ $bindings.headscale.target }}
-      {{- if $bindings.headscale.originRequest }}
-      originRequest:
-        {{- toYaml $bindings.headscale.originRequest | nindent 8 }}
+      {{- if $bindings.headscale.noTlsVerify }}
+      noTlsVerify: {{ $bindings.headscale.noTlsVerify }}
       {{- end }}
 {{- end }}
 

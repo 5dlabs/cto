@@ -1173,5 +1173,4 @@ cloudflare:
     headscale:
       hostname: headscale.5dlabs.ai
       target: https://headscale.headscale.svc:443
-      originRequest:
-        noTlsVerify: true
+      noTlsVerify: true
