@@ -47,10 +47,26 @@ PhoenixNAP Singapore — internal 10.2.0.0/24 (bond0.2, 50 Gbps bonded 2×25GbE)
         (Grafana, talosctl, kubectl — all private, no public ports)
 ```
 
-### Key principle: colocation = zero-latency RPC
+### Key principles
 
-The trader and the RPC node share a 50 Gbps bonded private link. Round-trip latency is
-microseconds. No Cloudflare, no public internet, no NAT on the hot path.
+**Colocation = zero-latency RPC**
+The trader and the RPC node share a 50 Gbps bonded private link (`bond0.2`, 10.2.0.0/24).
+Round-trip latency is microseconds. No proxy, no NAT, no extra hop on the hot path.
+
+**Direct public IP = zero-latency exchange egress**
+PhoenixNAP bare metal nodes are dual-homed: private VLAN (`bond0.2`) + real public IP
+(`bond0.3`). Outbound to exchange APIs goes directly over the public interface — no NAT
+device, no extra routing hop. This is the same setup already confirmed on the Solana node
+(`10.2.0.11` private, `125.253.92.141` public).
+
+```
+bond0.2  10.2.0.x  ──────► Solana RPC node (10.2.0.11:8899)   microseconds, stays in DC
+bond0.3  public IP ──────► Exchange REST/WS APIs               direct, no NAT
+```
+
+Inbound on `bond0.3`: default-deny (UFW + PhoenixNAP network firewall).
+Outbound on `bond0.3`: unrestricted at OS level; optionally scoped per-bot via
+Cilium egress NetworkPolicy (each bot namespace allowlisted to specific exchange IPs/ports).
 
 ---
 
