@@ -3,17 +3,11 @@
 # License: MPL-2.0 - Safe to distribute commercially
 # Source: https://github.com/Twingate/kubernetes-operator
 #
-# Features:
-# - Zero Trust Network Access (ZTNA)
-# - Remote Network management
-# - Connector deployment
-# - Network resource management
-# - Application access control
-#
-# Prerequisites:
-# - Twingate account with Remote Network configured
-# - Twingate API token with Read/Write/Provision permissions
-# - Connectors deployed (can be managed via operator)
+# NOTE: OCI chart at oci://ghcr.io/twingate/helmcharts/twingate-operator uses a
+# 3-level ghcr.io path. ArgoCD's OCI resolver only supports 2-level (org/repo) paths,
+# stripping the chart name to ghcr.io/twingate/helmcharts:x.y.z (wrong).
+# To fix: bundle the chart tarball in git at infra/charts/twingate-operator/
+# or wait for ArgoCD to support 3-level OCI paths.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -28,7 +22,7 @@ metadata:
     platform.5dlabs.io/distributable: "true"
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: cto-deployments
+    argocd.argoproj.io/skip-reconcile: "true"  # OCI 3-level path unsupported in ArgoCD; bundle chart in git to fix
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -36,21 +30,15 @@ spec:
   source:
     repoURL: oci://ghcr.io/twingate/helmcharts
     chart: twingate-operator
-    # LESSON LEARNED: Always pin helm chart versions for reproducible deployments
-    # See: pr-merge-loop/lessons-learned.md#ISSUE-006
     targetRevision: 0.28.0
     helm:
       values: |  # pragma: allowlist secret
         # Twingate Operator configuration
         twingateOperator:
-          # API token from ExternalSecret
-          # pragma: allowlist secret
           apiToken:  # pragma: allowlist secret
             secretRef:
               name: twingate-api-secret
               key: apiToken
-
-          # Resource limits
           resources:
             requests:
               cpu: 100m
@@ -58,29 +46,19 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-
-          # Pod labels for log collection
           podLabels:
             platform.5dlabs.io/log-collection: enabled
-
-          # Pod annotations for log collection
           podAnnotations:
             logs.platform.5dlabs.io/collect: "true"
             logs.platform.5dlabs.io/service: twingate-operator
-
-          # Service account
           serviceAccount:
             create: true
             name: twingate-operator
-
-        # Keep operator on worker nodes
         nodeSelector:
           node-role.kubernetes.io/worker: ""
-
   destination:
     server: https://kubernetes.default.svc
     namespace: operators
-
   syncPolicy:
     automated:
       prune: true
@@ -97,13 +75,10 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 3m
-
-  # Ignore CRD differences
   ignoreDifferences:
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
       jsonPointers:
         - /metadata/annotations
         - /spec/conversion
-
   revisionHistoryLimit: 5
