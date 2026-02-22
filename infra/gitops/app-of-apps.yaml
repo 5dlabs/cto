@@ -60,5 +60,14 @@ spec:
         factor: 2
         maxDuration: 3m
 
+  # Ignore image-updater write-backs to helm.parameters (argocd write-back method
+  # stores digests directly on the Application CR, not in git)
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jqPathExpressions:
+        - .spec.source.helm.parameters
+        - .spec.sources[].helm.parameters
+
   # Revision history
   revisionHistoryLimit: 10

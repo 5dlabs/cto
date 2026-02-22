@@ -52,4 +52,10 @@ spec:
         factor: 2
         maxDuration: 1m
 
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jqPathExpressions:
+        - .spec.source.helm.parameters
+
   revisionHistoryLimit: 5
