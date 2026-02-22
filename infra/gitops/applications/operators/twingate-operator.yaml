@@ -38,7 +38,7 @@ spec:
     chart: twingate-operator
     # LESSON LEARNED: Always pin helm chart versions for reproducible deployments
     # See: pr-merge-loop/lessons-learned.md#ISSUE-006
-    targetRevision: v0.28.0
+    targetRevision: 0.28.0
     helm:
       values: |  # pragma: allowlist secret
         # Twingate Operator configuration
