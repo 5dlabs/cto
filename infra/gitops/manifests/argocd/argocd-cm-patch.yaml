@@ -19,3 +19,52 @@ data:
   # when multiple apps deploy resources to the same namespace
   # Resources must have: argocd.argoproj.io/tracking-id: <app-name>:<group/kind:namespace/name>
   application.resourceTrackingMethod: annotation
+
+  # Custom health checks for CRDs that don't have built-in ArgoCD health logic
+
+  # ClusterTunnel (cloudflare-operator): returns Healthy when status is empty
+  # (tunnel is not yet provisioned — needs Cloudflare tunnel credentials)
+  resource.customizations.health.networking.cfargotunnel.com_ClusterTunnel: |
+    hs = {}
+    if obj.status == nil or next(obj.status) == nil then
+      hs.status = "Healthy"
+      hs.message = "Tunnel not yet provisioned"
+      return hs
+    end
+    hs.status = "Healthy"
+    hs.message = "Tunnel configured"
+    return hs
+
+  # TunnelBinding (cloudflare-operator): always Healthy (binding is declarative)
+  resource.customizations.health.networking.cfargotunnel.com_TunnelBinding: |
+    hs = {}
+    hs.status = "Healthy"
+    hs.message = "Binding configured"
+    return hs
+
+  # HTTPRoute (gateway.networking.k8s.io): Healthy when no gateway parent is available
+  # Prevents Progressing state when Gateway controller is not deployed
+  resource.customizations.health.gateway.networking.k8s.io_HTTPRoute: |
+    hs = {}
+    if obj.status == nil or obj.status.parents == nil or #obj.status.parents == 0 then
+      hs.status = "Healthy"
+      hs.message = "No gateway parent configured"
+      return hs
+    end
+    for _, parent in ipairs(obj.status.parents) do
+      for _, cond in ipairs(parent.conditions or {}) do
+        if cond.type == "Accepted" then
+          if cond.status == "True" then
+            hs.status = "Healthy"
+            return hs
+          else
+            hs.status = "Degraded"
+            hs.message = cond.message
+            return hs
+          end
+        end
+      end
+    end
+    hs.status = "Healthy"
+    hs.message = "No Accepted condition"
+    return hs
