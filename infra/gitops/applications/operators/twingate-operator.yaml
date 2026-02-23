@@ -22,7 +22,6 @@ metadata:
     platform.5dlabs.io/distributable: "true"
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-    argocd.argoproj.io/skip-reconcile: "true"  # OCI 3-level path unsupported in ArgoCD; bundle chart in git to fix
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
