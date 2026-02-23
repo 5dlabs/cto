@@ -73,9 +73,9 @@ resources:
     cpu: 100m
     memory: 256Mi
 
-# BPF masquerading
+# BPF masquerading — disabled when kubeProxyReplacement=false (requires NodePort)
 bpf:
-  masquerade: true
+  masquerade: false
   hostLegacyRouting: false
 
 # CNI config paths — same for k3s and Talos
@@ -120,6 +120,9 @@ bandwidthManager:
 socketLB:
   enabled: true
   hostNamespaceOnly: false
+
+nodePort:
+  enabled: true
 
 gatewayAPI:
   enabled: false
