@@ -1,15 +1,15 @@
 ---
-# AWS Storage Class Overlay
-# Creates a StorageClass named "mayastor" backed by AWS EBS (gp3)
+# Storage Class Overlay
+# Creates a StorageClass named "mayastor" backed by local-path provisioner
 # This allows all existing manifests that reference storageClass: "mayastor"
-# to work on AWS without modification.
+# to work on bare-metal OVH without modification.
 #
-# When switching back to bare metal (do not modify any Mayastor app or Helm values):
+# When Mayastor (OpenEBS) is fully set up:
 # 1. Disable this overlay app in Argo (toggle_app disable aws-storage-overlay); Argo prunes this StorageClass
 # 2. Enable the Mayastor app (toggle_app enable mayastor); it recreates StorageClass "mayastor"
 # This overlay does not touch Mayastor operator config or applications/storage/mayastor.yaml
 #
-# Note: Using gp3 (not gp2) for better baseline performance (3000 IOPS, 125 MiB/s)
+# Note: local-path uses node-local storage (hostPath). Suitable for stateful apps until Mayastor is ready.
 
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -20,12 +20,9 @@ metadata:
     app.kubernetes.io/part-of: platform
   annotations:
     platform.5dlabs.io/overlay: "true"
-    platform.5dlabs.io/reason: "AWS EBS overlay for bare-metal Mayastor storage class"
-provisioner: ebs.csi.aws.com
-parameters:
-  type: gp3
-  fsType: ext4
-  encrypted: "true"
+    platform.5dlabs.io/reason: "local-path overlay for bare-metal OVH (until Mayastor is ready)"
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: rancher.io/local-path
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
+allowVolumeExpansion: false
