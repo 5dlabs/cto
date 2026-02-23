@@ -11,8 +11,7 @@ cluster:
 k8sServiceHost: "51.79.26.198"
 k8sServicePort: "6443"
 
-# k3s includes kube-proxy — keep partial replacement mode initially
-# Set to false so cilium handles pod routing but kube-proxy handles Services
+# Temporarily fall back to kube-proxy for Services/NodePort until host↔pod routing is debugged
 kubeProxyReplacement: false
 
 # Tunnel mode (VXLAN) — safe default for cloud VMs without BGP/direct-routing support
@@ -27,9 +26,8 @@ mtu: 1450
 ipam:
   mode: kubernetes
 
-# k3s pod CIDR
-# Note: k3s default is 10.42.0.0/16; services 10.43.0.0/16
-ipv4NativeRoutingCIDR: 10.42.0.0/16
+# k3s pod CIDR handled via VXLAN tunnel; leave native routing CIDR unset
+ipv4NativeRoutingCIDR: ""
 
 # Hubble observability
 hubble:
@@ -73,10 +71,10 @@ resources:
     cpu: 100m
     memory: 256Mi
 
-# BPF masquerading — disabled when kubeProxyReplacement=false (requires NodePort)
+# BPF settings for host/pod traffic (iptables masquerade via kube-proxy)
 bpf:
   masquerade: false
-  hostLegacyRouting: false
+  hostLegacyRouting: true
 
 # CNI config paths — same for k3s and Talos
 cni:
@@ -122,7 +120,7 @@ socketLB:
   hostNamespaceOnly: false
 
 nodePort:
-  enabled: true
+  enabled: false
 
 gatewayAPI:
   enabled: false
@@ -137,6 +135,9 @@ bgp:
 
 endpointHealthChecking:
   enabled: true
+
+endpointRoutes:
+  enabled: false
 
 debug:
   enabled: false
