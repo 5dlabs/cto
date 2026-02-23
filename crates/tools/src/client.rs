@@ -843,13 +843,13 @@ impl McpClient {
             // Step 2: Read initialize response (with timeout to prevent hanging)
             let mut response_line = String::new();
             tokio::time::timeout(
-                tokio::time::Duration::from_secs(10),
+                tokio::time::Duration::from_secs(45),
                 stdout.read_line(&mut response_line),
             )
             .await
             .map_err(|_| {
-                tracing::warn!("[Bridge] ⏰ Timeout reading initialize response from '{server_name}' after 10s");
-                anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 10s")
+                tracing::warn!("[Bridge] ⏰ Timeout reading initialize response from '{server_name}' after 45s");
+                anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 45s")
             })?
             .map_err(|e| {
                 anyhow::anyhow!("Failed to read initialize response from '{server_name}': {e}")
@@ -924,13 +924,13 @@ impl McpClient {
             // Step 5: Read tools/list response (with timeout to prevent hanging)
             let mut tools_response_line = String::new();
             tokio::time::timeout(
-                tokio::time::Duration::from_secs(10),
+                tokio::time::Duration::from_secs(45),
                 stdout.read_line(&mut tools_response_line),
             )
             .await
             .map_err(|_| {
-                tracing::warn!("[Bridge] ⏰ Timeout reading tools/list response from '{server_name}' after 10s");
-                anyhow::anyhow!("Timeout reading tools/list response from '{server_name}' after 10s")
+                tracing::warn!("[Bridge] ⏰ Timeout reading tools/list response from '{server_name}' after 45s");
+                anyhow::anyhow!("Timeout reading tools/list response from '{server_name}' after 45s")
             })?
             .map_err(|e| {
                 anyhow::anyhow!("Failed to read tools/list response from '{server_name}': {e}")
