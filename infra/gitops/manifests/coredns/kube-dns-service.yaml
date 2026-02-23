@@ -1,0 +1,27 @@
+---
+# kube-dns service alias for RKE2 compatibility
+# Many apps (Loki, nginx, etc.) expect kube-dns service in kube-system
+# RKE2 uses rke2-coredns-rke2-coredns instead
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "CoreDNS"
+    app.kubernetes.io/managed-by: argocd
+spec:
+  selector:
+    app.kubernetes.io/name: rke2-coredns
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+    targetPort: 53
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+    targetPort: 53
+  type: ClusterIP
