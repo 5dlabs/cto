@@ -26,6 +26,8 @@ metadata:
   annotations:
     # Deploy early - other apps depend on ingress
     argocd.argoproj.io/sync-wave: "-2"
+    # Skip on OVH bare metal - this is AWS-specific, crashes without AWS API
+    argocd.argoproj.io/skip-reconcile: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
