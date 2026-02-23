@@ -42,6 +42,26 @@ data:
     hs.message = "Binding configured"
     return hs
 
+  # PersistentVolumeClaim: treat Pending PVCs as Healthy (WaitForFirstConsumer binding mode
+  # is by design on this cluster — local-path provisioner only binds when a pod consumes the PVC)
+  resource.customizations.health.PersistentVolumeClaim: |
+    hs = {}
+    if obj.status ~= nil then
+      if obj.status.phase == "Bound" then
+        hs.status = "Healthy"
+        hs.message = "PVC bound"
+        return hs
+      end
+      if obj.status.phase == "Pending" then
+        hs.status = "Healthy"
+        hs.message = "PVC pending (WaitForFirstConsumer)"
+        return hs
+      end
+    end
+    hs.status = "Progressing"
+    hs.message = "Waiting to be bound"
+    return hs
+
   # HTTPRoute (gateway.networking.k8s.io): Healthy when no gateway parent is available
   # Prevents Progressing state when Gateway controller is not deployed
   resource.customizations.health.gateway.networking.k8s.io_HTTPRoute: |
