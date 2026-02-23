@@ -17,6 +17,8 @@ metadata:
   annotations:
     # Deploy very early - storage is required by many workloads
     argocd.argoproj.io/sync-wave: "-10"
+    # Skip reconcile: using local-path storage overlay until Mayastor is properly set up on OVH
+    argocd.argoproj.io/skip-reconcile: "true"
     # On AWS, a StorageClass overlay named "mayastor" backed by gp3 is used instead
     # Enable via toggle_app MCP tool when running on bare metal
   finalizers:
