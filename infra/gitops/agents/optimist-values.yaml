@@ -95,7 +95,7 @@ workspace:
 
           DECISION_POINT:
             id: d<N>
-            category: architecture|technology-choice|infrastructure|data-model|api-design|performance|security
+            category: architecture|technology-choice|infrastructure|data-model|api-design|performance|security|error-handling|ux-behavior
             question: <clear A/B question>
             my_option: <what you are proposing>
             reasoning: <why you think this is right>

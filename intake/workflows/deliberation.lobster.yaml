@@ -41,32 +41,42 @@ steps:
     commands:
       - name: notify-optimist
         command: >
-          openclaw.invoke --tool nats-publish --args-json '{
-            "subject": "agent.optimist.inbox",
-            "message": {
-              "type": "deliberation_start",
-              "session_id": "{{inputs.session_id}}",
-              "prd_content": "{{inputs.prd_content}}",
-              "infrastructure_context": "{{inputs.infrastructure_context}}",
-              "timebox_minutes": {{inputs.timebox_minutes}},
-              "your_role": "optimist",
-              "opponent_id": "pessimist"
-            }
-          }'
+          jq -n
+            --arg session_id "{{inputs.session_id}}"
+            --arg prd_content "{{inputs.prd_content}}"
+            --arg infra_context "{{inputs.infrastructure_context}}"
+            --argjson timebox {{inputs.timebox_minutes}}
+            '{
+              "subject": "agent.optimist.inbox",
+              "message": {
+                "type": "deliberation_start",
+                "session_id": $session_id,
+                "prd_content": $prd_content,
+                "infrastructure_context": $infra_context,
+                "timebox_minutes": $timebox,
+                "your_role": "optimist",
+                "opponent_id": "pessimist"
+              }
+            }' | xargs -0 openclaw.invoke --tool nats-publish --args-json
       - name: notify-pessimist
         command: >
-          openclaw.invoke --tool nats-publish --args-json '{
-            "subject": "agent.pessimist.inbox",
-            "message": {
-              "type": "deliberation_start",
-              "session_id": "{{inputs.session_id}}",
-              "prd_content": "{{inputs.prd_content}}",
-              "infrastructure_context": "{{inputs.infrastructure_context}}",
-              "timebox_minutes": {{inputs.timebox_minutes}},
-              "your_role": "pessimist",
-              "opponent_id": "optimist"
-            }
-          }'
+          jq -n
+            --arg session_id "{{inputs.session_id}}"
+            --arg prd_content "{{inputs.prd_content}}"
+            --arg infra_context "{{inputs.infrastructure_context}}"
+            --argjson timebox {{inputs.timebox_minutes}}
+            '{
+              "subject": "agent.pessimist.inbox",
+              "message": {
+                "type": "deliberation_start",
+                "session_id": $session_id,
+                "prd_content": $prd_content,
+                "infrastructure_context": $infra_context,
+                "timebox_minutes": $timebox,
+                "your_role": "pessimist",
+                "opponent_id": "optimist"
+              }
+            }' | xargs -0 openclaw.invoke --tool nats-publish --args-json
 
   # ─────────────────────────────────────────────────────────
   # Step 2: Conduct the time-boxed debate
@@ -78,12 +88,22 @@ steps:
     depends_on: [broadcast-prd]
     timeout: "{{inputs.timebox_minutes}}m"
     command: >
-      intake-agent deliberate
-        --session-id "{{inputs.session_id}}"
-        --timebox-minutes {{inputs.timebox_minutes}}
-        --committee-ids "committee-1,committee-2,committee-3,committee-4,committee-5"
-        --vote-timeout-seconds 120
-        --output-schema "{{schemas/deliberation-result.schema.json}}"
+      jq -n
+        --arg session_id "{{inputs.session_id}}"
+        --arg prd_content "{{inputs.prd_content}}"
+        --arg infra_context "{{inputs.infrastructure_context}}"
+        --argjson timebox {{inputs.timebox_minutes}}
+        '{
+          "operation": "deliberate",
+          "payload": {
+            "session_id": $session_id,
+            "prd_content": $prd_content,
+            "infrastructure_context": $infra_context,
+            "timebox_minutes": $timebox,
+            "vote_timeout_seconds": 120,
+            "committee_ids": ["committee-1", "committee-2", "committee-3", "committee-4", "committee-5"]
+          }
+        }' | intake-agent
 
   # ─────────────────────────────────────────────────────────
   # Step 3: Compile resolved decisions into a design brief
@@ -92,16 +112,20 @@ steps:
     description: "Synthesize deliberation result + original PRD into design-brief.md"
     depends_on: [conduct-deliberation]
     command: >
-      openclaw.invoke --tool llm-task --action text --args-json '{
-        "prompt": "{{prompts/compile-design-brief-system.md}}",
-        "input": {
-          "deliberation_result": ${{ steps.conduct-deliberation.output }},
-          "prd_content": "{{inputs.prd_content}}"
-        },
-        "provider": "anthropic",
-        "model": "claude-opus-4-20250514",
-        "temperature": 0.2
-      }'
+      jq -n
+        --arg prompt "{{prompts/compile-design-brief-system.md}}"
+        --arg prd_content "{{inputs.prd_content}}"
+        --argjson delib_result '${{ steps.conduct-deliberation.output }}'
+        '{
+          "prompt": $prompt,
+          "input": {
+            "deliberation_result": $delib_result,
+            "prd_content": $prd_content
+          },
+          "provider": "anthropic",
+          "model": "claude-opus-4-20250514",
+          "temperature": 0.2
+        }' | xargs -0 openclaw.invoke --tool llm-task --action text --args-json
 
   # ─────────────────────────────────────────────────────────
   # Step 4: Save design brief to .tasks/docs/design-brief.md

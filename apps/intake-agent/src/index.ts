@@ -187,10 +187,8 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
       if (!payload?.prd_content) {
         return errorResponse('Missing prd_content in payload', 'validation_error');
       }
-      if (!payload?.session_id) {
-        payload.session_id = crypto.randomUUID();
-      }
-      return runDeliberation(payload);
+      const sessionId = payload.session_id ?? crypto.randomUUID();
+      return runDeliberation({ ...payload, session_id: sessionId });
     }
 
     case 'generate_docs': {

@@ -106,11 +106,27 @@ async function getNatsClient(): Promise<NatsClient> {
 // Decision Point Parser
 // =============================================================================
 
-const DECISION_POINT_REGEX = /DECISION_POINT:\s*\n\s*id:\s*(\S+)\s*\n\s*category:\s*(\S+)\s*\n\s*question:\s*(.+?)\s*\n\s*my_option:\s*(.+?)\s*\n\s*reasoning:\s*(.+?)(?=\n\n|\n[A-Z]|$)/gs;
+const DECISION_POINT_REGEX = /DECISION_POINT:\s*\n\s*id:\s*(\S+)\s*\n\s*category:\s*(\S+)\s*\n\s*question:\s*(.+?)\s*\n\s*my_option:\s*(.+?)\s*\n\s*reasoning:\s*(.+?)(?=\n\n|$)/gs;
+
+const VALID_CATEGORIES = [
+  'architecture',
+  'error-handling',
+  'data-model',
+  'api-design',
+  'ux-behavior',
+  'performance',
+  'security',
+  'technology-choice',
+  'infrastructure',
+] as const;
+
+function isValidCategory(category: string): category is DeliberationDecisionPoint['category'] {
+  return VALID_CATEGORIES.includes(category as DeliberationDecisionPoint['category']);
+}
 
 interface ParsedDecisionPoint {
   id: string;
-  category: string;
+  category: DeliberationDecisionPoint['category'];
   question: string;
   proposingOption: string;
   reasoning: string;
@@ -125,9 +141,14 @@ function parseDecisionPoints(content: string, speaker: 'optimist' | 'pessimist')
   DECISION_POINT_REGEX.lastIndex = 0;
 
   while ((match = DECISION_POINT_REGEX.exec(content)) !== null) {
+    const category = (match[2] ?? '').trim();
+    if (!isValidCategory(category)) {
+      console.error(`[DELIBERATION] Invalid category "${category}" — skipping decision point ${match[1]}`);
+      continue;
+    }
     points.push({
       id: (match[1] ?? '').trim(),
-      category: (match[2] ?? '').trim(),
+      category,
       question: (match[3] ?? '').trim(),
       proposingOption: (match[4] ?? '').trim(),
       reasoning: (match[5] ?? '').trim(),
@@ -177,11 +198,17 @@ async function conductCommitteeVote(
         voteTimeoutSeconds * 1000
       );
 
+      const chosenOption = (response.chosen_option as string) ?? 'abstain';
+      const validOptions = [...options, 'abstain'];
+      const isValidOption = validOptions.includes(chosenOption);
+      
       return {
         voter_id: voterId,
-        chosen_option: (response.chosen_option as string) ?? 'abstain',
+        chosen_option: isValidOption ? chosenOption : 'abstain',
         confidence: (response.confidence as number) ?? 0,
-        reasoning: (response.reasoning as string) ?? 'No reasoning provided',
+        reasoning: isValidOption 
+          ? (response.reasoning as string) ?? 'No reasoning provided'
+          : `Invalid vote option "${chosenOption}" provided - counted as abstain. ${(response.reasoning as string) ?? ''}`,
         concerns: (response.concerns as string[]) ?? [],
         timestamp: new Date().toISOString(),
       };
@@ -224,7 +251,7 @@ async function conductCommitteeVote(
   return {
     id: dp.id,
     question: dp.question,
-    category: dp.category as DeliberationDecisionPoint['category'],
+    category: dp.category,
     options,
     raised_by: dp.raisedBy,
     votes,
@@ -273,20 +300,24 @@ export async function runDeliberation(
     timebox_minutes: payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES,
   };
 
-  await Promise.all([
-    nats.publish('agent.optimist.inbox', {
-      type: 'deliberation_start',
-      ...startMsg,
-      your_role: 'optimist',
-      opponent_id: 'pessimist',
-    }),
-    nats.publish('agent.pessimist.inbox', {
-      type: 'deliberation_start',
-      ...startMsg,
-      your_role: 'pessimist',
-      opponent_id: 'optimist',
-    }),
-  ]);
+  try {
+    await Promise.all([
+      nats.publish('agent.optimist.inbox', {
+        type: 'deliberation_start',
+        ...startMsg,
+        your_role: 'optimist',
+        opponent_id: 'pessimist',
+      }),
+      nats.publish('agent.pessimist.inbox', {
+        type: 'deliberation_start',
+        ...startMsg,
+        your_role: 'pessimist',
+        opponent_id: 'optimist',
+      }),
+    ]);
+  } catch (err) {
+    console.error('[DELIBERATION] Failed to broadcast deliberation start:', err);
+  }
 
   // ─── Step 2: Debate loop ─────────────────────────────────────────────────
   let lastSpeaker: 'optimist' | 'pessimist' = 'pessimist'; // optimist goes first
@@ -306,10 +337,14 @@ export async function runDeliberation(
         minutes_remaining: minutesRemaining,
         message: `⏱ You have ${minutesRemaining} minutes remaining. Begin moving toward final positions.`,
       };
-      await Promise.all([
-        nats.publish('agent.optimist.inbox', warningMsg),
-        nats.publish('agent.pessimist.inbox', warningMsg),
-      ]);
+      try {
+        await Promise.all([
+          nats.publish('agent.optimist.inbox', warningMsg),
+          nats.publish('agent.pessimist.inbox', warningMsg),
+        ]);
+      } catch (err) {
+        console.error('[DELIBERATION] Failed to send timebox warning:', err);
+      }
     }
 
     // Alternate speakers: optimist goes first
@@ -372,6 +407,8 @@ export async function runDeliberation(
 
       if (optPos && pesPos) {
         pendingDecisionPoints.delete(dpId);
+        optimistPositions.delete(dpId);
+        pessimistPositions.delete(dpId);
 
         // Halt debate, conduct vote
         const resolved = await conductCommitteeVote(
@@ -392,10 +429,14 @@ export async function runDeliberation(
           consensus_strength: resolved.consensus_strength ?? 0,
           escalated: resolved.escalated,
         };
-        await Promise.all([
-          nats.publish('agent.optimist.inbox', voteResultMsg),
-          nats.publish('agent.pessimist.inbox', voteResultMsg),
-        ]);
+        try {
+          await Promise.all([
+            nats.publish('agent.optimist.inbox', voteResultMsg),
+            nats.publish('agent.pessimist.inbox', voteResultMsg),
+          ]);
+        } catch (err) {
+          console.error(`[DELIBERATION] Failed to broadcast vote result for ${dpId}:`, err);
+        }
       }
     }
 
@@ -431,8 +472,8 @@ export async function runDeliberation(
     const unresolvedDP: DeliberationDecisionPoint = {
       id: dp.id,
       question: dp.question,
-      category: dp.category as DeliberationDecisionPoint['category'],
-      options: [optPos ?? 'no position stated', pesPos ?? 'no position stated'],
+      category: dp.category,
+      options: [optPos ?? '[AGENT DID NOT PROVIDE POSITION]', pesPos ?? '[AGENT DID NOT PROVIDE POSITION]'],
       raised_by: dp.raisedBy,
       votes: [],
       vote_tally: {},
