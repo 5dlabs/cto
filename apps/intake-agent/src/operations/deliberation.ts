@@ -377,21 +377,30 @@ export async function runDeliberation(
     const responseContent = (response.content as string) ?? '';
     turnCount++;
 
-    // Log the turn
+    // Parse decision points raised in THIS turn before logging the turn,
+    // so we can annotate the log entry with what was actually raised here.
+    // (Resolution happens later and is tracked separately.)
+    const newDPs = parseDecisionPoints(responseContent, nextSpeaker);
+    const raisedThisTurn = newDPs.map(dp => dp.id);
+
+    // Log the turn — annotate with IDs raised in this turn's content
     debateLog.push({
       turn: turnCount,
       speaker: nextSpeaker,
       content: responseContent,
       timestamp: new Date().toISOString(),
+      ...(raisedThisTurn.length > 0 && {
+        decision_point_raised: raisedThisTurn.length === 1
+          ? raisedThisTurn[0]
+          : raisedThisTurn,
+      }),
     });
 
-    // Parse any decision points raised in this turn
-    const newDPs = parseDecisionPoints(responseContent, nextSpeaker);
+    // Register newly raised decision points and track positions
     for (const dp of newDPs) {
       console.error(`[DELIBERATION] Decision point raised: ${dp.id} by ${nextSpeaker}`);
       pendingDecisionPoints.set(dp.id, dp);
 
-      // Track positions
       if (nextSpeaker === 'optimist') {
         optimistPositions.set(dp.id, dp.proposingOption);
       } else {
@@ -399,8 +408,8 @@ export async function runDeliberation(
       }
     }
 
-    // If we have a pending decision point with both positions, trigger committee vote
-    const resolvedThisTurn: string[] = [];
+    // If we have a pending decision point with both positions, trigger committee vote.
+    // Resolution is tracked in resolvedDecisionPoints — NOT mixed into decision_point_raised.
     for (const [dpId, dp] of pendingDecisionPoints.entries()) {
       const optPos = optimistPositions.get(dpId);
       const pesPos = pessimistPositions.get(dpId);
@@ -416,7 +425,6 @@ export async function runDeliberation(
           payload.prd_content, committeeIds, voteTimeoutSeconds
         );
         resolvedDecisionPoints.push(resolved);
-        resolvedThisTurn.push(dpId);
 
         // Broadcast vote result back to both agents
         const voteResultMsg: NatsMessage = {
@@ -437,16 +445,6 @@ export async function runDeliberation(
         } catch (err) {
           console.error(`[DELIBERATION] Failed to broadcast vote result for ${dpId}:`, err);
         }
-      }
-    }
-
-    // Update debate log entry with all decision points resolved this turn
-    if (resolvedThisTurn.length > 0) {
-      const lastEntry = debateLog[debateLog.length - 1];
-      if (lastEntry) {
-        lastEntry.decision_point_raised = resolvedThisTurn.length === 1 
-          ? resolvedThisTurn[0] 
-          : resolvedThisTurn;
       }
     }
 
