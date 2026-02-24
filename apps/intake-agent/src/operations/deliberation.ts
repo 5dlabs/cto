@@ -365,6 +365,7 @@ export async function runDeliberation(
     }
 
     // If we have a pending decision point with both positions, trigger committee vote
+    const resolvedThisTurn: string[] = [];
     for (const [dpId, dp] of pendingDecisionPoints.entries()) {
       const optPos = optimistPositions.get(dpId);
       const pesPos = pessimistPositions.get(dpId);
@@ -378,12 +379,7 @@ export async function runDeliberation(
           payload.prd_content, committeeIds, voteTimeoutSeconds
         );
         resolvedDecisionPoints.push(resolved);
-
-        // Update debate log entry with decision point reference
-        const lastEntry = debateLog[debateLog.length - 1];
-        if (lastEntry) {
-          lastEntry.decision_point_raised = dpId;
-        }
+        resolvedThisTurn.push(dpId);
 
         // Broadcast vote result back to both agents
         const voteResultMsg: NatsMessage = {
@@ -403,16 +399,48 @@ export async function runDeliberation(
       }
     }
 
-    // Check for explicit consensus signal
-    if (responseContent.toLowerCase().includes('i agree with the optimist') ||
-        responseContent.toLowerCase().includes('i agree with the pessimist') ||
-        responseContent.toLowerCase().includes('we have consensus')) {
+    // Update debate log entry with all decision points resolved this turn
+    if (resolvedThisTurn.length > 0) {
+      const lastEntry = debateLog[debateLog.length - 1];
+      if (lastEntry) {
+        lastEntry.decision_point_raised = resolvedThisTurn.length === 1 
+          ? resolvedThisTurn[0] 
+          : resolvedThisTurn;
+      }
+    }
+
+    // Check for explicit consensus signal (require phrase at sentence boundaries)
+    const contentLower = responseContent.toLowerCase();
+    const consensusPattern = /(?:^|[.!?]\s+)(?:i\s+(?:fully\s+)?(?:agree|concede)|you'?re\s+right|we\s+have\s+consensus|i\s+withdraw\s+my\s+objection)(?:[,.\s]|$)/;
+    if (consensusPattern.test(contentLower)) {
       deliberationStatus = 'consensus';
       break;
     }
 
     lastSpeaker = nextSpeaker;
     lastContent = responseContent;
+  }
+
+  // Process any remaining pending decision points that never got both positions
+  for (const [dpId, dp] of pendingDecisionPoints.entries()) {
+    console.error(`[DELIBERATION] Decision point ${dpId} never received both positions — marking as unresolved/escalated`);
+    const optPos = optimistPositions.get(dpId);
+    const pesPos = pessimistPositions.get(dpId);
+    
+    // Create a decision point record with whatever positions we have
+    const unresolvedDP: DeliberationDecisionPoint = {
+      id: dp.id,
+      question: dp.question,
+      category: dp.category as DeliberationDecisionPoint['category'],
+      options: [optPos ?? 'no position stated', pesPos ?? 'no position stated'],
+      raised_by: dp.raisedBy,
+      votes: [],
+      vote_tally: {},
+      winning_option: undefined,
+      consensus_strength: 0,
+      escalated: true,
+    };
+    resolvedDecisionPoints.push(unresolvedDP);
   }
 
   // Assign final status based on how the deliberation ended
@@ -423,7 +451,7 @@ export async function runDeliberation(
   
   // Check if any escalated decision points should flip status to 'escalated'
   const hasEscalated = resolvedDecisionPoints.some(d => d.escalated);
-  if (hasEscalated && deliberationStatus === 'completed') {
+  if (hasEscalated) {
     deliberationStatus = 'escalated';
   }
 

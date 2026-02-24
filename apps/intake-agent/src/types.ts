@@ -373,7 +373,7 @@ export interface DebateTurn {
   turn: number;
   speaker: 'optimist' | 'pessimist';
   content: string;
-  decision_point_raised?: string;
+  decision_point_raised?: string | string[];
   timestamp: string;
 }
 
