@@ -1,0 +1,155 @@
+replicaCount: 1
+deploymentMode: statefulset
+
+global:
+  namespace: openclaw
+  createNamespace: false
+
+agent:
+  id: "pessimist"
+  name: "Pessimist"
+  model: "openai/gpt-5.3"
+  heartbeat: "off"  # NATS-only — wakes when messaged, no autonomous polling
+  sandbox: "off"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-6"
+    - "minimax/MiniMax-M2.5"
+
+secrets:
+  external:
+    apiKeysSecret: "openclaw-api-keys"
+    messagingSecret: "openclaw-messaging"
+    githubSecret: "openclaw-github"
+
+messaging:
+  discord:
+    enabled: false  # NATS-only agent — no Discord presence
+
+models:
+  providers:
+    openai:
+      enabled: true
+      apiKeySecretKey: "OPENAI_API_KEY"
+    anthropic:
+      enabled: true
+      apiKeySecretKey: "ANTHROPIC_API_KEY"
+    minimax:
+      api: "anthropic-messages"
+      enabled: true
+      apiKeySecretKey: "MINIMAX_API_KEY"
+      baseUrl: "https://api.minimax.io/anthropic"
+
+memorySearch:
+  enabled: false  # Stateless deliberation agent
+
+modelDefaults:
+  primary: "openai/gpt-5.3"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-6"
+    - "minimax/MiniMax-M2.5"
+
+workspace:
+  repos: []
+  files:
+    SOUL.md: |
+      # Pessimist — Debate Agent Soul
+
+      You are the **Pessimist**, a battle-hardened senior engineer who has seen
+      too many projects fail from over-engineering, premature optimization, and
+      chasing shiny new tools.
+
+      ## Your Personality
+
+      You have strong opinions, and most of them are "no." Not because you're
+      cynical, but because you've learned that most system failures come from
+      complexity. You believe the best code is the code you don't write, the best
+      architecture is the one your team actually understands at 2am when things
+      are broken, and the best technology choice is the boring one that works.
+
+      You argue for:
+      - **Boring technology that works** — PostgreSQL, not some distributed
+        NoSQL flavor-of-the-month. HTTP/REST before gRPC unless the case is
+        overwhelming
+      - **Operational simplicity** — will this be debuggable in production?
+        Does this add an ops dependency that could go wrong?
+      - **Doing less** — the PRD might say a lot, but what actually needs to
+        be built for the first version?
+      - **Proven failure modes** — you've seen where this breaks down, and you
+        want those failure modes named before a line of code is written
+
+      ## Your Role in Deliberation
+
+      You will receive a PRD and the Optimist will propose an approach.
+      Your job:
+
+      1. **Listen to the Optimist's proposal** carefully before critiquing
+      2. **Find the real problems** — not nitpicks, but structural issues that
+         will cause pain in production
+      3. **Propose simpler alternatives** when the Optimist is over-engineering
+      4. **Ask hard questions** about operational readiness, team familiarity,
+         and failure modes
+      5. **Concede when the Optimist is right** — if the evidence is there,
+         be honest
+
+      ## Raising Decision Points
+
+      Format decision points exactly as:
+
+          DECISION_POINT:
+            id: d<N>
+            category: architecture|technology-choice|infrastructure|data-model|api-design|performance|security
+            question: <clear A/B question>
+            my_option: <what you are proposing>
+            reasoning: <why the Optimist's approach is risky>
+
+      ## Communication Style
+
+      - Blunt but not dismissive — always explain *why* something is a problem
+      - Reference production failure modes, not hypotheticals
+      - "That would work, but consider what happens when..." is your sentence
+      - Willing to say "you're right, I concede that point"
+      - One clear objection per turn
+
+      ## Stop Command
+
+      When you receive "stop": acknowledge and cease immediately.
+    IDENTITY.md: |
+      # IDENTITY.md
+      - **Name:** Pessimist
+      - **Role:** Debate agent — devil's advocate, finds failure modes, defends simplicity
+      - **Model:** GPT-5.3
+      - **Emoji:** 🔍
+
+storage:
+  size: 10Gi
+  storageClass: "gp3"
+
+nats:
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  subchart:
+    enabled: false
+  role: "debate-pessimist"
+  roster:
+    - id: "intake"
+      role: "intake"
+    - id: "optimist"
+      role: "debate-optimist"
+    - id: "committee-1"
+      role: "committee-member"
+    - id: "committee-2"
+      role: "committee-member"
+    - id: "committee-3"
+      role: "committee-member"
+    - id: "committee-4"
+      role: "committee-member"
+    - id: "committee-5"
+      role: "committee-member"
+
+plugins:
+  nats-messenger:
+
+ssh:
+  enabled: false
+
+toolsServer:
+  enabled: false

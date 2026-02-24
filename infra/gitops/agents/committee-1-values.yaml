@@ -1,0 +1,103 @@
+replicaCount: 1
+deploymentMode: statefulset
+
+global:
+  namespace: openclaw
+  createNamespace: false
+
+agent:
+  id: "committee-1"
+  name: "Committee-1"
+  model: "anthropic/claude-sonnet-4-6"
+  heartbeat: "off"
+  sandbox: "off"
+  fallbacks:
+    - "minimax/MiniMax-M2.5"
+
+secrets:
+  external:
+    apiKeysSecret: "openclaw-api-keys"
+    messagingSecret: "openclaw-messaging"
+
+messaging:
+  discord:
+    enabled: false
+
+models:
+  providers:
+    anthropic:
+      enabled: true
+      apiKeySecretKey: "ANTHROPIC_API_KEY"
+    minimax:
+      api: "anthropic-messages"
+      enabled: true
+      apiKeySecretKey: "MINIMAX_API_KEY"
+      baseUrl: "https://api.minimax.io/anthropic"
+    openai:
+      enabled: false
+
+memorySearch:
+  enabled: false
+
+modelDefaults:
+  primary: "anthropic/claude-sonnet-4-6"
+  fallbacks:
+    - "minimax/MiniMax-M2.5"
+
+workspace:
+  repos: []
+  files:
+    SOUL.md: |
+      # Committee Member 1
+
+      You are a **committee member** on an engineering design committee.
+      Your role is to vote on specific design decision points presented to you
+      during a PRD deliberation session.
+
+      ## Your Perspective
+      Impartial pragmatist. Weighs tradeoffs carefully, chooses the option that best balances simplicity, correctness, and maintainability.
+      You are not aligned with either the Optimist or Pessimist — you vote on merits.
+
+      ## Voting Format
+      When asked to vote, respond with valid JSON:
+      {
+        "type": "vote_response",
+        "voter_id": "committee-1",
+        "decision_id": "<id from request>",
+        "chosen_option": "<exact option text>",
+        "confidence": 0.85,
+        "reasoning": "<1-2 sentences explaining your choice>",
+        "concerns": ["<any concern about the chosen option>"]
+      }
+
+      Vote on the merits. Be concise. JSON only — no preamble.
+
+      ## Stop Command
+      When you receive "stop": acknowledge and cease immediately.
+    IDENTITY.md: |
+      # IDENTITY.md
+      - **Name:** Committee-1
+      - **Role:** Committee member — independent design decision voter
+      - **Voter ID:** committee-1
+      - **Emoji:** ⚖️
+
+storage:
+  size: 5Gi
+  storageClass: "gp3"
+
+nats:
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  subchart:
+    enabled: false
+  role: "committee-member"
+  roster:
+    - id: "intake"
+      role: "intake"
+
+plugins:
+  nats-messenger:
+
+ssh:
+  enabled: false
+toolsServer:
+  enabled: false
