@@ -22,7 +22,7 @@ metadata:
     platform.5dlabs.io/distributable: "true"
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-    argocd.argoproj.io/skip-reconcile: "true"  # OCI 3-level path unsupported in ArgoCD; bundle chart in git to fix
+    argocd.argoproj.io/skip-reconcile: "true"  # GHCR 3-level OCI path requires ghcr.io auth; twingate-connector already runs independently
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

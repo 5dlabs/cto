@@ -1,0 +1,116 @@
+---
+# KubeAI Operator - Kubernetes-native AI inference platform
+# Manages Model CRDs with OpenAI-compatible API, scale-from-zero, multi-GPU support
+# License: Apache 2.0
+# Source: https://www.kubeai.org / https://github.com/kubeai-project/kubeai
+#
+# Supports: vLLM, Ollama, FasterWhisper backends
+# GPU profiles: nvidia-gpu-l4, nvidia-gpu-h100, nvidia-gpu-a100-80gb, cpu
+# API endpoint: http://kubeai.kubeai.svc.cluster.local/openai/v1
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubeai-operator
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: kubeai-operator
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: ai-ml
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://www.kubeai.org
+    chart: kubeai
+    targetRevision: 0.23.1
+    helm:
+      values: |
+        # Resource pool configuration
+        # CPU pool for nodes without GPUs
+        resourceProfiles:
+          cpu:
+            imageName: ghcr.io/kubeai-project/kubeai:latest
+            limits:
+              cpu: "4"
+              memory: 8Gi
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            affinity:
+              nodeAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 1
+                    preference:
+                      matchExpressions:
+                        - key: node-role.kubernetes.io/worker
+                          operator: Exists
+
+        # Operator configuration
+        operator:
+          logLevel: info
+
+        # Autoscaler configuration
+        autoscaler:
+          interval: 30s
+
+        # Enable model loading
+        modelLoader:
+          image: ghcr.io/kubeai-project/kubeai:latest
+
+        # Node selector for worker nodes
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
+
+        # Pod labels for observability
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: kubeai-operator
+
+        # Resource limits
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubeai
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /spec/conversion
+        - /spec/preserveUnknownFields
+        - /metadata/annotations
+        - /spec/versions
+
+  revisionHistoryLimit: 5

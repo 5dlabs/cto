@@ -712,19 +712,19 @@ impl ServerConnectionPool {
             conn.server_name.clone()
         };
 
-        tracing::info!("🔄 Initializing MCP server: {} (10s timeout)", server_name);
+        tracing::info!("🔄 Initializing MCP server: {} (60s timeout)", server_name);
 
         match tokio::time::timeout(
-            tokio::time::Duration::from_secs(10),
+            tokio::time::Duration::from_secs(60),
             self.initialize_server_inner(connection, &server_name),
         )
         .await
         {
             Ok(result) => result,
             Err(_) => {
-                tracing::error!("⏰ [{server_name}] MCP server initialization timed out after 10s");
+                tracing::error!("⏰ [{server_name}] MCP server initialization timed out after 60s");
                 Err(anyhow::anyhow!(
-                    "MCP server '{server_name}' initialization timed out after 10s"
+                    "MCP server '{server_name}' initialization timed out after 60s"
                 ))
             }
         }
@@ -762,12 +762,12 @@ impl ServerConnectionPool {
         // Read initialization response (with timeout to prevent hanging)
         tracing::info!("🔄 [{}] About to read initialize response", server_name);
         let _init_response = tokio::time::timeout(
-            tokio::time::Duration::from_secs(8),
+            tokio::time::Duration::from_secs(45),
             self.read_response(connection.clone()),
         )
         .await
         .map_err(|_| {
-            anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 8s")
+            anyhow::anyhow!("Timeout reading initialize response from '{server_name}' after 45s")
         })??;
         tracing::info!(
             "✅ [{}] Initialize response received successfully",

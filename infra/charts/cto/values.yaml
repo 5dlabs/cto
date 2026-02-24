@@ -559,8 +559,8 @@ tools:
         name: "Loki"
         description: "Query and analyze Grafana Loki logs with LogQL"
         transport: "stdio"
-        command: "docker"
-        args: ["run", "-i", "--rm", "-e", "LOKI_URL", "ghcr.io/grafana/loki-mcp:latest"]
+        command: "npx"
+        args: ["-y", "@elad12390/loki-mcp"]
         workingDirectory: "/tmp"
         env:
           LOKI_URL: "${LOKI_URL:-http://loki.observability.svc:3100}"

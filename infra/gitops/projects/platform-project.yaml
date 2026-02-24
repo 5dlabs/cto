@@ -78,6 +78,8 @@ spec:
     - 'https://github.com/llamastack/llama-stack-k8s-operator'
     - 'https://www.kubeai.org'
     - 'https://helm.ngc.nvidia.com/nvidia'
+    # Node Feature Discovery (required by Nvidia GPU Operator)
+    - 'https://kubernetes-sigs.github.io/node-feature-discovery/charts'
     # Storage Operators
     - 'https://openebs.github.io/mayastor-extensions'
     - 'https://seaweedfs.github.io/seaweedfs/helm'

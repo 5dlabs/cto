@@ -28,12 +28,15 @@ spec:
     helm:
       values: |
         controller:
-          # Use NodePort with externalIPs for direct LAN access on standard ports
+          # Use NodePort with externalIPs for OVH node access on standard ports
           service:
             type: NodePort
-            # Expose on control-plane node IP for direct LAN access
+            # Expose on OVH node IPs for direct access
             externalIPs:
-              - 192.168.1.77
+              - 51.79.26.198
+              - 51.79.29.63
+              - 148.113.141.154
+              - 15.235.46.13
 
           # Pod labels for log collection
           # Note: Don't override app.kubernetes.io/component - it's part of the
