@@ -230,26 +230,8 @@ impl IntakeDomain {
         // resulting design brief as the primary context for task generation.
         // Falls back to the raw PRD if deliberation is disabled or the brief
         // is not available.
-        let prd_content = if let Some(ref brief_path) = config.design_brief_path {
-            // Pre-computed brief supplied — use it directly
-            if brief_path.exists() {
-                let brief = tokio::fs::read_to_string(brief_path).await.map_err(|e| {
-                    TasksError::FileReadError {
-                        path: brief_path.display().to_string(),
-                        reason: e.to_string(),
-                    }
-                })?;
-                format!("{brief}\n\n---\n\n## Original PRD\n\n{raw_prd_content}")
-            } else {
-                tracing::warn!(
-                    "design_brief_path {:?} not found — falling back to raw PRD",
-                    brief_path
-                );
-                raw_prd_content.clone()
-            }
-        } else if config.deliberate {
-            // Deliberation is enabled but no pre-computed brief — check for
-            // a brief that was already produced in this run.
+        let prd_content = if config.deliberate {
+            // Deliberation is enabled — check for a brief that was produced in this run
             let default_brief_path = config.output_dir.join("docs/design-brief.md");
             if default_brief_path.exists() {
                 let brief = tokio::fs::read_to_string(&default_brief_path)
@@ -266,6 +248,23 @@ impl IntakeDomain {
                      run the deliberation workflow first, or call the intake \
                      agent with the brief pre-populated. Falling back to raw PRD.",
                     default_brief_path
+                );
+                raw_prd_content.clone()
+            }
+        } else if let Some(ref brief_path) = config.design_brief_path {
+            // Deliberation disabled but pre-computed brief supplied — use it as override
+            if brief_path.exists() {
+                let brief = tokio::fs::read_to_string(brief_path).await.map_err(|e| {
+                    TasksError::FileReadError {
+                        path: brief_path.display().to_string(),
+                        reason: e.to_string(),
+                    }
+                })?;
+                format!("{brief}\n\n---\n\n## Original PRD\n\n{raw_prd_content}")
+            } else {
+                tracing::warn!(
+                    "design_brief_path {:?} not found — falling back to raw PRD",
+                    brief_path
                 );
                 raw_prd_content.clone()
             }

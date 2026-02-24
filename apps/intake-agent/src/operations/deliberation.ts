@@ -292,32 +292,11 @@ export async function runDeliberation(
 
   console.error(`[DELIBERATION] Session ${sessionId} started (timebox: ${payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES}min)`);
 
-  // ─── Step 1: Broadcast PRD to both agents ───────────────────────────────
-  const startMsg = {
-    session_id: sessionId,
-    prd_content: payload.prd_content,
-    infrastructure_context: payload.infrastructure_context ?? '',
-    timebox_minutes: payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES,
-  };
-
-  try {
-    await Promise.all([
-      nats.publish('agent.optimist.inbox', {
-        type: 'deliberation_start',
-        ...startMsg,
-        your_role: 'optimist',
-        opponent_id: 'pessimist',
-      }),
-      nats.publish('agent.pessimist.inbox', {
-        type: 'deliberation_start',
-        ...startMsg,
-        your_role: 'pessimist',
-        opponent_id: 'optimist',
-      }),
-    ]);
-  } catch (err) {
-    console.error('[DELIBERATION] Failed to broadcast deliberation start:', err);
-  }
+  // ─── Step 1: PRD broadcast ───────────────────────────────────────────────
+  // NOTE: The broadcast-prd step in deliberation.lobster.yaml already sends
+  // deliberation_start messages to both agents. We do NOT duplicate that here.
+  // When running standalone (no Lobster workflow), the stub NATS client logs
+  // messages but doesn't require initialization broadcasts.
 
   // ─── Step 2: Debate loop ─────────────────────────────────────────────────
   let lastSpeaker: 'optimist' | 'pessimist' = 'pessimist'; // optimist goes first
@@ -369,9 +348,11 @@ export async function runDeliberation(
         AGENT_SKIP_TIMEOUT_MS
       );
     } catch {
-      console.error(`[DELIBERATION] ${nextSpeaker} timed out on turn ${turnCount + 1} — ending deliberation`);
-      deliberationStatus = 'timeout';
-      break;
+      console.error(`[DELIBERATION] ${nextSpeaker} timed out on turn ${turnCount + 1} — skipping turn and continuing`);
+      // Skip this turn and continue with a synthetic "no response" message
+      lastSpeaker = nextSpeaker;
+      lastContent = `[Agent ${nextSpeaker} did not respond within the timeout period]`;
+      continue;
     }
 
     const responseContent = (response.content as string) ?? '';
