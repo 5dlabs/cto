@@ -10,7 +10,7 @@ agent:
   id: "committee-1"
   name: "Committee-1"
   model: "anthropic/claude-sonnet-4-6"
-  heartbeat: "87600h"  # effectively off — wakes via NATS only
+  heartbeat: "500h"  # effectively off — ~3 weeks, avoids 32-bit setTimeout overflow
   sandbox: "off"
   fallbacks:
     - "minimax/MiniMax-M2.5"

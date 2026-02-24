@@ -10,7 +10,7 @@ agent:
   id: "pessimist"
   name: "Pessimist"
   model: "openai/gpt-5.3"
-  heartbeat: "87600h"  # effectively off — wakes via NATS only
+  heartbeat: "500h"  # effectively off — ~3 weeks, avoids 32-bit setTimeout overflow
   sandbox: "off"
   fallbacks:
     - "anthropic/claude-sonnet-4-6"
