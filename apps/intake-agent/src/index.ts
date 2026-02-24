@@ -181,6 +181,18 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
     case 'provider_status':
       return getProviderStatus();
 
+    case 'deliberate': {
+      const { runDeliberation } = await import('./operations/deliberation');
+      const payload = request.payload as import('./types').DeliberatePayload;
+      if (!payload?.prd_content) {
+        return errorResponse('Missing prd_content in payload', 'validation_error');
+      }
+      if (!payload?.session_id) {
+        payload.session_id = crypto.randomUUID();
+      }
+      return runDeliberation(payload);
+    }
+
     case 'generate_docs': {
       const payload = request.payload as {
         tasks: Array<{

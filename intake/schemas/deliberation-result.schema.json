@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deliberation-result.schema.json",
+  "title": "DeliberationResult",
+  "description": "Full output of a PRD deliberation session between debate agents with committee voting.",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Unique identifier for this deliberation session"
+    },
+    "prd_hash": {
+      "type": "string",
+      "description": "SHA256 hash of the PRD content, for cache invalidation"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "timebox_minutes": {
+      "type": "number",
+      "description": "Configured timebox duration in minutes"
+    },
+    "debate_turns": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of back-and-forth turns between optimist and pessimist"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "timeout", "consensus", "escalated"],
+      "description": "How the deliberation ended: completed (timebox hit), timeout (no response), consensus (both agreed), escalated (unresolvable tie)"
+    },
+    "decision_points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "question": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["architecture", "error-handling", "data-model", "api-design", "ux-behavior", "performance", "security", "technology-choice", "infrastructure"]
+          },
+          "options": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 2
+          },
+          "raised_by": {
+            "type": "string",
+            "enum": ["optimist", "pessimist", "intake"]
+          },
+          "votes": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/DecisionVote" }
+          },
+          "vote_tally": {
+            "type": "object",
+            "additionalProperties": { "type": "integer" },
+            "description": "Map of option -> vote count"
+          },
+          "winning_option": {
+            "type": "string",
+            "description": "The option that received the most votes (null if tie)"
+          },
+          "consensus_strength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Fraction of voters who chose the winning option"
+          },
+          "escalated": {
+            "type": "boolean",
+            "description": "True if this decision was a tie and needs human resolution"
+          }
+        },
+        "required": ["id", "question", "options", "votes", "vote_tally"]
+      }
+    },
+    "design_brief": {
+      "type": "string",
+      "description": "Compiled markdown design brief with all decisions resolved, ready for task generation"
+    },
+    "debate_log": {
+      "type": "array",
+      "description": "Ordered log of debate turns",
+      "items": {
+        "type": "object",
+        "properties": {
+          "turn": { "type": "integer" },
+          "speaker": { "type": "string", "enum": ["optimist", "pessimist"] },
+          "content": { "type": "string" },
+          "decision_point_raised": { "type": "string", "description": "Decision ID if this turn raised a decision" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["turn", "speaker", "content", "timestamp"]
+      }
+    }
+  },
+  "required": [
+    "session_id",
+    "started_at",
+    "timebox_minutes",
+    "status",
+    "decision_points",
+    "design_brief",
+    "debate_turns"
+  ],
+  "$defs": {
+    "DecisionVote": {
+      "type": "object",
+      "properties": {
+        "voter_id": { "type": "string" },
+        "chosen_option": { "type": "string" },
+        "confidence": { "type": "number" },
+        "reasoning": { "type": "string" },
+        "concerns": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["voter_id", "chosen_option", "confidence", "reasoning"]
+    }
+  }
+}

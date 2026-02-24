@@ -1,0 +1,115 @@
+name: deliberation
+description: >
+  PRD deliberation — Optimist vs Pessimist debate with multi-model committee
+  voting on decision points. Produces a resolved design-brief.md before task
+  generation begins.
+
+inputs:
+  - name: prd_content
+    type: string
+    description: "Full PRD markdown content"
+  - name: prd_path
+    type: string
+    description: "Path to the PRD file (for logging)"
+  - name: timebox_minutes
+    type: number
+    default: 30
+    description: "Maximum deliberation time in minutes"
+  - name: session_id
+    type: string
+    description: "Unique session identifier (UUID)"
+  - name: infrastructure_context
+    type: string
+    default: ""
+    description: "Available operators and services (injected from cluster state)"
+
+outputs:
+  - name: design_brief
+    type: string
+    description: "Resolved design brief markdown — feeds into parse-prd"
+  - name: deliberation_result
+    type: object
+    description: "Full DeliberationResult JSON for audit logging"
+
+steps:
+  # ─────────────────────────────────────────────────────────
+  # Step 1: Broadcast PRD to both debate agents simultaneously
+  # ─────────────────────────────────────────────────────────
+  - name: broadcast-prd
+    description: "Send PRD + infra context to optimist and pessimist in parallel"
+    parallel: true
+    commands:
+      - name: notify-optimist
+        command: >
+          openclaw.invoke --tool nats-publish --args-json '{
+            "subject": "agent.optimist.inbox",
+            "message": {
+              "type": "deliberation_start",
+              "session_id": "{{inputs.session_id}}",
+              "prd_content": "{{inputs.prd_content}}",
+              "infrastructure_context": "{{inputs.infrastructure_context}}",
+              "timebox_minutes": {{inputs.timebox_minutes}},
+              "your_role": "optimist",
+              "opponent_id": "pessimist"
+            }
+          }'
+      - name: notify-pessimist
+        command: >
+          openclaw.invoke --tool nats-publish --args-json '{
+            "subject": "agent.pessimist.inbox",
+            "message": {
+              "type": "deliberation_start",
+              "session_id": "{{inputs.session_id}}",
+              "prd_content": "{{inputs.prd_content}}",
+              "infrastructure_context": "{{inputs.infrastructure_context}}",
+              "timebox_minutes": {{inputs.timebox_minutes}},
+              "your_role": "pessimist",
+              "opponent_id": "optimist"
+            }
+          }'
+
+  # ─────────────────────────────────────────────────────────
+  # Step 2: Conduct the time-boxed debate
+  # Intake listens on its NATS inbox for turns and decision points.
+  # When a decision_point message arrives, committee votes are triggered.
+  # ─────────────────────────────────────────────────────────
+  - name: conduct-deliberation
+    description: "Run conductor loop for timebox_minutes, collecting turns and votes"
+    depends_on: [broadcast-prd]
+    timeout: "{{inputs.timebox_minutes}}m"
+    command: >
+      intake-agent deliberate
+        --session-id "{{inputs.session_id}}"
+        --timebox-minutes {{inputs.timebox_minutes}}
+        --committee-ids "committee-1,committee-2,committee-3,committee-4,committee-5"
+        --vote-timeout-seconds 120
+        --output-schema "{{schemas/deliberation-result.schema.json}}"
+
+  # ─────────────────────────────────────────────────────────
+  # Step 3: Compile resolved decisions into a design brief
+  # ─────────────────────────────────────────────────────────
+  - name: compile-brief
+    description: "Synthesize deliberation result + original PRD into design-brief.md"
+    depends_on: [conduct-deliberation]
+    command: >
+      openclaw.invoke --tool llm-task --action text --args-json '{
+        "prompt": "{{prompts/compile-design-brief-system.md}}",
+        "input": {
+          "deliberation_result": ${{ steps.conduct-deliberation.output }},
+          "prd_content": "{{inputs.prd_content}}"
+        },
+        "provider": "anthropic",
+        "model": "claude-opus-4-20250514",
+        "temperature": 0.2
+      }'
+
+  # ─────────────────────────────────────────────────────────
+  # Step 4: Save design brief to .tasks/docs/design-brief.md
+  # ─────────────────────────────────────────────────────────
+  - name: save-brief
+    description: "Persist design brief for audit trail and downstream pipeline"
+    depends_on: [compile-brief]
+    command: >
+      mkdir -p .tasks/docs &&
+      echo '${{ steps.compile-brief.output }}' > .tasks/docs/design-brief.md &&
+      echo "Design brief saved to .tasks/docs/design-brief.md"
