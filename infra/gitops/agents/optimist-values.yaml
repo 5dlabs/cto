@@ -10,7 +10,7 @@ agent:
   id: "optimist"
   name: "Optimist"
   model: "bedrock/us.anthropic.claude-opus-4-6-v1:0"
-  heartbeat: "off"  # NATS-only — wakes when messaged, no autonomous polling
+  heartbeat: "87600h"  # effectively off — wakes via NATS only
   sandbox: "off"
   fallbacks:
     - "anthropic/claude-sonnet-4-6"

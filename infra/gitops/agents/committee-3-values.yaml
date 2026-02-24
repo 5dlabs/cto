@@ -10,7 +10,7 @@ agent:
   id: "committee-3"
   name: "Committee-3"
   model: "minimax/MiniMax-M2.5"
-  heartbeat: "off"
+  heartbeat: "87600h"  # effectively off — wakes via NATS only
   sandbox: "off"
   fallbacks:
     - "anthropic/claude-sonnet-4-6"

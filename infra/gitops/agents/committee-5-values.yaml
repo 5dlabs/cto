@@ -10,7 +10,7 @@ agent:
   id: "committee-5"
   name: "Committee-5"
   model: "openai/gpt-5.3"
-  heartbeat: "off"
+  heartbeat: "87600h"  # effectively off — wakes via NATS only
   sandbox: "off"
   fallbacks:
     - "anthropic/claude-sonnet-4-6"
