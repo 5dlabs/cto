@@ -8,17 +8,6 @@ global:
 
 agent:
   id: "pessimist"
-  messaging:
-    discord:
-      enabled: true
-      tokenSecretKey: "DISCORD_TOKEN_PESSIMIST"
-      allowBots: true
-      guilds:
-        "1409006087331512342":
-          requireMention: false
-          channels:
-            "1471014430065164461":
-              allow: true
   name: "Pessimist"
   model: "openai/gpt-5.3"
   heartbeat: "500h"  # effectively off — ~3 weeks, avoids 32-bit setTimeout overflow
@@ -32,6 +21,19 @@ secrets:
     apiKeysSecret: "openclaw-api-keys"
     messagingSecret: "openclaw-messaging"
     githubSecret: "openclaw-github"
+
+messaging:
+  discord:
+    enabled: true
+    tokenSecretKey: "DISCORD_TOKEN_PESSIMIST"
+    allowBots: true
+    groupPolicy: "allowlist"
+    guilds:
+      "1409006087331512342":
+        requireMention: false
+        channels:
+          "1471014430065164461":
+            allow: true
 
 models:
   providers:
