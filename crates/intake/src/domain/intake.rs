@@ -241,7 +241,7 @@ impl IntakeDomain {
                         reason: e.to_string(),
                     })?;
                 tracing::info!("Using design brief from {:?}", default_brief_path);
-                format!("{brief}\n\n---\n\n## Original PRD\n\n{raw_prd_content}")
+                brief
             } else {
                 tracing::warn!(
                     "deliberate=true but no design brief found at {:?} — \
@@ -260,7 +260,7 @@ impl IntakeDomain {
                         reason: e.to_string(),
                     }
                 })?;
-                format!("{brief}\n\n---\n\n## Original PRD\n\n{raw_prd_content}")
+                brief
             } else {
                 tracing::warn!(
                     "design_brief_path {:?} not found — falling back to raw PRD",

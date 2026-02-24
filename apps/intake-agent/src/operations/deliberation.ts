@@ -327,6 +327,13 @@ export async function runDeliberation(
       }
     }
 
+    // Check if there's enough time remaining for an agent turn
+    // Require at least AGENT_SKIP_TIMEOUT_MS remaining to start a new turn
+    if (remaining < AGENT_SKIP_TIMEOUT_MS) {
+      console.error('[DELIBERATION] Insufficient time remaining for next turn — stopping debate');
+      break;
+    }
+
     // Alternate speakers: optimist goes first
     const nextSpeaker: 'optimist' | 'pessimist' = lastSpeaker === 'optimist' ? 'pessimist' : 'optimist';
 
@@ -398,6 +405,14 @@ export async function runDeliberation(
       const pesPos = pessimistPositions.get(dpId);
 
       if (optPos && pesPos) {
+        // Check if there's enough time remaining for a committee vote
+        const currentRemaining = timeboxMs - (Date.now() - startTime);
+        const voteTimeoutMs = voteTimeoutSeconds * 1000;
+        if (currentRemaining < voteTimeoutMs) {
+          console.error(`[DELIBERATION] Insufficient time remaining for committee vote on ${dpId} — deferring`);
+          continue;
+        }
+
         pendingDecisionPoints.delete(dpId);
         optimistPositions.delete(dpId);
         pessimistPositions.delete(dpId);
