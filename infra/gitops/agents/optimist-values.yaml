@@ -15,24 +15,23 @@ agent:
   fallbacks:
     - "anthropic/claude-sonnet-4-6"
     - "minimax/MiniMax-M2.5"
+  messaging:
+    discord:
+      enabled: true
+      tokenSecretKey: "DISCORD_TOKEN_OPTIMIST"
+      allowBots: true
+      guilds:
+        "1409006087331512342":
+          requireMention: false
+          channels:
+            "1471014430065164461":
+              allow: true
 
 secrets:
   external:
     apiKeysSecret: "openclaw-api-keys"
     messagingSecret: "openclaw-messaging"
     githubSecret: "openclaw-github"
-
-messaging:
-  discord:
-    enabled: true
-    tokenSecretKey: "DISCORD_TOKEN_OPTIMIST"
-    allowBots: true   # must talk to Pessimist bot
-    guilds:
-      "1409006087331512342":
-        requireMention: false
-        channels:
-          "1471014430065164461":
-            allow: true
 
 models:
   providers:
