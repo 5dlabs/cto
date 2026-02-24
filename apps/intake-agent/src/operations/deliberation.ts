@@ -431,7 +431,7 @@ export async function runDeliberation(
 
     // Check for explicit consensus signal (require phrase at sentence boundaries)
     const contentLower = responseContent.toLowerCase();
-    const consensusPattern = /(?:^|[.!?]\s+)(?:i\s+(?:fully\s+)?(?:agree|concede)|you'?re\s+right|we\s+have\s+consensus|i\s+withdraw\s+my\s+objection)(?:[,.\s]|$)/;
+    const consensusPattern = /(?:^|[.!?,]\s+)(?:i\s+(?:fully\s+)?(?:agree|concede)|you'?re\s+right|we\s+have\s+consensus|i\s+withdraw\s+my\s+objection)(?:[,.\s]|$)/;
     if (consensusPattern.test(contentLower)) {
       deliberationStatus = 'consensus';
       break;

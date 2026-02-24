@@ -115,7 +115,7 @@ steps:
       jq -n
         --arg prompt "{{prompts/compile-design-brief-system.md}}"
         --arg prd_content "{{inputs.prd_content}}"
-        --argjson delib_result '${{ steps.conduct-deliberation.output }}'
+        --argjson delib_result "${{ steps.conduct-deliberation.output }}"
         '{
           "prompt": $prompt,
           "input": {
@@ -135,5 +135,5 @@ steps:
     depends_on: [compile-brief]
     command: >
       mkdir -p .tasks/docs &&
-      echo '${{ steps.compile-brief.output }}' > .tasks/docs/design-brief.md &&
+      echo "${{ steps.compile-brief.output }}" > .tasks/docs/design-brief.md &&
       echo "Design brief saved to .tasks/docs/design-brief.md"
