@@ -95,7 +95,13 @@
           "turn": { "type": "integer" },
           "speaker": { "type": "string", "enum": ["optimist", "pessimist"] },
           "content": { "type": "string" },
-          "decision_point_raised": { "type": "string", "description": "Decision ID if this turn raised a decision" },
+          "decision_point_raised": { 
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ],
+            "description": "Decision ID(s) if this turn raised or resolved decision(s)"
+          },
           "timestamp": { "type": "string", "format": "date-time" }
         },
         "required": ["turn", "speaker", "content", "timestamp"]

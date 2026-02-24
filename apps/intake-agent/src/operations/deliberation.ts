@@ -450,8 +450,9 @@ export async function runDeliberation(
   }
   
   // Check if any escalated decision points should flip status to 'escalated'
+  // Only override if the session completed normally (not timeout or consensus)
   const hasEscalated = resolvedDecisionPoints.some(d => d.escalated);
-  if (hasEscalated) {
+  if (hasEscalated && deliberationStatus === 'completed') {
     deliberationStatus = 'escalated';
   }
 
