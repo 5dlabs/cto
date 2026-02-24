@@ -126,6 +126,16 @@ pub struct IntakeConfig {
     /// Whether to auto-append a deploy task after all other tasks.
     /// When enabled, a Bolt deploy task is added that depends on all other tasks.
     pub auto_append_deploy_task: bool,
+
+    /// Whether to run the deliberation phase before PRD parsing.
+    /// When enabled, the Optimist/Pessimist debate runs first and a resolved
+    /// design brief is used as input to parse_prd instead of the raw PRD.
+    /// Feature flag — defaults to false until deliberation agents are deployed.
+    pub deliberate: bool,
+
+    /// Path to a pre-computed design brief (output of deliberation).
+    /// If set and `deliberate` is false, this brief is used directly.
+    pub design_brief_path: Option<PathBuf>,
 }
 
 impl Default for IntakeConfig {
@@ -145,6 +155,8 @@ impl Default for IntakeConfig {
             docs_repository: None,
             docs_project_directory: None,
             auto_append_deploy_task: false,
+            deliberate: false,
+            design_brief_path: None,
         }
     }
 }
@@ -206,12 +218,59 @@ impl IntakeDomain {
         ));
 
         // 1. Read PRD content
-        let prd_content = tokio::fs::read_to_string(&config.prd_path)
+        let raw_prd_content = tokio::fs::read_to_string(&config.prd_path)
             .await
             .map_err(|e| TasksError::FileReadError {
                 path: config.prd_path.display().to_string(),
                 reason: e.to_string(),
             })?;
+
+        // 1a. Deliberation phase (feature-flagged).
+        // When enabled, run the Optimist/Pessimist debate and use the
+        // resulting design brief as the primary context for task generation.
+        // Falls back to the raw PRD if deliberation is disabled or the brief
+        // is not available.
+        let prd_content = if config.deliberate {
+            // Deliberation is enabled — check for a brief that was produced in this run
+            let default_brief_path = config.output_dir.join("docs/design-brief.md");
+            if default_brief_path.exists() {
+                let brief = tokio::fs::read_to_string(&default_brief_path)
+                    .await
+                    .map_err(|e| TasksError::FileReadError {
+                        path: default_brief_path.display().to_string(),
+                        reason: e.to_string(),
+                    })?;
+                tracing::info!("Using design brief from {:?}", default_brief_path);
+                brief
+            } else {
+                tracing::warn!(
+                    "deliberate=true but no design brief found at {:?} — \
+                     run the deliberation workflow first, or call the intake \
+                     agent with the brief pre-populated. Falling back to raw PRD.",
+                    default_brief_path
+                );
+                raw_prd_content.clone()
+            }
+        } else if let Some(ref brief_path) = config.design_brief_path {
+            // Deliberation disabled but pre-computed brief supplied — use it as override
+            if brief_path.exists() {
+                let brief = tokio::fs::read_to_string(brief_path).await.map_err(|e| {
+                    TasksError::FileReadError {
+                        path: brief_path.display().to_string(),
+                        reason: e.to_string(),
+                    }
+                })?;
+                brief
+            } else {
+                tracing::warn!(
+                    "design_brief_path {:?} not found — falling back to raw PRD",
+                    brief_path
+                );
+                raw_prd_content.clone()
+            }
+        } else {
+            raw_prd_content.clone()
+        };
 
         // 2. Read architecture content if provided
         let architecture_content = if let Some(arch_path) = &config.architecture_path {

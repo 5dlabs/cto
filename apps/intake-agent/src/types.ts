@@ -20,6 +20,7 @@ export type Operation =
   | 'generate_with_critic'
   | 'validate_content'
   | 'provider_status'
+  | 'deliberate'
   | 'ping';
 
 /**
@@ -337,7 +338,86 @@ export function validateRequest(request: unknown): request is AgentRequest {
       'validate_content',
       'generate_docs',
       'provider_status',
+      'deliberate',
       'ping',
     ].includes(req['operation'] as string)
   );
+}
+
+// =============================================================================
+// Deliberation Types
+// =============================================================================
+
+/**
+ * Payload for the deliberate operation.
+ */
+export interface DeliberatePayload {
+  /** Unique session identifier (UUID) */
+  session_id: string;
+  /** Full PRD markdown content */
+  prd_content: string;
+  /** Maximum deliberation time in minutes */
+  timebox_minutes?: number;
+  /** Available cluster operators/services (injected context) */
+  infrastructure_context?: string;
+  /** Committee member agent IDs */
+  committee_ids?: string[];
+  /** Seconds to wait for each committee vote before marking abstain */
+  vote_timeout_seconds?: number;
+}
+
+/**
+ * A single turn in the debate log.
+ */
+export interface DebateTurn {
+  turn: number;
+  speaker: 'optimist' | 'pessimist';
+  content: string;
+  decision_point_raised?: string | string[];
+  timestamp: string;
+}
+
+/**
+ * A committee member's vote on a decision point.
+ */
+export interface CommitteeVote {
+  voter_id: string;
+  chosen_option: string;
+  confidence: number;
+  reasoning: string;
+  concerns: string[];
+  timestamp?: string;
+}
+
+/**
+ * A single decision point raised during deliberation.
+ * Renamed to avoid collision with the task-level DecisionPoint type.
+ */
+export interface DeliberationDecisionPoint {
+  id: string;
+  question: string;
+  category: 'architecture' | 'error-handling' | 'data-model' | 'api-design' | 'ux-behavior' | 'performance' | 'security' | 'technology-choice' | 'infrastructure';
+  options: string[];
+  raised_by: 'optimist' | 'pessimist' | 'intake';
+  votes: CommitteeVote[];
+  vote_tally: Record<string, number>;
+  winning_option?: string;
+  consensus_strength?: number;
+  escalated: boolean;
+}
+
+/**
+ * Full output of a deliberation session.
+ */
+export interface DeliberationResult {
+  session_id: string;
+  prd_hash?: string;
+  started_at: string;
+  completed_at?: string;
+  timebox_minutes: number;
+  debate_turns: number;
+  status: 'completed' | 'timeout' | 'consensus' | 'escalated';
+  decision_points: DeliberationDecisionPoint[];
+  design_brief: string;
+  debate_log: DebateTurn[];
 }

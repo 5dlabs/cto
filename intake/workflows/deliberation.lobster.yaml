@@ -1,0 +1,142 @@
+name: deliberation
+description: >
+  PRD deliberation — Optimist vs Pessimist debate with multi-model committee
+  voting on decision points. Produces a resolved design-brief.md before task
+  generation begins.
+
+inputs:
+  - name: prd_content
+    type: string
+    description: "Full PRD markdown content"
+  - name: prd_path
+    type: string
+    description: "Path to the PRD file (for logging)"
+  - name: timebox_minutes
+    type: number
+    default: 30
+    description: "Maximum deliberation time in minutes"
+  - name: session_id
+    type: string
+    description: "Unique session identifier (UUID)"
+  - name: infrastructure_context
+    type: string
+    default: ""
+    description: "Available operators and services (injected from cluster state)"
+
+outputs:
+  - name: design_brief
+    type: string
+    description: "Resolved design brief markdown — feeds into parse-prd"
+  - name: deliberation_result
+    type: object
+    description: "Full DeliberationResult JSON for audit logging"
+
+steps:
+  # ─────────────────────────────────────────────────────────
+  # Step 1: Broadcast PRD to both debate agents simultaneously
+  # ─────────────────────────────────────────────────────────
+  - name: broadcast-prd
+    description: "Send PRD + infra context to optimist and pessimist in parallel"
+    parallel: true
+    commands:
+      - name: notify-optimist
+        command: >
+          jq -n
+            --arg session_id "{{inputs.session_id}}"
+            --arg prd_content "{{inputs.prd_content}}"
+            --arg infra_context "{{inputs.infrastructure_context}}"
+            --argjson timebox {{inputs.timebox_minutes}}
+            '{
+              "subject": "agent.optimist.inbox",
+              "message": {
+                "type": "deliberation_start",
+                "session_id": $session_id,
+                "prd_content": $prd_content,
+                "infrastructure_context": $infra_context,
+                "timebox_minutes": $timebox,
+                "your_role": "optimist",
+                "opponent_id": "pessimist"
+              }
+            }' | xargs -0 openclaw.invoke --tool nats-publish --args-json
+      - name: notify-pessimist
+        command: >
+          jq -n
+            --arg session_id "{{inputs.session_id}}"
+            --arg prd_content "{{inputs.prd_content}}"
+            --arg infra_context "{{inputs.infrastructure_context}}"
+            --argjson timebox {{inputs.timebox_minutes}}
+            '{
+              "subject": "agent.pessimist.inbox",
+              "message": {
+                "type": "deliberation_start",
+                "session_id": $session_id,
+                "prd_content": $prd_content,
+                "infrastructure_context": $infra_context,
+                "timebox_minutes": $timebox,
+                "your_role": "pessimist",
+                "opponent_id": "optimist"
+              }
+            }' | xargs -0 openclaw.invoke --tool nats-publish --args-json
+
+  # ─────────────────────────────────────────────────────────
+  # Step 2: Conduct the time-boxed debate
+  # Intake listens on its NATS inbox for turns and decision points.
+  # When a decision_point message arrives, committee votes are triggered.
+  # NOTE: Timeout includes 10-minute buffer beyond internal timebox to allow
+  # for in-flight agent requests (5min), committee votes (2min), and post-loop
+  # processing, preventing premature termination during final iteration.
+  # ─────────────────────────────────────────────────────────
+  - name: conduct-deliberation
+    description: "Run conductor loop for timebox_minutes, collecting turns and votes"
+    depends_on: [broadcast-prd]
+    timeout: "{{inputs.timebox_minutes + 10}}m"
+    command: >
+      jq -n
+        --arg session_id "{{inputs.session_id}}"
+        --arg prd_content "{{inputs.prd_content}}"
+        --arg infra_context "{{inputs.infrastructure_context}}"
+        --argjson timebox {{inputs.timebox_minutes}}
+        '{
+          "operation": "deliberate",
+          "payload": {
+            "session_id": $session_id,
+            "prd_content": $prd_content,
+            "infrastructure_context": $infra_context,
+            "timebox_minutes": $timebox,
+            "vote_timeout_seconds": 120,
+            "committee_ids": ["committee-1", "committee-2", "committee-3", "committee-4", "committee-5"]
+          }
+        }' | intake-agent
+
+  # ─────────────────────────────────────────────────────────
+  # Step 3: Compile resolved decisions into a design brief
+  # ─────────────────────────────────────────────────────────
+  - name: compile-brief
+    description: "Synthesize deliberation result + original PRD into design-brief.md"
+    depends_on: [conduct-deliberation]
+    command: >
+      jq -n
+        --arg prompt "{{prompts/compile-design-brief-system.md}}"
+        --arg prd_content "{{inputs.prd_content}}"
+        --argjson delib_result "${{ steps.conduct-deliberation.output }}"
+        '{
+          "prompt": $prompt,
+          "input": {
+            "deliberation_result": $delib_result,
+            "prd_content": $prd_content
+          },
+          "provider": "anthropic",
+          "model": "claude-opus-4-20250514",
+          "temperature": 0.2
+        }' | xargs -0 openclaw.invoke --tool llm-task --action text --args-json
+
+  # ─────────────────────────────────────────────────────────
+  # Step 4: Save design brief to .tasks/docs/design-brief.md
+  # ─────────────────────────────────────────────────────────
+  - name: save-brief
+    description: "Persist design brief for audit trail and downstream pipeline"
+    depends_on: [compile-brief]
+    command: >
+      mkdir -p .tasks/docs &&
+      echo "${{ steps.compile-brief.output }}" > .tasks/docs/design-brief.md &&
+      echo "Design brief saved to .tasks/docs/design-brief.md"

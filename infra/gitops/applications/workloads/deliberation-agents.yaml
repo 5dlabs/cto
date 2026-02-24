@@ -1,0 +1,89 @@
+---
+# =============================================================================
+# CTO Deliberation Agents — ArgoCD ApplicationSet
+# =============================================================================
+# Deploys the intake deliberation system agents:
+#   - optimist:     Claude Opus 4.6 (Bedrock) — advocates for ambitious approaches
+#   - pessimist:    GPT-5.3 — devil's advocate, finds failure modes
+#   - committee-1..5: Multi-provider voting panel for design decisions
+#
+# These are NATS-only agents (no Discord) that participate in the deliberation
+# phase before PRD task generation. They live in CTO because they are tightly
+# coupled to the intake pipeline, not to the general openclaw platform.
+#
+# Chart:   5dlabs/openclaw-platform → charts/openclaw
+# Values:  5dlabs/cto → infra/gitops/agents/{name}-values.yaml
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cto-deliberation-agents
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cto-deliberation-agents
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: intake-deliberation
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=zero"]
+
+  generators:
+    - list:
+        elements:
+          - name: optimist
+          - name: pessimist
+          - name: committee-1
+          - name: committee-2
+          - name: committee-3
+          - name: committee-4
+          - name: committee-5
+
+  template:
+    metadata:
+      name: 'cto-deliberation-{{ .name }}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: 'cto-deliberation-{{ .name }}'
+        app.kubernetes.io/part-of: cto-platform
+        app.kubernetes.io/component: intake-deliberation
+
+    spec:
+      project: default
+
+      # Two sources:
+      #   1. openclaw-platform chart (the Helm chart with workspace.files support)
+      #   2. CTO repo (agent-specific values files)
+      sources:
+        - repoURL: https://github.com/5dlabs/openclaw-platform
+          targetRevision: main
+          path: charts/openclaw
+          helm:
+            releaseName: 'cto-deliberation-{{ .name }}'
+            valueFiles:
+              - $cto/infra/gitops/agents/{{ .name }}-values.yaml
+
+        - repoURL: https://github.com/5dlabs/cto
+          targetRevision: main
+          ref: cto
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: openclaw
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true
+        retry:
+          limit: 5
+          backoff:
+            duration: "5s"
+            factor: 2
+            maxDuration: "3m"
