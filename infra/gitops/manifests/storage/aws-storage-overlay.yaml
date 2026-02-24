@@ -26,3 +26,23 @@ provisioner: rancher.io/local-path
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: false
+
+---
+# gp3 StorageClass alias — same pattern as mayastor above.
+# openclaw-platform and other upstream charts hardcode storageClassName: gp3 (AWS EBS).
+# Aliased to local-path so those charts work on OVH without modification.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  labels:
+    app.kubernetes.io/name: gp3-overlay
+    app.kubernetes.io/part-of: platform
+  annotations:
+    platform.5dlabs.io/overlay: "true"
+    platform.5dlabs.io/reason: "local-path alias for gp3 (AWS EBS) on OVH"
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: rancher.io/local-path
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: false

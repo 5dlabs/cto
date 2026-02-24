@@ -24,7 +24,15 @@ secrets:
 
 messaging:
   discord:
-    enabled: false  # NATS-only agent — no Discord presence
+    enabled: true
+    tokenSecretKey: "DISCORD_TOKEN_PESSIMIST"
+    allowBots: true   # must talk to Optimist bot
+    guilds:
+      "1409006087331512342":
+        requireMention: false
+        channels:
+          "1471014430065164461":
+            allow: true
 
 models:
   providers:
