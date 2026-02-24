@@ -82,11 +82,14 @@ steps:
   # Step 2: Conduct the time-boxed debate
   # Intake listens on its NATS inbox for turns and decision points.
   # When a decision_point message arrives, committee votes are triggered.
+  # NOTE: Timeout includes 10-minute buffer beyond internal timebox to allow
+  # for in-flight agent requests (5min), committee votes (2min), and post-loop
+  # processing, preventing premature termination during final iteration.
   # ─────────────────────────────────────────────────────────
   - name: conduct-deliberation
     description: "Run conductor loop for timebox_minutes, collecting turns and votes"
     depends_on: [broadcast-prd]
-    timeout: "{{inputs.timebox_minutes}}m"
+    timeout: "{{inputs.timebox_minutes + 10}}m"
     command: >
       jq -n
         --arg session_id "{{inputs.session_id}}"

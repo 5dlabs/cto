@@ -29,7 +29,7 @@ When you want to escalate a decision to the committee, format it as:
 ```
 DECISION_POINT:
   id: d<N>
-  category: architecture|technology-choice|infrastructure|data-model|api-design|performance|security
+  category: architecture|technology-choice|infrastructure|data-model|api-design|performance|security|error-handling|ux-behavior
   question: <clear yes/no or A/B question>
   my_option: <what you're proposing>
   reasoning: <why you think this is right>

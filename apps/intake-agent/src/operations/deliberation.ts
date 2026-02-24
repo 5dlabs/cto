@@ -283,6 +283,7 @@ export async function runDeliberation(
   const pendingDecisionPoints = new Map<string, ParsedDecisionPoint>();
 
   let turnCount = 0;
+  let timeoutCount = 0;
   let deliberationStatus: DeliberationResult['status'] | undefined = undefined;
   let softWarningEmitted = false;
 
@@ -349,6 +350,7 @@ export async function runDeliberation(
       );
     } catch {
       console.error(`[DELIBERATION] ${nextSpeaker} timed out on turn ${turnCount + 1} — skipping turn and continuing`);
+      timeoutCount++;
       // Skip this turn and continue with a synthetic "no response" message
       lastSpeaker = nextSpeaker;
       lastContent = `[Agent ${nextSpeaker} did not respond within the timeout period]`;
@@ -465,8 +467,14 @@ export async function runDeliberation(
 
   // Assign final status based on how the deliberation ended
   if (!deliberationStatus) {
-    // Natural timebox expiry (no explicit timeout or consensus)
-    deliberationStatus = 'completed';
+    // Check if agents were largely unresponsive (majority of turns timed out)
+    // If more than half of the turns timed out, mark as 'timeout' instead of 'completed'
+    if (turnCount > 0 && timeoutCount > turnCount / 2) {
+      deliberationStatus = 'timeout';
+    } else {
+      // Natural timebox expiry with responsive agents
+      deliberationStatus = 'completed';
+    }
   }
   
   // Check if any escalated decision points should flip status to 'escalated'
