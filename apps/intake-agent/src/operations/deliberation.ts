@@ -16,7 +16,7 @@ import { createHash, randomUUID } from 'crypto';
 import type {
   DeliberatePayload,
   DeliberationResult,
-  DecisionPoint,
+  DeliberationDecisionPoint,
   CommitteeVote,
   DebateTurn,
 } from '../types';
@@ -126,11 +126,11 @@ function parseDecisionPoints(content: string, speaker: 'optimist' | 'pessimist')
 
   while ((match = DECISION_POINT_REGEX.exec(content)) !== null) {
     points.push({
-      id: match[1].trim(),
-      category: match[2].trim(),
-      question: match[3].trim(),
-      proposingOption: match[4].trim(),
-      reasoning: match[5].trim(),
+      id: (match[1] ?? '').trim(),
+      category: (match[2] ?? '').trim(),
+      question: (match[3] ?? '').trim(),
+      proposingOption: (match[4] ?? '').trim(),
+      reasoning: (match[5] ?? '').trim(),
       raisedBy: speaker,
     });
   }
@@ -150,7 +150,7 @@ async function conductCommitteeVote(
   prdContext: string,
   committeeIds: string[],
   voteTimeoutSeconds: number
-): Promise<DecisionPoint> {
+): Promise<DeliberationDecisionPoint> {
   console.error(`[DELIBERATION] Committee vote on ${dp.id}: "${dp.question}"`);
 
   const options = [optimistPosition, pessimistPosition];
@@ -212,7 +212,7 @@ async function conductCommitteeVote(
   const maxVotes = Math.max(...Object.values(tally), 0);
   const winners = Object.entries(tally).filter(([, count]) => count === maxVotes);
   const isTie = winners.length > 1 || nonAbstainVotes.length === 0;
-  const winningOption = isTie ? undefined : winners[0][0];
+  const winningOption = isTie ? undefined : winners[0]?.[0];
   const consensusStrength = nonAbstainVotes.length > 0
     ? maxVotes / nonAbstainVotes.length
     : 0;
@@ -224,7 +224,7 @@ async function conductCommitteeVote(
   return {
     id: dp.id,
     question: dp.question,
-    category: dp.category as DecisionPoint['category'],
+    category: dp.category as DeliberationDecisionPoint['category'],
     options,
     raised_by: dp.raisedBy,
     votes,
@@ -252,7 +252,7 @@ export async function runDeliberation(
   const nats = await getNatsClient();
 
   const debateLog: DebateTurn[] = [];
-  const resolvedDecisionPoints: DecisionPoint[] = [];
+  const resolvedDecisionPoints: DeliberationDecisionPoint[] = [];
   const pendingDecisionPoints = new Map<string, ParsedDecisionPoint>();
 
   let turnCount = 0;
@@ -380,8 +380,9 @@ export async function runDeliberation(
         resolvedDecisionPoints.push(resolved);
 
         // Update debate log entry with decision point reference
-        if (debateLog.length > 0) {
-          debateLog[debateLog.length - 1].decision_point_raised = dpId;
+        const lastEntry = debateLog[debateLog.length - 1];
+        if (lastEntry) {
+          lastEntry.decision_point_raised = dpId;
         }
 
         // Broadcast vote result back to both agents
@@ -473,7 +474,7 @@ export async function runDeliberation(
 
 function compileBasicBrief(
   _prdContent: string,
-  decisions: DecisionPoint[],
+  decisions: DeliberationDecisionPoint[],
   _log: DebateTurn[],
   status: string
 ): string {

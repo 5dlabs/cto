@@ -391,8 +391,9 @@ export interface CommitteeVote {
 
 /**
  * A single decision point raised during deliberation.
+ * Renamed to avoid collision with the task-level DecisionPoint type.
  */
-export interface DecisionPoint {
+export interface DeliberationDecisionPoint {
   id: string;
   question: string;
   category: 'architecture' | 'error-handling' | 'data-model' | 'api-design' | 'ux-behavior' | 'performance' | 'security' | 'technology-choice' | 'infrastructure';
@@ -416,7 +417,7 @@ export interface DeliberationResult {
   timebox_minutes: number;
   debate_turns: number;
   status: 'completed' | 'timeout' | 'consensus' | 'escalated';
-  decision_points: DecisionPoint[];
+  decision_points: DeliberationDecisionPoint[];
   design_brief: string;
   debate_log: DebateTurn[];
 }
