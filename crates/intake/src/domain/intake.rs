@@ -254,7 +254,10 @@ impl IntakeDomain {
             if default_brief_path.exists() {
                 let brief = tokio::fs::read_to_string(&default_brief_path)
                     .await
-                    .unwrap_or_default();
+                    .map_err(|e| TasksError::FileReadError {
+                        path: default_brief_path.display().to_string(),
+                        reason: e.to_string(),
+                    })?;
                 tracing::info!("Using design brief from {:?}", default_brief_path);
                 format!("{brief}\n\n---\n\n## Original PRD\n\n{raw_prd_content}")
             } else {

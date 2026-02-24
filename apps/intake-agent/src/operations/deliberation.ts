@@ -36,7 +36,6 @@ const DEFAULT_COMMITTEE_IDS = [
   'committee-5',
 ];
 const SOFT_WARNING_RATIO = 0.8; // Send warning when 80% of timebox elapsed
-const AGENT_RESPONSE_TIMEOUT_MS = 3 * 60 * 1000; // 3 min nudge, 5 min skip
 const AGENT_SKIP_TIMEOUT_MS = 5 * 60 * 1000;
 
 // =============================================================================
@@ -257,7 +256,7 @@ export async function runDeliberation(
   const pendingDecisionPoints = new Map<string, ParsedDecisionPoint>();
 
   let turnCount = 0;
-  let deliberationStatus: DeliberationResult['status'] = 'timeout';
+  let deliberationStatus: DeliberationResult['status'] | undefined = undefined;
   let softWarningEmitted = false;
 
   // Positions tracked for each decision point
@@ -415,11 +414,14 @@ export async function runDeliberation(
     lastContent = responseContent;
   }
 
-  // Check if any escalated decision points should flip status
-  const hasEscalated = resolvedDecisionPoints.some(d => d.escalated);
-  if (deliberationStatus !== 'consensus' && deliberationStatus !== 'timeout') {
+  // Assign final status based on how the deliberation ended
+  if (!deliberationStatus) {
+    // Natural timebox expiry (no explicit timeout or consensus)
     deliberationStatus = 'completed';
   }
+  
+  // Check if any escalated decision points should flip status to 'escalated'
+  const hasEscalated = resolvedDecisionPoints.some(d => d.escalated);
   if (hasEscalated && deliberationStatus === 'completed') {
     deliberationStatus = 'escalated';
   }
