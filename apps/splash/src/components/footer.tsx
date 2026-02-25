@@ -8,6 +8,8 @@ const footerLinks = [
     links: [
       { name: "CTO Platform", href: "https://cto.5dlabs.ai" },
       { name: "Agentic Trading", href: "/#ventures" },
+      { name: "OpenClaw Platform", href: "https://github.com/5dlabs/openclaw-platform" },
+      { name: "Sanctuary", href: "/#ventures" },
     ],
   },
   {
@@ -23,7 +25,7 @@ const footerLinks = [
     title: "Connect",
     links: [
       { name: "GitHub", href: "https://github.com/5dlabs" },
-      { name: "Discord", href: "https://discord.gg/5dlabs" },
+      { name: "Discord", href: "https://discord.gg/r334tFP87Y" },
       { name: "X / Twitter", href: "https://x.com/5dlabs" },
       { name: "YouTube", href: "https://youtube.com/@5dlabs" },
     ],
@@ -39,7 +41,7 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Image
               src="/5dlabs-logo-header-v2.png"
-              alt="5D Labs"
+              alt="5D Labs — OpenClaw-first AI startup studio logo"
               width={120}
               height={120}
               className="opacity-90 mb-4"
@@ -79,10 +81,12 @@ export function Footer() {
             &copy; {new Date().getFullYear()} 5D Labs. Building the future in parallel.
           </p>
           <a
-            href="mailto:hello@5dlabs.ai"
+            href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-sm text-cyan hover:text-cyan/80 transition-colors"
           >
-            hello@5dlabs.ai
+            Schedule a Call
           </a>
         </div>
       </div>

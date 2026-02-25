@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { RainEffect } from "@/components/rain-effect";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { WaitlistForm } from "@/components/waitlist-form";
 
 const expertise = [
   {
@@ -267,18 +268,12 @@ export default function ConsultingPage() {
               className="flex flex-col sm:flex-row justify-center gap-4"
             >
               <a
-                href="mailto:hello@5dlabs.ai?subject=Consulting%20Inquiry"
+                href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
               >
                 Schedule a Discovery Call
-              </a>
-              <a
-                href="https://resume.jonathonfritz.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all"
-              >
-                View Resume
               </a>
             </motion.div>
           </div>
@@ -494,27 +489,6 @@ export default function ConsultingPage() {
               ))}
             </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="text-center"
-            >
-              <p className="text-muted-foreground mb-4">
-                Previously: Head of Infrastructure at Pocket Network, SRE at
-                Blocknative, CTO at Coinmiles. Building in blockchain and
-                infrastructure since 2018.
-              </p>
-              <a
-                href="https://resume.jonathonfritz.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-cyan hover:text-cyan/80 transition-colors font-medium"
-              >
-                View full resume &rarr;
-              </a>
-            </motion.div>
           </div>
         </section>
 
@@ -534,21 +508,20 @@ export default function ConsultingPage() {
               Every engagement begins with a complimentary 30-minute discovery
               call to understand your needs and scope the work.
             </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <a
-                href="mailto:hello@5dlabs.ai?subject=Consulting%20Inquiry"
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
-              >
-                Schedule a Discovery Call
-              </a>
-              <a
-                href="https://github.com/5dlabs"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all"
-              >
-                View on GitHub
-              </a>
+            <a
+              href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105 mb-10"
+            >
+              Schedule a Discovery Call
+            </a>
+
+            <div className="border-t border-border/30 pt-8">
+              <p className="text-sm text-muted-foreground mb-4">
+                Not ready for a call? Leave your email and we&apos;ll follow up.
+              </p>
+              <WaitlistForm source="consulting" compact />
             </div>
           </motion.div>
         </section>
