@@ -38,6 +38,14 @@ export const metadata: Metadata = {
     "blockchain",
     "machine learning",
     "artificial intelligence",
+    "AI consulting",
+    "blockchain consulting",
+    "Solana development",
+    "Kubernetes consulting",
+    "DevOps consulting",
+    "infrastructure consulting",
+    "Rust development",
+    "platform engineering",
   ],
   authors: [{ name: "5D Labs", url: "https://5dlabs.ai" }],
   creator: "5D Labs",
@@ -139,6 +147,29 @@ const jsonLd = {
       author: {
         "@id": "https://5dlabs.ai/#organization",
       },
+    },
+    {
+      "@type": "ProfessionalService",
+      "@id": "https://5dlabs.ai/consulting/#service",
+      name: "5D Labs Consulting",
+      description:
+        "Expert consulting for AI agent systems, blockchain and Solana development, Kubernetes infrastructure, and DevOps.",
+      provider: {
+        "@id": "https://5dlabs.ai/#organization",
+      },
+      serviceType: [
+        "AI Agent Consulting",
+        "Blockchain Consulting",
+        "Solana Development",
+        "Kubernetes Consulting",
+        "DevOps Consulting",
+      ],
+      areaServed: {
+        "@type": "Country",
+        name: "US",
+      },
+      url: "https://5dlabs.ai/consulting/",
+      priceRange: "$225-$3500/mo",
     },
   ],
 };
