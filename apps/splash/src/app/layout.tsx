@@ -297,6 +297,12 @@ export default function RootLayout({
         <link rel="llms" href="/llms.txt" />
         <link rel="llms-full" href="/llms-full.txt" />
         <meta name="llms-txt" content="/llms.txt" />
+        <script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="da83813e-ccdc-4b94-944a-66f476db85ef"
+          data-domains="5dlabs.ai"
+        />
       </head>
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}

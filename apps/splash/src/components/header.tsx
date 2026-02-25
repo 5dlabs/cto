@@ -94,6 +94,7 @@ export function Header() {
               rel="noopener noreferrer"
               className="flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-white/[0.06] transition-all"
               aria-label={s.name}
+              data-umami-event={`header-social-${s.name.toLowerCase()}`}
             >
               {s.icon}
             </a>

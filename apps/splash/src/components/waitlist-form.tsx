@@ -43,10 +43,14 @@ export function WaitlistForm({
         return;
       }
 
-      setStatus(data.alreadyOnList ? "exists" : "success");
-      if (!data.alreadyOnList) {
+      const isNew = !data.alreadyOnList;
+      setStatus(isNew ? "success" : "exists");
+      if (isNew) {
         setEmail("");
         setName("");
+      }
+      if (typeof window !== "undefined" && window.umami) {
+        window.umami.track(`waitlist-signup-${source}`, { new: isNew });
       }
     } catch {
       setStatus("error");

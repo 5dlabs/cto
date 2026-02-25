@@ -65,6 +65,7 @@ export function Footer() {
                       target={link.href.startsWith("http") ? "_blank" : undefined}
                       rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-umami-event={`footer-${group.title.toLowerCase()}-${link.name.toLowerCase().replace(/[\s\/]/g, "-")}`}
                     >
                       {link.name}
                     </a>
@@ -85,6 +86,7 @@ export function Footer() {
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-cyan hover:text-cyan/80 transition-colors"
+            data-umami-event="footer-schedule-call"
           >
             Schedule a Call
           </a>

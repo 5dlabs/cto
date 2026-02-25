@@ -88,27 +88,27 @@ const rates = [
   {
     name: "Hourly Advisory",
     price: "$225",
-    unit: "/ hour",
+    unit: "USD / hour",
     details: "Ad-hoc consulting, architecture guidance, troubleshooting. 1-hour minimum.",
   },
   {
     name: "Daily Intensive",
     price: "$1,600",
-    unit: "/ day",
+    unit: "USD / day",
     details: "Full-day working sessions. Ideal for workshops, hands-on setup, or team training.",
   },
   {
     name: "Monthly Retainer",
     price: "$3,500",
-    unit: "/ month",
+    unit: "USD / month",
     details: "~20 hours included. Dedicated availability, async Slack support, scheduled calls. Overage at $200/hr.",
     recommended: true,
   },
   {
     name: "Fixed-Scope Project",
-    price: "$5,000",
-    unit: "+",
-    details: "Defined deliverables with clear timeline and milestones. Scoped during discovery call.",
+    price: "Custom",
+    unit: "",
+    details: "Defined deliverables with clear timeline and milestones. Scoped during discovery call — pricing based on project complexity.",
   },
 ];
 
@@ -199,12 +199,7 @@ const consultingJsonLd = {
       {
         "@type": "Offer",
         name: "Fixed-Scope Project",
-        priceSpecification: {
-          "@type": "PriceSpecification",
-          minPrice: "5000",
-          priceCurrency: "USD",
-        },
-        description: "Defined deliverables with clear timeline and milestones.",
+        description: "Custom-scoped deliverables with clear timeline and milestones. Pricing based on project complexity.",
       },
     ],
   },
@@ -272,6 +267,7 @@ export default function ConsultingPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
+                data-umami-event="consulting-hero-schedule-call"
               >
                 Schedule a Discovery Call
               </a>
@@ -513,6 +509,7 @@ export default function ConsultingPage() {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105 mb-10"
+              data-umami-event="consulting-cta-schedule-call"
             >
               Schedule a Discovery Call
             </a>

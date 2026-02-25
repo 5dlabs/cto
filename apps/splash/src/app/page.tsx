@@ -538,6 +538,7 @@ export default function Home() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
+                data-umami-event="home-schedule-call"
               >
                 Schedule a Call
               </a>
@@ -546,6 +547,7 @@ export default function Home() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
+                data-umami-event="home-view-github"
               >
                 View on GitHub
               </a>
