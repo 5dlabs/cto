@@ -4,6 +4,9 @@ export const metadata: Metadata = {
   title: "Jonathon Fritz — Founder & CEO | 5D Labs",
   description:
     "Meet Jonathon Fritz, founder of 5D Labs. 15+ years building production systems across AI, blockchain, Kubernetes, and trading. Building the future of AI-native startups with OpenClaw.",
+  alternates: {
+    canonical: "/founder/",
+  },
   openGraph: {
     title: "Jonathon Fritz — Founder & CEO | 5D Labs",
     description:

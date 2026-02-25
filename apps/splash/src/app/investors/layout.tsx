@@ -4,6 +4,9 @@ export const metadata: Metadata = {
   title: "Investor Relations | 5D Labs — AI-Native Startup Studio",
   description:
     "5D Labs is raising its first round. 5+ active ventures powered by 13 AI agents, 60-80% infrastructure cost savings, and OpenClaw orchestration. See our thesis, portfolio, and key metrics.",
+  alternates: {
+    canonical: "/investors/",
+  },
   openGraph: {
     title: "Investor Relations | 5D Labs",
     description:

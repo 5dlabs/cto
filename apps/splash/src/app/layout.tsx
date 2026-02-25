@@ -52,7 +52,7 @@ export const metadata: Metadata = {
   publisher: "5D Labs",
   metadataBase: new URL("https://5dlabs.ai"),
   alternates: {
-    canonical: "https://5dlabs.ai",
+    canonical: "/",
   },
   openGraph: {
     title: "5D Labs | OpenClaw-First AI Startup Studio",
