@@ -58,8 +58,19 @@ Our open-source agent orchestration platform. It coordinates AI agents across:
 - X/Twitter: https://x.com/5dlabs
 - YouTube: https://youtube.com/@5dlabs
 
+## Consulting Services
+
+Jonathon Fritz / 5D Labs offers expert consulting in AI agent systems, blockchain (Solana, Base, Near, Ethereum), Kubernetes infrastructure, and DevOps.
+
+- Expertise: OpenClaw, multi-agent AI, Solana, DeFi trading systems, bare-metal Kubernetes, Rust, security
+- Rates: $225/hr, $3,500/mo retainer, fixed-scope from $5,000 (all USD)
+- Resume: https://resume.jonathonfritz.com
+- Contact: hello@5dlabs.ai
+- Page: https://5dlabs.ai/consulting/
+
 ## Contact
 
 - General: hello@5dlabs.ai
+- Consulting: https://5dlabs.ai/consulting/
 - Investor Inquiries: https://5dlabs.ai/investors/
 - GitHub: https://github.com/5dlabs

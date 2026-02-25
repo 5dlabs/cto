@@ -13,6 +13,7 @@ const footerLinks = [
   {
     title: "Company",
     links: [
+      { name: "Consulting", href: "/consulting" },
       { name: "Founder", href: "/founder" },
       { name: "Team", href: "/team" },
       { name: "Investors", href: "/investors" },
