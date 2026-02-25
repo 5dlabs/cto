@@ -183,6 +183,13 @@ const consultingJsonLd = {
       },
       {
         "@type": "Offer",
+        name: "Daily Intensive",
+        price: "1600",
+        priceCurrency: "USD",
+        description: "Full-day working sessions for workshops, hands-on setup, or team training.",
+      },
+      {
+        "@type": "Offer",
         name: "Monthly Retainer",
         price: "3500",
         priceCurrency: "USD",
