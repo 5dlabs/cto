@@ -19,13 +19,13 @@ agent:
 secrets:
   external:
     apiKeysSecret: "openclaw-api-keys"
-    messagingSecret: "openclaw-messaging"
+    messagingSecret: "openclaw-messaging-pessimist"
     githubSecret: "openclaw-github"
 
 messaging:
   discord:
     enabled: true
-    tokenSecretKey: "DISCORD_TOKEN_PESSIMIST"
+    # tokenSecretKey uses default "DISCORD_TOKEN" (matched to env var name)
     allowBots: true
     groupPolicy: "allowlist"
     guilds:

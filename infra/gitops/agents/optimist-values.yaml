@@ -19,7 +19,7 @@ agent:
 messaging:
   discord:
     enabled: true
-    tokenSecretKey: "DISCORD_TOKEN_OPTIMIST"
+    # tokenSecretKey uses default "DISCORD_TOKEN" (matched to env var name)
     allowBots: true
     groupPolicy: "allowlist"
     guilds:
@@ -32,7 +32,7 @@ messaging:
 secrets:
   external:
     apiKeysSecret: "openclaw-api-keys"
-    messagingSecret: "openclaw-messaging"
+    messagingSecret: "openclaw-messaging-optimist"
     githubSecret: "openclaw-github"
 
 models:
