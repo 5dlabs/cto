@@ -194,7 +194,7 @@ function AgentTeamCard({ agent, index, squadIndex }: { agent: Agent; index: numb
           {/* Avatar */}
           <Avatar className="size-16 ring-2 ring-border group-hover:ring-primary/50 transition-all shrink-0">
             {agent.avatar ? (
-              <AvatarImage src={agent.avatar} alt={agent.name} />
+              <AvatarImage src={agent.avatar} alt={`${agent.name} — ${agent.role} AI agent at 5D Labs`} />
             ) : null}
             <AvatarFallback
               className={cn(

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { RainEffect } from "@/components/rain-effect";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { WaitlistForm } from "@/components/waitlist-form";
 
 const highlights = [
   {
@@ -12,9 +13,9 @@ const highlights = [
     description: "Specialized autonomous agents powering our operations",
   },
   {
-    metric: "3+",
+    metric: "5+",
     label: "Active Ventures",
-    description: "Parallel initiatives across AI, crypto, and infrastructure",
+    description: "Parallel initiatives across AI, crypto, open-source tooling, smart home, and infrastructure",
   },
   {
     metric: "3",
@@ -285,50 +286,111 @@ export default function InvestorsPage() {
                   </span>
                 </div>
                 <p className="text-[oklch(0.7_0.25_320)] text-sm font-medium mb-2">
-                  Autonomous Trading Agents on Solana, Base, and Near
+                  HFT-Grade Autonomous Trading on Solana, Base, and Near
                 </p>
                 <p className="text-muted-foreground">
-                  AI-powered trading agents operating across multiple blockchains.
-                  Leveraging autonomous decision-making to navigate DeFi markets
-                  with speed and precision. Built on the same OpenClaw
-                  orchestration layer as CTO.
+                  Hedge-fund-grade trading technology for individuals. AI-driven
+                  strategy, execution, and risk management operating autonomously
+                  across DeFi markets 24/7. The same speed and precision that Wall
+                  Street uses — now accessible to everyone. Built on the same
+                  OpenClaw orchestration layer as CTO.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <h3 className="text-2xl font-bold">OpenClaw Platform</h3>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
+                    Building
+                  </span>
+                </div>
+                <p className="text-orange-400 text-sm font-medium mb-2">
+                  Open-Source Agent Orchestration for Kubernetes
+                </p>
+                <p className="text-muted-foreground mb-4">
+                  Kubernetes-native platform for deploying and managing AI agent
+                  fleets. One-command TUI installer for desktop KinD clusters or
+                  enterprise EKS, with GitOps via ArgoCD, NATS inter-agent messaging,
+                  Grafana observability, and integrated secrets management. Will be
+                  fully open-sourced and free.
+                </p>
+                <a
+                  href="https://github.com/5dlabs/openclaw-platform"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-cyan hover:text-cyan/80 underline underline-offset-4 transition-colors"
+                >
+                  View on GitHub
+                </a>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <h3 className="text-2xl font-bold">Sanctuary</h3>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
+                    Building
+                  </span>
+                </div>
+                <p className="text-emerald-400 text-sm font-medium mb-2">
+                  AI Life Architect for Smart Homes
+                </p>
+                <p className="text-muted-foreground">
+                  A privacy-forward AI system that turns multimodal life signals
+                  into textural orchestration — shaping lighting, sound, temperature,
+                  and microinterventions to improve wellbeing and household flow.
+                  Demonstrates the studio model extending beyond crypto and dev tools.
                 </p>
               </motion.div>
             </div>
           </div>
         </section>
 
-        {/* Contact CTA */}
+        {/* Investor Interest + CTA */}
         <section className="py-20 px-6 border-t border-border/30">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="max-w-2xl mx-auto text-center"
+            className="max-w-2xl mx-auto"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Let&apos;s <span className="gradient-text">Talk</span>
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Interested in our fundraise? We&apos;d love to share our vision,
-              our numbers, and our roadmap.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <WaitlistForm
+              source="investor"
+              heading="Stay Updated on Our Raise"
+              subheading="Drop your email to receive investor updates, pitch deck access, and fundraise milestones."
+            />
+
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
               <a
-                href="mailto:hello@5dlabs.ai"
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
+                href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
               >
-                Contact Us
+                Schedule a Call
               </a>
               <a
                 href="/founder"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all"
+                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
               >
                 Meet the Founder
               </a>
             </div>
-            <p className="text-sm text-muted-foreground mt-6">
+            <p className="text-sm text-muted-foreground mt-6 text-center">
               Pitch deck available upon request.
             </p>
           </motion.div>

@@ -5,6 +5,7 @@ import { RainEffect } from "@/components/rain-effect";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { VentureGrid, type Venture } from "@/components/venture-card";
+import { WaitlistForm } from "@/components/waitlist-form";
 
 const ventures: Venture[] = [
   {
@@ -19,11 +20,30 @@ const ventures: Venture[] = [
   },
   {
     name: "Agentic Trading",
-    tagline: "Autonomous agents on-chain.",
+    tagline: "Your own personal hedge fund.",
     description:
-      "AI-powered trading agents operating across Solana, Base, and Near. Leveraging autonomous decision-making to navigate DeFi markets with speed and precision.",
-    tags: ["Solana", "Base", "Near", "DeFi", "AI Agents"],
+      "HFT-grade autonomous trading agents on Solana, Base, and Near — putting the same technology that powers Wall Street hedge funds into the hands of individuals. AI-driven strategy, execution, and risk management across DeFi markets, 24/7.",
+    tags: ["HFT", "Solana", "Base", "Near", "DeFi", "AI Agents"],
     color: "from-purple-500 to-magenta",
+    status: "building",
+  },
+  {
+    name: "OpenClaw Platform",
+    tagline: "Deploy your own agent swarm.",
+    description:
+      "Open-source Kubernetes-native platform for orchestrating AI agent fleets. One-command install via TUI, runs on desktop KinD clusters or enterprise EKS — with GitOps, NATS messaging, observability, and secrets management built in.",
+    tags: ["Open Source", "Kubernetes", "GitOps", "ArgoCD", "Helm"],
+    color: "from-orange-500 to-amber-500",
+    href: "https://github.com/5dlabs/openclaw-platform",
+    status: "building",
+  },
+  {
+    name: "Sanctuary",
+    tagline: "Your home becomes a supportive director.",
+    description:
+      "A privacy-forward AI Life Architect that turns multimodal life signals — sensors, devices, calendar, purchases — into textural orchestration: shaping your environment, pacing, and microinterventions for wellbeing and household flow.",
+    tags: ["Smart Home", "AI", "IoT", "Wellness", "Privacy-First"],
+    color: "from-emerald-500 to-teal-500",
     status: "building",
   },
   {
@@ -67,7 +87,7 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8"
             >
               <span className="text-sm text-cyan font-semibold tracking-wide">
-                Agentic &middot; On-Chain
+                Agentic &middot; Fully Autonomous &middot; On-Chain
               </span>
             </motion.div>
 
@@ -124,7 +144,7 @@ export default function Home() {
               className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground"
             >
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-foreground">3+</span>
+                <span className="text-2xl font-bold text-foreground">5+</span>
                 <span>ventures in flight</span>
               </div>
               <div className="flex items-center gap-2">
@@ -165,7 +185,7 @@ export default function Home() {
             className="max-w-3xl mx-auto text-center"
           >
             <p className="text-xl sm:text-2xl text-muted-foreground leading-relaxed">
-              Cloud providers love your margins. VCs love your burn rate.
+              One idea. One team. One shot at product-market fit.
               <br className="hidden sm:block" />
               We thought there might be a{" "}
               <span className="text-foreground font-semibold">better way</span>.
@@ -269,8 +289,8 @@ export default function Home() {
                 Our <span className="gradient-text">Ventures</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                From AI engineering platforms to on-chain trading agents — here&apos;s
-                what we&apos;re building.
+                From AI engineering platforms to on-chain trading agents, open-source
+                tooling, and smart homes — here&apos;s what we&apos;re building.
               </p>
             </motion.div>
 
@@ -322,10 +342,11 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Stablecoins &amp; Bitcoin</h3>
+                <h3 className="text-lg font-semibold mb-2">Solana · Base · Near</h3>
                 <p className="text-sm text-muted-foreground">
-                  The foundation of the agent economy. Programmable money that
-                  agents can hold, send, and settle — without intermediaries.
+                  Three chains, one thesis. Solana for raw speed and HFT,
+                  Base for Ethereum-grade composability, Near for AI-native
+                  smart contracts. We&apos;re building where the action is.
                 </p>
               </motion.div>
 
@@ -496,34 +517,35 @@ export default function Home() {
           </div>
         </section>
 
-        {/* CTA Section */}
+        {/* Waitlist + CTA Section */}
         <section className="py-20 px-6 border-t border-border/30">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="max-w-2xl mx-auto text-center"
+            className="max-w-2xl mx-auto"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Let&apos;s <span className="gradient-text">Build Together</span>
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Whether you&apos;re an investor, a builder, or just curious about
-              what we&apos;re doing — we&apos;d love to hear from you.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <WaitlistForm
+              source="waitlist"
+              heading="Stay in the Loop"
+              subheading="Join the waitlist to get early access to OpenClaw Platform, trading tools, and studio updates. No spam, ever."
+            />
+
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
               <a
-                href="mailto:hello@5dlabs.ai"
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
+                href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
               >
-                Get in Touch
+                Schedule a Call
               </a>
               <a
                 href="https://github.com/5dlabs"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all"
+                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
               >
                 View on GitHub
               </a>
