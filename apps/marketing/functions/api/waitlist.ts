@@ -1,11 +1,59 @@
 interface Env {
   DB: D1Database;
+  ATTIO_API_KEY: string;
+}
+
+const ATTIO_BASE = "https://api.attio.com/v2";
+
+async function syncToAttio(email: string, env: Env) {
+  if (!env.ATTIO_API_KEY) return;
+
+  try {
+    const personRes = await fetch(
+      `${ATTIO_BASE}/objects/people/records?matching_attribute=email_addresses`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${env.ATTIO_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          data: {
+            values: {
+              email_addresses: [{ email_address: email }],
+            },
+          },
+        }),
+      }
+    );
+
+    if (!personRes.ok) return;
+
+    const person = (await personRes.json()) as { data: { id: { record_id: string } } };
+    const recordId = person.data.id.record_id;
+
+    await fetch(`${ATTIO_BASE}/lists/waitlist/entries`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.ATTIO_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        data: {
+          parent_object: "people",
+          parent_record_id: recordId,
+          entry_values: {},
+        },
+      }),
+    });
+  } catch (err) {
+    console.error("Attio sync failed (non-blocking):", err);
+  }
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
-  
-  // CORS headers
+
   const headers = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -24,10 +72,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       );
     }
 
-    // Insert into D1
     const result = await env.DB.prepare(
       "INSERT INTO waitlist (email) VALUES (?) ON CONFLICT(email) DO NOTHING RETURNING id"
     ).bind(email).first();
+
+    // Sync to Attio CRM in the background (non-blocking)
+    context.waitUntil(syncToAttio(email, env));
 
     if (result) {
       return new Response(
@@ -35,7 +85,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         { status: 201, headers }
       );
     } else {
-      // Email already exists
       return new Response(
         JSON.stringify({ success: true, message: "Already on waitlist" }),
         { status: 200, headers }
