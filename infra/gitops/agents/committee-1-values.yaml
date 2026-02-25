@@ -19,6 +19,7 @@ secrets:
   external:
     apiKeysSecret: "openclaw-api-keys"
     messagingSecret: "openclaw-messaging"
+    githubSecret: "openclaw-github"
 
 messaging:
   discord:
