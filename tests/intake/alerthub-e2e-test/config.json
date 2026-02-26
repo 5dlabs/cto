@@ -1,13 +1,11 @@
 {
   "service": "prd-alerthub-e2e-test",
+  "project_name": "alerthub",
   "namespace": "cto",
   "repository_url": "https://github.com/5dlabs/alerthub",
+  "primary_model": "claude-sonnet-4-20250514",
   "num_tasks": 30,
   "generate_ai_prompts": true,
-  "model": "claude-sonnet-4-20250514",
   "docs_repository_url": "https://github.com/5dlabs/cto",
-  "docs_project_directory": "tests/intake/alerthub-e2e-test",
-  "agents": [
-    { "id": "morgan", "name": "Morgan", "role": "intake" }
-  ]
+  "docs_project_directory": "tests/intake/alerthub-e2e-test"
 }
