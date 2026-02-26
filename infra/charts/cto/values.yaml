@@ -272,6 +272,9 @@ agent:
     opencode:
       repository: ghcr.io/5dlabs/opencode
       tag: latest
+    research:
+      repository: ghcr.io/5dlabs/research
+      tag: latest
   cliProviders: {}
   agentCliConfigs: {}
   inputBridge:
@@ -323,8 +326,8 @@ pm:
   # Intake workflow configuration
   intake:
     # CLI to use for intake - image is resolved from agent.cliImages[cli]
-    # Options: claude, cursor, codex, gemini, opencode, factory, dexter
-    cli: claude
+    # Options: claude, cursor, codex, gemini, opencode, factory, dexter, research
+    cli: research
     # Model configuration for intake workflows
     # Using Opus 4.5 with extended thinking for complex task generation
     models:
