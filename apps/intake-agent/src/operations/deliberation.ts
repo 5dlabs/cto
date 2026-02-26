@@ -13,6 +13,7 @@
  */
 
 import { createHash, randomUUID } from 'crypto';
+import { connect as natsConnect, StringCodec, type NatsConnection, type Subscription } from 'nats';
 import type {
   DeliberatePayload,
   DeliberationResult,
@@ -56,18 +57,65 @@ interface NatsClient {
 
 /**
  * Resolve the NATS client from the environment.
- * In production this is provided by the OpenClaw runtime.
- * Falls back to a stub that uses the intake-agent's tool invocation.
+ * Priority:
+ *   1. globalThis.__openclaw_nats__ (injected by OpenClaw gateway when running in-process)
+ *   2. NATS_URL or OPENCLAW_NATS_SERVICE_HOST env vars (subprocess/Lobster mode)
+ *   3. Stub (local testing only — no real NATS traffic)
  */
 async function getNatsClient(): Promise<NatsClient> {
   // OpenClaw injects a global NATS client when the agent is running in-pod.
-  // When running in standalone binary mode (testing), we fall back to a stub.
   const globalNats = (globalThis as Record<string, unknown>).__openclaw_nats__;
   if (globalNats) {
     return globalNats as NatsClient;
   }
 
-  // Stub implementation — logs NATS messages to stderr for local testing.
+  // When running as a Lobster subprocess, connect directly to NATS using env vars.
+  // Resolution order:
+  //   1. NATS_URL env var (explicit override)
+  //   2. OPENCLAW_NATS_SERVICE_HOST k8s service env (intake pod on EKS)
+  //   3. nats.messaging.svc.cluster.local (k8s DNS — always works for OVH CodeRun pods)
+  const natsUrl = process.env.NATS_URL
+    ?? (process.env.OPENCLAW_NATS_SERVICE_HOST
+        ? `nats://${process.env.OPENCLAW_NATS_SERVICE_HOST}:${process.env.OPENCLAW_NATS_SERVICE_PORT ?? '4222'}`
+        : 'nats://nats.messaging.svc.cluster.local:4222');
+
+  if (natsUrl) {
+    console.error(`[DELIBERATION] Connecting to NATS at ${natsUrl}`);
+    const nc: NatsConnection = await natsConnect({ servers: natsUrl });
+    const sc = StringCodec();
+    const subscriptions = new Map<string, Subscription>();
+
+    return {
+      async publish(subject: string, message: NatsMessage) {
+        nc.publish(subject, sc.encode(JSON.stringify(message)));
+      },
+      subscribe(subject: string, handler: (msg: NatsMessage) => void) {
+        const sub = nc.subscribe(subject);
+        subscriptions.set(subject, sub);
+        (async () => {
+          for await (const m of sub) {
+            try {
+              handler(JSON.parse(sc.decode(m.data)) as NatsMessage);
+            } catch (e) {
+              console.error('[DELIBERATION] subscribe parse error:', e);
+            }
+          }
+        })();
+        return () => {
+          sub.unsubscribe();
+          subscriptions.delete(subject);
+        };
+      },
+      async request(subject: string, message: NatsMessage, timeoutMs: number): Promise<NatsMessage> {
+        const reply = await nc.request(subject, sc.encode(JSON.stringify(message)), {
+          timeout: timeoutMs,
+        });
+        return JSON.parse(sc.decode(reply.data)) as NatsMessage;
+      },
+    };
+  }
+
+  // Stub implementation — logs NATS messages to stderr for local testing only.
   console.error('[DELIBERATION] NATS client not found — using stub (messages logged only)');
   const handlers: Map<string, ((msg: NatsMessage) => void)[]> = new Map();
 
