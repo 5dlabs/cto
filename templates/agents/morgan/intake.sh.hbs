@@ -415,7 +415,7 @@ intake split-tasks --input "$TASKS_FILE" --output .tasks/tasks 2>&1 || {
 }
 
 # Check if we should run AI-based prompt generation
-GENERATE_AI_PROMPTS="${GENERATE_AI_PROMPTS:-false}"
+GENERATE_AI_PROMPTS="${GENERATE_AI_PROMPTS:-true}"
 if [ "$GENERATE_AI_PROMPTS" = "true" ]; then
     echo "  → Running AI-based prompt generation (Session 2)..."
     # Build MCP args for prompt generation
@@ -440,7 +440,7 @@ if [ "$GENERATE_AI_PROMPTS" = "true" ]; then
         }
 else
     # Use template-based generation (faster, no additional AI cost)
-    echo "  → Using template-based documentation (set GENERATE_AI_PROMPTS=true for AI-based prompts)..."
+    echo "  → Using template-based documentation (set GENERATE_AI_PROMPTS=false to skip AI prompts)..."
     intake generate-docs --output .tasks/docs 2>&1 || echo "⚠️ Doc generation failed"
 fi
 
