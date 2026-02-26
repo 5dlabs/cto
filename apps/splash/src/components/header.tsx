@@ -57,7 +57,7 @@ export function Header() {
       transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
       className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
     >
-      <nav className="flex items-center gap-1 px-2 py-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.3)]">
+      <nav className="flex items-center gap-1 px-2 py-1.5 rounded-full glass-nav">
         {/* Logo */}
         <Link
           href="/"

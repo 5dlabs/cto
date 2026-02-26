@@ -224,7 +224,7 @@ export default function FounderPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                  className="relative p-6 rounded-2xl glass-card glass-shimmer text-center overflow-hidden"
                 >
                   <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mx-auto mb-4 text-cyan">
                     {item.icon}

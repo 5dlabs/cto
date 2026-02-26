@@ -124,7 +124,7 @@ export default function InvestorsPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                  className="relative p-6 rounded-2xl glass-card glass-shimmer text-center overflow-hidden"
                 >
                   <p className="text-3xl font-bold gradient-text mb-1">
                     {item.metric}
@@ -207,7 +207,7 @@ export default function InvestorsPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: i * 0.1 }}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                  className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
                 >
                   <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4 text-cyan">
                     {item.icon}
@@ -276,7 +276,7 @@ export default function InvestorsPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.1 }}
-                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                className="relative p-8 rounded-2xl glass-card glass-shimmer overflow-hidden"
               >
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">Agentic Trading</h3>
@@ -302,7 +302,7 @@ export default function InvestorsPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                className="relative p-8 rounded-2xl glass-card glass-shimmer overflow-hidden"
               >
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">OpenClaw Platform</h3>
@@ -336,7 +336,7 @@ export default function InvestorsPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.3 }}
-                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                className="relative p-8 rounded-2xl glass-card glass-shimmer overflow-hidden"
               >
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">Sanctuary</h3>
@@ -379,14 +379,14 @@ export default function InvestorsPage() {
                 href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
+                className="px-8 py-4 rounded-xl glass text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
                 data-umami-event="investors-schedule-call"
               >
                 Schedule a Call
               </a>
               <a
                 href="/founder"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
+                className="px-8 py-4 rounded-xl glass text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
                 data-umami-event="investors-meet-founder"
               >
                 Meet the Founder

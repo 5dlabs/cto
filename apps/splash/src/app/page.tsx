@@ -63,6 +63,12 @@ export default function Home() {
       {/* Background layers */}
       <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
       <div className="fixed inset-0 circuit-bg z-0" />
+      {/* Ambient color blobs for glass refraction */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[10%] left-[15%] w-[500px] h-[500px] rounded-full bg-cyan/[0.04] blur-[120px]" />
+        <div className="absolute top-[40%] right-[10%] w-[400px] h-[400px] rounded-full bg-[oklch(0.7_0.25_320)]/[0.03] blur-[100px]" />
+        <div className="absolute bottom-[20%] left-[30%] w-[600px] h-[600px] rounded-full bg-blue-500/[0.03] blur-[140px]" />
+      </div>
       <RainEffect />
       <div className="fixed inset-0 noise-overlay z-0" />
 
@@ -84,7 +90,7 @@ export default function Home() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.4, duration: 1.2, ease: "easeOut" }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-badge mb-8"
             >
               <span className="text-sm text-cyan font-semibold tracking-wide">
                 Agentic &middot; Fully Autonomous &middot; On-Chain
@@ -124,13 +130,13 @@ export default function Home() {
             >
               <a
                 href="https://cto.5dlabs.ai"
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
+                className="px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all glass-cta hover:scale-105 shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50"
               >
                 Explore CTO
               </a>
               <a
                 href="/investors"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all"
+                className="px-8 py-4 rounded-xl glass text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all"
               >
                 Investor Relations
               </a>
@@ -141,17 +147,17 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 1.6, duration: 1.2 }}
-              className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground"
+              className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-5 py-3 rounded-xl glass-subtle">
                 <span className="text-2xl font-bold text-foreground">5+</span>
                 <span>ventures in flight</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-5 py-3 rounded-xl glass-subtle">
                 <span className="text-2xl font-bold text-foreground">13</span>
                 <span>AI agents</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-5 py-3 rounded-xl glass-subtle">
                 <span className="text-2xl font-bold text-foreground">3</span>
                 <span>blockchains</span>
               </div>
@@ -168,7 +174,7 @@ export default function Home() {
             <motion.div
               animate={{ y: [0, 6, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex justify-center pt-2"
+              className="w-6 h-10 rounded-full border border-white/[0.1] bg-white/[0.03] backdrop-blur-sm flex justify-center pt-2"
             >
               <div className="w-1 h-2 rounded-full bg-cyan" />
             </motion.div>
@@ -218,9 +224,9 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer text-center overflow-hidden"
               >
-                <div className="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center mx-auto mb-4">
+                <div className="w-14 h-14 rounded-full bg-cyan/10 border border-cyan/20 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
@@ -238,9 +244,9 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.1 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer text-center overflow-hidden"
               >
-                <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mx-auto mb-4">
+                <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 border border-[oklch(0.7_0.25_320)]/20 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
@@ -257,7 +263,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer text-center overflow-hidden"
               >
                 <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -335,7 +341,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer text-center overflow-hidden"
               >
                 <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -355,7 +361,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.1 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer text-center overflow-hidden"
               >
                 <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -375,7 +381,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer text-center overflow-hidden"
               >
                 <div className="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -408,7 +414,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1, duration: 0.6 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-6"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-badge mb-6"
               >
                 <span className="text-xs text-cyan font-medium uppercase tracking-wider">
                   Our Foundation
@@ -431,7 +437,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
               >
                 <h3 className="text-xl font-semibold mb-2">Self-Hosted Models</h3>
                 <p className="text-muted-foreground text-sm">
@@ -446,7 +452,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.1 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
               >
                 <h3 className="text-xl font-semibold mb-2">Every Major Model</h3>
                 <p className="text-muted-foreground text-sm">
@@ -460,7 +466,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
               >
                 <h3 className="text-xl font-semibold mb-2">Cost Optimized</h3>
                 <p className="text-muted-foreground text-sm">
@@ -475,7 +481,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.3 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
               >
                 <h3 className="text-xl font-semibold mb-2">Always Current</h3>
                 <p className="text-muted-foreground text-sm">
@@ -489,7 +495,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.4 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
               >
                 <h3 className="text-xl font-semibold mb-2">Agent Orchestration</h3>
                 <p className="text-muted-foreground text-sm">
@@ -504,7 +510,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.5 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
               >
                 <h3 className="text-xl font-semibold mb-2">Open at the Core</h3>
                 <p className="text-muted-foreground text-sm">
@@ -537,7 +543,7 @@ export default function Home() {
                 href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
+                className="px-8 py-4 rounded-xl glass text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
                 data-umami-event="home-schedule-call"
               >
                 Schedule a Call
@@ -546,7 +552,7 @@ export default function Home() {
                 href="https://github.com/5dlabs"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
+                className="px-8 py-4 rounded-xl glass text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
                 data-umami-event="home-view-github"
               >
                 View on GitHub

@@ -305,7 +305,7 @@ export default function ConsultingPage() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.5, delay: i * 0.08 }}
-                    className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                    className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
                   >
                     <div
                       className={`w-14 h-14 rounded-full ${colors.bg} flex items-center justify-center mb-4`}
@@ -350,10 +350,10 @@ export default function ConsultingPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className={`p-6 rounded-xl border backdrop-blur-sm relative ${
+                  className={`p-6 rounded-2xl relative overflow-hidden glass-shimmer ${
                     rate.recommended
-                      ? "border-cyan/40 bg-cyan/5"
-                      : "border-border/50 bg-card/30"
+                      ? "glass-bold border-cyan/30"
+                      : "glass-card"
                   }`}
                 >
                   {rate.recommended && (
@@ -424,7 +424,7 @@ export default function ConsultingPage() {
                       {phase.week}
                     </div>
                   </div>
-                  <div className="flex-1 p-5 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                  <div className="flex-1 p-5 rounded-2xl glass-card">
                     <h3 className="text-lg font-semibold mb-1">{phase.title}</h3>
                     <p className="text-sm text-muted-foreground">
                       {phase.description}
@@ -475,7 +475,7 @@ export default function ConsultingPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="text-center p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                  className="relative text-center p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
                 >
                   <div className="text-3xl font-bold gradient-text mb-2">
                     {stat.value}

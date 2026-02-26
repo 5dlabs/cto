@@ -90,12 +90,12 @@ export function WaitlistForm({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 required
-                className="flex-1 px-4 py-3 rounded-lg bg-card/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/30 text-sm"
+                className="flex-1 px-4 py-3 rounded-xl glass-subtle text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/30 text-sm"
               />
               <button
                 type="submit"
                 disabled={status === "loading"}
-                className="px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-sm hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-sm hover:from-cyan-600 hover:to-blue-600 transition-all glass-cta shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 {status === "loading" ? (
                   <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -129,7 +129,7 @@ export function WaitlistForm({
             key="done"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="p-8 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-center"
+            className="p-8 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] backdrop-blur-xl text-center"
           >
             <svg className="w-12 h-12 text-emerald-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -155,7 +155,7 @@ export function WaitlistForm({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Name (optional)"
-                className="flex-1 px-4 py-3 rounded-lg bg-card/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/30 text-sm"
+                className="flex-1 px-4 py-3 rounded-xl glass-subtle text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/30 text-sm"
               />
               <input
                 type="email"
@@ -163,13 +163,13 @@ export function WaitlistForm({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                className="flex-1 px-4 py-3 rounded-lg bg-card/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/30 text-sm"
+                className="flex-1 px-4 py-3 rounded-xl glass-subtle text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan/50 focus:ring-1 focus:ring-cyan/30 text-sm"
               />
             </div>
             <button
               type="submit"
               disabled={status === "loading"}
-              className="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-600 hover:to-blue-600 transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-600 hover:to-blue-600 transition-all glass-cta shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {status === "loading" ? (
                 <span className="flex items-center justify-center gap-2">

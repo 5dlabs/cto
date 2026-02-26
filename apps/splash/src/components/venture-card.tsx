@@ -38,12 +38,10 @@ export function VentureCard({ venture, index }: VentureCardProps) {
     >
       <div
         className={cn(
-          "relative p-6 rounded-xl",
-          "bg-card/50 border border-border/50",
+          "relative p-6 rounded-2xl",
+          "glass-card glass-shimmer",
           "hover:border-primary/50",
-          "transition-all duration-300",
-          "backdrop-blur-sm",
-          "h-full flex flex-col"
+          "h-full flex flex-col overflow-hidden"
         )}
       >
         {/* Glow effect on hover */}
@@ -88,7 +86,7 @@ export function VentureCard({ venture, index }: VentureCardProps) {
             {venture.tags.map((tag) => (
               <span
                 key={tag}
-                className="text-xs px-2.5 py-1 rounded-md bg-muted/50 text-muted-foreground font-medium"
+                className="text-xs px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.06] text-muted-foreground font-medium backdrop-blur-sm"
               >
                 {tag}
               </span>
