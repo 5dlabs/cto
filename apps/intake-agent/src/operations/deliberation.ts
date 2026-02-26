@@ -13,6 +13,7 @@
  */
 
 import { createHash, randomUUID } from 'crypto';
+import { connect as natsConnect, StringCodec, type NatsConnection } from 'nats';
 import type {
   DeliberatePayload,
   DeliberationResult,
@@ -57,7 +58,8 @@ interface NatsClient {
 /**
  * Resolve the NATS client from the environment.
  * In production this is provided by the OpenClaw runtime.
- * Falls back to a stub that uses the intake-agent's tool invocation.
+ * Falls back to a direct NATS connection via NATS_URL env var (for CodeRun pods).
+ * Final fallback is a stub for local testing.
  */
 async function getNatsClient(): Promise<NatsClient> {
   // OpenClaw injects a global NATS client when the agent is running in-pod.
@@ -65,6 +67,46 @@ async function getNatsClient(): Promise<NatsClient> {
   const globalNats = (globalThis as Record<string, unknown>).__openclaw_nats__;
   if (globalNats) {
     return globalNats as NatsClient;
+  }
+
+  // Direct NATS connection via NATS_URL env var.
+  // Used when running as a CodeRun pod on the same cluster as the debate agents.
+  const natsUrl = process.env['NATS_URL'];
+  if (natsUrl) {
+    console.error(`[DELIBERATION] Connecting to NATS at ${natsUrl}`);
+    const nc: NatsConnection = await natsConnect({ servers: natsUrl });
+    const sc = StringCodec();
+
+    const subscriptions = new Map<string, ReturnType<NatsConnection['subscribe']>>();
+
+    return {
+      async publish(subject: string, message: NatsMessage): Promise<void> {
+        nc.publish(subject, sc.encode(JSON.stringify(message)));
+      },
+      subscribe(subject: string, handler: (msg: NatsMessage) => void) {
+        const sub = nc.subscribe(subject);
+        subscriptions.set(subject, sub);
+        // Process messages asynchronously
+        (async () => {
+          for await (const m of sub) {
+            try {
+              const parsed = JSON.parse(sc.decode(m.data)) as NatsMessage;
+              handler(parsed);
+            } catch (e) {
+              console.error(`[NATS] Failed to parse message on ${subject}:`, e);
+            }
+          }
+        })().catch(console.error);
+        return () => {
+          sub.unsubscribe();
+          subscriptions.delete(subject);
+        };
+      },
+      async request(subject: string, message: NatsMessage, timeoutMs: number): Promise<NatsMessage> {
+        const response = await nc.request(subject, sc.encode(JSON.stringify(message)), { timeout: timeoutMs });
+        return JSON.parse(sc.decode(response.data)) as NatsMessage;
+      },
+    };
   }
 
   // Stub implementation — logs NATS messages to stderr for local testing.
