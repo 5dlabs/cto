@@ -89,6 +89,9 @@ ENV CHROMIUM_PATH=/usr/bin/chromium
 # Set intake-agent path for AI provider
 ENV INTAKE_AGENT_PATH=/usr/local/bin/intake-agent
 
+# Default NATS URL for deliberation (OVH cluster — overridable via pod spec)
+ENV NATS_URL=nats://nats.messaging.svc.cluster.local:4222
+
 # Create non-root user with explicit UID to match k8s securityContext
 RUN useradd -u 1000 -ms /bin/bash research
 
