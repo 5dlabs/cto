@@ -253,7 +253,7 @@
   
   /* Muted colors - Apple-style white text */
   --muted: oklch(0.18 0 0); /* Darker gray - darker shade to avoid glass effect override */
-  --muted-foreground: oklch(1 0 0); /* White - Apple-style */
+  --muted-foreground: oklch(0.7 0 0); /* Medium gray for text hierarchy */
   
   /* Accent colors - Apple-style white text */
   --accent: oklch(0.25 0 0); /* Dark gray */
