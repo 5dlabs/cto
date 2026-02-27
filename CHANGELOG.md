@@ -3,6 +3,107 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.50](https://github.com/5dlabs/cto/compare/v0.2.49...v0.2.50) (2026-02-27)
+
+
+### ✨ Features
+
+* add AI, GPU, and Nvidia operators; enable twingate-operator ([6ec364a](https://github.com/5dlabs/cto/commit/6ec364a1aa2be73f3c151c2e544f8e0e9ad53096))
+* add kotal-operator ArgoCD app (5dlabs fork with Reth/NEAR support) ([78a5da3](https://github.com/5dlabs/cto/commit/78a5da3321d7e0bf3d8a9baf2aa17451119fe57d))
+* configure optimist/pessimist Discord + fix gp3 storage on OVH ([aee795a](https://github.com/5dlabs/cto/commit/aee795a8cd4cb3e48d97edf6100008cbc23e5a64))
+* **infra:** add switchable webhook exposure and re-enable Stitch Argo app ([#4419](https://github.com/5dlabs/cto/issues/4419)) ([db88b6d](https://github.com/5dlabs/cto/commit/db88b6dd7146ba51ed2760e9ed9a85d270d18466))
+* **infra:** AWS cluster bootstrap – OpenClaw bots disabled, storage overlay app ([#4416](https://github.com/5dlabs/cto/issues/4416)) ([5dd793f](https://github.com/5dlabs/cto/commit/5dd793f1d69994ce66ed86ef1d6ef6e46587dd86))
+* **infra:** AWS cluster bootstrap with skip-reconcile overlay strategy ([#4415](https://github.com/5dlabs/cto/issues/4415)) ([25afd22](https://github.com/5dlabs/cto/commit/25afd220e73400cbb2c07f3c056c5cf613a52b96))
+* **intake:** deliberation system — debate agents + committee voting ([#4434](https://github.com/5dlabs/cto/issues/4434)) ([6c95735](https://github.com/5dlabs/cto/commit/6c9573584afbe24c70c08eabbe71ebd73230b1e0))
+* **intake:** enable AI prompt generation (Session 2) by default ([d6578bd](https://github.com/5dlabs/cto/commit/d6578bdcb291cab0afb41362b63e39db5531d6fe))
+* **openclaw-agent:** add nodeSelector support and remove CPU limits ([89f7360](https://github.com/5dlabs/cto/commit/89f7360a3bad32991ae5c4479c34b2b03db86ed3))
+* **runtime:** add steipete CLI tools to baseline image ([#4423](https://github.com/5dlabs/cto/issues/4423)) ([4525b9e](https://github.com/5dlabs/cto/commit/4525b9e2a89d97886c3b7a3e62b2cf4067163066))
+* **skills:** add 10 ClawHub community skills to templates ([#4424](https://github.com/5dlabs/cto/issues/4424)) ([2f0f66e](https://github.com/5dlabs/cto/commit/2f0f66e4510a84923fe77846ea1bc6de3244b839))
+* **splash:** add 5D Labs homepage app for 5dlabs.io ([#4425](https://github.com/5dlabs/cto/issues/4425)) ([5aabffb](https://github.com/5dlabs/cto/commit/5aabffb356b65f1cfdcf282889ce7dde30df86e5))
+* **splash:** add consulting services page ([#4435](https://github.com/5dlabs/cto/issues/4435)) ([9061ee2](https://github.com/5dlabs/cto/commit/9061ee29ffe6abca3042b8a1b3c61b595dc0d410))
+* **task-controller:** add research CLI image + switch intake to research image ([2eac6de](https://github.com/5dlabs/cto/commit/2eac6de8734b354430686f68a7db11b8145dbf06))
+* update cilium values for k3s/OVH - tunnel mode, k3s API, correct pod CIDR ([b323e1e](https://github.com/5dlabs/cto/commit/b323e1e1c245cf02890c3fb4a78f37d0ca3004af))
+
+
+### 🐛 Bug Fixes
+
+* add custom ArgoCD Lua health checks for ClusterTunnel, TunnelBinding, HTTPRoute ([93f341b](https://github.com/5dlabs/cto/commit/93f341bab89fc6ff4323bb8a33f30bf12741213b))
+* add githubSecret to committee agent values (was causing empty secretKeyRef) ([fe521e0](https://github.com/5dlabs/cto/commit/fe521e0fc43c59c335c25b0d38e1b5e637a57024))
+* add headers field to tools mcp-servers.json configmap template ([83f65df](https://github.com/5dlabs/cto/commit/83f65df8ef9cb4081e67530db2332973bb1abdd4))
+* add kube-dns service alias for RKE2 compatibility ([9c0ecb0](https://github.com/5dlabs/cto/commit/9c0ecb0c174f7be76c7e9e84a713d0001e3b07e8))
+* **cilium:** disable bpf masquerade and enable nodeport for k3s ([5f0c9e6](https://github.com/5dlabs/cto/commit/5f0c9e6fbd0830716924e364ef5043f39be53197))
+* exclude twingate apps from platform-apps glob (managed by networking-apps) ([f2f1d4f](https://github.com/5dlabs/cto/commit/f2f1d4f4cffd6c1b77ceee51b95e0a79e50dd74d))
+* headscale TunnelBinding uses noTlsVerify directly in spec (not under originRequest) ([9565f80](https://github.com/5dlabs/cto/commit/9565f8069e57214dfd84eccbfe2418c7abaa9e87))
+* heartbeat "off" invalid duration — use 87600h across all deliberation agents ([7b9849c](https://github.com/5dlabs/cto/commit/7b9849c5597b031ae581fc2e9aa53a16cf0c21e0))
+* heartbeat 87600h overflows 32-bit setTimeout — use 500h (~3 weeks) ([9ed6487](https://github.com/5dlabs/cto/commit/9ed6487da9757f532a3319e911f8a5b36167ff1c))
+* ignore ClusterPolicy spec/status drift in nvidia-gpu-operator ([f13d989](https://github.com/5dlabs/cto/commit/f13d98913321e8cc8080637c4a8092db27733f92))
+* ignore HTTPRoute status in cto app (public-gateway not yet deployed) ([01dd660](https://github.com/5dlabs/cto/commit/01dd6608beef860f6a112e59900a2a9419dbdf33))
+* ignore image-updater helm.parameters drift in platform-apps and networking-apps ([3e52d81](https://github.com/5dlabs/cto/commit/3e52d813be4c4081118213266c264915a916afac))
+* ignore namespace label/annotation drift in platform-namespaces ([d2ccfa1](https://github.com/5dlabs/cto/commit/d2ccfa11bc6fc9ce86f4e1b1f73a8b5afe0279c5))
+* increase MCP server initialization timeout from 8-10s to 45-60s ([faa9787](https://github.com/5dlabs/cto/commit/faa978767712404e2777ebf5c81f261b4ffb8c50))
+* **infra:** remove Claude Code from runtime, add 1Password to minimal, restore ARC runners for EKS ([#4431](https://github.com/5dlabs/cto/issues/4431)) ([4617ab5](https://github.com/5dlabs/cto/commit/4617ab5bc05636bacb155cf7931ebdf62d25acd1))
+* **intake-agent:** add NATS_URL env fallback for CodeRun pod execution ([4be0680](https://github.com/5dlabs/cto/commit/4be0680e37dbc921dd463de09354332ce1ee4049))
+* **marketing:** add OpenGraph and Twitter splash image assets ([009d87a](https://github.com/5dlabs/cto/commit/009d87a77bff556ec31dbb169edaa6b2a6b3a4f6))
+* **marketing:** bust social card cache with versioned OG/Twitter images ([2e62dca](https://github.com/5dlabs/cto/commit/2e62dcab0bd6f514e5079834bb8e65546935f067))
+* **marketing:** remove Sidero/Omni infra cards ([#4426](https://github.com/5dlabs/cto/issues/4426)) ([614eefd](https://github.com/5dlabs/cto/commit/614eefd0fe2c10ab67617bcd7c4d7eca5ad21c2a))
+* move discord config into agent.messaging (not root messaging) ([020af4d](https://github.com/5dlabs/cto/commit/020af4d970752eb1ea80f1c962be12aa906d3efd))
+* nfd master nodeSelector to use worker nodes; twingate retry with GHCR creds ([e3d20fb](https://github.com/5dlabs/cto/commit/e3d20fb3ef11199b842cab36f7dfcc06bdb12520))
+* **ntfy:** update HTTP listen port to 8080 in configmap and deployment manifests ([bd735f5](https://github.com/5dlabs/cto/commit/bd735f5d12dcd88b69d8022382758ac86ce68c0b))
+* openclaw-agent image tag v prefix (2026.2.12 → v2026.2.12) ([b3031f1](https://github.com/5dlabs/cto/commit/b3031f1144a4cdf54918bf35593fb80c91da2f29))
+* **openclaw-agent:** reduce CPU requests to fit 14 agents on worker ([a1ff714](https://github.com/5dlabs/cto/commit/a1ff71460d3edef003ddef29d7533f229030441e))
+* otel skipSchemaValidation, seaweedfs nodeSelector removed, twingate OCI repo in AppProject ([c564d79](https://github.com/5dlabs/cto/commit/c564d79468a1d576537cd5b506a58efb4bfaf986))
+* patch TunnelBinding CRD to preserve unknown fields (headscale originRequest) ([f1059aa](https://github.com/5dlabs/cto/commit/f1059aaa90427ec85ee26bbdde857a2472e9aa23))
+* per-agent messaging secrets so DISCORD_TOKEN env var carries correct token ([e5486b7](https://github.com/5dlabs/cto/commit/e5486b741bea10823c108ea612399d3831bfd1b8))
+* persist ArgoCD ignoreDifferences for cert/CRD/namespace drift (OVH cluster) ([fae8dc6](https://github.com/5dlabs/cto/commit/fae8dc64749fe4693e28639162d66c41042ba0a4))
+* **pm:** scale PM server back to one replica ([#4420](https://github.com/5dlabs/cto/issues/4420)) ([caad801](https://github.com/5dlabs/cto/commit/caad801ad74f158150c2524ff41d5275e44b7757))
+* **research:** bake default NATS_URL into image for OVH CodeRun pods ([2b22832](https://github.com/5dlabs/cto/commit/2b2283293d9386751f79112d61d6659116605d3b))
+* resolve CSS layer specificity, blur variants, and missing magenta theme color ([cd6cdb9](https://github.com/5dlabs/cto/commit/cd6cdb990ba0f4b7df23c62f70117066606e27b8))
+* revert discord to top-level messaging (agent.messaging causes dm.policy panic) ([80520e7](https://github.com/5dlabs/cto/commit/80520e75c0b81acdaa22fbffd901671eb8962e8a))
+* seaweedfs tolerations type, otel featureGates schema, twingate-operator OCI chart ref ([cec0b6d](https://github.com/5dlabs/cto/commit/cec0b6d9f9a08f90b467642527c902c96d180dc5))
+* seaweedfs volume 100Gi-&gt;50Gi (mayastor pools max ~60GiB free per node) ([a7e44d8](https://github.com/5dlabs/cto/commit/a7e44d8f745518f2c46aab2fbe6093b3845217c3))
+* skip-reconcile aws-load-balancer-controller on OVH bare metal ([138234f](https://github.com/5dlabs/cto/commit/138234f6f2f1b0994edc439e7d81051ce5b2404f))
+* skip-reconcile Mayastor on OVH - using local-path storage overlay ([e89b2dc](https://github.com/5dlabs/cto/commit/e89b2dc2d9887fdb912365d14a3c92a8979ecafb))
+* **splash:** add Telegram-friendly OG image ([#4428](https://github.com/5dlabs/cto/issues/4428)) ([917137c](https://github.com/5dlabs/cto/commit/917137c242ee66261e70fe26d5520ad4025ed9de))
+* **splash:** button import from @radix-ui/react-slot not radix-ui ([6f90751](https://github.com/5dlabs/cto/commit/6f907511f79e2d0da2757f3538b54af7df9d1c14))
+* **splash:** replace [@apply](https://github.com/apply) glass-bg with inline CSS for Tailwind compat ([95bf65d](https://github.com/5dlabs/cto/commit/95bf65d501e40d1549682213dfb637aff9d7688a))
+* **splash:** restore dark theme so text is visible ([39694ed](https://github.com/5dlabs/cto/commit/39694edd8f23377870a0156c58e7cd3dd098a217))
+* **splash:** use Slot not Slot.Root from @radix-ui/react-slot ([a57cf1a](https://github.com/5dlabs/cto/commit/a57cf1ae8c33dc698ff51844a75ddf0e03b82f2c))
+* switch loki MCP from ghcr.io image (GHCR auth denied) to npx @elad12390/loki-mcp ([1a5ac57](https://github.com/5dlabs/cto/commit/1a5ac5750f137a873ed3b9c1913fd53156eaad1e))
+* switch storage overlay from AWS EBS to local-path for OVH deployment ([c398ca4](https://github.com/5dlabs/cto/commit/c398ca4c82d3490f8c88d085794e8ff8bb0b31b4))
+* treat pending WaitForFirstConsumer PVCs as Healthy in ArgoCD ([11f002f](https://github.com/5dlabs/cto/commit/11f002f05cc3679021a2587b13a768fe60e37f61))
+* twingate-operator version v0.28.0 -&gt; 0.28.0 (OCI tags have no v prefix) ([ffda650](https://github.com/5dlabs/cto/commit/ffda65007b7dde4116fc577a28c49ec837987fe1))
+* update ingress-nginx externalIPs to OVH node IPs ([92f0572](https://github.com/5dlabs/cto/commit/92f0572f656be778f962d85cf94be17755a0ffd4))
+
+
+### 📚 Documentation
+
+* add Solana K8s architecture and operator spec ([94d332a](https://github.com/5dlabs/cto/commit/94d332a3a9cd5c3c894af3b5853ba0f749b3fea1))
+* add Talos + Cilium responsibilities & overlap section ([c524d7e](https://github.com/5dlabs/cto/commit/c524d7e7ef0ef34783e6d5fa87a8a3aba190e225))
+* trading cluster — clarify dual-homed direct public IP model ([ceeaadf](https://github.com/5dlabs/cto/commit/ceeaadf0a98fd2e6581dec4a30757bab24107c46))
+* trading cluster — Cloudflare tunnels out, Twingate throughout ([3dc5469](https://github.com/5dlabs/cto/commit/3dc54697d47167fa9d215091dd8495325a6a78e4))
+* trading cluster — resolve open decisions, add Transit implementation ([c2426cc](https://github.com/5dlabs/cto/commit/c2426cc431095aa74dd60eed6a7a47eff93a7482))
+* trading cluster architecture & security plan ([d6c91a0](https://github.com/5dlabs/cto/commit/d6c91a0905c32802df5d8145bc00b4d4bd6b7563))
+
+
+### 🔧 Maintenance
+
+* add development notice and clean up stale root markdown files ([91d84d6](https://github.com/5dlabs/cto/commit/91d84d67b4512a0822d380b59bb8e18384b95a9e))
+* **cilium:** re-enable argocd management ([6ea452f](https://github.com/5dlabs/cto/commit/6ea452fbabd9d3c733ba4511756cbed9392252a5))
+* **docker:** pin OpenClaw to 2026.2.12, fix Gemini CLI build ([#4422](https://github.com/5dlabs/cto/issues/4422)) ([64afa7b](https://github.com/5dlabs/cto/commit/64afa7b491d382f559299946474fc807470e2549))
+* **docker:** update Dockerfiles for agents and Gemini CLI ([#4421](https://github.com/5dlabs/cto/issues/4421)) ([ad53801](https://github.com/5dlabs/cto/commit/ad53801ad578465ba2cd5de4a8e4902269b96aad))
+* enable all operators - remove skip-reconcile, fix otel issuerRef, set aws-lb clusterName ([c30fe8a](https://github.com/5dlabs/cto/commit/c30fe8a8c521280307a25898fcf12c84c8ffd152))
+* **gitops:** disable bots namespace apps by default ([#4417](https://github.com/5dlabs/cto/issues/4417)) ([a2d39dc](https://github.com/5dlabs/cto/commit/a2d39dc20883299c1fc2ba49d5477380338a405b))
+* **prd:** expand Hivelocity provider implementation plan ([#4418](https://github.com/5dlabs/cto/issues/4418)) ([071b881](https://github.com/5dlabs/cto/commit/071b88156f7455ed3b5b31b7a7b3c37e7ac0b23e))
+* re-add skip-reconcile to twingate-operator (GHCR OCI auth unresolved) ([38b624a](https://github.com/5dlabs/cto/commit/38b624aed4daffbf26d8c33d0c1b3d2f199cad7d))
+* re-disable cilium - requires k3s --flannel-backend=none (CNI conflict with flannel) ([dd390d9](https://github.com/5dlabs/cto/commit/dd390d9f450070a4d3626f66e7d17589375f6a04))
+* remove openclaw agent apps from CTO cluster gitops ([d4a7e70](https://github.com/5dlabs/cto/commit/d4a7e70a3377bb5ce068ce0dbae90dbd0d69a6c9))
+* twingate-operator - re-disable, document OCI 3-level path ArgoCD limitation ([c040d30](https://github.com/5dlabs/cto/commit/c040d303f4c371e64c1c1642c8c5d4525ff4226e))
+
+
+### 👷 CI/CD
+
+* add deploy-splash workflow for Cloudflare Pages (5dlabs.ai) ([19396bb](https://github.com/5dlabs/cto/commit/19396bb53ba617bae42ec9156af4b4001912756c))
+
 ## [0.2.49](https://github.com/5dlabs/cto/compare/v0.2.48...v0.2.49) (2026-02-08)
 
 
