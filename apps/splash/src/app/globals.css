@@ -38,6 +38,7 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-cyan: var(--cyan);
+  --color-magenta: var(--magenta);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -114,8 +115,8 @@
   --gradient: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
   /* Apple-standard blur values - moderate blur */
   --blur: 10px;
-  --blur-sm: 10px;
-  --blur-lg: 10px;
+  --blur-sm: 6px;
+  --blur-lg: 16px;
   
   /* Frosted glass variant - Enhanced opacity and stronger blur */
   --glass-frosted-bg: linear-gradient(135deg, 
@@ -233,34 +234,9 @@
               0 0 40px oklch(0.75 0.18 195 / 0.3),
               0 0 60px oklch(0.75 0.18 195 / 0.1);
 }
-.glow-text-cyan {
-  text-shadow: 0 0 10px oklch(0.75 0.18 195 / 0.8),
-               0 0 20px oklch(0.75 0.18 195 / 0.5),
-               0 0 30px oklch(0.75 0.18 195 / 0.3);
-}
 .glow-border-cyan {
   box-shadow: inset 0 0 20px oklch(0.75 0.18 195 / 0.1),
               0 0 20px oklch(0.75 0.18 195 / 0.3);
-}
-.circuit-bg {
-  background-image:
-    linear-gradient(oklch(0.75 0.18 195 / 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.75 0.18 195 / 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-}
-.gradient-text {
-  background: linear-gradient(135deg, oklch(0.8 0.2 195), oklch(0.7 0.25 320));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.noise-overlay::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.03;
-  pointer-events: none;
 }
 
 @layer utilities {
