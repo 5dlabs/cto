@@ -106,8 +106,8 @@ const rates = [
   },
   {
     name: "Fixed-Scope Project",
-    price: "$5,000",
-    unit: "+",
+    price: "Varies",
+    unit: "",
     details: "Defined deliverables with clear timeline and milestones. Scoped during discovery call.",
   },
 ];
@@ -199,12 +199,7 @@ const consultingJsonLd = {
       {
         "@type": "Offer",
         name: "Fixed-Scope Project",
-        priceSpecification: {
-          "@type": "PriceSpecification",
-          minPrice: "5000",
-          priceCurrency: "USD",
-        },
-        description: "Defined deliverables with clear timeline and milestones.",
+        description: "Defined deliverables with clear timeline and milestones. Price varies by project scope.",
       },
     ],
   },

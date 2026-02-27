@@ -47,7 +47,7 @@ const opportunities = [
   },
   {
     title: "Fractional CTO / Advisory",
-    badge: "From $3,500/mo",
+    badge: "Negotiable",
     badgeColor: "purple",
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">

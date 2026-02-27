@@ -134,7 +134,7 @@ Jonathon Fritz / 5D Labs offers expert consulting for early-stage teams and ente
 - **Hourly Advisory**: $225/hr — Ad-hoc consulting, architecture guidance, troubleshooting
 - **Daily Intensive**: $1,600/day — Full-day working sessions for workshops, hands-on setup, or team training
 - **Monthly Retainer**: $3,500/mo — ~20 hours included with dedicated availability and async support
-- **Fixed-Scope Projects**: From $5,000 — Architecture audits, proof-of-concepts, and focused deliverables
+- **Fixed-Scope Projects**: Varies by project — Architecture audits, proof-of-concepts, and focused deliverables
 
 ### Engagement
 
