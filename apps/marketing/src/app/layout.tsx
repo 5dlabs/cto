@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/og-image-v2.png",
+        url: "/opengraph-image.png",
         width: 1200,
         height: 630,
         alt: "CTO by 5D Labs - AI Engineering Collective",
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     title: "CTO by 5D Labs | AI Engineering Collective",
     description:
       "Thirteen AI specialists. Multi-agent orchestration on self-healing bare metal. 60-80% less than cloud.",
-    images: ["/twitter-image-v2.png"],
+    images: ["/twitter-image.png"],
     creator: "@5dlabs",
   },
   robots: {
