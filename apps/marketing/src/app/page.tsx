@@ -489,6 +489,15 @@ export default function Home() {
                 { name: "Scaleway", region: "France, Netherlands", desc: "European cloud provider" },
                 { name: "Cherry Servers", region: "Lithuania, Netherlands", desc: "High-performance bare-metal" },
                 { name: "DigitalOcean", region: "Americas, Europe, Asia", desc: "Developer-friendly droplets" },
+                { name: "Servers.com", region: "Americas, Europe, Asia", desc: "Hybrid bare-metal cloud" },
+                { name: "PhoenixNAP", region: "Americas, Europe, Asia", desc: "API-driven dedicated servers" },
+                { name: "i3D.net", region: "60+ locations, 6 continents", desc: "FlexMetal low-latency servers" },
+                { name: "Hivelocity", region: "50+ global locations", desc: "Instant bare metal via API" },
+                { name: "Denvr", region: "Canada, USA", desc: "GPU & AI compute platform" },
+                { name: "Zenlayer", region: "360+ edge locations", desc: "Distributed edge bare metal" },
+                { name: "NetActuate", region: "40+ global locations", desc: "API-driven edge servers" },
+                { name: "HOSTKEY", region: "Europe, USA, Turkey", desc: "GPU & dedicated servers" },
+                { name: "Leaseweb", region: "Global", desc: "Full API with PXE & callbacks" },
                 { name: "On-Premises", region: "Your datacenter", desc: "Talos Linux on your hardware" },
               ].map((provider, index) => (
                 <motion.div
