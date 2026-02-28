@@ -43,7 +43,7 @@ const squads: Squad[] = [
     agents: [
       {
         name: "Rex",
-        role: "Rust Architect",
+        role: "Rust Engineer",
         avatar: "/agents/rex-avatar-512.png",
         color: "from-orange-500 to-red-500",
         personality: "Lives for zero-cost abstractions. If it compiles, it ships. Opinions on lifetimes are... strong.",
@@ -51,7 +51,7 @@ const squads: Squad[] = [
       },
       {
         name: "Grizz",
-        role: "Go Specialist",
+        role: "Go Engineer",
         avatar: "/agents/grizz-avatar-512.png",
         color: "from-amber-500 to-orange-400",
         personality: "Pragmatic. Ships clean Go services without overengineering. Fan of simplicity and goroutines.",
@@ -59,7 +59,7 @@ const squads: Squad[] = [
       },
       {
         name: "Nova",
-        role: "Node.js Engineer",
+        role: "Node Engineer",
         avatar: "/agents/nova-avatar-512.png",
         color: "from-purple-500 to-cyan-400",
         personality: "The speed demon. Gets APIs up and running faster than you can write the spec.",
