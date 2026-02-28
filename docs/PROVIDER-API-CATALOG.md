@@ -12,8 +12,11 @@ This document catalogs all API calls across supported infrastructure providers i
 6. [Scaleway](#scaleway)
 7. [Cherry Servers](#cherry-servers)
 8. [DigitalOcean](#digitalocean)
-9. [On-Premises](#on-premises)
-10. [Latitude GPU VMs](#latitude-gpu-vms)
+9. [Servers.com](#serverscom)
+10. [PhoenixNAP](#phoenixnap)
+11. [i3D.net (FlexMetal)](#i3dnet-flexmetal)
+12. [On-Premises](#on-premises)
+13. [Latitude GPU VMs](#latitude-gpu-vms)
 
 ---
 
@@ -516,6 +519,48 @@ POST /droplets
   "monitoring": true
 }
 ```
+
+---
+
+## Servers.com
+
+**Partnership** — Bare-metal and cloud provider. API details and `Provider` trait integration TBD.
+
+- **Regions:** Global
+- **Docs:** https://www.servers.com/
+
+---
+
+## PhoenixNAP
+
+**Partnership** — Bare-metal and hybrid cloud with global data centers. API details and `Provider` trait integration TBD.
+
+- **Regions:** Americas, Europe, Asia
+- **Docs:** https://www.phoenixnap.com/
+- **Note:** Referenced in trading cluster architecture (ArgoCD external destination).
+
+---
+
+## i3D.net (FlexMetal)
+
+**API:** Yes — FlexMetal API (BETA). Base URL: `https://api.i3d.net`, auth: `PRIVATE-TOKEN` header.
+
+**Compatibility with CTO:** Yes. Create, list, get, delete servers via API; power_on / power_off / reboot; locations and instance types per location; **Talos Omni** supported as OS slug (`talos-omni-1110`). Initial provision can use Talos image directly (no custom iPXE required for first install). Reinstall-with-custom-iPXE flow not documented; may require delete + create or contact i3D for reinstall API.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v3/flexMetal/servers` | POST | Create server (name, location, instanceType, os.slug, sshKey, postInstallScript, tags, contractId, overflow) |
+| `/v3/flexMetal/servers` | GET | List servers (filter by status, tag; pagination via RANGED-DATA header) |
+| `/v3/flexMetal/servers/{uuid}` | GET | Get server details |
+| `/v3/flexMetal/servers/{uuid}` | DELETE | Release server |
+| `/v3/flexMetal/location/` | GET | List locations |
+| `/v3/flexMetal/plans` | GET | Instance types per location |
+| `/v3/operatingsystem` | GET | Supported OS (includes Talos versions) |
+| `/server/{uuid}/commands` | POST | power_on, power_off, reboot |
+
+- **Regions:** Americas, Europe, Asia (e.g. EU: Rotterdam; full list via location API)
+- **Docs:** [FlexMetal API](https://docs.i3d.net/compute/flexmetal/api), [Product docs](https://www.i3d.net/resources/documentation/)
+- **Dedicated Bare Metal** (non-FlexMetal): monthly, sales-led only — not API-provisioned.
 
 ---
 

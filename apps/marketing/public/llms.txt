@@ -62,6 +62,9 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 - Scaleway (France, Netherlands)
 - Cherry Servers (Lithuania, Netherlands)
 - DigitalOcean (Global)
+- Servers.com (Global)
+- PhoenixNAP (Americas, Europe, Asia)
+- i3D.net (FlexMetal: Americas, Europe, Asia; Talos supported)
 - On-premises (your datacenter)
 
 ### Technology Stack

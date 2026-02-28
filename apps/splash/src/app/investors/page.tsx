@@ -20,7 +20,7 @@ const highlights = [
   {
     metric: "3",
     label: "Blockchains",
-    description: "Agentic trading on Solana, Base, and Near",
+    description: "Agentic trading on Solana, Base, Near, and Sui",
   },
   {
     metric: "100%",
@@ -286,7 +286,7 @@ export default function InvestorsPage() {
                   </span>
                 </div>
                 <p className="text-[oklch(0.7_0.25_320)] text-sm font-medium mb-2">
-                  HFT-Grade Autonomous Trading on Solana, Base, and Near
+                  HFT-Grade Autonomous Trading on Solana, Base, Near, and Sui
                 </p>
                 <p className="text-muted-foreground">
                   Hedge-fund-grade trading technology for individuals. AI-driven
