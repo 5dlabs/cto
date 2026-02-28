@@ -22,8 +22,8 @@ const ventures: Venture[] = [
     name: "Agentic Trading",
     tagline: "Your own personal hedge fund.",
     description:
-      "HFT-grade autonomous trading agents on Solana, Base, and Near — putting the same technology that powers Wall Street hedge funds into the hands of individuals. AI-driven strategy, execution, and risk management across DeFi markets, 24/7.",
-    tags: ["HFT", "Solana", "Base", "Near", "DeFi", "AI Agents"],
+      "HFT-grade autonomous trading agents on Solana, Base, Near, and Sui — putting the same technology that powers Wall Street hedge funds into the hands of individuals. AI-driven strategy, execution, and risk management across DeFi markets, 24/7.",
+    tags: ["HFT", "Solana", "Base", "Near", "Sui", "DeFi", "AI Agents"],
     color: "from-purple-500 to-magenta",
     status: "building",
   },
@@ -342,11 +342,11 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Solana · Base · Near</h3>
+                <h3 className="text-lg font-semibold mb-2">Solana · Base · Near · Sui</h3>
                 <p className="text-sm text-muted-foreground">
-                  Three chains, one thesis. Solana for raw speed and HFT,
+                  Four chains, one thesis. Solana for raw speed and HFT,
                   Base for Ethereum-grade composability, Near for AI-native
-                  smart contracts. We&apos;re building where the action is.
+                  smart contracts, Sui for Move and object-centric DeFi. We&apos;re building where the action is.
                 </p>
               </motion.div>
 
@@ -365,7 +365,7 @@ export default function Home() {
                 <h3 className="text-lg font-semibold mb-2">Multi-Chain</h3>
                 <p className="text-sm text-muted-foreground">
                   Solana for speed, Ethereum and Base for composability, Near
-                  for AI-native smart contracts. We go where the opportunity
+                  for AI-native smart contracts, Sui for Move and object-centric DeFi. We go where the opportunity
                   is.
                 </p>
               </motion.div>

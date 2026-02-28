@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "5D Labs | OpenClaw-First AI Startup Studio",
   description:
-    "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio. We build and validate multiple ventures in parallel — from agentic trading on Solana, Base, and Near to CTO, our multi-agent AI engineering platform.",
+    "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio. We build and validate multiple ventures in parallel — from agentic trading on Solana, Base, Near, and Sui to CTO, our multi-agent AI engineering platform.",
   keywords: [
     "5D Labs",
     "OpenClaw",
@@ -93,10 +93,11 @@ export const metadata: Metadata = {
   },
   other: {
     "ai:description":
-      "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel. Current ventures include CTO (multi-agent AI engineering platform), agentic trading on Solana, Base, and Near, OpenClaw Platform (open-source Kubernetes-native agent orchestration), and Sanctuary (AI-powered smart home orchestration).",
+      "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel. Current ventures include CTO (multi-agent AI engineering platform), agentic trading on Solana, Base, Near, and Sui, OpenClaw Platform (open-source Kubernetes-native agent orchestration), and Sanctuary (AI-powered smart home orchestration). Founder Jonathon Fritz is open to technical co-founder, fractional CTO, and senior infrastructure roles — see /opportunities/.",
     "ai:capabilities":
-      "startup-studio, multi-agent-orchestration, agentic-trading, AI-engineering, crypto, DeFi, smart-home, IoT, open-source, kubernetes, gitops",
+      "startup-studio, multi-agent-orchestration, agentic-trading, AI-engineering, crypto, DeFi, smart-home, IoT, open-source, kubernetes, gitops, technical-co-founder, fractional-cto, infrastructure-lead",
     "ai:ventures": "CTO, Agentic Trading, OpenClaw Platform, Sanctuary",
+    "ai:opportunities": "https://5dlabs.ai/opportunities/",
   },
 };
 
@@ -245,7 +246,7 @@ const jsonLd = {
           name: "What is 5D Labs?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel using autonomous AI agents. Current ventures include CTO (multi-agent engineering platform), Agentic Trading (HFT on Solana, Base, Near), OpenClaw Platform (open-source agent orchestration), and Sanctuary (AI smart home).",
+            text: "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel using autonomous AI agents. Current ventures include CTO (multi-agent engineering platform), Agentic Trading (HFT on Solana, Base, Near, Sui), OpenClaw Platform (open-source agent orchestration), and Sanctuary (AI smart home).",
           },
         },
         {
@@ -261,7 +262,7 @@ const jsonLd = {
           name: "Does 5D Labs offer consulting services?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. 5D Labs offers expert consulting in AI agent systems, blockchain development (Solana, Base, Near), Kubernetes infrastructure, and DevOps. Rates start at $225/hr with monthly retainers available at $3,500/mo. Book a free discovery call at https://cal.com/jonathon-fritz-2uhdqe/discovery.",
+            text: "Yes. 5D Labs offers expert consulting in AI agent systems, blockchain development (Solana, Base, Near, Sui), Kubernetes infrastructure, and DevOps. Rates start at $225/hr with monthly retainers available at $3,500/mo. Book a free discovery call at https://cal.com/jonathon-fritz-2uhdqe/discovery.",
           },
         },
         {
@@ -269,7 +270,7 @@ const jsonLd = {
           name: "What blockchains does 5D Labs support?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "5D Labs operates agentic trading systems across Solana (for raw speed and HFT), Base (for Ethereum-grade composability), and Near (for AI-native smart contracts).",
+            text: "5D Labs operates agentic trading systems across Solana (for raw speed and HFT), Base (for Ethereum-grade composability), Near (for AI-native smart contracts), and Sui (for Move and object-centric DeFi).",
           },
         },
       ],

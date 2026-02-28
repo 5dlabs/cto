@@ -7,7 +7,7 @@
 ## Ventures
 
 - [CTO Platform](https://cto.5dlabs.ai): Multi-agent AI engineering platform — 13 specialized agents ship features from PRD to production on self-healing bare metal infrastructure with 60-80% cost savings vs cloud
-- [Agentic Trading](https://5dlabs.ai/#ventures): HFT-grade autonomous trading agents — hedge-fund-grade technology for individuals, operating 24/7 across Solana, Base, and Near DeFi markets
+- [Agentic Trading](https://5dlabs.ai/#ventures): HFT-grade autonomous trading agents — hedge-fund-grade technology for individuals, operating 24/7 across Solana, Base, Near, and Sui DeFi markets
 - [OpenClaw Platform](https://github.com/5dlabs/openclaw-platform): Open-source Kubernetes-native agent orchestration — deploy AI agent fleets with a single command via TUI installer, supporting KinD and enterprise EKS with GitOps, NATS messaging, and observability
 - [Sanctuary](https://5dlabs.ai/#ventures): AI Life Architect for smart homes — privacy-forward system that turns multimodal life signals into textural orchestration for wellbeing and household flow
 
@@ -18,13 +18,13 @@
 
 ## Consulting
 
-- [Consulting Services](https://5dlabs.ai/consulting/): Expert consulting in AI agent systems, blockchain (Solana, Base, Near, Ethereum), Kubernetes infrastructure, and DevOps — $225/hr, $1,600/day, $3,500/mo retainer (USD)
+- [Consulting Services](https://5dlabs.ai/consulting/): Expert consulting in AI agent systems, blockchain (Solana, Base, Near, Sui, Ethereum), Kubernetes infrastructure, and DevOps — $225/hr, $1,600/day, $3,500/mo retainer (USD)
 - [Schedule a Discovery Call](https://cal.com/jonathon-fritz-2uhdqe/discovery): Book a free 30-minute consultation
 - [Resume](https://resume.jonathonfritz.com): Professional background and experience
 
 ## Opportunities
 
-- [Work With Me](https://5dlabs.ai/opportunities/): Jonathon Fritz is open to technical co-founder, fractional CTO, and senior infrastructure roles — 20+ years, 10,600+ GitHub contributions, SE→CTO in 3 months at Coinmiles, led 1B+ daily requests at Pocket Network
+- [Work With Me](https://5dlabs.ai/opportunities/): Technical co-founder, fractional CTO (negotiable), and senior infrastructure roles — 20+ years, 10,600+ GitHub contributions, SE→CTO in 3 months at Coinmiles, 1B+ daily requests at Pocket Network; full engagement types and case studies on the opportunities page
 
 ## Company
 

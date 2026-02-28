@@ -114,6 +114,9 @@ Deploy CTO on any infrastructure—bare-metal, on-premises, or cloud:
 | **Scaleway** | European cloud provider with ARM & x86 options | France, Netherlands, Poland |
 | **Cherry Servers** | European bare-metal with high-performance networking | Lithuania, Netherlands |
 | **DigitalOcean** | Developer-friendly bare-metal droplets | Americas, Europe, Asia-Pacific |
+| **Servers.com** | Global bare-metal and cloud with flexible deployment | Global |
+| **PhoenixNAP** | Bare-metal and hybrid cloud with global data centers | Americas, Europe, Asia |
+| **i3D.net** | FlexMetal bare metal API; Talos Omni supported | Americas, Europe, Asia |
 | **On-Premises** | Your own hardware with Talos Linux | Anywhere |
 
 #### **Cloud Providers**
@@ -143,7 +146,7 @@ The platform is under active development.
 ✅ MCP server with dynamic tool registration  
 ✅ Kubernetes controllers with self-healing  
 ✅ GitHub Apps + Linear integration  
-✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean)  
+✅ Bare-metal deployment (Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean, Servers.com, PhoenixNAP, i3D.net)  
 ✅ Cloudflare Tunnels for public access without exposed interfaces  
 ✅ Infrastructure operators (PostgreSQL, MySQL, MongoDB, Kafka, RabbitMQ, NATS, Redis, SeaweedFS, OpenSearch, ClickHouse, QuestDB, Keycloak, Temporal, ScyllaDB)  
 ✅ Long-term memory with OpenMemory  
@@ -633,7 +636,7 @@ CTO runs anywhere you have Kubernetes—from bare-metal servers to managed cloud
 
 | Deployment Type | Providers | Best For |
 |-----------------|-----------|----------|
-| **Bare-Metal** | Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean | Maximum cost savings, data sovereignty |
+| **Bare-Metal** | Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean, Servers.com, PhoenixNAP, i3D.net | Maximum cost savings, data sovereignty |
 | **On-Premises** | Any server with Talos Linux | Air-gapped environments, full control |
 | **Cloud** | AWS, Azure, GCP | Existing cloud infrastructure |
 
@@ -663,6 +666,9 @@ helm install cto 5dlabs/cto --namespace cto --create-namespace
 - **Scaleway** - European cloud provider
 - **Cherry Servers** - European bare-metal
 - **DigitalOcean** - Droplets & bare-metal
+- **Servers.com** - Global bare-metal and cloud
+- **PhoenixNAP** - Bare-metal and hybrid cloud
+- **i3D.net** - FlexMetal API, Talos supported
 
 ### Deploy on Existing Kubernetes
 
@@ -1616,7 +1622,7 @@ For more details, see the [LICENSE](LICENSE) file.
 | **CI/CD** | GitHub Actions, ArgoCD Image Updater, Self-hosted Arc Runners (Rust-optimized) |
 | **Observability** | Prometheus, Grafana, Loki |
 | **Security** | Trivy, Kube-bench, Gitleaks, Falco |
-| **Bare-Metal** | Talos Linux, Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean |
+| **Bare-Metal** | Talos Linux, Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry, DigitalOcean, Servers.com, PhoenixNAP, i3D.net |
 | **Cloud** | AWS, Azure, GCP |
 | **Agent Runtime** | Custom container image with multi-CLI support, Git, and development tooling |
 
