@@ -23,7 +23,7 @@ We recently realized we made a **significant oversight** by not including Sidero
 **CTO** is an AGPL-3.0 licensed platform that provides:
 - **13 Specialized AI Agents** (Morgan, Rex, Grizz, Nova, Blaze, Tap, Spark, Cleo, Cipher, Tess, Stitch, Atlas, Bolt) handling everything from PRD intake to production deployment
 - **Bare-Metal First Architecture** — running on Talos Linux with 60-80% cost savings vs cloud
-- **Multi-Provider Support** — currently supporting Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry Servers, DigitalOcean, Servers.com, PhoenixNAP, and i3D.net (FlexMetal)
+- **Multi-Provider Support** — currently supporting Latitude, Hetzner, OVH, Vultr, Scaleway, Cherry Servers, DigitalOcean, Servers.com, PhoenixNAP, i3D.net (FlexMetal), and Hivelocity
 - **Self-Healing Infrastructure** — automatic remediation of workflow failures, pod issues, and CI problems
 - **GitOps-Driven** — ArgoCD-based deployments with GitHub Apps integration
 

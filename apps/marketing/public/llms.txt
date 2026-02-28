@@ -65,6 +65,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 - Servers.com (Global)
 - PhoenixNAP (Americas, Europe, Asia)
 - i3D.net (FlexMetal: Americas, Europe, Asia; Talos supported)
+- Hivelocity (Americas; instant bare metal via API, custom iPXE)
 - On-premises (your datacenter)
 
 ### Technology Stack

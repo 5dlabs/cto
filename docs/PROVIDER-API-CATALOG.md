@@ -15,8 +15,9 @@ This document catalogs all API calls across supported infrastructure providers i
 9. [Servers.com](#serverscom)
 10. [PhoenixNAP](#phoenixnap)
 11. [i3D.net (FlexMetal)](#i3dnet-flexmetal)
-12. [On-Premises](#on-premises)
-13. [Latitude GPU VMs](#latitude-gpu-vms)
+12. [Hivelocity](#hivelocity)
+13. [On-Premises](#on-premises)
+14. [Latitude GPU VMs](#latitude-gpu-vms)
 
 ---
 
@@ -561,6 +562,23 @@ POST /droplets
 - **Regions:** Americas, Europe, Asia (e.g. EU: Rotterdam; full list via location API)
 - **Docs:** [FlexMetal API](https://docs.i3d.net/compute/flexmetal/api), [Product docs](https://www.i3d.net/resources/documentation/)
 - **Dedicated Bare Metal** (non-FlexMetal): monthly, sales-led only — not API-provisioned.
+
+---
+
+## Hivelocity
+
+**API:** Yes — instant bare metal provisioning via `https://core.hivelocity.net/api/v2`. Auth: API key.
+
+**Compatibility with CTO:** Yes (PRD in progress). API supports create_server, list/get/delete server, facility discovery, inventory/stock checks, VLAN creation, and **custom iPXE script URL** for Talos boot. Aligns with Provider trait and Talos reinstall flow. Lower-cost option for memory-heavy workloads.
+
+| Endpoint / capability | Notes |
+|-----------------------|--------|
+| Provision | Instant bare metal with productId, locationName, osName, hostname, period |
+| Reinstall | customIPXEScriptURL for Talos iPXE chain |
+| Facilities | e.g. TPA1, DAL1, LAX2 |
+
+- **Regions:** Americas (see [PRD](docs/prds/hivelocity-provider-prd.md) for facility codes)
+- **Docs:** [PRD: Add Hivelocity Provider to Metal](prds/hivelocity-provider-prd.md)
 
 ---
 
