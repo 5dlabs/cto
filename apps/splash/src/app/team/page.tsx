@@ -68,7 +68,7 @@ const squads: Squad[] = [
     ],
   },
   {
-    title: "The Designers",
+    title: "The Product",
     emoji: "🎨",
     agents: [
       {
