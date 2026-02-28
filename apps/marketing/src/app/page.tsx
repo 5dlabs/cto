@@ -135,11 +135,18 @@ const squads: AgentSquad[] = [
       },
       {
         name: "Bolt",
-        role: "Deployment Specialist",
+        role: "Infrastructure & SRE",
         avatar: "/agents/bolt-avatar-512.png",
         color: "from-yellow-500 to-amber-500",
-        description: "Handles GitOps deployments with zero-downtime and automated rollbacks.",
-        stack: ["Kubernetes", "Helm", "GitOps"],
+        description: "Your always-on SRE. Provisions bare metal, deploys services, monitors health, and triggers self-healing — so you never get paged.",
+        stack: ["Kubernetes", "Bare Metal", "GitOps"],
+      },
+      {
+        name: "Healer",
+        role: "Self-Healing Agent",
+        color: "from-green-500 to-emerald-500",
+        description: "Detects failures, remediates incidents, restarts stuck workflows, and fixes CI — automatically, before you notice.",
+        stack: ["Incident Response", "Auto-Remediation", "Monitoring"],
       },
     ],
   },
@@ -363,11 +370,11 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-magenta/60"></span>
-                    <span>Self-healing bare metal clusters</span>
+                    <span>Bolt provisions &amp; monitors bare metal</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-magenta/60"></span>
-                    <span>Talos Linux, GitOps, self-healing</span>
+                    <span>Healer auto-remediates incidents</span>
                   </div>
                 </div>
               </motion.div>
@@ -595,10 +602,10 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Self-Healing Infrastructure</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Automatic remediation of stuck workflows, pod failures, CI issues, and silent errors. No on-call rotation needed.
+                  Healer detects incidents, remediates failures, and restarts stuck workflows — automatically. Bolt provisions and monitors bare metal. No on-call rotation needed.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["Auto-rollback", "Health Checks", "Alert Routing"].map(feature => (
+                  {["Auto-Remediation", "Incident Detection", "Health Checks", "Auto-Rollback"].map(feature => (
                     <span key={feature} className="text-xs px-2 py-1 rounded bg-green-500/10 text-green-500">{feature}</span>
                   ))}
                 </div>

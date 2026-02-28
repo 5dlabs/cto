@@ -86,7 +86,7 @@ export const metadata: Metadata = {
     "ai:capabilities":
       "code-generation, code-review, security-analysis, testing, infrastructure-setup, project-management",
     "ai:agents":
-      "Morgan, Rex, Grizz, Nova, Blaze, Tap, Spark, Vex, Cleo, Cipher, Tess, Atlas, Bolt",
+      "Morgan, Rex, Grizz, Nova, Blaze, Tap, Spark, Vex, Cleo, Cipher, Tess, Atlas, Bolt, Healer",
   },
 };
 
@@ -177,7 +177,7 @@ const jsonLd = {
           name: "What AI agents are included?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "CTO includes 13 specialized agents: Morgan (project management), Rex (Rust), Grizz (Go), Nova (Node.js), Blaze (React), Tap (Mobile), Spark (Desktop), Vex (XR), Cleo (code review), Cipher (security), Tess (testing), Atlas (integration), and Bolt (infrastructure).",
+            text: "CTO includes 14 specialized agents: Morgan (project management), Rex (Rust), Grizz (Go), Nova (Node.js), Blaze (React), Tap (Mobile), Spark (Desktop), Vex (XR), Cleo (code review), Cipher (security), Tess (testing), Atlas (integration), Bolt (infrastructure & SRE), and Healer (self-healing & incident response).",
           },
         },
       ],
