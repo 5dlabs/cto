@@ -275,6 +275,9 @@ agent:
     research:
       repository: ghcr.io/5dlabs/research
       tag: latest
+    grok:
+      repository: ghcr.io/5dlabs/research
+      tag: latest
   cliProviders: {}
   agentCliConfigs: {}
   inputBridge:
