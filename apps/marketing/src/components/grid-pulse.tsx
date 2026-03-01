@@ -9,16 +9,16 @@ const hues = [195, 300] as const;
 export function GridPulse() {
   return (
     <div
-      className="fixed inset-0 pointer-events-none overflow-hidden z-[1]"
-      style={{ contain: "layout style paint", isolation: "isolate" }}
+      className="fixed inset-0 pointer-events-none overflow-hidden z-0"
+      style={{ contain: "layout style paint", isolation: "isolate", opacity: 0.42 }}
     >
       {/* Drifting grid — cyan horizontal, purple vertical */}
       <div
         className="absolute -inset-20"
         style={{
           backgroundImage: `
-            linear-gradient(oklch(0.8 0.18 195 / 0.18) 1px, transparent 1px),
-            linear-gradient(90deg, oklch(0.75 0.18 300 / 0.14) 1px, transparent 1px)
+            linear-gradient(oklch(0.8 0.18 195 / 0.08) 1px, transparent 1px),
+            linear-gradient(90deg, oklch(0.75 0.18 300 / 0.06) 1px, transparent 1px)
           `,
           backgroundSize: "60px 60px",
           willChange: "transform",
@@ -28,7 +28,7 @@ export function GridPulse() {
       {/* Wandering node glows — vivid, transform-only animation */}
       {Array.from({ length: 6 }, (_, i) => {
         const hue = hues[i % 2];
-        const opacity = 0.15 + seededValue(i * 3 + 2) * 0.15;
+        const opacity = 0.06 + seededValue(i * 3 + 2) * 0.08;
         return (
           <div
             key={`node-${i}`}
@@ -54,8 +54,8 @@ export function GridPulse() {
             className="absolute left-0 right-0"
             style={{
               top: `${15 + i * 18}%`,
-              height: "2px",
-              background: `linear-gradient(90deg, transparent, oklch(0.8 0.2 ${hue} / 0.5), transparent)`,
+              height: "1px",
+              background: `linear-gradient(90deg, transparent, oklch(0.8 0.2 ${hue} / 0.18), transparent)`,
               willChange: "transform",
               animation: `grid-energy-h ${3 + seededValue(i * 7) * 2}s ease-in-out ${i * 1.5}s infinite`,
             }}
@@ -71,8 +71,8 @@ export function GridPulse() {
             className="absolute top-0 bottom-0"
             style={{
               left: `${12 + i * 22}%`,
-              width: "2px",
-              background: `linear-gradient(180deg, transparent, oklch(0.8 0.2 ${hue} / 0.45), transparent)`,
+              width: "1px",
+              background: `linear-gradient(180deg, transparent, oklch(0.8 0.2 ${hue} / 0.16), transparent)`,
               willChange: "transform",
               animation: `grid-energy-v ${3.5 + seededValue(i * 9) * 2}s ease-in-out ${i * 2}s infinite`,
             }}
