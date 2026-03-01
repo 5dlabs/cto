@@ -334,6 +334,45 @@ if [ -f ".tasks/tasks/tasks.json" ]; then
     mv ".tasks/tasks/tasks.json" ".tasks/tasks/tasks.json.bak.$(date +%s)"
 fi
 
+# =========================================================================
+# Deliberation (optional) — Optimist vs Pessimist debate before task gen
+# =========================================================================
+DELIBERATE=$(jq -r '.deliberate // false' "$CONFIG_FILE")
+if [ "$DELIBERATE" = "true" ] && command -v intake-agent >/dev/null 2>&1; then
+    echo ""
+    echo "🎙️ Running deliberation — Optimist vs Pessimist..."
+    PRD_CONTENT=$(cat "$PRD_FILE")
+    ARCH_CONTENT=""
+    [ -f "$ARCH_FILE" ] && ARCH_CONTENT=$(cat "$ARCH_FILE")
+    DELIBERATION_OUTPUT=$(jq -n \
+        --arg prd "$PRD_CONTENT" \
+        --arg arch "$ARCH_CONTENT" \
+        --arg session "${PROJECT_NAME}-$(date +%s)" \
+        '{ \
+            "operation": "deliberate", \
+            "model": "claude-sonnet-4-20250514", \
+            "payload": { \
+                "prd_content": ($prd + (if $arch != "" then "\n\n## Architecture\n" + $arch else "" end)), \
+                "session_id": $session, \
+                "timebox_minutes": 10, \
+                "research_enabled": true, \
+                "research_timeout_minutes": 5 \
+            } \
+        }' | NATS_URL="${NATS_URL:-nats://nats.messaging.svc.cluster.local:4222}" intake-agent 2>&1)
+    DESIGN_BRIEF=$(echo "$DELIBERATION_OUTPUT" | jq -r '.data.design_brief // ""' 2>/dev/null)
+    if [ -n "$DESIGN_BRIEF" ] && [ "$DESIGN_BRIEF" != "null" ]; then
+        echo "$DESIGN_BRIEF" > ".tasks/docs/design-brief.md"
+        echo "  ✅ Design brief generated ($(wc -l < .tasks/docs/design-brief.md) lines)"
+        # Use design brief as PRD for task generation
+        echo "$DESIGN_BRIEF" > /tmp/design-brief-for-intake.txt
+        INTAKE_ARGS="$INTAKE_ARGS --prd /tmp/design-brief-for-intake.txt"
+    else
+        echo "  ⚠️ Deliberation returned no design brief — proceeding with raw PRD"
+    fi
+else
+    echo "  ℹ️ Deliberation skipped (deliberate=false or intake-agent not found)"
+fi
+
 echo ""
 echo "📋 Running: intake intake $INTAKE_ARGS"
 echo ""
