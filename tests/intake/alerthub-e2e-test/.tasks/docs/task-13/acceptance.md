@@ -1,19 +1,10 @@
-# Acceptance Criteria - Task 13
+# Acceptance Criteria: Task 13
 
-## Task
-Kafka Event Publishing (Rex - Rust/Axum)
-
-## Criteria
-1. Notification submissions trigger Kafka events
-2. events visible in Kafka topic
-3. service handles Kafka downtime gracefully
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Integrate Kafka producer to publish notification events for downstream processing
+- [ ] Notification submissions trigger Kafka events, events visible in Kafka topic, service handles Kafka downtime gracefully
+- [ ] All requirements implemented
+- [ ] Tests passing (`cargo test --workspace` exits 0)
+- [ ] Lints passing (`cargo clippy --all-targets -- -D warnings -W clippy::pedantic` exits 0)
+- [ ] Formatted (`cargo fmt --all --check` exits 0)
+- [ ] Build succeeds (`cargo build --release` exits 0)
+- [ ] PR created and ready for review

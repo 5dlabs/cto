@@ -1,19 +1,10 @@
-# Acceptance Criteria - Task 26
+# Acceptance Criteria: Task 26
 
-## Task
-Analytics and Reporting Service (Grizz - Go/gRPC)
-
-## Criteria
-1. Analytics queries return accurate metrics
-2. time-series aggregation works
-3. performance acceptable for dashboard queries
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Implement AnalyticsService for notification metrics and delivery statistics
+- [ ] Analytics queries return accurate metrics, time-series aggregation works, performance acceptable for dashboard queries
+- [ ] All requirements implemented
+- [ ] Tests passing (`go test ./...` exits 0)
+- [ ] Lints passing (`golangci-lint run` exits 0)
+- [ ] Formatted (`gofmt -l .` exits 0)
+- [ ] Build succeeds (`go build ./...` exits 0)
+- [ ] PR created and ready for review

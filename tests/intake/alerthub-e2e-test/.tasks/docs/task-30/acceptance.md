@@ -1,20 +1,10 @@
-# Acceptance Criteria - Task 30
+# Acceptance Criteria: Task 30
 
-## Task
-Desktop Client Foundation (Spark - Electron)
-
-## Criteria
-1. Electron app starts
-2. system tray shows unread count
-3. desktop notifications appear
-4. main window displays notifications
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Create Electron app with system tray integration and native desktop notifications
+- [ ] Electron app starts, system tray shows unread count, desktop notifications appear, main window displays notifications
+- [ ] All requirements implemented
+- [ ] Tests passing (`npm run test` exits 0)
+- [ ] Lints passing (`npm run lint` exits 0)
+- [ ] Formatted (`npm run format:check` exits 0)
+- [ ] Build succeeds (`npm run build` exits 0)
+- [ ] PR created and ready for review

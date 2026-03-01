@@ -1,22 +1,10 @@
-# Acceptance Criteria - Task 14
+# Acceptance Criteria: Task 14
 
-## Task
-WebSocket Real-time Updates (Rex - Rust/Axum)
-
-## Criteria
-1. WebSocket connections established
-2. receives real-time updates when notifications change status
-3. handles client disconnections
-
-## Decision Points Requiring Resolution
-### Hard Constraints (Must Follow)
-- **d14**: Maximum concurrent WebSocket connections
-
-
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Implement WebSocket endpoint for real-time notification status updates
+- [ ] WebSocket connections established, receives real-time updates when notifications change status, handles client disconnections
+- [ ] All requirements implemented
+- [ ] Tests passing (`cargo test --workspace` exits 0)
+- [ ] Lints passing (`cargo clippy --all-targets -- -D warnings -W clippy::pedantic` exits 0)
+- [ ] Formatted (`cargo fmt --all --check` exits 0)
+- [ ] Build succeeds (`cargo build --release` exits 0)
+- [ ] PR created and ready for review

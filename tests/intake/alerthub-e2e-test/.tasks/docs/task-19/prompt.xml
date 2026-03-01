@@ -1,34 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="19" project="alerthub">
-  <title>Slack Integration Service</title>
-  <agent name="nova" stack="Bun/Elysia+Effect" />
-  <priority>high</priority>
-  <status>pending</status>
-  
-  <description>
-    Implement Slack delivery service with Effect retry logic and error handling
-  </description>
-  
-  <dependencies>
-    <dependency task_id="18" />
-  </dependencies>
-  
-  <implementation>
-    <details>1. Create SlackService using Effect.Service pattern\n2. Implement webhook and Bot API delivery methods\n3. Add Effect.retry with exponential backoff\n4. Handle Slack-specific errors as tagged unions\n5. Add rate limiting with Effect.Semaphore</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d19" category="error-handling" constraint="soft" requires_approval="false">
-      <description>Slack API failure retry strategy</description>
-      <options>
-        <option>3 retries with exponential backoff</option>
-        <option>5 retries with fixed delay</option>
-        <option>circuit breaker pattern</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    Can deliver notifications to Slack webhooks, retries work on failures, rate limiting prevents API abuse
-  </acceptance_criteria>
+<task id="19" priority="high" agent="nova">
+    <meta>
+        <title>Slack Integration Service (Nova - Bun/Elysia+Effect)</title>
+        <priority>high</priority>
+        <dependencies>18</dependencies>
+        <agent_hint>nova</agent_hint>
+    </meta>
+
+    <role>You are a Senior Node.js Engineer with expertise in server-side JavaScript and APIs. Implement Task 19 with production-quality code.</role>
+
+    <context>
+        <overview>Implement Slack delivery service with Effect retry logic and error handling</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 18
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Create SlackService using Effect.Service pattern\n2. Implement webhook and Bot API delivery methods\n3. Add Effect.retry with exponential backoff\n4. Handle Slack-specific errors as tagged unions\n5. Add rate limiting with Effect.Semaphore</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-19): Slack Integration Service (Nova - Bun/Elysia+Effect)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>Can deliver notifications to Slack webhooks, retries work on failures, rate limiting prevents API abuse</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>bun test</command>
+        <command>bun run lint</command>
+        <command>bun run typecheck</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

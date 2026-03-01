@@ -1,34 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="8" project="alerthub">
-  <title>Monitoring and Observability Setup</title>
-  <agent name="bolt" stack="Kubernetes" />
-  <priority>medium</priority>
-  <status>pending</status>
-  
-  <description>
-    Deploy Prometheus, Grafana, and logging stack for system observability
-  </description>
-  
-  <dependencies>
-    <dependency task_id="1" />
-  </dependencies>
-  
-  <implementation>
-    <details>1. Install Prometheus operator and Prometheus instance\n2. Deploy Grafana with AlertHub dashboards\n3. Set up log aggregation with Loki or ELK\n4. Configure alert rules for SLA monitoring\n5. Create service monitors for all components</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d8" category="performance" constraint="soft" requires_approval="false">
-      <description>Metrics retention and storage strategy</description>
-      <options>
-        <option>15 days local</option>
-        <option>30 days local</option>
-        <option>90 days with remote storage</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    Prometheus collecting metrics from all services, Grafana dashboards loading, alerts firing for test conditions
-  </acceptance_criteria>
+<task id="8" priority="medium" agent="bolt">
+    <meta>
+        <title>Monitoring and Observability Setup (Bolt - Kubernetes)</title>
+        <priority>medium</priority>
+        <dependencies>1</dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 8 with production-quality code.</role>
+
+    <context>
+        <overview>Deploy Prometheus, Grafana, and logging stack for system observability</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 1
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Install Prometheus operator and Prometheus instance\n2. Deploy Grafana with AlertHub dashboards\n3. Set up log aggregation with Loki or ELK\n4. Configure alert rules for SLA monitoring\n5. Create service monitors for all components</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-8): Monitoring and Observability Setup (Bolt - Kubernetes)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>Prometheus collecting metrics from all services, Grafana dashboards loading, alerts firing for test conditions</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>kubectl get pods -n {namespace} - verify all pods running</command>
+        <command>kubectl get secrets - verify connection secrets created</command>
+        <command>kubectl logs {pod} - check for errors</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

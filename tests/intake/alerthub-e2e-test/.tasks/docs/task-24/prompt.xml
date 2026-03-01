@@ -1,34 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="24" project="alerthub">
-  <title>Tenant and User Management</title>
-  <agent name="grizz" stack="Go/gRPC" />
-  <priority>high</priority>
-  <status>pending</status>
-  
-  <description>
-    Implement TenantService and UserService with database operations
-  </description>
-  
-  <dependencies>
-    <dependency task_id="23" />
-  </dependencies>
-  
-  <implementation>
-    <details>1. Implement TenantService CRUD operations\n2. Add UserService with preference management\n3. Set up PostgreSQL connection and queries\n4. Add JWT authentication middleware\n5. Implement role-based access control</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d24" category="security" constraint="hard" requires_approval="false">
-      <description>JWT token expiration times</description>
-      <options>
-        <option>15min access + 7day refresh</option>
-        <option>1hour access + 30day refresh</option>
-        <option>configurable per tenant</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    Can create/read/update tenants and users, authentication works, RBAC properly restricts access
-  </acceptance_criteria>
+<task id="24" priority="high" agent="grizz">
+    <meta>
+        <title>Tenant and User Management (Grizz - Go/gRPC)</title>
+        <priority>high</priority>
+        <dependencies>23</dependencies>
+        <agent_hint>grizz</agent_hint>
+    </meta>
+
+    <role>You are a Senior Go Engineer with expertise in concurrent systems and microservices. Implement Task 24 with production-quality code.</role>
+
+    <context>
+        <overview>Implement TenantService and UserService with database operations</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 23
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Implement TenantService CRUD operations\n2. Add UserService with preference management\n3. Set up PostgreSQL connection and queries\n4. Add JWT authentication middleware\n5. Implement role-based access control</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-24): Tenant and User Management (Grizz - Go/gRPC)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>Can create/read/update tenants and users, authentication works, RBAC properly restricts access</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>go test ./...</command>
+        <command>golangci-lint run</command>
+        <command>go build ./...</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

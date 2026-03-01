@@ -1,19 +1,10 @@
-# Acceptance Criteria - Task 7
+# Acceptance Criteria: Task 7
 
-## Task
-SeaweedFS Object Storage Setup (Bolt - Kubernetes)
-
-## Criteria
-1. SeaweedFS is running
-2. S3 API responds
-3. can create/delete objects in test bucket using AWS CLI
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Deploy SeaweedFS for S3-compatible object storage of attachments and exports
+- [ ] SeaweedFS is running, S3 API responds, can create/delete objects in test bucket using AWS CLI
+- [ ] All requirements implemented
+- [ ] Tests passing (`helm lint charts/*` exits 0)
+- [ ] Lints passing (`kubectl apply --dry-run=client -f . -R` exits 0)
+- [ ] Formatted (`yamllint .` exits 0)
+- [ ] Build succeeds (`helm template charts/*` exits 0)
+- [ ] PR created and ready for review

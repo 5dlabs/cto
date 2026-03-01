@@ -1,20 +1,10 @@
-# Acceptance Criteria - Task 6
+# Acceptance Criteria: Task 6
 
-## Task
-RabbitMQ Task Queue Setup (Bolt - Kubernetes)
-
-## Criteria
-1. RabbitMQ is running
-2. management UI accessible
-3. can publish/consume messages
-4. DLQs are configured
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Deploy RabbitMQ operator for integration delivery task queues
+- [ ] RabbitMQ is running, management UI accessible, can publish/consume messages, DLQs are configured
+- [ ] All requirements implemented
+- [ ] Tests passing (`helm lint charts/*` exits 0)
+- [ ] Lints passing (`kubectl apply --dry-run=client -f . -R` exits 0)
+- [ ] Formatted (`yamllint .` exits 0)
+- [ ] Build succeeds (`helm template charts/*` exits 0)
+- [ ] PR created and ready for review

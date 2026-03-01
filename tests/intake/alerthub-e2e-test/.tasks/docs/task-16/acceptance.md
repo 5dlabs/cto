@@ -1,20 +1,10 @@
-# Acceptance Criteria - Task 16
+# Acceptance Criteria: Task 16
 
-## Task
-Service Deployment and Configuration (Rex - Rust/Axum)
-
-## Criteria
-1. Service deploys successfully
-2. health checks pass
-3. scales based on load
-4. accessible via Kubernetes service
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Create Kubernetes manifests and deploy notification router service
+- [ ] Service deploys successfully, health checks pass, scales based on load, accessible via Kubernetes service
+- [ ] All requirements implemented
+- [ ] Tests passing (`cargo test --workspace` exits 0)
+- [ ] Lints passing (`cargo clippy --all-targets -- -D warnings -W clippy::pedantic` exits 0)
+- [ ] Formatted (`cargo fmt --all --check` exits 0)
+- [ ] Build succeeds (`cargo build --release` exits 0)
+- [ ] PR created and ready for review

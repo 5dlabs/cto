@@ -1,34 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="14" project="alerthub">
-  <title>WebSocket Real-time Updates</title>
-  <agent name="rex" stack="Rust/Axum" />
-  <priority>medium</priority>
-  <status>pending</status>
-  
-  <description>
-    Implement WebSocket endpoint for real-time notification status updates
-  </description>
-  
-  <dependencies>
-    <dependency task_id="11" />
-  </dependencies>
-  
-  <implementation>
-    <details>1. Add WebSocket support to Axum\n2. Implement /api/v1/ws endpoint with authentication\n3. Subscribe to Redis pub/sub for updates\n4. Handle WebSocket connection lifecycle\n5. Add connection metrics and limits</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d14" category="performance" constraint="hard" requires_approval="false">
-      <description>Maximum concurrent WebSocket connections</description>
-      <options>
-        <option>1000 connections</option>
-        <option>5000 connections</option>
-        <option>unlimited</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    WebSocket connections established, receives real-time updates when notifications change status, handles client disconnections
-  </acceptance_criteria>
+<task id="14" priority="medium" agent="rex">
+    <meta>
+        <title>WebSocket Real-time Updates (Rex - Rust/Axum)</title>
+        <priority>medium</priority>
+        <dependencies>11</dependencies>
+        <agent_hint>rex</agent_hint>
+    </meta>
+
+    <role>You are a Senior Rust Engineer with expertise in systems programming and APIs. Implement Task 14 with production-quality code.</role>
+
+    <context>
+        <overview>Implement WebSocket endpoint for real-time notification status updates</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 11
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Add WebSocket support to Axum\n2. Implement /api/v1/ws endpoint with authentication\n3. Subscribe to Redis pub/sub for updates\n4. Handle WebSocket connection lifecycle\n5. Add connection metrics and limits</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-14): WebSocket Real-time Updates (Rex - Rust/Axum)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>WebSocket connections established, receives real-time updates when notifications change status, handles client disconnections</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>cargo test --all</command>
+        <command>cargo clippy -- -D warnings</command>
+        <command>cargo fmt --check</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

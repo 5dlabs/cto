@@ -1211,6 +1211,8 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 docs_repository,
                 docs_project_directory,
                 auto_append_deploy_task: auto_append_deploy,
+                deliberate: false,
+                design_brief_path: None,
             };
 
             ui::print_info("Starting intake workflow...");

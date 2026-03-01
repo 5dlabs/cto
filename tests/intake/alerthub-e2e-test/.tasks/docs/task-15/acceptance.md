@@ -1,19 +1,10 @@
-# Acceptance Criteria - Task 15
+# Acceptance Criteria: Task 15
 
-## Task
-Notification Query API (Rex - Rust/Axum)
-
-## Criteria
-1. Can retrieve notification by ID
-2. events endpoint returns delivery history
-3. pagination works correctly
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Implement GET endpoints for notification status and event history
+- [ ] Can retrieve notification by ID, events endpoint returns delivery history, pagination works correctly
+- [ ] All requirements implemented
+- [ ] Tests passing (`cargo test --workspace` exits 0)
+- [ ] Lints passing (`cargo clippy --all-targets -- -D warnings -W clippy::pedantic` exits 0)
+- [ ] Formatted (`cargo fmt --all --check` exits 0)
+- [ ] Build succeeds (`cargo build --release` exits 0)
+- [ ] PR created and ready for review

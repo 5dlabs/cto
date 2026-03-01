@@ -1,22 +1,10 @@
-# Acceptance Criteria - Task 24
+# Acceptance Criteria: Task 24
 
-## Task
-Tenant and User Management (Grizz - Go/gRPC)
-
-## Criteria
-1. Can create/read/update tenants and users
-2. authentication works
-3. RBAC properly restricts access
-
-## Decision Points Requiring Resolution
-### Hard Constraints (Must Follow)
-- **d24**: JWT token expiration times
-
-
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Implement TenantService and UserService with database operations
+- [ ] Can create/read/update tenants and users, authentication works, RBAC properly restricts access
+- [ ] All requirements implemented
+- [ ] Tests passing (`go test ./...` exits 0)
+- [ ] Lints passing (`golangci-lint run` exits 0)
+- [ ] Formatted (`gofmt -l .` exits 0)
+- [ ] Build succeeds (`go build ./...` exits 0)
+- [ ] PR created and ready for review
