@@ -9,7 +9,7 @@ global:
 agent:
   id: "optimist"
   name: "Optimist"
-  model: "bedrock/us.anthropic.claude-opus-4-6-v1:0"
+  model: "anthropic/claude-sonnet-4-6"
   heartbeat: "30s"  # responsive to NATS messages; requestHeartbeatNow not available, need periodic poll
   sandbox: "off"
   fallbacks:
@@ -53,7 +53,7 @@ memorySearch:
   enabled: false  # Stateless deliberation agent
 
 modelDefaults:
-  primary: "bedrock/us.anthropic.claude-opus-4-6-v1:0"
+  primary: "anthropic/claude-sonnet-4-6"
   fallbacks:
     - "anthropic/claude-sonnet-4-6"
     - "minimax/MiniMax-M2.5"
