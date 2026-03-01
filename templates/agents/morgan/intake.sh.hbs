@@ -302,8 +302,9 @@ else
 fi
 
 # Build intake CLI arguments
-INTAKE_ARGS="--prd .tasks/docs/prd.txt"
-INTAKE_ARGS="$INTAKE_ARGS --num-tasks $NUM_TASKS"
+# PRD path will be set to design brief if deliberation succeeds, otherwise use raw PRD
+PRD_PATH=".tasks/docs/prd.txt"
+INTAKE_ARGS="--num-tasks $NUM_TASKS"
 
 # Use CLI mode instead of API mode for AI operations
 # This uses the external CLI (claude, codex, etc.) instead of direct API calls
@@ -358,20 +359,23 @@ if [ "$DELIBERATE" = "true" ] && command -v intake-agent >/dev/null 2>&1; then
                 "research_enabled": true, \
                 "research_timeout_minutes": 5 \
             } \
-        }' | NATS_URL="${NATS_URL:-nats://nats.messaging.svc.cluster.local:4222}" intake-agent 2>&1)
+        }' | NATS_URL="${NATS_URL:-nats://nats.messaging.svc.cluster.local:4222}" intake-agent)
     DESIGN_BRIEF=$(echo "$DELIBERATION_OUTPUT" | jq -r '.data.design_brief // ""' 2>/dev/null)
     if [ -n "$DESIGN_BRIEF" ] && [ "$DESIGN_BRIEF" != "null" ]; then
         echo "$DESIGN_BRIEF" > ".tasks/docs/design-brief.md"
         echo "  ✅ Design brief generated ($(wc -l < .tasks/docs/design-brief.md) lines)"
         # Use design brief as PRD for task generation
         echo "$DESIGN_BRIEF" > /tmp/design-brief-for-intake.txt
-        INTAKE_ARGS="$INTAKE_ARGS --prd /tmp/design-brief-for-intake.txt"
+        PRD_PATH="/tmp/design-brief-for-intake.txt"
     else
         echo "  ⚠️ Deliberation returned no design brief — proceeding with raw PRD"
     fi
 else
     echo "  ℹ️ Deliberation skipped (deliberate=false or intake-agent not found)"
 fi
+
+# Add PRD path to intake arguments (set to design brief if deliberation succeeded)
+INTAKE_ARGS="--prd $PRD_PATH $INTAKE_ARGS"
 
 echo ""
 echo "📋 Running: intake intake $INTAKE_ARGS"
