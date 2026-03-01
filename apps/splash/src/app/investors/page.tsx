@@ -1,6 +1,5 @@
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { WaitlistForm } from "@/components/waitlist-form";
 
 const highlights = [
   {
@@ -72,7 +71,7 @@ export default function InvestorsPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       {/* Background layers */}
-      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
+      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.04_0.02_260)] z-0" />
       <div className="fixed inset-0 circuit-bg z-[1]" />
       {/* GridPulse at z-[2] from layout */}
       <div className="fixed inset-0 noise-overlay z-[3]" />
@@ -302,22 +301,24 @@ export default function InvestorsPage() {
           </div>
         </section>
 
-        {/* Investor Interest + CTA */}
+        {/* Investor CTA */}
         <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-2xl mx-auto">
-            <WaitlistForm
-              source="investor"
-              heading="Stay Updated on Our Raise"
-              subheading="Drop your email to receive investor updates, pitch deck access, and fundraise milestones."
-            />
+          <div className="max-w-2xl mx-auto text-center">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+              Let&apos;s <span className="gradient-text">Talk</span>
+            </h2>
+            <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
+              Interested in learning more? Download the one-pager, schedule a
+              conversation, or meet the founder.
+            </p>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
               <a
                 href="/5dlabs-investor-one-pager.pdf"
                 download
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 text-center"
               >
-                Download Investor One-Pager (PDF)
+                Download One-Pager (PDF)
               </a>
               <a
                 href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
@@ -334,8 +335,8 @@ export default function InvestorsPage() {
                 Meet the Founder
               </a>
             </div>
-            <p className="text-sm text-muted-foreground mt-6 text-center">
-              Investor one-pager available now. Full pitch deck available upon request.
+            <p className="text-sm text-muted-foreground mt-6">
+              Full pitch deck available upon request.
             </p>
           </div>
         </section>
