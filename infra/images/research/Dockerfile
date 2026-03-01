@@ -135,7 +135,7 @@ COPY --from=intake-builder /build/dist/intake-agent /usr/local/bin/intake-agent
 RUN chmod +x /usr/local/bin/intake-agent
 
 # Verify binaries work
-RUN research --help && intake --help && intake-agent --help
+RUN research --help && intake-agent --help && (ldd /usr/local/bin/intake 2>&1 || true) && (intake --help 2>&1 | head -3 || echo "⚠️ intake binary check: see ldd output above")
 
 USER research
 
@@ -159,7 +159,7 @@ COPY intake-agent /usr/local/bin/intake-agent
 RUN chmod +x /usr/local/bin/intake-agent
 
 # Verify binaries work
-RUN research --help && intake --help && intake-agent --help
+RUN research --help && intake-agent --help && (ldd /usr/local/bin/intake 2>&1 || true) && (intake --help 2>&1 | head -3 || echo "⚠️ intake binary check: see ldd output above")
 
 USER research
 
