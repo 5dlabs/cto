@@ -13,7 +13,7 @@ No - must wait for dependencies
 Setup Kafka consumer group configurations for integration service consumers
 
 ## Dependencies
-- Subtask 3.3.1
+- Subtask 4.2
 
 ## Implementation Details
 Configure consumer groups for integration service (alerthub-integration-consumers), set offset strategies, consumer lag monitoring

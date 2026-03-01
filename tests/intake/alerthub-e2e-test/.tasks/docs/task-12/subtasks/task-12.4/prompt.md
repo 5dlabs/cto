@@ -13,9 +13,8 @@ No - must wait for dependencies
 Create unit and integration tests covering all CRUD endpoints with Effect error scenarios, validation edge cases, and tenant isolation
 
 ## Dependencies
-- Subtask 13.1
-- Subtask 13.2
-- Subtask 13.3
+- Subtask 12.2
+- Subtask 12.3
 
 ## Implementation Details
 Write test suite covering POST, GET, PATCH, DELETE endpoints with test cases for successful operations, validation failures, authorization errors, tenant isolation, database constraint violations, and Effect error handling paths. Include test fixtures and mock data setup.

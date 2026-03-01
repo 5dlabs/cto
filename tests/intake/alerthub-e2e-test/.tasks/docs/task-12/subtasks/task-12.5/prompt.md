@@ -13,9 +13,8 @@ No - must wait for dependencies
 Conduct code review of all CRUD endpoints focusing on Effect patterns, error handling consistency, security, and API design best practices
 
 ## Dependencies
-- Subtask 13.1
-- Subtask 13.2
-- Subtask 13.3
+- Subtask 12.2
+- Subtask 12.3
 
 ## Implementation Details
 Review implementation quality including Effect usage patterns, error handling consistency across endpoints, request/response validation, tenant isolation implementation, MongoDB query optimization, API design adherence to REST principles, and security considerations.

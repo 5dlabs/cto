@@ -13,7 +13,7 @@ No - must wait for dependencies
 Provision PostgreSQL, Redis/Valkey, and MongoDB clusters using their respective CRDs
 
 ## Dependencies
-- Subtask 1.1.2
+- Subtask 1.1
 
 ## Implementation Details
 Deploy CloudNative-PG cluster, Redis/Valkey instance, Percona MongoDB replica set with persistent storage

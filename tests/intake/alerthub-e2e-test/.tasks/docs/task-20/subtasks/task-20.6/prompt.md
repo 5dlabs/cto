@@ -13,9 +13,9 @@ No - must wait for dependencies
 Create comprehensive unit and integration tests for all channel delivery services including error scenarios, retry logic validation, and rate limiting behavior testing.
 
 ## Dependencies
-- Subtask 14.1
-- Subtask 14.2
-- Subtask 14.3
+- Subtask 19.1
+- Subtask 20.4
+- Subtask 20.5
 
 ## Implementation Details
 Develop test suite covering SlackService, DiscordService, EmailService, and WebhookService. Include unit tests for each service method, integration tests with mocked external APIs, error scenario testing (network failures, API errors, rate limiting), retry logic validation, and Semaphore rate limiting behavior verification. Create test utilities for mocking HTTP responses and simulating various failure conditions.

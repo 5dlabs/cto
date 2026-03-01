@@ -13,8 +13,8 @@ No - must wait for dependencies
 Apply network policies for service isolation and verify all services can communicate
 
 ## Dependencies
-- Subtask 1.1.3
-- Subtask 1.1.4
+- Subtask 1.1
+- Subtask 1.2
 
 ## Implementation Details
 Create NetworkPolicy resources for each namespace, test connectivity between services, validate health endpoints

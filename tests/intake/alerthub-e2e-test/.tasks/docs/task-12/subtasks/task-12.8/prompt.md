@@ -13,7 +13,7 @@ No - must wait for dependencies
 Setup grpc-gateway annotations for HTTP/REST access to tenant gRPC methods
 
 ## Dependencies
-- Subtask 18.18.3
+- Subtask 18.18.2
 
 ## Implementation Details
 Add grpc-gateway annotations to proto definitions, configure HTTP rules for POST /api/v1/tenants, GET /api/v1/tenants/:id, PUT /api/v1/tenants/:id, GET /api/v1/tenants

@@ -13,8 +13,8 @@ No - must wait for dependencies
 Test producer/consumer connectivity and measure baseline throughput for message brokers
 
 ## Dependencies
-- Subtask 3.3.2
-- Subtask 3.3.3
+- Subtask 7.1
+- Subtask 4.2
 
 ## Implementation Details
 Run connectivity tests, measure publish/consume latency, validate DLQ routing works, confirm retention policies applied

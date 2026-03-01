@@ -13,7 +13,7 @@ No - must wait for dependencies
 Add metrics collection middleware to all Axum route handlers
 
 ## Dependencies
-- Subtask 11.11.3
+- Subtask 11.11.1
 
 ## Implementation Details
 Implement Tower middleware layer that records request duration, status codes, and endpoint labels for all routes automatically

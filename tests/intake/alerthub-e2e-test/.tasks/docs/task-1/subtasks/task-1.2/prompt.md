@@ -13,7 +13,7 @@ No - must wait for dependencies
 Setup databases, messaging, kafka, and seaweedfs namespaces with mayastor storage class
 
 ## Dependencies
-- Subtask 1.1.1
+- Subtask 1.1
 
 ## Implementation Details
 Create namespaces: databases, messaging, kafka, seaweedfs. Configure mayastor storage class for persistent volumes
