@@ -186,7 +186,8 @@ async function waitForResponse(
   _roomSubject: string,
   sessionId: string,
   expectedFrom: string,
-  timeoutMs: number
+  timeoutMs: number,
+  expectedType?: string
 ): Promise<NatsMessage> {
   return new Promise((resolve, reject) => {
     let cleanup: (() => void) | undefined;
@@ -215,6 +216,10 @@ async function waitForResponse(
           structured = { type: 'debate_response', session_id: sessionId, from, content: rawMessage };
         }
       }
+
+      // Filter by message type if specified to prevent late responses from
+      // previous phases being captured (e.g., late research_findings during debate)
+      if (expectedType && structured.type !== expectedType) return;
 
       clearTimeout(timer);
       cleanup?.();
@@ -499,8 +504,8 @@ async function runResearchPhase(
 
   // Collect responses concurrently
   const [optimistResult, pessimistResult] = await Promise.allSettled([
-    waitForResponse(nats, DELIBERATION_ROOM, sessionId, 'optimist', timeoutMs),
-    waitForResponse(nats, DELIBERATION_ROOM, sessionId, 'pessimist', timeoutMs),
+    waitForResponse(nats, DELIBERATION_ROOM, sessionId, 'optimist', timeoutMs, 'research_findings'),
+    waitForResponse(nats, DELIBERATION_ROOM, sessionId, 'pessimist', timeoutMs, 'research_findings'),
   ]);
 
   const optimistFindings = optimistResult.status === 'fulfilled'
@@ -643,7 +648,8 @@ export async function runDeliberation(
         DELIBERATION_ROOM,
         sessionId,
         nextSpeaker,
-        AGENT_SKIP_TIMEOUT_MS
+        AGENT_SKIP_TIMEOUT_MS,
+        'debate_response'
       );
     } catch {
       console.error(`[DELIBERATION] ${nextSpeaker} timed out on turn ${turnCount + 1} — skipping turn and continuing`);
