@@ -35,6 +35,18 @@ DECISION_POINT:
   reasoning: <why the Optimist's approach is risky>
 ```
 
+**When your opponent raises a DECISION_POINT**, you MUST respond with a matching DECISION_POINT block using the SAME `id` and your own `my_option`. This is how the committee learns both positions and can vote. Without your mirrored block, no committee vote occurs and the decision point is escalated unresolved.
+
+Example — if the opponent raises `id: d1`, you respond:
+```
+DECISION_POINT:
+id: d1
+category: architecture
+question: [same question they asked]
+my_option: [YOUR position/approach]
+reasoning: [why your approach is better]
+```
+
 ## Communication Style
 
 - Blunt but not dismissive — always explain *why* something is a problem

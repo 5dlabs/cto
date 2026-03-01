@@ -148,8 +148,6 @@ async function getNatsClient(): Promise<NatsClient> {
 // Decision Point Parser
 // =============================================================================
 
-const DECISION_POINT_REGEX = /DECISION_POINT:\s*\n\s*id:\s*(\S+)\s*\n\s*category:\s*(\S+)\s*\n\s*question:\s*(.+?)\s*\n\s*my_option:\s*(.+?)\s*\n\s*reasoning:\s*(.+?)(?=\n\n|$)/gs;
-
 const VALID_CATEGORIES = [
   'architecture',
   'error-handling',
@@ -177,23 +175,35 @@ interface ParsedDecisionPoint {
 
 function parseDecisionPoints(content: string, speaker: 'optimist' | 'pessimist'): ParsedDecisionPoint[] {
   const points: ParsedDecisionPoint[] = [];
-  let match: RegExpExecArray | null;
+  // Fresh regex each call — no shared lastIndex state
+  const blockRegex = /DECISION_POINT:\s*\n([\s\S]+?)(?=\n\nDECISION_POINT:|\n\n(?!\s)|$)/g;
+  let blockMatch: RegExpExecArray | null;
 
-  // Reset regex
-  DECISION_POINT_REGEX.lastIndex = 0;
+  while ((blockMatch = blockRegex.exec(content)) !== null) {
+    const block = blockMatch[1];
+    const get = (field: string) => {
+      const m = new RegExp(`^${field}:\\s*(.+?)\\s*$`, 'm').exec(block);
+      return m?.[1]?.trim() ?? '';
+    };
+    const id = get('id').replace(/[.,;:!?]+$/, '');
+    const category = get('category').replace(/[.,;:!?]+$/, '');
+    const question = get('question');
+    const my_option = get('my_option');
+    const reasoning = block.replace(/^(?:id|category|question|my_option):[^\n]*\n?/gm, '').trim()
+      || get('reasoning');
 
-  while ((match = DECISION_POINT_REGEX.exec(content)) !== null) {
-    const category = (match[2] ?? '').trim();
+    if (!id || !category || !question || !my_option) continue;
+
     if (!isValidCategory(category)) {
-      console.error(`[DELIBERATION] Invalid category "${category}" — skipping decision point ${match[1]}`);
+      console.error(`[DELIBERATION] Invalid category "${category}" — skipping decision point ${id}`);
       continue;
     }
     points.push({
-      id: (match[1] ?? '').trim(),
+      id,
       category,
-      question: (match[3] ?? '').trim(),
-      proposingOption: (match[4] ?? '').trim(),
-      reasoning: (match[5] ?? '').trim(),
+      question,
+      proposingOption: my_option,
+      reasoning,
       raisedBy: speaker,
     });
   }

@@ -8,9 +8,6 @@ inputs:
   - name: prd_content
     type: string
     description: "Full PRD markdown content"
-  - name: prd_path
-    type: string
-    description: "Path to the PRD file (for logging)"
   - name: timebox_minutes
     type: number
     default: 30
@@ -57,7 +54,8 @@ steps:
                 "your_role": "optimist",
                 "opponent_id": "pessimist"
               }
-            }' | xargs -0 openclaw.invoke --tool nats-publish --args-json
+            }' > /tmp/optimist-msg.json &&
+          openclaw.invoke --tool nats-publish --args-json "$(cat /tmp/optimist-msg.json)"
       - name: notify-pessimist
         command: >
           jq -n
@@ -76,7 +74,8 @@ steps:
                 "your_role": "pessimist",
                 "opponent_id": "optimist"
               }
-            }' | xargs -0 openclaw.invoke --tool nats-publish --args-json
+            }' > /tmp/pessimist-msg.json &&
+          openclaw.invoke --tool nats-publish --args-json "$(cat /tmp/pessimist-msg.json)"
 
   # ─────────────────────────────────────────────────────────
   # Step 2: Conduct the time-boxed debate
@@ -115,20 +114,21 @@ steps:
     description: "Synthesize deliberation result + original PRD into design-brief.md"
     depends_on: [conduct-deliberation]
     command: >
+      echo '${{ steps.conduct-deliberation.output }}' > /tmp/delib_result.json &&
       jq -n
         --arg prompt "{{prompts/compile-design-brief-system.md}}"
         --arg prd_content "{{inputs.prd_content}}"
-        --argjson delib_result "${{ steps.conduct-deliberation.output }}"
+        --slurpfile delib_result /tmp/delib_result.json
         '{
           "prompt": $prompt,
           "input": {
-            "deliberation_result": $delib_result,
+            "deliberation_result": $delib_result[0],
             "prd_content": $prd_content
           },
           "provider": "anthropic",
           "model": "claude-opus-4-20250514",
           "temperature": 0.2
-        }' | xargs -0 openclaw.invoke --tool llm-task --action text --args-json
+        }' | xargs -I{} openclaw.invoke --tool llm-task --action text --args-json '{}'
 
   # ─────────────────────────────────────────────────────────
   # Step 4: Save design brief to .tasks/docs/design-brief.md
@@ -140,3 +140,7 @@ steps:
       mkdir -p .tasks/docs &&
       echo "${{ steps.compile-brief.output }}" > .tasks/docs/design-brief.md &&
       echo "Design brief saved to .tasks/docs/design-brief.md"
+
+output_mappings:
+  design_brief: ${{ steps.compile-brief.output }}
+  deliberation_result: ${{ steps.conduct-deliberation.output }}
