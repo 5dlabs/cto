@@ -73,11 +73,11 @@ steps:
 
   - name: commit-outputs
     description: "Stage all generated task files for PR"
-    depends_on: [generate-prompts]
+    depends_on: [generate-prompts, generate-docs]
     command: >
       git config user.email "morgan@5dlabs.io" &&
       git config user.name "Morgan (Intake Agent)" &&
-      git checkout -b intake/{{inputs.project_name}}-$(date +%Y%m%d-%H%M%S) 2>/dev/null || true &&
+      git checkout -b intake/{{inputs.project_name}}-$(date +%Y%m%d-%H%M%S) &&
       git add .tasks/ &&
       git diff --staged --stat &&
       git commit -m "feat(intake): generated tasks for {{inputs.project_name}}

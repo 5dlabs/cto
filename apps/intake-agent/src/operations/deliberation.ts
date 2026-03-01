@@ -521,13 +521,16 @@ export async function runDeliberation(
 
   await Promise.all(['optimist', 'pessimist'].map(id => {
     const agentId = id as 'optimist' | 'pessimist';
+    const researchData = payload.research_memos && typeof payload.research_memos === 'object' && 'data' in payload.research_memos
+      ? (payload.research_memos.data as Record<string, string>)
+      : payload.research_memos;
     const startPayload = {
       type: 'deliberation_start',
       session_id: sessionId,
       prd_content: payload.prd_content,
       infrastructure_context: payload.infrastructure_context ?? '',
       timebox_minutes: payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES,
-      research_memo: payload.research_memos?.[agentId] ?? '',
+      research_memo: researchData?.[agentId] ?? '',
     };
     return publishToAgent(nats, agentId, { ...startPayload, to: agentId });
   }));
