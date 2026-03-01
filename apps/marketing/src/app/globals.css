@@ -187,6 +187,13 @@
   50% { transform: scaleY(1) translateY(0%); }
   100% { transform: scaleY(0.3) translateY(100%); }
 }
+@keyframes grid-foreground-rare {
+  0%, 96%, 100% { opacity: 0; }
+  96.8% { opacity: 0.05; }
+  97.6% { opacity: 0.1; }
+  98.4% { opacity: 0.04; }
+  99.2% { opacity: 0; }
+}
 
 /* Circuit pattern background */
 .circuit-bg {
