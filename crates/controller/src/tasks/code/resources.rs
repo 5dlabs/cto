@@ -1531,7 +1531,7 @@ impl<'a> CodeResourceManager<'a> {
         // 1. Creates a unique subdirectory per CodeRun to prevent git lock conflicts
         // 2. Sets proper ownership for the agent (uid 1000)
         let workspace_setup_cmd = format!(
-            "mkdir -p /workspace/{workspace_subdir} && chown -R 1000:1000 /workspace/{workspace_subdir} && chmod -R ug+rwX /workspace/{workspace_subdir}"
+            "mkdir -p /workspace/{workspace_subdir} && chown -R 1000:1000 /workspace/runs && chmod -R ug+rwX /workspace/runs"
         );
         let mut init_containers = vec![json!({
             "name": "setup-workspace",
