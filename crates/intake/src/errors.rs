@@ -1,5 +1,7 @@
 //! Error types for the tasks crate.
 
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 /// Comprehensive error types for task management
@@ -60,6 +62,9 @@ pub enum TasksError {
 
     #[error("Failed to read file '{path}': {reason}")]
     FileReadError { path: String, reason: String },
+
+    #[error("Design brief not found at {path}: {hint}")]
+    MissingDesignBrief { path: PathBuf, hint: String },
 
     #[error("Failed to write file '{path}': {reason}")]
     FileWriteError { path: String, reason: String },

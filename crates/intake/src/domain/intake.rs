@@ -231,25 +231,27 @@ impl IntakeDomain {
         // Falls back to the raw PRD if deliberation is disabled or the brief
         // is not available.
         let prd_content = if config.deliberate {
-            // Deliberation is enabled — check for a brief that was produced in this run
-            let default_brief_path = config.output_dir.join("docs/design-brief.md");
-            if default_brief_path.exists() {
-                let brief = tokio::fs::read_to_string(&default_brief_path)
+            // When deliberating, prefer explicit design_brief_path if set,
+            // then fall back to the default location written by the Lobster workflow
+            let brief_path = config
+                .design_brief_path
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| config.output_dir.join("docs/design-brief.md"));
+            if brief_path.exists() {
+                let brief = tokio::fs::read_to_string(&brief_path)
                     .await
                     .map_err(|e| TasksError::FileReadError {
-                        path: default_brief_path.display().to_string(),
+                        path: brief_path.display().to_string(),
                         reason: e.to_string(),
                     })?;
-                tracing::info!("Using design brief from {:?}", default_brief_path);
+                tracing::info!("Using design brief from {:?}", brief_path);
                 brief
             } else {
-                tracing::warn!(
-                    "deliberate=true but no design brief found at {:?} — \
-                     run the deliberation workflow first, or call the intake \
-                     agent with the brief pre-populated. Falling back to raw PRD.",
-                    default_brief_path
-                );
-                raw_prd_content.clone()
+                return Err(TasksError::MissingDesignBrief {
+                    path: brief_path,
+                    hint: "Run the deliberation step first (deliberation.lobster.yaml) to generate the design brief, or set deliberate=false to use the raw PRD.".to_string(),
+                });
             }
         } else if let Some(ref brief_path) = config.design_brief_path {
             // Deliberation disabled but pre-computed brief supplied — use it as override
