@@ -103,7 +103,7 @@
       },
       {
         "name": "target-repo-webhook-configured",
-        "command": "gh api repos/5dlabs/prd-prd-alerthub-e2e-test/hooks --jq '[.[] | select(.config.url | contains(\"5dlabs\") or contains(\"pm-\"))] | length > 0'",
+        "command": "gh api repos/5dlabs/prd-prd-alerthub-e2e-test/hooks | jq -e '[.[] | select(.config.url | contains(\"5dlabs\") or contains(\"pm-\"))] | length > 0'",
         "description": "Target repo has webhook configured for Linear sync"
       },
       {
@@ -249,7 +249,7 @@
         {
           "name": "intake-pr-created",
           "description": "Intake PR was created in repository",
-          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state all --json title,headRefName --jq '[.[] | select(.headRefName | startswith(\"intake-\"))] | length > 0'"
+          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state all --json title,headRefName | jq -e '[.[] | select(.headRefName | startswith(\"intake-\"))] | length > 0'"
         }
       ],
       "cleanup": [
@@ -269,7 +269,7 @@
         {
           "name": "intake-pr-merged",
           "description": "Intake PR was merged (triggers play via webhook)",
-          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state merged --json number,title --jq '[.[] | select(.title | contains(\"intake\") or contains(\"tasks\"))] | length > 0'"
+          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state merged --json number,title | jq -e '[.[] | select(.title | contains(\"intake\") or contains(\"tasks\"))] | length > 0'"
         },
         {
           "name": "linear-task-issues-created",
@@ -319,7 +319,7 @@
         {
           "name": "agent-tools-match-profile",
           "description": "Agent MCP tools match profile definition (context7, firecrawl, etc.)",
-          "command": "AGENT=$(kubectl get coderuns -n cto -o json | jq -r '[.items[] | select(.spec.runType == \"code\")][0].metadata.labels[\"cto.5dlabs.io/agent-type\"]'); PROFILE_TOOLS=$(curl -sf http://localhost:8081/api/agents/$AGENT/profile | jq -r '.tools | sort | join(\",\")'); POD_TOOLS=$(kubectl get pods -n cto -o json | jq -r '[.items[] | select(.metadata.labels[\"cto.5dlabs.io/run-type\"] == \"code\")][0].spec.containers[0].env[] | select(.name == \"MCP_TOOLS\" or .name == \"AGENT_TOOLS\") | .value' | tr ',' '\\n' | sort | tr '\\n' ','); echo \"Profile: $PROFILE_TOOLS, Pod: $POD_TOOLS\"; [[ \"$POD_TOOLS\" == *\"$PROFILE_TOOLS\"* ]] || [ -n \"$PROFILE_TOOLS\" ]"
+          "command": "AGENT=$(kubectl get coderuns -n cto -o json | jq -r '[.items[] | select(.spec.runType == \"code\")][0].metadata.labels[\"cto.5dlabs.io/agent-type\"]'); PROFILE_TOOLS=$(curl -sf http://localhost:8081/api/agents/$AGENT/profile | jq -r '.tools | sort | join(\",\")'); POD_TOOLS=$(kubectl get pods -n cto -o json | jq -r '[.items[] | select(.metadata.labels[\"cto.5dlabs.io/run-type\"] == \"code\")][0].spec.containers[0].env[] | select(.name == \"MCP_TOOLS\" or .name == \"AGENT_TOOLS\") | .value' | tr ',' '\\n' | sort | tr '\\n' ','); echo \"Profile: $PROFILE_TOOLS, Pod: $POD_TOOLS\"; [[ \"$POD_TOOLS\" == *\"$PROFILE_TOOLS\"* ]] || [ -z \"$PROFILE_TOOLS\" ]"
         },
         {
           "name": "agent-language-correct",
@@ -354,7 +354,7 @@
         {
           "name": "pr-created",
           "description": "PR created in repository",
-          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state open --json number --jq 'length > 0'"
+          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state open --json number | jq -e 'length > 0'"
         },
         {
           "name": "pr-author-correct",
@@ -641,7 +641,7 @@
         {
           "name": "pr-merged",
           "description": "PR was merged",
-          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state merged --json number --jq 'length > 0'"
+          "command": "gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state merged --json number | jq -e 'length > 0'"
         },
         {
           "name": "auto-merge-configured",
@@ -651,7 +651,7 @@
         {
           "name": "atlas-auto-merged",
           "description": "Atlas auto-merged PR after all checks passed",
-          "command": "gh pr view --repo 5dlabs/prd-prd-alerthub-e2e-test 1 --json mergedBy --jq '.mergedBy.login' | grep -iE 'atlas|5dlabs'"
+          "command": "PR_NUM=$(gh pr list --repo 5dlabs/prd-prd-alerthub-e2e-test --state merged --json number --jq '.[0].number'); gh pr view --repo 5dlabs/prd-prd-alerthub-e2e-test $PR_NUM --json mergedBy --jq '.mergedBy.login' | grep -iE 'atlas|5dlabs'"
         },
         {
           "name": "task-sync-before-stage",
@@ -774,7 +774,7 @@
         {
           "name": "ralph-state-tracking",
           "description": "Ralph state file tracks completed objectives correctly",
-          "command": "cat ${ROOT_DIR}/lifecycle-test/ralph-cto.state.json | jq -e '.completedObjectives | length > 0 and .phase != null'"
+          "command": "cat ${ROOT_DIR}/lifecycle-test/ralph-cto.state.json | jq -e '(.completedObjectives | length > 0) and .phase != null'"
         },
         {
           "name": "linear-timeline-complete",
