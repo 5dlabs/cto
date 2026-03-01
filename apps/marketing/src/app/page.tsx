@@ -498,7 +498,6 @@ export default function Home() {
                 { name: "NetActuate", region: "40+ locations", desc: "Edge bare metal" },
                 { name: "HOSTKEY", region: "Europe, USA, Turkey", desc: "GPU & dedicated servers" },
                 { name: "Leaseweb", region: "Global", desc: "Dedicated servers" },
-                { name: "On-Premises", region: "Your datacenter", desc: "Talos Linux on your hardware" },
               ].map((provider, index) => (
                 <motion.div
                   key={provider.name}

@@ -71,7 +71,6 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 - NetActuate (40+ locations)
 - HOSTKEY (Europe, USA, Turkey; GPU)
 - Leaseweb (Global)
-- On-premises (your datacenter)
 
 ### Technology Stack
 - **Orchestration**: Kubernetes, Talos Linux, Helm
