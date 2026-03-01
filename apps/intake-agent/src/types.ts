@@ -381,7 +381,7 @@ export interface DeliberatePayload {
   /** Seconds to wait for each committee vote before marking abstain */
   vote_timeout_seconds?: number;
   /** Pre-debate research memos from Tavily (optimist = best practices, pessimist = failure modes) */
-  research_memos?: ResearchMemos;
+  research_memos?: ResearchMemos | AgentSuccessResponse<ResearchMemos>;
 }
 
 /**
