@@ -82,36 +82,6 @@ export function GridPulse() {
         })}
       </div>
 
-      {/* Rare foreground shimmer — sits BELOW main content (z-10) so it never hides tiles. */}
-      <div
-        className="fixed inset-0 pointer-events-none overflow-hidden z-[9]"
-        style={{
-          contain: "layout style paint",
-          opacity: 0,
-          animation: "grid-foreground-rare 45s linear infinite",
-        }}
-      >
-        <div
-          className="absolute left-0 right-0"
-          style={{
-            top: "34%",
-            height: "1px",
-            background: "linear-gradient(90deg, transparent, oklch(0.7 0.17 195 / 0.25), transparent)",
-            willChange: "transform",
-            animation: "grid-energy-h 8.5s ease-in-out 0.5s infinite",
-          }}
-        />
-        <div
-          className="absolute top-0 bottom-0"
-          style={{
-            left: "62%",
-            width: "1px",
-            background: "linear-gradient(180deg, transparent, oklch(0.65 0.17 300 / 0.2), transparent)",
-            willChange: "transform",
-            animation: "grid-energy-v 9.25s ease-in-out 1.2s infinite",
-          }}
-        />
-      </div>
     </>
   );
 }
