@@ -63,8 +63,10 @@ FROM debian:bookworm-slim AS runtime-base
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     chromium \
+    curl \
     fonts-liberation \
     git \
+    jq \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
