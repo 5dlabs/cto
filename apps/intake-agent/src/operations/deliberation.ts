@@ -212,8 +212,8 @@ async function waitForResponse(
           const parsed = JSON.parse(rawMessage) as NatsMessage;
           structured = { ...parsed, from, session_id: sessionId };
         } catch {
-          // Agent sent plain text — wrap as debate_response
-          structured = { type: 'debate_response', session_id: sessionId, from, content: rawMessage };
+          // Agent sent plain text — wrap with expectedType if provided, else debate_response
+          structured = { type: expectedType ?? 'debate_response', session_id: sessionId, from, content: rawMessage };
         }
       }
 
