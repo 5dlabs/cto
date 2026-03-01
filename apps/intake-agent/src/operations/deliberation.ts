@@ -451,6 +451,72 @@ async function conductCommitteeVote(
 }
 
 // =============================================================================
+// Research Phase
+// =============================================================================
+
+const DEFAULT_RESEARCH_TIMEOUT_MINUTES = 5;
+
+interface ResearchFindings {
+  optimist: string;
+  pessimist: string;
+}
+
+/**
+ * Pre-debate research phase.
+ *
+ * Sends each debate agent a `research_request` message containing the PRD.
+ * Agents are expected to use Tavily (web search) and Firecrawl (deep crawl)
+ * to gather relevant information before the debate begins.
+ * Both agents are queried concurrently; findings are collected and returned
+ * as context that will be prepended to the first debate turn.
+ */
+async function runResearchPhase(
+  nats: NatsClient,
+  sessionId: string,
+  prdContent: string,
+  researchTimeoutMinutes: number
+): Promise<ResearchFindings> {
+  const timeoutMs = researchTimeoutMinutes * 60 * 1000;
+  console.error(`[DELIBERATION] Research phase started (timeout: ${researchTimeoutMinutes}min)`);
+
+  const researchPayload = {
+    type: 'research_request',
+    session_id: sessionId,
+    prd_content: prdContent,
+    instructions: [
+      'Use Tavily to search for relevant best practices, benchmarks, and recent developments related to the technology choices in this PRD.',
+      'Use Firecrawl to deep-crawl any URLs referenced in the PRD or highly relevant documentation pages you find.',
+      'Compile your findings into a structured summary covering: technology landscape, known trade-offs, and relevant real-world examples.',
+      'Reply with a research_findings message containing your compiled findings as plain text in the `content` field.',
+    ].join('\n'),
+    timeout_minutes: researchTimeoutMinutes,
+  };
+
+  // Send research requests to both agents concurrently
+  await Promise.all(['optimist', 'pessimist'].map(id =>
+    publishToAgent(nats, id, { ...researchPayload, to: id })
+  ));
+
+  // Collect responses concurrently
+  const [optimistResult, pessimistResult] = await Promise.allSettled([
+    waitForResponse(nats, DELIBERATION_ROOM, sessionId, 'optimist', timeoutMs),
+    waitForResponse(nats, DELIBERATION_ROOM, sessionId, 'pessimist', timeoutMs),
+  ]);
+
+  const optimistFindings = optimistResult.status === 'fulfilled'
+    ? ((optimistResult.value.content as string) ?? '[No research findings]')
+    : `[Research timeout after ${researchTimeoutMinutes} minutes]`;
+
+  const pessimistFindings = pessimistResult.status === 'fulfilled'
+    ? ((pessimistResult.value.content as string) ?? '[No research findings]')
+    : `[Research timeout after ${researchTimeoutMinutes} minutes]`;
+
+  console.error(`[DELIBERATION] Research phase complete — optimist: ${optimistFindings.length} chars, pessimist: ${pessimistFindings.length} chars`);
+
+  return { optimist: optimistFindings, pessimist: pessimistFindings };
+}
+
+// =============================================================================
 // Main Deliberation Loop
 // =============================================================================
 
@@ -481,6 +547,25 @@ export async function runDeliberation(
 
   console.error(`[DELIBERATION] Session ${sessionId} started (timebox: ${payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES}min)`);
 
+  // ─── Step 0: Research phase (optional) ────────────────────────────────────
+  let researchContext = '';
+  if (payload.research_enabled) {
+    const researchTimeoutMinutes = payload.research_timeout_minutes ?? DEFAULT_RESEARCH_TIMEOUT_MINUTES;
+    const findings = await runResearchPhase(
+      nats, sessionId, payload.prd_content, researchTimeoutMinutes
+    );
+    researchContext = [
+      '## Pre-Debate Research Findings',
+      '',
+      '### Optimist Research',
+      findings.optimist,
+      '',
+      '### Pessimist Research',
+      findings.pessimist,
+    ].join('\n');
+    console.error('[DELIBERATION] Research context compiled — feeding into debate');
+  }
+
   // ─── Step 1: PRD broadcast ───────────────────────────────────────────────
   // Publish one deliberation_start message to the room — both optimist and
   // pessimist receive it since they both subscribe to deliberation.room.
@@ -491,6 +576,7 @@ export async function runDeliberation(
     prd_content: payload.prd_content,
     infrastructure_context: payload.infrastructure_context ?? '',
     timebox_minutes: payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES,
+    research_context: researchContext,
   };
   await Promise.all(['optimist', 'pessimist'].map(id =>
     publishToAgent(nats, id, { ...startPayload, to: id })

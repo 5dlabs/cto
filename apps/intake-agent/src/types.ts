@@ -368,6 +368,10 @@ export interface DeliberatePayload {
   committee_ids?: string[];
   /** Seconds to wait for each committee vote before marking abstain */
   vote_timeout_seconds?: number;
+  /** Whether to run a pre-debate research phase (default: false) */
+  research_enabled?: boolean;
+  /** Minutes to allow each agent for research (default: 5) */
+  research_timeout_minutes?: number;
 }
 
 /**

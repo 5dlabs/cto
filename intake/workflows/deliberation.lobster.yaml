@@ -21,6 +21,14 @@ inputs:
     type: string
     default: ""
     description: "Available operators and services (injected from cluster state)"
+  - name: research_enabled
+    type: boolean
+    default: false
+    description: "Run a pre-debate research phase (Tavily + Firecrawl) before the debate"
+  - name: research_timeout_minutes
+    type: number
+    default: 5
+    description: "Minutes to allow each agent for research (applies when research_enabled=true)"
 
 outputs:
   - name: design_brief
@@ -32,23 +40,25 @@ outputs:
 
 steps:
   # ─────────────────────────────────────────────────────────
-  # Step 1: Conduct the time-boxed debate
-  # intake-agent broadcasts the PRD to deliberation.room internally (Step 1 of
-  # runDeliberation), then orchestrates the debate loop, committee votes, and
-  # result collection — all via the single shared deliberation.room subject.
-  # NOTE: Timeout includes 10-minute buffer beyond internal timebox to allow
-  # for in-flight agent requests (5min), committee votes (2min), and post-loop
+  # Step 1: Conduct the time-boxed debate (with optional research phase)
+  # When research_enabled=true, intake-agent sends research_request messages to
+  # both agents before the debate begins, giving them time_research_timeout_minutes
+  # to use Tavily and Firecrawl. Findings feed into the debate as context.
+  # NOTE: Timeout includes 10-minute buffer beyond internal timebox + research
+  # time to allow for in-flight agent requests, committee votes, and post-loop
   # processing, preventing premature termination during final iteration.
   # ─────────────────────────────────────────────────────────
   - name: conduct-deliberation
-    description: "Run conductor loop for timebox_minutes, collecting turns and votes"
-    timeout: "{{inputs.timebox_minutes + 10}}m"
+    description: "Run conductor loop for timebox_minutes (with optional research phase), collecting turns and votes"
+    timeout: "{{inputs.timebox_minutes + inputs.research_timeout_minutes + 10}}m"
     command: >
       jq -n
         --arg session_id "{{inputs.session_id}}"
         --arg prd_content "{{inputs.prd_content}}"
         --arg infra_context "{{inputs.infrastructure_context}}"
         --argjson timebox {{inputs.timebox_minutes}}
+        --argjson research_enabled {{inputs.research_enabled}}
+        --argjson research_timeout_minutes {{inputs.research_timeout_minutes}}
         '{
           "operation": "deliberate",
           "payload": {
@@ -57,7 +67,9 @@ steps:
             "infrastructure_context": $infra_context,
             "timebox_minutes": $timebox,
             "vote_timeout_seconds": 120,
-            "committee_ids": ["committee-1", "committee-2", "committee-3", "committee-4", "committee-5"]
+            "committee_ids": ["committee-1", "committee-2", "committee-3", "committee-4", "committee-5"],
+            "research_enabled": $research_enabled,
+            "research_timeout_minutes": $research_timeout_minutes
           }
         }' | intake-agent
 
