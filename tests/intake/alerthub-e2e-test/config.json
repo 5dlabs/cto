@@ -7,5 +7,6 @@
   "num_tasks": 30,
   "generate_ai_prompts": true,
   "docs_repository_url": "https://github.com/5dlabs/cto",
-  "docs_project_directory": "tests/intake/alerthub-e2e-test"
+  "docs_project_directory": "tests/intake/alerthub-e2e-test",
+  "deliberate": true
 }

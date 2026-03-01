@@ -1,0 +1,12 @@
+# Runtime state - do not commit
+observe/events.jsonl
+progress.txt
+report.json
+current-objective.md
+pin.md
+pin.lookup.md
+implementation-plan.md
+healer-remediation-status.md
+prd.json
+ralph-guardian.sh
+# keep: ralph-cto.json, ralph-cto.state.json, ralph-coordination.json, *-prompt.md
