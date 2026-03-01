@@ -1,4 +1,4 @@
-# Subtask 27.1: Initialize Expo Application with SDK 50+
+# Subtask task-27.1: Initialize Next.js 15 Application with TypeScript
 
 ## Parent Task
 Task 27
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create new Expo application project using Expo CLI with SDK version 50 or higher, configure basic project structure and dependencies
+Create new Next.js 15 project with App Router and configure TypeScript settings for optimal development experience
 
 ## Dependencies
 None
 
 ## Implementation Details
-Use 'npx create-expo-app' with TypeScript template, ensure SDK 50+ is used, configure app.json/app.config.js with proper app metadata, install essential dependencies including @expo/vector-icons and expo-constants
+Use create-next-app with TypeScript template, configure tsconfig.json for strict mode, setup app directory structure with layout.tsx and page.tsx, configure next.config.js for production optimization
 
 ## Test Strategy
-Verify app builds successfully and runs on simulator/device
+Verify project builds successfully and TypeScript compilation passes
 
 ---
 *Project: alerthub*

@@ -1,4 +1,4 @@
-# Subtask 13.1: Implement POST /api/v1/integrations endpoint
+# Subtask task-13.1: Validate message broker connectivity and throughput
 
 ## Parent Task
 Task 13
@@ -7,16 +7,17 @@ Task 13
 implementer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Create the POST endpoint for creating new channel integrations with Effect error handling, request validation, and MongoDB operations via Drizzle ORM
+Test producer/consumer connectivity and measure baseline throughput for message brokers
 
 ## Dependencies
-None
+- Subtask 3.3.2
+- Subtask 3.3.3
 
 ## Implementation Details
-Implement the POST /api/v1/integrations endpoint using Elysia framework with Effect for error handling. Include request body validation, tenant isolation logic, integration creation via Drizzle ORM, and comprehensive error mapping for creation failures.
+Run connectivity tests, measure publish/consume latency, validate DLQ routing works, confirm retention policies applied
 
 ## Test Strategy
 See parent task acceptance criteria.

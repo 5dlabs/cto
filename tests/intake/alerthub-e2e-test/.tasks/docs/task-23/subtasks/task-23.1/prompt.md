@@ -1,4 +1,4 @@
-# Subtask 23.1: Create Dashboard Page Layout with Overview Metrics
+# Subtask task-23.1: Define TenantService Protobuf Schema
 
 ## Parent Task
 Task 23
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Build the main dashboard page structure with overview metrics cards, responsive grid layout, and shadcn/ui components for the header and navigation sections.
+Create protobuf definition for TenantService with message types, validation rules, field numbering, and grpc-gateway annotations
 
 ## Dependencies
 None
 
 ## Implementation Details
-Implement the dashboard page component with responsive grid layout using shadcn/ui components. Create metric cards for overview data (user count, activity stats, system health). Set up proper routing and page structure. Use Tailwind CSS for responsive design and ensure mobile compatibility. Include placeholder data for metrics until backend integration.
+Implement tenant.proto file with TenantService definition including CreateTenant, UpdateTenant, DeleteTenant, GetTenant, ListTenants RPCs. Define Tenant message type with proper field numbering, protoc-gen-validate constraints for tenant name, description, status fields. Add grpc-gateway HTTP annotations for REST API mapping with appropriate HTTP methods and URL paths.
 
 ## Test Strategy
-Component rendering tests and responsive design validation
+Validate protobuf compilation and generated code structure
 
 ---
 *Project: alerthub*

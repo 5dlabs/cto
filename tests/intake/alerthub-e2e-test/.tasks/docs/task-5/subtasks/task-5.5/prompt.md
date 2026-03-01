@@ -1,24 +1,22 @@
-# Subtask 5.5: Review SeaweedFS Bucket Configuration
+# Subtask task-5.5: Create MongoDB templates collection with indexes
 
 ## Parent Task
 Task 5
 
 ## Subagent Type
-reviewer
+implementer
 
 ## Parallelizable
-No - must wait for dependencies
+Yes - can run concurrently
 
 ## Description
-Review the complete bucket setup for security, performance, and best practices compliance
+Set up the templates collection in MongoDB with appropriate compound indexes for efficient querying
 
 ## Dependencies
-- Subtask 5.2
-- Subtask 5.3
-- Subtask 5.4
+None
 
 ## Implementation Details
-Conduct thorough review of bucket policies, lifecycle configurations, security settings, and S3 compatibility implementation. Verify tenant isolation effectiveness, policy correctness, and alignment with object storage best practices.
+Create the 'templates' collection and implement compound indexes optimized for tenant_id + channel queries. Set up additional indexes for template name, version, and creation date to support common query patterns. Ensure proper index ordering for query performance.
 
 ## Test Strategy
 See parent task acceptance criteria.

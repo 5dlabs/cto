@@ -1,27 +1,25 @@
-# Subtask 5.4: Test S3 API Compatibility and Operations
+# Subtask task-5.4: Create MongoDB integrations collection with schema validation
 
 ## Parent Task
 Task 5
 
 ## Subagent Type
-tester
+implementer
 
 ## Parallelizable
-No - must wait for dependencies
+Yes - can run concurrently
 
 ## Description
-Validate S3 API compatibility by testing standard operations against all created buckets
+Set up the integrations collection in MongoDB with proper schema validation rules for integration configurations
 
 ## Dependencies
-- Subtask 5.1
-- Subtask 5.2
-- Subtask 5.3
+None
 
 ## Implementation Details
-Perform comprehensive S3 API testing including PUT/GET/DELETE operations, multipart uploads, bucket listing, object metadata operations, and presigned URLs. Test with standard S3 clients and SDKs to ensure compatibility.
+Create the 'integrations' collection and implement comprehensive schema validation rules to ensure integration configs follow the proper structure. Define required fields, data types, and constraints for integration documents including tenant_id, channel type, configuration parameters, and metadata fields.
 
 ## Test Strategy
-Execute S3 API test suite covering CRUD operations, policy enforcement, and lifecycle rule validation
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

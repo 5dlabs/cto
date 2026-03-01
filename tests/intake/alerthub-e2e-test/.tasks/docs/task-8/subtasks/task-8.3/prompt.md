@@ -1,4 +1,4 @@
-# Subtask 8.3: Implement Token Bucket Algorithm with Sliding Window Counters
+# Subtask task-8.3: Configure Alerting Rules and Notification Channels
 
 ## Parent Task
 Task 8
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Build the token bucket algorithm implementation with sliding window counters for accurate rate limiting and burst handling.
+Set up Prometheus alerting rules with notification channels for proactive incident management
 
 ## Dependencies
-- Subtask 8.1
+- Subtask 30.2
 
 ## Implementation Details
-Implement token bucket algorithm with configurable capacity and refill rates, sliding window counter logic for time-based rate limiting, burst allowance calculations, and efficient token consumption/refill operations. Include time-based cleanup of expired windows.
+Create AlertManager configuration with routing rules for different alert severities. Configure notification channels (Slack, email, PagerDuty). Define alerting rules for application health, resource exhaustion, and SLA violations.
 
 ## Test Strategy
-Unit tests for algorithm correctness and edge cases
+Test alert firing and notification delivery through configured channels
 
 ---
 *Project: alerthub*

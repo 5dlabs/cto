@@ -1,4 +1,4 @@
-# Subtask 4.1: Create MongoDB integrations collection with schema validation
+# Subtask task-4.1: Implement Kafka Consumer Configuration Module
 
 ## Parent Task
 Task 4
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Set up the integrations collection in MongoDB with proper schema validation rules for integration configurations
+Create Kafka consumer configuration module with connection settings, consumer group configuration, and topic subscription for alerthub.notifications.created
 
 ## Dependencies
 None
 
 ## Implementation Details
-Create the 'integrations' collection and implement comprehensive schema validation rules to ensure integration configs follow the proper structure. Define required fields, data types, and constraints for integration documents including tenant_id, channel type, configuration parameters, and metadata fields.
+Implement Kafka consumer configuration using Bun/Elysia framework. Include consumer group ID, bootstrap servers, auto-commit settings, and topic subscription configuration. Create configuration validation and environment variable integration for flexible deployment.
 
 ## Test Strategy
-See parent task acceptance criteria.
+Unit tests for configuration validation and environment variable parsing
 
 ---
 *Project: alerthub*

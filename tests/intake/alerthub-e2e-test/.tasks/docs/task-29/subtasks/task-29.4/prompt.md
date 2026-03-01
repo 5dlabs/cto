@@ -1,4 +1,4 @@
-# Subtask 29.4: Develop Native Notifications and Auto-updater System
+# Subtask task-29.4: Integrate Push Notification Handling
 
 ## Parent Task
 Task 29
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Build native desktop notification system and implement auto-updater functionality for seamless application updates.
+Implement push notification reception, processing, and display using Expo's notification system with proper permission handling.
 
 ## Dependencies
-- Subtask 29.1
+None
 
 ## Implementation Details
-Implement Electron's Notification API for cross-platform notifications, create notification management system, integrate electron-updater for automatic updates, configure update server endpoints, implement update checking logic, handle update downloads and installations, and create user-friendly update prompts.
+Set up Expo Notifications for receiving push notifications, handle notification permissions, process incoming notifications, update notification feed when new notifications arrive, and manage notification badges.
 
 ## Test Strategy
-Integration tests for notification delivery and mock tests for update scenarios
+Test notification reception and feed updates
 
 ---
 *Project: alerthub*

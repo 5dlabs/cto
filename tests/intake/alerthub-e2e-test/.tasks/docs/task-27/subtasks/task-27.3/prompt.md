@@ -1,4 +1,4 @@
-# Subtask 27.3: Configure Expo Push Notifications
+# Subtask task-27.3: Create Analytics Dashboard Page Structure and Routing
 
 ## Parent Task
 Task 27
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Setup expo-notifications package for push notification handling including permissions, token registration, and notification listeners
+Set up the main analytics dashboard page component with Next.js routing, basic layout structure, and navigation integration
 
 ## Dependencies
-- Subtask 27.1
+None
 
 ## Implementation Details
-Install and configure expo-notifications, implement permission requests, setup notification token retrieval, create notification handlers for foreground/background notifications, configure notification channels for Android
+Create /pages/analytics/index.tsx or /app/analytics/page.tsx (depending on Next.js version), implement basic page layout with header, sidebar navigation integration, responsive grid container for charts, and proper TypeScript interfaces for analytics data structures
 
 ## Test Strategy
-Test notification permissions, token generation, and notification receipt on device
+Unit tests for component rendering and routing functionality
 
 ---
 *Project: alerthub*

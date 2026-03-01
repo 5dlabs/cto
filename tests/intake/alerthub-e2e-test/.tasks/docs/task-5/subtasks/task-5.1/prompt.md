@@ -1,4 +1,4 @@
-# Subtask 5.1: Create SeaweedFS S3-Compatible Buckets
+# Subtask task-5.1: Create MongoDB integrations collection with schema validation
 
 ## Parent Task
 Task 5
@@ -10,13 +10,13 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create the three required S3-compatible buckets (alerthub-attachments, alerthub-exports, alerthub-media) in SeaweedFS object storage system
+Set up the integrations collection in MongoDB with proper schema validation rules for integration configurations
 
 ## Dependencies
 None
 
 ## Implementation Details
-Use SeaweedFS S3 API or management interface to create buckets: alerthub-attachments for file attachments, alerthub-exports for data exports, and alerthub-media for media files. Ensure buckets are properly initialized and accessible via S3 API endpoints.
+Create the 'integrations' collection and implement comprehensive schema validation rules to ensure integration configs follow the proper structure. Define required fields, data types, and constraints for integration documents including tenant_id, channel type, configuration parameters, and metadata fields.
 
 ## Test Strategy
 See parent task acceptance criteria.

@@ -1,4 +1,4 @@
-# Subtask 4.3: Create MongoDB delivery_logs collection with TTL indexes
+# Subtask task-4.3: Configure Kafka consumer groups
 
 ## Parent Task
 Task 4
@@ -7,16 +7,16 @@ Task 4
 implementer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Set up the delivery_logs collection in MongoDB with TTL indexes for automatic cleanup of old log entries
+Setup Kafka consumer group configurations for integration service consumers
 
 ## Dependencies
-None
+- Subtask 3.3.1
 
 ## Implementation Details
-Create the 'delivery_logs' collection and implement TTL (Time To Live) indexes for automatic cleanup of delivery logs after a specified retention period. Configure compound indexes for tenant_id + channel queries and set up additional indexes for delivery status and timestamp fields for efficient log querying and cleanup operations.
+Configure consumer groups for integration service (alerthub-integration-consumers), set offset strategies, consumer lag monitoring
 
 ## Test Strategy
 See parent task acceptance criteria.

@@ -1,4 +1,4 @@
-# Subtask 29.1: Initialize Electron Application with Main Process
+# Subtask task-29.1: Setup Expo Router Navigation System
 
 ## Parent Task
 Task 29
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Set up the foundational Electron application structure with main process configuration, window management, and basic app lifecycle handling.
+Configure Expo Router for file-based routing and implement bottom tab navigation structure with proper route definitions
 
 ## Dependencies
-None
+- Subtask 27.1
 
 ## Implementation Details
-Create package.json with Electron dependencies, set up main.js with BrowserWindow creation, implement app lifecycle events (ready, window-all-closed, activate), configure basic security settings, and establish IPC communication setup between main and renderer processes.
+Install expo-router, configure app layout with tabs, create _layout.tsx files for tab structure, implement bottom tab navigation with icons for Home, Integrations, Settings, and Profile tabs using @expo/vector-icons
 
 ## Test Strategy
-Unit tests for main process initialization and window creation
+Test navigation between all tabs works correctly and routes are properly defined
 
 ---
 *Project: alerthub*

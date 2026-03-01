@@ -1,4 +1,4 @@
-# Subtask 25.2: Implement Rule Testing and Validation Engine
+# Subtask task-25.2: Develop Rule Evaluation Engine
 
 ## Parent Task
 Task 25
@@ -10,13 +10,13 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create the rule execution engine that can test rules against sample data and validate rule logic with real-time feedback
+Create the core rule evaluation engine that processes conditions, applies regex patterns, handles metadata field matching, and determines rule execution priority
 
 ## Dependencies
-None
+- Subtask 20.1
 
 ## Implementation Details
-Build a rule evaluation engine that can execute constructed rules against test data. Implement validation logic for rule completeness, circular dependencies, and logical consistency. Create a testing interface that allows users to input sample data and see rule outcomes. Include error handling and user feedback for invalid rule configurations.
+Build evaluation engine with condition parsing, regex pattern matching, metadata field comparison, and priority-based rule ordering. Include support for complex condition combinations (AND/OR) and efficient rule matching algorithms.
 
 ## Test Strategy
 See parent task acceptance criteria.

@@ -1,4 +1,4 @@
-# Subtask 14.3: Implement Email and Webhook Channel Delivery Services
+# Subtask task-14.3: Implement WebSocket Connection with Effect Stream
 
 ## Parent Task
 Task 14
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create EmailService and WebhookService using Effect.Service pattern with HTTP client integration, retry logic with exponential backoff, rate limiting via Semaphore, and comprehensive error handling.
+Set up WebSocket connection infrastructure using Effect Stream for real-time communication, including connection management, error handling, and message parsing.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Implement EmailService for SMTP/email provider integration and WebhookService for generic HTTP webhook delivery. Both services follow Effect.Service pattern with HTTP client usage, exponential backoff retry mechanism, Semaphore-based rate limiting, and comprehensive error types. Include email-specific validations (recipient format, content validation) and webhook-specific handling (custom headers, payload serialization, response validation).
+Create WebSocket client using Effect Stream library for reactive programming. Implement connection lifecycle management (connect, disconnect, reconnect). Set up message parsing and typing for notification events. Add error handling and retry logic for connection failures. Create custom hooks for WebSocket state management and message handling.
 
 ## Test Strategy
-Unit tests for both services, integration tests with mock email/webhook endpoints, error scenario testing
+WebSocket connection tests and error scenario validation
 
 ---
 *Project: alerthub*

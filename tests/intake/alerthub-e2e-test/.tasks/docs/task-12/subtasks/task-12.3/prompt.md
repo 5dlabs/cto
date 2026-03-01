@@ -1,4 +1,4 @@
-# Subtask 12.3: Create Discord and Email Configuration Schemas
+# Subtask task-12.3: Implement PATCH and DELETE /api/v1/integrations endpoints
 
 ## Parent Task
 Task 12
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Implement Effect Schema definitions for DiscordConfig and EmailConfig with platform-specific validation rules and required field constraints.
+Create the PATCH and DELETE endpoints for updating and removing channel integrations with proper authorization and Effect error handling
 
 ## Dependencies
 None
 
 ## Implementation Details
-Define DiscordConfig schema with webhook URL, guild ID, channel ID, and bot token fields. Create EmailConfig schema with SMTP settings, recipient lists, template options, and authentication credentials. Include validation for Discord snowflake IDs, email address formats, and SMTP configuration requirements. Use branded types for secure credential handling.
+Implement PATCH /api/v1/integrations/:id for partial updates and DELETE /api/v1/integrations/:id for removal. Include ID validation, tenant authorization checks, optimistic locking for updates, soft delete patterns, and comprehensive Effect error mapping.
 
 ## Test Strategy
-Validation tests for Discord and email configuration edge cases
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

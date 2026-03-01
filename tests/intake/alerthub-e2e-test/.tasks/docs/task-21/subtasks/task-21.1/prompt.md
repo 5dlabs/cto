@@ -1,25 +1,25 @@
-# Subtask 21.1: Implement Core AnalyticsService with gRPC Interface
+# Subtask task-21.1: Research Effect Stream Kafka Integration Patterns
 
 ## Parent Task
 Task 21
 
 ## Subagent Type
-implementer
+researcher
 
 ## Parallelizable
 Yes - can run concurrently
 
 ## Description
-Create the foundational AnalyticsService with gRPC protocol buffer definitions, service interface, and basic server implementation for notification statistics collection.
+Research and analyze Effect Stream integration patterns with Kafka, including backpressure handling, consumer group management, and commit strategies for the alerthub.notifications.created topic
 
 ## Dependencies
 None
 
 ## Implementation Details
-Define analytics.proto with service methods for collecting notification events, delivery status updates, and basic statistics queries. Implement the core AnalyticsService struct with gRPC server setup, connection handling, and basic event ingestion methods. Include proper error handling and logging infrastructure.
+Investigate Effect Stream APIs for Kafka consumer implementation, analyze backpressure handling mechanisms, research consumer group management patterns, and identify optimal commit strategies. Document findings on dead letter queue integration approaches and error recovery patterns specific to Effect Stream.
 
 ## Test Strategy
-Unit tests for service initialization and basic gRPC method handling
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

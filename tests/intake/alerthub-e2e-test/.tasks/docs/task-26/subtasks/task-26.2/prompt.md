@@ -1,4 +1,4 @@
-# Subtask 26.2: Implement Effect-Powered Data Transformation Pipeline
+# Subtask task-26.2: Implement Effect-Powered Data Transformation Pipeline
 
 ## Parent Task
 Task 26

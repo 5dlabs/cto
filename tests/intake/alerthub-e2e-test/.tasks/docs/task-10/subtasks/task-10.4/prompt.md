@@ -1,4 +1,4 @@
-# Subtask 10.4: Integrate Redis Pub/Sub for Cross-Instance Messaging
+# Subtask task-10.4: Initialize Expo Application with SDK 50+
 
 ## Parent Task
 Task 10
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Implement Redis pub/sub integration to enable real-time message distribution across multiple WebSocket service instances for horizontal scaling.
+Create new Expo application project using Expo CLI with SDK version 50 or higher, configure basic project structure and dependencies
 
 ## Dependencies
 None
 
 ## Implementation Details
-Set up Redis connection pool, implement pub/sub message handlers for tenant channels, create message serialization/deserialization for notification payloads, handle Redis connection failures with retry logic, and implement message deduplication. Include Redis cluster support and failover handling.
+Use 'npx create-expo-app' with TypeScript template, ensure SDK 50+ is used, configure app.json/app.config.js with proper app metadata, install essential dependencies including @expo/vector-icons and expo-constants
 
 ## Test Strategy
-Integration tests for Redis connectivity, message distribution, and failover scenarios
+Verify app builds successfully and runs on simulator/device
 
 ---
 *Project: alerthub*

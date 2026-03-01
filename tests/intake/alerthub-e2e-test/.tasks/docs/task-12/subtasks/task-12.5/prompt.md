@@ -1,4 +1,4 @@
-# Subtask 12.5: Review Schema Implementation and Type Safety
+# Subtask task-12.5: Review integration CRUD API implementation
 
 ## Parent Task
 Task 12
@@ -10,19 +10,18 @@ reviewer
 No - must wait for dependencies
 
 ## Description
-Conduct comprehensive review of all Effect Schema implementations to ensure type safety, validation completeness, and adherence to Effect patterns and best practices.
+Conduct code review of all CRUD endpoints focusing on Effect patterns, error handling consistency, security, and API design best practices
 
 ## Dependencies
-- Subtask 12.1
-- Subtask 12.2
-- Subtask 12.3
-- Subtask 12.4
+- Subtask 13.1
+- Subtask 13.2
+- Subtask 13.3
 
 ## Implementation Details
-Review all schema definitions for proper use of Effect Schema patterns, branded types, and validation rules. Verify type safety across integration configs and error handling. Check for consistent error messaging, appropriate use of tagged unions, and proper schema composition. Ensure schemas integrate well with Elysia request validation and provide clear error messages for API consumers. Validate that all required fields are properly marked and optional fields have appropriate defaults.
+Review implementation quality including Effect usage patterns, error handling consistency across endpoints, request/response validation, tenant isolation implementation, MongoDB query optimization, API design adherence to REST principles, and security considerations.
 
 ## Test Strategy
-Integration tests with Elysia endpoints using the schemas
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

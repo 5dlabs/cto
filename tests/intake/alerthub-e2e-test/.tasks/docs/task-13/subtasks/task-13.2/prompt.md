@@ -1,4 +1,4 @@
-# Subtask 13.2: Implement GET /api/v1/integrations endpoint
+# Subtask task-13.2: Implement Kafka Producer Core Module
 
 ## Parent Task
 Task 13
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create the GET endpoint for retrieving channel integrations with filtering, pagination, and tenant isolation using Effect patterns
+Implement the core KafkaProducer module with connection pooling, message serialization, and basic publishing functionality for Rex service.
 
 ## Dependencies
-None
+- Subtask 9.1
 
 ## Implementation Details
-Implement the GET /api/v1/integrations endpoint with query parameter validation, tenant-scoped filtering, pagination support, and Effect-based error handling. Include MongoDB queries via Drizzle ORM and proper response formatting.
+Create KafkaProducer struct with rdkafka-rs client integration. Implement connection pooling with configurable pool size, connection timeout, and health checks. Add message serialization support for notification events with proper schema validation. Implement async publish method with proper error handling and connection management. Include producer configuration management and connection lifecycle methods.
 
 ## Test Strategy
-See parent task acceptance criteria.
+Unit tests for producer initialization, connection management, and message serialization
 
 ---
 *Project: alerthub*

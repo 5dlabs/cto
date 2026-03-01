@@ -1,4 +1,4 @@
-# Subtask 21.2: Implement Time-Series Data Aggregation Engine
+# Subtask task-21.2: Build Effect Stream Kafka Consumer Core
 
 ## Parent Task
 Task 21
@@ -7,19 +7,19 @@ Task 21
 implementer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Build the time-series aggregation system for processing notification delivery metrics with configurable time windows and statistical calculations.
+Implement the core Effect Stream-based Kafka consumer with backpressure handling and message processing pipeline
 
 ## Dependencies
-None
+- Subtask 15.1
 
 ## Implementation Details
-Create aggregation engine with support for multiple time windows (hourly, daily, weekly, monthly). Implement statistical calculations for delivery success rates, failure rates, latency percentiles, and volume metrics. Include data retention policies and automatic cleanup of old aggregated data. Use efficient data structures for high-throughput metric processing.
+Create Effect Stream consumer that subscribes to alerthub.notifications.created topic. Implement backpressure handling using Effect Stream operators, message deserialization, and processing pipeline. Include proper resource management and graceful shutdown handling.
 
 ## Test Strategy
-Unit tests for aggregation logic and performance benchmarks
+Integration tests with mock Kafka broker and backpressure simulation
 
 ---
 *Project: alerthub*

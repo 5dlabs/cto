@@ -1,4 +1,4 @@
-# Subtask 23.2: Implement WebSocket Connection with Effect Stream
+# Subtask task-23.2: Define UserService Protobuf Schema
 
 ## Parent Task
 Task 23
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Set up WebSocket connection infrastructure using Effect Stream for real-time communication, including connection management, error handling, and message parsing.
+Create protobuf definition for UserService with message types, validation rules, field numbering, and grpc-gateway annotations
 
 ## Dependencies
 None
 
 ## Implementation Details
-Create WebSocket client using Effect Stream library for reactive programming. Implement connection lifecycle management (connect, disconnect, reconnect). Set up message parsing and typing for notification events. Add error handling and retry logic for connection failures. Create custom hooks for WebSocket state management and message handling.
+Implement user.proto file with UserService definition including CreateUser, UpdateUser, DeleteUser, GetUser, ListUsers, AuthenticateUser RPCs. Define User message type with proper field numbering, protoc-gen-validate constraints for email format, password strength, role validation. Add grpc-gateway HTTP annotations for REST API mapping with appropriate authentication headers and response codes.
 
 ## Test Strategy
-WebSocket connection tests and error scenario validation
+Validate protobuf compilation and authentication flow schemas
 
 ---
 *Project: alerthub*

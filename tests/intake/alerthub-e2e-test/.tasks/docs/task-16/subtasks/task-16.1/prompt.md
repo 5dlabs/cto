@@ -1,4 +1,4 @@
-# Subtask 16.1: Design Template Schema and MongoDB Collections
+# Subtask task-16.1: Deploy Core Microservices to Kubernetes
 
 ## Parent Task
 Task 16
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Define the data structure for storing notification templates in MongoDB, including tenant-specific and channel-specific template configurations with proper indexing strategy.
+Deploy all application microservices to Kubernetes cluster with proper resource limits, health checks, and HPA configuration
 
 ## Dependencies
 None
 
 ## Implementation Details
-Create MongoDB schema design for template storage including fields for tenant ID, channel type, template content, variables, metadata, and versioning. Design indexes for efficient querying by tenant and channel. Define data validation rules and document the schema structure.
+Create Kubernetes manifests (Deployments, Services, ConfigMaps, Secrets) for all microservices. Configure resource requests/limits, liveness/readiness probes, and Horizontal Pod Autoscaler policies. Apply proper labels and annotations for service discovery and monitoring.
 
 ## Test Strategy
-See parent task acceptance criteria.
+Verify all pods are running, health checks passing, and services are accessible
 
 ---
 *Project: alerthub*

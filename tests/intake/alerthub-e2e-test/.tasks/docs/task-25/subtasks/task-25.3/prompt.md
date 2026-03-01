@@ -1,25 +1,26 @@
-# Subtask 25.3: Build Rule Templates and Import/Export System
+# Subtask task-25.3: Implement Rule Testing and Validation Framework
 
 ## Parent Task
 Task 25
 
 ## Subagent Type
-implementer
+tester
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Create a system for rule templates, saving/loading rules, and importing/exporting rule configurations with priority ordering functionality
+Create comprehensive testing utilities for rule validation, condition evaluation testing, and rule engine performance verification
 
 ## Dependencies
-None
+- Subtask 20.2
+- Subtask 20.3
 
 ## Implementation Details
-Implement a template system with pre-built rule configurations for common use cases. Build import/export functionality supporting JSON format with schema validation. Create rule priority ordering with drag-and-drop reordering capabilities. Include local storage persistence and optional server-side storage integration. Add template management UI with categorization and search.
+Build rule testing service with mock data generation, condition evaluation testing, rule matching validation, and performance benchmarking. Include test data factories and rule simulation capabilities for debugging rule configurations.
 
 ## Test Strategy
-See parent task acceptance criteria.
+Unit tests for individual components, integration tests for rule evaluation flows, performance tests for rule matching at scale
 
 ---
 *Project: alerthub*

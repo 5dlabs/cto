@@ -1,4 +1,4 @@
-# Subtask 20.3: Develop Rule Evaluation Engine
+# Subtask task-20.3: Create Discord and Email Configuration Schemas
 
 ## Parent Task
 Task 20
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create the core rule evaluation engine that processes conditions, applies regex patterns, handles metadata field matching, and determines rule execution priority
+Implement Effect Schema definitions for DiscordConfig and EmailConfig with platform-specific validation rules and required field constraints.
 
 ## Dependencies
-- Subtask 20.1
+None
 
 ## Implementation Details
-Build evaluation engine with condition parsing, regex pattern matching, metadata field comparison, and priority-based rule ordering. Include support for complex condition combinations (AND/OR) and efficient rule matching algorithms.
+Define DiscordConfig schema with webhook URL, guild ID, channel ID, and bot token fields. Create EmailConfig schema with SMTP settings, recipient lists, template options, and authentication credentials. Include validation for Discord snowflake IDs, email address formats, and SMTP configuration requirements. Use branded types for secure credential handling.
 
 ## Test Strategy
-See parent task acceptance criteria.
+Validation tests for Discord and email configuration edge cases
 
 ---
 *Project: alerthub*

@@ -1,4 +1,4 @@
-# Subtask 13.3: Implement PATCH and DELETE /api/v1/integrations endpoints
+# Subtask task-13.3: Integrate Kafka Publisher with Notification Service
 
 ## Parent Task
 Task 13
@@ -7,19 +7,20 @@ Task 13
 implementer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Create the PATCH and DELETE endpoints for updating and removing channel integrations with proper authorization and Effect error handling
+Integrate the Kafka producer with Rex's notification service to publish events to alerthub.notifications.created topic on successful notification submission.
 
 ## Dependencies
-None
+- Subtask 9.2
+- Subtask 9.3
 
 ## Implementation Details
-Implement PATCH /api/v1/integrations/:id for partial updates and DELETE /api/v1/integrations/:id for removal. Include ID validation, tenant authorization checks, optimistic locking for updates, soft delete patterns, and comprehensive Effect error mapping.
+Modify Rex's notification service handlers to integrate Kafka publisher after successful notification creation. Add event publishing to alerthub.notifications.created topic with proper message structure including notification_id, user_id, notification_type, timestamp, and payload. Implement async publishing to avoid blocking notification response. Add configuration injection and service initialization in Rex's startup sequence. Ensure proper error handling that doesn't affect notification creation success.
 
 ## Test Strategy
-See parent task acceptance criteria.
+Integration tests with embedded Kafka and end-to-end notification flow testing
 
 ---
 *Project: alerthub*

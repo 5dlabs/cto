@@ -1,4 +1,4 @@
-# Subtask 5.3: Setup Bucket Lifecycle Rules
+# Subtask task-5.3: Design Template Schema and MongoDB Collections
 
 ## Parent Task
 Task 5
@@ -10,13 +10,13 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Configure automated lifecycle management rules for object cleanup and storage optimization across all buckets
+Define the data structure for storing notification templates in MongoDB, including tenant-specific and channel-specific template configurations with proper indexing strategy.
 
 ## Dependencies
-- Subtask 5.1
+None
 
 ## Implementation Details
-Implement lifecycle policies for automatic cleanup of old objects, transition rules for different storage classes if available, and retention policies. Configure rules specific to each bucket type based on usage patterns (attachments, exports, media).
+Create MongoDB schema design for template storage including fields for tenant ID, channel type, template content, variables, metadata, and versioning. Design indexes for efficient querying by tenant and channel. Define data validation rules and document the schema structure.
 
 ## Test Strategy
 See parent task acceptance criteria.

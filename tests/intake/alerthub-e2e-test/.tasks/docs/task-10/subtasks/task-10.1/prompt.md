@@ -1,4 +1,4 @@
-# Subtask 10.1: Implement WebSocket Connection Management Core
+# Subtask task-10.1: Add performance indexes and seed initial data
 
 ## Parent Task
 Task 10
@@ -7,19 +7,19 @@ Task 10
 implementer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Create the foundational WebSocket connection handling infrastructure including connection lifecycle, heartbeat/ping mechanisms, and basic connection state management.
+Create composite indexes for common queries and insert seed data for system roles and default tenant
 
 ## Dependencies
-None
+- Subtask 2.2.3
 
 ## Implementation Details
-Implement WebSocket upgrade handler in Axum, connection struct with metadata (user_id, tenant_id, connection_id), heartbeat timer management, ping/pong frame handling, graceful connection cleanup on disconnect, and connection state tracking. Include error handling for connection failures and timeout scenarios.
+Add compound indexes on (tenant_id, status), (tenant_id, created_at). Insert default system roles and admin tenant seed data
 
 ## Test Strategy
-Unit tests for connection lifecycle, heartbeat functionality, and error scenarios
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

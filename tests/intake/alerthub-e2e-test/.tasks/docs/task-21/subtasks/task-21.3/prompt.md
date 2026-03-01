@@ -1,25 +1,27 @@
-# Subtask 21.3: Implement Channel Performance and Tenant Usage Reporting
+# Subtask task-21.3: Review Kafka Consumer Implementation
 
 ## Parent Task
 Task 21
 
 ## Subagent Type
-implementer
+reviewer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Create reporting modules for channel breakdown statistics and tenant-specific usage analytics with multi-dimensional data analysis.
+Comprehensive code review of the Effect Stream Kafka consumer implementation including architecture, error handling, and performance optimization
 
 ## Dependencies
-None
+- Subtask 15.2
+- Subtask 15.3
+- Subtask 15.4
 
 ## Implementation Details
-Build channel performance analyzer that tracks delivery rates, error patterns, and performance metrics per notification channel (email, SMS, push, etc.). Implement tenant usage tracker for quota monitoring, usage patterns, and billing analytics. Include comparative analysis features and trend detection algorithms. Support flexible querying with filters by tenant, channel, time range, and status.
+Review consumer configuration module, Effect Stream implementation, backpressure handling, commit strategies, dead letter queue integration, and error recovery mechanisms. Validate architectural decisions, code quality, performance considerations, and adherence to Effect Stream best practices.
 
 ## Test Strategy
-Integration tests with mock data for various channel and tenant scenarios
+Code review checklist and architectural validation
 
 ---
 *Project: alerthub*

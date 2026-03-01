@@ -1,4 +1,4 @@
-# Subtask 25.1: Create Core Rule Builder Components and Types
+# Subtask task-25.1: Build Rule CRUD Operations Service
 
 ## Parent Task
 Task 25
@@ -10,13 +10,13 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Implement the foundational React components for the rule builder interface including drag-and-drop zones, condition blocks, action blocks, and TypeScript type definitions with Effect Schema validation
+Implement the RuleService gRPC server with complete CRUD operations for managing notification rules including persistence layer integration
 
 ## Dependencies
-None
+- Subtask 20.1
 
 ## Implementation Details
-Build the core component architecture including DragDropContext, ConditionBlock, ActionBlock, RuleCanvas components. Define TypeScript interfaces for Rule, Condition, Action types. Implement Effect Schema validators for rule configurations. Create reusable UI components for the builder interface with proper drag-and-drop functionality using react-beautiful-dnd or similar library.
+Create RuleService with CreateRule, GetRule, UpdateRule, DeleteRule, and ListRules methods. Implement database persistence layer with proper indexing for rule lookup. Include rule validation logic and error handling.
 
 ## Test Strategy
 See parent task acceptance criteria.

@@ -1,4 +1,4 @@
-# Subtask 19.1: Implement User CRUD Operations and Data Models
+# Subtask task-19.1: Implement Slack Channel Delivery Service
 
 ## Parent Task
 Task 19
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create user data structures, database schemas, and basic CRUD operations for user management including creation, retrieval, updates, and deletion of user accounts.
+Create SlackService using Effect.Service pattern with HTTP client integration, retry logic with exponential backoff, rate limiting via Semaphore, and comprehensive error handling for Slack API interactions.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Implement User struct/model with fields like ID, email, username, password hash, created/updated timestamps. Create database schema migrations. Implement CreateUser, GetUser, UpdateUser, DeleteUser, ListUsers methods with proper error handling and validation. Include email uniqueness constraints and basic field validation.
+Implement SlackService class following Effect.Service pattern. Include HTTP client for Slack API calls, exponential backoff retry mechanism, Semaphore-based rate limiting, and comprehensive error types for Slack-specific failures (auth errors, rate limits, message format errors). Handle webhook delivery with proper payload formatting and response validation.
 
 ## Test Strategy
-See parent task acceptance criteria.
+Unit tests for service methods, integration tests with mock Slack API, error scenario testing
 
 ---
 *Project: alerthub*

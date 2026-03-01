@@ -1,4 +1,4 @@
-# Subtask 7.1: Implement Core REST Endpoints Structure
+# Subtask task-7.1: Deploy message brokers (Kafka, RabbitMQ) and SeaweedFS
 
 ## Parent Task
 Task 7
@@ -7,19 +7,19 @@ Task 7
 implementer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Create the basic Axum router structure with POST /api/v1/notifications and POST /api/v1/notifications/batch endpoints, including request/response models and basic routing setup
+Provision Kafka cluster, RabbitMQ cluster, and SeaweedFS object storage
 
 ## Dependencies
-None
+- Subtask 1.1.2
 
 ## Implementation Details
-Set up Axum application with router configuration, define NotificationRequest and BatchNotificationRequest structs with serde serialization, create response models for success/error cases, and implement basic handler function signatures. Include OpenAPI documentation attributes.
+Deploy Strimzi Kafka with persistence, RabbitMQ cluster with persistence, SeaweedFS for S3-compatible storage
 
 ## Test Strategy
-Unit tests for request/response serialization and basic routing
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

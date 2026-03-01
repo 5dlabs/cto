@@ -1,4 +1,4 @@
-# Subtask 20.1: Implement Rule Data Models and Proto Definitions
+# Subtask task-20.1: Build Tenant-Based Channel Subscription System
 
 ## Parent Task
 Task 20
@@ -7,19 +7,20 @@ Task 20
 implementer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Create the foundational data structures for the notification rules engine including gRPC proto definitions for rules, conditions, actions, and metadata matching
+Implement tenant channel management allowing clients to subscribe to tenant-specific notification channels with proper isolation and access control.
 
 ## Dependencies
-None
+- Subtask 10.1
+- Subtask 10.2
 
 ## Implementation Details
-Define proto messages for Rule, Condition, Action, RuleMetadata, and evaluation request/response types. Include field definitions for rule priority, regex patterns, metadata field matching, and rule status. Generate Go structs and gRPC service definitions.
+Create channel subscription handler that validates tenant access permissions, manages tenant-based message routing, implements channel join/leave operations, maintains subscriber lists per tenant, and ensures tenant data isolation. Include subscription state persistence and cleanup on disconnect.
 
 ## Test Strategy
-See parent task acceptance criteria.
+Integration tests for tenant isolation, subscription management, and access control
 
 ---
 *Project: alerthub*

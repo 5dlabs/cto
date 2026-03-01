@@ -1,4 +1,4 @@
-# Subtask 19.2: Implement JWT Authentication System
+# Subtask task-19.2: Implement OAuth Flow Handling System
 
 ## Parent Task
 Task 19
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Build JWT token generation, validation, and refresh functionality with proper security practices including token expiration and secret management.
+Build OAuth authentication flow components and handlers for third-party integration authorization, including redirect handling and token management.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Create JWT service with GenerateToken, ValidateToken, RefreshToken methods. Implement proper token claims with user ID, roles, and expiration. Add token blacklisting for logout functionality. Use secure secret management and implement token rotation capabilities. Include middleware for token validation in gRPC interceptors.
+Create OAuth flow components for handling authorization redirects, token exchange, and callback processing. Implement secure token storage and refresh mechanisms. Include OAuth provider configuration for different integration types (Slack, Discord, GitHub, etc.) with proper error handling for failed authorizations.
 
 ## Test Strategy
-See parent task acceptance criteria.
+OAuth flow simulation and token handling tests
 
 ---
 *Project: alerthub*

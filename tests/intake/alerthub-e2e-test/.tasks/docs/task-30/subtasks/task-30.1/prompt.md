@@ -1,4 +1,4 @@
-# Subtask 30.1: Deploy Core Microservices to Kubernetes
+# Subtask task-30.1: Initialize Electron Application with Main Process
 
 ## Parent Task
 Task 30
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Deploy all application microservices to Kubernetes cluster with proper resource limits, health checks, and HPA configuration
+Set up the foundational Electron application structure with main process configuration, window management, and basic app lifecycle handling.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Create Kubernetes manifests (Deployments, Services, ConfigMaps, Secrets) for all microservices. Configure resource requests/limits, liveness/readiness probes, and Horizontal Pod Autoscaler policies. Apply proper labels and annotations for service discovery and monitoring.
+Create package.json with Electron dependencies, set up main.js with BrowserWindow creation, implement app lifecycle events (ready, window-all-closed, activate), configure basic security settings, and establish IPC communication setup between main and renderer processes.
 
 ## Test Strategy
-Verify all pods are running, health checks passing, and services are accessible
+Unit tests for main process initialization and window creation
 
 ---
 *Project: alerthub*

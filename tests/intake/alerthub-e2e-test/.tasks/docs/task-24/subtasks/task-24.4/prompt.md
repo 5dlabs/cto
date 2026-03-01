@@ -1,4 +1,4 @@
-# Subtask 24.4: Create Integration Testing UI and Error Display
+# Subtask task-24.4: Implement JWT Authentication System
 
 ## Parent Task
 Task 24
@@ -7,21 +7,19 @@ Task 24
 implementer
 
 ## Parallelizable
-No - must wait for dependencies
+Yes - can run concurrently
 
 ## Description
-Build comprehensive testing interface for validating integrations and displaying errors using Effect error mapping patterns.
+Build JWT token generation, validation, and refresh functionality with proper security practices including token expiration and secret management.
 
 ## Dependencies
-- Subtask 24.1
-- Subtask 24.2
-- Subtask 24.3
+None
 
 ## Implementation Details
-Implement testing UI components for validating integration connections, sending test messages, and displaying connection status. Create comprehensive error display system using Effect error mapping to show user-friendly error messages for various failure scenarios (network issues, authentication failures, API limits). Include retry mechanisms and troubleshooting guidance.
+Create JWT service with GenerateToken, ValidateToken, RefreshToken methods. Implement proper token claims with user ID, roles, and expiration. Add token blacklisting for logout functionality. Use secure secret management and implement token rotation capabilities. Include middleware for token validation in gRPC interceptors.
 
 ## Test Strategy
-Integration testing UI validation and error handling tests
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

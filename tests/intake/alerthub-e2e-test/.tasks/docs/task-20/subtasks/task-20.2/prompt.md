@@ -1,4 +1,4 @@
-# Subtask 20.2: Build Rule CRUD Operations Service
+# Subtask task-20.2: Define Core Integration Schema Types
 
 ## Parent Task
 Task 20
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Implement the RuleService gRPC server with complete CRUD operations for managing notification rules including persistence layer integration
+Create Effect Schema definitions for the core Integration type and Channel union types to establish the foundational data structures for integration configurations.
 
 ## Dependencies
-- Subtask 20.1
+None
 
 ## Implementation Details
-Create RuleService with CreateRule, GetRule, UpdateRule, DeleteRule, and ListRules methods. Implement database persistence layer with proper indexing for rule lookup. Include rule validation logic and error handling.
+Implement Effect Schema for the base Integration type with common fields like id, name, type, enabled status. Define Channel union schema that encompasses all supported integration channels (Slack, Discord, Email, Webhook). Use Effect's Schema.Union and branded types for type safety. Include validation rules for required fields and data constraints.
 
 ## Test Strategy
-See parent task acceptance criteria.
+Unit tests for schema validation with valid/invalid payloads
 
 ---
 *Project: alerthub*

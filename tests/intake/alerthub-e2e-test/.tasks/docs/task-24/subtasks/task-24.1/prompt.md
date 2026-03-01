@@ -1,4 +1,4 @@
-# Subtask 24.1: Create Integration Cards Component and Layout
+# Subtask task-24.1: Implement JWT Authentication Middleware for WebSocket
 
 ## Parent Task
 Task 24
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Build the main integrations page layout with channel cards display, including card components for showing integration status, configuration options, and basic interaction handlers.
+Create JWT token validation middleware specifically for WebSocket connections to authenticate users before establishing the connection.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Implement React components for integration cards showing channel types (Slack, Discord, etc.), connection status, last sync time, and action buttons. Create responsive grid layout for cards with proper spacing and hover effects. Include empty state component for when no integrations exist.
+Build WebSocket-specific JWT validation that extracts token from query parameters or headers, validates signature and expiration, extracts user and tenant information, and rejects unauthorized connections with proper error codes. Handle token refresh scenarios and malformed token edge cases.
 
 ## Test Strategy
-Unit tests for card rendering and layout responsiveness
+Unit tests for token validation, expiration handling, and authorization flows
 
 ---
 *Project: alerthub*

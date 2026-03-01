@@ -1,22 +1,22 @@
-# Subtask 24.5: Review Integration Management Interface Implementation
+# Subtask task-24.5: Implement RBAC Role Management System
 
 ## Parent Task
 Task 24
 
 ## Subagent Type
-reviewer
+implementer
 
 ## Parallelizable
-No - must wait for dependencies
+Yes - can run concurrently
 
 ## Description
-Conduct comprehensive code review of the integration management interface focusing on React best practices, Effect error handling patterns, and UI/UX consistency.
+Create role-based access control system with role definitions, assignment, and permission checking for owner, admin, member, and viewer roles.
 
 ## Dependencies
-- Subtask 24.4
+None
 
 ## Implementation Details
-Review all components for proper React patterns, Effect Schema usage, OAuth security best practices, and error handling consistency. Validate form validation logic, component reusability, accessibility compliance, and performance optimization. Check integration with existing Blaze design system and ensure proper TypeScript typing throughout.
+Define Role enum/constants for owner/admin/member/viewer. Create UserRole association tables/structures. Implement AssignRole, RemoveRole, GetUserRoles, CheckPermission methods. Create permission matrix defining what each role can access. Include role hierarchy validation and role change audit logging.
 
 ## Test Strategy
 See parent task acceptance criteria.

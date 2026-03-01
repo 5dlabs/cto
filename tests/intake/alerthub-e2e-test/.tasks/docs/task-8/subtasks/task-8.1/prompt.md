@@ -1,22 +1,22 @@
-# Subtask 8.1: Design Rate Limiting Architecture and Data Structures
+# Subtask task-8.1: Add Prometheus metrics endpoint with custom metrics
 
 ## Parent Task
 Task 8
 
 ## Subagent Type
-researcher
+implementer
 
 ## Parallelizable
 Yes - can run concurrently
 
 ## Description
-Design the core RateLimiter struct, Redis data structures, and token bucket algorithm implementation strategy for the rate limiting service.
+Create /metrics endpoint with request duration, notification count, and rate limit metrics
 
 ## Dependencies
 None
 
 ## Implementation Details
-Define RateLimiter struct with Redis client, design Redis key patterns for tenant/endpoint combinations, specify token bucket algorithm parameters (capacity, refill rate, last refill timestamp), and plan data serialization formats. Document the architecture for sliding window counters and burst allowance handling.
+Expose /metrics endpoint with: request_duration_seconds histogram, notifications_submitted_total counter, rate_limit_hits_total counter, websocket_connections_active gauge
 
 ## Test Strategy
 See parent task acceptance criteria.

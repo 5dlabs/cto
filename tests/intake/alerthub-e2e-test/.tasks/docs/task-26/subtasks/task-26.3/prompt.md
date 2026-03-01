@@ -1,4 +1,4 @@
-# Subtask 26.3: Build Recharts Visualization Components
+# Subtask task-26.3: Build Recharts Visualization Components
 
 ## Parent Task
 Task 26

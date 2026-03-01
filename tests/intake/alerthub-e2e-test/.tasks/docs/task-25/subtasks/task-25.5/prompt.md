@@ -1,24 +1,22 @@
-# Subtask 25.5: Review Rule Builder Implementation and Architecture
+# Subtask task-25.5: Create Core Rule Builder Components and Types
 
 ## Parent Task
 Task 25
 
 ## Subagent Type
-reviewer
+implementer
 
 ## Parallelizable
-No - must wait for dependencies
+Yes - can run concurrently
 
 ## Description
-Conduct comprehensive code review focusing on React best practices, TypeScript implementation, Effect Schema usage, and overall architecture quality
+Implement the foundational React components for the rule builder interface including drag-and-drop zones, condition blocks, action blocks, and TypeScript type definitions with Effect Schema validation
 
 ## Dependencies
-- Subtask 25.1
-- Subtask 25.2
-- Subtask 25.3
+None
 
 ## Implementation Details
-Review component architecture for proper separation of concerns and reusability. Validate TypeScript type safety and Effect Schema implementation. Check React best practices including performance optimization, proper hook usage, and state management. Assess drag-and-drop implementation for accessibility and user experience. Review code organization, naming conventions, and documentation quality.
+Build the core component architecture including DragDropContext, ConditionBlock, ActionBlock, RuleCanvas components. Define TypeScript interfaces for Rule, Condition, Action types. Implement Effect Schema validators for rule configurations. Create reusable UI components for the builder interface with proper drag-and-drop functionality using react-beautiful-dnd or similar library.
 
 ## Test Strategy
 See parent task acceptance criteria.

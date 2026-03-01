@@ -1,4 +1,4 @@
-# Subtask 7.2: Implement Request Validation and Authentication
+# Subtask task-7.2: Create SeaweedFS S3-Compatible Buckets
 
 ## Parent Task
 Task 7
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Add comprehensive request validation using validator crate and implement tenant authentication middleware for API endpoints
+Create the three required S3-compatible buckets (alerthub-attachments, alerthub-exports, alerthub-media) in SeaweedFS object storage system
 
 ## Dependencies
 None
 
 ## Implementation Details
-Implement validation rules for notification fields (recipient, content, priority, etc.), create tenant authentication middleware that verifies API keys or JWT tokens, add validation error handling with detailed error responses, and ensure proper sanitization of input data.
+Use SeaweedFS S3 API or management interface to create buckets: alerthub-attachments for file attachments, alerthub-exports for data exports, and alerthub-media for media files. Ensure buckets are properly initialized and accessible via S3 API endpoints.
 
 ## Test Strategy
-Integration tests for validation scenarios and authentication flows
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

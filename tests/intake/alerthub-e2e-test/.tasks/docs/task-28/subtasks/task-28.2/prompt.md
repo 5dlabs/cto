@@ -1,4 +1,4 @@
-# Subtask 28.2: Implement Pull-to-Refresh Functionality
+# Subtask task-28.2: Create Notification Feed Screen with FlatList
 
 ## Parent Task
 Task 28
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Add pull-to-refresh capability to the notification feed using React Native's RefreshControl component for manual feed updates.
+Build the main notification feed screen component with FlatList for displaying notifications, including UI layout, styling, and basic data rendering structure.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Integrate RefreshControl with FlatList, implement refresh state management, handle refresh API calls, and provide visual feedback during refresh operations. Include proper error handling for refresh failures.
+Create NotificationFeedScreen.tsx with FlatList component, notification item rendering, empty state handling, loading states, and basic styling. Include proper TypeScript interfaces for notification data structure and component props.
 
 ## Test Strategy
-Test refresh behavior and API call triggers
+Unit tests for component rendering and prop handling
 
 ---
 *Project: alerthub*

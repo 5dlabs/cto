@@ -1,4 +1,4 @@
-# Subtask 14.2: Implement Discord Channel Delivery Service
+# Subtask task-14.2: Integrate Redis Pub/Sub for Cross-Instance Messaging
 
 ## Parent Task
 Task 14
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create DiscordService using Effect.Service pattern with HTTP client integration, retry logic with exponential backoff, rate limiting via Semaphore, and comprehensive error handling for Discord API interactions.
+Implement Redis pub/sub integration to enable real-time message distribution across multiple WebSocket service instances for horizontal scaling.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Implement DiscordService class following Effect.Service pattern. Include HTTP client for Discord API calls, exponential backoff retry mechanism, Semaphore-based rate limiting, and comprehensive error types for Discord-specific failures (auth errors, rate limits, message format errors). Handle webhook delivery with proper payload formatting and Discord-specific message structure validation.
+Set up Redis connection pool, implement pub/sub message handlers for tenant channels, create message serialization/deserialization for notification payloads, handle Redis connection failures with retry logic, and implement message deduplication. Include Redis cluster support and failover handling.
 
 ## Test Strategy
-Unit tests for service methods, integration tests with mock Discord API, error scenario testing
+Integration tests for Redis connectivity, message distribution, and failover scenarios
 
 ---
 *Project: alerthub*

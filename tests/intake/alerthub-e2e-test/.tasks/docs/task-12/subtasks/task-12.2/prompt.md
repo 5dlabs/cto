@@ -1,4 +1,4 @@
-# Subtask 12.2: Create Slack Configuration Schema
+# Subtask task-12.2: Implement POST /api/v1/integrations endpoint
 
 ## Parent Task
 Task 12
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Implement Effect Schema definition for SlackConfig with comprehensive validation for Slack-specific integration parameters and authentication details.
+Create the POST endpoint for creating new channel integrations with Effect error handling, request validation, and MongoDB operations via Drizzle ORM
 
 ## Dependencies
 None
 
 ## Implementation Details
-Define SlackConfig schema with fields for webhook URL, channel, bot token, signing secret, and message formatting options. Include validation for Slack webhook URL format, channel name patterns, and required authentication fields. Use Effect Schema's string refinements for URL validation and branded types for sensitive data.
+Implement the POST /api/v1/integrations endpoint using Elysia framework with Effect for error handling. Include request body validation, tenant isolation logic, integration creation via Drizzle ORM, and comprehensive error mapping for creation failures.
 
 ## Test Strategy
-Schema validation tests with various Slack configuration scenarios
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

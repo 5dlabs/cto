@@ -1,28 +1,25 @@
-# Subtask 10.5: Review WebSocket Service Implementation
+# Subtask task-10.5: Define Core Notification Struct
 
 ## Parent Task
 Task 10
 
 ## Subagent Type
-reviewer
+implementer
 
 ## Parallelizable
-No - must wait for dependencies
+Yes - can run concurrently
 
 ## Description
-Conduct comprehensive code review of the WebSocket service implementation focusing on security, performance, error handling, and architectural patterns.
+Create the primary Notification struct with all required fields, serde serialization, and sqlx database mapping traits
 
 ## Dependencies
-- Subtask 10.1
-- Subtask 10.2
-- Subtask 10.3
-- Subtask 10.4
+None
 
 ## Implementation Details
-Review JWT authentication security implementation, validate tenant isolation mechanisms, assess connection management efficiency, verify Redis integration patterns, check error handling coverage, evaluate performance implications of connection scaling, and ensure proper resource cleanup. Validate adherence to Rust/Axum best practices and security standards.
+Implement the main Notification struct with fields like id, title, content, channel, priority, status, created_at, updated_at. Add serde Serialize/Deserialize derives and sqlx FromRow/Type traits for database operations. Include validation attributes and proper field types.
 
 ## Test Strategy
-Code review checklist covering security, performance, and architectural compliance
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

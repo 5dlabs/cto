@@ -1,27 +1,25 @@
-# Subtask 25.4: Develop Comprehensive Test Suite for Rule Builder
+# Subtask task-25.4: Implement Notification Filtering and Search
 
 ## Parent Task
 Task 25
 
 ## Subagent Type
-tester
+implementer
 
 ## Parallelizable
 No - must wait for dependencies
 
 ## Description
-Create unit tests, integration tests, and end-to-end tests for all rule builder functionality including drag-and-drop interactions and rule validation
+Add filtering and search functionality to the notification feed, including filter controls, search input, and dynamic filtering logic for notification types and content.
 
 ## Dependencies
-- Subtask 25.1
-- Subtask 25.2
-- Subtask 25.3
+- Subtask 23.3
 
 ## Implementation Details
-Write comprehensive test coverage using Jest and React Testing Library for component logic. Create integration tests for drag-and-drop functionality using testing utilities. Build end-to-end tests with Playwright or Cypress for complete user workflows. Test rule validation, import/export, template system, and rule execution engine. Include accessibility testing and cross-browser compatibility tests.
+Create filter controls for notification types (info, warning, error) and date ranges. Implement search functionality for notification content and sender. Add filter state management with URL synchronization for deep linking. Create debounced search input and efficient filtering algorithms. Include clear filters functionality and filter count indicators.
 
 ## Test Strategy
-Unit tests for components, integration tests for drag-and-drop, E2E tests for complete workflows
+Filter functionality tests and search performance validation
 
 ---
 *Project: alerthub*

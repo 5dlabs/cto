@@ -1,25 +1,27 @@
-# Subtask 12.4: Implement Webhook Configuration and Error Schemas
+# Subtask task-12.4: Write comprehensive test suite for integration CRUD API
 
 ## Parent Task
 Task 12
 
 ## Subagent Type
-implementer
+tester
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Create Effect Schema for WebhookConfig and define tagged error classes for delivery failure scenarios with comprehensive error categorization.
+Create unit and integration tests covering all CRUD endpoints with Effect error scenarios, validation edge cases, and tenant isolation
 
 ## Dependencies
-None
+- Subtask 13.1
+- Subtask 13.2
+- Subtask 13.3
 
 ## Implementation Details
-Define WebhookConfig schema with URL, headers, authentication, retry policies, and timeout settings. Create tagged error classes using Effect's Data.TaggedError for different failure types: NetworkError, AuthenticationError, ValidationError, DeliveryTimeoutError, and RateLimitError. Include error codes, messages, and retry metadata. Implement schema for delivery payloads with common structure across all integration types.
+Write test suite covering POST, GET, PATCH, DELETE endpoints with test cases for successful operations, validation failures, authorization errors, tenant isolation, database constraint violations, and Effect error handling paths. Include test fixtures and mock data setup.
 
 ## Test Strategy
-Error handling tests and webhook configuration validation scenarios
+Unit tests for individual endpoint logic, integration tests for full request/response cycles, error scenario testing
 
 ---
 *Project: alerthub*

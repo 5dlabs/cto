@@ -1,4 +1,4 @@
-# Subtask 27.2: Setup Expo Router Navigation System
+# Subtask task-27.2: Install and Configure TailwindCSS
 
 ## Parent Task
 Task 27
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Configure Expo Router for file-based routing and implement bottom tab navigation structure with proper route definitions
+Setup TailwindCSS for styling with optimal configuration for Next.js App Router
 
 ## Dependencies
-- Subtask 27.1
+- Subtask 22.1
 
 ## Implementation Details
-Install expo-router, configure app layout with tabs, create _layout.tsx files for tab structure, implement bottom tab navigation with icons for Home, Integrations, Settings, and Profile tabs using @expo/vector-icons
+Install tailwindcss, postcss, autoprefixer packages, configure tailwind.config.js with content paths for app directory, setup globals.css with Tailwind directives, configure CSS optimization settings
 
 ## Test Strategy
-Test navigation between all tabs works correctly and routes are properly defined
+Verify Tailwind classes render correctly and CSS builds without errors
 
 ---
 *Project: alerthub*

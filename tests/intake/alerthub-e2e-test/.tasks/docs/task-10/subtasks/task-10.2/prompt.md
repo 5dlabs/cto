@@ -1,4 +1,4 @@
-# Subtask 10.2: Implement JWT Authentication Middleware for WebSocket
+# Subtask task-10.2: Implement Time-Series Data Aggregation Engine
 
 ## Parent Task
 Task 10
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create JWT token validation middleware specifically for WebSocket connections to authenticate users before establishing the connection.
+Build the time-series aggregation system for processing notification delivery metrics with configurable time windows and statistical calculations.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Build WebSocket-specific JWT validation that extracts token from query parameters or headers, validates signature and expiration, extracts user and tenant information, and rejects unauthorized connections with proper error codes. Handle token refresh scenarios and malformed token edge cases.
+Create aggregation engine with support for multiple time windows (hourly, daily, weekly, monthly). Implement statistical calculations for delivery success rates, failure rates, latency percentiles, and volume metrics. Include data retention policies and automatic cleanup of old aggregated data. Use efficient data structures for high-throughput metric processing.
 
 ## Test Strategy
-Unit tests for token validation, expiration handling, and authorization flows
+Unit tests for aggregation logic and performance benchmarks
 
 ---
 *Project: alerthub*

@@ -1,4 +1,4 @@
-# Subtask 5.2: Configure Tenant Isolation Bucket Policies
+# Subtask task-5.2: Integrate metrics middleware with Axum routes
 
 ## Parent Task
 Task 5
@@ -7,16 +7,16 @@ Task 5
 implementer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Set up bucket access policies to ensure proper tenant isolation and security boundaries for each bucket
+Add metrics collection middleware to all Axum route handlers
 
 ## Dependencies
-- Subtask 5.1
+- Subtask 11.11.3
 
 ## Implementation Details
-Configure IAM policies and bucket access controls for tenant isolation. Define user/role-based access patterns, ensure cross-tenant data isolation, and implement least-privilege access principles for each bucket type.
+Implement Tower middleware layer that records request duration, status codes, and endpoint labels for all routes automatically
 
 ## Test Strategy
 See parent task acceptance criteria.

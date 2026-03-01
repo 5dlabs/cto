@@ -1,25 +1,28 @@
-# Subtask 12.1: Define Core Integration Schema Types
+# Subtask task-12.1: Review Schema Implementation and Type Safety
 
 ## Parent Task
 Task 12
 
 ## Subagent Type
-implementer
+reviewer
 
 ## Parallelizable
-Yes - can run concurrently
+No - must wait for dependencies
 
 ## Description
-Create Effect Schema definitions for the core Integration type and Channel union types to establish the foundational data structures for integration configurations.
+Conduct comprehensive review of all Effect Schema implementations to ensure type safety, validation completeness, and adherence to Effect patterns and best practices.
 
 ## Dependencies
-None
+- Subtask 12.1
+- Subtask 12.2
+- Subtask 12.3
+- Subtask 12.4
 
 ## Implementation Details
-Implement Effect Schema for the base Integration type with common fields like id, name, type, enabled status. Define Channel union schema that encompasses all supported integration channels (Slack, Discord, Email, Webhook). Use Effect's Schema.Union and branded types for type safety. Include validation rules for required fields and data constraints.
+Review all schema definitions for proper use of Effect Schema patterns, branded types, and validation rules. Verify type safety across integration configs and error handling. Check for consistent error messaging, appropriate use of tagged unions, and proper schema composition. Ensure schemas integrate well with Elysia request validation and provide clear error messages for API consumers. Validate that all required fields are properly marked and optional fields have appropriate defaults.
 
 ## Test Strategy
-Unit tests for schema validation with valid/invalid payloads
+Integration tests with Elysia endpoints using the schemas
 
 ---
 *Project: alerthub*

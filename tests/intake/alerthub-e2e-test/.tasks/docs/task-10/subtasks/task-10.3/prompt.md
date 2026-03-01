@@ -1,4 +1,4 @@
-# Subtask 10.3: Build Tenant-Based Channel Subscription System
+# Subtask task-10.3: Setup Effect Dependencies and Schema Configuration
 
 ## Parent Task
 Task 10
@@ -7,20 +7,19 @@ Task 10
 implementer
 
 ## Parallelizable
-No - must wait for dependencies
+Yes - can run concurrently
 
 ## Description
-Implement tenant channel management allowing clients to subscribe to tenant-specific notification channels with proper isolation and access control.
+Install Effect ecosystem packages and configure Effect Schema for API validation and data modeling
 
 ## Dependencies
-- Subtask 10.1
-- Subtask 10.2
+- Subtask 22.1
 
 ## Implementation Details
-Create channel subscription handler that validates tenant access permissions, manages tenant-based message routing, implements channel join/leave operations, maintains subscriber lists per tenant, and ensures tenant data isolation. Include subscription state persistence and cleanup on disconnect.
+Install @effect/schema, effect, @effect/platform packages, create schema directory structure, setup basic schemas for common data types, configure Effect runtime and context providers
 
 ## Test Strategy
-Integration tests for tenant isolation, subscription management, and access control
+Verify Effect Schema validation works correctly with sample data structures
 
 ---
 *Project: alerthub*

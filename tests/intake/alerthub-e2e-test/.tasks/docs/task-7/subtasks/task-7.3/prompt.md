@@ -1,4 +1,4 @@
-# Subtask 7.3: Implement Redis Rate Limiting and Deduplication
+# Subtask task-7.3: Setup Bucket Lifecycle Rules
 
 ## Parent Task
 Task 7
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create Redis-based rate limiting system and notification deduplication cache with configurable limits and TTL settings
+Configure automated lifecycle management rules for object cleanup and storage optimization across all buckets
 
 ## Dependencies
-None
+- Subtask 5.1
 
 ## Implementation Details
-Implement sliding window rate limiter using Redis with per-tenant limits, create deduplication logic using content hash keys with configurable TTL, add Redis connection pool management, implement rate limit headers in responses, and handle Redis connectivity failures gracefully.
+Implement lifecycle policies for automatic cleanup of old objects, transition rules for different storage classes if available, and retention policies. Configure rules specific to each bucket type based on usage patterns (attachments, exports, media).
 
 ## Test Strategy
-Integration tests with Redis container for rate limiting and deduplication scenarios
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

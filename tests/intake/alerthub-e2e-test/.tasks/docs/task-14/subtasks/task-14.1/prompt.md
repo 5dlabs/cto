@@ -1,4 +1,4 @@
-# Subtask 14.1: Implement Slack Channel Delivery Service
+# Subtask task-14.1: Implement WebSocket Connection Management Core
 
 ## Parent Task
 Task 14
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Create SlackService using Effect.Service pattern with HTTP client integration, retry logic with exponential backoff, rate limiting via Semaphore, and comprehensive error handling for Slack API interactions.
+Create the foundational WebSocket connection handling infrastructure including connection lifecycle, heartbeat/ping mechanisms, and basic connection state management.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Implement SlackService class following Effect.Service pattern. Include HTTP client for Slack API calls, exponential backoff retry mechanism, Semaphore-based rate limiting, and comprehensive error types for Slack-specific failures (auth errors, rate limits, message format errors). Handle webhook delivery with proper payload formatting and response validation.
+Implement WebSocket upgrade handler in Axum, connection struct with metadata (user_id, tenant_id, connection_id), heartbeat timer management, ping/pong frame handling, graceful connection cleanup on disconnect, and connection state tracking. Include error handling for connection failures and timeout scenarios.
 
 ## Test Strategy
-Unit tests for service methods, integration tests with mock Slack API, error scenario testing
+Unit tests for connection lifecycle, heartbeat functionality, and error scenarios
 
 ---
 *Project: alerthub*

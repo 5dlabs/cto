@@ -1,27 +1,25 @@
-# Subtask 4.4: Test MongoDB collections functionality and performance
+# Subtask task-4.4: Design Kafka Producer Architecture and Configuration
 
 ## Parent Task
 Task 4
 
 ## Subagent Type
-tester
+researcher
 
 ## Parallelizable
-No - must wait for dependencies
+Yes - can run concurrently
 
 ## Description
-Validate that all MongoDB collections are properly created with correct indexes and schema validation
+Research and design the Kafka producer architecture including connection pooling strategy, serialization format, partition key design, and configuration structure for Rex service integration.
 
 ## Dependencies
-- Subtask 4.1
-- Subtask 4.2
-- Subtask 4.3
+None
 
 ## Implementation Details
-Execute comprehensive tests to verify collection creation, schema validation enforcement, index performance, and TTL functionality. Test compound index efficiency for tenant_id + channel queries across all collections. Validate that schema validation properly rejects invalid integration configs and that TTL indexes correctly remove expired delivery logs.
+Analyze Rex's current architecture to design Kafka producer integration. Define configuration structure for broker connections, SSL/SASL settings, connection pool parameters, serialization format (JSON/Avro), partition key strategy for notifications, and error handling approach. Create architectural design document with connection lifecycle, thread safety considerations, and performance optimization strategies.
 
 ## Test Strategy
-Create test documents for each collection, verify schema validation works, test query performance with indexes, and confirm TTL cleanup functionality
+See parent task acceptance criteria.
 
 ---
 *Project: alerthub*

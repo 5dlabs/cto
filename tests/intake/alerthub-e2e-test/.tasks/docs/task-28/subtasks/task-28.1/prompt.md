@@ -1,4 +1,4 @@
-# Subtask 28.1: Create Notification Feed Screen with FlatList
+# Subtask task-28.1: Create Dashboard Page Layout with Overview Metrics
 
 ## Parent Task
 Task 28
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Build the main notification feed screen component with FlatList for displaying notifications, including UI layout, styling, and basic data rendering structure.
+Build the main dashboard page structure with overview metrics cards, responsive grid layout, and shadcn/ui components for the header and navigation sections.
 
 ## Dependencies
 None
 
 ## Implementation Details
-Create NotificationFeedScreen.tsx with FlatList component, notification item rendering, empty state handling, loading states, and basic styling. Include proper TypeScript interfaces for notification data structure and component props.
+Implement the dashboard page component with responsive grid layout using shadcn/ui components. Create metric cards for overview data (user count, activity stats, system health). Set up proper routing and page structure. Use Tailwind CSS for responsive design and ensure mobile compatibility. Include placeholder data for metrics until backend integration.
 
 ## Test Strategy
-Unit tests for component rendering and prop handling
+Component rendering tests and responsive design validation
 
 ---
 *Project: alerthub*

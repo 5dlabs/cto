@@ -1,26 +1,25 @@
-# Subtask 20.4: Implement Rule Testing and Validation Framework
+# Subtask task-20.4: Implement Discord Channel Delivery Service
 
 ## Parent Task
 Task 20
 
 ## Subagent Type
-tester
+implementer
 
 ## Parallelizable
-No - must wait for dependencies
+Yes - can run concurrently
 
 ## Description
-Create comprehensive testing utilities for rule validation, condition evaluation testing, and rule engine performance verification
+Create DiscordService using Effect.Service pattern with HTTP client integration, retry logic with exponential backoff, rate limiting via Semaphore, and comprehensive error handling for Discord API interactions.
 
 ## Dependencies
-- Subtask 20.2
-- Subtask 20.3
+None
 
 ## Implementation Details
-Build rule testing service with mock data generation, condition evaluation testing, rule matching validation, and performance benchmarking. Include test data factories and rule simulation capabilities for debugging rule configurations.
+Implement DiscordService class following Effect.Service pattern. Include HTTP client for Discord API calls, exponential backoff retry mechanism, Semaphore-based rate limiting, and comprehensive error types for Discord-specific failures (auth errors, rate limits, message format errors). Handle webhook delivery with proper payload formatting and Discord-specific message structure validation.
 
 ## Test Strategy
-Unit tests for individual components, integration tests for rule evaluation flows, performance tests for rule matching at scale
+Unit tests for service methods, integration tests with mock Discord API, error scenario testing
 
 ---
 *Project: alerthub*

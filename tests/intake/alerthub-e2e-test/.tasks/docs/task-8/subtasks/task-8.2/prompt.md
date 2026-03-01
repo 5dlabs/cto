@@ -1,4 +1,4 @@
-# Subtask 8.2: Implement Core RateLimiter Struct and Redis Backend
+# Subtask task-8.2: Deploy Grafana Dashboards and Visualization
 
 ## Parent Task
 Task 8
@@ -10,16 +10,16 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Build the main RateLimiter struct with Redis connectivity, connection pooling, and basic CRUD operations for rate limit data.
+Deploy Grafana with pre-configured dashboards for monitoring microservices and infrastructure metrics
 
 ## Dependencies
-- Subtask 8.1
+- Subtask 30.2
 
 ## Implementation Details
-Implement RateLimiter struct with redis-rs client, connection pool configuration, error handling for Redis operations, and basic methods for storing/retrieving rate limit state. Include Redis key generation utilities and connection health checks.
+Deploy Grafana with Prometheus as data source. Create and import dashboards for application metrics, Kubernetes cluster health, resource utilization, and custom business metrics. Configure authentication and user permissions.
 
 ## Test Strategy
-Unit tests for Redis operations and connection handling
+Verify dashboards display correct metrics and visualizations are functional
 
 ---
 *Project: alerthub*

@@ -1,4 +1,4 @@
-# Subtask 4.2: Create MongoDB templates collection with indexes
+# Subtask task-4.2: Create Kafka topics with partitioning and retention
 
 ## Parent Task
 Task 4
@@ -10,13 +10,13 @@ implementer
 Yes - can run concurrently
 
 ## Description
-Set up the templates collection in MongoDB with appropriate compound indexes for efficient querying
+Create all required Kafka topics with correct partition counts and retention policies
 
 ## Dependencies
 None
 
 ## Implementation Details
-Create the 'templates' collection and implement compound indexes optimized for tenant_id + channel queries. Set up additional indexes for template name, version, and creation date to support common query patterns. Ensure proper index ordering for query performance.
+Create topics: alerthub.notifications.created (6 partitions, 7d), alerthub.notifications.delivered (3 partitions, 7d), alerthub.notifications.failed (3 partitions, 14d), alerthub.integrations.events (3 partitions, 7d)
 
 ## Test Strategy
 See parent task acceptance criteria.
