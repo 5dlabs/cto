@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export interface Venture {
@@ -24,29 +21,21 @@ const statusConfig = {
   exploring: { label: "Exploring", bg: "bg-yellow-500/10", text: "text-yellow-400", dot: "bg-yellow-400" },
 };
 
-export function VentureCard({ venture, index }: VentureCardProps) {
+export function VentureCard({ venture }: VentureCardProps) {
   const status = statusConfig[venture.status];
 
   const card = (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6, delay: index * 0.1 }}
-      whileHover={{ scale: 1.01, y: -2 }}
-      className="group cursor-pointer"
-    >
+    <div className="group cursor-pointer reveal-on-scroll">
       <div
         className={cn(
           "relative p-6 rounded-xl",
           "bg-card/50 border border-border/50",
-          "hover:border-primary/50",
+          "hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-0.5",
           "transition-all duration-300",
           "backdrop-blur-sm",
           "h-full flex flex-col"
         )}
       >
-        {/* Glow effect on hover */}
         <div
           className={cn(
             "absolute inset-0 rounded-xl opacity-0 group-hover:opacity-10",
@@ -56,7 +45,6 @@ export function VentureCard({ venture, index }: VentureCardProps) {
         />
 
         <div className="relative z-10 flex-1 flex flex-col">
-          {/* Header */}
           <div className="flex items-start justify-between mb-4">
             <h3 className="text-xl font-bold text-foreground">
               {venture.name}
@@ -73,17 +61,14 @@ export function VentureCard({ venture, index }: VentureCardProps) {
             </span>
           </div>
 
-          {/* Tagline */}
           <p className="text-sm font-medium text-cyan mb-3">
             {venture.tagline}
           </p>
 
-          {/* Description */}
           <p className="text-sm text-muted-foreground mb-4 flex-1">
             {venture.description}
           </p>
 
-          {/* Tags */}
           <div className="flex flex-wrap gap-2">
             {venture.tags.map((tag) => (
               <span
@@ -96,7 +81,7 @@ export function VentureCard({ venture, index }: VentureCardProps) {
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 
   if (venture.href) {

@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
@@ -25,29 +22,17 @@ interface AgentCardProps {
   squadIndex: number;
 }
 
-export function AgentCard({ agent, index, squadIndex }: AgentCardProps) {
+export function AgentCard({ agent }: AgentCardProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{
-        delay: squadIndex * 0.08 + index * 0.04,
-        duration: 0.7,
-        ease: "easeOut",
-      }}
-      whileHover={{ scale: 1.01, y: -2 }}
-      className="group cursor-pointer"
-    >
+    <div className="group cursor-pointer reveal-on-scroll">
       <div
         className={cn(
           "relative flex items-center gap-5 p-5 rounded-xl",
           "bg-card border border-border",
-          "hover:border-primary/50",
+          "hover:border-primary/50 hover:scale-[1.01] hover:-translate-y-0.5",
           "transition-all duration-300"
         )}
       >
-        {/* Glow effect */}
         <div
           className={cn(
             "absolute inset-0 rounded-xl opacity-0 group-hover:opacity-20",
@@ -56,7 +41,6 @@ export function AgentCard({ agent, index, squadIndex }: AgentCardProps) {
           )}
         />
 
-        {/* Avatar */}
         <Avatar className="size-[90px] ring-2 ring-border group-hover:ring-primary/50 transition-all shrink-0">
           {agent.avatar ? (
             <AvatarImage src={agent.avatar} alt={agent.name} />
@@ -71,7 +55,6 @@ export function AgentCard({ agent, index, squadIndex }: AgentCardProps) {
           </AvatarFallback>
         </Avatar>
 
-        {/* Info */}
         <div className="relative z-10 flex-1 min-w-0">
           <p className="font-semibold text-lg text-foreground truncate">{agent.name}</p>
           <p className="text-sm text-muted-foreground truncate">{agent.role}</p>
@@ -89,7 +72,6 @@ export function AgentCard({ agent, index, squadIndex }: AgentCardProps) {
           )}
         </div>
 
-        {/* Status indicator */}
         <div
           className={cn(
             "size-2 rounded-full shrink-0",
@@ -98,7 +80,7 @@ export function AgentCard({ agent, index, squadIndex }: AgentCardProps) {
           )}
         />
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -110,14 +92,7 @@ export function AgentGrid({ squads }: AgentGridProps) {
   return (
     <div className="space-y-8">
       {squads.map((squad, squadIndex) => (
-        <motion.div
-          key={squad.title}
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: squadIndex * 0.08, duration: 0.8, ease: "easeOut" }}
-        >
-          {/* Squad Header */}
+        <div key={squad.title} className="reveal-on-scroll">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-xl">{squad.emoji}</span>
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
@@ -126,7 +101,6 @@ export function AgentGrid({ squads }: AgentGridProps) {
             <div className="flex-1 h-px bg-border/50" />
           </div>
 
-          {/* Agent Cards Grid */}
           <div
             className={cn(
               "grid gap-4",
@@ -144,7 +118,7 @@ export function AgentGrid({ squads }: AgentGridProps) {
               />
             ))}
           </div>
-        </motion.div>
+        </div>
       ))}
     </div>
   );

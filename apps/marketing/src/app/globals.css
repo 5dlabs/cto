@@ -227,6 +227,36 @@
   animation: gradient-rotate 4s ease infinite;
 }
 
+/* === Entrance animations (replace Framer Motion) === */
+
+@keyframes fade-in-up-kf {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scroll-bounce-kf {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+.fade-in-up {
+  animation: fade-in-up-kf 0.8s ease-out both;
+}
+
+.scroll-bounce {
+  animation: scroll-bounce-kf 3s ease-in-out infinite;
+}
+
+.reveal-on-scroll {
+  opacity: 1;
+}
+
 /* Marquee animation for tech stack */
 @keyframes marquee-scroll {
   0% {
