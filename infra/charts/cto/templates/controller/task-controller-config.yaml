@@ -24,8 +24,8 @@ data:
     agents:
       morgan:
         githubApp: "5DLabs-Morgan"
-        cli: "claude"
-        model: "claude-opus-4-5-20251101"
+        cli: "grok"
+        model: "claude-sonnet-4-20250514"
       rex:
         githubApp: "5DLabs-Rex"
         cli: "claude"
