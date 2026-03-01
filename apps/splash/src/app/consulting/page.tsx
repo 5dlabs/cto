@@ -196,7 +196,7 @@ const consultingJsonLd = {
 export default function ConsultingPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
+      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.04_0.02_260)] z-0" />
       <div className="fixed inset-0 circuit-bg z-[1]" />
       {/* GridPulse at z-[2] from layout */}
       <div className="fixed inset-0 noise-overlay z-[3]" />
