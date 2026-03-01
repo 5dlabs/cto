@@ -32,7 +32,20 @@ outputs:
 
 steps:
   # ─────────────────────────────────────────────────────────
-  # Step 1: Conduct the time-boxed debate
+  # Step 1: Research PRD context via Tavily
+  # Fires targeted searches to give each debate agent evidence for
+  # their position before the debate begins.
+  # ─────────────────────────────────────────────────────────
+  - name: research-prd
+    description: "Research PRD context via Tavily before debate — gives each agent evidence for their position"
+    timeout: "5m"
+    command: >
+      jq -n
+        --arg prd_content "{{inputs.prd_content}}"
+        '{"operation":"prd_research","payload":{"prd_content":$prd_content}}' | intake-agent
+
+  # ─────────────────────────────────────────────────────────
+  # Step 2: Conduct the time-boxed debate
   # intake-agent broadcasts the PRD to deliberation.room internally (Step 1 of
   # runDeliberation), then orchestrates the debate loop, committee votes, and
   # result collection — all via the single shared deliberation.room subject.
@@ -42,6 +55,7 @@ steps:
   # ─────────────────────────────────────────────────────────
   - name: conduct-deliberation
     description: "Run conductor loop for timebox_minutes, collecting turns and votes"
+    depends_on: [research-prd]
     timeout: "{{inputs.timebox_minutes + 10}}m"
     command: >
       jq -n
@@ -49,6 +63,7 @@ steps:
         --arg prd_content "{{inputs.prd_content}}"
         --arg infra_context "{{inputs.infrastructure_context}}"
         --argjson timebox {{inputs.timebox_minutes}}
+        --argjson research_memos '${{ steps.research-prd.output }}'
         '{
           "operation": "deliberate",
           "payload": {
@@ -56,6 +71,7 @@ steps:
             "prd_content": $prd_content,
             "infrastructure_context": $infra_context,
             "timebox_minutes": $timebox,
+            "research_memos": $research_memos,
             "vote_timeout_seconds": 120,
             "committee_ids": ["committee-1", "committee-2", "committee-3", "committee-4", "committee-5"]
           }

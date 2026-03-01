@@ -23,8 +23,8 @@ steps:
         "prompt": "{{prompts/vote-system.md}}",
         "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
         "schema": "{{schemas/vote-ballot.schema.json}}",
-        "provider": "openai",
-        "model": "gpt-4.1"
+        "provider": "anthropic",
+        "model": "claude-opus-4-20250514"
       }'
 
   - name: voter-3
@@ -43,8 +43,8 @@ steps:
         "prompt": "{{prompts/vote-system.md}}",
         "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
         "schema": "{{schemas/vote-ballot.schema.json}}",
-        "provider": "minimax",
-        "model": "minimax-01"
+        "provider": "google",
+        "model": "gemini-2.0-flash"
       }'
 
   - name: voter-5
@@ -53,8 +53,8 @@ steps:
         "prompt": "{{prompts/vote-system.md}}",
         "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
         "schema": "{{schemas/vote-ballot.schema.json}}",
-        "provider": "openai",
-        "model": "o3-mini"
+        "provider": "google",
+        "model": "gemini-2.5-pro"
       }'
 
   - name: tally

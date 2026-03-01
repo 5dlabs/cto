@@ -192,6 +192,22 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
       return runDeliberation({ ...payload, session_id: sessionId });
     }
 
+    case 'prd_research': {
+      const { prdResearch } = await import('./operations/prd-research');
+      const payload = request.payload as { prd_content: string };
+      if (!payload?.prd_content) {
+        return errorResponse('Missing prd_content in payload', 'validation_error');
+      }
+      const memos = await prdResearch(payload);
+      return {
+        success: true,
+        data: memos,
+        usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+        model: 'tavily',
+        provider: 'tavily',
+      };
+    }
+
     case 'generate_docs': {
       const payload = request.payload as {
         tasks: GeneratedTask[];
@@ -304,6 +320,7 @@ Operations:
   generate_docs          Generate documentation for tasks
   generate_with_debate   Generate with debate pattern
   deliberate             Run deliberation session on PRD
+  prd_research           Research PRD context via Tavily (pre-debate)
 
 Options:
   -h, --help             Show this help message
@@ -366,7 +383,7 @@ async function main(): Promise<void> {
     if (!validateRequest(request)) {
       writeStdout(
         errorResponse(
-          'Invalid request structure. Expected { operation: "ping" | "parse_prd" | "parse_prd_iterative" | "expand_task" | "analyze_complexity" | "generate" | "generate_prompts" | "generate_docs" | "generate_with_debate" | "generate_with_critic" | "validate_content" | "research" | "research_capabilities" | "provider_status" | "deliberate", payload?: {...} }',
+          'Invalid request structure. Expected { operation: "ping" | "parse_prd" | "parse_prd_iterative" | "expand_task" | "analyze_complexity" | "generate" | "generate_prompts" | "generate_docs" | "generate_with_debate" | "generate_with_critic" | "validate_content" | "research" | "research_capabilities" | "provider_status" | "deliberate" | "prd_research", payload?: {...} }',
           'validation_error'
         )
       );
