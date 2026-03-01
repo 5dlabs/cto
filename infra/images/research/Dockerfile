@@ -67,6 +67,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     git \
     jq \
+    nodejs \
+    python3 \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
