@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "session": {
+    "id": null,
+    "startedAt": null,
+    "expiresAt": null
+  },
+  "circuitBreaker": {
+    "state": "closed",
+    "noProgressCount": 0,
+    "sameErrorCount": 0,
+    "lastError": null,
+    "openedAt": null,
+    "recoveryAt": null
+  },
+  "issues": [],
+  "stats": {
+    "totalRemediations": 0,
+    "successfulRemediations": 0,
+    "failedRemediations": 0
+  }
+}
