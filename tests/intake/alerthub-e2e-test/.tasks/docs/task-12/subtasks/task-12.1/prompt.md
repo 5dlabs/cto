@@ -13,7 +13,6 @@ No - must wait for dependencies
 Conduct comprehensive review of all Effect Schema implementations to ensure type safety, validation completeness, and adherence to Effect patterns and best practices.
 
 ## Dependencies
-- Subtask 12.1
 - Subtask 12.2
 - Subtask 12.3
 - Subtask 12.4

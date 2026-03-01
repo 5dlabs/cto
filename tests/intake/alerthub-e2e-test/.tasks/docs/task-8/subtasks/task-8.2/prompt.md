@@ -13,7 +13,7 @@ Yes - can run concurrently
 Deploy Grafana with pre-configured dashboards for monitoring microservices and infrastructure metrics
 
 ## Dependencies
-- Subtask 30.2
+- Subtask 1.5
 
 ## Implementation Details
 Deploy Grafana with Prometheus as data source. Create and import dashboards for application metrics, Kubernetes cluster health, resource utilization, and custom business metrics. Configure authentication and user permissions.

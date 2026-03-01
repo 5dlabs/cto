@@ -13,10 +13,9 @@ No - must wait for dependencies
 Comprehensive code review of all notification models for Rust best practices, error handling, and API consistency
 
 ## Dependencies
-- Subtask 6.1
-- Subtask 6.2
-- Subtask 6.3
-- Subtask 6.4
+- Subtask 10.5
+- Subtask 10.6
+- Subtask 10.7
 
 ## Implementation Details
 Review all implemented structs and enums for proper Rust idioms, memory efficiency, error handling patterns, serde configuration, sqlx integration, validation logic, and overall code quality. Ensure consistent naming conventions, documentation, and adherence to Rust/Axum best practices.

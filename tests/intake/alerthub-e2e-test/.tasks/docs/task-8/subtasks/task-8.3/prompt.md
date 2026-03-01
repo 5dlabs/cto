@@ -13,7 +13,7 @@ Yes - can run concurrently
 Set up Prometheus alerting rules with notification channels for proactive incident management
 
 ## Dependencies
-- Subtask 30.2
+- Subtask 1.5
 
 ## Implementation Details
 Create AlertManager configuration with routing rules for different alert severities. Configure notification channels (Slack, email, PagerDuty). Define alerting rules for application health, resource exhaustion, and SLA violations.
