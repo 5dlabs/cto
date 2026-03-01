@@ -359,7 +359,7 @@ if [ "$DELIBERATE" = "true" ] && command -v intake-agent >/dev/null 2>&1; then
                 "research_enabled": true,
                 "research_timeout_minutes": 5
             }
-        }' | NATS_URL="${NATS_URL:-nats://nats.messaging.svc.cluster.local:4222}" intake-agent)
+        }' | NATS_URL="${NATS_URL:-nats://nats.messaging.svc.cluster.local:4222}" intake-agent || true)
     DESIGN_BRIEF=$(echo "$DELIBERATION_OUTPUT" | jq -r '.data.design_brief // ""' 2>/dev/null)
     if [ -n "$DESIGN_BRIEF" ] && [ "$DESIGN_BRIEF" != "null" ]; then
         echo "$DESIGN_BRIEF" > ".tasks/docs/design-brief.md"
