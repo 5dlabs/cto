@@ -1,6 +1,8 @@
 ---
-# Argo CD Application for Twingate Resources
-# Manages Twingate RemoteNetwork, Connector, and Network resources
+# Argo CD Application for Twingate Operator-based Resources
+# NOTE: Currently empty - connector deployed via twingate-connector Helm app.
+# Operator-based CRD management is pending proper operator installation.
+# See infra/gitops/manifests/twingate/kustomization.yaml for details.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,7 +13,6 @@ metadata:
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: networking
   annotations:
-    # Deploy after the operator is ready
     argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -28,10 +29,11 @@ spec:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: false
+      allowEmpty: true
     syncOptions:
       - CreateNamespace=false
       - ServerSideApply=true
+      - AllowEmpty=true
     retry:
       limit: 5
       backoff:

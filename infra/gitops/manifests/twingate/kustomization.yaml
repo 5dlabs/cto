@@ -2,14 +2,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - remote-network.yaml
-  - connector.yaml
-  - network-resource.yaml
-
-# Common labels
-labels:
-  - pairs:
-      app.kubernetes.io/name: twingate
-      app.kubernetes.io/part-of: networking
-      app.kubernetes.io/managed-by: argocd
+# NOTE: Operator-based CRD manifests (TwingateConnector, TwingateRemoteNetwork, TwingateResource)
+# have been removed. The Twingate connector is deployed via the twingate-connector Helm app.
+#
+# The twingate-operator ArgoCD app is skipped (GHCR 3-level OCI path not supported by ArgoCD).
+# To re-enable operator-based management:
+# 1. Bundle the chart tarball in git at infra/charts/twingate-operator/
+# 2. Set a real API token in OpenBao at secret/tools-twingate (TWINGATE_API_TOKEN)
+# 3. Re-add CRD manifests here (TwingateRemoteNetwork does NOT exist as a CRD in the operator -
+#    use TWINGATE_REMOTE_NETWORK_NAME env var in the operator deployment instead)
+#
+# Status: Connector running via twingate-connector Helm app (namespace: cto)
+resources: []
