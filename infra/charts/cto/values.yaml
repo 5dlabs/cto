@@ -327,7 +327,7 @@ pm:
   intake:
     # CLI to use for intake - image is resolved from agent.cliImages[cli]
     # Options: claude, cursor, codex, gemini, opencode, factory, dexter, research
-    cli: research
+    cli: claude
     # Model configuration for intake workflows
     # Using Opus 4.5 with extended thinking for complex task generation
     models:
