@@ -208,8 +208,8 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
       >
+        <GridPulse />
         <ShiftDimensionsWrapper>
-          <GridPulse />
           {children}
         </ShiftDimensionsWrapper>
       </body>
