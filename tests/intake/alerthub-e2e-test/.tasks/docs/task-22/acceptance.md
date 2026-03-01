@@ -1,19 +1,10 @@
-# Acceptance Criteria - Task 22
+# Acceptance Criteria: Task 22
 
-## Task
-Integration Management API (Nova - Bun/Elysia+Effect)
-
-## Criteria
-1. All CRUD operations work
-2. validation prevents invalid configurations
-3. test endpoint verifies channel connectivity
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Create REST API endpoints for CRUD operations on integrations with Effect validation
+- [ ] All CRUD operations work, validation prevents invalid configurations, test endpoint verifies channel connectivity
+- [ ] All requirements implemented
+- [ ] Tests passing (`bun test` exits 0)
+- [ ] Lints passing (`bun run lint` exits 0)
+- [ ] Formatted (`bun run format:check` exits 0)
+- [ ] Build succeeds (`bun run build` exits 0)
+- [ ] PR created and ready for review

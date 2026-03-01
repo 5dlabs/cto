@@ -1,22 +1,10 @@
-# Acceptance Criteria - Task 12
+# Acceptance Criteria: Task 12
 
-## Task
-Notification Submission API (Rex - Rust/Axum)
-
-## Criteria
-1. Can submit valid notifications and receive 202 Accepted
-2. invalid requests return 400 with error details
-3. rate limits enforced
-
-## Decision Points Requiring Resolution
-### Hard Constraints (Must Follow)
-- **d12**: Batch submission size limit
-
-
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Implement POST endpoints for single and batch notification submission
+- [ ] Can submit valid notifications and receive 202 Accepted, invalid requests return 400 with error details, rate limits enforced
+- [ ] All requirements implemented
+- [ ] Tests passing (`cargo test --workspace` exits 0)
+- [ ] Lints passing (`cargo clippy --all-targets -- -D warnings -W clippy::pedantic` exits 0)
+- [ ] Formatted (`cargo fmt --all --check` exits 0)
+- [ ] Build succeeds (`cargo build --release` exits 0)
+- [ ] PR created and ready for review

@@ -1,19 +1,10 @@
-# Acceptance Criteria - Task 5
+# Acceptance Criteria: Task 5
 
-## Task
-MongoDB Document Store Setup (Bolt - Kubernetes)
-
-## Criteria
-1. MongoDB is running
-2. accepts connections
-3. can create/query documents in integrations collection
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Deploy Percona MongoDB operator for flexible integration configs and templates
+- [ ] MongoDB is running, accepts connections, can create/query documents in integrations collection
+- [ ] All requirements implemented
+- [ ] Tests passing (`helm lint charts/*` exits 0)
+- [ ] Lints passing (`kubectl apply --dry-run=client -f . -R` exits 0)
+- [ ] Formatted (`yamllint .` exits 0)
+- [ ] Build succeeds (`helm template charts/*` exits 0)
+- [ ] PR created and ready for review

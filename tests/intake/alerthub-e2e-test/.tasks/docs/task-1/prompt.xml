@@ -1,34 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="1" project="alerthub">
-  <title>Infrastructure Foundation Setup</title>
-  <agent name="bolt" stack="Kubernetes" />
-  <priority>high</priority>
-  <status>pending</status>
-  
-  <description>
-    Set up Kubernetes cluster with basic operators and namespaces for AlertHub platform
-  </description>
-  
-  <dependencies>
-    
-  </dependencies>
-  
-  <implementation>
-    <details>1. Create Kubernetes cluster\n2. Install cert-manager for TLS certificates\n3. Create namespaces: databases, kafka, messaging, alerthub\n4. Set up RBAC policies\n5. Configure network policies for service isolation</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d1" category="architecture" constraint="soft" requires_approval="false">
-      <description>Storage class selection for persistent volumes</description>
-      <options>
-        <option>mayastor</option>
-        <option>local-path</option>
-        <option>nfs</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    Cluster is accessible via kubectl, all namespaces exist, cert-manager webhook responds, network policies allow expected traffic
-  </acceptance_criteria>
+<task id="1" priority="high" agent="bolt">
+    <meta>
+        <title>Infrastructure Foundation Setup (Bolt - Kubernetes)</title>
+        <priority>high</priority>
+        <dependencies></dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 1 with production-quality code.</role>
+
+    <context>
+        <overview>Set up Kubernetes cluster with basic operators and namespaces for AlertHub platform</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Create Kubernetes cluster\n2. Install cert-manager for TLS certificates\n3. Create namespaces: databases, kafka, messaging, alerthub\n4. Set up RBAC policies\n5. Configure network policies for service isolation</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-1): Infrastructure Foundation Setup (Bolt - Kubernetes)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>Cluster is accessible via kubectl, all namespaces exist, cert-manager webhook responds, network policies allow expected traffic</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>kubectl get pods -n {namespace} - verify all pods running</command>
+        <command>kubectl get secrets - verify connection secrets created</command>
+        <command>kubectl logs {pod} - check for errors</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

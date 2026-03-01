@@ -1,20 +1,10 @@
-# Acceptance Criteria - Task 3
+# Acceptance Criteria: Task 3
 
-## Task
-Redis Cache Setup (Bolt - Kubernetes)
-
-## Criteria
-1. Valkey instance is running
-2. accepts redis-cli connections
-3. can set/get keys
-4. persistence is working
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Deploy Redis operator and Valkey instance for caching and rate limiting
+- [ ] Valkey instance is running, accepts redis-cli connections, can set/get keys, persistence is working
+- [ ] All requirements implemented
+- [ ] Tests passing (`helm lint charts/*` exits 0)
+- [ ] Lints passing (`kubectl apply --dry-run=client -f . -R` exits 0)
+- [ ] Formatted (`yamllint .` exits 0)
+- [ ] Build succeeds (`helm template charts/*` exits 0)
+- [ ] PR created and ready for review

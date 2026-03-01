@@ -1,20 +1,10 @@
-# Acceptance Criteria - Task 27
+# Acceptance Criteria: Task 27
 
-## Task
-Web Console Foundation (Blaze - React/Next.js)
-
-## Criteria
-1. Next.js app builds and runs
-2. Effect integration works
-3. authentication flow functional
-4. shadcn/ui components render
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Set up Next.js 15 project with React 19, shadcn/ui, and Effect integration
+- [ ] Next.js app builds and runs, Effect integration works, authentication flow functional, shadcn/ui components render
+- [ ] All requirements implemented
+- [ ] Tests passing (`npm run test` exits 0)
+- [ ] Lints passing (`npm run lint` exits 0)
+- [ ] Formatted (`npm run format:check` exits 0)
+- [ ] Build succeeds (`npm run build` exits 0)
+- [ ] PR created and ready for review

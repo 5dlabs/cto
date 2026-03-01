@@ -1,19 +1,10 @@
-# Acceptance Criteria - Task 8
+# Acceptance Criteria: Task 8
 
-## Task
-Monitoring and Observability Setup (Bolt - Kubernetes)
-
-## Criteria
-1. Prometheus collecting metrics from all services
-2. Grafana dashboards loading
-3. alerts firing for test conditions
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Deploy Prometheus, Grafana, and logging stack for system observability
+- [ ] Prometheus collecting metrics from all services, Grafana dashboards loading, alerts firing for test conditions
+- [ ] All requirements implemented
+- [ ] Tests passing (`helm lint charts/*` exits 0)
+- [ ] Lints passing (`kubectl apply --dry-run=client -f . -R` exits 0)
+- [ ] Formatted (`yamllint .` exits 0)
+- [ ] Build succeeds (`helm template charts/*` exits 0)
+- [ ] PR created and ready for review

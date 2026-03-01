@@ -1,36 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="27" project="alerthub">
-  <title>Web Console Foundation</title>
-  <agent name="blaze" stack="React/Next.js" />
-  <priority>high</priority>
-  <status>pending</status>
-  
-  <description>
-    Set up Next.js 15 project with React 19, shadcn/ui, and Effect integration
-  </description>
-  
-  <dependencies>
-    <dependency task_id="16" />
-    <dependency task_id="22" />
-    <dependency task_id="26" />
-  </dependencies>
-  
-  <implementation>
-    <details>1. Create Next.js 15 project with App Router\n2. Install React 19, shadcn/ui, TailwindCSS 4\n3. Set up Effect 3.x with TypeScript 5.x\n4. Configure authentication with JWT\n5. Add basic layout and navigation components</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d27" category="ux-behavior" constraint="soft" requires_approval="false">
-      <description>Default theme selection</description>
-      <options>
-        <option>light theme</option>
-        <option>dark theme</option>
-        <option>system preference</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    Next.js app builds and runs, Effect integration works, authentication flow functional, shadcn/ui components render
-  </acceptance_criteria>
+<task id="27" priority="high" agent="blaze">
+    <meta>
+        <title>Web Console Foundation (Blaze - React/Next.js)</title>
+        <priority>high</priority>
+        <dependencies>16, 22, 26</dependencies>
+        <agent_hint>blaze</agent_hint>
+    </meta>
+
+    <role>You are a Senior Frontend Engineer with expertise in React, TypeScript, and modern UI/UX. Implement Task 27 with production-quality code.</role>
+
+    <context>
+        <overview>Set up Next.js 15 project with React 19, shadcn/ui, and Effect integration</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 16, 22, 26
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Create Next.js 15 project with App Router\n2. Install React 19, shadcn/ui, TailwindCSS 4\n3. Set up Effect 3.x with TypeScript 5.x\n4. Configure authentication with JWT\n5. Add basic layout and navigation components</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-27): Web Console Foundation (Blaze - React/Next.js)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>Next.js app builds and runs, Effect integration works, authentication flow functional, shadcn/ui components render</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>npm run build</command>
+        <command>npm run lint</command>
+        <command>npm run test</command>
+        <command>npm run typecheck</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

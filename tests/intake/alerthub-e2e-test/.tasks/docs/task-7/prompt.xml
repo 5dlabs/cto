@@ -1,34 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="7" project="alerthub">
-  <title>SeaweedFS Object Storage Setup</title>
-  <agent name="bolt" stack="Kubernetes" />
-  <priority>medium</priority>
-  <status>pending</status>
-  
-  <description>
-    Deploy SeaweedFS for S3-compatible object storage of attachments and exports
-  </description>
-  
-  <dependencies>
-    <dependency task_id="1" />
-  </dependencies>
-  
-  <implementation>
-    <details>1. Deploy SeaweedFS master, volume, and filer components\n2. Configure S3 gateway for compatibility\n3. Create buckets for attachments, exports, media\n4. Set up access policies and credentials\n5. Configure backup retention</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d7" category="architecture" constraint="open" requires_approval="false">
-      <description>Object storage replication strategy</description>
-      <options>
-        <option>single copy</option>
-        <option>dual copy</option>
-        <option>erasure coding</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    SeaweedFS is running, S3 API responds, can create/delete objects in test bucket using AWS CLI
-  </acceptance_criteria>
+<task id="7" priority="medium" agent="bolt">
+    <meta>
+        <title>SeaweedFS Object Storage Setup (Bolt - Kubernetes)</title>
+        <priority>medium</priority>
+        <dependencies>1</dependencies>
+        <agent_hint>bolt</agent_hint>
+    </meta>
+
+    <role>You are a Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD. Implement Task 7 with production-quality code.</role>
+
+    <context>
+        <overview>Deploy SeaweedFS for S3-compatible object storage of attachments and exports</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 1
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Deploy SeaweedFS master, volume, and filer components\n2. Configure S3 gateway for compatibility\n3. Create buckets for attachments, exports, media\n4. Set up access policies and credentials\n5. Configure backup retention</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-7): SeaweedFS Object Storage Setup (Bolt - Kubernetes)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>SeaweedFS is running, S3 API responds, can create/delete objects in test bucket using AWS CLI</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>kubectl get pods -n {namespace} - verify all pods running</command>
+        <command>kubectl get secrets - verify connection secrets created</command>
+        <command>kubectl logs {pod} - check for errors</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

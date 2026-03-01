@@ -1,20 +1,10 @@
-# Acceptance Criteria - Task 2
+# Acceptance Criteria: Task 2
 
-## Task
-PostgreSQL Database Setup (Bolt - Kubernetes)
-
-## Criteria
-1. PostgreSQL cluster is running
-2. accepts connections
-3. alerthub database exists
-4. connection string works from test pod
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Deploy CloudNative-PG operator and PostgreSQL cluster for structured data storage
+- [ ] PostgreSQL cluster is running, accepts connections, alerthub database exists, connection string works from test pod
+- [ ] All requirements implemented
+- [ ] Tests passing (`helm lint charts/*` exits 0)
+- [ ] Lints passing (`kubectl apply --dry-run=client -f . -R` exits 0)
+- [ ] Formatted (`yamllint .` exits 0)
+- [ ] Build succeeds (`helm template charts/*` exits 0)
+- [ ] PR created and ready for review

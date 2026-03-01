@@ -1,20 +1,10 @@
-# Acceptance Criteria - Task 29
+# Acceptance Criteria: Task 29
 
-## Task
-Mobile App Foundation (Tap - Expo)
-
-## Criteria
-1. App builds and runs on simulator
-2. push notifications register successfully
-3. navigation works
-4. authentication functional
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Create Expo React Native app with push notification support and basic screens
+- [ ] App builds and runs on simulator, push notifications register successfully, navigation works, authentication functional
+- [ ] All requirements implemented
+- [ ] Tests passing (`npm run test` exits 0)
+- [ ] Lints passing (`npm run lint` exits 0)
+- [ ] Formatted (`npm run format:check` exits 0)
+- [ ] Build succeeds (`npx expo export` exits 0)
+- [ ] PR created and ready for review

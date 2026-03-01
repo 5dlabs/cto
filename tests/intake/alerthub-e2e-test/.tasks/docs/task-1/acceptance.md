@@ -1,20 +1,10 @@
-# Acceptance Criteria - Task 1
+# Acceptance Criteria: Task 1
 
-## Task
-Infrastructure Foundation Setup (Bolt - Kubernetes)
-
-## Criteria
-1. Cluster is accessible via kubectl
-2. all namespaces exist
-3. cert-manager webhook responds
-4. network policies allow expected traffic
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Set up Kubernetes cluster with basic operators and namespaces for AlertHub platform
+- [ ] Cluster is accessible via kubectl, all namespaces exist, cert-manager webhook responds, network policies allow expected traffic
+- [ ] All requirements implemented
+- [ ] Tests passing (`helm lint charts/*` exits 0)
+- [ ] Lints passing (`kubectl apply --dry-run=client -f . -R` exits 0)
+- [ ] Formatted (`yamllint .` exits 0)
+- [ ] Build succeeds (`helm template charts/*` exits 0)
+- [ ] PR created and ready for review

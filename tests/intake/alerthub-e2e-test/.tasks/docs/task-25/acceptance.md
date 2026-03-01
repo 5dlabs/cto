@@ -1,19 +1,10 @@
-# Acceptance Criteria - Task 25
+# Acceptance Criteria: Task 25
 
-## Task
-Notification Rules Engine (Grizz - Go/gRPC)
-
-## Criteria
-1. Can create rules with various conditions
-2. rule evaluation correctly filters notifications
-3. priority ordering works
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Implement RuleService for configurable notification routing and filtering
+- [ ] Can create rules with various conditions, rule evaluation correctly filters notifications, priority ordering works
+- [ ] All requirements implemented
+- [ ] Tests passing (`go test ./...` exits 0)
+- [ ] Lints passing (`golangci-lint run` exits 0)
+- [ ] Formatted (`gofmt -l .` exits 0)
+- [ ] Build succeeds (`go build ./...` exits 0)
+- [ ] PR created and ready for review

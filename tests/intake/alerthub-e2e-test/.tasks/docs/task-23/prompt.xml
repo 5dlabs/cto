@@ -1,34 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="23" project="alerthub">
-  <title>Admin API gRPC Foundation</title>
-  <agent name="grizz" stack="Go/gRPC" />
-  <priority>high</priority>
-  <status>pending</status>
-  
-  <description>
-    Set up Go project with gRPC services and grpc-gateway for REST API
-  </description>
-  
-  <dependencies>
-    <dependency task_id="2" />
-  </dependencies>
-  
-  <implementation>
-    <details>1. Initialize Go module with gRPC dependencies\n2. Define protobuf schemas for all services\n3. Generate Go code and grpc-gateway handlers\n4. Set up basic server with health checks\n5. Add structured logging with zap</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d23" category="api-design" constraint="soft" requires_approval="false">
-      <description>API versioning strategy</description>
-      <options>
-        <option>v1 in package path</option>
-        <option>version in service name</option>
-        <option>no versioning initially</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    gRPC server starts successfully, health checks respond, protobuf compilation works, basic service calls succeed
-  </acceptance_criteria>
+<task id="23" priority="high" agent="grizz">
+    <meta>
+        <title>Admin API gRPC Foundation (Grizz - Go/gRPC)</title>
+        <priority>high</priority>
+        <dependencies>2</dependencies>
+        <agent_hint>grizz</agent_hint>
+    </meta>
+
+    <role>You are a Senior Go Engineer with expertise in concurrent systems and microservices. Implement Task 23 with production-quality code.</role>
+
+    <context>
+        <overview>Set up Go project with gRPC services and grpc-gateway for REST API</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 2
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Initialize Go module with gRPC dependencies\n2. Define protobuf schemas for all services\n3. Generate Go code and grpc-gateway handlers\n4. Set up basic server with health checks\n5. Add structured logging with zap</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-23): Admin API gRPC Foundation (Grizz - Go/gRPC)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>gRPC server starts successfully, health checks respond, protobuf compilation works, basic service calls succeed</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>go test ./...</command>
+        <command>golangci-lint run</command>
+        <command>go build ./...</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

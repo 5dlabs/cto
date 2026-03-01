@@ -1,20 +1,10 @@
-# Acceptance Criteria - Task 28
+# Acceptance Criteria: Task 28
 
-## Task
-Dashboard and Notification Management (Blaze - React/Next.js)
-
-## Criteria
-1. Dashboard displays notifications
-2. real-time updates work
-3. can manage integrations and rules
-4. filtering functional
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Implement main dashboard with notification feed and management interfaces
+- [ ] Dashboard displays notifications, real-time updates work, can manage integrations and rules, filtering functional
+- [ ] All requirements implemented
+- [ ] Tests passing (`npm run test` exits 0)
+- [ ] Lints passing (`npm run lint` exits 0)
+- [ ] Formatted (`npm run format:check` exits 0)
+- [ ] Build succeeds (`npm run build` exits 0)
+- [ ] PR created and ready for review

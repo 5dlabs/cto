@@ -1,35 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="21" project="alerthub">
-  <title>Kafka Event Consumer</title>
-  <agent name="nova" stack="Bun/Elysia+Effect" />
-  <priority>high</priority>
-  <status>pending</status>
-  
-  <description>
-    Implement Kafka consumer with Effect Stream for processing notification events
-  </description>
-  
-  <dependencies>
-    <dependency task_id="4" />
-    <dependency task_id="20" />
-  </dependencies>
-  
-  <implementation>
-    <details>1. Add kafkajs with Effect Stream adapter\n2. Subscribe to notifications.created topic\n3. Process events through integration services\n4. Implement backpressure handling\n5. Add consumer group management</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d21" category="performance" constraint="open" requires_approval="false">
-      <description>Kafka consumer parallelism strategy</description>
-      <options>
-        <option>single consumer</option>
-        <option>consumer per partition</option>
-        <option>consumer pool</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    Consumer processes Kafka events, routes to appropriate integration services, handles backpressure gracefully
-  </acceptance_criteria>
+<task id="21" priority="high" agent="nova">
+    <meta>
+        <title>Kafka Event Consumer (Nova - Bun/Elysia+Effect)</title>
+        <priority>high</priority>
+        <dependencies>4, 20</dependencies>
+        <agent_hint>nova</agent_hint>
+    </meta>
+
+    <role>You are a Senior Node.js Engineer with expertise in server-side JavaScript and APIs. Implement Task 21 with production-quality code.</role>
+
+    <context>
+        <overview>Implement Kafka consumer with Effect Stream for processing notification events</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 4, 20
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Add kafkajs with Effect Stream adapter\n2. Subscribe to notifications.created topic\n3. Process events through integration services\n4. Implement backpressure handling\n5. Add consumer group management</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-21): Kafka Event Consumer (Nova - Bun/Elysia+Effect)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>Consumer processes Kafka events, routes to appropriate integration services, handles backpressure gracefully</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>bun test</command>
+        <command>bun run lint</command>
+        <command>bun run typecheck</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

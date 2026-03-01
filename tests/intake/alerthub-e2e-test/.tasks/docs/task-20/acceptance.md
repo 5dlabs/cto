@@ -1,22 +1,10 @@
-# Acceptance Criteria - Task 20
+# Acceptance Criteria: Task 20
 
-## Task
-Multi-Channel Integration Services (Nova - Bun/Elysia+Effect)
-
-## Criteria
-1. All channel services deliver notifications successfully
-2. error handling consistent across channels
-3. parallel testing works
-
-## Decision Points Requiring Resolution
-### Hard Constraints (Must Follow)
-- **d20**: Webhook signature verification requirement
-
-
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Implement Discord, Email, and Webhook services with Effect composability
+- [ ] All channel services deliver notifications successfully, error handling consistent across channels, parallel testing works
+- [ ] All requirements implemented
+- [ ] Tests passing (`bun test` exits 0)
+- [ ] Lints passing (`bun run lint` exits 0)
+- [ ] Formatted (`bun run format:check` exits 0)
+- [ ] Build succeeds (`bun run build` exits 0)
+- [ ] PR created and ready for review

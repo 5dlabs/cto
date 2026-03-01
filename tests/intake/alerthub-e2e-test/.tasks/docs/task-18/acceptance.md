@@ -1,18 +1,10 @@
-# Acceptance Criteria - Task 18
+# Acceptance Criteria: Task 18
 
-## Task
-MongoDB Integration with Drizzle ORM (Nova - Bun/Elysia+Effect)
-
-## Criteria
-1. MongoDB connections successful
-2. can create/read/update/delete integration records via Drizzle
-
-## Decision Points Requiring Resolution
-All decisions can be made by the agent.
-
-## Definition of Done
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
+- [ ] Connect to MongoDB using Drizzle ORM for integration configs and templates
+- [ ] MongoDB connections successful, can create/read/update/delete integration records via Drizzle
+- [ ] All requirements implemented
+- [ ] Tests passing (`bun test` exits 0)
+- [ ] Lints passing (`bun run lint` exits 0)
+- [ ] Formatted (`bun run format:check` exits 0)
+- [ ] Build succeeds (`bun run build` exits 0)
+- [ ] PR created and ready for review

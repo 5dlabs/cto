@@ -103,8 +103,46 @@ async function getNatsClient(): Promise<NatsClient> {
         };
       },
       async request(subject: string, message: NatsMessage, timeoutMs: number): Promise<NatsMessage> {
-        const response = await nc.request(subject, sc.encode(JSON.stringify(message)), { timeout: timeoutMs });
-        return JSON.parse(sc.decode(response.data)) as NatsMessage;
+        // Convert NatsMessage to AgentMessage format expected by nats-messenger plugin.
+        // Subscribe to agent.deliberation.inbox for the response.
+        const replySubject = 'agent.deliberation.inbox';
+        const agentMsg = {
+          from: 'deliberation',
+          to: subject.replace('agent.', '').replace('.inbox', ''),
+          subject,
+          message: `[DEBATE TURN ${(message as Record<string, unknown>)['turn'] ?? ''}]\n\n${(message as Record<string, unknown>)['content'] ?? ''}\n\nSession: ${message.session_id}. Minutes remaining: ${(message as Record<string, unknown>)['minutes_remaining'] ?? '?'}. Please respond with your full debate position. End with: nats(action="publish", to="deliberation", message="<your full response>")`,
+          priority: 'normal',
+          timestamp: new Date().toISOString(),
+          type: 'message',
+          replyTo: replySubject,
+        };
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            sub.unsubscribe();
+            reject(new Error(`Timeout waiting for reply from ${subject}`));
+          }, timeoutMs);
+          const sub = nc.subscribe(replySubject);
+          (async () => {
+            for await (const m of sub) {
+              try {
+                const data = JSON.parse(sc.decode(m.data)) as Record<string, unknown>;
+                if (data['type'] === 'discovery_ping' || data['type'] === 'discovery_pong') continue;
+                clearTimeout(timer);
+                sub.unsubscribe();
+                const reply: NatsMessage = {
+                  type: 'debate_turn_reply',
+                  session_id: message.session_id,
+                  content: (data['message'] as string) ?? '',
+                };
+                resolve(reply);
+                break;
+              } catch (e) {
+                console.error('[NATS] Failed to parse reply:', e);
+              }
+            }
+          })().catch(reject);
+          nc.publish(subject, sc.encode(JSON.stringify(agentMsg)));
+        });
       },
     };
   }

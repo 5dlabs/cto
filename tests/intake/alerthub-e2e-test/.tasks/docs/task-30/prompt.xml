@@ -1,35 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<task id="30" project="alerthub">
-  <title>Desktop Client Foundation</title>
-  <agent name="spark" stack="Electron" />
-  <priority>medium</priority>
-  <status>pending</status>
-  
-  <description>
-    Create Electron app with system tray integration and native desktop notifications
-  </description>
-  
-  <dependencies>
-    <dependency task_id="16" />
-    <dependency task_id="28" />
-  </dependencies>
-  
-  <implementation>
-    <details>1. Set up Electron 28+ project with React\n2. Implement system tray with badge count\n3. Add native desktop notification support\n4. Create main window with notification feed\n5. Set up auto-updater and cross-platform builds</details>
-  </implementation>
-  
-  <decision_points>
-    <decision id="d30" category="ux-behavior" constraint="soft" requires_approval="false">
-      <description>Desktop notification persistence</description>
-      <options>
-        <option>persist until dismissed</option>
-        <option>auto-dismiss after 5s</option>
-        <option>configurable timeout</option>
-      </options>
-    </decision>
-  </decision_points>
-  
-  <acceptance_criteria>
-    Electron app starts, system tray shows unread count, desktop notifications appear, main window displays notifications
-  </acceptance_criteria>
+<task id="30" priority="medium" agent="spark">
+    <meta>
+        <title>Desktop Client Foundation (Spark - Electron)</title>
+        <priority>medium</priority>
+        <dependencies>16, 28</dependencies>
+        <agent_hint>spark</agent_hint>
+    </meta>
+
+    <role>You are a Senior Desktop Engineer with expertise in Electron and native integrations. Implement Task 30 with production-quality code.</role>
+
+    <context>
+        <overview>Create Electron app with system tray integration and native desktop notifications</overview>
+        <background>
+            This task is part of a larger project. Key resources:
+            - PRD: .tasks/docs/prd.txt (full requirements and architecture)
+            - Related tasks: 16, 28
+            - Infrastructure config: Check ConfigMaps for connection strings
+        </background>
+    </context>
+
+    <requirements>
+        <description>1. Set up Electron 28+ project with React\n2. Implement system tray with badge count\n3. Add native desktop notification support\n4. Create main window with notification feed\n5. Set up auto-updater and cross-platform builds</description>
+        <constraints>
+            <constraint>Match existing codebase patterns and conventions</constraint>
+            <constraint>Create PR with atomic, well-described commits</constraint>
+            <constraint>Include unit tests for new functionality</constraint>
+            <constraint>PR title format: feat(task-30): Desktop Client Foundation (Spark - Electron)</constraint>
+        </constraints>
+    </requirements>
+
+    <acceptance_criteria>
+        <criterion>All requirements from task description implemented</criterion>
+        <criterion>Tests passing with adequate coverage</criterion>
+        <criterion>Code follows project conventions and style guide</criterion>
+        <criterion>Electron app starts, system tray shows unread count, desktop notifications appear, main window displays notifications</criterion>
+    </acceptance_criteria>
+
+    <validation>
+        <command>npm run build</command>
+        <command>npm run lint</command>
+        <command>npm run test</command>
+    </validation>
+
+    <deliverables>
+        <deliverable>Working implementation of described functionality</deliverable>
+        <deliverable>Unit tests covering new code paths</deliverable>
+        <deliverable>Pull request with clear description</deliverable>
+    </deliverables>
 </task>

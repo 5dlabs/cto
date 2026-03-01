@@ -1,0 +1,25 @@
+# Subtask task-4.3: Configure Kafka consumer groups
+
+## Parent Task
+Task 4
+
+## Subagent Type
+implementer
+
+## Parallelizable
+No - must wait for dependencies
+
+## Description
+Setup Kafka consumer group configurations for integration service consumers
+
+## Dependencies
+- Subtask 4.2
+
+## Implementation Details
+Configure consumer groups for integration service (alerthub-integration-consumers), set offset strategies, consumer lag monitoring
+
+## Test Strategy
+See parent task acceptance criteria.
+
+---
+*Project: alerthub*

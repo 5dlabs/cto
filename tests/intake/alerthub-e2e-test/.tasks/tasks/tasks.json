@@ -1,8 +1,500 @@
 {
   "metadata": {
-    "created": "2026-01-11T17:01:30.011385Z",
-    "updatedAt": "2026-01-11T17:01:30.011405Z",
+    "completedCount": 0,
+    "lastModified": "2026-03-01T05:12:14.207029+00:00",
+    "taskCount": 30,
     "version": "1.0.0"
   },
-  "tasks": []
+  "tasks": [
+    {
+      "agentHint": "bolt",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [],
+      "description": "Set up Kubernetes cluster with basic operators and namespaces for AlertHub platform",
+      "details": "1. Create Kubernetes cluster\\n2. Install cert-manager for TLS certificates\\n3. Create namespaces: databases, kafka, messaging, alerthub\\n4. Set up RBAC policies\\n5. Configure network policies for service isolation",
+      "id": "1",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Cluster is accessible via kubectl, all namespaces exist, cert-manager webhook responds, network policies allow expected traffic",
+      "title": "Infrastructure Foundation Setup (Bolt - Kubernetes)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "bolt",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Deploy CloudNative-PG operator and PostgreSQL cluster for structured data storage",
+      "details": "1. Install CloudNative-PG operator\\n2. Create PostgreSQL cluster with 1 instance\\n3. Configure database schemas for users, tenants, notifications\\n4. Set up connection pooling\\n5. Create service accounts and secrets",
+      "id": "2",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "PostgreSQL cluster is running, accepts connections, alerthub database exists, connection string works from test pod",
+      "title": "PostgreSQL Database Setup (Bolt - Kubernetes)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "bolt",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Deploy Redis operator and Valkey instance for caching and rate limiting",
+      "details": "1. Install Redis operator\\n2. Create Valkey instance with persistence\\n3. Configure memory limits and eviction policies\\n4. Set up monitoring and alerts\\n5. Create service for internal access",
+      "id": "3",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Valkey instance is running, accepts redis-cli connections, can set/get keys, persistence is working",
+      "title": "Redis Cache Setup (Bolt - Kubernetes)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "bolt",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Deploy Strimzi operator and Kafka cluster for async event processing",
+      "details": "1. Install Strimzi operator\\n2. Create Kafka cluster with 1 broker\\n3. Create topics for notifications.created, notifications.delivered, notifications.failed\\n4. Configure topic partitions and retention\\n5. Set up Kafka Connect if needed",
+      "id": "4",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Kafka cluster is running, topics exist with correct partitions, can produce/consume messages via kafka-console tools",
+      "title": "Kafka Event Streaming Setup (Bolt - Kubernetes)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "bolt",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Deploy Percona MongoDB operator for flexible integration configs and templates",
+      "details": "1. Install Percona MongoDB operator\\n2. Create MongoDB replica set with 1 instance\\n3. Configure authentication and authorization\\n4. Create collections for integrations and templates\\n5. Set up backup policies",
+      "id": "5",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "MongoDB is running, accepts connections, can create/query documents in integrations collection",
+      "title": "MongoDB Document Store Setup (Bolt - Kubernetes)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "bolt",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Deploy RabbitMQ operator for integration delivery task queues",
+      "details": "1. Install RabbitMQ operator\\n2. Create RabbitMQ cluster with 1 instance\\n3. Configure queues for each integration type\\n4. Set up dead letter queues\\n5. Configure management UI access",
+      "id": "6",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "RabbitMQ is running, management UI accessible, can publish/consume messages, DLQs are configured",
+      "title": "RabbitMQ Task Queue Setup (Bolt - Kubernetes)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "bolt",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Deploy SeaweedFS for S3-compatible object storage of attachments and exports",
+      "details": "1. Deploy SeaweedFS master, volume, and filer components\\n2. Configure S3 gateway for compatibility\\n3. Create buckets for attachments, exports, media\\n4. Set up access policies and credentials\\n5. Configure backup retention",
+      "id": "7",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "SeaweedFS is running, S3 API responds, can create/delete objects in test bucket using AWS CLI",
+      "title": "SeaweedFS Object Storage Setup (Bolt - Kubernetes)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "bolt",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "1"
+      ],
+      "description": "Deploy Prometheus, Grafana, and logging stack for system observability",
+      "details": "1. Install Prometheus operator and Prometheus instance\\n2. Deploy Grafana with AlertHub dashboards\\n3. Set up log aggregation with Loki or ELK\\n4. Configure alert rules for SLA monitoring\\n5. Create service monitors for all components",
+      "id": "8",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Prometheus collecting metrics from all services, Grafana dashboards loading, alerts firing for test conditions",
+      "title": "Monitoring and Observability Setup (Bolt - Kubernetes)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "rex",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "2",
+        "3"
+      ],
+      "description": "Create Rust/Axum service foundation with basic HTTP server and health endpoints",
+      "details": "1. Initialize Rust project with Axum 0.7\\n2. Set up basic HTTP server with routes\\n3. Implement health check endpoints (/health/live, /health/ready)\\n4. Add structured logging with tracing\\n5. Configure Prometheus metrics endpoint",
+      "id": "9",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Service starts successfully, health endpoints return 200, metrics endpoint exposes basic HTTP metrics",
+      "title": "Notification Router Core Service (Rex - Rust/Axum)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "rex",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "9"
+      ],
+      "description": "Implement PostgreSQL connection pool and data models for notifications",
+      "details": "1. Add sqlx with PostgreSQL driver\\n2. Create connection pool configuration\\n3. Define Notification, User, Tenant structs\\n4. Implement database migrations\\n5. Add connection health checks",
+      "id": "10",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Database connections successful, migrations run without errors, can insert/query test notification records",
+      "title": "Database Models and Connections (Rex - Rust/Axum)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "rex",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "9"
+      ],
+      "description": "Implement Redis connection and rate limiting middleware for tenant isolation",
+      "details": "1. Add redis crate and connection pool\\n2. Implement rate limiting middleware with token bucket\\n3. Add deduplication cache with TTL\\n4. Configure Redis for pub/sub notifications\\n5. Add Redis health checks",
+      "id": "11",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Redis connections work, rate limiting blocks requests after limit, deduplication prevents duplicate notifications",
+      "title": "Redis Integration and Rate Limiting (Rex - Rust/Axum)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "rex",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "10",
+        "11"
+      ],
+      "description": "Implement POST endpoints for single and batch notification submission",
+      "details": "1. Create POST /api/v1/notifications endpoint\\n2. Add request validation with serde\\n3. Implement batch submission endpoint\\n4. Add authentication middleware\\n5. Return proper HTTP status codes and error responses",
+      "id": "12",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Can submit valid notifications and receive 202 Accepted, invalid requests return 400 with error details, rate limits enforced",
+      "title": "Notification Submission API (Rex - Rust/Axum)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "rex",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "4",
+        "12"
+      ],
+      "description": "Integrate Kafka producer to publish notification events for downstream processing",
+      "details": "1. Add rdkafka crate for Kafka integration\\n2. Configure Kafka producer with proper serialization\\n3. Publish events to notifications.created topic\\n4. Handle Kafka connection failures gracefully\\n5. Add producer metrics",
+      "id": "13",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Notification submissions trigger Kafka events, events visible in Kafka topic, service handles Kafka downtime gracefully",
+      "title": "Kafka Event Publishing (Rex - Rust/Axum)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "rex",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "11"
+      ],
+      "description": "Implement WebSocket endpoint for real-time notification status updates",
+      "details": "1. Add WebSocket support to Axum\\n2. Implement /api/v1/ws endpoint with authentication\\n3. Subscribe to Redis pub/sub for updates\\n4. Handle WebSocket connection lifecycle\\n5. Add connection metrics and limits",
+      "id": "14",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "WebSocket connections established, receives real-time updates when notifications change status, handles client disconnections",
+      "title": "WebSocket Real-time Updates (Rex - Rust/Axum)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "rex",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "10"
+      ],
+      "description": "Implement GET endpoints for notification status and event history",
+      "details": "1. Add GET /api/v1/notifications/:id endpoint\\n2. Implement GET /api/v1/notifications/:id/events\\n3. Add pagination and filtering\\n4. Include performance optimization with indexes\\n5. Add request validation and error handling",
+      "id": "15",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Can retrieve notification by ID, events endpoint returns delivery history, pagination works correctly",
+      "title": "Notification Query API (Rex - Rust/Axum)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "rex",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "8",
+        "13",
+        "14",
+        "15"
+      ],
+      "description": "Create Kubernetes manifests and deploy notification router service",
+      "details": "1. Create Dockerfile with multi-stage build\\n2. Build Kubernetes Deployment manifest\\n3. Configure Service and optional Ingress\\n4. Add ConfigMap for environment variables\\n5. Set up horizontal pod autoscaling",
+      "id": "16",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Service deploys successfully, health checks pass, scales based on load, accessible via Kubernetes service",
+      "title": "Service Deployment and Configuration (Rex - Rust/Axum)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "nova",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "5",
+        "6"
+      ],
+      "description": "Set up Bun/Elysia service with Effect for type-safe integration management",
+      "details": "1. Initialize Bun project with Elysia 1.x\\n2. Set up Effect 3.x with TypeScript 5.x\\n3. Configure basic HTTP server with health endpoints\\n4. Add Effect error handling and logging\\n5. Set up Effect Schema for validation",
+      "id": "17",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Service starts with Bun runtime, Elysia server responds, Effect error handling works, health endpoint returns status",
+      "title": "Integration Service Foundation (Nova - Bun/Elysia+Effect)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "nova",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "17"
+      ],
+      "description": "Connect to MongoDB using Drizzle ORM for integration configs and templates",
+      "details": "1. Add Drizzle ORM with MongoDB adapter\\n2. Define schemas for integrations and templates\\n3. Configure database connection with Effect\\n4. Implement CRUD operations as Effect services\\n5. Add database health checks",
+      "id": "18",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "MongoDB connections successful, can create/read/update/delete integration records via Drizzle",
+      "title": "MongoDB Integration with Drizzle ORM (Nova - Bun/Elysia+Effect)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "nova",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "18"
+      ],
+      "description": "Implement Slack delivery service with Effect retry logic and error handling",
+      "details": "1. Create SlackService using Effect.Service pattern\\n2. Implement webhook and Bot API delivery methods\\n3. Add Effect.retry with exponential backoff\\n4. Handle Slack-specific errors as tagged unions\\n5. Add rate limiting with Effect.Semaphore",
+      "id": "19",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Can deliver notifications to Slack webhooks, retries work on failures, rate limiting prevents API abuse",
+      "title": "Slack Integration Service (Nova - Bun/Elysia+Effect)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "nova",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "19"
+      ],
+      "description": "Implement Discord, Email, and Webhook services with Effect composability",
+      "details": "1. Create DiscordService for webhook delivery\\n2. Implement EmailService with SMTP support\\n3. Add WebhookService with HMAC signature verification\\n4. Use Effect.all for parallel delivery testing\\n5. Implement unified error handling across channels",
+      "id": "20",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "All channel services deliver notifications successfully, error handling consistent across channels, parallel testing works",
+      "title": "Multi-Channel Integration Services (Nova - Bun/Elysia+Effect)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "nova",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "4",
+        "20"
+      ],
+      "description": "Implement Kafka consumer with Effect Stream for processing notification events",
+      "details": "1. Add kafkajs with Effect Stream adapter\\n2. Subscribe to notifications.created topic\\n3. Process events through integration services\\n4. Implement backpressure handling\\n5. Add consumer group management",
+      "id": "21",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Consumer processes Kafka events, routes to appropriate integration services, handles backpressure gracefully",
+      "title": "Kafka Event Consumer (Nova - Bun/Elysia+Effect)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "nova",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "20"
+      ],
+      "description": "Create REST API endpoints for CRUD operations on integrations with Effect validation",
+      "details": "1. Implement POST /api/v1/integrations with Effect Schema\\n2. Add GET, PATCH, DELETE endpoints\\n3. Create integration testing endpoint\\n4. Add OAuth flow handling for supported channels\\n5. Implement proper error responses with Effect",
+      "id": "22",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "All CRUD operations work, validation prevents invalid configurations, test endpoint verifies channel connectivity",
+      "title": "Integration Management API (Nova - Bun/Elysia+Effect)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "grizz",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "2"
+      ],
+      "description": "Set up Go project with gRPC services and grpc-gateway for REST API",
+      "details": "1. Initialize Go module with gRPC dependencies\\n2. Define protobuf schemas for all services\\n3. Generate Go code and grpc-gateway handlers\\n4. Set up basic server with health checks\\n5. Add structured logging with zap",
+      "id": "23",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "gRPC server starts successfully, health checks respond, protobuf compilation works, basic service calls succeed",
+      "title": "Admin API gRPC Foundation (Grizz - Go/gRPC)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "grizz",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "23"
+      ],
+      "description": "Implement TenantService and UserService with database operations",
+      "details": "1. Implement TenantService CRUD operations\\n2. Add UserService with preference management\\n3. Set up PostgreSQL connection and queries\\n4. Add JWT authentication middleware\\n5. Implement role-based access control",
+      "id": "24",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Can create/read/update tenants and users, authentication works, RBAC properly restricts access",
+      "title": "Tenant and User Management (Grizz - Go/gRPC)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "grizz",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "24"
+      ],
+      "description": "Implement RuleService for configurable notification routing and filtering",
+      "details": "1. Design rule condition evaluation engine\\n2. Implement RuleService CRUD operations\\n3. Add rule evaluation logic with metadata filtering\\n4. Support regex and comparison operators\\n5. Add rule priority and conflict resolution",
+      "id": "25",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Can create rules with various conditions, rule evaluation correctly filters notifications, priority ordering works",
+      "title": "Notification Rules Engine (Grizz - Go/gRPC)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "grizz",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "24"
+      ],
+      "description": "Implement AnalyticsService for notification metrics and delivery statistics",
+      "details": "1. Create AnalyticsService with metrics aggregation\\n2. Implement time-series data collection\\n3. Add delivery success/failure rate calculations\\n4. Create channel breakdown reports\\n5. Set up data retention policies",
+      "id": "26",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Analytics queries return accurate metrics, time-series aggregation works, performance acceptable for dashboard queries",
+      "title": "Analytics and Reporting Service (Grizz - Go/gRPC)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "blaze",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "16",
+        "22",
+        "26"
+      ],
+      "description": "Set up Next.js 15 project with React 19, shadcn/ui, and Effect integration",
+      "details": "1. Create Next.js 15 project with App Router\\n2. Install React 19, shadcn/ui, TailwindCSS 4\\n3. Set up Effect 3.x with TypeScript 5.x\\n4. Configure authentication with JWT\\n5. Add basic layout and navigation components",
+      "id": "27",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Next.js app builds and runs, Effect integration works, authentication flow functional, shadcn/ui components render",
+      "title": "Web Console Foundation (Blaze - React/Next.js)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "blaze",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "27"
+      ],
+      "description": "Implement main dashboard with notification feed and management interfaces",
+      "details": "1. Create dashboard page with notification overview\\n2. Implement real-time notification feed with WebSocket\\n3. Add notification history with filtering\\n4. Create integration management interface\\n5. Build rule configuration wizard with drag-and-drop",
+      "id": "28",
+      "priority": "high",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Dashboard displays notifications, real-time updates work, can manage integrations and rules, filtering functional",
+      "title": "Dashboard and Notification Management (Blaze - React/Next.js)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "tap",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "16",
+        "22"
+      ],
+      "description": "Create Expo React Native app with push notification support and basic screens",
+      "details": "1. Initialize Expo SDK 50+ project\\n2. Set up navigation with bottom tabs\\n3. Implement push notification registration\\n4. Create basic screens for notifications, settings\\n5. Add authentication flow with biometric support",
+      "id": "29",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "App builds and runs on simulator, push notifications register successfully, navigation works, authentication functional",
+      "title": "Mobile App Foundation (Tap - Expo)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    },
+    {
+      "agentHint": "spark",
+      "createdAt": "2026-03-01T05:09:29.999189Z",
+      "dependencies": [
+        "16",
+        "28"
+      ],
+      "description": "Create Electron app with system tray integration and native desktop notifications",
+      "details": "1. Set up Electron 28+ project with React\\n2. Implement system tray with badge count\\n3. Add native desktop notification support\\n4. Create main window with notification feed\\n5. Set up auto-updater and cross-platform builds",
+      "id": "30",
+      "priority": "medium",
+      "status": "pending",
+      "subtasks": [],
+      "testStrategy": "Electron app starts, system tray shows unread count, desktop notifications appear, main window displays notifications",
+      "title": "Desktop Client Foundation (Spark - Electron)",
+      "updatedAt": "2026-03-01T05:09:29.999189Z"
+    }
+  ]
 }
