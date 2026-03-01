@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 
@@ -19,31 +16,17 @@ export default function FounderPage() {
         {/* Hero */}
         <section className="py-20 px-6">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="flex flex-col md:flex-row items-center gap-12"
-            >
+            <div className="flex flex-col md:flex-row items-center gap-12 fade-in-up">
               {/* Avatar placeholder */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.8 }}
-                className="shrink-0"
-              >
+              <div className="shrink-0 fade-in-up">
                 <div className="w-48 h-48 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center ring-4 ring-cyan/20">
                   <span className="text-6xl font-bold text-white">JF</span>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Info */}
               <div>
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.8 }}
-                >
+                <div className="fade-in-up">
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-4">
                     <span className="text-xs text-cyan font-medium uppercase tracking-wider">
                       Founder & CEO
@@ -57,15 +40,10 @@ export default function FounderPage() {
                     autonomous systems. Obsessed with the idea that software can
                     build itself — and proving it daily.
                   </p>
-                </motion.div>
+                </div>
 
                 {/* Social links */}
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5, duration: 0.8 }}
-                  className="flex gap-4 mt-6"
-                >
+                <div className="flex gap-4 mt-6 fade-in-up">
                   <a
                     href="https://github.com/5dlabs"
                     target="_blank"
@@ -99,9 +77,9 @@ export default function FounderPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </a>
-                </motion.div>
+                </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -110,12 +88,7 @@ export default function FounderPage() {
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12">
               {/* Background */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-              >
+              <div className="reveal-on-scroll">
                 <h2 className="text-2xl font-bold mb-6">
                   <span className="gradient-text">Background</span>
                 </h2>
@@ -134,15 +107,10 @@ export default function FounderPage() {
                     More details coming soon.
                   </p>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Vision */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-              >
+              <div className="reveal-on-scroll">
                 <h2 className="text-2xl font-bold mb-6">
                   <span className="gradient-text">Vision</span>
                 </h2>
@@ -160,7 +128,7 @@ export default function FounderPage() {
                     different — and better — way to build companies.
                   </p>
                 </div>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
@@ -168,17 +136,11 @@ export default function FounderPage() {
         {/* What Drives Me */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-12"
-            >
+            <div className="text-center mb-12 reveal-on-scroll">
               <h2 className="text-2xl font-bold mb-4">
                 What <span className="gradient-text">Drives</span> This
               </h2>
-            </motion.div>
+            </div>
 
             <div className="grid sm:grid-cols-3 gap-6">
               {[
@@ -213,14 +175,10 @@ export default function FounderPage() {
                     </svg>
                   ),
                 },
-              ].map((item, i) => (
-                <motion.div
+              ].map((item) => (
+                <div
                   key={item.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll"
                 >
                   <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mx-auto mb-4 text-cyan">
                     {item.icon}
@@ -229,7 +187,7 @@ export default function FounderPage() {
                   <p className="text-sm text-muted-foreground">
                     {item.description}
                   </p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>

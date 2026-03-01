@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -160,18 +157,7 @@ const squads: Squad[] = [
 
 function AgentTeamCard({ agent, index, squadIndex }: { agent: Agent; index: number; squadIndex: number }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{
-        delay: squadIndex * 0.08 + index * 0.04,
-        duration: 0.7,
-        ease: "easeOut",
-      }}
-      whileHover={{ scale: 1.01, y: -2 }}
-      className="group"
-    >
+    <div className="group reveal-on-scroll">
       <div
         className={cn(
           "relative p-5 rounded-xl",
@@ -233,7 +219,7 @@ function AgentTeamCard({ agent, index, squadIndex }: { agent: Agent; index: numb
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -252,11 +238,7 @@ export default function TeamPage() {
         {/* Hero */}
         <section className="py-20 px-6">
           <div className="max-w-6xl mx-auto text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-            >
+            <div className="fade-in-up">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
                 <span className="text-sm text-cyan font-medium">
@@ -281,7 +263,7 @@ export default function TeamPage() {
                 </a>{" "}
                 page.
               </p>
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -289,13 +271,7 @@ export default function TeamPage() {
         <section className="pb-20 px-6">
           <div className="max-w-6xl mx-auto space-y-10">
             {squads.map((squad, squadIndex) => (
-              <motion.div
-                key={squad.title}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: squadIndex * 0.08, duration: 0.8, ease: "easeOut" }}
-              >
+              <div key={squad.title} className="reveal-on-scroll">
                 {/* Squad header */}
                 <div className="flex items-center gap-3 mb-4">
                   <span className="text-xl">{squad.emoji}</span>
@@ -323,20 +299,14 @@ export default function TeamPage() {
                     />
                   ))}
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </section>
 
         {/* Fun CTA */}
         <section className="py-20 px-6 border-t border-border/30">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl mx-auto text-center"
-          >
+          <div className="max-w-2xl mx-auto text-center reveal-on-scroll">
             <h2 className="text-3xl font-bold mb-4">
               Want to see them in <span className="gradient-text">action</span>?
             </h2>
@@ -349,7 +319,7 @@ export default function TeamPage() {
             >
               Visit CTO
             </a>
-          </motion.div>
+          </div>
         </section>
 
         <Footer />

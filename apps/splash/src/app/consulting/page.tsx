@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { WaitlistForm } from "@/components/waitlist-form";
@@ -215,43 +212,31 @@ export default function ConsultingPage() {
         {/* Hero */}
         <section className="py-20 px-6">
           <div className="max-w-4xl mx-auto text-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2, duration: 0.8 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8"
+            <div
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8 fade-in-up"
             >
               <span className="text-sm text-cyan font-semibold tracking-wide">
                 Available for Engagements
               </span>
-            </motion.div>
+            </div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 1 }}
-              className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-6"
+            <h1
+              className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-6 fade-in-up"
             >
               <span className="gradient-text glow-text-cyan">AI, Blockchain &</span>
               <br />
               <span className="text-foreground">Infrastructure Consulting</span>
-            </motion.h1>
+            </h1>
 
-            <motion.p
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7, duration: 1 }}
-              className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10"
+            <p
+              className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in-up"
             >
               From multi-agent AI platforms to Solana trading systems to bare-metal
               Kubernetes &mdash; hands-on expertise from someone who builds it daily.
-            </motion.p>
+            </p>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.0, duration: 0.8 }}
-              className="flex flex-col sm:flex-row justify-center gap-4"
+            <div
+              className="flex flex-col sm:flex-row justify-center gap-4 fade-in-up"
             >
               <a
                 href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
@@ -261,19 +246,15 @@ export default function ConsultingPage() {
               >
                 Schedule a Discovery Call
               </a>
-            </motion.div>
+            </div>
           </div>
         </section>
 
         {/* Expertise Grid */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
+            <div
+              className="text-center mb-16 reveal-on-scroll"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 What I <span className="gradient-text">Bring</span>
@@ -283,19 +264,15 @@ export default function ConsultingPage() {
                 infrastructure &mdash; not theory, but systems I build and operate
                 every day.
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {expertise.map((item, i) => {
                 const colors = colorMap[item.color] || colorMap.cyan;
                 return (
-                  <motion.div
+                  <div
                     key={item.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: i * 0.08 }}
-                    className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                    className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll"
                   >
                     <div
                       className={`w-14 h-14 rounded-full ${colors.bg} flex items-center justify-center mb-4`}
@@ -306,7 +283,7 @@ export default function ConsultingPage() {
                     <p className="text-sm text-muted-foreground">
                       {item.description}
                     </p>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -316,12 +293,8 @@ export default function ConsultingPage() {
         {/* Rate Card */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
+            <div
+              className="text-center mb-16 reveal-on-scroll"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 <span className="gradient-text">Engagement</span> Options
@@ -330,17 +303,13 @@ export default function ConsultingPage() {
                 Flexible structures to match your team&apos;s needs and budget. All
                 engagements include a complimentary 30-minute discovery call.
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {rates.map((rate, i) => (
-                <motion.div
+                <div
                   key={rate.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className={`p-6 rounded-xl border backdrop-blur-sm relative ${
+                  className={`p-6 rounded-xl border backdrop-blur-sm relative reveal-on-scroll ${
                     rate.recommended
                       ? "border-cyan/40 bg-cyan/5"
                       : "border-border/50 bg-card/30"
@@ -363,32 +332,24 @@ export default function ConsultingPage() {
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground">{rate.details}</p>
-                </motion.div>
+                </div>
               ))}
             </div>
 
-            <motion.p
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.5, duration: 0.6 }}
-              className="text-center text-sm text-muted-foreground mt-8"
+            <p
+              className="text-center text-sm text-muted-foreground mt-8 reveal-on-scroll"
             >
               All rates quoted in USD. Payment accepted via wire transfer, ACH,
               or major credit card.
-            </motion.p>
+            </p>
           </div>
         </section>
 
         {/* Sample Engagement */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
+            <div
+              className="text-center mb-16 reveal-on-scroll"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Sample <span className="gradient-text">Engagement</span>
@@ -397,17 +358,13 @@ export default function ConsultingPage() {
                 A typical fixed-scope engagement for teams looking to deploy AI
                 agents, blockchain infrastructure, or modernize their platform.
               </p>
-            </motion.div>
+            </div>
 
             <div className="space-y-6">
               {phases.map((phase, i) => (
-                <motion.div
+                <div
                   key={phase.title}
-                  initial={{ opacity: 0, x: -20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="flex gap-6 items-start"
+                  className="flex gap-6 items-start reveal-on-scroll"
                 >
                   <div className="shrink-0 w-20 text-center">
                     <div className="text-xs font-semibold text-cyan uppercase tracking-wider">
@@ -420,16 +377,12 @@ export default function ConsultingPage() {
                       {phase.description}
                     </p>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.5, duration: 0.6 }}
-              className="text-center mt-10 p-4 rounded-lg border border-border/30 bg-card/20"
+            <div
+              className="text-center mt-10 p-4 rounded-lg border border-border/30 bg-card/20 reveal-on-scroll"
             >
               <p className="text-muted-foreground">
                 Estimated investment:{" "}
@@ -438,40 +391,32 @@ export default function ConsultingPage() {
                 </span>{" "}
                 depending on team size, scope, and infrastructure complexity.
               </p>
-            </motion.div>
+            </div>
           </div>
         </section>
 
         {/* Track Record */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
+            <div
+              className="text-center mb-16 reveal-on-scroll"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Track <span className="gradient-text">Record</span>
               </h2>
-            </motion.div>
+            </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
               {stats.map((stat, i) => (
-                <motion.div
+                <div
                   key={stat.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="text-center p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                  className="text-center p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll"
                 >
                   <div className="text-3xl font-bold gradient-text mb-2">
                     {stat.value}
                   </div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
-                </motion.div>
+                </div>
               ))}
             </div>
 
@@ -480,12 +425,8 @@ export default function ConsultingPage() {
 
         {/* CTA */}
         <section className="py-20 px-6 border-t border-border/30">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl mx-auto text-center"
+          <div
+            className="max-w-2xl mx-auto text-center reveal-on-scroll"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Ready to <span className="gradient-text">Get Started</span>?
@@ -509,7 +450,7 @@ export default function ConsultingPage() {
               </p>
               <WaitlistForm source="consulting" compact />
             </div>
-          </motion.div>
+          </div>
         </section>
 
         <Footer />

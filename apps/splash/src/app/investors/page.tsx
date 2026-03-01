@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { WaitlistForm } from "@/components/waitlist-form";
@@ -86,11 +83,7 @@ export default function InvestorsPage() {
         {/* Hero */}
         <section className="py-20 px-6">
           <div className="max-w-4xl mx-auto text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-            >
+            <div className="fade-in-up">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
                 <span className="text-sm text-cyan font-medium">
@@ -108,7 +101,7 @@ export default function InvestorsPage() {
                 infrastructure for AI-native startups — and proving the model
                 with our own ventures.
               </p>
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -117,13 +110,9 @@ export default function InvestorsPage() {
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {highlights.map((item, i) => (
-                <motion.div
+                <div
                   key={item.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
+                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll"
                 >
                   <p className="text-3xl font-bold gradient-text mb-1">
                     {item.metric}
@@ -134,7 +123,7 @@ export default function InvestorsPage() {
                   <p className="text-xs text-muted-foreground">
                     {item.description}
                   </p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
@@ -143,12 +132,7 @@ export default function InvestorsPage() {
         {/* Mission */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-            >
+            <div className="reveal-on-scroll">
               <h2 className="text-3xl sm:text-4xl font-bold mb-8 text-center">
                 The <span className="gradient-text">Opportunity</span>
               </h2>
@@ -175,20 +159,14 @@ export default function InvestorsPage() {
                   </span>.
                 </p>
               </div>
-            </motion.div>
+            </div>
           </div>
         </section>
 
         {/* Differentiators */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
+            <div className="text-center mb-16 reveal-on-scroll">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Why <span className="gradient-text">5D Labs</span>
               </h2>
@@ -196,17 +174,13 @@ export default function InvestorsPage() {
                 What makes us different from every other AI company you&apos;ll
                 hear a pitch from this year.
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid md:grid-cols-2 gap-6">
               {differentiators.map((item, i) => (
-                <motion.div
+                <div
                   key={item.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: i * 0.1 }}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll"
                 >
                   <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4 text-cyan">
                     {item.icon}
@@ -215,7 +189,7 @@ export default function InvestorsPage() {
                   <p className="text-sm text-muted-foreground">
                     {item.description}
                   </p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
@@ -224,26 +198,14 @@ export default function InvestorsPage() {
         {/* Ventures Overview */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-12"
-            >
+            <div className="text-center mb-12 reveal-on-scroll">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Current <span className="gradient-text">Portfolio</span>
               </h2>
-            </motion.div>
+            </div>
 
             <div className="space-y-6">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-                className="p-8 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm"
-              >
+              <div className="p-8 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm reveal-on-scroll">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">CTO</h3>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
@@ -268,15 +230,9 @@ export default function InvestorsPage() {
                 >
                   Visit cto.5dlabs.ai
                 </a>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">Agentic Trading</h3>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
@@ -294,15 +250,9 @@ export default function InvestorsPage() {
                   Street uses — now accessible to everyone. Built on the same
                   OpenClaw orchestration layer as CTO.
                 </p>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">OpenClaw Platform</h3>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
@@ -328,15 +278,9 @@ export default function InvestorsPage() {
                 >
                   View on GitHub
                 </a>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">Sanctuary</h3>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
@@ -353,20 +297,14 @@ export default function InvestorsPage() {
                   and microinterventions to improve wellbeing and household flow.
                   Demonstrates the studio model extending beyond crypto and dev tools.
                 </p>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
 
         {/* Investor Interest + CTA */}
         <section className="py-20 px-6 border-t border-border/30">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl mx-auto"
-          >
+          <div className="max-w-2xl mx-auto reveal-on-scroll">
             <WaitlistForm
               source="investor"
               heading="Stay Updated on Our Raise"
@@ -399,7 +337,7 @@ export default function InvestorsPage() {
             <p className="text-sm text-muted-foreground mt-6 text-center">
               Investor one-pager available now. Full pitch deck available upon request.
             </p>
-          </motion.div>
+          </div>
         </section>
 
         <Footer />

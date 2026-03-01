@@ -1,4 +1,5 @@
 import type React from "react";
+import Link from "next/link";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { VentureGrid, type Venture } from "@/components/venture-card";
@@ -93,12 +94,12 @@ export default function Home() {
               >
                 Explore CTO
               </a>
-              <a
+              <Link
                 href="/investors"
                 className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all"
               >
                 Investor Relations
-              </a>
+              </Link>
             </div>
 
             <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground fade-in-up stagger" style={{ "--delay": "400ms" } as React.CSSProperties}>
