@@ -113,12 +113,11 @@ function GridPulse() {
             linear-gradient(90deg, oklch(0.75 0.15 300 / 0.08) 1px, transparent 1px)
           `,
           backgroundSize: "60px 60px",
-          willChange: "transform",
           animation: "grid-drift 30s linear infinite",
           opacity: 0.8,
         }}
       />
-      {/* Wandering node glows — cyan + purple mix */}
+      {/* Wandering node glows — transform-only, no repaints */}
       {Array.from({ length: 6 }, (_, i) => {
         const hue = hues[i % 2];
         const opacity = 0.06 + seededValue(i * 3 + 2) * 0.08;
@@ -132,13 +131,12 @@ function GridPulse() {
               width: "350px",
               height: "350px",
               background: `radial-gradient(circle, oklch(0.75 0.2 ${hue} / ${opacity}), transparent 70%)`,
-              willChange: "transform",
               animation: `grid-node-wander-${i % 4} ${12 + i * 2}s ease-in-out ${i * 1}s infinite alternate`,
             }}
           />
         );
       })}
-      {/* Horizontal energy pulses — alternating colors */}
+      {/* Horizontal energy pulses */}
       {Array.from({ length: 5 }, (_, i) => {
         const hue = hues[i % 2];
         return (
@@ -148,13 +146,12 @@ function GridPulse() {
             style={{
               top: `${15 + i * 18}%`,
               background: `linear-gradient(90deg, transparent, oklch(0.8 0.2 ${hue} / 0.4), transparent)`,
-              willChange: "transform, opacity",
               animation: `grid-energy-h ${3 + seededValue(i * 7) * 2}s ease-in-out ${i * 1.5}s infinite`,
             }}
           />
         );
       })}
-      {/* Vertical energy pulses — alternating colors */}
+      {/* Vertical energy pulses */}
       {Array.from({ length: 4 }, (_, i) => {
         const hue = hues[(i + 1) % 2];
         return (
@@ -164,7 +161,6 @@ function GridPulse() {
             style={{
               left: `${12 + i * 22}%`,
               background: `linear-gradient(180deg, transparent, oklch(0.8 0.2 ${hue} / 0.35), transparent)`,
-              willChange: "transform, opacity",
               animation: `grid-energy-v ${3.5 + seededValue(i * 9) * 2}s ease-in-out ${i * 2}s infinite`,
             }}
           />
