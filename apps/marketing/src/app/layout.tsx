@@ -203,6 +203,7 @@ export default function RootLayout({
         {/* Additional AI/Agent hints */}
         <link rel="llms" href="/llms.txt" />
         <meta name="llms-txt" content="/llms.txt" />
+        <script dangerouslySetInnerHTML={{ __html: `if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js")` }} />
       </head>
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
