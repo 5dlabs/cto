@@ -131,7 +131,7 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
 
   // Fire 4 targeted searches in parallel
   const [bestPractices, productionProblems, architecturePatterns, failureModes] = await Promise.all([
-    tavilySearch(`${techStack} best practices 2025`),
+    tavilySearch(`${techStack} best practices ${new Date().getFullYear()}`),
     tavilySearch(`${techStack} production deployment problems`),
     tavilySearch(`${domain} architecture patterns`),
     tavilySearch(`${domain} ${techStack} failure modes operational risks`),
@@ -139,7 +139,7 @@ export async function prdResearch(payload: { prd_content: string }): Promise<Res
 
   const optimist = [
     '# Research Memo: What\'s Proven and Working\n',
-    summarizeResults(bestPractices, `${techStack} best practices 2025`),
+    summarizeResults(bestPractices, `${techStack} best practices ${new Date().getFullYear()}`),
     '',
     summarizeResults(architecturePatterns, `${domain} architecture patterns`),
   ].join('\n');
