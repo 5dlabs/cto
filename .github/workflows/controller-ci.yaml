@@ -13,7 +13,7 @@ on:
 # See: pr-merge-loop/lessons-learned.md#ISSUE-005
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
