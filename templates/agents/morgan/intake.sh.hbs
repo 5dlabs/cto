@@ -349,16 +349,16 @@ if [ "$DELIBERATE" = "true" ] && command -v intake-agent >/dev/null 2>&1; then
         --arg prd "$PRD_CONTENT" \
         --arg arch "$ARCH_CONTENT" \
         --arg session "${PROJECT_NAME}-$(date +%s)" \
-        '{ \
-            "operation": "deliberate", \
-            "model": "claude-sonnet-4-20250514", \
-            "payload": { \
-                "prd_content": ($prd + (if $arch != "" then "\n\n## Architecture\n" + $arch else "" end)), \
-                "session_id": $session, \
-                "timebox_minutes": 10, \
-                "research_enabled": true, \
-                "research_timeout_minutes": 5 \
-            } \
+        '{
+            "operation": "deliberate",
+            "model": "claude-sonnet-4-20250514",
+            "payload": {
+                "prd_content": ($prd + (if $arch != "" then "\n\n## Architecture\n" + $arch else "" end)),
+                "session_id": $session,
+                "timebox_minutes": 10,
+                "research_enabled": true,
+                "research_timeout_minutes": 5
+            }
         }' | NATS_URL="${NATS_URL:-nats://nats.messaging.svc.cluster.local:4222}" intake-agent)
     DESIGN_BRIEF=$(echo "$DELIBERATION_OUTPUT" | jq -r '.data.design_brief // ""' 2>/dev/null)
     if [ -n "$DESIGN_BRIEF" ] && [ "$DESIGN_BRIEF" != "null" ]; then
