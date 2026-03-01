@@ -566,6 +566,9 @@ export async function runDeliberation(
     console.error('[DELIBERATION] Research context compiled — feeding into debate');
   }
 
+  // Reset startTime after research to ensure debate gets full timebox
+  const debateStartTime = Date.now();
+
   // ─── Step 1: PRD broadcast ───────────────────────────────────────────────
   // Publish one deliberation_start message to the room — both optimist and
   // pessimist receive it since they both subscribe to deliberation.room.
@@ -586,8 +589,8 @@ export async function runDeliberation(
   let lastSpeaker: 'optimist' | 'pessimist' = 'pessimist'; // optimist goes first
   let lastContent = `Please begin by proposing your architectural approach for the PRD.`;
 
-  while (Date.now() - startTime < timeboxMs) {
-    const elapsed = Date.now() - startTime;
+  while (Date.now() - debateStartTime < timeboxMs) {
+    const elapsed = Date.now() - debateStartTime;
     const remaining = timeboxMs - elapsed;
     const minutesRemaining = Math.ceil(remaining / 60000);
 
@@ -693,7 +696,7 @@ export async function runDeliberation(
 
       if (optPos && pesPos) {
         // Check if there's enough time remaining for a committee vote
-        const currentRemaining = timeboxMs - (Date.now() - startTime);
+        const currentRemaining = timeboxMs - (Date.now() - debateStartTime);
         const voteTimeoutMs = voteTimeoutSeconds * 1000;
         if (currentRemaining < voteTimeoutMs) {
           console.error(`[DELIBERATION] Insufficient time remaining for committee vote on ${dpId} — deferring`);

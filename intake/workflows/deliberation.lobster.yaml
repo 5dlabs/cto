@@ -44,13 +44,13 @@ steps:
   # When research_enabled=true, intake-agent sends research_request messages to
   # both agents before the debate begins, giving them time_research_timeout_minutes
   # to use Tavily and Firecrawl. Findings feed into the debate as context.
-  # NOTE: Timeout includes 10-minute buffer beyond internal timebox + research
-  # time to allow for in-flight agent requests, committee votes, and post-loop
-  # processing, preventing premature termination during final iteration.
+  # NOTE: Timeout includes 10-minute buffer beyond internal timebox, plus research
+  # time when enabled, to allow for in-flight agent requests, committee votes, and
+  # post-loop processing, preventing premature termination during final iteration.
   # ─────────────────────────────────────────────────────────
   - name: conduct-deliberation
     description: "Run conductor loop for timebox_minutes (with optional research phase), collecting turns and votes"
-    timeout: "{{inputs.timebox_minutes + inputs.research_timeout_minutes + 10}}m"
+    timeout: "{{inputs.timebox_minutes + (inputs.research_enabled ? inputs.research_timeout_minutes : 0) + 10}}m"
     command: >
       jq -n
         --arg session_id "{{inputs.session_id}}"
