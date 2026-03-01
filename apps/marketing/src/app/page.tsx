@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { GridPulse } from "@/components/grid-pulse";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { AgentGrid, type AgentSquad } from "@/components/agent-card";
 import { Header } from "@/components/header";
@@ -141,13 +140,6 @@ const squads: AgentSquad[] = [
         description: "Your always-on SRE. Provisions bare metal, deploys services, monitors health, and triggers self-healing — so you never get paged.",
         stack: ["Kubernetes", "Bare Metal", "GitOps"],
       },
-      {
-        name: "Healer",
-        role: "Self-Healing Agent",
-        color: "from-green-500 to-emerald-500",
-        description: "Detects failures, remediates incidents, restarts stuck workflows, and fixes CI — automatically, before you notice.",
-        stack: ["Incident Response", "Auto-Remediation", "Monitoring"],
-      },
     ],
   },
 ];
@@ -158,7 +150,6 @@ export default function Home() {
       {/* Background layers */}
       <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
       <div className="fixed inset-0 circuit-bg z-0" />
-      <GridPulse />
       <div className="fixed inset-0 noise-overlay z-0" />
 
       {/* Header */}
@@ -374,7 +365,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-magenta/60"></span>
-                    <span>Healer auto-remediates incidents</span>
+                    <span>Self-healing infrastructure built-in</span>
                   </div>
                 </div>
               </motion.div>
@@ -598,7 +589,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Self-Healing Infrastructure</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Healer detects incidents, remediates failures, and restarts stuck workflows — automatically. Bolt provisions and monitors bare metal. No on-call rotation needed.
+                  Automated incident detection, failure remediation, and workflow restarts — built into the platform. Bolt provisions and monitors bare metal. No on-call rotation needed.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {["Auto-Remediation", "Incident Detection", "Health Checks", "Auto-Rollback"].map(feature => (

@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { GridPulse } from "@/components/grid-pulse";
 import { Header } from "@/components/header";
 
 const tiers = [
@@ -61,7 +60,7 @@ const tiers = [
       { label: "Repositories", value: "Unlimited" },
       { label: "AI API keys", value: "BYOK or Managed (+10%)" },
       { label: "Support", value: "Slack (24h)" },
-      { label: "Features", value: "Full SSO/SAML, audit logs, SCIM, Healer" },
+      { label: "Features", value: "Full SSO/SAML, audit logs, SCIM, self-healing" },
     ],
     cta: "Start Trial",
     ctaHref: "https://app.5dlabs.ai",
@@ -107,7 +106,7 @@ const comparisonFeatures = [
       { name: "Fully Managed", free: true, team: true, growth: true, enterprise: true },
       { name: "Self-Hosted Option", free: false, team: false, growth: false, enterprise: true },
       { name: "Dedicated Namespace", free: false, team: false, growth: true, enterprise: true },
-      { name: "Self-Healing (Healer)", free: false, team: false, growth: true, enterprise: true },
+      { name: "Self-Healing Infrastructure", free: false, team: false, growth: true, enterprise: true },
     ],
   },
   {
@@ -166,7 +165,6 @@ export default function PricingPage() {
       {/* Background layers */}
       <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
       <div className="fixed inset-0 circuit-bg z-0" />
-      <GridPulse />
       <div className="fixed inset-0 noise-overlay z-0" />
 
       {/* Header */}

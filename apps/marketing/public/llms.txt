@@ -10,7 +10,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 2. **Assigns specialized agents** - Rex (Rust), Blaze (React), Grizz (Go), Nova (Node.js) implement features
 3. **Ensures quality** - Cleo reviews code, Tess writes tests, Cipher audits security
 4. **Deploys automatically** - Bolt handles GitOps deployment with zero-downtime rollouts
-5. **Self-heals** - Healer monitors production and fixes issues automatically
+5. **Self-heals** - Automated incident detection, remediation, and workflow restarts built into the platform
 
 ## The Agent Collective
 
@@ -41,7 +41,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 ## Key Differentiators
 
 ### vs. AI Coding Assistants (Cursor, Copilot, Devin)
-- **Multi-agent specialization**: 13 domain experts vs. one generic AI
+- **Multi-agent specialization**: 13 domain experts vs one generic AI
 - **Full workflow automation**: PRD → Production, not just code suggestions
 - **Built-in infrastructure**: Deployment included, not a separate concern
 - **Self-healing**: Automatic issue detection and remediation

@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { GridPulse } from "@/components/grid-pulse";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { WaitlistForm } from "@/components/waitlist-form";
@@ -202,7 +201,6 @@ export default function ConsultingPage() {
     <div className="relative min-h-screen overflow-hidden">
       <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
       <div className="fixed inset-0 circuit-bg z-0" />
-      <GridPulse />
       <div className="fixed inset-0 noise-overlay z-0" />
 
       <script

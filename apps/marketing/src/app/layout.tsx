@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { ShiftDimensionsWrapper } from "@/components/shift-dimensions-wrapper";
+import { GridPulse } from "@/components/grid-pulse";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -87,7 +88,7 @@ export const metadata: Metadata = {
     "ai:capabilities":
       "code-generation, code-review, security-analysis, testing, infrastructure-setup, project-management",
     "ai:agents":
-      "Morgan, Rex, Grizz, Nova, Blaze, Tap, Spark, Vex, Cleo, Cipher, Tess, Atlas, Bolt, Healer",
+      "Morgan, Rex, Grizz, Nova, Blaze, Tap, Spark, Vex, Cleo, Cipher, Tess, Atlas, Bolt",
   },
 };
 
@@ -178,7 +179,7 @@ const jsonLd = {
           name: "What AI agents are included?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "CTO includes 14 specialized agents: Morgan (project management), Rex (Rust), Grizz (Go), Nova (Node.js), Blaze (React), Tap (Mobile), Spark (Desktop), Vex (XR), Cleo (code review), Cipher (security), Tess (testing), Atlas (integration), Bolt (infrastructure & SRE), and Healer (self-healing & incident response).",
+            text: "CTO includes 13 specialized agents: Morgan (project management), Rex (Rust), Grizz (Go), Nova (Node.js), Blaze (React), Tap (Mobile), Spark (Desktop), Vex (XR), Cleo (code review), Cipher (security), Tess (testing), Atlas (integration), and Bolt (infrastructure & SRE). Self-healing infrastructure is built into the platform.",
           },
         },
       ],
@@ -206,6 +207,7 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
       >
+        <GridPulse />
         <ShiftDimensionsWrapper>{children}</ShiftDimensionsWrapper>
       </body>
     </html>

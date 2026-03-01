@@ -425,7 +425,7 @@
     position: absolute;
     inset: 0;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='3.5' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
-    opacity: 0.5;
+    opacity: 0.03;
     pointer-events: none;
   }
   
@@ -495,7 +495,7 @@
   100% { transform: translate(10px, -30px) scale(1.1); }
 }
 @keyframes grid-breathe {
-  0%, 100% { opacity: 0.4; }
+  0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
 }
 @keyframes grid-drift {
@@ -507,36 +507,36 @@
   100% { opacity: 1; transform: scale(1.2); }
 }
 @keyframes grid-node-wander-0 {
-  0% { transform: translate(0, 0) scale(0.8); opacity: 0.3; }
-  50% { transform: translate(80px, -60px) scale(1.1); opacity: 0.9; }
-  100% { transform: translate(-40px, 50px) scale(0.9); opacity: 0.5; }
+  0% { transform: translate(0, 0) scale(0.8); opacity: 0.2; }
+  50% { transform: translate(120px, -90px) scale(1.15); opacity: 0.8; }
+  100% { transform: translate(-60px, 80px) scale(0.9); opacity: 0.4; }
 }
 @keyframes grid-node-wander-1 {
-  0% { transform: translate(0, 0) scale(0.9); opacity: 0.4; }
-  50% { transform: translate(-70px, 40px) scale(1.2); opacity: 1; }
-  100% { transform: translate(60px, -30px) scale(0.8); opacity: 0.3; }
+  0% { transform: translate(0, 0) scale(0.9); opacity: 0.3; }
+  50% { transform: translate(-100px, 70px) scale(1.2); opacity: 0.9; }
+  100% { transform: translate(90px, -50px) scale(0.8); opacity: 0.25; }
 }
 @keyframes grid-node-wander-2 {
-  0% { transform: translate(0, 0) scale(1); opacity: 0.5; }
-  50% { transform: translate(50px, 70px) scale(0.8); opacity: 0.3; }
-  100% { transform: translate(-60px, -50px) scale(1.15); opacity: 0.9; }
+  0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+  50% { transform: translate(80px, 100px) scale(0.8); opacity: 0.2; }
+  100% { transform: translate(-90px, -70px) scale(1.15); opacity: 0.8; }
 }
 @keyframes grid-node-wander-3 {
-  0% { transform: translate(0, 0) scale(0.85); opacity: 0.35; }
-  50% { transform: translate(-50px, -60px) scale(1.1); opacity: 0.85; }
-  100% { transform: translate(70px, 40px) scale(0.95); opacity: 0.5; }
+  0% { transform: translate(0, 0) scale(0.85); opacity: 0.3; }
+  50% { transform: translate(-80px, -90px) scale(1.15); opacity: 0.75; }
+  100% { transform: translate(100px, 60px) scale(0.95); opacity: 0.4; }
 }
 @keyframes grid-energy-h {
   0%, 100% { opacity: 0; transform: scaleX(0.1) translateX(-100%); }
   15% { opacity: 1; }
-  50% { transform: scaleX(0.3) translateX(0%); }
+  50% { transform: scaleX(0.4) translateX(0%); }
   85% { opacity: 1; }
   100% { opacity: 0; transform: scaleX(0.1) translateX(100%); }
 }
 @keyframes grid-energy-v {
   0%, 100% { opacity: 0; transform: scaleY(0.1) translateY(-100%); }
   15% { opacity: 1; }
-  50% { transform: scaleY(0.3) translateY(0%); }
+  50% { transform: scaleY(0.4) translateY(0%); }
   85% { opacity: 1; }
   100% { opacity: 0; transform: scaleY(0.1) translateY(100%); }
 }

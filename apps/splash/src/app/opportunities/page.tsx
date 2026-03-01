@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { GridPulse } from "@/components/grid-pulse";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { colorMap } from "@/lib/utils";
@@ -202,7 +201,6 @@ export default function OpportunitiesPage() {
         <div className="absolute top-[50%] right-[5%] w-[400px] h-[400px] rounded-full bg-[oklch(0.7_0.25_320)]/[0.03] blur-[100px]" />
         <div className="absolute bottom-[15%] left-[35%] w-[600px] h-[600px] rounded-full bg-blue-500/[0.03] blur-[140px]" />
       </div>
-      <GridPulse />
       <div className="fixed inset-0 noise-overlay z-0" />
 
       <Header />
