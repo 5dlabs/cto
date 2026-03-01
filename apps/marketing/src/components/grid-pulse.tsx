@@ -9,7 +9,7 @@ const hues = [195, 300] as const;
 export function GridPulse() {
   return (
     <div
-      className="fixed inset-0 pointer-events-none overflow-hidden z-[2]"
+      className="fixed inset-0 pointer-events-none overflow-hidden z-[1]"
       style={{ contain: "layout style paint", isolation: "isolate" }}
     >
       {/* Drifting grid — cyan horizontal, purple vertical */}
