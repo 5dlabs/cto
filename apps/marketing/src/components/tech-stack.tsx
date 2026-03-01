@@ -1,7 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
-
 interface TechItem {
   name: string;
   color: string;
@@ -271,24 +267,12 @@ export function TechStack() {
   return (
     <section id="stack" className="py-24 border-t border-border/30 overflow-hidden">
       <div className="max-w-6xl mx-auto px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-6"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1, duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-6"
-          >
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-6">
             <span className="text-xs text-cyan font-medium uppercase tracking-wider">
               Managed Services
             </span>
-          </motion.div>
+          </div>
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">
             Everything You Need,{" "}
             <span className="gradient-text">Already Running</span>
@@ -298,16 +282,10 @@ export function TechStack() {
             storage—all pre-configured and managed so you can focus on shipping
             code.
           </p>
-        </motion.div>
+        </div>
 
         {/* Stats bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground mb-14"
-        >
+        <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground mb-14">
           <div className="flex items-center gap-2">
             <span className="text-2xl font-bold text-foreground">30+</span>
             <span>managed services</span>
@@ -320,7 +298,7 @@ export function TechStack() {
             <span className="text-2xl font-bold text-foreground">100%</span>
             <span>open source</span>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Marquee rows - full width */}
@@ -333,15 +311,11 @@ export function TechStack() {
       {/* Category breakdown grid */}
       <div className="max-w-6xl mx-auto px-6">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {categories.map((cat, index) => {
+          {categories.map((cat) => {
             const colors = colorMap[cat.color] ?? colorMap.cyan;
             return (
-              <motion.div
+              <div
                 key={cat.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.08 }}
                 className={`p-5 rounded-xl border ${colors.border} bg-card/30 backdrop-blur-sm`}
               >
                 <div
@@ -363,7 +337,7 @@ export function TechStack() {
                     </span>
                   ))}
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>

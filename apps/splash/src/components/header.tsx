@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import Link from "next/link";
 
 const navLinks = [
@@ -51,12 +48,7 @@ const socials = [
 
 export function Header() {
   return (
-    <motion.header
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-      className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
-    >
+    <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4">
       <nav className="flex items-center gap-1 px-2 py-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.3)]">
         {/* Logo */}
         <Link
@@ -100,6 +92,6 @@ export function Header() {
           ))}
         </div>
       </nav>
-    </motion.header>
+    </header>
   );
 }

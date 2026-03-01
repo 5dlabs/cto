@@ -203,8 +203,7 @@ export default function RootLayout({
         {/* Additional AI/Agent hints */}
         <link rel="llms" href="/llms.txt" />
         <meta name="llms-txt" content="/llms.txt" />
-        <script dangerouslySetInnerHTML={{ __html: `if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js")` }} />
-        <script dangerouslySetInnerHTML={{ __html: `document.addEventListener("DOMContentLoaded",function(){if(!("IntersectionObserver"in window))return;var vh=window.innerHeight;document.querySelectorAll(".reveal-on-scroll").forEach(function(el){if(el.getBoundingClientRect().top>vh){el.style.opacity="0";el.style.transform="translateY(16px)";el.style.transition="opacity .6s ease-out,transform .6s ease-out"}});var o=new IntersectionObserver(function(e){e.forEach(function(i){if(i.isIntersecting){i.target.style.opacity="1";i.target.style.transform="translateY(0)";o.unobserve(i.target)}})},{threshold:0.08,rootMargin:"0px 0px -40px 0px"});document.querySelectorAll(".reveal-on-scroll").forEach(function(el){if(el.style.opacity==="0")o.observe(el)})})` }} />
+        {/* Keep content declarative: avoid scripts that hide/show nodes post-render. */}
       </head>
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
