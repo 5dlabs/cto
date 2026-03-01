@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="21" project="alerthub">
+  <title>Kafka Event Consumer</title>
+  <agent name="nova" stack="Bun/Elysia+Effect" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement Kafka consumer with Effect Stream for processing notification events
+  </description>
+  
+  <dependencies>
+    <dependency task_id="4" />
+    <dependency task_id="20" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Add kafkajs with Effect Stream adapter\n2. Subscribe to notifications.created topic\n3. Process events through integration services\n4. Implement backpressure handling\n5. Add consumer group management</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d21" category="performance" constraint="open" requires_approval="false">
+      <description>Kafka consumer parallelism strategy</description>
+      <options>
+        <option>single consumer</option>
+        <option>consumer per partition</option>
+        <option>consumer pool</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Consumer processes Kafka events, routes to appropriate integration services, handles backpressure gracefully
+  </acceptance_criteria>
+</task>

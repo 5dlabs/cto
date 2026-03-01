@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="4" project="alerthub">
+  <title>Kafka Event Streaming Setup</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Deploy Strimzi operator and Kafka cluster for async event processing
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Install Strimzi operator\n2. Create Kafka cluster with 1 broker\n3. Create topics for notifications.created, notifications.delivered, notifications.failed\n4. Configure topic partitions and retention\n5. Set up Kafka Connect if needed</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d4" category="architecture" constraint="open" requires_approval="false">
+      <description>Event schema evolution strategy</description>
+      <options>
+        <option>Avro with schema registry</option>
+        <option>JSON with versioning</option>
+        <option>protobuf</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Kafka cluster is running, topics exist with correct partitions, can produce/consume messages via kafka-console tools
+  </acceptance_criteria>
+</task>

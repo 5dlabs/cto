@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="2" project="alerthub">
+  <title>PostgreSQL Database Setup</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Deploy CloudNative-PG operator and PostgreSQL cluster for structured data storage
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Install CloudNative-PG operator\n2. Create PostgreSQL cluster with 1 instance\n3. Configure database schemas for users, tenants, notifications\n4. Set up connection pooling\n5. Create service accounts and secrets</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d2" category="data-model" constraint="open" requires_approval="false">
+      <description>Database schema versioning strategy</description>
+      <options>
+        <option>migrations in app</option>
+        <option>schema operator</option>
+        <option>manual scripts</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    PostgreSQL cluster is running, accepts connections, alerthub database exists, connection string works from test pod
+  </acceptance_criteria>
+</task>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="13" project="alerthub">
+  <title>Kafka Event Publishing</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Integrate Kafka producer to publish notification events for downstream processing
+  </description>
+  
+  <dependencies>
+    <dependency task_id="4" />
+    <dependency task_id="12" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Add rdkafka crate for Kafka integration\n2. Configure Kafka producer with proper serialization\n3. Publish events to notifications.created topic\n4. Handle Kafka connection failures gracefully\n5. Add producer metrics</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d13" category="error-handling" constraint="soft" requires_approval="false">
+      <description>Kafka publish failure handling</description>
+      <options>
+        <option>fail request</option>
+        <option>async retry</option>
+        <option>store and forward</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Notification submissions trigger Kafka events, events visible in Kafka topic, service handles Kafka downtime gracefully
+  </acceptance_criteria>
+</task>

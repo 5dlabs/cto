@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="11" project="alerthub">
+  <title>Redis Integration and Rate Limiting</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement Redis connection and rate limiting middleware for tenant isolation
+  </description>
+  
+  <dependencies>
+    <dependency task_id="9" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Add redis crate and connection pool\n2. Implement rate limiting middleware with token bucket\n3. Add deduplication cache with TTL\n4. Configure Redis for pub/sub notifications\n5. Add Redis health checks</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d11" category="performance" constraint="escalation" requires_approval="true">
+      <description>Default rate limit values per tenant</description>
+      <options>
+        <option>100/min</option>
+        <option>1000/min</option>
+        <option>configurable per tenant</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Redis connections work, rate limiting blocks requests after limit, deduplication prevents duplicate notifications
+  </acceptance_criteria>
+</task>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="12" project="alerthub">
+  <title>Notification Submission API</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement POST endpoints for single and batch notification submission
+  </description>
+  
+  <dependencies>
+    <dependency task_id="10" />
+    <dependency task_id="11" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Create POST /api/v1/notifications endpoint\n2. Add request validation with serde\n3. Implement batch submission endpoint\n4. Add authentication middleware\n5. Return proper HTTP status codes and error responses</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d12" category="api-design" constraint="hard" requires_approval="false">
+      <description>Batch submission size limit</description>
+      <options>
+        <option>100 notifications</option>
+        <option>500 notifications</option>
+        <option>1000 notifications</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Can submit valid notifications and receive 202 Accepted, invalid requests return 400 with error details, rate limits enforced
+  </acceptance_criteria>
+</task>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="29" project="alerthub">
+  <title>Mobile App Foundation</title>
+  <agent name="tap" stack="Expo" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Create Expo React Native app with push notification support and basic screens
+  </description>
+  
+  <dependencies>
+    <dependency task_id="16" />
+    <dependency task_id="22" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Initialize Expo SDK 50+ project\n2. Set up navigation with bottom tabs\n3. Implement push notification registration\n4. Create basic screens for notifications, settings\n5. Add authentication flow with biometric support</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d29" category="ux-behavior" constraint="soft" requires_approval="false">
+      <description>Offline notification storage strategy</description>
+      <options>
+        <option>store all notifications</option>
+        <option>recent notifications only</option>
+        <option>starred notifications only</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    App builds and runs on simulator, push notifications register successfully, navigation works, authentication functional
+  </acceptance_criteria>
+</task>

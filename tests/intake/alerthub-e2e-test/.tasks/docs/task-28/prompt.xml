@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="28" project="alerthub">
+  <title>Dashboard and Notification Management</title>
+  <agent name="blaze" stack="React/Next.js" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement main dashboard with notification feed and management interfaces
+  </description>
+  
+  <dependencies>
+    <dependency task_id="27" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Create dashboard page with notification overview\n2. Implement real-time notification feed with WebSocket\n3. Add notification history with filtering\n4. Create integration management interface\n5. Build rule configuration wizard with drag-and-drop</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d28" category="ux-behavior" constraint="open" requires_approval="false">
+      <description>Real-time update notification behavior</description>
+      <options>
+        <option>auto-scroll to new</option>
+        <option>toast notification</option>
+        <option>badge count only</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Dashboard displays notifications, real-time updates work, can manage integrations and rules, filtering functional
+  </acceptance_criteria>
+</task>

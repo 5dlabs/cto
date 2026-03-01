@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="20" project="alerthub">
+  <title>Multi-Channel Integration Services</title>
+  <agent name="nova" stack="Bun/Elysia+Effect" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement Discord, Email, and Webhook services with Effect composability
+  </description>
+  
+  <dependencies>
+    <dependency task_id="19" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Create DiscordService for webhook delivery\n2. Implement EmailService with SMTP support\n3. Add WebhookService with HMAC signature verification\n4. Use Effect.all for parallel delivery testing\n5. Implement unified error handling across channels</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d20" category="security" constraint="hard" requires_approval="false">
+      <description>Webhook signature verification requirement</description>
+      <options>
+        <option>optional</option>
+        <option>required</option>
+        <option>configurable per integration</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    All channel services deliver notifications successfully, error handling consistent across channels, parallel testing works
+  </acceptance_criteria>
+</task>

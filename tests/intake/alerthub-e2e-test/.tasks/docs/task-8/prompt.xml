@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="8" project="alerthub">
+  <title>Monitoring and Observability Setup</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Deploy Prometheus, Grafana, and logging stack for system observability
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Install Prometheus operator and Prometheus instance\n2. Deploy Grafana with AlertHub dashboards\n3. Set up log aggregation with Loki or ELK\n4. Configure alert rules for SLA monitoring\n5. Create service monitors for all components</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d8" category="performance" constraint="soft" requires_approval="false">
+      <description>Metrics retention and storage strategy</description>
+      <options>
+        <option>15 days local</option>
+        <option>30 days local</option>
+        <option>90 days with remote storage</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Prometheus collecting metrics from all services, Grafana dashboards loading, alerts firing for test conditions
+  </acceptance_criteria>
+</task>

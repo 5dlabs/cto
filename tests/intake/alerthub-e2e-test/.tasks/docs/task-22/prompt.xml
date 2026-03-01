@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="22" project="alerthub">
+  <title>Integration Management API</title>
+  <agent name="nova" stack="Bun/Elysia+Effect" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Create REST API endpoints for CRUD operations on integrations with Effect validation
+  </description>
+  
+  <dependencies>
+    <dependency task_id="20" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Implement POST /api/v1/integrations with Effect Schema\n2. Add GET, PATCH, DELETE endpoints\n3. Create integration testing endpoint\n4. Add OAuth flow handling for supported channels\n5. Implement proper error responses with Effect</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d22" category="ux-behavior" constraint="soft" requires_approval="false">
+      <description>Integration test behavior on creation</description>
+      <options>
+        <option>automatic test</option>
+        <option>manual test only</option>
+        <option>optional automatic test</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    All CRUD operations work, validation prevents invalid configurations, test endpoint verifies channel connectivity
+  </acceptance_criteria>
+</task>

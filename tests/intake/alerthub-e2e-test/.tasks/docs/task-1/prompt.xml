@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="1" project="alerthub">
+  <title>Infrastructure Foundation Setup</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Set up Kubernetes cluster with basic operators and namespaces for AlertHub platform
+  </description>
+  
+  <dependencies>
+    
+  </dependencies>
+  
+  <implementation>
+    <details>1. Create Kubernetes cluster\n2. Install cert-manager for TLS certificates\n3. Create namespaces: databases, kafka, messaging, alerthub\n4. Set up RBAC policies\n5. Configure network policies for service isolation</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d1" category="architecture" constraint="soft" requires_approval="false">
+      <description>Storage class selection for persistent volumes</description>
+      <options>
+        <option>mayastor</option>
+        <option>local-path</option>
+        <option>nfs</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Cluster is accessible via kubectl, all namespaces exist, cert-manager webhook responds, network policies allow expected traffic
+  </acceptance_criteria>
+</task>

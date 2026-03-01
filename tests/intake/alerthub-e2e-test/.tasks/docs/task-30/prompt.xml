@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="30" project="alerthub">
+  <title>Desktop Client Foundation</title>
+  <agent name="spark" stack="Electron" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Create Electron app with system tray integration and native desktop notifications
+  </description>
+  
+  <dependencies>
+    <dependency task_id="16" />
+    <dependency task_id="28" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Set up Electron 28+ project with React\n2. Implement system tray with badge count\n3. Add native desktop notification support\n4. Create main window with notification feed\n5. Set up auto-updater and cross-platform builds</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d30" category="ux-behavior" constraint="soft" requires_approval="false">
+      <description>Desktop notification persistence</description>
+      <options>
+        <option>persist until dismissed</option>
+        <option>auto-dismiss after 5s</option>
+        <option>configurable timeout</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Electron app starts, system tray shows unread count, desktop notifications appear, main window displays notifications
+  </acceptance_criteria>
+</task>

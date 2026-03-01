@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="23" project="alerthub">
+  <title>Admin API gRPC Foundation</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Set up Go project with gRPC services and grpc-gateway for REST API
+  </description>
+  
+  <dependencies>
+    <dependency task_id="2" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Initialize Go module with gRPC dependencies\n2. Define protobuf schemas for all services\n3. Generate Go code and grpc-gateway handlers\n4. Set up basic server with health checks\n5. Add structured logging with zap</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d23" category="api-design" constraint="soft" requires_approval="false">
+      <description>API versioning strategy</description>
+      <options>
+        <option>v1 in package path</option>
+        <option>version in service name</option>
+        <option>no versioning initially</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    gRPC server starts successfully, health checks respond, protobuf compilation works, basic service calls succeed
+  </acceptance_criteria>
+</task>

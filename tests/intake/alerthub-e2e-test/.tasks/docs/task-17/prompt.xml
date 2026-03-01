@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="17" project="alerthub">
+  <title>Integration Service Foundation</title>
+  <agent name="nova" stack="Bun/Elysia+Effect" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Set up Bun/Elysia service with Effect for type-safe integration management
+  </description>
+  
+  <dependencies>
+    <dependency task_id="5" />
+    <dependency task_id="6" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Initialize Bun project with Elysia 1.x\n2. Set up Effect 3.x with TypeScript 5.x\n3. Configure basic HTTP server with health endpoints\n4. Add Effect error handling and logging\n5. Set up Effect Schema for validation</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d17" category="architecture" constraint="open" requires_approval="false">
+      <description>Effect service layer organization</description>
+      <options>
+        <option>single service file</option>
+        <option>service per channel</option>
+        <option>feature-based modules</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Service starts with Bun runtime, Elysia server responds, Effect error handling works, health endpoint returns status
+  </acceptance_criteria>
+</task>

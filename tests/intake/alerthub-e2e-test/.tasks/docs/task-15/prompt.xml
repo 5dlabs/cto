@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="15" project="alerthub">
+  <title>Notification Query API</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement GET endpoints for notification status and event history
+  </description>
+  
+  <dependencies>
+    <dependency task_id="10" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Add GET /api/v1/notifications/:id endpoint\n2. Implement GET /api/v1/notifications/:id/events\n3. Add pagination and filtering\n4. Include performance optimization with indexes\n5. Add request validation and error handling</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d15" category="api-design" constraint="soft" requires_approval="false">
+      <description>Default page size for notification queries</description>
+      <options>
+        <option>25 items</option>
+        <option>50 items</option>
+        <option>100 items</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Can retrieve notification by ID, events endpoint returns delivery history, pagination works correctly
+  </acceptance_criteria>
+</task>

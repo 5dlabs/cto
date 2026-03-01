@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="19" project="alerthub">
+  <title>Slack Integration Service</title>
+  <agent name="nova" stack="Bun/Elysia+Effect" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement Slack delivery service with Effect retry logic and error handling
+  </description>
+  
+  <dependencies>
+    <dependency task_id="18" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Create SlackService using Effect.Service pattern\n2. Implement webhook and Bot API delivery methods\n3. Add Effect.retry with exponential backoff\n4. Handle Slack-specific errors as tagged unions\n5. Add rate limiting with Effect.Semaphore</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d19" category="error-handling" constraint="soft" requires_approval="false">
+      <description>Slack API failure retry strategy</description>
+      <options>
+        <option>3 retries with exponential backoff</option>
+        <option>5 retries with fixed delay</option>
+        <option>circuit breaker pattern</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Can deliver notifications to Slack webhooks, retries work on failures, rate limiting prevents API abuse
+  </acceptance_criteria>
+</task>

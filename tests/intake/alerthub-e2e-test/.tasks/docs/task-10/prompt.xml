@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="10" project="alerthub">
+  <title>Database Models and Connections</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement PostgreSQL connection pool and data models for notifications
+  </description>
+  
+  <dependencies>
+    <dependency task_id="9" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Add sqlx with PostgreSQL driver\n2. Create connection pool configuration\n3. Define Notification, User, Tenant structs\n4. Implement database migrations\n5. Add connection health checks</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d10" category="data-model" constraint="open" requires_approval="false">
+      <description>Notification ID generation strategy</description>
+      <options>
+        <option>UUID v4</option>
+        <option>UUID v7</option>
+        <option>Snowflake ID</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Database connections successful, migrations run without errors, can insert/query test notification records
+  </acceptance_criteria>
+</task>

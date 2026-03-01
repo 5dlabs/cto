@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="9" project="alerthub">
+  <title>Notification Router Core Service</title>
+  <agent name="rex" stack="Rust/Axum" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Create Rust/Axum service foundation with basic HTTP server and health endpoints
+  </description>
+  
+  <dependencies>
+    <dependency task_id="2" />
+    <dependency task_id="3" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Initialize Rust project with Axum 0.7\n2. Set up basic HTTP server with routes\n3. Implement health check endpoints (/health/live, /health/ready)\n4. Add structured logging with tracing\n5. Configure Prometheus metrics endpoint</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d9" category="architecture" constraint="soft" requires_approval="false">
+      <description>Async runtime configuration</description>
+      <options>
+        <option>single-threaded</option>
+        <option>multi-threaded</option>
+        <option>current-thread</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Service starts successfully, health endpoints return 200, metrics endpoint exposes basic HTTP metrics
+  </acceptance_criteria>
+</task>

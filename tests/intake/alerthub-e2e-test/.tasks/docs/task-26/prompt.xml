@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="26" project="alerthub">
+  <title>Analytics and Reporting Service</title>
+  <agent name="grizz" stack="Go/gRPC" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Implement AnalyticsService for notification metrics and delivery statistics
+  </description>
+  
+  <dependencies>
+    <dependency task_id="24" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Create AnalyticsService with metrics aggregation\n2. Implement time-series data collection\n3. Add delivery success/failure rate calculations\n4. Create channel breakdown reports\n5. Set up data retention policies</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d26" category="performance" constraint="soft" requires_approval="false">
+      <description>Metrics aggregation strategy</description>
+      <options>
+        <option>real-time calculation</option>
+        <option>pre-aggregated hourly</option>
+        <option>mixed approach</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    Analytics queries return accurate metrics, time-series aggregation works, performance acceptable for dashboard queries
+  </acceptance_criteria>
+</task>

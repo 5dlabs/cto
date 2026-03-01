@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="7" project="alerthub">
+  <title>SeaweedFS Object Storage Setup</title>
+  <agent name="bolt" stack="Kubernetes" />
+  <priority>medium</priority>
+  <status>pending</status>
+  
+  <description>
+    Deploy SeaweedFS for S3-compatible object storage of attachments and exports
+  </description>
+  
+  <dependencies>
+    <dependency task_id="1" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Deploy SeaweedFS master, volume, and filer components\n2. Configure S3 gateway for compatibility\n3. Create buckets for attachments, exports, media\n4. Set up access policies and credentials\n5. Configure backup retention</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d7" category="architecture" constraint="open" requires_approval="false">
+      <description>Object storage replication strategy</description>
+      <options>
+        <option>single copy</option>
+        <option>dual copy</option>
+        <option>erasure coding</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    SeaweedFS is running, S3 API responds, can create/delete objects in test bucket using AWS CLI
+  </acceptance_criteria>
+</task>

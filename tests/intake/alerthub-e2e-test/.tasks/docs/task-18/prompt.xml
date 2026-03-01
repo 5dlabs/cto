@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task id="18" project="alerthub">
+  <title>MongoDB Integration with Drizzle ORM</title>
+  <agent name="nova" stack="Bun/Elysia+Effect" />
+  <priority>high</priority>
+  <status>pending</status>
+  
+  <description>
+    Connect to MongoDB using Drizzle ORM for integration configs and templates
+  </description>
+  
+  <dependencies>
+    <dependency task_id="17" />
+  </dependencies>
+  
+  <implementation>
+    <details>1. Add Drizzle ORM with MongoDB adapter\n2. Define schemas for integrations and templates\n3. Configure database connection with Effect\n4. Implement CRUD operations as Effect services\n5. Add database health checks</details>
+  </implementation>
+  
+  <decision_points>
+    <decision id="d18" category="data-model" constraint="open" requires_approval="false">
+      <description>Integration config storage format</description>
+      <options>
+        <option>typed objects</option>
+        <option>JSON blobs</option>
+        <option>hybrid approach</option>
+      </options>
+    </decision>
+  </decision_points>
+  
+  <acceptance_criteria>
+    MongoDB connections successful, can create/read/update/delete integration records via Drizzle
+  </acceptance_criteria>
+</task>
