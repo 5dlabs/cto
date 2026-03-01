@@ -6,10 +6,14 @@
  * points raised during the debate.
  *
  * Flow:
- *   1. Broadcast PRD to both debate agents
- *   2. Conduct debate loop (relay turns, enforce timebox)
- *   3. On DECISION_POINT: fan-out committee votes, tally, broadcast result
+ *   1. Broadcast PRD to both debate agents via deliberation.room
+ *   2. Conduct debate loop (relay turns via room, enforce timebox)
+ *   3. On DECISION_POINT: publish vote_request to room, collect responses, tally, broadcast result
  *   4. On timeout or consensus: compile design brief, return DeliberationResult
+ *
+ * Architecture: one shared NATS subject (deliberation.room) — all 7 agents
+ * subscribe and respond there. Messages carry a `to` field indicating the
+ * intended recipient(s); agents ignore messages not addressed to them.
  */
 
 import { createHash, randomUUID } from 'crypto';
@@ -27,6 +31,7 @@ import type { AgentResponse, TokenUsage } from '../types';
 // Constants
 // =============================================================================
 
+const DELIBERATION_ROOM = 'deliberation.room';
 const DEFAULT_TIMEBOX_MINUTES = 30;
 const DEFAULT_VOTE_TIMEOUT_SECONDS = 120;
 const DEFAULT_COMMITTEE_IDS = [
@@ -52,7 +57,6 @@ interface NatsMessage {
 interface NatsClient {
   publish(subject: string, message: NatsMessage): Promise<void>;
   subscribe(subject: string, handler: (msg: NatsMessage) => void): () => void;
-  request(subject: string, message: NatsMessage, timeoutMs: number): Promise<NatsMessage>;
 }
 
 /**
@@ -77,15 +81,12 @@ async function getNatsClient(): Promise<NatsClient> {
     const nc: NatsConnection = await natsConnect({ servers: natsUrl });
     const sc = StringCodec();
 
-    const subscriptions = new Map<string, ReturnType<NatsConnection['subscribe']>>();
-
     return {
       async publish(subject: string, message: NatsMessage): Promise<void> {
         nc.publish(subject, sc.encode(JSON.stringify(message)));
       },
       subscribe(subject: string, handler: (msg: NatsMessage) => void) {
         const sub = nc.subscribe(subject);
-        subscriptions.set(subject, sub);
         // Process messages asynchronously
         (async () => {
           for await (const m of sub) {
@@ -99,50 +100,7 @@ async function getNatsClient(): Promise<NatsClient> {
         })().catch(console.error);
         return () => {
           sub.unsubscribe();
-          subscriptions.delete(subject);
         };
-      },
-      async request(subject: string, message: NatsMessage, timeoutMs: number): Promise<NatsMessage> {
-        // Convert NatsMessage to AgentMessage format expected by nats-messenger plugin.
-        // Subscribe to agent.deliberation.inbox for the response.
-        const replySubject = 'agent.deliberation.inbox';
-        const agentMsg = {
-          from: 'deliberation',
-          to: subject.replace('agent.', '').replace('.inbox', ''),
-          subject,
-          message: `[DEBATE TURN ${(message as Record<string, unknown>)['turn'] ?? ''}]\n\n${(message as Record<string, unknown>)['content'] ?? ''}\n\nSession: ${message.session_id}. Minutes remaining: ${(message as Record<string, unknown>)['minutes_remaining'] ?? '?'}. Please respond with your full debate position. End with: nats(action="publish", to="deliberation", message="<your full response>")`,
-          priority: 'normal',
-          timestamp: new Date().toISOString(),
-          type: 'message',
-          replyTo: replySubject,
-        };
-        return new Promise((resolve, reject) => {
-          const timer = setTimeout(() => {
-            sub.unsubscribe();
-            reject(new Error(`Timeout waiting for reply from ${subject}`));
-          }, timeoutMs);
-          const sub = nc.subscribe(replySubject);
-          (async () => {
-            for await (const m of sub) {
-              try {
-                const data = JSON.parse(sc.decode(m.data)) as Record<string, unknown>;
-                if (data['type'] === 'discovery_ping' || data['type'] === 'discovery_pong') continue;
-                clearTimeout(timer);
-                sub.unsubscribe();
-                const reply: NatsMessage = {
-                  type: 'debate_turn_reply',
-                  session_id: message.session_id,
-                  content: (data['message'] as string) ?? '',
-                };
-                resolve(reply);
-                break;
-              } catch (e) {
-                console.error('[NATS] Failed to parse reply:', e);
-              }
-            }
-          })().catch(reject);
-          nc.publish(subject, sc.encode(JSON.stringify(agentMsg)));
-        });
       },
     };
   }
@@ -164,22 +122,102 @@ async function getNatsClient(): Promise<NatsClient> {
         if (idx >= 0) list.splice(idx, 1);
       };
     },
-    async request(subject: string, message: NatsMessage, timeoutMs: number): Promise<NatsMessage> {
-      console.error(`[NATS REQUEST→${subject}]`, JSON.stringify(message, null, 2));
-      // Stub returns a synthetic abstain vote for testing
-      await new Promise(res => setTimeout(res, Math.min(timeoutMs, 100)));
-      return {
-        type: 'vote_response',
-        session_id: message.session_id,
-        voter_id: subject,
-        decision_id: (message as Record<string, unknown>).decision_id as string,
-        chosen_option: ((message as Record<string, unknown>).options as string[])?.[0] ?? 'abstain',
-        confidence: 0.5,
-        reasoning: 'Stub vote (NATS not connected)',
-        concerns: [],
-      };
-    },
   };
+}
+
+// =============================================================================
+// Room Helpers
+// =============================================================================
+
+/**
+ * Subscribe to the room and resolve when the expected agent posts a response.
+ * Rejects with an Error on timeout.
+ */
+async function waitForResponse(
+  nats: NatsClient,
+  roomSubject: string,
+  sessionId: string,
+  expectedFrom: string,
+  timeoutMs: number
+): Promise<NatsMessage> {
+  return new Promise((resolve, reject) => {
+    let cleanup: (() => void) | undefined;
+
+    const timer = setTimeout(() => {
+      cleanup?.();
+      reject(new Error(`Timeout waiting for ${expectedFrom}`));
+    }, timeoutMs);
+
+    cleanup = nats.subscribe(roomSubject, (msg) => {
+      if (
+        msg.session_id === sessionId &&
+        msg.from === expectedFrom &&
+        (msg.type === 'debate_response' || msg.type === 'response')
+      ) {
+        clearTimeout(timer);
+        cleanup?.();
+        resolve(msg);
+      }
+    });
+  });
+}
+
+/**
+ * Subscribe to the room and collect vote_response messages from all voterIds.
+ * Returns when all votes are received or on timeout (abstains fill missing votes).
+ */
+async function collectVotes(
+  nats: NatsClient,
+  roomSubject: string,
+  sessionId: string,
+  voterIds: string[],
+  timeoutMs: number
+): Promise<CommitteeVote[]> {
+  const votes: CommitteeVote[] = [];
+  const remaining = new Set(voterIds);
+
+  return new Promise((resolve) => {
+    let cleanup: (() => void) | undefined;
+
+    const timer = setTimeout(() => {
+      cleanup?.();
+      // Fill abstains for non-responders
+      for (const voterId of remaining) {
+        votes.push({
+          voter_id: voterId,
+          chosen_option: 'abstain',
+          confidence: 0,
+          reasoning: 'Timeout',
+          concerns: [],
+          timestamp: new Date().toISOString(),
+        });
+      }
+      resolve(votes);
+    }, timeoutMs);
+
+    cleanup = nats.subscribe(roomSubject, (msg) => {
+      if (
+        msg.session_id === sessionId &&
+        msg.type === 'vote_response' &&
+        remaining.has(msg.from as string)
+      ) {
+        remaining.delete(msg.from as string);
+        votes.push({
+          voter_id: msg.from as string,
+          chosen_option: (msg.chosen_option as string) ?? 'abstain',
+          confidence: (msg.confidence as number) ?? 0,
+          reasoning: (msg.reasoning as string) ?? '',
+          concerns: (msg.concerns as string[]) ?? [],
+          timestamp: new Date().toISOString(),
+        });
+        if (remaining.size === 0) {
+          clearTimeout(timer);
+          cleanup?.();
+          resolve(votes);
+        }
+      }
+    });
+  });
 }
 
 // =============================================================================
@@ -266,66 +304,52 @@ async function conductCommitteeVote(
 
   const options = [optimistPosition, pessimistPosition];
 
-  // Fan out vote requests to all committee members in parallel
-  const votePromises = committeeIds.map(async (voterId): Promise<CommitteeVote> => {
-    const request: NatsMessage = {
-      type: 'vote_request',
-      session_id: sessionId,
-      decision_id: dp.id,
-      question: dp.question,
-      category: dp.category,
-      options,
-      optimist_position: optimistPosition,
-      pessimist_position: pessimistPosition,
-      context: prdContext.slice(0, 2000), // Limit context size
-      deadline_seconds: voteTimeoutSeconds,
-    };
-
-    try {
-      const response = await nats.request(
-        `agent.${voterId}.inbox`,
-        request,
-        voteTimeoutSeconds * 1000
-      );
-
-      const chosenOption = (response.chosen_option as string) ?? 'abstain';
-      const validOptions = [...options, 'abstain'];
-      const isValidOption = validOptions.includes(chosenOption);
-      
-      return {
-        voter_id: voterId,
-        chosen_option: isValidOption ? chosenOption : 'abstain',
-        confidence: (response.confidence as number) ?? 0,
-        reasoning: isValidOption 
-          ? (response.reasoning as string) ?? 'No reasoning provided'
-          : `Invalid vote option "${chosenOption}" provided - counted as abstain. ${(response.reasoning as string) ?? ''}`,
-        concerns: (response.concerns as string[]) ?? [],
-        timestamp: new Date().toISOString(),
-      };
-    } catch {
-      console.error(`[DELIBERATION] ${voterId} timed out — marking abstain`);
-      return {
-        voter_id: voterId,
-        chosen_option: 'abstain',
-        confidence: 0,
-        reasoning: 'Vote timed out',
-        concerns: [],
-        timestamp: new Date().toISOString(),
-      };
-    }
+  // Publish ONE vote request to the room addressed to all committee members
+  await nats.publish(DELIBERATION_ROOM, {
+    type: 'vote_request',
+    session_id: sessionId,
+    to: committeeIds,
+    decision_id: dp.id,
+    question: dp.question,
+    category: dp.category,
+    options,
+    optimist_position: optimistPosition,
+    pessimist_position: pessimistPosition,
+    context: prdContext.slice(0, 2000), // Limit context size
+    deadline_seconds: voteTimeoutSeconds,
   });
 
-  const votes = await Promise.all(votePromises);
+  // Collect votes from room — wait for vote_response messages
+  const votes = await collectVotes(
+    nats,
+    DELIBERATION_ROOM,
+    sessionId,
+    committeeIds,
+    voteTimeoutSeconds * 1000
+  );
+
+  // Normalize invalid vote options to abstain
+  const normalizedVotes: CommitteeVote[] = votes.map(vote => {
+    const validOptions = [...options, 'abstain'];
+    if (!validOptions.includes(vote.chosen_option)) {
+      return {
+        ...vote,
+        chosen_option: 'abstain',
+        reasoning: `Invalid vote option "${vote.chosen_option}" provided - counted as abstain. ${vote.reasoning}`,
+      };
+    }
+    return vote;
+  });
 
   // Tally votes (abstains are excluded from majority calculation)
   const tally: Record<string, number> = {};
-  for (const vote of votes) {
+  for (const vote of normalizedVotes) {
     if (vote.chosen_option !== 'abstain') {
       tally[vote.chosen_option] = (tally[vote.chosen_option] ?? 0) + 1;
     }
   }
 
-  const nonAbstainVotes = votes.filter(v => v.chosen_option !== 'abstain');
+  const nonAbstainVotes = normalizedVotes.filter(v => v.chosen_option !== 'abstain');
   const maxVotes = Math.max(...Object.values(tally), 0);
   const winners = Object.entries(tally).filter(([, count]) => count === maxVotes);
   const isTie = winners.length > 1 || nonAbstainVotes.length === 0;
@@ -344,7 +368,7 @@ async function conductCommitteeVote(
     category: dp.category,
     options,
     raised_by: dp.raisedBy,
-    votes,
+    votes: normalizedVotes,
     vote_tally: tally,
     winning_option: winningOption,
     consensus_strength: consensusStrength,
@@ -384,10 +408,16 @@ export async function runDeliberation(
   console.error(`[DELIBERATION] Session ${sessionId} started (timebox: ${payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES}min)`);
 
   // ─── Step 1: PRD broadcast ───────────────────────────────────────────────
-  // NOTE: The broadcast-prd step in deliberation.lobster.yaml already sends
-  // deliberation_start messages to both agents. We do NOT duplicate that here.
-  // When running standalone (no Lobster workflow), the stub NATS client logs
-  // messages but doesn't require initialization broadcasts.
+  // Publish one deliberation_start message to the room — both optimist and
+  // pessimist receive it since they both subscribe to deliberation.room.
+  await nats.publish(DELIBERATION_ROOM, {
+    type: 'deliberation_start',
+    session_id: sessionId,
+    to: ['optimist', 'pessimist'],
+    prd_content: payload.prd_content,
+    infrastructure_context: payload.infrastructure_context ?? '',
+    timebox_minutes: payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES,
+  });
 
   // ─── Step 2: Debate loop ─────────────────────────────────────────────────
   let lastSpeaker: 'optimist' | 'pessimist' = 'pessimist'; // optimist goes first
@@ -401,17 +431,14 @@ export async function runDeliberation(
     // Soft warning at 80% of timebox
     if (!softWarningEmitted && elapsed >= timeboxMs * SOFT_WARNING_RATIO) {
       softWarningEmitted = true;
-      const warningMsg: NatsMessage = {
-        type: 'timebox_warning',
-        session_id: sessionId,
-        minutes_remaining: minutesRemaining,
-        message: `⏱ You have ${minutesRemaining} minutes remaining. Begin moving toward final positions.`,
-      };
       try {
-        await Promise.all([
-          nats.publish('agent.optimist.inbox', warningMsg),
-          nats.publish('agent.pessimist.inbox', warningMsg),
-        ]);
+        await nats.publish(DELIBERATION_ROOM, {
+          type: 'timebox_warning',
+          session_id: sessionId,
+          to: ['optimist', 'pessimist'],
+          minutes_remaining: minutesRemaining,
+          message: `⏱ ${minutesRemaining} minutes remaining. Begin moving toward final positions.`,
+        });
       } catch (err) {
         console.error('[DELIBERATION] Failed to send timebox warning:', err);
       }
@@ -427,22 +454,26 @@ export async function runDeliberation(
     // Alternate speakers: optimist goes first
     const nextSpeaker: 'optimist' | 'pessimist' = lastSpeaker === 'optimist' ? 'pessimist' : 'optimist';
 
-    // Send turn to next speaker
-    const turnMsg: NatsMessage = {
+    // Send turn to room — only the named agent should respond
+    await nats.publish(DELIBERATION_ROOM, {
       type: 'debate_turn',
       session_id: sessionId,
+      to: nextSpeaker,
       turn: turnCount + 1,
       from: lastSpeaker,
       content: lastContent,
       minutes_remaining: minutesRemaining,
       decision_points_resolved: resolvedDecisionPoints.map(d => d.id),
-    };
+    });
 
+    // Wait for response from room (agent publishes back to deliberation.room)
     let response: NatsMessage;
     try {
-      response = await nats.request(
-        `agent.${nextSpeaker}.inbox`,
-        turnMsg,
+      response = await waitForResponse(
+        nats,
+        DELIBERATION_ROOM,
+        sessionId,
+        nextSpeaker,
         AGENT_SKIP_TIMEOUT_MS
       );
     } catch {
@@ -514,22 +545,19 @@ export async function runDeliberation(
         );
         resolvedDecisionPoints.push(resolved);
 
-        // Broadcast vote result back to both agents
-        const voteResultMsg: NatsMessage = {
-          type: 'vote_result',
-          session_id: sessionId,
-          decision_id: dpId,
-          question: dp.question,
-          winning_option: resolved.winning_option ?? 'escalated',
-          vote_tally: resolved.vote_tally,
-          consensus_strength: resolved.consensus_strength ?? 0,
-          escalated: resolved.escalated,
-        };
+        // Announce vote result to the room
         try {
-          await Promise.all([
-            nats.publish('agent.optimist.inbox', voteResultMsg),
-            nats.publish('agent.pessimist.inbox', voteResultMsg),
-          ]);
+          await nats.publish(DELIBERATION_ROOM, {
+            type: 'vote_result',
+            session_id: sessionId,
+            to: ['optimist', 'pessimist'],
+            decision_id: dpId,
+            question: dp.question,
+            winning_option: resolved.winning_option ?? 'escalated',
+            vote_tally: resolved.vote_tally,
+            consensus_strength: resolved.consensus_strength ?? 0,
+            escalated: resolved.escalated,
+          });
         } catch (err) {
           console.error(`[DELIBERATION] Failed to broadcast vote result for ${dpId}:`, err);
         }
@@ -553,7 +581,7 @@ export async function runDeliberation(
     console.error(`[DELIBERATION] Decision point ${dpId} never received both positions — marking as unresolved/escalated`);
     const optPos = optimistPositions.get(dpId);
     const pesPos = pessimistPositions.get(dpId);
-    
+
     // Create a decision point record with whatever positions we have
     const unresolvedDP: DeliberationDecisionPoint = {
       id: dp.id,
@@ -581,7 +609,7 @@ export async function runDeliberation(
       deliberationStatus = 'completed';
     }
   }
-  
+
   // Check if any escalated decision points should flip status to 'escalated'
   // Only override if the session completed normally (not timeout or consensus)
   const hasEscalated = resolvedDecisionPoints.some(d => d.escalated);

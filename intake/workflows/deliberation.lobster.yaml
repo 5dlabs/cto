@@ -1,8 +1,10 @@
 name: deliberation
 description: >
   PRD deliberation — Optimist vs Pessimist debate with multi-model committee
-  voting on decision points. Produces a resolved design-brief.md before task
-  generation begins.
+  voting on decision points. All communication flows through a single shared
+  NATS subject (deliberation.room); intake-agent broadcasts the PRD and
+  orchestrates turns internally. Produces a resolved design-brief.md before
+  task generation begins.
 
 inputs:
   - name: prd_content
@@ -30,64 +32,16 @@ outputs:
 
 steps:
   # ─────────────────────────────────────────────────────────
-  # Step 1: Broadcast PRD to both debate agents simultaneously
-  # ─────────────────────────────────────────────────────────
-  - name: broadcast-prd
-    description: "Send PRD + infra context to optimist and pessimist in parallel"
-    parallel: true
-    commands:
-      - name: notify-optimist
-        command: >
-          jq -n
-            --arg session_id "{{inputs.session_id}}"
-            --arg prd_content "{{inputs.prd_content}}"
-            --arg infra_context "{{inputs.infrastructure_context}}"
-            --argjson timebox {{inputs.timebox_minutes}}
-            '{
-              "subject": "agent.optimist.inbox",
-              "message": {
-                "type": "deliberation_start",
-                "session_id": $session_id,
-                "prd_content": $prd_content,
-                "infrastructure_context": $infra_context,
-                "timebox_minutes": $timebox,
-                "your_role": "optimist",
-                "opponent_id": "pessimist"
-              }
-            }' > /tmp/optimist-msg.json &&
-          openclaw.invoke --tool nats-publish --args-json "$(cat /tmp/optimist-msg.json)"
-      - name: notify-pessimist
-        command: >
-          jq -n
-            --arg session_id "{{inputs.session_id}}"
-            --arg prd_content "{{inputs.prd_content}}"
-            --arg infra_context "{{inputs.infrastructure_context}}"
-            --argjson timebox {{inputs.timebox_minutes}}
-            '{
-              "subject": "agent.pessimist.inbox",
-              "message": {
-                "type": "deliberation_start",
-                "session_id": $session_id,
-                "prd_content": $prd_content,
-                "infrastructure_context": $infra_context,
-                "timebox_minutes": $timebox,
-                "your_role": "pessimist",
-                "opponent_id": "optimist"
-              }
-            }' > /tmp/pessimist-msg.json &&
-          openclaw.invoke --tool nats-publish --args-json "$(cat /tmp/pessimist-msg.json)"
-
-  # ─────────────────────────────────────────────────────────
-  # Step 2: Conduct the time-boxed debate
-  # Intake listens on its NATS inbox for turns and decision points.
-  # When a decision_point message arrives, committee votes are triggered.
+  # Step 1: Conduct the time-boxed debate
+  # intake-agent broadcasts the PRD to deliberation.room internally (Step 1 of
+  # runDeliberation), then orchestrates the debate loop, committee votes, and
+  # result collection — all via the single shared deliberation.room subject.
   # NOTE: Timeout includes 10-minute buffer beyond internal timebox to allow
   # for in-flight agent requests (5min), committee votes (2min), and post-loop
   # processing, preventing premature termination during final iteration.
   # ─────────────────────────────────────────────────────────
   - name: conduct-deliberation
     description: "Run conductor loop for timebox_minutes, collecting turns and votes"
-    depends_on: [broadcast-prd]
     timeout: "{{inputs.timebox_minutes + 10}}m"
     command: >
       jq -n
@@ -108,7 +62,7 @@ steps:
         }' | intake-agent
 
   # ─────────────────────────────────────────────────────────
-  # Step 3: Compile resolved decisions into a design brief
+  # Step 2: Compile resolved decisions into a design brief
   # ─────────────────────────────────────────────────────────
   - name: compile-brief
     description: "Synthesize deliberation result + original PRD into design-brief.md"
@@ -131,7 +85,7 @@ steps:
         }' | xargs -I{} openclaw.invoke --tool llm-task --action text --args-json '{}'
 
   # ─────────────────────────────────────────────────────────
-  # Step 4: Save design brief to .tasks/docs/design-brief.md
+  # Step 3: Save design brief to .tasks/docs/design-brief.md
   # ─────────────────────────────────────────────────────────
   - name: save-brief
     description: "Persist design brief for audit trail and downstream pipeline"
