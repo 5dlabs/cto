@@ -21,6 +21,10 @@ export type Operation =
   | 'validate_content'
   | 'provider_status'
   | 'deliberate'
+  | 'parse_prd_iterative'
+  | 'generate_prompts'
+  | 'generate_with_debate'
+  | 'generate_docs'
   | 'ping';
 
 /**
@@ -117,7 +121,7 @@ export interface TaskSummary {
   details?: string;
   test_strategy?: string;
   status: string;
-  dependencies: string[];
+  dependencies: number[];
 }
 
 /**

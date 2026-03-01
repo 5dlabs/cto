@@ -183,61 +183,89 @@ export async function expandTask(
       pathToClaudeCodeExecutable: cliPath,
     };
 
-    let responseText = '';
-    let usage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
+    const MAX_ATTEMPTS = 3;
+    let lastParseError = '';
+    let lastResponseText = '';
+    let finalResult: ReturnType<typeof parseJsonResponse<GeneratedSubtask>> | null = null;
+    let finalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
 
-    for await (const message of query({
-      prompt: userPrompt,
-      options: sdkOptions,
-    })) {
-      if (message.type === 'assistant') {
-        responseText += extractAssistantText(message);
-      }
-      
-      if (message.type === 'result') {
-        const resultMsg = message as SDKResultMessage;
-        if ('usage' in resultMsg) {
-          usage.input_tokens = resultMsg.usage.input_tokens;
-          usage.output_tokens = resultMsg.usage.output_tokens;
-          usage.total_tokens = usage.input_tokens + usage.output_tokens;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      let responseText = '';
+      let usage: TokenUsage = { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
+
+      for await (const message of query({
+        prompt: userPrompt,
+        options: sdkOptions,
+      })) {
+        if (message.type === 'assistant') {
+          responseText += extractAssistantText(message);
+        }
+        
+        if (message.type === 'result') {
+          const resultMsg = message as SDKResultMessage;
+          if ('usage' in resultMsg) {
+            usage.input_tokens = resultMsg.usage.input_tokens;
+            usage.output_tokens = resultMsg.usage.output_tokens;
+            usage.total_tokens = usage.input_tokens + usage.output_tokens;
+          }
         }
       }
-    }
 
-    // Handle both cases:
-    // 1. Model outputs array contents directly (needs wrapping)
-    // 2. Model outputs full JSON with {"subtasks":[...]} (use as-is)
-    const trimmed = responseText.trim();
-    let wrappedResponse: string;
-    
-    if (trimmed.startsWith('{"subtasks"') || trimmed.startsWith('{ "subtasks"')) {
-      // Model gave us full JSON, use as-is
-      wrappedResponse = trimmed;
-    } else if (trimmed.startsWith('[')) {
-      // Model gave us just the array, wrap it
-      wrappedResponse = '{"subtasks":' + trimmed + '}';
-    } else if (trimmed.startsWith('{')) {
-      // Model started with first object, wrap in array
-      wrappedResponse = '{"subtasks":[' + trimmed;
-    } else {
-      // Unexpected format, try wrapping anyway
-      wrappedResponse = '{"subtasks":[' + trimmed;
-    }
-    
-    // Parse with robust JSON parser
-    const result = parseJsonResponse<GeneratedSubtask>(wrappedResponse, 'subtasks', isValidSubtask);
+      lastResponseText = responseText;
 
-    if (!result.success) {
+      // Handle both cases:
+      // 1. Model outputs array contents directly (needs wrapping)
+      // 2. Model outputs full JSON with {"subtasks":[...]} (use as-is)
+      const trimmed = responseText.trim();
+      let wrappedResponse: string;
+      
+      if (trimmed.startsWith('{"subtasks"') || trimmed.startsWith('{ "subtasks"')) {
+        // Model gave us full JSON, use as-is
+        wrappedResponse = trimmed;
+      } else if (trimmed.startsWith('[')) {
+        // Model gave us just the array, wrap it
+        wrappedResponse = '{"subtasks":' + trimmed + '}';
+      } else if (trimmed.startsWith('{')) {
+        // Model started with first object, wrap in array
+        wrappedResponse = '{"subtasks":[' + trimmed;
+      } else {
+        // Unexpected format, try wrapping anyway
+        wrappedResponse = '{"subtasks":[' + trimmed;
+      }
+      
+      // Parse with robust JSON parser
+      const result = parseJsonResponse<GeneratedSubtask>(wrappedResponse, 'subtasks', isValidSubtask);
+
+      if (!result.success) {
+        lastParseError = result.error ?? 'Parse failed';
+        if (attempt < MAX_ATTEMPTS) {
+          continue; // retry
+        }
+        return {
+          success: false,
+          error: lastParseError,
+          error_type: 'parse_error',
+          details: lastResponseText.slice(0, 500),
+        };
+      }
+
+      // Parse succeeded, capture and break
+      finalResult = result;
+      finalUsage = usage;
+      break;
+    } // end retry loop
+
+    if (!finalResult || !finalResult.success) {
       return {
         success: false,
-        error: result.error,
+        error: lastParseError || 'Parse failed',
         error_type: 'parse_error',
-        details: responseText.slice(0, 500),
+        details: lastResponseText.slice(0, 500),
       };
     }
 
     // Validate single-concern rule
-    const validation = validateSingleConcern(result.items);
+    const validation = validateSingleConcern(finalResult.items);
     if (!validation.valid) {
       const violations = validation.violations.map(v => 
         `Subtask ${v.id} ("${v.title}"): ${v.reason}`
@@ -253,8 +281,8 @@ export async function expandTask(
 
     return {
       success: true,
-      data: { subtasks: result.items },
-      usage,
+      data: { subtasks: finalResult.items },
+      usage: finalUsage,
       model,
       provider: 'claude-agent-sdk',
     };

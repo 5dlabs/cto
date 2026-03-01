@@ -347,7 +347,7 @@ export async function generatePrompts(
     return {
       success: false,
       error: `Failed to generate prompts: ${error}`,
-      error_type: 'file_error',
+      error_type: 'unknown',
     };
   }
 }
