@@ -34,7 +34,7 @@ function extractAssistantText(message: SDKAssistantMessage): string {
 /**
  * Generate system prompt for subtask expansion with full subagent support.
  */
-function getSystemPrompt(subtaskCount: number, nextId: number, enableSubagents: boolean, useResearch: boolean): string {
+function getSystemPrompt(_subtaskCount: number, nextId: number, enableSubagents: boolean, useResearch: boolean): string {
   const researchSection = useResearch ? `
 
 You have access to current best practices and latest technical information to provide research-backed subtask generation.` : '';
@@ -239,7 +239,7 @@ export async function expandTask(
       }
       
       // Parse with robust JSON parser
-      const result = parseJsonResponse<GeneratedSubtask>(wrappedResponse, 'subtasks', isValidSubtask);
+      const result = parseJsonResponse<GeneratedSubtask>(wrappedResponse, 'subtasks', isValidSubtask as (item: unknown) => item is GeneratedSubtask);
 
       if (!result.success) {
         lastParseError = result.error ?? 'Parse failed';

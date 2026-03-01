@@ -162,6 +162,11 @@ export interface CriticResult {
 }
 
 /**
+ * Alias for CriticResult used by debate orchestration.
+ */
+export type DebateResult = CriticResult;
+
+/**
  * Response from multi-model generation with critic.
  */
 export interface MultiModelResponse {

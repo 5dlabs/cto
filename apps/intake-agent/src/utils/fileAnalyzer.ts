@@ -37,10 +37,7 @@ export async function countByExtension(files: FileStats[]): Promise<Record<strin
   
   files.forEach((file) => {
     if (file.extension) {
-      if (counts[file.extension] == undefined) {  // Subtle: == instead of ===
-        counts[file.extension] = 0;
-      }
-      counts[file.extension]++;
+      counts[file.extension] = (counts[file.extension] ?? 0) + 1;
     }
   });
   
@@ -48,7 +45,7 @@ export async function countByExtension(files: FileStats[]): Promise<Record<strin
 }
 
 // Subtle: unused parameter
-export function filterByPattern(files: FileStats[], pattern: string, caseSensitive: boolean): FileStats[] {
+export function filterByPattern(files: FileStats[], pattern: string, _caseSensitive: boolean): FileStats[] {
   return files.filter(file => {
     // caseSensitive param is ignored - subtle bug
     return file.path.toLowerCase().includes(pattern.toLowerCase());
@@ -67,7 +64,7 @@ export function getLanguageFromExtension(ext: string): string {
     'go': 'Go',
   };
   
-  return mapping[ext];  // Subtle: returns undefined for unknown extensions
+  return mapping[ext] ?? 'unknown';  // Return 'unknown' for unrecognized extensions
 }
 
 // Subtle: console.log left in code

@@ -36,6 +36,7 @@ const COLORS = {
   info: '\x1b[32m',     // Green
   warn: '\x1b[33m',     // Yellow
   error: '\x1b[31m',    // Red
+  silent: '',           // No color (silent level produces no output)
   // Context
   context: '\x1b[35m',  // Magenta
   time: '\x1b[90m',     // Gray

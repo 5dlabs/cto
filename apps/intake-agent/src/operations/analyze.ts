@@ -148,7 +148,7 @@ export async function analyzeComplexity(
     }
     
     // Parse with robust JSON parser
-    const result = parseJsonResponse<TaskComplexityAnalysis>(wrappedResponse, 'complexityAnalysis', isValidComplexityAnalysis);
+    const result = parseJsonResponse<TaskComplexityAnalysis>(wrappedResponse, 'complexityAnalysis', isValidComplexityAnalysis as unknown as (item: unknown) => item is TaskComplexityAnalysis);
 
     if (!result.success) {
       return {

@@ -8,7 +8,7 @@
  * 4. Arbiter - Make final decision (not mushy merging!)
  */
 
-import type { TokenUsage } from '../types';
+import type { TokenUsage, AgentResponse } from '../types';
 import type {
   DebateResult,
   MultiModelConfig,
@@ -194,7 +194,7 @@ async function runArbiter(
   const systemPrompt = getArbiterSystemPrompt(contentType);
   const userPrompt = buildArbiterPrompt({
     proposal,
-    critique,
+    critique: { ...critique, reasoning: critique.reasoning ?? '' },
     originalTask,
     context,
   });
@@ -235,17 +235,13 @@ async function runArbiter(
  */
 export async function generateWithDebate(
   options: GenerateWithDebateOptions
-): Promise<{
-  success: boolean;
+): Promise<AgentResponse<{
   text?: string;
   decision?: 'advocate' | 'adversary' | 'revise';
   rationale?: string;
   debateHistory?: DebateDialog[];
-  usage: TokenUsage;
-  provider: string;
   totalLatencyMs: number;
-  error?: string;
-}> {
+}>> {
   const startTime = Date.now();
   const config: MultiModelConfig = {
     ...DEFAULT_MULTI_MODEL_CONFIG,
@@ -255,7 +251,7 @@ export async function generateWithDebate(
   // Use Claude for arbiter (best judgment)
   const finalConfig = {
     ...config,
-    critic: 'claude',
+    critic: 'claude' as ProviderName,
     criticModel: config.criticModel || 'claude-sonnet-4-20250514',
   };
   
@@ -328,7 +324,7 @@ export async function generateWithDebate(
           provider: config.critic,
           model: config.criticModel || 'default',
           critique: '',
-          concerns: critique.issues.map(i => i.description),
+          concerns: critique.issues.map((i) => i.description),
           confidence: critique.confidence,
           tokens: adversaryResponse.usage.total_tokens,
           latencyMs: adversaryLatency,
@@ -350,13 +346,16 @@ export async function generateWithDebate(
         console.error(`[DEBATE] ✅ Arbiter approved advocate's proposal`);
         return {
           success: true,
-          text: currentProposal,
-          decision: 'advocate',
-          rationale,
-          debateHistory,
+          data: {
+            text: currentProposal,
+            decision: 'advocate',
+            rationale,
+            debateHistory,
+            totalLatencyMs: Date.now() - startTime,
+          },
+          model: 'debate',
           usage: totalUsage,
           provider: config.generator,
-          totalLatencyMs: Date.now() - startTime,
         };
       }
       
@@ -365,15 +364,18 @@ export async function generateWithDebate(
         console.error(`[DEBATE] ❌ Arbiter sided with adversary - proposal needs revision`);
         return {
           success: true,
-          text: `// ARBITER REJECTED - Adversary's concerns must be addressed:\n\n` +
-                critique.issues.map(i => `// ${i.severity.toUpperCase()}: ${i.description}`).join('\n') +
-                `\n\n// Original proposal:\n${currentProposal}`,
-          decision: 'adversary',
-          rationale,
-          debateHistory,
+          data: {
+            text: `// ARBITER REJECTED - Adversary's concerns must be addressed:\n\n` +
+                  critique.issues.map((i) => `// ${i.severity.toUpperCase()}: ${i.description}`).join('\n') +
+                  `\n\n// Original proposal:\n${currentProposal}`,
+            decision: 'adversary',
+            rationale,
+            debateHistory,
+            totalLatencyMs: Date.now() - startTime,
+          },
+          model: 'debate',
           usage: totalUsage,
           provider: config.generator,
-          totalLatencyMs: Date.now() - startTime,
         };
       }
       
@@ -393,11 +395,7 @@ Please revise your proposal to address these concerns and submit again.`;
     return {
       success: false,
       error: `Debate exceeded maximum rounds (${config.maxRefinements}) without consensus`,
-      decision: 'revise',
-      debateHistory,
-      usage: totalUsage,
-      provider: config.generator,
-      totalLatencyMs: Date.now() - startTime,
+      error_type: 'unknown',
     };
     
   } catch (e) {
@@ -406,9 +404,7 @@ Please revise your proposal to address these concerns and submit again.`;
     return {
       success: false,
       error: `Debate orchestration error: ${error}`,
-      usage: totalUsage,
-      provider: config.generator,
-      totalLatencyMs: Date.now() - startTime,
+      error_type: 'unknown',
     };
   }
 }

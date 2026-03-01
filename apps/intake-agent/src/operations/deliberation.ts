@@ -180,7 +180,7 @@ function parseDecisionPoints(content: string, speaker: 'optimist' | 'pessimist')
   let blockMatch: RegExpExecArray | null;
 
   while ((blockMatch = blockRegex.exec(content)) !== null) {
-    const block = blockMatch[1];
+    const block = blockMatch[1] ?? '';
     const get = (field: string) => {
       const m = new RegExp(`^${field}:\\s*(.+?)\\s*$`, 'm').exec(block);
       return m?.[1]?.trim() ?? '';

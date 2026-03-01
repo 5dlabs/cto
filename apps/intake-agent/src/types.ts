@@ -10,21 +10,21 @@
 /**
  * Operation types supported by the agent.
  */
-export type Operation = 
-  | 'parse_prd' 
-  | 'expand_task' 
-  | 'analyze_complexity' 
-  | 'generate' 
+export type Operation =
+  | 'parse_prd'
+  | 'parse_prd_iterative'
+  | 'expand_task'
+  | 'analyze_complexity'
+  | 'generate'
+  | 'generate_prompts'
+  | 'generate_docs'
+  | 'generate_with_debate'
   | 'research'
   | 'research_capabilities'
   | 'generate_with_critic'
   | 'validate_content'
   | 'provider_status'
   | 'deliberate'
-  | 'parse_prd_iterative'
-  | 'generate_prompts'
-  | 'generate_with_debate'
-  | 'generate_docs'
   | 'ping';
 
 /**

@@ -19,6 +19,7 @@ import type {
   AnalyzeComplexityPayload,
   PingData,
   ErrorType,
+  GeneratedTask,
 } from './types';
 import { validateRequest } from './types';
 import { parsePrd } from './operations/parse-prd';
@@ -193,33 +194,7 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
 
     case 'generate_docs': {
       const payload = request.payload as {
-        tasks: Array<{
-          id: number;
-          title: string;
-          description: string;
-          status?: string;
-          priority?: string;
-          dependencies: number[];
-          details?: string;
-          test_strategy?: string;
-          subtasks?: Array<{
-            id: string;
-            title: string;
-            description: string;
-            status?: string;
-            dependencies?: number[];
-            details?: string;
-            test_strategy?: string;
-          }>;
-          decision_points?: Array<{
-            id: string;
-            category: string;
-            description: string;
-            options: string[];
-            requires_approval: boolean;
-            constraint_type: string;
-          }>;
-        }>;
+        tasks: GeneratedTask[];
         base_path: string;
         project_root?: string;
       };
@@ -229,7 +204,7 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
       if (!payload?.base_path) {
         return errorResponse('Missing base_path in payload', 'validation_error');
       }
-      return generateDocs(payload);
+      return generateDocs(payload as unknown as Parameters<typeof generateDocs>[0]) as unknown as AgentResponse<unknown>;
     }
 
     case 'generate_with_debate': {
@@ -256,7 +231,7 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
         userPrompt: payload.user_prompt,
         prefill: payload.prefill,
         context: payload.context,
-        contentType: payload.content_type,
+        contentType: payload.content_type as 'tasks' | 'code' | 'docs' | 'general' | undefined,
         config: payload.config,
       });
     }
@@ -328,6 +303,7 @@ Operations:
   provider_status        Get provider status
   generate_docs          Generate documentation for tasks
   generate_with_debate   Generate with debate pattern
+  deliberate             Run deliberation session on PRD
 
 Options:
   -h, --help             Show this help message
@@ -390,7 +366,7 @@ async function main(): Promise<void> {
     if (!validateRequest(request)) {
       writeStdout(
         errorResponse(
-          'Invalid request structure. Expected { operation: "parse_prd" | "expand_task" | "analyze_complexity" | "generate" | "research" | "research_capabilities" | "generate_docs" | "ping", payload?: {...} }',
+          'Invalid request structure. Expected { operation: "ping" | "parse_prd" | "parse_prd_iterative" | "expand_task" | "analyze_complexity" | "generate" | "generate_prompts" | "generate_docs" | "generate_with_debate" | "generate_with_critic" | "validate_content" | "research" | "research_capabilities" | "provider_status" | "deliberate", payload?: {...} }',
           'validation_error'
         )
       );

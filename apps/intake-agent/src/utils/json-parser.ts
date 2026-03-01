@@ -160,8 +160,8 @@ export async function parseStreamingJson<T>(
   
   const parser = new JSONParser({ paths: [config.jsonPath] });
   
-  parser.onValue = (value: { value: unknown }) => {
-    const item = value.value || value;
+  parser.onValue = (value: { value?: unknown }) => {
+    const item = value.value ?? value;
     if (!config.itemValidator || config.itemValidator(item as T)) {
       items.push(item as T);
       config.onProgress?.(item as T, items.length);

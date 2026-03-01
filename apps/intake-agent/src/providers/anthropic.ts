@@ -23,11 +23,6 @@ const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 const API_KEY_ENV = 'ANTHROPIC_API_KEY';
 
 /**
- * Default timeout for API requests (5 minutes).
- */
-const DEFAULT_TIMEOUT_MS = 300_000;
-
-/**
  * Anthropic-compatible message format.
  */
 interface AnthropicMessage {
@@ -159,7 +154,7 @@ export class AnthropicProvider implements ModelProvider {
         };
       }
       
-      const data: AnthropicResponse = await response.json();
+      const data = await response.json() as AnthropicResponse;
       
       const responseText = data.content
         .filter(block => block.type === 'text')

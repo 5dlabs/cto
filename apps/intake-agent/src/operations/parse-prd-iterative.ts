@@ -140,7 +140,7 @@ async function generateServiceTasks(
     }
   }
 
-  const result = parseJsonResponse<GeneratedTask>(responseText, 'tasks', isValidTask);
+  const result = parseJsonResponse<GeneratedTask>(responseText, 'tasks', isValidTask as (item: unknown) => item is GeneratedTask);
   
   if (!result.success) {
     logger.warn(`Failed to parse tasks for ${service.name}`, { error: result.error });
@@ -163,7 +163,7 @@ function extractServices(prd: StructuredPrd): ServiceContext[] {
   for (const [name] of Object.entries(prd.tech_stack)) {
     reqMap[name] = (prd.requirements || []).filter(r => 
       r.toLowerCase().includes(name.replace('_', ' ')) ||
-      r.toLowerCase().includes(prd.tech_stack![name].agent?.toLowerCase() || '')
+      r.toLowerCase().includes(prd.tech_stack![name]?.agent?.toLowerCase() ?? '')
     );
   }
 

@@ -156,12 +156,12 @@ class ClaudeSdkProvider implements ModelProvider {
   async generate(
     prompt: string,
     systemPrompt: string,
-    options?: ProviderOptions,
+    _options?: ProviderOptions,
     model?: string
   ): Promise<ProviderResponse> {
     const startTime = Date.now();
     const actualModel = model || this.defaultModel;
-    
+
     try {
       const cliPath = this.cliPath || getClaudeCliOrThrow();
       this.cliPath = cliPath;

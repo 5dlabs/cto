@@ -18,7 +18,7 @@ import type {
 } from '../types';
 import { getClaudeCliOrThrow } from '../cli-finder';
 import { parseJsonResponse, isValidTask } from '../utils/json-parser';
-import { createLogger, createTimer } from '../utils/logger';
+import { createLogger } from '../utils/logger';
 import { withTimeout, Timeouts } from '../utils/timeout';
 
 const logger = createLogger('parse-prd');
@@ -188,8 +188,6 @@ export async function parsePrd(
   const cliPath = getClaudeCliOrThrow();
   logger.debug('Using Claude CLI', { path: cliPath });
   
-  const timer = createTimer('parse-prd', logger);
-
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     logger.info(`Attempt ${attempt + 1}/${MAX_RETRIES}`);
     const attemptStart = Date.now();
@@ -257,7 +255,7 @@ export async function parsePrd(
 
       // Parse and validate with robust JSON parser
       logger.debug('Parsing JSON response');
-      const parseResult = parseJsonResponse<GeneratedTask>(responseText, 'tasks', isValidTask);
+      const parseResult = parseJsonResponse<GeneratedTask>(responseText, 'tasks', isValidTask as (item: unknown) => item is GeneratedTask);
 
       if (!parseResult.success) {
         lastError = parseResult.error;

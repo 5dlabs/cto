@@ -20,7 +20,7 @@ import {
   buildRefinerPrompt,
   REFINER_SYSTEM_PROMPT,
 } from '../prompts/critic-templates';
-import { createLogger, createTimer, logSeparator } from '../utils/logger';
+import { createLogger, logSeparator } from '../utils/logger';
 
 const logger = createLogger('multi-model');
 

@@ -43,7 +43,7 @@ export interface GeneratePromptsData {
 function extractAgent(title: string): { agent: string; stack: string } {
   const match = title.match(/\((\w+)\s*-\s*([^)]+)\)/);
   if (match) {
-    return { agent: match[1].toLowerCase(), stack: match[2] };
+    return { agent: (match[1] ?? 'unknown').toLowerCase(), stack: match[2] ?? 'unknown' };
   }
   return { agent: 'unknown', stack: 'unknown' };
 }
@@ -74,10 +74,10 @@ ${task.dependencies.length > 0 ? task.dependencies.map(d => `- Task ${d}`).join(
 ${task.details || 'See acceptance criteria.'}
 
 ## Decision Points
-${formatDecisionPoints(task.decision_points || task.decisionPoints)}
+${formatDecisionPoints(task.decision_points)}
 
 ## Acceptance Criteria
-${task.test_strategy || task.testStrategy || 'To be defined.'}
+${task.test_strategy || 'To be defined.'}
 
 ---
 *Project: ${projectName}*
@@ -112,11 +112,11 @@ function generateTaskPromptXml(task: GeneratedTask, projectName: string): string
   </implementation>
   
   <decision_points>
-    ${formatDecisionPointsXml(task.decision_points || task.decisionPoints)}
+    ${formatDecisionPointsXml(task.decision_points)}
   </decision_points>
-  
+
   <acceptance_criteria>
-    ${escapeXml(task.test_strategy || task.testStrategy || '')}
+    ${escapeXml(task.test_strategy || '')}
   </acceptance_criteria>
 </task>
 `;
@@ -126,7 +126,7 @@ function generateTaskPromptXml(task: GeneratedTask, projectName: string): string
  * Generate acceptance criteria markdown.
  */
 function generateAcceptanceMd(task: GeneratedTask): string {
-  const criteria = task.test_strategy || task.testStrategy || '';
+  const criteria = task.test_strategy || '';
   const criteriaList = criteria.split(/[,;]/).map(c => c.trim()).filter(c => c);
   
   return `# Acceptance Criteria - Task ${task.id}
@@ -140,14 +140,14 @@ ${criteriaList.length > 0
     : '- To be defined'}
 
 ## Decision Points Requiring Resolution
-${formatDecisionPointsForAcceptance(task.decision_points || task.decisionPoints)}
+${formatDecisionPointsForAcceptance(task.decision_points)}
 
 ## Definition of Done
 - [ ] All acceptance criteria met
 - [ ] Tests passing
 - [ ] Code reviewed
 - [ ] Documentation updated
-${((task.decision_points || task.decisionPoints) || []).filter(d => d.requires_approval || d.requiresApproval).map(d => 
+${(task.decision_points || []).filter(d => d.requires_approval).map(d =>
     `- [ ] Decision "${d.id}" approved: ${d.description}`
   ).join('\n')}
 `;
@@ -160,8 +160,8 @@ function formatDecisionPoints(points?: DecisionPoint[]): string {
   if (!points || points.length === 0) return 'None';
   
   return points.map(p => {
-    const approval = (p.requires_approval || p.requiresApproval) ? '⚠️ **Requires Approval**' : '';
-    const constraint = p.constraint_type || p.constraintType || 'open';
+    const approval = p.requires_approval ? '⚠️ **Requires Approval**' : '';
+    const constraint = p.constraint_type || 'open';
     return `### ${p.id}: ${p.description}
 - **Category**: ${p.category}
 - **Constraint**: ${constraint}
@@ -177,8 +177,8 @@ function formatDecisionPointsXml(points?: DecisionPoint[]): string {
   if (!points || points.length === 0) return '';
   
   return points.map(p => {
-    const constraint = p.constraint_type || p.constraintType || 'open';
-    const approval = p.requires_approval || p.requiresApproval || false;
+    const constraint = p.constraint_type || 'open';
+    const approval = p.requires_approval || false;
     return `<decision id="${p.id}" category="${p.category}" constraint="${constraint}" requires_approval="${approval}">
       <description>${escapeXml(p.description)}</description>
       <options>
@@ -194,8 +194,8 @@ function formatDecisionPointsXml(points?: DecisionPoint[]): string {
 function formatDecisionPointsForAcceptance(points?: DecisionPoint[]): string {
   if (!points || points.length === 0) return 'None';
   
-  const hardConstraints = points.filter(p => (p.constraint_type || p.constraintType) === 'hard');
-  const approvalRequired = points.filter(p => p.requires_approval || p.requiresApproval);
+  const hardConstraints = points.filter(p => p.constraint_type === 'hard');
+  const approvalRequired = points.filter(p => p.requires_approval);
   
   let result = '';
   
@@ -235,7 +235,7 @@ function generateSubtaskPromptMd(subtask: GeneratedSubtask, parentTaskId: number
 Task ${parentTaskId}
 
 ## Subagent Type
-${subtask.subagent_type || subtask.subagentType || 'implementer'}
+${subtask.subagent_type || 'implementer'}
 
 ## Parallelizable
 ${subtask.parallelizable ? 'Yes - can run concurrently' : 'No - must wait for dependencies'}
@@ -250,7 +250,7 @@ ${subtask.dependencies.length > 0 ? subtask.dependencies.map(d => `- Subtask ${p
 ${subtask.details || 'See parent task.'}
 
 ## Test Strategy
-${subtask.test_strategy || subtask.testStrategy || 'See parent task acceptance criteria.'}
+${subtask.test_strategy || 'See parent task acceptance criteria.'}
 
 ---
 *Project: ${projectName}*
