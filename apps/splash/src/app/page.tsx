@@ -1,3 +1,4 @@
+import type React from "react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { VentureGrid, type Venture } from "@/components/venture-card";
@@ -67,25 +68,25 @@ export default function Home() {
         {/* Hero Section */}
         <section className="min-h-screen flex flex-col items-center justify-center px-6 py-20 pt-24">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8 scale-fade-in stagger" style={{ "--delay": "0ms" } as React.CSSProperties}>
               <span className="text-sm text-cyan font-semibold tracking-wide">
                 Agentic &middot; Fully Autonomous &middot; On-Chain
               </span>
             </div>
 
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 fade-in-up stagger" style={{ "--delay": "100ms" } as React.CSSProperties}>
               <span className="gradient-text glow-text-cyan">Build in Parallel.</span>
               <br />
               <span className="text-foreground">Fail Fast. Double Down.</span>
             </h1>
 
-            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10">
+            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in-up stagger" style={{ "--delay": "200ms" } as React.CSSProperties}>
               5D Labs is a startup studio that leverages OpenClaw and autonomous
               AI agents to validate many ideas simultaneously — transcending the
               old &ldquo;pivot or perish&rdquo; model.
             </p>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16 fade-in-up stagger" style={{ "--delay": "300ms" } as React.CSSProperties}>
               <a
                 href="https://cto.5dlabs.ai"
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
@@ -100,7 +101,7 @@ export default function Home() {
               </a>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
+            <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground fade-in-up stagger" style={{ "--delay": "400ms" } as React.CSSProperties}>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">5+</span>
                 <span>ventures in flight</span>
