@@ -211,6 +211,11 @@ export async function expandTask(
         }
       }
 
+      // Accumulate token usage across all attempts
+      finalUsage.input_tokens += usage.input_tokens;
+      finalUsage.output_tokens += usage.output_tokens;
+      finalUsage.total_tokens += usage.total_tokens;
+
       lastResponseText = responseText;
 
       // Handle both cases:
@@ -251,7 +256,6 @@ export async function expandTask(
 
       // Parse succeeded, capture and break
       finalResult = result;
-      finalUsage = usage;
       break;
     } // end retry loop
 
