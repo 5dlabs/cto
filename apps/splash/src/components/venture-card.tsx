@@ -25,7 +25,7 @@ export function VentureCard({ venture }: VentureCardProps) {
   const status = statusConfig[venture.status];
 
   const card = (
-    <div className="group cursor-pointer reveal-on-scroll">
+    <div className="group cursor-pointer">
       <div
         className={cn(
           "relative p-6 rounded-xl",

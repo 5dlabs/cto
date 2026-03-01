@@ -213,7 +213,7 @@ export default function ConsultingPage() {
         <section className="py-20 px-6">
           <div className="max-w-4xl mx-auto text-center">
             <div
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8 fade-in-up"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8"
             >
               <span className="text-sm text-cyan font-semibold tracking-wide">
                 Available for Engagements
@@ -221,7 +221,7 @@ export default function ConsultingPage() {
             </div>
 
             <h1
-              className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-6 fade-in-up"
+              className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-6"
             >
               <span className="gradient-text glow-text-cyan">AI, Blockchain &</span>
               <br />
@@ -229,14 +229,14 @@ export default function ConsultingPage() {
             </h1>
 
             <p
-              className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in-up"
+              className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10"
             >
               From multi-agent AI platforms to Solana trading systems to bare-metal
               Kubernetes &mdash; hands-on expertise from someone who builds it daily.
             </p>
 
             <div
-              className="flex flex-col sm:flex-row justify-center gap-4 fade-in-up"
+              className="flex flex-col sm:flex-row justify-center gap-4"
             >
               <a
                 href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
@@ -254,7 +254,7 @@ export default function ConsultingPage() {
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
             <div
-              className="text-center mb-16 reveal-on-scroll"
+              className="text-center mb-16"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 What I <span className="gradient-text">Bring</span>
@@ -272,7 +272,7 @@ export default function ConsultingPage() {
                 return (
                   <div
                     key={item.title}
-                    className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll"
+                    className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
                   >
                     <div
                       className={`w-14 h-14 rounded-full ${colors.bg} flex items-center justify-center mb-4`}
@@ -294,7 +294,7 @@ export default function ConsultingPage() {
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
             <div
-              className="text-center mb-16 reveal-on-scroll"
+              className="text-center mb-16"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 <span className="gradient-text">Engagement</span> Options
@@ -309,7 +309,7 @@ export default function ConsultingPage() {
               {rates.map((rate, i) => (
                 <div
                   key={rate.name}
-                  className={`p-6 rounded-xl border backdrop-blur-sm relative reveal-on-scroll ${
+                  className={`p-6 rounded-xl border backdrop-blur-sm relative ${
                     rate.recommended
                       ? "border-cyan/40 bg-cyan/5"
                       : "border-border/50 bg-card/30"
@@ -337,7 +337,7 @@ export default function ConsultingPage() {
             </div>
 
             <p
-              className="text-center text-sm text-muted-foreground mt-8 reveal-on-scroll"
+              className="text-center text-sm text-muted-foreground mt-8"
             >
               All rates quoted in USD. Payment accepted via wire transfer, ACH,
               or major credit card.
@@ -349,7 +349,7 @@ export default function ConsultingPage() {
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
             <div
-              className="text-center mb-16 reveal-on-scroll"
+              className="text-center mb-16"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Sample <span className="gradient-text">Engagement</span>
@@ -364,7 +364,7 @@ export default function ConsultingPage() {
               {phases.map((phase, i) => (
                 <div
                   key={phase.title}
-                  className="flex gap-6 items-start reveal-on-scroll"
+                  className="flex gap-6 items-start"
                 >
                   <div className="shrink-0 w-20 text-center">
                     <div className="text-xs font-semibold text-cyan uppercase tracking-wider">
@@ -382,7 +382,7 @@ export default function ConsultingPage() {
             </div>
 
             <div
-              className="text-center mt-10 p-4 rounded-lg border border-border/30 bg-card/20 reveal-on-scroll"
+              className="text-center mt-10 p-4 rounded-lg border border-border/30 bg-card/20"
             >
               <p className="text-muted-foreground">
                 Estimated investment:{" "}
@@ -399,7 +399,7 @@ export default function ConsultingPage() {
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
             <div
-              className="text-center mb-16 reveal-on-scroll"
+              className="text-center mb-16"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Track <span className="gradient-text">Record</span>
@@ -410,7 +410,7 @@ export default function ConsultingPage() {
               {stats.map((stat, i) => (
                 <div
                   key={stat.label}
-                  className="text-center p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll"
+                  className="text-center p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
                 >
                   <div className="text-3xl font-bold gradient-text mb-2">
                     {stat.value}
@@ -426,7 +426,7 @@ export default function ConsultingPage() {
         {/* CTA */}
         <section className="py-20 px-6 border-t border-border/30">
           <div
-            className="max-w-2xl mx-auto text-center reveal-on-scroll"
+            className="max-w-2xl mx-auto text-center"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Ready to <span className="gradient-text">Get Started</span>?

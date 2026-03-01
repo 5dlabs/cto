@@ -24,7 +24,7 @@ interface AgentCardProps {
 
 export function AgentCard({ agent }: AgentCardProps) {
   return (
-    <div className="group cursor-pointer reveal-on-scroll">
+    <div className="group cursor-pointer">
       <div
         className={cn(
           "relative flex items-center gap-5 p-5 rounded-xl",
@@ -92,7 +92,7 @@ export function AgentGrid({ squads }: AgentGridProps) {
   return (
     <div className="space-y-8">
       {squads.map((squad, squadIndex) => (
-        <div key={squad.title} className="reveal-on-scroll">
+        <div key={squad.title}>
           <div className="flex items-center gap-3 mb-4">
             <span className="text-xl">{squad.emoji}</span>
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">

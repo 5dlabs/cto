@@ -83,7 +83,7 @@ export default function InvestorsPage() {
         {/* Hero */}
         <section className="py-20 px-6">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="fade-in-up">
+            <div>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
                 <span className="text-sm text-cyan font-medium">
@@ -112,7 +112,7 @@ export default function InvestorsPage() {
               {highlights.map((item, i) => (
                 <div
                   key={item.label}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll"
+                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
                 >
                   <p className="text-3xl font-bold gradient-text mb-1">
                     {item.metric}
@@ -132,7 +132,7 @@ export default function InvestorsPage() {
         {/* Mission */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <div className="reveal-on-scroll">
+            <div>
               <h2 className="text-3xl sm:text-4xl font-bold mb-8 text-center">
                 The <span className="gradient-text">Opportunity</span>
               </h2>
@@ -166,7 +166,7 @@ export default function InvestorsPage() {
         {/* Differentiators */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16 reveal-on-scroll">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Why <span className="gradient-text">5D Labs</span>
               </h2>
@@ -180,7 +180,7 @@ export default function InvestorsPage() {
               {differentiators.map((item, i) => (
                 <div
                   key={item.title}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll"
+                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
                 >
                   <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4 text-cyan">
                     {item.icon}
@@ -198,14 +198,14 @@ export default function InvestorsPage() {
         {/* Ventures Overview */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12 reveal-on-scroll">
+            <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Current <span className="gradient-text">Portfolio</span>
               </h2>
             </div>
 
             <div className="space-y-6">
-              <div className="p-8 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-8 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">CTO</h3>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
@@ -232,7 +232,7 @@ export default function InvestorsPage() {
                 </a>
               </div>
 
-              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">Agentic Trading</h3>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
@@ -252,7 +252,7 @@ export default function InvestorsPage() {
                 </p>
               </div>
 
-              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">OpenClaw Platform</h3>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
@@ -280,7 +280,7 @@ export default function InvestorsPage() {
                 </a>
               </div>
 
-              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">Sanctuary</h3>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
@@ -304,7 +304,7 @@ export default function InvestorsPage() {
 
         {/* Investor Interest + CTA */}
         <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-2xl mx-auto reveal-on-scroll">
+          <div className="max-w-2xl mx-auto">
             <WaitlistForm
               source="investor"
               heading="Stay Updated on Our Raise"
