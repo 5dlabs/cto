@@ -11,15 +11,15 @@ export function GridPulse() {
     <>
       <div
         className="fixed inset-0 pointer-events-none overflow-hidden z-[5]"
-        style={{ contain: "layout style paint", isolation: "isolate", opacity: 0.62 }}
+        style={{ contain: "layout style paint", isolation: "isolate", opacity: 0.45 }}
       >
         {/* Drifting grid — cyan horizontal, purple vertical */}
         <div
           className="absolute -inset-20"
           style={{
             backgroundImage: `
-              linear-gradient(oklch(0.8 0.18 195 / 0.16) 1px, transparent 1px),
-              linear-gradient(90deg, oklch(0.75 0.18 300 / 0.12) 1px, transparent 1px)
+              linear-gradient(oklch(0.7 0.15 195 / 0.12) 1px, transparent 1px),
+              linear-gradient(90deg, oklch(0.65 0.15 300 / 0.09) 1px, transparent 1px)
             `,
             backgroundSize: "60px 60px",
             willChange: "transform",
@@ -29,7 +29,7 @@ export function GridPulse() {
         {/* Wandering node glows — vivid, transform-only animation */}
         {Array.from({ length: 6 }, (_, i) => {
           const hue = hues[i % 2];
-          const opacity = 0.12 + seededValue(i * 3 + 2) * 0.12;
+          const opacity = 0.08 + seededValue(i * 3 + 2) * 0.08;
           return (
             <div
               key={`node-${i}`}
@@ -39,7 +39,7 @@ export function GridPulse() {
                 top: `${seededValue(i * 3 + 1) * 100}%`,
                 width: "400px",
                 height: "400px",
-                background: `radial-gradient(circle, oklch(0.75 0.22 ${hue} / ${opacity}), transparent 70%)`,
+                background: `radial-gradient(circle, oklch(0.65 0.18 ${hue} / ${opacity}), transparent 70%)`,
                 willChange: "transform",
                 animation: `grid-node-wander-${i % 4} ${12 + i * 2}s ease-in-out ${i * 1}s infinite alternate`,
               }}
@@ -56,7 +56,7 @@ export function GridPulse() {
               style={{
                 top: `${15 + i * 18}%`,
                 height: "1px",
-                background: `linear-gradient(90deg, transparent, oklch(0.8 0.2 ${hue} / 0.3), transparent)`,
+                background: `linear-gradient(90deg, transparent, oklch(0.7 0.17 ${hue} / 0.2), transparent)`,
                 willChange: "transform",
                 animation: `grid-energy-h ${3 + seededValue(i * 7) * 2}s ease-in-out ${i * 1.5}s infinite`,
               }}
@@ -73,7 +73,7 @@ export function GridPulse() {
               style={{
                 left: `${12 + i * 22}%`,
                 width: "1px",
-                background: `linear-gradient(180deg, transparent, oklch(0.8 0.2 ${hue} / 0.27), transparent)`,
+                background: `linear-gradient(180deg, transparent, oklch(0.7 0.17 ${hue} / 0.18), transparent)`,
                 willChange: "transform",
                 animation: `grid-energy-v ${3.5 + seededValue(i * 9) * 2}s ease-in-out ${i * 2}s infinite`,
               }}
@@ -96,7 +96,7 @@ export function GridPulse() {
           style={{
             top: "34%",
             height: "1px",
-            background: "linear-gradient(90deg, transparent, oklch(0.82 0.2 195 / 0.35), transparent)",
+            background: "linear-gradient(90deg, transparent, oklch(0.7 0.17 195 / 0.25), transparent)",
             willChange: "transform",
             animation: "grid-energy-h 8.5s ease-in-out 0.5s infinite",
           }}
@@ -106,7 +106,7 @@ export function GridPulse() {
           style={{
             left: "62%",
             width: "1px",
-            background: "linear-gradient(180deg, transparent, oklch(0.76 0.2 300 / 0.3), transparent)",
+            background: "linear-gradient(180deg, transparent, oklch(0.65 0.17 300 / 0.2), transparent)",
             willChange: "transform",
             animation: "grid-energy-v 9.25s ease-in-out 1.2s infinite",
           }}
