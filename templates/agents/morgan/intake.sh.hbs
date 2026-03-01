@@ -268,6 +268,7 @@ echo "🚀 Running intake workflow..."
 # Clean workspace subdir to prevent stale artifacts from previous retries
 if [ -d "${WORKSPACE_DIR}" ]; then
     echo "  🧹 Cleaning previous workspace at ${WORKSPACE_DIR}"
+    chmod -R 777 "${WORKSPACE_DIR}" 2>/dev/null || true
     rm -rf "${WORKSPACE_DIR}" 2>/dev/null || {
         find "${WORKSPACE_DIR}" -mindepth 1 -delete 2>/dev/null || true
     }
