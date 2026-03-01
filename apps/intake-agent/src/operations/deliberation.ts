@@ -28,6 +28,36 @@ import type {
 import type { AgentResponse, TokenUsage } from '../types';
 
 // =============================================================================
+// Discord Reporting
+// =============================================================================
+
+const DISCORD_CHANNEL_ID = '1473310690067353682'; // #e2e-testing
+
+/**
+ * Post a message to the Discord #e2e-testing channel.
+ * Silently skips if DISCORD_BOT_TOKEN is not configured.
+ *
+ * TODO: DISCORD_BOT_TOKEN must be added to the CodeRun pod secret so it is
+ *       available as process.env.DISCORD_BOT_TOKEN at runtime.
+ */
+async function postToDiscord(content: string): Promise<void> {
+  const token = process.env['DISCORD_BOT_TOKEN'];
+  if (!token) return;
+  try {
+    await fetch(`https://discord.com/api/v10/channels/${DISCORD_CHANNEL_ID}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content }),
+    });
+  } catch (e) {
+    console.error('[DISCORD] Failed to post:', e);
+  }
+}
+
+// =============================================================================
 // Constants
 // =============================================================================
 
@@ -485,16 +515,22 @@ export async function runDeliberation(
   // Publish one deliberation_start message to the room — both optimist and
   // pessimist receive it since they both subscribe to deliberation.room.
   // Send deliberation_start to each debate agent's inbox using AgentMessage format
-  const startPayload = {
-    type: 'deliberation_start',
-    session_id: sessionId,
-    prd_content: payload.prd_content,
-    infrastructure_context: payload.infrastructure_context ?? '',
-    timebox_minutes: payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES,
-  };
-  await Promise.all(['optimist', 'pessimist'].map(id =>
-    publishToAgent(nats, id, { ...startPayload, to: id })
-  ));
+  await postToDiscord(
+    `🏛️ **Deliberation started** — session \`${sessionId}\`\n📋 PRD: ${payload.prd_content.slice(0, 200)}...`
+  );
+
+  await Promise.all(['optimist', 'pessimist'].map(id => {
+    const agentId = id as 'optimist' | 'pessimist';
+    const startPayload = {
+      type: 'deliberation_start',
+      session_id: sessionId,
+      prd_content: payload.prd_content,
+      infrastructure_context: payload.infrastructure_context ?? '',
+      timebox_minutes: payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES,
+      research_memo: payload.research_memos?.[agentId] ?? '',
+    };
+    return publishToAgent(nats, agentId, { ...startPayload, to: agentId });
+  }));
 
   // ─── Step 2: Debate loop ─────────────────────────────────────────────────
   let lastSpeaker: 'optimist' | 'pessimist' = 'pessimist'; // optimist goes first
@@ -587,10 +623,16 @@ export async function runDeliberation(
       }),
     });
 
+    // Report debate turn to Discord
+    await postToDiscord(
+      `🗣️ **${nextSpeaker.toUpperCase()}** (Turn ${turnCount}):\n${responseContent.slice(0, 1800)}`
+    );
+
     // Register newly raised decision points and track positions
     for (const dp of newDPs) {
       console.error(`[DELIBERATION] Decision point raised: ${dp.id} by ${nextSpeaker}`);
       pendingDecisionPoints.set(dp.id, dp);
+      await postToDiscord(`⚖️ **DECISION POINT ${dp.id}** raised by ${nextSpeaker}:\n> ${dp.question}`);
 
       if (nextSpeaker === 'optimist') {
         optimistPositions.set(dp.id, dp.proposingOption);
@@ -624,6 +666,11 @@ export async function runDeliberation(
           payload.prd_content, committeeIds, voteTimeoutSeconds
         );
         resolvedDecisionPoints.push(resolved);
+
+        // Report vote result to Discord
+        await postToDiscord(
+          `${resolved.escalated ? '🟡' : '✅'} **Vote on ${resolved.id}**: ${resolved.winning_option ?? 'ESCALATED (tie)'} — ${Object.entries(resolved.vote_tally).map(([k, v]) => `${k}: ${v}`).join(', ')}`
+        );
 
         // Announce vote result to the room
         try {
@@ -729,6 +776,10 @@ export async function runDeliberation(
     `[DELIBERATION] Session ${sessionId} complete: ${deliberationStatus}, ` +
     `${turnCount} turns, ${resolvedDecisionPoints.length} decisions, ` +
     `${Math.round((Date.now() - startTime) / 1000)}s elapsed`
+  );
+
+  await postToDiscord(
+    `🎯 **Deliberation complete** — Status: ${deliberationStatus}\n${designBrief.slice(0, 1800)}`
   );
 
   return {

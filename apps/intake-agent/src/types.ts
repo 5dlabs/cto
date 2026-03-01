@@ -25,6 +25,7 @@ export type Operation =
   | 'validate_content'
   | 'provider_status'
   | 'deliberate'
+  | 'prd_research'
   | 'ping';
 
 /**
@@ -343,6 +344,7 @@ export function validateRequest(request: unknown): request is AgentRequest {
       'generate_docs',
       'provider_status',
       'deliberate',
+      'prd_research',
       'ping',
     ].includes(req['operation'] as string)
   );
@@ -351,6 +353,16 @@ export function validateRequest(request: unknown): request is AgentRequest {
 // =============================================================================
 // Deliberation Types
 // =============================================================================
+
+/**
+ * Research memos produced by the prd_research operation.
+ */
+export interface ResearchMemos {
+  /** Evidence for what's proven and working in the ecosystem */
+  optimist: string;
+  /** Known failure modes and operational risks */
+  pessimist: string;
+}
 
 /**
  * Payload for the deliberate operation.
@@ -368,6 +380,8 @@ export interface DeliberatePayload {
   committee_ids?: string[];
   /** Seconds to wait for each committee vote before marking abstain */
   vote_timeout_seconds?: number;
+  /** Pre-debate research memos from Tavily (optimist = best practices, pessimist = failure modes) */
+  research_memos?: ResearchMemos;
 }
 
 /**
