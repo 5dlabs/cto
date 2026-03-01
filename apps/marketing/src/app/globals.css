@@ -147,6 +147,50 @@
   animation: rain linear infinite;
 }
 
+/* Grid Pulse background keyframes */
+@keyframes grid-breathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+@keyframes grid-drift {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(60px, 60px); }
+}
+@keyframes grid-node-wander-0 {
+  0% { transform: translate(0, 0) scale(0.8); opacity: 0.3; }
+  50% { transform: translate(80px, -60px) scale(1.1); opacity: 0.9; }
+  100% { transform: translate(-40px, 50px) scale(0.9); opacity: 0.5; }
+}
+@keyframes grid-node-wander-1 {
+  0% { transform: translate(0, 0) scale(0.9); opacity: 0.4; }
+  50% { transform: translate(-70px, 40px) scale(1.2); opacity: 1; }
+  100% { transform: translate(60px, -30px) scale(0.8); opacity: 0.3; }
+}
+@keyframes grid-node-wander-2 {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  50% { transform: translate(50px, 70px) scale(0.8); opacity: 0.3; }
+  100% { transform: translate(-60px, -50px) scale(1.15); opacity: 0.9; }
+}
+@keyframes grid-node-wander-3 {
+  0% { transform: translate(0, 0) scale(0.85); opacity: 0.35; }
+  50% { transform: translate(-50px, -60px) scale(1.1); opacity: 0.85; }
+  100% { transform: translate(70px, 40px) scale(0.95); opacity: 0.5; }
+}
+@keyframes grid-energy-h {
+  0%, 100% { opacity: 0; transform: scaleX(0.1) translateX(-100%); }
+  15% { opacity: 1; }
+  50% { transform: scaleX(0.3) translateX(0%); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: scaleX(0.1) translateX(100%); }
+}
+@keyframes grid-energy-v {
+  0%, 100% { opacity: 0; transform: scaleY(0.1) translateY(-100%); }
+  15% { opacity: 1; }
+  50% { transform: scaleY(0.3) translateY(0%); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: scaleY(0.1) translateY(100%); }
+}
+
 /* Circuit pattern background */
 .circuit-bg {
   background-image: 

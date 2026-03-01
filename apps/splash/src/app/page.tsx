@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { RainEffect } from "@/components/rain-effect";
+import { GridPulse } from "@/components/grid-pulse";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { VentureGrid, type Venture } from "@/components/venture-card";
@@ -63,7 +63,7 @@ export default function Home() {
       {/* Background layers */}
       <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
       <div className="fixed inset-0 circuit-bg z-0" />
-      <RainEffect />
+      <GridPulse />
       <div className="fixed inset-0 noise-overlay z-0" />
 
       {/* Header */}

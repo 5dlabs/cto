@@ -366,6 +366,34 @@ tunnel-status:
     @nslookup pm-dev.5dlabs.ai | grep -A 2 "Name:" || echo "DNS not resolving"
 
 # =============================================================================
+# Deploy sites to Cloudflare Pages (1Password for API token)
+# =============================================================================
+
+# Deploy splash site (5dlabs.ai) — token from 1Password "CloudFlare API" / automation store
+deploy-splash:
+    #!/usr/bin/env bash
+    set -e
+    echo "Fetching Cloudflare API token from 1Password..."
+    export CLOUDFLARE_API_TOKEN=$(op item get "yljt57qq5vo5eocnb4fl6epf3q" --fields credential --reveal 2>/dev/null || op item get "CloudFlare API" --vault OnePass --fields credential --reveal 2>/dev/null || op item get "CloudFlare API" --vault Automation --fields credential --reveal 2>/dev/null || op item get "CloudFlare API" --fields credential --reveal)
+    echo "Building splash..."
+    cd apps/splash && npm run build
+    echo "Deploying to Cloudflare Pages (5dlabs-splash)..."
+    npx wrangler pages deploy out --project-name=5dlabs-splash
+    echo "✅ Splash deployed (5dlabs.ai)"
+
+# Deploy marketing site (cto.5dlabs.ai) — token from 1Password "CloudFlare API" / automation store
+deploy-marketing:
+    #!/usr/bin/env bash
+    set -e
+    echo "Fetching Cloudflare API token from 1Password..."
+    export CLOUDFLARE_API_TOKEN=$(op item get "yljt57qq5vo5eocnb4fl6epf3q" --fields credential --reveal 2>/dev/null || op item get "CloudFlare API" --vault OnePass --fields credential --reveal 2>/dev/null || op item get "CloudFlare API" --vault Automation --fields credential --reveal 2>/dev/null || op item get "CloudFlare API" --fields credential --reveal)
+    echo "Building marketing..."
+    cd apps/marketing && npm run build
+    echo "Deploying to Cloudflare Pages (cto-marketing)..."
+    npx wrangler pages deploy out --project-name=cto-marketing
+    echo "✅ Marketing deployed (cto.5dlabs.ai)"
+
+# =============================================================================
 # Cluster Management (for local dev)
 # =============================================================================
 
