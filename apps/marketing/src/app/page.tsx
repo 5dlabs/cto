@@ -1,3 +1,4 @@
+import type React from "react";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { AgentGrid, type AgentSquad } from "@/components/agent-card";
 import { Header } from "@/components/header";
@@ -158,7 +159,7 @@ export default function Home() {
         <section id="hero" className="min-h-screen flex flex-col items-center justify-center px-6 py-20 pt-24">
           <div className="max-w-4xl mx-auto text-center">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8 scale-fade-in stagger" style={{ "--delay": "0ms" } as React.CSSProperties}>
               <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
               <span className="text-sm text-cyan font-medium">
                 From PRD to Production — Autonomously
@@ -166,19 +167,19 @@ export default function Home() {
             </div>
 
             {/* Headline - LCP element, must be visible immediately */}
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 fade-in-up stagger" style={{ "--delay": "100ms" } as React.CSSProperties}>
               <span className="gradient-text glow-text-cyan">Your Engineering Team</span>
               <br />
               <span className="text-foreground">Lives Here</span>
             </h1>
 
             {/* Subheadline */}
-            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10">
+            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in-up stagger" style={{ "--delay": "200ms" } as React.CSSProperties}>
               Thirteen specialized AI agents that ship complete features. From requirements to deployed code—automatically.
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16 fade-in-up stagger" style={{ "--delay": "300ms" } as React.CSSProperties}>
               {featureFlags.showStartNowButton && (
                 <a
                   href="https://app.5dlabs.ai"
@@ -191,7 +192,7 @@ export default function Home() {
             </div>
 
             {/* Stats */}
-            <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
+            <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground fade-in-up stagger" style={{ "--delay": "400ms" } as React.CSSProperties}>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">60-80%</span>
                 <span>cost savings vs cloud</span>

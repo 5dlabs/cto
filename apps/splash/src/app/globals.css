@@ -452,17 +452,21 @@
   }
 }
 
-/* === Entrance animations (replace Framer Motion) === */
+/* === Entrance animations === */
 
 @keyframes fade-in-up-kf {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-down-kf {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-fade-in-kf {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 @keyframes scroll-bounce-kf {
@@ -470,16 +474,41 @@
   50% { transform: translateY(6px); }
 }
 
+@keyframes reveal-up-kf {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .fade-in-up {
-  animation: fade-in-up-kf 0.8s ease-out both;
+  animation: fade-in-up-kf 0.7s ease-out both;
+}
+
+.fade-in-down {
+  animation: fade-in-down-kf 0.6s ease-out both;
+}
+
+.scale-fade-in {
+  animation: scale-fade-in-kf 0.5s ease-out both;
 }
 
 .scroll-bounce {
   animation: scroll-bounce-kf 3s ease-in-out infinite;
 }
 
+/* Stagger delays via CSS custom property --delay (default 0) */
+.stagger { animation-delay: var(--delay, 0ms); }
+
+/* Scroll-triggered reveal: visible by default, animates when supported */
 .reveal-on-scroll {
   opacity: 1;
+}
+
+@supports (animation-timeline: view()) {
+  .reveal-on-scroll {
+    animation: reveal-up-kf 0.6s ease-out both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 30%;
+  }
 }
 
 @keyframes shimmer {
