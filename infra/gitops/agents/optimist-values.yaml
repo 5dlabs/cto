@@ -10,7 +10,7 @@ agent:
   id: "optimist"
   name: "Optimist"
   model: "bedrock/us.anthropic.claude-opus-4-6-v1:0"
-  heartbeat: "500h"  # effectively off — ~3 weeks, avoids 32-bit setTimeout overflow
+  heartbeat: "30s"  # responsive to NATS messages; requestHeartbeatNow not available, need periodic poll
   sandbox: "off"
   fallbacks:
     - "anthropic/claude-sonnet-4-6"

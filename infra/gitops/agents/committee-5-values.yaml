@@ -10,7 +10,7 @@ agent:
   id: "committee-5"
   name: "Committee-5"
   model: "openai/gpt-5.3"
-  heartbeat: "500h"  # effectively off — ~3 weeks, avoids 32-bit setTimeout overflow
+  heartbeat: "30s"  # effectively off — ~3 weeks, avoids 32-bit setTimeout overflow
   sandbox: "off"
   fallbacks:
     - "anthropic/claude-sonnet-4-6"
