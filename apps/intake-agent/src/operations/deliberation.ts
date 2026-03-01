@@ -32,6 +32,7 @@ import type { AgentResponse, TokenUsage } from '../types';
 // =============================================================================
 
 const DELIBERATION_ROOM = 'deliberation.room';
+const DELIBERATION_INBOX = 'agent.deliberation.inbox';
 const DEFAULT_TIMEBOX_MINUTES = 30;
 const DEFAULT_VOTE_TIMEOUT_SECONDS = 120;
 const DEFAULT_COMMITTEE_IDS = [
@@ -126,6 +127,53 @@ async function getNatsClient(): Promise<NatsClient> {
 }
 
 // =============================================================================
+// AgentMessage Helpers
+// =============================================================================
+
+/**
+ * Wire format matching the nats-messenger plugin's AgentMessage type.
+ * All messages published to agent inboxes must use this format so the
+ * receiving agent's nats-messenger plugin can parse and present them.
+ */
+interface AgentMessage {
+  from: string;
+  to?: string;
+  subject: string;
+  message: string;
+  priority: 'normal' | 'urgent';
+  timestamp: string;
+  replyTo?: string;
+  type?: 'message';
+}
+
+/**
+ * Publish a structured NatsMessage to a specific agent's inbox using
+ * the AgentMessage wire format expected by the nats-messenger plugin.
+ * The structured content is JSON-serialized into the  field.
+ * The  is set to DELIBERATION_INBOX so agents can reply back.
+ */
+async function publishToAgent(
+  nats: NatsClient,
+  agentId: string,
+  natsMessage: NatsMessage
+): Promise<void> {
+  const subject = `agent.${agentId}.inbox`;
+  const agentMsg: AgentMessage = {
+    from: 'intake',
+    to: agentId,
+    subject,
+    message: JSON.stringify(natsMessage),
+    priority: 'normal',
+    timestamp: new Date().toISOString(),
+    replyTo: DELIBERATION_INBOX,
+    type: 'message',
+  };
+  // Cast to NatsMessage for the underlying publish call since we control
+  // the NATS connection in getNatsClient() and accept any JSON object.
+  await nats.publish(subject, agentMsg as unknown as NatsMessage);
+}
+
+// =============================================================================
 // Room Helpers
 // =============================================================================
 
@@ -135,7 +183,7 @@ async function getNatsClient(): Promise<NatsClient> {
  */
 async function waitForResponse(
   nats: NatsClient,
-  roomSubject: string,
+  _roomSubject: string,
   sessionId: string,
   expectedFrom: string,
   timeoutMs: number
@@ -148,16 +196,29 @@ async function waitForResponse(
       reject(new Error(`Timeout waiting for ${expectedFrom}`));
     }, timeoutMs);
 
-    cleanup = nats.subscribe(roomSubject, (msg) => {
-      if (
-        msg.session_id === sessionId &&
-        msg.from === expectedFrom &&
-        (msg.type === 'debate_response' || msg.type === 'response')
-      ) {
-        clearTimeout(timer);
-        cleanup?.();
-        resolve(msg);
+    // Subscribe to DELIBERATION_INBOX — agents reply here via the replyTo field
+    // set in publishToAgent(). This implements the publish+subscribe reply pattern.
+    cleanup = nats.subscribe(DELIBERATION_INBOX, (msg) => {
+      const from = (msg.from as string) ?? '';
+      if (from !== expectedFrom) return;
+
+      // Agents send AgentMessage format; structured deliberation data is
+      // JSON-encoded in the `message` field. Try to parse it.
+      let structured: NatsMessage = msg;
+      const rawMessage = msg.message as string | undefined;
+      if (rawMessage) {
+        try {
+          const parsed = JSON.parse(rawMessage) as NatsMessage;
+          structured = { ...parsed, from, session_id: sessionId };
+        } catch {
+          // Agent sent plain text — wrap as debate_response
+          structured = { type: 'debate_response', session_id: sessionId, from, content: rawMessage };
+        }
       }
+
+      clearTimeout(timer);
+      cleanup?.();
+      resolve(structured);
     });
   });
 }
@@ -168,7 +229,7 @@ async function waitForResponse(
  */
 async function collectVotes(
   nats: NatsClient,
-  roomSubject: string,
+  _roomSubject: string,
   sessionId: string,
   voterIds: string[],
   timeoutMs: number
@@ -195,26 +256,38 @@ async function collectVotes(
       resolve(votes);
     }, timeoutMs);
 
-    cleanup = nats.subscribe(roomSubject, (msg) => {
-      if (
-        msg.session_id === sessionId &&
-        msg.type === 'vote_response' &&
-        remaining.has(msg.from as string)
-      ) {
-        remaining.delete(msg.from as string);
-        votes.push({
-          voter_id: msg.from as string,
-          chosen_option: (msg.chosen_option as string) ?? 'abstain',
-          confidence: (msg.confidence as number) ?? 0,
-          reasoning: (msg.reasoning as string) ?? '',
-          concerns: (msg.concerns as string[]) ?? [],
-          timestamp: new Date().toISOString(),
-        });
-        if (remaining.size === 0) {
-          clearTimeout(timer);
-          cleanup?.();
-          resolve(votes);
+    // Subscribe to DELIBERATION_INBOX — committee agents reply here
+    cleanup = nats.subscribe(DELIBERATION_INBOX, (msg) => {
+      const from = (msg.from as string) ?? '';
+      if (!remaining.has(from)) return;
+
+      // Parse structured vote data from AgentMessage.message field
+      let structured: NatsMessage = msg;
+      const rawMessage = msg.message as string | undefined;
+      if (rawMessage) {
+        try {
+          const parsed = JSON.parse(rawMessage) as NatsMessage;
+          structured = { ...parsed, from, session_id: sessionId };
+        } catch {
+          structured = { type: 'vote_response', session_id: sessionId, from };
         }
+      }
+
+      if (structured.session_id !== sessionId && msg.session_id !== sessionId) return;
+
+      remaining.delete(from);
+      votes.push({
+        voter_id: from,
+        chosen_option: (structured.chosen_option as string) ?? 'abstain',
+        confidence: (structured.confidence as number) ?? 0,
+        reasoning: (structured.reasoning as string) ?? '',
+        concerns: (structured.concerns as string[]) ?? [],
+        timestamp: new Date().toISOString(),
+      });
+      if (remaining.size === 0) {
+        clearTimeout(timer);
+        cleanup?.();
+        resolve(votes);
       }
     });
   });
@@ -305,10 +378,10 @@ async function conductCommitteeVote(
   const options = [optimistPosition, pessimistPosition];
 
   // Publish ONE vote request to the room addressed to all committee members
-  await nats.publish(DELIBERATION_ROOM, {
+  // Fan out vote_request to each committee member's inbox using AgentMessage format
+  const votePayload = {
     type: 'vote_request',
     session_id: sessionId,
-    to: committeeIds,
     decision_id: dp.id,
     question: dp.question,
     category: dp.category,
@@ -317,7 +390,8 @@ async function conductCommitteeVote(
     pessimist_position: pessimistPosition,
     context: prdContext.slice(0, 2000), // Limit context size
     deadline_seconds: voteTimeoutSeconds,
-  });
+  };
+  await Promise.all(committeeIds.map(id => publishToAgent(nats, id, { ...votePayload, to: id })));
 
   // Collect votes from room — wait for vote_response messages
   const votes = await collectVotes(
@@ -410,14 +484,17 @@ export async function runDeliberation(
   // ─── Step 1: PRD broadcast ───────────────────────────────────────────────
   // Publish one deliberation_start message to the room — both optimist and
   // pessimist receive it since they both subscribe to deliberation.room.
-  await nats.publish(DELIBERATION_ROOM, {
+  // Send deliberation_start to each debate agent's inbox using AgentMessage format
+  const startPayload = {
     type: 'deliberation_start',
     session_id: sessionId,
-    to: ['optimist', 'pessimist'],
     prd_content: payload.prd_content,
     infrastructure_context: payload.infrastructure_context ?? '',
     timebox_minutes: payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES,
-  });
+  };
+  await Promise.all(['optimist', 'pessimist'].map(id =>
+    publishToAgent(nats, id, { ...startPayload, to: id })
+  ));
 
   // ─── Step 2: Debate loop ─────────────────────────────────────────────────
   let lastSpeaker: 'optimist' | 'pessimist' = 'pessimist'; // optimist goes first
@@ -432,13 +509,15 @@ export async function runDeliberation(
     if (!softWarningEmitted && elapsed >= timeboxMs * SOFT_WARNING_RATIO) {
       softWarningEmitted = true;
       try {
-        await nats.publish(DELIBERATION_ROOM, {
+        const warningPayload = {
           type: 'timebox_warning',
           session_id: sessionId,
-          to: ['optimist', 'pessimist'],
           minutes_remaining: minutesRemaining,
           message: `⏱ ${minutesRemaining} minutes remaining. Begin moving toward final positions.`,
-        });
+        };
+        await Promise.all(['optimist', 'pessimist'].map(id =>
+          publishToAgent(nats, id, { ...warningPayload, to: id })
+        ));
       } catch (err) {
         console.error('[DELIBERATION] Failed to send timebox warning:', err);
       }
@@ -455,7 +534,8 @@ export async function runDeliberation(
     const nextSpeaker: 'optimist' | 'pessimist' = lastSpeaker === 'optimist' ? 'pessimist' : 'optimist';
 
     // Send turn to room — only the named agent should respond
-    await nats.publish(DELIBERATION_ROOM, {
+    // Send debate turn directly to the agent's inbox using AgentMessage format
+    await publishToAgent(nats, nextSpeaker, {
       type: 'debate_turn',
       session_id: sessionId,
       to: nextSpeaker,
@@ -547,17 +627,19 @@ export async function runDeliberation(
 
         // Announce vote result to the room
         try {
-          await nats.publish(DELIBERATION_ROOM, {
+          const resultPayload = {
             type: 'vote_result',
             session_id: sessionId,
-            to: ['optimist', 'pessimist'],
             decision_id: dpId,
             question: dp.question,
             winning_option: resolved.winning_option ?? 'escalated',
             vote_tally: resolved.vote_tally,
             consensus_strength: resolved.consensus_strength ?? 0,
             escalated: resolved.escalated,
-          });
+          };
+          await Promise.all(['optimist', 'pessimist'].map(id =>
+            publishToAgent(nats, id, { ...resultPayload, to: id })
+          ));
         } catch (err) {
           console.error(`[DELIBERATION] Failed to broadcast vote result for ${dpId}:`, err);
         }
