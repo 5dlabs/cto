@@ -9,8 +9,9 @@ export default function FounderPage() {
     <div className="relative min-h-screen overflow-hidden">
       {/* Background layers */}
       <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
-      <div className="fixed inset-0 circuit-bg z-0" />
-      <div className="fixed inset-0 noise-overlay z-0" />
+      <div className="fixed inset-0 circuit-bg z-[1]" />
+      {/* GridPulse at z-[2] from layout */}
+      <div className="fixed inset-0 noise-overlay z-[3]" />
 
       <Header />
 

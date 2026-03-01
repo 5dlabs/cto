@@ -195,13 +195,9 @@ export default function OpportunitiesPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
-      <div className="fixed inset-0 circuit-bg z-0" />
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[5%] left-[20%] w-[500px] h-[500px] rounded-full bg-cyan/[0.04] blur-[120px]" />
-        <div className="absolute top-[50%] right-[5%] w-[400px] h-[400px] rounded-full bg-[oklch(0.7_0.25_320)]/[0.03] blur-[100px]" />
-        <div className="absolute bottom-[15%] left-[35%] w-[600px] h-[600px] rounded-full bg-blue-500/[0.03] blur-[140px]" />
-      </div>
-      <div className="fixed inset-0 noise-overlay z-0" />
+      <div className="fixed inset-0 circuit-bg z-[1]" />
+      {/* GridPulse at z-[2] from layout */}
+      <div className="fixed inset-0 noise-overlay z-[3]" />
 
       <Header />
 
