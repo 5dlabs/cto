@@ -10,7 +10,7 @@ export function GridPulse() {
   return (
     <div
       className="fixed inset-0 pointer-events-none overflow-hidden z-[2]"
-      style={{ contain: "layout style paint", transform: "translateZ(0)" }}
+      style={{ contain: "layout style paint", isolation: "isolate" }}
     >
       {/* Drifting grid — cyan horizontal, purple vertical */}
       <div

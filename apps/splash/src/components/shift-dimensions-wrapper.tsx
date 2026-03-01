@@ -30,7 +30,7 @@ export function ShiftDimensionsWrapper({ children }: { children: React.ReactNode
 
   return (
     <motion.div
-      style={{ transformOrigin: "50% 50%", minHeight: "100%", display: "flex", flexDirection: "column" }}
+      style={{ transformOrigin: "50% 50%", minHeight: "100%", display: "flex", flexDirection: "column", transformStyle: "flat" as const }}
       animate={controls}
       initial={{ transform: "perspective(1200px) rotateX(0deg) rotateY(0deg) scale(1) translateZ(0)" }}
     >

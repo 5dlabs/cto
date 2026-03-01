@@ -178,14 +178,14 @@
   100% { transform: translate3d(100px, 60px, 0) scale(0.95); }
 }
 @keyframes grid-energy-h {
-  0% { transform: scaleX(0) translateX(-100%); }
+  0% { transform: scaleX(0.3) translateX(-100%); }
   50% { transform: scaleX(1) translateX(0%); }
-  100% { transform: scaleX(0) translateX(100%); }
+  100% { transform: scaleX(0.3) translateX(100%); }
 }
 @keyframes grid-energy-v {
-  0% { transform: scaleY(0) translateY(-100%); }
+  0% { transform: scaleY(0.3) translateY(-100%); }
   50% { transform: scaleY(1) translateY(0%); }
-  100% { transform: scaleY(0) translateY(100%); }
+  100% { transform: scaleY(0.3) translateY(100%); }
 }
 
 /* Circuit pattern background */
