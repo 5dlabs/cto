@@ -41,7 +41,7 @@ const DISCORD_CHANNEL_ID = '1473310690067353682'; // #e2e-testing
  *       available as process.env.DISCORD_BOT_TOKEN at runtime.
  */
 async function postToDiscord(content: string): Promise<void> {
-  const token = process.env['DISCORD_BOT_TOKEN'];
+  const token = process.env['DISCORD_PM_BOT_TOKEN'] ?? process.env['DISCORD_BOT_TOKEN'];
   if (!token) return;
   try {
     await fetch(`https://discord.com/api/v10/channels/${DISCORD_CHANNEL_ID}/messages`, {

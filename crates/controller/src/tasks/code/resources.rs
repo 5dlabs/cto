@@ -1248,11 +1248,19 @@ impl<'a> CodeResourceManager<'a> {
             }
         }));
 
-        // Mount intake-api-keys for Tavily, Discord bot token, Gemini
+        // Mount intake-api-keys for Tavily and Gemini API keys
         // This secret is NOT ArgoCD-managed (won't be reverted by Helm syncs)
         env_from.push(json!({
             "secretRef": {
                 "name": "intake-api-keys",
+                "optional": serde_json::Value::Bool(true)
+            }
+        }));
+
+        // Mount discord-pm-bot for DISCORD_PM_BOT_TOKEN (live debate channel posting)
+        env_from.push(json!({
+            "secretRef": {
+                "name": "discord-pm-bot",
                 "optional": serde_json::Value::Bool(true)
             }
         }));
