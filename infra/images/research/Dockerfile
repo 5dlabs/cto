@@ -41,7 +41,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
-    cargo build --release --package research
+    cargo build --release --package research && \
+    cargo build --release --package intake
 
 # =============================================================================
 # INTAKE-AGENT BUILD STAGE (for local builds)
@@ -125,12 +126,16 @@ FROM runtime-base AS local
 COPY --from=builder /build/target/release/research /usr/local/bin/research
 RUN chmod +x /usr/local/bin/research
 
+# Copy intake CLI binary from builder stage
+COPY --from=builder /build/target/release/intake /usr/local/bin/intake
+RUN chmod +x /usr/local/bin/intake
+
 # Copy intake-agent binary from intake-builder stage
 COPY --from=intake-builder /build/dist/intake-agent /usr/local/bin/intake-agent
 RUN chmod +x /usr/local/bin/intake-agent
 
 # Verify binaries work
-RUN research --help && intake-agent --help
+RUN research --help && intake --help && intake-agent --help
 
 USER research
 
@@ -147,11 +152,14 @@ COPY research /usr/local/bin/research
 RUN chmod +x /usr/local/bin/research
 
 # Copy pre-built intake-agent binary (placed by CI workflow into build context)
+COPY intake /usr/local/bin/intake
+RUN chmod +x /usr/local/bin/intake
+
 COPY intake-agent /usr/local/bin/intake-agent
 RUN chmod +x /usr/local/bin/intake-agent
 
 # Verify binaries work
-RUN research --help && intake-agent --help
+RUN research --help && intake --help && intake-agent --help
 
 USER research
 
