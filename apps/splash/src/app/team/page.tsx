@@ -157,7 +157,7 @@ const squads: Squad[] = [
 
 function AgentTeamCard({ agent, index, squadIndex }: { agent: Agent; index: number; squadIndex: number }) {
   return (
-    <div className="group reveal-on-scroll">
+    <div className="group">
       <div
         className={cn(
           "relative p-5 rounded-xl",
@@ -238,7 +238,7 @@ export default function TeamPage() {
         {/* Hero */}
         <section className="py-20 px-6">
           <div className="max-w-6xl mx-auto text-center">
-            <div className="fade-in-up">
+            <div>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
                 <span className="text-sm text-cyan font-medium">
@@ -271,7 +271,7 @@ export default function TeamPage() {
         <section className="pb-20 px-6">
           <div className="max-w-6xl mx-auto space-y-10">
             {squads.map((squad, squadIndex) => (
-              <div key={squad.title} className="reveal-on-scroll">
+              <div key={squad.title}>
                 {/* Squad header */}
                 <div className="flex items-center gap-3 mb-4">
                   <span className="text-xl">{squad.emoji}</span>
@@ -306,7 +306,7 @@ export default function TeamPage() {
 
         {/* Fun CTA */}
         <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-2xl mx-auto text-center reveal-on-scroll">
+          <div className="max-w-2xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4">
               Want to see them in <span className="gradient-text">action</span>?
             </h2>

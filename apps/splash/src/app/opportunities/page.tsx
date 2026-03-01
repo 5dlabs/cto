@@ -203,10 +203,10 @@ export default function OpportunitiesPage() {
         {/* Hero */}
         <section className="min-h-[60vh] flex flex-col items-center justify-center px-6 py-20 text-center">
           <div
-            className="max-w-4xl mx-auto fade-in-up"
+            className="max-w-4xl mx-auto"
           >
             <div
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-badge mb-8 fade-in-up"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-badge mb-8"
             >
               <span className="w-2 h-2 rounded-full bg-cyan animate-pulse" />
               <span className="text-sm text-cyan font-semibold tracking-wide">
@@ -215,7 +215,7 @@ export default function OpportunitiesPage() {
             </div>
 
             <h1
-              className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 fade-in-up"
+              className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6"
             >
               <span className="gradient-text glow-text-cyan">Let&apos;s Build</span>
               <br />
@@ -223,7 +223,7 @@ export default function OpportunitiesPage() {
             </h1>
 
             <p
-              className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10 leading-relaxed fade-in-up"
+              className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10 leading-relaxed"
             >
               I build AI agent platforms and bare-metal infrastructure for a living —{" "}
               <span className="text-foreground font-semibold">10,600+ GitHub contributions</span> in
@@ -232,7 +232,7 @@ export default function OpportunitiesPage() {
             </p>
 
             <div
-              className="flex flex-col sm:flex-row justify-center gap-4 fade-in-up"
+              className="flex flex-col sm:flex-row justify-center gap-4"
             >
               <a
                 href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
@@ -257,7 +257,7 @@ export default function OpportunitiesPage() {
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
             <div
-              className="text-center mb-16 reveal-on-scroll"
+              className="text-center mb-16"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 What I&apos;m{" "}
@@ -274,7 +274,7 @@ export default function OpportunitiesPage() {
                 return (
                   <div
                     key={opp.title}
-                    className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden flex flex-col reveal-on-scroll"
+                    className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden flex flex-col"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className={`w-12 h-12 rounded-xl ${colors.bg} border ${colors.border} flex items-center justify-center`}>
@@ -326,7 +326,7 @@ export default function OpportunitiesPage() {
         <section className="py-20 px-6 border-t border-border/30 glass-section">
           <div className="max-w-6xl mx-auto">
             <div
-              className="text-center mb-12 reveal-on-scroll"
+              className="text-center mb-12"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 What I <span className="gradient-text">Bring</span>
@@ -339,7 +339,7 @@ export default function OpportunitiesPage() {
 
             {/* Stats row */}
             <div
-              className="flex flex-wrap justify-center gap-4 mb-16 reveal-on-scroll"
+              className="flex flex-wrap justify-center gap-4 mb-16"
             >
               {stats.map((stat) => (
                 <div key={stat.value} className="flex items-center gap-2 px-5 py-3 rounded-xl glass-subtle">
@@ -356,7 +356,7 @@ export default function OpportunitiesPage() {
                 return (
                   <div
                     key={area.title}
-                    className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden reveal-on-scroll"
+                    className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
                   >
                     <div className={`w-11 h-11 rounded-xl ${colors.bg} border ${colors.border} flex items-center justify-center mb-4`}>
                       <span className={colors.text}>{area.icon}</span>
@@ -374,7 +374,7 @@ export default function OpportunitiesPage() {
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
             <div
-              className="text-center mb-16 reveal-on-scroll"
+              className="text-center mb-16"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 How I&apos;ve <span className="gradient-text">Done It</span>
@@ -390,7 +390,7 @@ export default function OpportunitiesPage() {
                 return (
                   <div
                     key={cs.company}
-                    className="relative p-8 rounded-2xl glass-card glass-shimmer overflow-hidden reveal-on-scroll"
+                    className="relative p-8 rounded-2xl glass-card glass-shimmer overflow-hidden"
                   >
                     <div className="flex items-start gap-4 mb-6">
                       <div className={`shrink-0 w-12 h-12 rounded-xl ${colors.bg} border ${colors.border} flex items-center justify-center`}>
@@ -427,7 +427,7 @@ export default function OpportunitiesPage() {
         <section className="py-20 px-6 border-t border-border/30 glass-section">
           <div className="max-w-4xl mx-auto">
             <div
-              className="text-center mb-12 reveal-on-scroll"
+              className="text-center mb-12"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Currently <span className="gradient-text">Building</span>
@@ -442,7 +442,7 @@ export default function OpportunitiesPage() {
               {ventures.map((v, i) => (
                 <div
                   key={v.name}
-                  className="relative p-5 rounded-2xl glass-card glass-shimmer overflow-hidden reveal-on-scroll"
+                  className="relative p-5 rounded-2xl glass-card glass-shimmer overflow-hidden"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="text-base font-semibold">
@@ -469,7 +469,7 @@ export default function OpportunitiesPage() {
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-2xl mx-auto text-center">
             <div
-              className="reveal-on-scroll"
+              className=""
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Let&apos;s <span className="gradient-text">Talk</span>

@@ -1,4 +1,3 @@
-import type React from "react";
 import Link from "next/link";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -69,25 +68,25 @@ export default function Home() {
         {/* Hero Section */}
         <section className="min-h-screen flex flex-col items-center justify-center px-6 py-20 pt-24">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8 scale-fade-in stagger" style={{ "--delay": "0ms" } as React.CSSProperties}>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
               <span className="text-sm text-cyan font-semibold tracking-wide">
                 Agentic &middot; Fully Autonomous &middot; On-Chain
               </span>
             </div>
 
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 fade-in-up stagger" style={{ "--delay": "100ms" } as React.CSSProperties}>
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
               <span className="gradient-text glow-text-cyan">Build in Parallel.</span>
               <br />
               <span className="text-foreground">Fail Fast. Double Down.</span>
             </h1>
 
-            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in-up stagger" style={{ "--delay": "200ms" } as React.CSSProperties}>
+            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10">
               5D Labs is a startup studio that leverages OpenClaw and autonomous
               AI agents to validate many ideas simultaneously — transcending the
               old &ldquo;pivot or perish&rdquo; model.
             </p>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16 fade-in-up stagger" style={{ "--delay": "300ms" } as React.CSSProperties}>
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
               <a
                 href="https://cto.5dlabs.ai"
                 className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105"
@@ -102,7 +101,7 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground fade-in-up stagger" style={{ "--delay": "400ms" } as React.CSSProperties}>
+            <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">5+</span>
                 <span>ventures in flight</span>
@@ -127,7 +126,7 @@ export default function Home() {
 
         {/* Disruptor Manifesto */}
         <section className="py-16 px-6">
-          <div className="max-w-3xl mx-auto text-center reveal-on-scroll">
+          <div className="max-w-3xl mx-auto text-center">
             <p className="text-xl sm:text-2xl text-muted-foreground leading-relaxed">
               One idea. One team. One shot at product-market fit.
               <br className="hidden sm:block" />
@@ -140,7 +139,7 @@ export default function Home() {
         {/* Thesis Section */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16 reveal-on-scroll">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 The <span className="gradient-text">Startup Studio</span> Model, Reimagined
               </h2>
@@ -151,7 +150,7 @@ export default function Home() {
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
                 <div className="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -164,7 +163,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
                 <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -177,7 +176,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
                 <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
@@ -196,7 +195,7 @@ export default function Home() {
         {/* Ventures Section */}
         <section id="ventures" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16 reveal-on-scroll">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Our <span className="gradient-text">Ventures</span>
               </h2>
@@ -213,7 +212,7 @@ export default function Home() {
         {/* Crypto Vision Section */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16 reveal-on-scroll">
+            <div className="text-center mb-16">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[oklch(0.7_0.25_320)]/20 bg-[oklch(0.7_0.25_320)]/5 mb-6">
                 <span className="text-xs text-[oklch(0.7_0.25_320)] font-medium uppercase tracking-wider">
                   Crypto Native
@@ -230,7 +229,7 @@ export default function Home() {
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
                 <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -244,7 +243,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
                 <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -257,7 +256,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
                 <div className="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -277,7 +276,7 @@ export default function Home() {
         {/* OpenClaw Section */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12 reveal-on-scroll">
+            <div className="text-center mb-12">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-6">
                 <span className="text-xs text-cyan font-medium uppercase tracking-wider">
                   Our Foundation
@@ -303,7 +302,7 @@ export default function Home() {
                 { title: "Agent Orchestration", text: "Thirteen specialized agents coordinated across development, trading, and operations. Each with its own identity, skills, and tools." },
                 { title: "Open at the Core", text: "Key infrastructure and tooling released as open source. We contribute upstream and build on open standards wherever possible." },
               ].map((item) => (
-                <div key={item.title} className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+                <div key={item.title} className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                   <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
                   <p className="text-muted-foreground text-sm">{item.text}</p>
                 </div>
@@ -314,7 +313,7 @@ export default function Home() {
 
         {/* Waitlist + CTA Section */}
         <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-2xl mx-auto reveal-on-scroll">
+          <div className="max-w-2xl mx-auto">
             <WaitlistForm
               source="waitlist"
               heading="Stay in the Loop"

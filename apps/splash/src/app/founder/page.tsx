@@ -16,9 +16,9 @@ export default function FounderPage() {
         {/* Hero */}
         <section className="py-20 px-6">
           <div className="max-w-4xl mx-auto">
-            <div className="flex flex-col md:flex-row items-center gap-12 fade-in-up">
+            <div className="flex flex-col md:flex-row items-center gap-12">
               {/* Avatar placeholder */}
-              <div className="shrink-0 fade-in-up">
+              <div className="shrink-0">
                 <div className="w-48 h-48 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center ring-4 ring-cyan/20">
                   <span className="text-6xl font-bold text-white">JF</span>
                 </div>
@@ -26,7 +26,7 @@ export default function FounderPage() {
 
               {/* Info */}
               <div>
-                <div className="fade-in-up">
+                <div>
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-4">
                     <span className="text-xs text-cyan font-medium uppercase tracking-wider">
                       Founder & CEO
@@ -43,7 +43,7 @@ export default function FounderPage() {
                 </div>
 
                 {/* Social links */}
-                <div className="flex gap-4 mt-6 fade-in-up">
+                <div className="flex gap-4 mt-6">
                   <a
                     href="https://github.com/5dlabs"
                     target="_blank"
@@ -88,7 +88,7 @@ export default function FounderPage() {
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12">
               {/* Background */}
-              <div className="reveal-on-scroll">
+              <div>
                 <h2 className="text-2xl font-bold mb-6">
                   <span className="gradient-text">Background</span>
                 </h2>
@@ -110,7 +110,7 @@ export default function FounderPage() {
               </div>
 
               {/* Vision */}
-              <div className="reveal-on-scroll">
+              <div>
                 <h2 className="text-2xl font-bold mb-6">
                   <span className="gradient-text">Vision</span>
                 </h2>
@@ -136,7 +136,7 @@ export default function FounderPage() {
         {/* What Drives Me */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12 reveal-on-scroll">
+            <div className="text-center mb-12">
               <h2 className="text-2xl font-bold mb-4">
                 What <span className="gradient-text">Drives</span> This
               </h2>
@@ -178,7 +178,7 @@ export default function FounderPage() {
               ].map((item) => (
                 <div
                   key={item.title}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center reveal-on-scroll"
+                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
                 >
                   <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mx-auto mb-4 text-cyan">
                     {item.icon}

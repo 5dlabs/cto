@@ -1,4 +1,3 @@
-import type React from "react";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { AgentGrid, type AgentSquad } from "@/components/agent-card";
 import { Header } from "@/components/header";
@@ -159,7 +158,7 @@ export default function Home() {
         <section id="hero" className="min-h-screen flex flex-col items-center justify-center px-6 py-20 pt-24">
           <div className="max-w-4xl mx-auto text-center">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8 scale-fade-in stagger" style={{ "--delay": "0ms" } as React.CSSProperties}>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
               <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
               <span className="text-sm text-cyan font-medium">
                 From PRD to Production — Autonomously
@@ -167,19 +166,19 @@ export default function Home() {
             </div>
 
             {/* Headline - LCP element, must be visible immediately */}
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 fade-in-up stagger" style={{ "--delay": "100ms" } as React.CSSProperties}>
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
               <span className="gradient-text glow-text-cyan">Your Engineering Team</span>
               <br />
               <span className="text-foreground">Lives Here</span>
             </h1>
 
             {/* Subheadline */}
-            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10 fade-in-up stagger" style={{ "--delay": "200ms" } as React.CSSProperties}>
+            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10">
               Thirteen specialized AI agents that ship complete features. From requirements to deployed code—automatically.
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16 fade-in-up stagger" style={{ "--delay": "300ms" } as React.CSSProperties}>
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
               {featureFlags.showStartNowButton && (
                 <a
                   href="https://app.5dlabs.ai"
@@ -192,7 +191,7 @@ export default function Home() {
             </div>
 
             {/* Stats */}
-            <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground fade-in-up stagger" style={{ "--delay": "400ms" } as React.CSSProperties}>
+            <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">60-80%</span>
                 <span>cost savings vs cloud</span>
@@ -219,7 +218,7 @@ export default function Home() {
         {/* Agents Section */}
         <section id="agents" className="py-20 px-6">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16 reveal-on-scroll">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 We Brought the <span className="gradient-text">Whole Team</span>
               </h2>
@@ -239,7 +238,7 @@ export default function Home() {
         {/* Ecosystem Section */}
         <section id="ecosystem" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16 reveal-on-scroll">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Your <span className="gradient-text">Entire Stack</span>, Orchestrated
               </h2>
@@ -249,7 +248,7 @@ export default function Home() {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -276,7 +275,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-magenta/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
@@ -303,7 +302,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-yellow/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -330,7 +329,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-green/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -358,7 +357,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="text-center mt-12 reveal-on-scroll">
+            <div className="text-center mt-12">
               <p className="text-muted-foreground">
                 Submit a PRD, connect your repo, and watch your AI team ship. No manual handoffs, no context switching.
               </p>
@@ -369,7 +368,7 @@ export default function Home() {
         {/* Infrastructure Providers Section */}
         <section id="infrastructure" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16 reveal-on-scroll">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Bare Metal <span className="gradient-text">Everywhere</span>
               </h2>
@@ -399,7 +398,7 @@ export default function Home() {
               ].map((provider) => (
                 <div
                   key={provider.name}
-                  className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center hover:border-cyan/30 transition-colors reveal-on-scroll"
+                  className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center hover:border-cyan/30 transition-colors"
                 >
                   <h4 className="font-semibold mb-1 text-foreground">{provider.name}</h4>
                   <p className="text-xs text-muted-foreground mb-1">{provider.region}</p>
@@ -413,7 +412,7 @@ export default function Home() {
         {/* Platform Features Section */}
         <section id="platform" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16 reveal-on-scroll">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 The <span className="gradient-text">Platform</span>
               </h2>
@@ -425,7 +424,7 @@ export default function Home() {
             <div className="grid md:grid-cols-3 gap-6">
               {/* MCP Tools */}
               <div
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll"
+                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
               >
                 <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -444,7 +443,7 @@ export default function Home() {
               </div>
 
               {/* Linear Integration */}
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -462,7 +461,7 @@ export default function Home() {
               </div>
 
               {/* Self-Healing */}
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -480,7 +479,7 @@ export default function Home() {
               </div>
 
               {/* Kubernetes Operators */}
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
@@ -498,7 +497,7 @@ export default function Home() {
               </div>
 
               {/* GitHub-Driven Deployment */}
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -516,7 +515,7 @@ export default function Home() {
               </div>
 
               {/* BYOK */}
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -539,7 +538,7 @@ export default function Home() {
         {/* Why CTO Section */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16 reveal-on-scroll">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Why <span className="gradient-text">CTO</span>?
               </h2>
@@ -549,7 +548,7 @@ export default function Home() {
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              <div className="p-6 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm text-center h-full reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm text-center h-full">
                 <div className="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -561,7 +560,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="p-6 rounded-xl border border-[oklch(0.7_0.25_320)]/30 bg-[oklch(0.7_0.25_320)]/5 backdrop-blur-sm text-center h-full reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-[oklch(0.7_0.25_320)]/30 bg-[oklch(0.7_0.25_320)]/5 backdrop-blur-sm text-center h-full">
                 <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -573,7 +572,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="p-6 rounded-xl border border-green-500/30 bg-green-500/5 backdrop-blur-sm text-center h-full reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-green-500/30 bg-green-500/5 backdrop-blur-sm text-center h-full">
                 <div className="w-14 h-14 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
@@ -585,7 +584,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="p-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 backdrop-blur-sm text-center h-full reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 backdrop-blur-sm text-center h-full">
                 <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -604,7 +603,7 @@ export default function Home() {
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-8">
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
@@ -616,7 +615,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm reveal-on-scroll">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-magenta/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -633,7 +632,7 @@ export default function Home() {
 
         {/* CTA Section */}
         <section className="py-20 px-6">
-          <div className="max-w-2xl mx-auto text-center reveal-on-scroll">
+          <div className="max-w-2xl mx-auto text-center">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Start <span className="gradient-text">Shipping</span>
             </h2>

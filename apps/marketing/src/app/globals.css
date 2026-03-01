@@ -236,68 +236,14 @@
   animation: gradient-rotate 4s ease infinite;
 }
 
-/* === Entrance animations === */
-
-@keyframes fade-in-up-kf {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fade-in-down-kf {
-  from { opacity: 0; transform: translateY(-12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes scale-fade-in-kf {
-  from { opacity: 0; transform: scale(0.96); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
+/* Scroll indicator bounce — purely decorative, no opacity changes */
 @keyframes scroll-bounce-kf {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(6px); }
 }
 
-@keyframes reveal-up-kf {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.fade-in-up {
-  animation: fade-in-up-kf 0.7s ease-out both;
-}
-
-.fade-in-down {
-  animation: fade-in-down-kf 0.6s ease-out both;
-}
-
-.scale-fade-in {
-  animation: scale-fade-in-kf 0.5s ease-out both;
-}
-
 .scroll-bounce {
   animation: scroll-bounce-kf 3s ease-in-out infinite;
-}
-
-.stagger { animation-delay: var(--delay, 0ms); }
-
-.reveal-on-scroll {
-  opacity: 1;
-}
-
-/* Page-level perspective breathing — matches bg-preview demo values */
-@keyframes shift-dimensions-kf {
-  0%, 100% {
-    transform: perspective(1200px) rotateX(0deg) rotateY(0deg) scale(1) translateZ(0);
-  }
-  50% {
-    transform: perspective(1200px) rotateX(0.35deg) rotateY(0.25deg) scale(1.003) translateZ(12px);
-  }
-}
-
-.shift-dimensions {
-  animation: shift-dimensions-kf 5s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
-  will-change: transform;
 }
 
 /* Marquee animation for tech stack */

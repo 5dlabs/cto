@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
-import { ShiftDimensionsWrapper } from "@/components/shift-dimensions-wrapper";
 import { GridPulse } from "@/components/grid-pulse";
 import "./globals.css";
 
@@ -306,9 +305,7 @@ export default function RootLayout({
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <GridPulse />
-        <ShiftDimensionsWrapper>
-          {children}
-        </ShiftDimensionsWrapper>
+        {children}
       </body>
     </html>
   );
