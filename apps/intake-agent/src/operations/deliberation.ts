@@ -18,6 +18,7 @@
 
 import { createHash, randomUUID } from 'crypto';
 import { connect as natsConnect, StringCodec, type NatsConnection } from 'nats';
+import https from 'https';
 import type {
   DeliberatePayload,
   DeliberationResult,
@@ -44,6 +45,59 @@ const DEFAULT_COMMITTEE_IDS = [
 ];
 const SOFT_WARNING_RATIO = 0.8; // Send warning when 80% of timebox elapsed
 const AGENT_SKIP_TIMEOUT_MS = 5 * 60 * 1000;
+
+
+// =============================================================================
+// Discord Notifier (PM bot)
+// =============================================================================
+
+const DISCORD_DELIBERATION_CHANNEL = '1473310690067353682';
+
+/**
+ * Post a message to the deliberation Discord channel via the PM bot token.
+ * Silently swallows errors so Discord outages never break deliberation flow.
+ * Retries once on HTTP 429 (rate limit) with the retry-after delay.
+ */
+async function postToDiscord(message: string): Promise<void> {
+  const token = process.env['DISCORD_PM_BOT_TOKEN'];
+  if (!token) return; // Token not configured — silently skip
+
+  const body = JSON.stringify({ content: message });
+  const doPost = (): Promise<number> =>
+    new Promise((resolve) => {
+      const req = https.request(
+        {
+          hostname: 'discord.com',
+          path: `/api/v10/channels/${DISCORD_DELIBERATION_CHANNEL}/messages`,
+          method: 'POST',
+          headers: {
+            Authorization: `Bot ${token}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body),
+          },
+        },
+        (res) => {
+          // Drain the response body
+          res.on('data', () => {});
+          res.on('end', () => resolve(res.statusCode ?? 0));
+        }
+      );
+      req.on('error', () => resolve(0));
+      req.write(body);
+      req.end();
+    });
+
+  try {
+    const status = await doPost();
+    if (status === 429) {
+      // Rate limited — wait 5s and retry once
+      await new Promise((r) => setTimeout(r, 5000));
+      await doPost();
+    }
+  } catch {
+    // Swallow all Discord errors — deliberation must not be interrupted
+  }
+}
 
 // =============================================================================
 // NATS Abstraction
@@ -496,6 +550,12 @@ export async function runDeliberation(
     publishToAgent(nats, id, { ...startPayload, to: id })
   ));
 
+  // Notify Discord that deliberation is starting
+  await postToDiscord(
+    `🎙️ **AlertHub PRD Deliberation Starting**\n` +
+    `Optimist and Pessimist are entering the room. Timebox: ${payload.timebox_minutes ?? DEFAULT_TIMEBOX_MINUTES} minutes.`
+  );
+
   // ─── Step 2: Debate loop ─────────────────────────────────────────────────
   let lastSpeaker: 'optimist' | 'pessimist' = 'pessimist'; // optimist goes first
   let lastContent = `Please begin by proposing your architectural approach for the PRD.`;
@@ -587,10 +647,19 @@ export async function runDeliberation(
       }),
     });
 
+    // Post this debate turn to Discord
+    const speakerLabel = nextSpeaker === 'optimist' ? 'Optimist' : 'Pessimist';
+    const truncated = responseContent.length > 1800
+      ? responseContent.slice(0, 1797) + '...'
+      : responseContent;
+    await postToDiscord(`**${speakerLabel}:** ${truncated}`);
+
     // Register newly raised decision points and track positions
     for (const dp of newDPs) {
       console.error(`[DELIBERATION] Decision point raised: ${dp.id} by ${nextSpeaker}`);
       pendingDecisionPoints.set(dp.id, dp);
+      // Notify Discord of the decision point
+      await postToDiscord(`⚖️ **Decision Point:** ${dp.question}\nCommittee voting...`);
 
       if (nextSpeaker === 'optimist') {
         optimistPositions.set(dp.id, dp.proposingOption);
@@ -642,6 +711,16 @@ export async function runDeliberation(
           ));
         } catch (err) {
           console.error(`[DELIBERATION] Failed to broadcast vote result for ${dpId}:`, err);
+        }
+
+        // Post vote result to Discord
+        if (resolved.escalated) {
+          await postToDiscord(`🚨 **Escalated to human review:** ${dp.question}`);
+        } else {
+          const confidencePct = Math.round((resolved.consensus_strength ?? 0) * 100);
+          await postToDiscord(
+            `✅ **Resolved:** ${dp.question} → ${resolved.winning_option} (${confidencePct}% confidence)`
+          );
         }
       }
     }
@@ -729,6 +808,12 @@ export async function runDeliberation(
     `[DELIBERATION] Session ${sessionId} complete: ${deliberationStatus}, ` +
     `${turnCount} turns, ${resolvedDecisionPoints.length} decisions, ` +
     `${Math.round((Date.now() - startTime) / 1000)}s elapsed`
+  );
+
+  // Post deliberation complete summary to Discord
+  await postToDiscord(
+    `📋 **Deliberation Complete** — ${turnCount} turns, ` +
+    `${resolvedDecisionPoints.length} decisions resolved. Design brief ready.`
   );
 
   return {
