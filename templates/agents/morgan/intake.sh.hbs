@@ -34,14 +34,21 @@ fi
 # Intake Configuration
 # =========================================================================
 
-CONFIG_FILE="/intake-files/config.json"
-PRD_FILE="/intake-files/prd.txt"
-ARCH_FILE="/intake-files/architecture.md"
-
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "❌ Configuration file not found at $CONFIG_FILE"
+# Primary: intake-files volume (mounted from INTAKE_CONFIGMAP by controller)
+# Fallback: task-files (legacy path, used when INTAKE_CONFIGMAP is not set)
+if [ -f "/intake-files/config.json" ]; then
+    INTAKE_DIR="/intake-files"
+elif [ -f "/task-files/config.json" ]; then
+    INTAKE_DIR="/task-files"
+    echo "  ⚠️  Using legacy /task-files path (INTAKE_CONFIGMAP not set)"
+else
+    echo "❌ Configuration file not found at /intake-files/config.json or /task-files/config.json"
     exit 1
 fi
+
+CONFIG_FILE="${INTAKE_DIR}/config.json"
+PRD_FILE="${INTAKE_DIR}/prd.txt"
+ARCH_FILE="${INTAKE_DIR}/architecture.md"
 
 echo "📄 Loading configuration..."
 PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
@@ -52,7 +59,7 @@ LINEAR_TEAM_ID=$(jq -r '.linear_team_id // ""' "$CONFIG_FILE")
 
 # Use REPOSITORY_URL from environment if set, otherwise read from config
 # The environment variable takes precedence as it's set by the controller
-if [ -z "$REPOSITORY_URL" ]; then
+if [ -z "${REPOSITORY_URL:-}" ]; then
     REPOSITORY_URL=$(jq -r '.repository_url // ""' "$CONFIG_FILE")
 fi
 
@@ -90,7 +97,7 @@ REPO_NAME=$(echo "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-
 # Track whether we created a new repo (affects directory structure)
 REPO_CREATED="false"
 
-if [ -z "$REPOSITORY_URL" ] || [ "$REPOSITORY_URL" = "null" ]; then
+if [ -z "${REPOSITORY_URL:-}" ] || [ "${REPOSITORY_URL:-}" = "null" ]; then
     # =========================================================================
     # Create New Repository
     # =========================================================================
@@ -258,6 +265,13 @@ cp "$PRD_FILE" ".tasks/docs/prd.txt"
 echo ""
 echo "🚀 Running intake workflow..."
 
+# Clean workspace subdir to prevent stale artifacts from previous retries
+if [ -d "${WORKSPACE_DIR}" ]; then
+    echo "  🧹 Cleaning previous workspace at ${WORKSPACE_DIR}"
+    rm -rf "${WORKSPACE_DIR}"
+fi
+mkdir -p "${WORKSPACE_DIR}"
+
 # Stream output file for sidecar to parse (structured activities)
 STREAM_OUTPUT="/workspace/claude-stream.jsonl"
 rm -f "$STREAM_OUTPUT" 2>/dev/null || true
@@ -309,6 +323,12 @@ fi
 # Set model if specified
 if [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ]; then
     INTAKE_ARGS="$INTAKE_ARGS --model $PRIMARY_MODEL"
+fi
+
+# Ensure fresh task generation — remove any partial tasks.json from previous attempts
+if [ -f ".tasks/tasks/tasks.json" ]; then
+    echo "  🔄 Removing stale tasks.json from previous attempt"
+    mv ".tasks/tasks/tasks.json" ".tasks/tasks/tasks.json.bak.$(date +%s)"
 fi
 
 echo ""
