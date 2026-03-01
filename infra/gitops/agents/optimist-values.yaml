@@ -21,6 +21,7 @@ messaging:
     enabled: true
     # tokenSecretKey uses default "DISCORD_TOKEN" (matched to env var name)
     allowBots: true
+    dmPolicy: "block"
     groupPolicy: "allowlist"
     guilds:
       "1409006087331512342":
