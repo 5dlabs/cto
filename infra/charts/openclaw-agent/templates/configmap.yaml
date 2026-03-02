@@ -111,7 +111,12 @@ data:
         },
         "bind": {{ .Values.gateway.bind | quote }},
         "mode": {{ .Values.gateway.mode | quote }},
-        "port": {{ .Values.gateway.port }}
+        "port": {{ .Values.gateway.port }},
+        "controlUi": {
+          "enabled": {{ .Values.gateway.controlUi.enabled | default true }},
+          "basePath": {{ .Values.gateway.controlUi.basePath | default "/openclaw" | quote }},
+          "dangerouslyAllowHostHeaderOriginFallback": true
+        }
       },
       "memory": {
         "citations": {{ .Values.memory.citations | default "auto" | quote }}
