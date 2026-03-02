@@ -50,7 +50,7 @@ const row3: TechItem[] = [
   { name: "ChatGPT", color: "#10A37F", category: "Model" },
   { name: "Gemini", color: "#4285F4", category: "Model" },
   { name: "DeepSeek", color: "#00BFFF", category: "Self-Hosted" },
-  { name: "Qwen3", color: "#FF6B00", category: "Self-Hosted" },
+  { name: "Qwen3.5", color: "#FF6B00", category: "Self-Hosted" },
   { name: "Ollama", color: "#FFFFFF", category: "Self-Hosted" },
   { name: "vLLM", color: "#FF6B6B", category: "Self-Hosted" },
 ];

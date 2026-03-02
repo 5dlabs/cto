@@ -161,8 +161,8 @@ const squads: AgentSquad[] = [
     ],
   },
   {
-    title: "Blockchain",
-    emoji: "⛓️",
+    title: "Specialists",
+    emoji: "🔬",
     agents: [
       {
         name: "Block",
@@ -172,12 +172,6 @@ const squads: AgentSquad[] = [
         tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
         skills: ["Ethereum", "NEAR", "Solana", "Node Ops", "Smart Contracts"],
       },
-    ],
-  },
-  {
-    title: "Immersive & Gaming",
-    emoji: "🎮",
-    agents: [
       {
         name: "Vex",
         role: "VR/Unity Developer",
@@ -898,62 +892,46 @@ export default function Home() {
                   Run frontier open-weight models on your own NVIDIA GPU hardware. Served via KubeAI with OpenAI-compatible endpoints — no API costs, no data leaving your cluster, no rate limits.
                 </p>
 
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                   {[
                     {
-                      name: "DeepSeek V3",
-                      creator: "DeepSeek",
-                      context: "128K",
-                      tags: ["Coding", "General"],
-                      note: "Matches GPT-4o across most benchmarks",
-                      accent: "cyan",
-                    },
-                    {
-                      name: "DeepSeek R1",
-                      creator: "DeepSeek",
-                      context: "128K",
-                      tags: ["Math", "Reasoning"],
-                      note: "97.3% MATH-500 — rivals OpenAI o1",
-                      accent: "cyan",
-                    },
-                    {
-                      name: "MiniMax-Text-01",
+                      name: "MiniMax-M2.5",
                       creator: "MiniMax",
-                      context: "1M",
-                      tags: ["Long Context", "Agents"],
-                      note: "1M token context, beats GPT-4o on LongBench",
+                      context: "200K",
+                      tags: ["Coding", "Agentic"],
+                      note: "80.2% SWE-Bench Verified — best-in-class agentic coding",
                       accent: "pink",
                     },
                     {
-                      name: "Qwen3",
+                      name: "Qwen3.5",
                       creator: "Alibaba",
-                      context: "128K",
-                      tags: ["Multilingual", "General"],
-                      note: "Best-in-class multilingual performance, strong coding and reasoning benchmarks",
+                      context: "256K",
+                      tags: ["Multilingual", "Multimodal"],
+                      note: "201 languages, native multimodal, outperforms GPT-5.2 on IFBench",
                       accent: "orange",
                     },
                     {
-                      name: "GLM-4",
-                      creator: "Zhipu AI",
-                      context: "128K",
-                      tags: ["Chinese", "General"],
-                      note: "Strong coding and instruction following",
+                      name: "GLM-4.7",
+                      creator: "Z.ai",
+                      context: "205K",
+                      tags: ["Coding", "Agents"],
+                      note: "Rivals Claude Sonnet 4.5 on SWE-bench at 32B active params",
                       accent: "blue",
                     },
                     {
-                      name: "Yi",
-                      creator: "01.AI",
-                      context: "200K",
-                      tags: ["Long Context", "General"],
-                      note: "200K context, Apache 2.0 licensed",
-                      accent: "indigo",
+                      name: "Kimi K2.5",
+                      creator: "Moonshot AI",
+                      context: "256K",
+                      tags: ["Multimodal", "Agent Swarm"],
+                      note: "1T-param MoE, 74.9% BrowseComp, 100-agent parallel swarm",
+                      accent: "cyan",
                     },
                     {
-                      name: "Llama 4",
+                      name: "Llama 4 Maverick",
                       creator: "Meta",
-                      context: "128K",
-                      tags: ["General", "Multilingual"],
-                      note: "Open-weight, commercially licensed",
+                      context: "1M",
+                      tags: ["Multimodal", "General"],
+                      note: "1M token context, open-weight, commercially licensed",
                       accent: "blue",
                     },
                     {
@@ -961,7 +939,7 @@ export default function Home() {
                       creator: "Mistral AI",
                       context: "256K",
                       tags: ["Coding", "Reasoning"],
-                      note: "92% HumanEval — top coding performance",
+                      note: "92% HumanEval — strong coding and reasoning performance",
                       accent: "violet",
                     },
                   ].map((model) => (
