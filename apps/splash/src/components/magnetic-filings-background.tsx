@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, Suspense } from "react";
+import { useEffect, useMemo, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
 
 const CELL_SIZE = 56;
-const COLS = 28;
-const ROWS = 18;
+const COLS = 20;
+const ROWS = 13;
 
 function Filing({
   col,
@@ -61,6 +61,7 @@ export function MagneticFilingsBackground({
 }: {
   variant?: "spring" | "plain";
 }) {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
@@ -72,6 +73,14 @@ export function MagneticFilingsBackground({
       })),
     [],
   );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(mediaQuery.matches);
+    const onChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const setInitial = () => {
@@ -88,6 +97,10 @@ export function MagneticFilingsBackground({
     document.addEventListener("mousemove", onMove);
     return () => document.removeEventListener("mousemove", onMove);
   }, [mouseX, mouseY]);
+
+  if (prefersReducedMotion) {
+    return null;
+  }
 
   return (
     <div
