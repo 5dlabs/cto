@@ -104,9 +104,9 @@ const squads: AgentSquad[] = [
         role: "Security Sentinel",
         avatar: "/agents/cipher-avatar-512.png",
         color: "from-red-500 to-rose-500",
-        description: "Runs security audits, dependency scans, and ensures OWASP compliance.",
-        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
-        skills: ["Semgrep", "CodeQL", "SARIF", "Variant Analysis", "Audit Prep"],
+        description: "Runs security audits, dependency scans, and pen tests. Scans at code level then attacks deployed apps to find what static analysis misses.",
+        tools: ["Context7", "Firecrawl", "Tavily", "OpenCode", "GitHub"],
+        skills: ["Semgrep", "CodeQL", "Pen Testing", "Red Teaming", "SARIF", "Audit Prep"],
       },
       {
         name: "Tess",
@@ -149,6 +149,34 @@ const squads: AgentSquad[] = [
         description: "Your always-on SRE. Provisions bare metal, deploys services, monitors health, and triggers self-healing — so you never get paged.",
         tools: ["Context7", "Kubernetes", "GitHub"],
         skills: ["Kubernetes Operators", "ArgoCD/GitOps", "Secrets Mgmt", "Observability", "MCP Builder"],
+      },
+    ],
+  },
+  {
+    title: "Blockchain",
+    emoji: "⛓️",
+    agents: [
+      {
+        name: "Block",
+        role: "Blockchain Specialist",
+        color: "from-amber-500 to-orange-500",
+        description: "Deploys and operates blockchain nodes across every supported chain. Validator setup, RPC endpoints, archive nodes — all on bare metal.",
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Ethereum", "NEAR", "Solana", "Node Ops", "Smart Contracts"],
+      },
+    ],
+  },
+  {
+    title: "Immersive",
+    emoji: "🥽",
+    agents: [
+      {
+        name: "Vex",
+        role: "VR/Unity Developer",
+        color: "from-violet-500 to-indigo-500",
+        description: "Builds cross-platform VR and XR experiences with Unity and OpenXR. From Quest to PC to spatial web.",
+        tools: ["Context7", "Octocode", "Firecrawl", "GitHub"],
+        skills: ["Unity", "OpenXR", "Meta XR", "Three.js", "Cross-Platform XR"],
       },
     ],
   },
@@ -333,7 +361,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
-                    <span>o3, GPT-4o, Gemini 2.5 models</span>
+                    <span>ChatGPT Codex, Gemini, Claude models</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
@@ -418,6 +446,102 @@ export default function Home() {
                   <p className="text-xs text-muted-foreground">{provider.desc}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Integrations Section */}
+        <section id="integrations" className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Works With Your <span className="gradient-text">Entire Stack</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Native integrations with the tools your team already uses — from project management to alerting to observability.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Project Management */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Project Management</h3>
+                <p className="text-xs text-muted-foreground mb-4">Linear is primary — full agent activity sync, PRD intake, and live task updates. Other platforms get task creation and status updates.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { name: "Linear", primary: true },
+                    { name: "GitHub Issues", primary: true },
+                    { name: "Jira", primary: false },
+                    { name: "Asana", primary: false },
+                    { name: "Trello", primary: false },
+                    { name: "Monday", primary: false },
+                    { name: "Notion", primary: false },
+                    { name: "ClickUp", primary: false },
+                  ].map(({ name, primary }) => (
+                    <span key={name} className={`text-[11px] px-2 py-0.5 rounded-md font-medium ${primary ? "bg-[oklch(0.7_0.25_320)]/15 text-[oklch(0.7_0.25_320)]" : "bg-muted/50 text-muted-foreground"}`}>{name}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Communication & Alerting */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Communication & Alerting</h3>
+                <p className="text-xs text-muted-foreground mb-4">Agents post progress updates, incident alerts, and deployment notifications to your channels in real time.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Discord", "Slack", "Microsoft Teams", "PagerDuty", "Email"].map(name => (
+                    <span key={name} className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-cyan/10 text-cyan">{name}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Observability */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Observability</h3>
+                <p className="text-xs text-muted-foreground mb-4">Self-hosted Grafana, Prometheus, and Loki pre-wired. Datadog supported for teams already invested in it.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { name: "Grafana", primary: true },
+                    { name: "Prometheus", primary: true },
+                    { name: "Loki", primary: true },
+                    { name: "Jaeger", primary: true },
+                    { name: "OpenTelemetry", primary: true },
+                    { name: "Datadog", primary: false },
+                  ].map(({ name, primary }) => (
+                    <span key={name} className={`text-[11px] px-2 py-0.5 rounded-md font-medium ${primary ? "bg-orange-500/10 text-orange-400" : "bg-muted/50 text-muted-foreground"}`}>{name}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Source Control & CI */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Source Control & CI</h3>
+                <p className="text-xs text-muted-foreground mb-4">Each agent has its own GitHub App. PRs, reviews, and deployments are fully automated through Git.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["GitHub Apps", "GitHub Actions", "ArgoCD", "Webhooks", "PR Automation"].map(name => (
+                    <span key={name} className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-green-500/10 text-green-400">{name}</span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>

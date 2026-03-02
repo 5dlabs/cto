@@ -14,6 +14,7 @@ const row1: TechItem[] = [
   { name: "Prometheus", color: "#E6522C", category: "Metrics" },
   { name: "Loki", color: "#F4D03F", category: "Logs" },
   { name: "Tempo", color: "#2EB67D", category: "Traces" },
+  { name: "Datadog", color: "#632CA6", category: "Observability" },
   { name: "Mayastor", color: "#00BFFF", category: "Block Storage" },
   { name: "SeaweedFS", color: "#4CAF50", category: "Object Storage" },
 ];
@@ -28,7 +29,12 @@ const row2: TechItem[] = [
   { name: "Trivy", color: "#1904DA", category: "Vulnerability Scanning" },
   { name: "Gitleaks", color: "#FF4444", category: "Secret Detection" },
   { name: "GitHub", color: "#FFFFFF", category: "Source Control" },
-  { name: "Linear", color: "#5E6AD2", category: "Project Management" },
+  { name: "Linear", color: "#5E6AD2", category: "Project Mgmt" },
+  { name: "Slack", color: "#4A154B", category: "Alerting" },
+  { name: "Discord", color: "#5865F2", category: "Alerting" },
+  { name: "PagerDuty", color: "#06AC38", category: "Incidents" },
+  { name: "Jira", color: "#0052CC", category: "Project Mgmt" },
+  { name: "Asana", color: "#F06A6A", category: "Project Mgmt" },
 ];
 
 // Row 3: Supported AI CLIs & models
@@ -40,8 +46,10 @@ const row3: TechItem[] = [
   { name: "Gemini CLI", color: "#4285F4", category: "AI CLI" },
   { name: "OpenCode", color: "#FFFFFF", category: "AI CLI" },
   { name: "Claude", color: "#D4A574", category: "Model" },
-  { name: "GPT-4", color: "#10A37F", category: "Model" },
+  { name: "ChatGPT", color: "#10A37F", category: "Model" },
   { name: "Gemini", color: "#4285F4", category: "Model" },
+  { name: "DeepSeek", color: "#00BFFF", category: "Self-Hosted" },
+  { name: "Qwen", color: "#FF6B00", category: "Self-Hosted" },
   { name: "Ollama", color: "#FFFFFF", category: "Self-Hosted" },
   { name: "vLLM", color: "#FF6B6B", category: "Self-Hosted" },
 ];
@@ -128,7 +136,7 @@ const categories = [
         />
       </svg>
     ),
-    items: ["Grafana", "Prometheus", "Loki", "Tempo"],
+    items: ["Grafana", "Prometheus", "Loki", "Tempo", "Datadog", "OpenTelemetry"],
     color: "orange",
   },
   {
@@ -209,7 +217,7 @@ const categories = [
   {
     title: "Integrations",
     description:
-      "Native connections to your source control and project management tools",
+      "Native connections to your project management, communication, and alerting tools",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -220,7 +228,7 @@ const categories = [
         />
       </svg>
     ),
-    items: ["GitHub", "Linear"],
+    items: ["GitHub", "Linear", "Slack", "Discord", "Jira", "Asana", "Teams", "PagerDuty"],
     color: "rose",
   },
 ];
@@ -287,7 +295,7 @@ export function TechStack() {
         {/* Stats bar */}
         <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground mb-14">
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-foreground">30+</span>
+            <span className="text-2xl font-bold text-foreground">50+</span>
             <span>managed services</span>
           </div>
           <div className="flex items-center gap-2">
