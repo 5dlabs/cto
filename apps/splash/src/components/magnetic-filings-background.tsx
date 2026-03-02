@@ -2,12 +2,7 @@
 
 import { useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  motion,
-  useMotionValue,
-  useTransform,
-  useSpring,
-} from "framer-motion";
+import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
 
 const CELL_SIZE = 56;
 const COLS = 28;
@@ -75,18 +70,20 @@ export function MagneticFilingsBackground({
         col: i % COLS,
         row: Math.floor(i / COLS),
       })),
-    []
+    [],
   );
 
   useEffect(() => {
     const setInitial = () => {
-      mouseX.set(typeof window !== "undefined" ? window.innerWidth / 2 : 0);
-      mouseY.set(typeof window !== "undefined" ? window.innerHeight / 2 : 0);
+      mouseX.set((COLS * CELL_SIZE) / 2);
+      mouseY.set((ROWS * CELL_SIZE) / 2);
     };
     setInitial();
     const onMove = (e: MouseEvent) => {
-      mouseX.set(e.clientX);
-      mouseY.set(e.clientY);
+      const containerOffsetX = window.innerWidth / 2 - (COLS * CELL_SIZE) / 2;
+      const containerOffsetY = window.innerHeight / 2 - (ROWS * CELL_SIZE) / 2;
+      mouseX.set(e.clientX - containerOffsetX);
+      mouseY.set(e.clientY - containerOffsetY);
     };
     document.addEventListener("mousemove", onMove);
     return () => document.removeEventListener("mousemove", onMove);
