@@ -113,8 +113,8 @@ data:
         "mode": {{ .Values.gateway.mode | quote }},
         "port": {{ .Values.gateway.port }},
         "controlUi": {
-          "enabled": {{ .Values.gateway.controlUi.enabled | default true }},
-          "basePath": {{ .Values.gateway.controlUi.basePath | default "/openclaw" | quote }},
+          "enabled": {{ if .Values.gateway.controlUi }}{{ .Values.gateway.controlUi.enabled | default true }}{{ else }}true{{ end }},
+          "basePath": {{ if .Values.gateway.controlUi }}{{ .Values.gateway.controlUi.basePath | default "/openclaw" | quote }}{{ else }}"/openclaw"{{ end }},
           "dangerouslyAllowHostHeaderOriginFallback": true
         }
       },
