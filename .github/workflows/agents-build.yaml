@@ -258,7 +258,7 @@ jobs:
 
       - name: Build and push base image
         if: steps.check.outputs.exists == 'false' || inputs.force_rebuild == true
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v5
         with:
           context: .
           file: ./infra/images/runtime/Dockerfile
@@ -328,7 +328,7 @@ jobs:
           echo "📦 Sidecar version: $VERSION"
 
       - name: Build and push linear-sidecar
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: ./infra/images/linear-sidecar/Dockerfile
@@ -385,7 +385,7 @@ jobs:
           echo "📦 cursor version (dir hash): $VERSION"
 
       - name: Build cursor (cache warmup)
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v5
         with:
           context: ./infra/images/cursor
           file: ./infra/images/cursor/Dockerfile
@@ -588,7 +588,7 @@ jobs:
         # Registry cache will help with base image layers
 
       - name: Build and push image
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v5
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
