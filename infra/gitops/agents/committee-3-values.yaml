@@ -99,6 +99,10 @@ nats:
 plugins:
   nats-messenger:
 
+tools:
+  acp:
+    enabled: false
+
 ssh:
   enabled: false
 toolsServer:
