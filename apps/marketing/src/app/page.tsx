@@ -14,8 +14,9 @@ const squads: AgentSquad[] = [
         role: "Technical Program Manager",
         avatar: "/agents/morgan-avatar-512.png",
         color: "from-cyan-400 to-pink-500",
-        description: "Orchestrates project lifecycles—syncing GitHub with Linear, decomposing PRDs into tasks.",
-        stack: ["Linear", "GitHub", "PRDs"],
+        description: "Orchestrates project lifecycles—syncing GitHub with Linear, decomposing PRDs into tasks. Research tools for docs, web, and codebase context.",
+        tools: ["Context7", "Firecrawl", "Perplexity", "Tavily", "Exa", "Repomix", "Linear", "GitHub"],
+        skills: ["PRD Analysis", "Deep Research", "Multi-Agent", "Brainstorming", "Writing Plans"],
       },
     ],
   },
@@ -29,7 +30,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/rex-avatar-512.png",
         color: "from-orange-500 to-red-500",
         description: "Builds high-performance APIs and systems-level infrastructure. When microseconds matter.",
-        stack: ["Rust", "Tokio", "Axum"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Rust Patterns", "Error Handling", "Axum/Tokio", "Compound Engineering"],
       },
       {
         name: "Grizz",
@@ -37,7 +39,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/grizz-avatar-512.png",
         color: "from-amber-500 to-orange-400",
         description: "Ships bulletproof backend services, REST/gRPC APIs, and Kubernetes operators.",
-        stack: ["Go", "gRPC", "PostgreSQL"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Go Patterns", "Concurrency", "gRPC/Chi", "Systematic Debugging"],
       },
       {
         name: "Nova",
@@ -45,7 +48,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/nova-avatar-512.png",
         color: "from-purple-500 to-cyan-400",
         description: "Rapid API development and third-party integrations. Speed-to-market specialist.",
-        stack: ["Node.js", "TypeScript", "Fastify"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Effect Patterns", "Elysia", "Drizzle", "Better Auth"],
       },
     ],
   },
@@ -59,7 +63,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/blaze-avatar-512.png",
         color: "from-blue-500 to-cyan-500",
         description: "Creates stunning web applications with modern component libraries.",
-        stack: ["React", "Next.js", "shadcn/ui"],
+        tools: ["Context7", "shadcn/ui", "AI Elements", "TanStack", "GitHub"],
+        skills: ["Frontend Excellence", "React Best Practices", "Anime.js", "Frontend Design"],
       },
       {
         name: "Tap",
@@ -67,7 +72,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/tap-avatar-512.png",
         color: "from-green-500 to-emerald-400",
         description: "Native-quality iOS and Android apps from a single TypeScript codebase.",
-        stack: ["Expo", "React Native", "NativeWind"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Expo Patterns", "React Native", "EAS Build", "Frontend Design"],
       },
       {
         name: "Spark",
@@ -75,7 +81,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/spark-avatar-512.png",
         color: "from-blue-500 to-yellow-400",
         description: "Cross-platform desktop apps with native integrations and offline-first architecture.",
-        stack: ["Electron", "Tauri", "React"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Electron Patterns", "Tauri", "Frontend Design"],
       },
     ],
   },
@@ -89,7 +96,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/cleo-avatar-512.png",
         color: "from-emerald-500 to-teal-500",
         description: "Refactors for maintainability and ensures enterprise-grade code quality.",
-        stack: ["Code Review", "Patterns", "Best Practices"],
+        tools: ["Context7", "Firecrawl", "Repomix", "GitHub"],
+        skills: ["Code Review", "Evaluation", "Code Maturity", "Advanced Evaluation"],
       },
       {
         name: "Cipher",
@@ -97,7 +105,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/cipher-avatar-512.png",
         color: "from-red-500 to-rose-500",
         description: "Runs security audits, dependency scans, and ensures OWASP compliance.",
-        stack: ["Trivy", "Gitleaks", "OWASP"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Semgrep", "CodeQL", "SARIF", "Variant Analysis", "Audit Prep"],
       },
       {
         name: "Tess",
@@ -105,7 +114,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/tess-avatar-512.png",
         color: "from-violet-500 to-purple-500",
         description: "Creates comprehensive test suites—unit, integration, and e2e.",
-        stack: ["Jest", "Playwright", "Vitest"],
+        tools: ["Context7", "Kubernetes", "GitHub"],
+        skills: ["Testing Strategies", "Playwright", "TDD", "Property-Based Testing"],
       },
     ],
   },
@@ -119,7 +129,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/stitch-avatar-512.png",
         color: "from-orange-500 to-blue-400",
         description: "Reviews every PR with surgical precision—catches bugs, suggests improvements.",
-        stack: ["PR Review", "Linting", "Standards"],
+        tools: ["Context7", "Octocode", "GitHub"],
+        skills: ["PR Review", "Code Review", "Differential Review"],
       },
       {
         name: "Atlas",
@@ -127,7 +138,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/atlas-avatar-512.png",
         color: "from-slate-500 to-zinc-500",
         description: "Manages PR merges, rebases stale branches, and ensures clean integration.",
-        stack: ["Git", "Rebasing", "CI/CD"],
+        tools: ["Context7", "Repomix", "GitHub"],
+        skills: ["Git Integration", "Git Worktrees", "Multi-Agent", "Finishing Branch"],
       },
       {
         name: "Bolt",
@@ -135,7 +147,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/bolt-avatar-512.png",
         color: "from-yellow-500 to-amber-500",
         description: "Your always-on SRE. Provisions bare metal, deploys services, monitors health, and triggers self-healing — so you never get paged.",
-        stack: ["Kubernetes", "Bare Metal", "GitOps"],
+        tools: ["Context7", "Kubernetes", "GitHub"],
+        skills: ["Kubernetes Operators", "ArgoCD/GitOps", "Secrets Mgmt", "Observability", "MCP Builder"],
       },
     ],
   },
@@ -258,19 +271,19 @@ export default function Home() {
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan/60"></span>
-                    <span>Rust, Go, Node.js, Python</span>
+                    <span>Rust, Go, Node.js, TypeScript</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan/60"></span>
-                    <span>React, Vue, Svelte, Next.js</span>
+                    <span>React, Next.js, Expo, Electron</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan/60"></span>
-                    <span>FastAPI, Express, Axum, Chi</span>
+                    <span>Axum, Elysia/Bun, Chi, gRPC</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan/60"></span>
-                    <span>Electron, Expo, Unity</span>
+                    <span>FastAPI (planned), more coming soon</span>
                   </div>
                 </div>
               </div>
@@ -320,7 +333,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
-                    <span>GPT-4, Claude, Gemini models</span>
+                    <span>o3, GPT-4o, Gemini 2.5 models</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
@@ -449,9 +462,9 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Linear Agent API</h3>
+                <h3 className="text-xl font-semibold mb-2">Linear Integration</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Native Linear integration with real-time agent activities. Watch your AI team work in your project board.
+                  Full Linear integration syncing GitHub issues, agent activities, and project boards in real time.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {["PRD Intake", "Task Sync", "Live Updates"].map(feature => (
@@ -485,12 +498,12 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Database Operators</h3>
+                <h3 className="text-xl font-semibold mb-2">Kubernetes Operators</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Replace managed cloud services with open-source Kubernetes operators. 60-80% cost savings.
+                  Replace managed cloud services with open-source operators. CloudNativePG, KubeAI, NVIDIA GPU, Kafka, and more — all self-hosted.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["PostgreSQL", "Redis", "Kafka", "MongoDB"].map(db => (
+                  {["CloudNativePG", "KubeAI", "NVIDIA GPU", "SeaweedFS", "Kotal"].map(db => (
                     <span key={db} className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-500">{db}</span>
                   ))}
                 </div>
@@ -521,12 +534,12 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Bring Your Own Keys</h3>
+                <h3 className="text-xl font-semibold mb-2">Managed or Bring Your Own</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Your API keys, your infrastructure credentials. Stored in OpenBao (HashiCorp Vault fork). Zero vendor lock-in.
+                  We handle your bare metal relationships — or bring your own API keys and credentials. Stored in OpenBao. Zero lock-in.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["OpenBao", "Zero Trust", "BYOK"].map(feature => (
+                  {["Managed Infra", "OpenBao", "Zero Trust"].map(feature => (
                     <span key={feature} className="text-xs px-2 py-1 rounded bg-purple-500/10 text-purple-500">{feature}</span>
                   ))}
                 </div>
