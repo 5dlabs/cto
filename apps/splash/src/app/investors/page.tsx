@@ -1,5 +1,6 @@
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { InvestorCtaButtons } from "@/components/investor-cta-buttons";
 
 const highlights = [
   {
@@ -312,29 +313,7 @@ export default function InvestorsPage() {
               conversation, or meet the founder.
             </p>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <a
-                href="/5dlabs-investor-one-pager.pdf"
-                download
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-lg hover:from-cyan-600 hover:to-blue-600 transition-all shadow-xl shadow-cyan-500/30 hover:shadow-cyan-500/50 text-center"
-              >
-                Download One-Pager (PDF)
-              </a>
-              <a
-                href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
-              >
-                Schedule a Call
-              </a>
-              <a
-                href="/founder"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
-              >
-                Meet the Founder
-              </a>
-            </div>
+            <InvestorCtaButtons />
             <p className="text-sm text-muted-foreground mt-6">
               Full pitch deck available upon request.
             </p>
