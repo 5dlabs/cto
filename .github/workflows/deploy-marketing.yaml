@@ -42,5 +42,5 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/marketing
           wranglerVersion: "4"
-          command: pages deploy out --project-name=cto-marketing --commit-dirty=true
+          command: pages deploy out --project-name=cto-marketing --branch=main --commit-dirty=true
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
