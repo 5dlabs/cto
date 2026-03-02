@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { GridPulse } from "@/components/grid-pulse";
+import { MagneticFilingsBackgroundSwitch } from "@/components/magnetic-filings-background";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -304,6 +306,13 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
       >
+        <Script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="da83813e-ccdc-4b94-944a-66f476db85ef"
+          strategy="afterInteractive"
+        />
+        <MagneticFilingsBackgroundSwitch />
         <GridPulse />
         {children}
       </body>

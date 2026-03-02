@@ -88,6 +88,7 @@ export function Header() {
           <Link
             key={link.name}
             href={link.href}
+            prefetch={false}
             className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all"
           >
             {link.name}
