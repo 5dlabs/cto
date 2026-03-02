@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 
 const buttonClass =
-  "px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-colors text-center inline-block";
+  "px-8 py-4 rounded-lg border border-cyan/20 bg-cyan/10 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/40 hover:bg-cyan/15 transition-colors text-center inline-block";
 
 export function InvestorCtaButtons() {
   return (
