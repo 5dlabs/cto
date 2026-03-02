@@ -9,7 +9,7 @@ const ventures: Venture[] = [
     name: "CTO",
     tagline: "The thing to build the thing.",
     description:
-      "A multi-agent AI engineering platform. Thirteen specialized agents ship complete features — from PRD to production — autonomously on self-healing bare metal infrastructure.",
+      "A multi-agent AI engineering platform. Specialized agents ship complete features — from PRD to production — autonomously on self-healing bare metal infrastructure.",
     tags: ["Multi-Agent", "Kubernetes", "OpenClaw", "Bare Metal"],
     color: "from-cyan-500 to-blue-500",
     href: "https://cto.5dlabs.ai",

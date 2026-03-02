@@ -22,10 +22,11 @@ const row1: TechItem[] = [
 // Row 2: Delivery, security, integrations
 const row2: TechItem[] = [
   { name: "ArgoCD", color: "#EF7B4D", category: "Continuous Delivery" },
-  { name: "Argo Workflows", color: "#EF7B4D", category: "Workflow Engine" },
-  { name: "Argo Events", color: "#EF7B4D", category: "Event Automation" },
   { name: "OpenBao", color: "#FFEC6E", category: "Secret Management" },
   { name: "External Secrets", color: "#6C5CE7", category: "BYOK Sync" },
+  { name: "Snyk", color: "#4C4CFF", category: "SCA" },
+  { name: "Nuclei", color: "#00BCD4", category: "Pentest CLI" },
+  { name: "Aikido", color: "#6C63FF", category: "AI Security" },
   { name: "Trivy", color: "#1904DA", category: "Vulnerability Scanning" },
   { name: "Gitleaks", color: "#FF4444", category: "Secret Detection" },
   { name: "GitHub", color: "#FFFFFF", category: "Source Control" },
@@ -49,7 +50,7 @@ const row3: TechItem[] = [
   { name: "ChatGPT", color: "#10A37F", category: "Model" },
   { name: "Gemini", color: "#4285F4", category: "Model" },
   { name: "DeepSeek", color: "#00BFFF", category: "Self-Hosted" },
-  { name: "Qwen", color: "#FF6B00", category: "Self-Hosted" },
+  { name: "Qwen3", color: "#FF6B00", category: "Self-Hosted" },
   { name: "Ollama", color: "#FFFFFF", category: "Self-Hosted" },
   { name: "vLLM", color: "#FF6B6B", category: "Self-Hosted" },
 ];
@@ -140,9 +141,9 @@ const categories = [
     color: "orange",
   },
   {
-    title: "Continuous Delivery & Workflows",
+    title: "Continuous Delivery",
     description:
-      "GitOps deployments, workflow orchestration, and event-driven automation as a service",
+      "GitOps deployments with ArgoCD — continuously reconciled, automated rollouts, and instant rollback",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -153,7 +154,7 @@ const categories = [
         />
       </svg>
     ),
-    items: ["ArgoCD", "Argo Workflows", "Argo Events"],
+    items: ["ArgoCD"],
     color: "purple",
   },
   {
@@ -170,7 +171,7 @@ const categories = [
         />
       </svg>
     ),
-    items: ["OpenBao", "External Secrets", "Trivy", "Gitleaks"],
+    items: ["OpenBao", "External Secrets", "Snyk", "Nuclei", "Aikido", "Trivy", "Gitleaks"],
     color: "green",
   },
   {

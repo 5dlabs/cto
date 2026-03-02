@@ -190,7 +190,9 @@ export function AgentGrid({ squads }: AgentGridProps) {
                 ? "max-w-sm grid-cols-1 mx-auto"
                 : squad.agents.length === 2
                   ? "grid-cols-1 sm:grid-cols-2"
-                  : "grid-cols-1 md:grid-cols-3"
+                  : squad.agents.length === 4
+                    ? "grid-cols-1 sm:grid-cols-2"
+                    : "grid-cols-1 md:grid-cols-3"
             )}
           >
             {squad.agents.map((agent, agentIndex) => (

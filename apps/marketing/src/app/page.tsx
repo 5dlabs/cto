@@ -51,6 +51,14 @@ const squads: AgentSquad[] = [
         tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
         skills: ["Effect Patterns", "Elysia", "Drizzle", "Better Auth"],
       },
+      {
+        name: "Viper",
+        role: "Python Specialist",
+        color: "from-yellow-500 to-green-500",
+        description: "Data pipelines, ML workflows, automation scripts, and backend services in Python. Fast iteration, clean packages.",
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["FastAPI", "Pydantic", "Async Python", "Data Pipelines", "ML Tooling"],
+      },
     ],
   },
   {
@@ -105,8 +113,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/cipher-avatar-512.png",
         color: "from-red-500 to-rose-500",
         description: "Runs security audits, dependency scans, and pen tests. Scans at code level then attacks deployed apps to find what static analysis misses.",
-        tools: ["Context7", "Firecrawl", "Tavily", "OpenCode", "GitHub"],
-        skills: ["Semgrep", "CodeQL", "Pen Testing", "Red Teaming", "SARIF", "Audit Prep"],
+        tools: ["Context7", "Firecrawl", "Tavily", "OpenCode", "GitHub", "Snyk", "Nuclei", "Aikido"],
+        skills: ["Semgrep", "CodeQL", "Pen Testing", "Red Teaming", "SARIF", "Audit Prep", "Supply Chain"],
       },
       {
         name: "Tess",
@@ -167,8 +175,8 @@ const squads: AgentSquad[] = [
     ],
   },
   {
-    title: "Immersive",
-    emoji: "🥽",
+    title: "Immersive & Gaming",
+    emoji: "🎮",
     agents: [
       {
         name: "Vex",
@@ -177,6 +185,14 @@ const squads: AgentSquad[] = [
         description: "Builds cross-platform VR and XR experiences with Unity and OpenXR. From Quest to PC to spatial web.",
         tools: ["Context7", "Octocode", "Firecrawl", "GitHub"],
         skills: ["Unity", "OpenXR", "Meta XR", "Three.js", "Cross-Platform XR"],
+      },
+      {
+        name: "Glitch",
+        role: "Game Developer",
+        color: "from-fuchsia-500 to-pink-500",
+        description: "Builds games and interactive experiences — indie titles, serious games, and browser-based play. Unity, Godot, Unreal, and WebGL.",
+        tools: ["Context7", "GitHub", "Firecrawl", "Tavily"],
+        skills: ["Unity", "Godot", "Unreal Engine", "WebGL", "Game Physics", "Shader Programming"],
       },
     ],
   },
@@ -409,17 +425,34 @@ export default function Home() {
         {/* Infrastructure Providers Section */}
         <section id="infrastructure" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16">
+            <div className="text-center mb-10">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Bare Metal <span className="gradient-text">Everywhere</span>
+                One Platform, <span className="gradient-text">17+ Providers</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Deploy on dedicated servers worldwide. Skip the cloud tax and own your infrastructure.
+                Frictionless bare metal — no vendor research, no contracts, no provisioning delays. We maintain inventory across 17+ providers worldwide. Pick a region, pick your specs — we handle the rest.
               </p>
+            </div>
+
+            {/* Feature callouts */}
+            <div className="grid sm:grid-cols-3 gap-4 mb-12">
+              <div className="p-5 rounded-xl border border-cyan/20 bg-cyan/5">
+                <p className="text-sm font-semibold text-cyan mb-1">🗺 Region-First Deployment</p>
+                <p className="text-xs text-muted-foreground">Pick any region worldwide. We surface available servers from inventory in real time.</p>
+              </div>
+              <div className="p-5 rounded-xl border border-cyan/20 bg-cyan/5">
+                <p className="text-sm font-semibold text-cyan mb-1">📦 Always-Available Inventory</p>
+                <p className="text-xs text-muted-foreground">Because we span 17+ providers, you&apos;re not blocked by one provider&apos;s stock constraints.</p>
+              </div>
+              <div className="p-5 rounded-xl border border-cyan/20 bg-cyan/5">
+                <p className="text-sm font-semibold text-cyan mb-1">🤝 Fully Managed Contracts</p>
+                <p className="text-xs text-muted-foreground">We manage vendor relationships and procurement. You pay us, we handle the rest.</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
+                { name: "5D Labs", region: "Victoria, BC, Canada", desc: "Our own data center", own: true },
                 { name: "Latitude.sh", region: "Americas, Europe, Asia", desc: "Global bare-metal cloud" },
                 { name: "Hetzner", region: "Germany, Finland", desc: "European dedicated servers" },
                 { name: "OVH", region: "Europe, Americas, Asia", desc: "Global bare-metal & cloud" },
@@ -439,13 +472,102 @@ export default function Home() {
               ].map((provider) => (
                 <div
                   key={provider.name}
-                  className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center hover:border-cyan/30 transition-colors"
+                  className={`p-4 rounded-xl border bg-card/30 backdrop-blur-sm text-center hover:border-cyan/30 transition-colors relative ${
+                    (provider as { own?: boolean }).own
+                      ? "border-cyan/40 bg-cyan/5"
+                      : "border-border/50"
+                  }`}
                 >
+                  {(provider as { own?: boolean }).own && (
+                    <span className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 rounded font-medium bg-cyan/20 text-cyan">✦ Our DC</span>
+                  )}
                   <h4 className="font-semibold mb-1 text-foreground">{provider.name}</h4>
                   <p className="text-xs text-muted-foreground mb-1">{provider.region}</p>
                   <p className="text-xs text-muted-foreground">{provider.desc}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Multi-Region Cluster Connectivity Section */}
+        <section className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Connected Across Regions & <span className="gradient-text">Providers</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Spin up clusters in different regions — even on different providers — and they stay network-connected. Encrypted tunnels between every node, cross-cluster service discovery, and unified network policy. From your application&apos;s perspective, it&apos;s one flat network.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-6">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-2">Cross-Provider Mesh</h3>
+                <p className="text-sm text-muted-foreground">Encrypted cluster-to-cluster networking. Every node connected regardless of provider or region.</p>
+              </div>
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-2">Automatic Failover</h3>
+                <p className="text-sm text-muted-foreground">If a data center goes down, traffic shifts to healthy regions automatically. Zero manual intervention.</p>
+              </div>
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-2">Transparent Redundancy</h3>
+                <p className="text-sm text-muted-foreground">Use up to 5 providers simultaneously. If one has better pricing or availability, we route there. Your app doesn&apos;t notice.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Cloud Exit Journey Section */}
+        <section className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Your Path Out of <span className="gradient-text">the Cloud</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Most teams don&apos;t exit cloud overnight. CTO supports every stage — and we provide the infrastructure AND the tooling to complete the transition.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-6 mb-8">
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="text-xs font-mono text-muted-foreground mb-3 uppercase tracking-wider">[1] Cloud</div>
+                <h3 className="font-semibold mb-2 text-foreground">Still on AWS/GCP?</h3>
+                <p className="text-sm text-muted-foreground">We meet you there. Start shipping with AI agents now.</p>
+              </div>
+              <div className="p-6 rounded-xl border border-cyan/20 bg-cyan/5 backdrop-blur-sm relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-muted-foreground text-sm">→</div>
+                <div className="text-xs font-mono text-cyan mb-3 uppercase tracking-wider">[2] Hosted Bare Metal</div>
+                <h3 className="font-semibold mb-2 text-foreground">Dedicated servers at 17+ global providers.</h3>
+                <p className="text-sm text-muted-foreground">Your infra, your data, our management layer.</p>
+              </div>
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-muted-foreground text-sm">→</div>
+                <div className="text-xs font-mono text-muted-foreground mb-3 uppercase tracking-wider">[3] On-Prem / Colo</div>
+                <h3 className="font-semibold mb-2 text-foreground">Own hardware, your facility or ours.</h3>
+                <p className="text-sm text-muted-foreground">Full sovereignty. We still manage it.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl border border-border/30 bg-muted/20 text-center">
+              <p className="text-sm text-muted-foreground">We provide the migration tooling and automation — not just the destination.</p>
             </div>
           </div>
         </section>
@@ -462,7 +584,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
               {/* Project Management */}
               <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-10 h-10 rounded-lg bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mb-4">
@@ -539,6 +661,22 @@ export default function Home() {
                 <div className="flex flex-wrap gap-1.5">
                   {["GitHub Apps", "GitHub Actions", "ArgoCD", "Webhooks", "PR Automation"].map(name => (
                     <span key={name} className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-green-500/10 text-green-400">{name}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Security Scanning */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Security Scanning</h3>
+                <p className="text-xs text-muted-foreground mb-4">Vulnerability scanning, SCA, AI-native remediation, and supply-chain protection — all surfaced through Cipher&apos;s agent interface.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Snyk", "Nuclei", "Aikido", "Socket", "Trivy", "Gitleaks", "Datadog", "Dynatrace"].map(name => (
+                    <span key={name} className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-rose-500/10 text-rose-400">{name}</span>
                   ))}
                 </div>
               </div>
@@ -703,18 +841,18 @@ export default function Home() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-8">
                   {[
-                    { name: "Ethereum", types: "Validator · Archive · RPC", status: "live" },
-                    { name: "NEAR", types: "Validator · Archive · RPC", status: "live" },
-                    { name: "BASE", types: "Full · RPC", status: "live" },
-                    { name: "Solana", types: "Validator · RPC", status: "beta" },
-                    { name: "Aptos", types: "Full · Validator", status: "live" },
-                    { name: "Polkadot", types: "Validator · RPC", status: "live" },
-                    { name: "Bitcoin", types: "Full · RPC", status: "live" },
-                    { name: "Filecoin", types: "Full · Storage", status: "live" },
-                    { name: "Chainlink", types: "Oracle Nodes", status: "live" },
-                    { name: "The Graph", types: "Indexer Nodes", status: "live" },
-                    { name: "Stacks", types: "RPC · API", status: "live" },
-                    { name: "OP Stack L2s", types: "Sequencer · RPC", status: "beta" },
+                    { name: "Ethereum", types: "Validator · Archive · RPC", status: "live", trading: false },
+                    { name: "Solana", types: "Validator · RPC", status: "live", trading: true },
+                    { name: "Sui", types: "Full · RPC", status: "live", trading: true },
+                    { name: "NEAR", types: "Validator · Archive · RPC", status: "live", trading: true },
+                    { name: "BASE", types: "Full · RPC", status: "live", trading: true },
+                    { name: "Aptos", types: "Full · Validator", status: "live", trading: false },
+                    { name: "Bitcoin", types: "Full · RPC", status: "live", trading: false },
+                    { name: "Arbitrum", types: "Full · RPC", status: "live", trading: false },
+                    { name: "Optimism", types: "Full · RPC", status: "live", trading: false },
+                    { name: "Chainlink", types: "Oracle Nodes", status: "live", trading: false },
+                    { name: "The Graph", types: "Indexer Nodes", status: "live", trading: false },
+                    { name: "LayerZero", types: "Relayer Nodes", status: "beta", trading: false },
                   ].map((chain) => (
                     <div key={chain.name} className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm hover:border-amber-500/30 transition-colors">
                       <div className="flex items-center justify-between mb-1.5">
@@ -722,6 +860,9 @@ export default function Home() {
                         <span className={`w-2 h-2 rounded-full shrink-0 ${chain.status === "live" ? "bg-green-500" : "bg-amber-500 animate-[pulse_2s_ease-in-out_infinite]"}`} />
                       </div>
                       <p className="text-[11px] text-muted-foreground">{chain.types}</p>
+                      {chain.trading && (
+                        <span className="mt-1.5 inline-block text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-500/10 text-amber-400">★ Trading</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -784,11 +925,11 @@ export default function Home() {
                       accent: "pink",
                     },
                     {
-                      name: "Qwen 2.5",
+                      name: "Qwen3",
                       creator: "Alibaba",
                       context: "128K",
                       tags: ["Multilingual", "General"],
-                      note: "Best-in-class Chinese + English performance",
+                      note: "Best-in-class multilingual performance, strong coding and reasoning benchmarks",
                       accent: "orange",
                     },
                     {
