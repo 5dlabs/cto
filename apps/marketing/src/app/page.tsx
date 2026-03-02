@@ -548,6 +548,199 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Blockchain & AI Section */}
+        <section id="web3-ai" className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Built for <span className="gradient-text">Blockchain & AI Teams</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Blockchain companies and AI labs share the same problem: they need powerful, sovereign infrastructure without cloud lock-in. CTO ships both.
+              </p>
+            </div>
+
+            <div className="space-y-20">
+
+              {/* ── Blockchain Node Deployment ── */}
+              <div>
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold">Blockchain Node Deployment</h3>
+                  <div className="h-px flex-1 bg-border/40" />
+                </div>
+                <p className="text-muted-foreground mb-8 max-w-3xl">
+                  Spin up L1 and L2 validator nodes, RPC endpoints, and archive nodes on dedicated bare metal. Our blockchain operator handles upgrades, peer discovery, and failover automatically — no DevOps team required.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-8">
+                  {[
+                    { name: "Ethereum", types: "Validator · Archive · RPC", status: "live" },
+                    { name: "NEAR", types: "Validator · Archive · RPC", status: "live" },
+                    { name: "BASE", types: "Full · RPC", status: "live" },
+                    { name: "Solana", types: "Validator · RPC", status: "beta" },
+                    { name: "Aptos", types: "Full · Validator", status: "live" },
+                    { name: "Polkadot", types: "Validator · RPC", status: "live" },
+                    { name: "Bitcoin", types: "Full · RPC", status: "live" },
+                    { name: "Filecoin", types: "Full · Storage", status: "live" },
+                    { name: "Chainlink", types: "Oracle Nodes", status: "live" },
+                    { name: "The Graph", types: "Indexer Nodes", status: "live" },
+                    { name: "Stacks", types: "RPC · API", status: "live" },
+                    { name: "OP Stack L2s", types: "Sequencer · RPC", status: "beta" },
+                  ].map((chain) => (
+                    <div key={chain.name} className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm hover:border-amber-500/30 transition-colors">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-semibold text-sm text-foreground">{chain.name}</span>
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${chain.status === "live" ? "bg-green-500" : "bg-amber-500 animate-[pulse_2s_ease-in-out_infinite]"}`} />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">{chain.types}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div className="p-5 rounded-xl border border-amber-500/20 bg-amber-500/5">
+                    <p className="text-sm font-semibold text-amber-400 mb-1">Self-Managing Nodes</p>
+                    <p className="text-xs text-muted-foreground">Automatic upgrades, peer discovery, and chain sync. Bolt monitors node health 24/7 and self-heals on failure.</p>
+                  </div>
+                  <div className="p-5 rounded-xl border border-amber-500/20 bg-amber-500/5">
+                    <p className="text-sm font-semibold text-amber-400 mb-1">GitOps-Driven</p>
+                    <p className="text-xs text-muted-foreground">Node configs live in Git. Version-controlled chain deployments with one-command rollback to any prior state.</p>
+                  </div>
+                  <div className="p-5 rounded-xl border border-amber-500/20 bg-amber-500/5">
+                    <p className="text-sm font-semibold text-amber-400 mb-1">Sovereign Key Storage</p>
+                    <p className="text-xs text-muted-foreground">Validator keys stored in OpenBao on your hardware. Never leave your infrastructure. Zero custody risk.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Self-Hosted AI on GPU Bare Metal ── */}
+              <div>
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold">Self-Hosted AI on GPU Bare Metal</h3>
+                  <div className="h-px flex-1 bg-border/40" />
+                </div>
+                <p className="text-muted-foreground mb-8 max-w-3xl">
+                  Run frontier open-weight models on your own NVIDIA GPU hardware. Served via KubeAI with OpenAI-compatible endpoints — no API costs, no data leaving your cluster, no rate limits.
+                </p>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  {[
+                    {
+                      name: "DeepSeek V3",
+                      creator: "DeepSeek",
+                      context: "128K",
+                      tags: ["Coding", "General"],
+                      note: "Matches GPT-4o across most benchmarks",
+                      accent: "cyan",
+                    },
+                    {
+                      name: "DeepSeek R1",
+                      creator: "DeepSeek",
+                      context: "128K",
+                      tags: ["Math", "Reasoning"],
+                      note: "97.3% MATH-500 — rivals OpenAI o1",
+                      accent: "cyan",
+                    },
+                    {
+                      name: "MiniMax-Text-01",
+                      creator: "MiniMax",
+                      context: "1M",
+                      tags: ["Long Context", "Agents"],
+                      note: "1M token context, beats GPT-4o on LongBench",
+                      accent: "pink",
+                    },
+                    {
+                      name: "Qwen 2.5",
+                      creator: "Alibaba",
+                      context: "128K",
+                      tags: ["Multilingual", "General"],
+                      note: "Best-in-class Chinese + English performance",
+                      accent: "orange",
+                    },
+                    {
+                      name: "GLM-4",
+                      creator: "Zhipu AI",
+                      context: "128K",
+                      tags: ["Chinese", "General"],
+                      note: "Strong coding and instruction following",
+                      accent: "blue",
+                    },
+                    {
+                      name: "Yi",
+                      creator: "01.AI",
+                      context: "200K",
+                      tags: ["Long Context", "General"],
+                      note: "200K context, Apache 2.0 licensed",
+                      accent: "indigo",
+                    },
+                    {
+                      name: "Llama 4",
+                      creator: "Meta",
+                      context: "128K",
+                      tags: ["General", "Multilingual"],
+                      note: "Open-weight, commercially licensed",
+                      accent: "blue",
+                    },
+                    {
+                      name: "Mistral Large",
+                      creator: "Mistral AI",
+                      context: "256K",
+                      tags: ["Coding", "Reasoning"],
+                      note: "92% HumanEval — top coding performance",
+                      accent: "violet",
+                    },
+                  ].map((model) => (
+                    <div key={model.name} className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm hover:border-purple-500/30 transition-colors">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                          <p className="font-semibold text-sm text-foreground">{model.name}</p>
+                          <p className="text-[11px] text-muted-foreground">{model.creator}</p>
+                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 font-mono shrink-0">
+                          {model.context}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {model.tags.map(tag => (
+                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted/50 text-muted-foreground">{tag}</span>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">{model.note}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-6 rounded-xl border border-purple-500/20 bg-purple-500/5 backdrop-blur-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-6">
+                    <div className="flex-1">
+                      <p className="font-semibold mb-1">Deployment Stack</p>
+                      <p className="text-sm text-muted-foreground">
+                        Models sourced from Hugging Face, served via KubeAI (Kubernetes-native) or Ollama for development. Use vLLM in production for up to 19× higher throughput. NVIDIA GPU Operator handles driver and plugin lifecycle automatically across your bare metal fleet.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end shrink-0">
+                      {["KubeAI", "Ollama", "vLLM", "Hugging Face", "NVIDIA GPU Op."].map(t => (
+                        <span key={t} className="text-xs px-3 py-1 rounded-full border border-purple-500/30 text-purple-300 bg-purple-500/10 whitespace-nowrap">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
         {/* Why CTO Section */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
