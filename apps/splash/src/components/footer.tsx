@@ -9,7 +9,6 @@ const footerLinks = [
       { name: "CTO Platform", href: "https://cto.5dlabs.ai" },
       { name: "Agentic Trading", href: "/#ventures" },
       { name: "OpenClaw Platform", href: "https://github.com/5dlabs/openclaw-platform" },
-      { name: "Sanctuary", href: "/#ventures" },
     ],
   },
   {

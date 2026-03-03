@@ -279,25 +279,6 @@ export default function InvestorsPage() {
                   View on GitHub
                 </a>
               </div>
-
-              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-2xl font-bold">Sanctuary</h3>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
-                    Building
-                  </span>
-                </div>
-                <p className="text-emerald-400 text-sm font-medium mb-2">
-                  AI Life Architect for Smart Homes
-                </p>
-                <p className="text-muted-foreground">
-                  A privacy-forward AI system that turns multimodal life signals
-                  into textural orchestration — shaping lighting, sound, temperature,
-                  and microinterventions to improve wellbeing and household flow.
-                  Demonstrates the studio model extending beyond crypto and dev tools.
-                </p>
-              </div>
             </div>
           </div>
         </section>

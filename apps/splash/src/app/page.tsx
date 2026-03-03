@@ -35,15 +35,6 @@ const ventures: Venture[] = [
     status: "building",
   },
   {
-    name: "Sanctuary",
-    tagline: "Your home becomes a supportive director.",
-    description:
-      "A privacy-forward AI Life Architect that turns multimodal life signals — sensors, devices, calendar, purchases — into textural orchestration: shaping your environment, pacing, and microinterventions for wellbeing and household flow.",
-    tags: ["Smart Home", "AI", "IoT", "Wellness", "Privacy-First"],
-    color: "from-emerald-500 to-teal-500",
-    status: "building",
-  },
-  {
     name: "What's Next?",
     tagline: "Always building.",
     description:

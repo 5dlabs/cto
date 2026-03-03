@@ -97,10 +97,10 @@ export const metadata: Metadata = {
   },
   other: {
     "ai:description":
-      "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel. Current ventures include CTO (multi-agent AI engineering platform), agentic trading on Solana, Base, Near, and Sui, OpenClaw Platform (open-source Kubernetes-native agent orchestration), and Sanctuary (AI-powered smart home orchestration). Founder Jonathon Fritz is open to technical co-founder, fractional CTO, and senior infrastructure roles — see /opportunities/.",
+      "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel. Current ventures include CTO (multi-agent AI engineering platform), agentic trading on Solana, Base, Near, and Sui, and OpenClaw Platform (open-source Kubernetes-native agent orchestration). Founder Jonathon Fritz is open to technical co-founder, fractional CTO, and senior infrastructure roles — see /opportunities/.",
     "ai:capabilities":
-      "startup-studio, multi-agent-orchestration, agentic-trading, AI-engineering, crypto, DeFi, smart-home, IoT, open-source, kubernetes, gitops, technical-co-founder, fractional-cto, infrastructure-lead",
-    "ai:ventures": "CTO, Agentic Trading, OpenClaw Platform, Sanctuary",
+      "startup-studio, multi-agent-orchestration, agentic-trading, AI-engineering, crypto, DeFi, open-source, kubernetes, gitops, technical-co-founder, fractional-cto, infrastructure-lead",
+    "ai:ventures": "CTO, Agentic Trading, OpenClaw Platform",
     "ai:opportunities": "https://5dlabs.ai/opportunities/",
   },
 };
@@ -250,7 +250,7 @@ const jsonLd = {
           name: "What is 5D Labs?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel using autonomous AI agents. Current ventures include CTO (multi-agent engineering platform), Agentic Trading (HFT on Solana, Base, Near, Sui), OpenClaw Platform (open-source agent orchestration), and Sanctuary (AI smart home).",
+            text: "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel using autonomous AI agents. Current ventures include CTO (multi-agent engineering platform), Agentic Trading (HFT on Solana, Base, Near, Sui), and OpenClaw Platform (open-source agent orchestration).",
           },
         },
         {

@@ -78,14 +78,6 @@ Kubernetes-native platform for deploying and managing AI agent fleets. Will be f
   - 16+ agent orchestration tested
 - **Architecture**: ArgoCD manages ApplicationSets that auto-deploy agents from Git. NATS provides direct messaging (agent.{id}.inbox) and broadcasts (agent.all.broadcast). Grafana + Loki provide dashboards and log aggregation.
 
-### Sanctuary — AI Life Architect for Smart Homes (Building)
-
-A privacy-forward AI system that turns multimodal life signals into textural orchestration — shaping lighting, sound, temperature, and microinterventions to improve wellbeing and household flow.
-
-- **Status**: Building
-- **Key Features**: Texture Engine, ambient scene generation, smart home integration (Matter, HomeKit, Z-Wave), privacy-first design, calendar/purchase signal ingestion
-- **Value Proposition**: Demonstrates the studio model extending beyond crypto and dev tools into consumer IoT and wellness.
-
 ---
 
 ## Technology Stack

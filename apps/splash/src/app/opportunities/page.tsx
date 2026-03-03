@@ -185,7 +185,6 @@ const ventures = [
   { name: "CTO Platform", desc: "Multi-agent AI engineering platform", href: "https://cto.5dlabs.ai", status: "Pre-launch" },
   { name: "OpenClaw Platform", desc: "Open-source Kubernetes-native agent orchestration", href: "https://github.com/5dlabs/openclaw-platform", status: "Building" },
   { name: "Agentic Trading", desc: "Autonomous on-chain trading agents on Solana, Base, Near, and Sui", href: null, status: "Building" },
-  { name: "Sanctuary", desc: "AI-powered smart home orchestration", href: null, status: "Building" },
 ];
 
 export default function OpportunitiesPage() {
