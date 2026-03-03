@@ -242,7 +242,7 @@ export default function TeamPage() {
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
                 <span className="text-sm text-cyan font-medium">
-                  13 Agents. 0 Humans.*
+                  AI Agents. 0 Humans.*
                 </span>
               </div>
 

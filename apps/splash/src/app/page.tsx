@@ -107,8 +107,8 @@ export default function Home() {
                 <span>ventures in flight</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-foreground">13</span>
-                <span>AI agents</span>
+                <span className="text-2xl font-bold text-foreground">17+</span>
+                <span>infra providers</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">3</span>
@@ -299,12 +299,76 @@ export default function Home() {
                 { title: "Every Major Model", text: "We use them all — frontier and open-weight. Best model for each task, swapped in as new ones drop." },
                 { title: "Cost Optimized", text: "Bare metal over cloud. Self-hosted inference over API calls. 60-80% savings on infrastructure without sacrificing performance." },
                 { title: "Always Current", text: "New model? Integrated within days. New CLI? Already supported. We move at the speed of the industry — or faster." },
-                { title: "Agent Orchestration", text: "Thirteen specialized agents coordinated across development, trading, and operations. Each with its own identity, skills, and tools." },
+                { title: "Agent Orchestration", text: "Specialized agents coordinated across development, trading, and operations. Each with its own identity, skills, and tools — and the roster keeps growing." },
                 { title: "Open at the Core", text: "Key infrastructure and tooling released as open source. We contribute upstream and build on open standards wherever possible." },
               ].map((item) => (
                 <div key={item.title} className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                   <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
                   <p className="text-muted-foreground text-sm">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Business Agents Section */}
+        <section className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[oklch(0.7_0.25_320)]/20 bg-[oklch(0.7_0.25_320)]/5 mb-6">
+                <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.7_0.25_320)] animate-pulse" />
+                <span className="text-xs text-[oklch(0.7_0.25_320)] font-medium uppercase tracking-wider">
+                  Coming Soon
+                </span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Beyond Engineering — <span className="gradient-text">Business Agents</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                The next wave of specialized agents. Legal, marketing, and finance — autonomous, expert, and always available.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-6">
+              {[
+                {
+                  name: "Lex",
+                  role: "Legal Counsel",
+                  color: "from-blue-600 to-indigo-600",
+                  description: "Contract review, compliance checks, and legal risk assessment. Trained on your jurisdiction, your agreements, your standards.",
+                },
+                {
+                  name: "Hype",
+                  role: "Marketing Strategist",
+                  color: "from-orange-500 to-rose-500",
+                  description: "Campaign strategy, copy, and analytics. From brand voice to conversion — autonomous marketing that moves as fast as your product.",
+                },
+                {
+                  name: "Tally",
+                  role: "Accounting Specialist",
+                  color: "from-emerald-600 to-teal-600",
+                  description: "Bookkeeping, reconciliation, and financial reporting. Always accurate, always current, zero overhead.",
+                },
+              ].map((agent) => (
+                <div
+                  key={agent.name}
+                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm flex flex-col gap-4"
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`w-[72px] h-[72px] sm:w-[88px] sm:h-[88px] lg:w-[112px] lg:h-[112px] rounded-full bg-gradient-to-br ${agent.color} flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shrink-0 ring-2 ring-border/50`}
+                    >
+                      {agent.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-lg text-foreground">{agent.name}</p>
+                      <p className="text-sm text-muted-foreground">{agent.role}</p>
+                      <span className="text-[10px] uppercase tracking-widest text-[oklch(0.7_0.25_320)]/70 font-medium">
+                        In Development
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{agent.description}</p>
                 </div>
               ))}
             </div>

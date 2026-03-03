@@ -131,7 +131,7 @@ const stats = [
   { value: "20+", label: "years in infrastructure & engineering" },
   { value: "1B+", label: "daily requests managed (Pocket Network)" },
   { value: "50+", label: "blockchain clients operated" },
-  { value: "13", label: "AI agents shipping production code" },
+  { value: "60+", label: "MCP tools integrated" },
 ];
 
 const consultingJsonLd = {

@@ -6,7 +6,7 @@ const stats = [
   { value: "20+", label: "years in production infra" },
   { value: "10,600+", label: "GitHub contributions (last year)" },
   { value: "1B+", label: "daily requests managed" },
-  { value: "13", label: "AI agents shipping code" },
+  { value: "60+", label: "MCP tools integrated" },
   { value: "60–80%", label: "cost savings on migrations" },
   { value: "SE→CTO", label: "in 3 months at Coinmiles" },
 ];
@@ -155,7 +155,7 @@ const caseStudies = [
     color: "cyan",
     problem:
       "Early-stage startups can't afford full engineering teams, but need production-grade software infrastructure from day one.",
-    what: "Built a Cognitive Task Orchestrator deploying 13 specialized AI agents — Rex (Orchestrator), Blaze (Implementer), Morgan (Architect), Sentinel (Security), Pixel (Frontend), Echo (QA) — across the full SDLC. Runs on bare-metal Kubernetes with Talos Linux, ArgoCD, Cilium, and a full observability stack. Custom MCP server with 60+ tools and a self-healing system with 9 automated remediation types.",
+    what: "Built a Cognitive Task Orchestrator deploying specialized AI agents — Rex (Orchestrator), Blaze (Implementer), Morgan (Architect), Sentinel (Security), Pixel (Frontend), Echo (QA) — across the full SDLC. Runs on bare-metal Kubernetes with Talos Linux, ArgoCD, Cilium, and a full observability stack. Custom MCP server with 60+ tools and a self-healing system with 9 automated remediation types.",
     result:
       "\"CTO as a Service\" platform replacing early engineering hires at 60–80% lower infrastructure cost than cloud. Open-sourced under AGPL-3.0.",
   },

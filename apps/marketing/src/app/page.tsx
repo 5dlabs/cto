@@ -225,7 +225,7 @@ export default function Home() {
 
             {/* Subheadline */}
             <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10">
-              Thirteen specialized AI agents that ship complete features. From requirements to deployed code—automatically.
+              A growing team of specialized AI agents that ship complete features. From requirements to deployed code—automatically.
             </p>
 
             {/* CTA Buttons */}
@@ -248,8 +248,8 @@ export default function Home() {
                 <span>cost savings vs cloud</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-foreground">13</span>
-                <span>specialized agents</span>
+                <span className="text-2xl font-bold text-foreground">17+</span>
+                <span>infra providers</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">∞</span>
@@ -274,7 +274,7 @@ export default function Home() {
                 We Brought the <span className="gradient-text">Whole Team</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                Not one generic AI—thirteen domain experts working in parallel across your entire development lifecycle.
+                Not one generic AI — a full team of domain experts working in parallel across your entire development lifecycle.
               </p>
             </div>
 
@@ -1017,7 +1017,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Multi-Agent</h3>
                 <p className="text-sm text-muted-foreground">
-                  13 specialists working in parallel. PM, backend, frontend, QA, security, DevOps—all coordinated.
+                  A full team of specialists working in parallel. PM, backend, frontend, QA, security, DevOps — all coordinated.
                 </p>
               </div>
 
@@ -1072,7 +1072,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Complete Engineering Team</h3>
                 <p className="text-muted-foreground">
-                  Not an AI assistant. Thirteen specialists across PM, backend, frontend, quality, security, testing, and deployment.
+                  Not an AI assistant. Specialists across PM, backend, frontend, quality, security, testing, and deployment.
                 </p>
               </div>
             </div>

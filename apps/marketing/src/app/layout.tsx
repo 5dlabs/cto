@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "CTO by 5D Labs | AI Engineering Collective",
   description:
-    "Thirteen AI specialists from the Fifth Dimension. Multi-agent orchestration on self-healing bare metal. 60-80% less than cloud. Bring your own CLI and keys.",
+    "Specialized AI agents from the Fifth Dimension. Multi-agent orchestration on self-healing bare metal. 60-80% less than cloud. Bring your own CLI and keys.",
   keywords: [
     "AI engineering team",
     "AI agents",
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "CTO by 5D Labs | AI Engineering Collective",
     description:
-      "Thirteen AI specialists. Multi-agent orchestration on self-healing bare metal. 60-80% less than cloud.",
+      "Specialized AI agents. Multi-agent orchestration on self-healing bare metal. 60-80% less than cloud.",
     url: "https://cto.5dlabs.ai",
     siteName: "CTO by 5D Labs",
     locale: "en_US",
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "CTO by 5D Labs | AI Engineering Collective",
     description:
-      "Thirteen AI specialists. Multi-agent orchestration on self-healing bare metal. 60-80% less than cloud.",
+      "Specialized AI agents. Multi-agent orchestration on self-healing bare metal. 60-80% less than cloud.",
     images: ["/twitter-image.png"],
     creator: "@5dlabs",
   },
@@ -83,11 +83,11 @@ export const metadata: Metadata = {
   // For AI agents/crawlers
   other: {
     "ai:description":
-      "CTO is a multi-agent AI engineering platform with 13 specialized agents (Rex, Blaze, Nova, Grizz, etc.) that deploy on bare metal infrastructure. Supports Claude Code, Cursor, Factory, Codex CLIs with BYOK model.",
+      "CTO is a multi-agent AI engineering platform with specialized agents (Rex, Grizz, Nova, Viper, Blaze, Cipher, Bolt, and more) that deploy on bare metal infrastructure. Supports Claude Code, Cursor, Factory, Codex CLIs with BYOK model.",
     "ai:capabilities":
       "code-generation, code-review, security-analysis, testing, infrastructure-setup, project-management",
     "ai:agents":
-      "Morgan, Rex, Grizz, Nova, Blaze, Tap, Spark, Vex, Cleo, Cipher, Tess, Atlas, Bolt",
+      "Morgan, Rex, Grizz, Nova, Viper, Blaze, Tap, Spark, Cleo, Cipher, Tess, Stitch, Atlas, Bolt, Block, Vex, Glitch",
   },
 };
 
@@ -112,7 +112,7 @@ const jsonLd = {
       url: "https://cto.5dlabs.ai",
       name: "CTO by 5D Labs",
       description:
-        "AI Engineering Collective - Thirteen AI specialists on self-healing bare metal infrastructure",
+        "AI Engineering Collective - Specialized AI agents on self-healing bare metal infrastructure",
       publisher: {
         "@id": "https://cto.5dlabs.ai/#organization",
       },
@@ -124,7 +124,7 @@ const jsonLd = {
       applicationCategory: "DeveloperApplication",
       operatingSystem: "Cloud, On-Premises",
       description:
-        "Multi-agent AI engineering platform with 13 specialized agents for software development, deployment, and maintenance on bare metal infrastructure.",
+        "Multi-agent AI engineering platform with specialized AI agents for software development, deployment, and maintenance on bare metal infrastructure.",
       offers: {
         "@type": "Offer",
         price: "0",
@@ -154,7 +154,7 @@ const jsonLd = {
           name: "What is CTO?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "CTO is an AI-powered engineering collective with 13 specialized AI agents that work together to build, ship, and maintain software on self-healing bare metal infrastructure.",
+            text: "CTO is an AI-powered engineering collective with specialized AI agents that work together to build, ship, and maintain software on self-healing bare metal infrastructure.",
           },
         },
         {
@@ -178,7 +178,7 @@ const jsonLd = {
           name: "What AI agents are included?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "CTO includes 13 specialized agents: Morgan (project management), Rex (Rust), Grizz (Go), Nova (Node.js), Blaze (React), Tap (Mobile), Spark (Desktop), Vex (XR), Cleo (code review), Cipher (security), Tess (testing), Atlas (integration), and Bolt (infrastructure & SRE). Self-healing infrastructure is built into the platform.",
+            text: "CTO includes specialized agents: Morgan (project management), Rex (Rust), Grizz (Go), Nova (Node.js), Viper (Python), Blaze (React), Tap (Mobile), Spark (Desktop), Cleo (code review), Cipher (security), Tess (testing), Stitch (PR review), Atlas (integration), Bolt (infrastructure & SRE), Block (blockchain), Vex (XR), and Glitch (game dev). Self-healing infrastructure is built into the platform.",
           },
         },
       ],

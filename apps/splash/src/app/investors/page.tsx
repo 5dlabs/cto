@@ -4,9 +4,9 @@ import { InvestorCtaButtons } from "@/components/investor-cta-buttons";
 
 const highlights = [
   {
-    metric: "13",
-    label: "AI Agents",
-    description: "Specialized autonomous agents powering our operations",
+    metric: "17+",
+    label: "Infra Providers",
+    description: "Global bare metal providers across every major region",
   },
   {
     metric: "5+",
@@ -148,7 +148,7 @@ export default function InvestorsPage() {
                 <p>
                   5D Labs is positioned at this inflection point. We&apos;ve
                   built OpenClaw — an agent orchestration platform that
-                  coordinates 13 specialized AI agents across the full software
+                  coordinates specialized AI agents across the full software
                   development lifecycle. And we&apos;re using it to run a startup
                   studio that validates multiple ventures in parallel.
                 </p>
@@ -217,7 +217,7 @@ export default function InvestorsPage() {
                   Multi-Agent AI Engineering Platform
                 </p>
                 <p className="text-muted-foreground mb-4">
-                  Thirteen specialized AI agents that ship complete features from
+                  Specialized AI agents that ship complete features from
                   PRD to production. Self-healing bare metal infrastructure with
                   60-80% cost savings vs. cloud. Our flagship product and the
                   first proof that the model works.

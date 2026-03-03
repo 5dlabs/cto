@@ -385,7 +385,7 @@ export default function BgPreviewPage() {
           </h1>
 
           <p className="text-xl text-white/50 max-w-2xl mx-auto mb-10">
-            Thirteen specialized AI agents that ship complete features. From requirements to deployed code — automatically.
+            Specialized AI agents that ship complete features. From requirements to deployed code — automatically.
           </p>
 
           <div className="flex flex-wrap justify-center gap-8 text-sm text-white/50">
@@ -394,8 +394,8 @@ export default function BgPreviewPage() {
               <span>cost savings vs cloud</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-white">13</span>
-              <span>specialized agents</span>
+              <span className="text-2xl font-bold text-white">60+</span>
+              <span>MCP tools integrated</span>
             </div>
           </div>
         </div>
