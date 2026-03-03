@@ -191,8 +191,8 @@ export default function Home() {
                 Our <span className="gradient-text">Ventures</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                From AI engineering platforms to on-chain trading agents, open-source
-                tooling, and smart homes — here&apos;s what we&apos;re building.
+                From AI engineering platforms to on-chain trading agents and open-source
+                tooling — here&apos;s what we&apos;re building.
               </p>
             </div>
 
@@ -316,11 +316,11 @@ export default function Home() {
                 Beyond Engineering — <span className="gradient-text">Business Agents</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                The next wave of specialized agents. Legal, marketing, and finance — autonomous, expert, and always available.
+                The next wave of specialized agents. Legal, marketing, finance, and sales — autonomous, expert, and always available.
               </p>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-6">
+            <div className="grid sm:grid-cols-2 gap-6">
               {[
                 {
                   name: "Lex",
@@ -340,6 +340,12 @@ export default function Home() {
                   color: "from-emerald-600 to-teal-600",
                   description: "Bookkeeping, reconciliation, and financial reporting. Always accurate, always current, zero overhead.",
                 },
+                {
+                  name: "Chase",
+                  role: "Sales Agent",
+                  color: "from-amber-500 to-yellow-500",
+                  description: "Outreach, pipeline management, and closing. Handles discovery, follow-ups, and deal tracking so your team stays focused on building.",
+                },
               ].map((agent) => (
                 <div
                   key={agent.name}
@@ -347,7 +353,7 @@ export default function Home() {
                 >
                   <div className="flex items-center gap-4">
                     <div
-                      className={`w-[72px] h-[72px] sm:w-[88px] sm:h-[88px] lg:w-[112px] lg:h-[112px] rounded-full bg-gradient-to-br ${agent.color} flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shrink-0 ring-2 ring-border/50`}
+                      className={`w-[80px] h-[80px] sm:w-[96px] sm:h-[96px] lg:w-[120px] lg:h-[120px] rounded-full bg-gradient-to-br ${agent.color} flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shrink-0 ring-2 ring-border/50`}
                     >
                       {agent.name.charAt(0)}
                     </div>
