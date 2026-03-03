@@ -888,9 +888,41 @@ export default function Home() {
                   <h3 className="text-xl font-semibold">Self-Hosted AI on GPU Bare Metal</h3>
                   <div className="h-px flex-1 bg-border/40" />
                 </div>
-                <p className="text-muted-foreground mb-8 max-w-3xl">
-                  Run frontier open-weight models on your own NVIDIA GPU hardware. Served via KubeAI with OpenAI-compatible endpoints — no API costs, no data leaving your cluster, no rate limits.
+                <p className="text-muted-foreground mb-6 max-w-3xl">
+                  Run frontier open-weight models on your own infrastructure. Start with shared inference pools during development, scale to dedicated GPU bare metal when volume justifies it — same OpenAI-compatible API throughout.
                 </p>
+
+                <div className="grid sm:grid-cols-3 gap-3 mb-8">
+                  {[
+                    {
+                      tier: "Shared Inference",
+                      desc: "Serverless GPU pools via Together AI, Fireworks, or Groq. Pay per token, zero commitment — ideal for development and low-volume workloads.",
+                      note: "~$0.20–$0.90 / 1M tokens",
+                      color: "border-border/50 bg-card/20",
+                      labelColor: "text-muted-foreground",
+                    },
+                    {
+                      tier: "GPU VMs",
+                      desc: "Single-tenant GPU instances (Latitude vGPU, RunPod). Hourly billing, no noisy neighbours — right-sized for mid-scale production.",
+                      note: "~$0.40–$1.70 / hr per GPU",
+                      color: "border-purple-500/20 bg-purple-500/5",
+                      labelColor: "text-purple-300",
+                    },
+                    {
+                      tier: "Bare Metal GPU",
+                      desc: "Full NVIDIA GPU nodes on dedicated servers. No per-token cost, no data leaving your cluster, maximum throughput. Economical at 100k+ tokens/min.",
+                      note: "~$0.83–$1.66 / hr (H100 reserved)",
+                      color: "border-purple-500/30 bg-purple-500/10",
+                      labelColor: "text-purple-200",
+                    },
+                  ].map((t) => (
+                    <div key={t.tier} className={`p-4 rounded-xl border ${t.color} backdrop-blur-sm`}>
+                      <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${t.labelColor}`}>{t.tier}</p>
+                      <p className="text-sm text-muted-foreground mb-2">{t.desc}</p>
+                      <p className="text-xs font-mono text-muted-foreground/60">{t.note}</p>
+                    </div>
+                  ))}
+                </div>
 
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                   {[
