@@ -111,7 +111,7 @@ export function AgentCard({ agent }: AgentCardProps) {
               </p>
             )}
           </div>
-          {hasDetails && (
+          {hasDetails && !agent.badge && (
             <div
               className={cn(
                 "relative z-10 size-2 shrink-0 rounded-full bg-gradient-to-r animate-[pulse_3s_ease-in-out_infinite]",
