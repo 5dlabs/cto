@@ -186,6 +186,7 @@ const squads: AgentSquad[] = [
       {
         name: "Glitch",
         role: "Game Developer",
+        avatar: "/agents/glitch-avatar-512.png",
         color: "from-fuchsia-500 to-pink-500",
         description: "Builds games and interactive experiences — indie titles, serious games, and browser-based play. Unity, Godot, Unreal, and WebGL.",
         tools: ["Context7", "GitHub", "Firecrawl", "Tavily"],
