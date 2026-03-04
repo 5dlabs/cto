@@ -168,6 +168,7 @@ const squads: AgentSquad[] = [
       {
         name: "Block",
         role: "Blockchain Specialist",
+        avatar: "/agents/block-avatar-512.png",
         color: "from-amber-500 to-orange-500",
         description: "Deploys and operates blockchain nodes across every supported chain. Validator setup, RPC endpoints, archive nodes — all on bare metal.",
         tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
@@ -176,6 +177,7 @@ const squads: AgentSquad[] = [
       {
         name: "Vex",
         role: "VR/Unity Developer",
+        avatar: "/agents/vex-avatar-512.png",
         color: "from-violet-500 to-indigo-500",
         description: "Builds cross-platform VR and XR experiences with Unity and OpenXR. From Quest to PC to spatial web.",
         tools: ["Context7", "Octocode", "Firecrawl", "GitHub"],
