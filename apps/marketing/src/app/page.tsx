@@ -54,6 +54,7 @@ const squads: AgentSquad[] = [
       {
         name: "Viper",
         role: "Python Specialist",
+        avatar: "/agents/viper-avatar-512.svg",
         color: "from-yellow-500 to-green-500",
         description: "Data pipelines, ML workflows, automation scripts, and backend services in Python. Fast iteration, clean packages.",
         tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
