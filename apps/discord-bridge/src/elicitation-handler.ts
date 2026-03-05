@@ -343,7 +343,10 @@ export function createDiscordElicitationHandler(
         return;
       }
 
-      if (!selectedValue) return;
+      if (!selectedValue) {
+        await interaction.deferUpdate();
+        return;
+      }
 
       if (entry.timeoutTimer) clearTimeout(entry.timeoutTimer);
 
