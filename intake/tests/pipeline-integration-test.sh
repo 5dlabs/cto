@@ -66,7 +66,9 @@ for prompt in parse-prd-system.md parse-prd-user.md analyze-complexity-system.md
   analyze-complexity-user.md expand-task-system.md expand-task-user.md \
   vote-system.md vote-user.md optimist-soul.md pessimist-soul.md \
   deliberation-conductor-system.md compile-design-brief-system.md \
-  codebase-analysis-system.md; do
+  codebase-analysis-system.md \
+  voter-architect-soul.md voter-pragmatist-soul.md voter-minimalist-soul.md \
+  voter-operator-soul.md voter-strategist-soul.md; do
   filepath="$INTAKE_DIR/prompts/$prompt"
   if [ -f "$filepath" ]; then
     pass "$prompt exists"
@@ -584,6 +586,57 @@ for mapping in verdict suggestions tally_result; do
     pass "voting outputs $mapping"
   else
     fail "voting output: $mapping" "$mapping not found in voting output_mappings"
+  fi
+done
+
+# =========================================================================
+# Test 13: Voting committee soul diversity
+# =========================================================================
+echo ""
+echo "=== Test 13: Voting Committee Soul Diversity ==="
+
+voting_wf="$INTAKE_DIR/workflows/voting.lobster.yaml"
+
+# Check each voter references a distinct soul prompt
+for soul in voter-architect-soul voter-pragmatist-soul voter-minimalist-soul \
+  voter-operator-soul voter-strategist-soul; do
+  if grep -q "$soul" "$voting_wf" 2>/dev/null; then
+    pass "voting workflow references $soul"
+  else
+    fail "voting soul: $soul" "$soul not found in voting workflow"
+  fi
+done
+
+# Check model diversity — at least 3 distinct providers
+provider_count=$(grep -o '"provider": "[^"]*"' "$voting_wf" 2>/dev/null | sort -u | wc -l | tr -d ' ')
+if [ "$provider_count" -ge 3 ]; then
+  pass "voting committee uses $provider_count distinct providers"
+else
+  fail "provider diversity" "Expected >= 3 providers, found $provider_count"
+fi
+
+# Check model diversity — all 5 models should be distinct
+model_count=$(grep -o '"model": "[^"]*"' "$voting_wf" 2>/dev/null | sort -u | wc -l | tr -d ' ')
+if [ "$model_count" -ge 5 ]; then
+  pass "voting committee uses $model_count distinct models"
+else
+  fail "model diversity" "Expected 5 distinct models, found $model_count"
+fi
+
+# Check each soul prompt has Identity and Evaluation Lens sections
+for soul in voter-architect-soul voter-pragmatist-soul voter-minimalist-soul \
+  voter-operator-soul voter-strategist-soul; do
+  filepath="$INTAKE_DIR/prompts/${soul}.md"
+  if [ -f "$filepath" ]; then
+    has_identity=$(grep -c "^# Identity" "$filepath" 2>/dev/null || true)
+    has_lens=$(grep -c "^# Evaluation Lens" "$filepath" 2>/dev/null || true)
+    has_bias=$(grep -c "^# Scoring Bias" "$filepath" 2>/dev/null || true)
+    has_voice=$(grep -c "^# Voice" "$filepath" 2>/dev/null || true)
+    if [ "$has_identity" -ge 1 ] && [ "$has_lens" -ge 1 ] && [ "$has_bias" -ge 1 ] && [ "$has_voice" -ge 1 ]; then
+      pass "$soul has all 4 sections (Identity, Evaluation Lens, Scoring Bias, Voice)"
+    else
+      fail "$soul structure" "Missing sections: Identity=$has_identity Lens=$has_lens Bias=$has_bias Voice=$has_voice"
+    fi
   fi
 done
 
