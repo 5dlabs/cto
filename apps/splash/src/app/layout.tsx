@@ -139,7 +139,7 @@ const jsonLd = {
         "Multi-Agent Systems",
         "Blockchain Development",
         "Solana",
-        "High-Frequency Trading",
+        "Autonomous Trading Infrastructure",
         "Kubernetes",
         "DevOps",
         "OpenClaw",
@@ -197,7 +197,7 @@ const jsonLd = {
         "Solana Development",
         "Kubernetes Consulting",
         "DevOps Consulting",
-        "HFT Trading Systems",
+        "Autonomous Trading Systems",
         "Platform Engineering",
       ],
       areaServed: {
@@ -250,7 +250,7 @@ const jsonLd = {
           name: "What is 5D Labs?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel using autonomous AI agents. Current ventures include CTO (multi-agent engineering platform), Agentic Trading (HFT on Solana, Base, Near, Sui), and OpenClaw Platform (open-source agent orchestration).",
+            text: "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel using autonomous AI agents. Current ventures include CTO (multi-agent engineering platform), Agentic Trading (autonomous trading infrastructure on Solana, Base, Near, Sui), and OpenClaw Platform (open-source agent orchestration).",
           },
         },
         {
@@ -274,7 +274,7 @@ const jsonLd = {
           name: "What blockchains does 5D Labs support?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "5D Labs operates agentic trading systems across Solana (for raw speed and HFT), Base (for Ethereum-grade composability), Near (for AI-native smart contracts), and Sui (for Move and object-centric DeFi).",
+            text: "5D Labs operates agentic trading systems across Solana (for low-latency execution), Base (for Ethereum-grade composability), Near (for AI-native smart contracts), and Sui (for Move and object-centric DeFi).", 
           },
         },
       ],

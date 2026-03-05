@@ -14,7 +14,7 @@ const highlights = [
     description: "Parallel initiatives across AI, crypto, open-source tooling, smart home, and infrastructure",
   },
   {
-    metric: "3",
+    metric: "4",
     label: "Blockchains",
     description: "Agentic trading on Solana, Base, Near, and Sui",
   },
@@ -241,14 +241,14 @@ export default function InvestorsPage() {
                   </span>
                 </div>
                 <p className="text-[oklch(0.7_0.25_320)] text-sm font-medium mb-2">
-                  HFT-Grade Autonomous Trading on Solana, Base, Near, and Sui
+                  Autonomous Trading Infrastructure on Solana, Base, Near, and Sui
                 </p>
                 <p className="text-muted-foreground">
-                  Hedge-fund-grade trading technology for individuals. AI-driven
+                  Agentic financial infrastructure for companies. AI-driven
                   strategy, execution, and risk management operating autonomously
-                  across DeFi markets 24/7. The same speed and precision that Wall
-                  Street uses — now accessible to everyone. Built on the same
-                  OpenClaw orchestration layer as CTO.
+                  across DeFi markets 24/7. Designed for teams adding programmable
+                  on-chain revenue rails, built on the same OpenClaw orchestration
+                  layer as CTO.
                 </p>
               </div>
 
