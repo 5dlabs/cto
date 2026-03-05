@@ -170,18 +170,76 @@ The `discover-tools` step in `pipeline.lobster.yaml` runs parallel with `build-i
 | `intake/prompts/` | System prompts for each LLM step |
 | `intake/schemas/` | JSON schemas for LLM outputs |
 
+## Bridge Communication (NATS-Free)
+
+The pipeline uses HTTP webhooks instead of NATS. Two bridges handle human-in-the-loop:
+
+| Bridge | Port | Role | Network |
+|--------|------|------|---------|
+| `linear-bridge` | 3100 | Control plane — webhooks, run registry, Lobster resume, Linear Agent API | External via `agents.5dlabs.ai` (Cloudflare Tunnel) |
+| `discord-bridge` | 3200 | Rendering surface — embeds, buttons, select menus | Internal only (ClusterIP) |
+
+**Linear-bridge is the authority.** It receives all external webhooks (Linear Agent Session events), manages run state (RunRegistry), and triggers Lobster resume via durable resume tokens. Discord-bridge renders votes/decisions and forwards user interactions back to linear-bridge.
+
+### Bridge URLs (Environment-Dependent)
+
+| Environment | Linear Bridge URL | Discord Bridge URL |
+|-------------|------|------|
+| **Prod cluster** (main K8s) | `http://linear-bridge.bots.svc:3100` (internal) or `https://agents.5dlabs.ai` (external) | `http://discord-bridge.bots.svc:3200` |
+| **Test EKS cluster** | `https://agents.5dlabs.ai` (via Cloudflare Tunnel — no local bridge needed) | N/A (called by linear-bridge, not by agents) |
+
+Test agents on EKS reach linear-bridge through the Cloudflare Tunnel at `agents.5dlabs.ai`. No bridge deployment is needed on the test cluster — all webhook routing, run registration, and Lobster resume flow through the prod linear-bridge.
+
+### Notification Flow
+
+```
+Workflow step → intake-util bridge-notify
+  → POST linear-bridge/notify  (→ Linear comment / Agent Activity)
+  → POST discord-bridge/notify (→ Discord embed in allocated room)
+
+Elicitation → intake-util bridge-elicitation
+  → POST linear-bridge/elicitation   (→ Linear select signal)
+  → POST discord-bridge/elicitation  (→ Discord embed + buttons)
+  → Lobster approval gate (pause)
+
+Human responds on EITHER platform:
+  Linear:  webhook → linear-bridge → Lobster resume
+  Discord: interaction → discord-bridge → POST linear-bridge/runs/{id}/callback → Lobster resume
+
+Cross-cancel: whichever platform answers first cancels the other.
+```
+
+### Key Bridge Files
+
+| File | Purpose |
+|------|---------|
+| `apps/linear-bridge/src/http-server.ts` | Full HTTP router — webhooks, run registry, elicitation |
+| `apps/linear-bridge/src/run-registry.ts` | Maps runId → {agent, sessionKey, resumeToken} |
+| `apps/linear-bridge/src/agent-session-manager.ts` | Maps deliberation sessions → Linear sessions |
+| `apps/linear-bridge/src/elicitation-handler.ts` | Linear select signal + Lobster resume |
+| `apps/discord-bridge/src/http-server.ts` | Notification + elicitation HTTP API |
+| `apps/discord-bridge/src/elicitation-handler.ts` | Discord embed rendering + interaction → callback |
+| `infra/manifests/linear-bridge/tunnel-binding.yaml` | Cloudflare TunnelBinding for agents.5dlabs.ai |
+| `docs/cloudflare-tunnel-intake-agent.md` | Tunnel setup instructions |
+
 ## intake-util CLI
 
 ```
 intake-util <subcommand> [options]
 
 Subcommands:
-  write-files   --base-path <dir> --type <docs|prompts>
-  tally         --ballots-json <file>
-  fan-out       --prompt <path> --schema <path> --context <json> --provider <p> --model <m> [--concurrency <n>]
-  validate      --type <docs|prompts> --task-ids <json>
-  sync-linear init    --project-name <n> --team-id <id> --prd-content <file>
-  sync-linear issues  --project-id <id> --prd-issue-id <id> --team-id <id> --base-url <url>
+  write-files           --base-path <dir> --type <docs|prompts>
+  tally                 --ballots-json <file>
+  tally-decision-votes  (stdin: vote ballot array)
+  parse-decision-points (stdin: debate turn JSON)
+  fan-out               --prompt <path> --schema <path> --context <json> --provider <p> --model <m> [--concurrency <n>]
+  validate              --type <docs|prompts|tasks|decision-vote|debate-turn|deliberation-result|tally|workflows> [--strict]
+  sync-linear init      --project-name <n> --team-id <id> --prd-content <file>
+  sync-linear issues    --project-id <id> --prd-issue-id <id> --team-id <id> --base-url <url>
+  bridge-notify         --from <agent> --to <target> [--metadata <json>]
+  bridge-elicitation    --session-id <id> --decision-id <id> --vote-result <json> --resume-token <token> --human-review-mode <mode>
+  stack-validators      (stdin: scaffold JSON → validates stack/framework detection)
+  generate-workflow     (stdin: expanded tasks → per-task implementation workflow YAML)
 ```
 
 All subcommands read JSON from stdin when file path arguments are omitted.
