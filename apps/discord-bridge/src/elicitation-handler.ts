@@ -240,7 +240,6 @@ export function createDiscordElicitationHandler(
       timeoutTimer = setTimeout(async () => {
         const p = pending.get(elicitation_id);
         if (!p) return;
-        pending.delete(elicitation_id);
 
         logger.info(`Elicitation ${elicitation_id}: timeout — auto-selecting "${request.recommended_option}"`);
 
@@ -248,6 +247,7 @@ export function createDiscordElicitationHandler(
           selectedOption: request.recommended_option,
         });
         await resolveElicitation(elicitation_id, response);
+        pending.delete(elicitation_id);
 
         const resolvedEmbed = buildEmbed(request, `Timeout — auto-selected: ${request.recommended_option}`);
         await discord.updateMessage(p.channelId, p.messageId, resolvedEmbed);
@@ -282,7 +282,6 @@ export function createDiscordElicitationHandler(
         }
 
         if (entry.timeoutTimer) clearTimeout(entry.timeoutTimer);
-        pending.delete(elicitationId);
 
         await interaction.deferUpdate();
 
@@ -290,6 +289,7 @@ export function createDiscordElicitationHandler(
           userContext: "Human requested re-deliberation via Discord",
         });
         await resolveElicitation(elicitationId, response);
+        pending.delete(elicitationId);
 
         const resolvedEmbed = buildEmbed(entry.request, `Re-deliberation requested by <@${interaction.user.id}>`);
         await discord.updateMessage(entry.channelId, entry.messageId, resolvedEmbed);
@@ -314,7 +314,6 @@ export function createDiscordElicitationHandler(
         }
 
         if (entry.timeoutTimer) clearTimeout(entry.timeoutTimer);
-        pending.delete(elicitationId);
 
         await interaction.deferUpdate();
 
@@ -322,6 +321,7 @@ export function createDiscordElicitationHandler(
           selectedOption: selectedValue,
         });
         await resolveElicitation(elicitationId, response);
+        pending.delete(elicitationId);
 
         const optLabel = entry.request.options.find((o) => o.value === selectedValue)?.label ?? selectedValue;
         const resolvedEmbed = buildEmbed(entry.request, `${optLabel} — selected by <@${interaction.user.id}>`);
@@ -346,7 +346,6 @@ export function createDiscordElicitationHandler(
       if (!selectedValue) return;
 
       if (entry.timeoutTimer) clearTimeout(entry.timeoutTimer);
-      pending.delete(elicitationId);
 
       await interaction.deferUpdate();
 
@@ -354,6 +353,7 @@ export function createDiscordElicitationHandler(
         selectedOption: selectedValue,
       });
       await resolveElicitation(elicitationId, response);
+      pending.delete(elicitationId);
 
       const optLabel = entry.request.options.find((o) => o.value === selectedValue)?.label ?? selectedValue;
       const resolvedEmbed = buildEmbed(entry.request, `${optLabel} — selected by <@${interaction.user.id}>`);
