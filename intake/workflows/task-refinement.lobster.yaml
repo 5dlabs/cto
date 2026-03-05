@@ -1,0 +1,184 @@
+name: task-refinement
+description: >
+  Expand tasks into subtasks, run 5-model quality voting, and revise if needed.
+  Supports up to max_revisions rounds (default 2). If the committee rejects after
+  all rounds, proceeds with the best attempt and attaches a warning.
+
+inputs:
+  - name: tasks
+    type: string
+    description: "Parsed tasks JSON from parse-prd step"
+  - name: complexity
+    type: string
+    description: "Complexity analysis JSON from analyze-complexity step"
+  - name: evaluation_criteria
+    type: string
+    default: "task decomposition quality, dependency ordering, decision point coverage"
+    description: "Criteria string passed to the voting committee"
+  - name: max_revisions
+    type: number
+    default: 2
+    description: "Maximum revision rounds before proceeding regardless"
+
+steps:
+  # ─────────────────────────────────────────────────────────
+  # Round 0: Initial expansion + vote
+  # ─────────────────────────────────────────────────────────
+  - name: expand-round-0
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/expand-task-system.md}}",
+        "input": {
+          "tasks": {{inputs.tasks}},
+          "complexity": {{inputs.complexity}}
+        },
+        "schema": "{{schemas/generated-task.schema.json}}",
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514"
+      }'
+
+  - name: vote-round-0
+    depends_on: [expand-round-0]
+    workflow: voting.lobster.yaml
+    inputs:
+      content_to_evaluate: ${{ steps.expand-round-0.output }}
+      evaluation_criteria: "{{inputs.evaluation_criteria}}"
+
+  - name: check-round-0
+    depends_on: [vote-round-0]
+    command: >
+      echo '${{ steps.vote-round-0.outputs.tally_result }}' | jq '{
+        verdict: .verdict,
+        suggestions: (.suggestions // []),
+        round: 0,
+        needs_revision: (.verdict == "revise" or .verdict == "reject")
+      }'
+
+  # ─────────────────────────────────────────────────────────
+  # Round 1: First revision (conditional on round 0 not approving)
+  # ─────────────────────────────────────────────────────────
+  - name: expand-round-1
+    when: "${{ steps.check-round-0.output | jq -r '.needs_revision' }}"
+    depends_on: [check-round-0]
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/expand-task-system.md}}",
+        "input": {
+          "tasks": {{inputs.tasks}},
+          "complexity": {{inputs.complexity}},
+          "previous_expansion": ${{ steps.expand-round-0.output }},
+          "revision_suggestions": ${{ steps.check-round-0.output | jq '.suggestions' }},
+          "revision_round": 1,
+          "additional_context": "This is revision round 1. The 5-model voting committee flagged issues with the previous expansion. Address the suggestions below while preserving what worked well."
+        },
+        "schema": "{{schemas/generated-task.schema.json}}",
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514"
+      }'
+
+  - name: vote-round-1
+    when: "${{ steps.check-round-0.output | jq -r '.needs_revision' }}"
+    depends_on: [expand-round-1]
+    workflow: voting.lobster.yaml
+    inputs:
+      content_to_evaluate: ${{ steps.expand-round-1.output }}
+      evaluation_criteria: "{{inputs.evaluation_criteria}}"
+
+  - name: check-round-1
+    when: "${{ steps.check-round-0.output | jq -r '.needs_revision' }}"
+    depends_on: [vote-round-1]
+    command: >
+      echo '${{ steps.vote-round-1.outputs.tally_result }}' | jq '{
+        verdict: .verdict,
+        suggestions: (.suggestions // []),
+        round: 1,
+        needs_revision: (.verdict == "revise" or .verdict == "reject")
+      }'
+
+  # ─────────────────────────────────────────────────────────
+  # Round 2: Second revision (conditional on round 1 not approving)
+  # Only runs if max_revisions >= 2
+  # ─────────────────────────────────────────────────────────
+  - name: expand-round-2
+    when: "${{ steps.check-round-1.output | jq -r '.needs_revision' }}"
+    depends_on: [check-round-1]
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/expand-task-system.md}}",
+        "input": {
+          "tasks": {{inputs.tasks}},
+          "complexity": {{inputs.complexity}},
+          "previous_expansion": ${{ steps.expand-round-1.output }},
+          "revision_suggestions": ${{ steps.check-round-1.output | jq '.suggestions' }},
+          "revision_round": 2,
+          "additional_context": "This is revision round 2 (final). The committee still has concerns. Make targeted fixes for the specific issues raised — do not restructure the entire decomposition."
+        },
+        "schema": "{{schemas/generated-task.schema.json}}",
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514"
+      }'
+
+  - name: vote-round-2
+    when: "${{ steps.check-round-1.output | jq -r '.needs_revision' }}"
+    depends_on: [expand-round-2]
+    workflow: voting.lobster.yaml
+    inputs:
+      content_to_evaluate: ${{ steps.expand-round-2.output }}
+      evaluation_criteria: "{{inputs.evaluation_criteria}}"
+
+  - name: check-round-2
+    when: "${{ steps.check-round-1.output | jq -r '.needs_revision' }}"
+    depends_on: [vote-round-2]
+    command: >
+      echo '${{ steps.vote-round-2.outputs.tally_result }}' | jq '{
+        verdict: .verdict,
+        suggestions: (.suggestions // []),
+        round: 2,
+        needs_revision: (.verdict == "revise" or .verdict == "reject")
+      }'
+
+  # ─────────────────────────────────────────────────────────
+  # Resolve: Pick the best expansion output from whichever
+  # round approved (or the last round if all rejected).
+  # Produces the final expanded tasks + vote metadata.
+  # ─────────────────────────────────────────────────────────
+  - name: resolve-output
+    depends_on: [check-round-0, check-round-1, check-round-2]
+    command: >
+      ROUND_2='${{ steps.check-round-2.output }}' &&
+      ROUND_1='${{ steps.check-round-1.output }}' &&
+      ROUND_0='${{ steps.check-round-0.output }}' &&
+      if [ -n "$ROUND_2" ] && [ "$ROUND_2" != "null" ] && [ "$ROUND_2" != "" ]; then
+        FINAL_TASKS='${{ steps.expand-round-2.output }}'
+        FINAL_VOTE="$ROUND_2"
+        REVISION_COUNT=2
+      elif [ -n "$ROUND_1" ] && [ "$ROUND_1" != "null" ] && [ "$ROUND_1" != "" ]; then
+        FINAL_TASKS='${{ steps.expand-round-1.output }}'
+        FINAL_VOTE="$ROUND_1"
+        REVISION_COUNT=1
+      else
+        FINAL_TASKS='${{ steps.expand-round-0.output }}'
+        FINAL_VOTE="$ROUND_0"
+        REVISION_COUNT=0
+      fi &&
+      VERDICT=$(echo "$FINAL_VOTE" | jq -r '.verdict') &&
+      jq -n \
+        --argjson tasks "$FINAL_TASKS" \
+        --argjson vote "$FINAL_VOTE" \
+        --argjson revision_count "$REVISION_COUNT" \
+        --arg verdict "$VERDICT" \
+        --arg warning "$([ "$VERDICT" != "approve" ] && echo "WARNING: Task decomposition proceeded after $REVISION_COUNT revision(s) without full committee approval (verdict: $VERDICT). Review carefully." || echo "")" \
+        '{
+          expanded_tasks: $tasks,
+          final_vote: $vote,
+          revision_count: $revision_count,
+          verdict: $verdict,
+          warning: $warning
+        }'
+
+output_mappings:
+  expanded_tasks: ${{ steps.resolve-output.output | jq '.expanded_tasks' }}
+  verdict: ${{ steps.resolve-output.output | jq -r '.verdict' }}
+  revision_count: ${{ steps.resolve-output.output | jq '.revision_count' }}
+  warning: ${{ steps.resolve-output.output | jq -r '.warning' }}
+  refinement_result: ${{ steps.resolve-output.output }}

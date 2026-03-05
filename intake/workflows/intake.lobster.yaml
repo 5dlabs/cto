@@ -1,16 +1,35 @@
 name: intake
-description: "PRD intake pipeline with voting committee"
+description: >
+  PRD intake pipeline — parses a PRD (or design brief) into tasks, analyzes
+  complexity, expands into subtasks, runs 5-model quality voting, generates
+  documentation and prompts, then commits and opens a PR.
 inputs:
   - name: prd_content
     type: string
+    description: "Full PRD or design brief markdown content"
   - name: prd_path
     type: string
+    description: "Path to the PRD file (for reference in docs)"
   - name: num_tasks
     type: number
     default: 10
+    description: "Target number of top-level tasks to generate"
   - name: project_name
     type: string
     default: "project"
+    description: "Short project slug used for branch names and PR titles"
+  - name: intake_metadata
+    type: string
+    default: ""
+    description: "JSON string of Linear metadata (session_id, prd_issue_id, etc.) for PR body"
+  - name: pr_base_branch
+    type: string
+    default: "main"
+    description: "Base branch for the PR"
+  - name: codebase_context
+    type: string
+    default: ""
+    description: "Structured codebase context from codebase-analysis step (empty for greenfield)"
 
 steps:
   - name: parse-prd
@@ -19,6 +38,7 @@ steps:
         "prompt": "{{prompts/parse-prd-system.md}}\n\n{{prompts/parse-prd-user.md}}",
         "input": {
           "prd_content": "{{inputs.prd_content}}",
+          "codebase_context": "{{inputs.codebase_context}}",
           "num_tasks": {{inputs.num_tasks}},
           "next_id": 1
         },
@@ -28,6 +48,7 @@ steps:
       }'
 
   - name: analyze-complexity
+    depends_on: [parse-prd]
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
         "prompt": "{{prompts/analyze-complexity-system.md}}",
@@ -38,59 +59,65 @@ steps:
       }'
 
   - name: review-tasks
+    depends_on: [analyze-complexity]
     approval:
       message: "Review generated tasks and complexity analysis before expanding"
       show:
         - tasks: ${{ steps.parse-prd.output }}
         - complexity: ${{ steps.analyze-complexity.output }}
 
-  - name: expand-tasks
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/expand-task-system.md}}",
-        "input": {
-          "tasks": ${{ steps.parse-prd.output }},
-          "complexity": ${{ steps.analyze-complexity.output }}
-        },
-        "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514"
-      }'
-
-  - name: vote-on-quality
-    workflow: voting.lobster.yaml
+  # ─────────────────────────────────────────────────────────
+  # Task refinement: expand -> vote -> revise loop (max 2 rounds)
+  # Replaces the old expand-tasks + vote-on-quality steps with a
+  # sub-workflow that gates on committee approval.
+  # ─────────────────────────────────────────────────────────
+  - name: refine-tasks
+    depends_on: [review-tasks]
+    workflow: task-refinement.lobster.yaml
     inputs:
-      content_to_evaluate: ${{ steps.expand-tasks.output }}
+      tasks: ${{ steps.parse-prd.output }}
+      complexity: ${{ steps.analyze-complexity.output }}
       evaluation_criteria: "task decomposition quality, dependency ordering, decision point coverage"
+      max_revisions: 2
 
   - name: generate-docs
+    depends_on: [refine-tasks]
     command: >
-      echo '${{ steps.expand-tasks.output }}' | intake-util generate-docs --base-path .tasks/docs
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | intake-util generate-docs --base-path .tasks/docs
 
   - name: generate-prompts
+    depends_on: [generate-docs]
     command: >
-      echo '${{ steps.expand-tasks.output }}' | intake-util generate-prompts --output-dir .tasks/docs --project-name {{inputs.project_name}}
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | intake-util generate-prompts --output-dir .tasks/docs --project-name {{inputs.project_name}}
 
   - name: commit-outputs
-    description: "Stage all generated task files for PR"
-    depends_on: [generate-prompts, generate-docs, vote-on-quality]
+    description: "Stage all generated task files and open a PR"
+    depends_on: [generate-prompts]
     command: >
+      TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
+      REFINEMENT_WARNING='${{ steps.refine-tasks.outputs.warning }}' &&
       git config user.email "morgan@5dlabs.io" &&
       git config user.name "Morgan (Intake Agent)" &&
-      git checkout -b intake/{{inputs.project_name}}-$(date +%Y%m%d-%H%M%S) &&
+      BRANCH_NAME="intake/{{inputs.project_name}}-$(date +%Y%m%d-%H%M%S)" &&
+      git checkout -b "$BRANCH_NAME" &&
       git add .tasks/ &&
       git diff --staged --stat &&
-      git commit -m "feat(intake): generated tasks for {{inputs.project_name}}
+      git commit -m "feat(intake): generated ${TASK_COUNT} tasks for {{inputs.project_name}}
 
-      Generated by Morgan intake pipeline.
+      Generated by Morgan intake pipeline (Lobster).
       - design-brief.md: resolved decisions and architecture overview
       - tasks/: expanded task breakdown with subtask prompts
-      - docs/: task documentation"
+      - docs/: task documentation and per-agent prompts
+      - Vote verdict: ${{ steps.refine-tasks.outputs.verdict }} (after ${{ steps.refine-tasks.outputs.revision_count }} revision(s))"
 
   - name: create-pr
-    description: "Open GitHub PR with generated tasks, design brief, and subtask docs"
+    description: "Push branch and open GitHub PR"
     depends_on: [commit-outputs]
     command: >
+      TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
+      VERDICT='${{ steps.refine-tasks.outputs.verdict }}' &&
+      REVISION_COUNT='${{ steps.refine-tasks.outputs.revision_count }}' &&
+      WARNING='${{ steps.refine-tasks.outputs.warning }}' &&
       BRANCH=$(git rev-parse --abbrev-ref HEAD) &&
       git push origin "$BRANCH" &&
       gh pr create \
@@ -101,16 +128,26 @@ steps:
 
       ### What's included
       - \`.tasks/docs/design-brief.md\` — Architecture decisions from Optimist vs Pessimist deliberation
-      - \`.tasks/docs/\` — Expanded task descriptions with implementation guidance
-      - Task prompts for each sub-agent
+      - \`.tasks/docs/task-*/\` — Expanded task descriptions with implementation guidance
+      - Per-agent implementation prompts (\`prompt.md\`, \`prompt.xml\`, \`acceptance.md\`)
 
       ### Process
-      1. PRD analyzed and tasks parsed
-      2. Complexity analyzed
-      3. Tasks expanded with full implementation context
-      4. 5-model committee voted on quality
+      1. PRD parsed into ${TASK_COUNT} tasks with agent routing
+      2. Complexity analyzed and subtasks expanded
+      3. 5-model committee voted on task quality — verdict: **${VERDICT}** (${REVISION_COUNT} revision round(s))
+      4. Documentation and prompts generated
+
+      ${WARNING:+> **Note:** $WARNING}
+
+      <!-- intake-metadata: {{inputs.intake_metadata}} -->
 
       _Review and merge to kick off implementation._" \
-        --base main \
+        --base "{{inputs.pr_base_branch}}" \
         --label "intake" 2>&1 | tee /tmp/pr-url.txt &&
       cat /tmp/pr-url.txt
+
+output_mappings:
+  task_count: ${{ steps.refine-tasks.outputs.expanded_tasks | jq 'length' }}
+  pr_url: ${{ steps.create-pr.output }}
+  vote_verdict: ${{ steps.refine-tasks.outputs.verdict }}
+  revision_count: ${{ steps.refine-tasks.outputs.revision_count }}

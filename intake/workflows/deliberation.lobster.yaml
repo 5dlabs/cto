@@ -21,6 +21,10 @@ inputs:
     type: string
     default: ""
     description: "Available operators and services (injected from cluster state)"
+  - name: codebase_context
+    type: string
+    default: ""
+    description: "Structured codebase context from codebase-analysis step (empty for greenfield)"
 
 outputs:
   - name: design_brief
@@ -42,7 +46,13 @@ steps:
     command: >
       jq -n
         --arg prd_content "{{inputs.prd_content}}"
-        '{"operation":"prd_research","payload":{"prd_content":$prd_content}}' | intake-agent
+        --arg codebase_context "{{inputs.codebase_context}}"
+        '{
+          "operation": "prd_research",
+          "payload": {
+            "prd_content": (if $codebase_context != "" then ($prd_content + "\n\n## Existing Codebase Context\n" + $codebase_context) else $prd_content end)
+          }
+        }' | intake-agent
 
   # ─────────────────────────────────────────────────────────
   # Step 2: Conduct the time-boxed debate
@@ -62,6 +72,7 @@ steps:
         --arg session_id "{{inputs.session_id}}"
         --arg prd_content "{{inputs.prd_content}}"
         --arg infra_context "{{inputs.infrastructure_context}}"
+        --arg codebase_context "{{inputs.codebase_context}}"
         --argjson timebox {{inputs.timebox_minutes}}
         --argjson research_memos '${{ steps.research-prd.output }}'
         '{
@@ -69,7 +80,7 @@ steps:
           "payload": {
             "session_id": $session_id,
             "prd_content": $prd_content,
-            "infrastructure_context": $infra_context,
+            "infrastructure_context": (if $codebase_context != "" then ($infra_context + "\n\n## Existing Codebase\n" + $codebase_context) else $infra_context end),
             "timebox_minutes": $timebox,
             "research_memos": $research_memos,
             "vote_timeout_seconds": 120,

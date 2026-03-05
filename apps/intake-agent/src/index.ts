@@ -34,7 +34,6 @@ import {
   validateContentOperation,
   getProviderStatus,
 } from './operations/generate-with-critic';
-import { generateWithDebate } from './operations/generate-with-debate';
 import { generateDocs } from './operations/generate-docs';
 import type { GenerateWithCriticPayload, ProviderName } from './providers/types';
 
@@ -223,35 +222,6 @@ async function handleRequest(request: AgentRequest): Promise<AgentResponse<unkno
       return generateDocs(payload as unknown as Parameters<typeof generateDocs>[0]) as unknown as AgentResponse<unknown>;
     }
 
-    case 'generate_with_debate': {
-      const payload = request.payload as {
-        user_prompt: string;
-        system_prompt?: string;
-        prefill?: string;
-        context?: string;
-        content_type?: string;
-        config?: {
-          generator?: ProviderName;
-          critic?: ProviderName;
-          generator_model?: string;
-          critic_model?: string;
-          max_refinements?: number;
-          critic_threshold?: number;
-        };
-      };
-      if (!payload?.user_prompt) {
-        return errorResponse('Missing user_prompt in payload', 'validation_error');
-      }
-      return generateWithDebate({
-        systemPrompt: payload.system_prompt || 'You are a helpful assistant.',
-        userPrompt: payload.user_prompt,
-        prefill: payload.prefill,
-        context: payload.context,
-        contentType: payload.content_type as 'tasks' | 'code' | 'docs' | 'general' | undefined,
-        config: payload.config,
-      });
-    }
-
     default:
       return errorResponse(`Unknown operation: ${request.operation}`, 'validation_error');
   }
@@ -318,7 +288,6 @@ Operations:
   validate_content       Validate content with AI
   provider_status        Get provider status
   generate_docs          Generate documentation for tasks
-  generate_with_debate   Generate with debate pattern
   deliberate             Run deliberation session on PRD
   prd_research           Research PRD context via Tavily (pre-debate)
 
@@ -383,7 +352,7 @@ async function main(): Promise<void> {
     if (!validateRequest(request)) {
       writeStdout(
         errorResponse(
-          'Invalid request structure. Expected { operation: "ping" | "parse_prd" | "parse_prd_iterative" | "expand_task" | "analyze_complexity" | "generate" | "generate_prompts" | "generate_docs" | "generate_with_debate" | "generate_with_critic" | "validate_content" | "research" | "research_capabilities" | "provider_status" | "deliberate" | "prd_research", payload?: {...} }',
+          'Invalid request structure. Expected { operation: "ping" | "parse_prd" | "parse_prd_iterative" | "expand_task" | "analyze_complexity" | "generate" | "generate_prompts" | "generate_docs" | "generate_with_critic" | "validate_content" | "research" | "research_capabilities" | "provider_status" | "deliberate" | "prd_research", payload?: {...} }',
           'validation_error'
         )
       );

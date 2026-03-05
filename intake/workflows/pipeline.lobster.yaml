@@ -1,0 +1,118 @@
+name: pipeline
+description: >
+  Top-level intake pipeline — optionally analyzes an existing codebase,
+  runs the Optimist/Pessimist deliberation phase, then feeds the resulting
+  context (codebase + design brief, or raw PRD) into the task-generation
+  intake workflow.
+
+inputs:
+  - name: prd_content
+    type: string
+    description: "Full PRD markdown content"
+  - name: project_name
+    type: string
+    default: "project"
+    description: "Short project slug used for branch names and PR titles"
+  - name: num_tasks
+    type: number
+    default: 10
+    description: "Target number of top-level tasks to generate"
+  - name: include_codebase
+    type: boolean
+    default: false
+    description: "When true, analyze existing repo via Repomix/OctoCode before task generation"
+  - name: repository_url
+    type: string
+    default: ""
+    description: "GitHub repository URL for codebase analysis (required when include_codebase=true)"
+  - name: deliberate
+    type: boolean
+    default: false
+    description: "When true, run Optimist/Pessimist deliberation before task generation"
+  - name: timebox_minutes
+    type: number
+    default: 30
+    description: "Deliberation timebox in minutes (ignored when deliberate=false)"
+  - name: infrastructure_context
+    type: string
+    default: ""
+    description: "Available operators and services (injected from cluster state)"
+  - name: intake_metadata
+    type: string
+    default: ""
+    description: "JSON string of Linear metadata for PR body"
+  - name: pr_base_branch
+    type: string
+    default: "main"
+    description: "Base branch for the PR"
+
+steps:
+  # ─────────────────────────────────────────────────────────
+  # Phase 0: Codebase Analysis (conditional)
+  # For non-greenfield projects, pack and analyze the existing
+  # repository to produce structured context that informs both
+  # the deliberation debate and the task generation.
+  # ─────────────────────────────────────────────────────────
+  - name: codebase-analysis
+    when: "{{inputs.include_codebase}}"
+    workflow: codebase-analysis.lobster.yaml
+    inputs:
+      repository_url: "{{inputs.repository_url}}"
+      prd_content: "{{inputs.prd_content}}"
+      branch: "{{inputs.pr_base_branch}}"
+
+  # ─────────────────────────────────────────────────────────
+  # Phase 1: Deliberation (conditional)
+  # Runs the Optimist/Pessimist debate to produce a design brief
+  # that resolves architectural decision points before task generation.
+  # When codebase analysis ran, its context is passed to the debate
+  # agents so they can reference existing architecture.
+  # ─────────────────────────────────────────────────────────
+  - name: deliberation
+    when: "{{inputs.deliberate}}"
+    depends_on: [codebase-analysis]
+    workflow: deliberation.lobster.yaml
+    inputs:
+      prd_content: "{{inputs.prd_content}}"
+      timebox_minutes: "{{inputs.timebox_minutes}}"
+      session_id: "{{inputs.project_name}}-{{timestamp}}"
+      infrastructure_context: "{{inputs.infrastructure_context}}"
+      codebase_context: >
+        {{#if steps.codebase-analysis.outputs.codebase_context}}
+          {{steps.codebase-analysis.outputs.codebase_context}}
+        {{else}}
+        {{/if}}
+
+  # ─────────────────────────────────────────────────────────
+  # Phase 2: Task generation
+  # Uses the design brief from deliberation as the PRD content
+  # when deliberation ran, otherwise uses the raw PRD directly.
+  # Codebase context is passed through so the parse-prd step
+  # can generate tasks that extend existing code.
+  # ─────────────────────────────────────────────────────────
+  - name: intake
+    depends_on: [deliberation, codebase-analysis]
+    workflow: intake.lobster.yaml
+    inputs:
+      prd_content: >
+        {{#if steps.deliberation.outputs.design_brief}}
+          {{steps.deliberation.outputs.design_brief}}
+        {{else}}
+          {{inputs.prd_content}}
+        {{/if}}
+      prd_path: ".tasks/docs/prd.txt"
+      num_tasks: "{{inputs.num_tasks}}"
+      project_name: "{{inputs.project_name}}"
+      intake_metadata: "{{inputs.intake_metadata}}"
+      pr_base_branch: "{{inputs.pr_base_branch}}"
+      codebase_context: >
+        {{#if steps.codebase-analysis.outputs.codebase_context}}
+          {{steps.codebase-analysis.outputs.codebase_context}}
+        {{else}}
+        {{/if}}
+
+output_mappings:
+  codebase_context: ${{ steps.codebase-analysis.outputs.codebase_context }}
+  design_brief: ${{ steps.deliberation.outputs.design_brief }}
+  deliberation_result: ${{ steps.deliberation.outputs.deliberation_result }}
+  pr_url: ${{ steps.intake.outputs.pr_url }}

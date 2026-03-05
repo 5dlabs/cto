@@ -58,6 +58,7 @@ steps:
       }'
 
   - name: tally
+    depends_on: [voter-1, voter-2, voter-3, voter-4, voter-5]
     command: >
       intake-util tally --ballots-json <(echo '[
         ${{ steps.voter-1.output }},
@@ -66,3 +67,8 @@ steps:
         ${{ steps.voter-4.output }},
         ${{ steps.voter-5.output }}
       ]')
+
+output_mappings:
+  verdict: ${{ steps.tally.output | jq -r '.verdict' }}
+  suggestions: ${{ steps.tally.output | jq '.suggestions' }}
+  tally_result: ${{ steps.tally.output }}
