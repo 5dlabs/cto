@@ -34,6 +34,10 @@ ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:full
 
 FROM ${BASE_IMAGE}
 
+LABEL org.opencontainers.image.source="https://github.com/5dlabs/cto"
+LABEL org.opencontainers.image.description="CTO AI Agent - Unified multi-agent platform image"
+LABEL org.opencontainers.image.licenses="MIT"
+
 USER root
 
 # =============================================================================
@@ -73,12 +77,32 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
 ARG OPENCLAW_VERSION=2026.2.12
 RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     if [ "$OPENCLAW_VERSION" = "latest" ]; then \
-        npm install -g --no-audit --no-fund openclaw; \
+        npm install -g --no-audit --no-fund --ignore-scripts openclaw; \
     else \
-        npm install -g --no-audit --no-fund openclaw@${OPENCLAW_VERSION}; \
+        npm install -g --no-audit --no-fund --ignore-scripts openclaw@${OPENCLAW_VERSION}; \
     fi && \
     echo "--- OpenClaw (agent CLI) included ---" && \
     openclaw --version
+
+# =============================================================================
+# ClawHub CLI — skill registry search and installation
+# =============================================================================
+RUN --mount=type=cache,target=/root/.npm,sharing=shared \
+    npm install -g --no-audit --no-fund clawhub@latest && \
+    echo "clawhub installed" && \
+    clawhub --version
+
+# =============================================================================
+# intake-util — deterministic pipeline operations (tally, sync-linear, write-files)
+# =============================================================================
+COPY apps/intake-util/ /tmp/intake-util-build/
+RUN cd /tmp/intake-util-build && \
+    npm ci --ignore-scripts && \
+    npm run build && \
+    cp dist/intake-util /usr/local/bin/intake-util && \
+    chmod +x /usr/local/bin/intake-util && \
+    rm -rf /tmp/intake-util-build && \
+    intake-util --help
 
 # =============================================================================
 # Cursor Agent CLI
@@ -129,11 +153,36 @@ RUN set -eux; \
     opencode --version
 
 # =============================================================================
-# inotify-tools (Linux file watcher for cto-services watch command)
+# GitHub CLI (gh) - PR creation, issue management, repo operations
+# =============================================================================
+RUN (type -p wget >/dev/null || (apt-get update && apt-get install wget -y)) \
+    && mkdir -p -m 755 /etc/apt/keyrings \
+    && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update \
+    && apt-get install gh -y \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
+# System packages — SSH server, browser automation, file watcher
 # =============================================================================
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      inotify-tools gettext-base && \
+      openssh-server \
+      inotify-tools \
+      gettext-base \
+      wget \
+      gnupg2 \
+      ca-certificates \
+      ffmpeg && \
+    mkdir -p /etc/apt/keyrings && \
+    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      google-chrome-stable && \
+    mkdir -p /run/sshd && \
     rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
@@ -182,7 +231,14 @@ RUN set -e; \
     cursor-agent --version 2>/dev/null && echo "cursor-agent   OK" || echo "cursor-agent   SKIP"; \
     FACTORY_DISABLE_TELEMETRY=1 droid --version && echo "droid          OK"; \
     opencode --version  && echo "opencode       OK"; \
-    op --version        && echo "op             OK"
+    op --version        && echo "op             OK"; \
+    gh --version        && echo "gh             OK"; \
+    clawhub --version   && echo "clawhub        OK"; \
+    intake-util --help  && echo "intake-util    OK"
+
+# Health check — confirms the openclaw gateway process is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD ps aux | grep -q "[o]penclaw gateway" || exit 1
 
 # Default: run the agent entrypoint which reads identity from env vars
 ENTRYPOINT ["agent-entrypoint"]

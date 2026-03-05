@@ -246,37 +246,37 @@ controller:
 # =============================================================================
 agent:
   image:
-    repository: ghcr.io/5dlabs/claude
-    tag: dev
+    repository: ghcr.io/5dlabs/agents
+    tag: latest
   serviceAccountName: ""
-  # Each CLI type has its own dedicated image
+  # Single unified image with all CLIs installed (claude, codex, cursor, gemini, factory, opencode, openclaw)
   cliImages:
     claude:
-      repository: ghcr.io/5dlabs/claude
-      tag: dev
+      repository: ghcr.io/5dlabs/agents
+      tag: latest
     cursor:
-      repository: ghcr.io/5dlabs/cursor
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     codex:
-      repository: ghcr.io/5dlabs/codex
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     code:
-      repository: ghcr.io/5dlabs/code
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     gemini:
-      repository: ghcr.io/5dlabs/gemini
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     factory:
-      repository: ghcr.io/5dlabs/factory
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     opencode:
-      repository: ghcr.io/5dlabs/opencode
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     research:
-      repository: ghcr.io/5dlabs/research
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     grok:
-      repository: ghcr.io/5dlabs/research
+      repository: ghcr.io/5dlabs/agents
       tag: latest
   cliProviders: {}
   agentCliConfigs: {}
@@ -471,8 +471,13 @@ tools:
           GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 
       # --- UI Components ---
-      # shadcn: removed - broken ESM dependencies, no working npm package
-      # ai-elements and better-auth are available for documentation needs
+      shadcn:
+        name: "shadcn/ui"
+        description: "Modern React UI component library - browse, search, and get component source code"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "shadcn@5.3.0", "mcp"]
+        workingDirectory: "/tmp"
 
       ai-elements:
         name: "AI Elements"
@@ -525,8 +530,13 @@ tools:
       # tavily is available below for web scraping needs
 
       # --- Codebase Analysis ---
-      # repomix: removed - missing ajv dependency, no working npm package
-      # octocode is available below for GitHub code search
+      repomix:
+        name: "Repomix"
+        description: "Pack codebases into context-optimized formats for LLM analysis - pack remote repos, search and read packed output"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "repomix@latest", "--mcp"]
+        workingDirectory: "/tmp"
 
       octocode:
         name: "Octocode"

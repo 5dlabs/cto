@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tmux-agent-test
+  namespace: cto
+  labels:
+    app: tmux-agent-test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: agents
+      image: ubuntu:22.04
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          apt-get update -qq && apt-get install -y -qq tmux procps > /dev/null 2>&1
+          echo "=== tmux agent multiplexer test ==="
+
+          # Create tmux session with first pane (morgan - PM)
+          tmux new-session -d -s agents -x 200 -y 50
+
+          # Rename first window
+          tmux rename-window -t agents:0 'agent-dashboard'
+
+          # First pane: Morgan (PM agent)
+          tmux send-keys -t agents:0 'echo "═══ MORGAN (PM) ═══"; while true; do echo "[morgan][$(date +%H:%M:%S)] Planning sprint tasks... model=claude-opus-4-6 provider=anthropic step=deliberation"; sleep 3; echo "[morgan][$(date +%H:%M:%S)] Reviewing task dependencies..."; sleep 2; echo "[morgan][$(date +%H:%M:%S)] Assigning bolt to infra task #42"; sleep 4; done' Enter
+
+          # Split horizontally for Rex
+          tmux split-window -h -t agents:0
+
+          # Second pane: Rex (Rust engineer)
+          tmux send-keys -t agents:0.1 'echo "═══ REX (Rust) ═══"; while true; do echo "[rex][$(date +%H:%M:%S)] Compiling crate controller... model=claude-opus-4-6 provider=anthropic step=code.implement"; sleep 2; echo "[rex][$(date +%H:%M:%S)] Running cargo test..."; sleep 3; echo "[rex][$(date +%H:%M:%S)] 42 tests passed, 0 failed"; sleep 2; done' Enter
+
+          # Split first pane vertically for status bar
+          tmux split-window -v -t agents:0.0 -l 5
+
+          # Third pane: Status/coordinator
+          tmux send-keys -t agents:0.2 'echo "═══ OPENCLAW COORDINATOR ═══"; while true; do echo "[openclaw][$(date +%H:%M:%S)] Active agents: morgan(claude), rex(claude) | NATS: connected | Step: deliberation"; sleep 5; done' Enter
+
+          echo "tmux session 'agents' created with 3 panes"
+          echo "Attach with: kubectl exec -it tmux-agent-test -n cto -- tmux attach -t agents"
+
+          # Keep the pod alive
+          sleep infinity
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "50m"
+        limits:
+          memory: "256Mi"
+          cpu: "200m"

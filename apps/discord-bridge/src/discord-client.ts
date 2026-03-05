@@ -3,9 +3,13 @@ import {
   GatewayIntentBits,
   ChannelType,
   EmbedBuilder,
+  ActionRowBuilder,
   type Guild,
   type TextChannel,
   type CategoryChannel,
+  type Message,
+  type Interaction,
+  type MessageActionRowComponentBuilder,
 } from "discord.js";
 import { NUM_ROOMS, availableChannelName } from "./types.js";
 
@@ -16,6 +20,21 @@ export interface DiscordHandle {
   renameChannel(channelId: string, name: string): Promise<void>;
   /** Post a message embed to a channel */
   postEmbed(channelId: string, embed: EmbedBuilder): Promise<void>;
+  /** Post an embed with interactive components (buttons/select menus) */
+  postElicitation(
+    channelId: string,
+    embed: EmbedBuilder,
+    components: ActionRowBuilder<MessageActionRowComponentBuilder>[],
+  ): Promise<Message>;
+  /** Update an existing message's embed and components */
+  updateMessage(
+    channelId: string,
+    messageId: string,
+    embed: EmbedBuilder,
+    components?: ActionRowBuilder<MessageActionRowComponentBuilder>[],
+  ): Promise<void>;
+  /** Register a handler for interaction events (buttons, select menus) */
+  onInteraction(handler: (interaction: Interaction) => void): void;
   /** Disconnect from Discord */
   destroy(): void;
 }
@@ -112,6 +131,35 @@ export async function createDiscordClient(
       } catch (err) {
         logger.warn(`Failed to post embed to channel ${channelId}: ${err}`);
       }
+    },
+
+    async postElicitation(channelId, embed, components): Promise<Message> {
+      const channel = await client.channels.fetch(channelId);
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        throw new Error(`Channel ${channelId} not found or not a text channel`);
+      }
+      return (channel as TextChannel).send({
+        embeds: [embed],
+        components,
+      });
+    },
+
+    async updateMessage(channelId, messageId, embed, components): Promise<void> {
+      try {
+        const channel = await client.channels.fetch(channelId);
+        if (!channel || channel.type !== ChannelType.GuildText) return;
+        const message = await (channel as TextChannel).messages.fetch(messageId);
+        await message.edit({
+          embeds: [embed],
+          components: components ?? [],
+        });
+      } catch (err) {
+        logger.warn(`Failed to update message ${messageId} in ${channelId}: ${err}`);
+      }
+    },
+
+    onInteraction(handler): void {
+      client.on("interactionCreate", handler);
     },
 
     destroy(): void {

@@ -1,63 +1,123 @@
 name: voting
-description: "5-model voting committee for task quality evaluation"
+description: >
+  5-model voting committee for task quality evaluation. Each voter has a
+  distinct evaluation personality (soul) and runs on a different frontier
+  model to maximize perspective diversity and avoid groupthink.
+
 inputs:
   - name: content_to_evaluate
     type: string
   - name: evaluation_criteria
     type: string
+  - name: voter_1_provider
+    type: string
+    default: "anthropic"
+  - name: voter_1_model
+    type: string
+    default: "claude-opus-4-6"
+  - name: voter_2_provider
+    type: string
+    default: "openai"
+  - name: voter_2_model
+    type: string
+    default: "gpt-5.2-pro"
+  - name: voter_3_provider
+    type: string
+    default: "anthropic"
+  - name: voter_3_model
+    type: string
+    default: "claude-sonnet-4-6"
+  - name: voter_4_provider
+    type: string
+    default: "openai"
+  - name: voter_4_model
+    type: string
+    default: "o3-pro"
+  - name: voter_5_provider
+    type: string
+    default: "google"
+  - name: voter_5_model
+    type: string
+    default: "gemini-2.5-pro"
 
 steps:
+  # ─────────────────────────────────────────────────────────
+  # Voter 1: The Architect (Claude Opus 4.6)
+  # Evaluates structural integrity, separation of concerns,
+  # clean interfaces, and pattern consistency.
+  # ─────────────────────────────────────────────────────────
   - name: voter-1
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/vote-system.md}}",
+        "prompt": "{{prompts/voter-architect-soul.md}}\n\n---\n\n{{prompts/vote-system.md}}",
         "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
         "schema": "{{schemas/vote-ballot.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514"
+        "provider": "{{inputs.voter_1_provider}}",
+        "model": "{{inputs.voter_1_model}}"
       }'
 
+  # ─────────────────────────────────────────────────────────
+  # Voter 2: The Pragmatist (GPT-5.2 Pro)
+  # Evaluates implementability, task sizing, timeline realism,
+  # and whether real engineers can actually execute this plan.
+  # ─────────────────────────────────────────────────────────
   - name: voter-2
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/vote-system.md}}",
+        "prompt": "{{prompts/voter-pragmatist-soul.md}}\n\n---\n\n{{prompts/vote-system.md}}",
         "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
         "schema": "{{schemas/vote-ballot.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-opus-4-20250514"
+        "provider": "{{inputs.voter_2_provider}}",
+        "model": "{{inputs.voter_2_model}}"
       }'
 
+  # ─────────────────────────────────────────────────────────
+  # Voter 3: The Minimalist (Claude Sonnet 4.6)
+  # Penalizes over-engineering, rewards simplicity, identifies
+  # tasks that can be removed or deferred.
+  # ─────────────────────────────────────────────────────────
   - name: voter-3
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/vote-system.md}}",
+        "prompt": "{{prompts/voter-minimalist-soul.md}}\n\n---\n\n{{prompts/vote-system.md}}",
         "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
         "schema": "{{schemas/vote-ballot.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-haiku-4-20250514"
+        "provider": "{{inputs.voter_3_provider}}",
+        "model": "{{inputs.voter_3_model}}"
       }'
 
+  # ─────────────────────────────────────────────────────────
+  # Voter 4: The Operator (O3 Pro)
+  # Evaluates deployability, observability, debuggability,
+  # and operational readiness. Thinks in terms of incidents.
+  # ─────────────────────────────────────────────────────────
   - name: voter-4
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/vote-system.md}}",
+        "prompt": "{{prompts/voter-operator-soul.md}}\n\n---\n\n{{prompts/vote-system.md}}",
         "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
         "schema": "{{schemas/vote-ballot.schema.json}}",
-        "provider": "google",
-        "model": "gemini-2.0-flash"
+        "provider": "{{inputs.voter_4_provider}}",
+        "model": "{{inputs.voter_4_model}}"
       }'
 
+  # ─────────────────────────────────────────────────────────
+  # Voter 5: The Strategist (Gemini 2.5 Pro)
+  # Evaluates long-term maintainability, migration paths,
+  # API contract stability, and evolutionary trajectory.
+  # ─────────────────────────────────────────────────────────
   - name: voter-5
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/vote-system.md}}",
+        "prompt": "{{prompts/voter-strategist-soul.md}}\n\n---\n\n{{prompts/vote-system.md}}",
         "input": { "content": "{{inputs.content_to_evaluate}}", "criteria": "{{inputs.evaluation_criteria}}" },
         "schema": "{{schemas/vote-ballot.schema.json}}",
-        "provider": "google",
-        "model": "gemini-2.5-pro"
+        "provider": "{{inputs.voter_5_provider}}",
+        "model": "{{inputs.voter_5_model}}"
       }'
 
   - name: tally
+    depends_on: [voter-1, voter-2, voter-3, voter-4, voter-5]
     command: >
       intake-util tally --ballots-json <(echo '[
         ${{ steps.voter-1.output }},
@@ -66,3 +126,8 @@ steps:
         ${{ steps.voter-4.output }},
         ${{ steps.voter-5.output }}
       ]')
+
+output_mappings:
+  verdict: ${{ steps.tally.output | jq -r '.verdict' }}
+  suggestions: ${{ steps.tally.output | jq '.suggestions' }}
+  tally_result: ${{ steps.tally.output }}

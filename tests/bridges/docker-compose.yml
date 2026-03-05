@@ -1,0 +1,28 @@
+services:
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+  discord-bridge:
+    build: ../../apps/discord-bridge
+    depends_on: [nats]
+    environment:
+      DISCORD_BRIDGE_TOKEN: ${DISCORD_BRIDGE_TOKEN}
+      GUILD_ID: "1409006087331512342"
+      NATS_URL: nats://nats:4222
+      CATEGORY_NAME: "Bot Conversations"
+
+  linear-bridge:
+    build: ../../apps/linear-bridge
+    depends_on: [nats]
+    ports:
+      - "3100:3100"
+    environment:
+      LINEAR_API_KEY: ${LINEAR_API_KEY}
+      LINEAR_TEAM_ID: ${LINEAR_TEAM_ID}
+      NATS_URL: nats://nats:4222
+      WEBHOOK_PORT: "3100"
+      AGENT_SESSIONS_ENABLED: "true"

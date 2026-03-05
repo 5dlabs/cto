@@ -1,7 +1,10 @@
 ---
 name: Agent Images
 
-# Automatically build latest agent images (Claude Code, Grok, etc.)
+# Build the unified agent image (ghcr.io/5dlabs/agents) which bundles ALL CLI tools:
+#   Claude Code, OpenAI Codex, Every Code, Cursor Agent, Factory Droid,
+#   Gemini CLI, OpenCode, OpenClaw
+#
 # Triggers: daily schedule, pushes to infra/images/**, or manual dispatch
 
 on:
@@ -18,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       force_rebuild:
-        description: 'Force rebuild all agents even if versions match'
+        description: 'Force rebuild even if versions match'
         required: false
         default: false
         type: boolean
@@ -27,8 +30,13 @@ on:
         required: false
         default: false
         type: boolean
-      factory_version_override:
-        description: 'Override Factory CLI version (e.g., "1.2.3"). If not provided, auto-detection will be used.'
+      openclaw_version:
+        description: 'Override OpenClaw version (e.g., "2026.2.12"). Defaults to latest.'
+        required: false
+        default: ''
+        type: string
+      opencode_version:
+        description: 'Override OpenCode version (e.g., "1.1.44"). Defaults to Dockerfile default.'
         required: false
         default: ''
         type: string
@@ -38,7 +46,6 @@ env:
   IMAGE_BASE: 5dlabs
 
 # Prevent auto-cancellation of in-progress runs when new runs are triggered
-# With cancel-in-progress: false, new runs queue instead of cancelling existing ones
 concurrency:
   group: agents-build
   cancel-in-progress: false
@@ -68,14 +75,6 @@ jobs:
           node-version: '20'
           check-latest: true
 
-      - name: Get TaskMaster version from npm
-        id: taskmaster-version
-        run: |
-          # Get latest TaskMaster version from npm registry
-          VERSION=$(npm view task-master-ai version 2>/dev/null || echo "0.36.0")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "📦 TaskMaster version: $VERSION"
-
       - name: Get latest binaries release version
         id: binaries-version
         env:
@@ -83,13 +82,11 @@ jobs:
         run: |
           set -eo pipefail
 
-          # Initialize version variables to empty strings (prevent unbound errors)
           TOOLS_VERSION=""
           MONITOR_VERSION=""
           TASKS_VERSION=""
           INTAKE_AGENT_VERSION=""
 
-          # Debug: Check if gh CLI is available
           echo "📍 Checking gh CLI..."
           if ! command -v gh &> /dev/null; then
             echo "⚠️ gh CLI not found, installing..."
@@ -99,26 +96,16 @@ jobs:
           fi
           echo "✅ gh version: $(gh --version | head -1)"
 
-          # Query GitHub API for recent unified releases (tags matching v*.*.*)
-          # Iterate through releases to find the first one with actual assets
-          # (new releases may not have binaries uploaded yet)
           echo "📍 Fetching releases..."
           RAW_RELEASES=$(gh release list --limit 20 || echo "")
-          echo "Raw release output:"
-          echo "$RAW_RELEASES"
           RELEASES=$(echo "$RAW_RELEASES" | awk -F'\t' '{print $3}' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "")
-          echo "Parsed releases: $RELEASES"
 
-          # Create directory for downloaded binaries (will be copied into Docker context)
-          # Include a placeholder so COPY doesn't fail if no binaries are found
           mkdir -p .docker-binaries
           touch .docker-binaries/.gitkeep
 
           for TAG in $RELEASES; do
-            VERSION="${TAG#v}"  # Strip leading 'v'
+            VERSION="${TAG#v}"
 
-            # Check for tools-client if not yet found
-            # Note: Use gh CLI instead of curl for private repo asset checks
             if [ -z "$TOOLS_VERSION" ]; then
               if gh release download "$TAG" --pattern 'tools-client-linux-x86_64' --skip-existing --dir .docker-binaries 2>/dev/null; then
                 echo "📦 Found tools-client in release: $VERSION"
@@ -126,7 +113,6 @@ jobs:
               fi
             fi
 
-            # Check for play-monitor if not yet found
             if [ -z "$MONITOR_VERSION" ]; then
               if gh release download "$TAG" --pattern 'play-monitor-linux-x86_64' --skip-existing --dir .docker-binaries 2>/dev/null; then
                 echo "📦 Found play-monitor in release: $VERSION"
@@ -134,7 +120,6 @@ jobs:
               fi
             fi
 
-            # Check for intake CLI if not yet found
             if [ -z "$TASKS_VERSION" ]; then
               if gh release download "$TAG" --pattern 'intake-linux-x86_64' --skip-existing --dir .docker-binaries 2>/dev/null; then
                 echo "📦 Found intake in release: $VERSION"
@@ -142,7 +127,6 @@ jobs:
               fi
             fi
 
-            # Check for intake-agent (TypeScript/Bun compiled) if not yet found
             if [ -z "$INTAKE_AGENT_VERSION" ]; then
               if gh release download "$TAG" --pattern 'intake-agent-linux-x86_64' --skip-existing --dir .docker-binaries 2>/dev/null; then
                 echo "📦 Found intake-agent in release: $VERSION"
@@ -150,17 +134,14 @@ jobs:
               fi
             fi
 
-            # Exit early if all found
             if [ -n "$TOOLS_VERSION" ] && [ -n "$MONITOR_VERSION" ] && [ -n "$TASKS_VERSION" ] && [ -n "$INTAKE_AGENT_VERSION" ]; then
               break
             fi
           done
 
-          # List downloaded binaries
           echo "📁 Downloaded binaries:"
           ls -la .docker-binaries/ || echo "  (none)"
 
-          # Output tools version
           if [ -n "$TOOLS_VERSION" ]; then
             echo "✅ Using tools version: $TOOLS_VERSION"
             echo "tools_version=$TOOLS_VERSION" >> "$GITHUB_OUTPUT"
@@ -169,7 +150,6 @@ jobs:
             echo "tools_version=skip" >> "$GITHUB_OUTPUT"
           fi
 
-          # Output play-monitor version
           if [ -n "$MONITOR_VERSION" ]; then
             echo "✅ Using play-monitor version: $MONITOR_VERSION"
             echo "play_monitor_version=$MONITOR_VERSION" >> "$GITHUB_OUTPUT"
@@ -178,7 +158,6 @@ jobs:
             echo "play_monitor_version=skip" >> "$GITHUB_OUTPUT"
           fi
 
-          # Output intake version
           if [ -n "$TASKS_VERSION" ]; then
             echo "✅ Using intake version: $TASKS_VERSION"
             echo "tasks_version=$TASKS_VERSION" >> "$GITHUB_OUTPUT"
@@ -187,7 +166,6 @@ jobs:
             echo "tasks_version=skip" >> "$GITHUB_OUTPUT"
           fi
 
-          # Output intake-agent version
           if [ -n "$INTAKE_AGENT_VERSION" ]; then
             echo "✅ Using intake-agent version: $INTAKE_AGENT_VERSION"
             echo "intake_agent_version=$INTAKE_AGENT_VERSION" >> "$GITHUB_OUTPUT"
@@ -200,15 +178,12 @@ jobs:
         id: tag
         run: |
           set -euo pipefail
-          # Include Dockerfile hash and binary versions in tag to ensure rebuilds
-          # when tools-client, play-monitor, intake, or intake-agent becomes available or version changes
           DOCKERFILE_HASH=$(git log -1 --format="%h" -- infra/images/runtime/Dockerfile)
           TOOLS_VER="${{ steps.binaries-version.outputs.tools_version }}"
           MONITOR_VER="${{ steps.binaries-version.outputs.play_monitor_version }}"
           TASKS_VER="${{ steps.binaries-version.outputs.tasks_version }}"
           INTAKE_AGENT_VER="${{ steps.binaries-version.outputs.intake_agent_version }}"
 
-          # Build version suffix from available binaries
           VERSION_SUFFIX=""
           if [ "$TOOLS_VER" != "skip" ] && [ -n "$TOOLS_VER" ]; then
             VERSION_SUFFIX="${VERSION_SUFFIX}-t$(echo "$TOOLS_VER" | tr '.' '-')"
@@ -223,7 +198,6 @@ jobs:
             VERSION_SUFFIX="${VERSION_SUFFIX}-ia$(echo "$INTAKE_AGENT_VER" | tr '.' '-')"
           fi
 
-          # Fallback if no binaries available
           if [ -z "$VERSION_SUFFIX" ]; then
             VERSION_SUFFIX="-nobin"
           fi
@@ -242,8 +216,6 @@ jobs:
       - name: Check if base image exists
         id: check
         run: |
-          # Use timeout to prevent hanging on Docker socket issues
-          # If manifest check times out or fails, assume image doesn't exist and rebuild
           if timeout 30 docker manifest inspect "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ steps.tag.outputs.tag }}" > /dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "✅ Base image exists: v${{ steps.tag.outputs.tag }}"
@@ -262,26 +234,21 @@ jobs:
         with:
           context: .
           file: ./infra/images/runtime/Dockerfile
-          # Use minimal target by default (agents only need essential tools)
-          # For full image with all dev tools: docker build --target production
-          target: minimal
+          target: production
           platforms: linux/amd64
           pull: true
           push: true
-          # Disable attestations - avoids GHCR permission issues
           provenance: false
           sbom: false
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:full
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ steps.tag.outputs.tag }}
           build-args: |
             TOOLS_VERSION=${{ steps.binaries-version.outputs.tools_version }}
             PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
             TASKS_VERSION=${{ steps.binaries-version.outputs.tasks_version }}
             INTAKE_AGENT_VERSION=${{ steps.binaries-version.outputs.intake_agent_version }}
-            TASKMASTER_VERSION=${{ steps.taskmaster-version.outputs.version }}
-          # Cache strategy: GHA cache (fast) + registry cache (persistent fallback)
-          # Registry cache survives even when no_cache=true (only disables GHA cache)
           no-cache: ${{ inputs.no_cache == true }}
           cache-from: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
@@ -322,7 +289,6 @@ jobs:
       - name: Calculate sidecar version
         id: version
         run: |
-          # Use git hash of relevant code for versioning
           VERSION=$(git rev-parse --short HEAD)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 Sidecar version: $VERSION"
@@ -335,7 +301,6 @@ jobs:
           target: local
           platforms: linux/amd64
           push: true
-          # Disable attestations - avoids GHCR permission issues
           provenance: false
           sbom: false
           tags: |
@@ -354,12 +319,11 @@ jobs:
             echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/linear-sidecar:${{ steps.version.outputs.version }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # Phase 1: Build a simple agent first to warm the registry buildcache
-  # This ensures base image layers are in the cache before other agents start
-  warm-cache:
+  # Build the unified agents image containing ALL CLI tools
+  build-agents:
     needs: build-runtime
     runs-on: [k8s-runner]
-    timeout-minutes: 10
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -367,267 +331,100 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
-
-      - name: Determine cursor version
-        id: version
-        run: |
-          VERSION=$(git log -1 --format="%h" -- "./infra/images/cursor/")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "📦 cursor version (dir hash): $VERSION"
-
-      - name: Build cursor (cache warmup)
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
-        with:
-          context: ./infra/images/cursor
-          file: ./infra/images/cursor/Dockerfile
-          platforms: linux/amd64
-          pull: true
-          push: true
-          provenance: false
-          sbom: false
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:v${{ steps.version.outputs.version }}
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-            BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
-          no-cache: ${{ inputs.no_cache == true }}
-          cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:buildcache
-            ${{ inputs.no_cache != true && 'type=gha,scope=cursor' || '' }}
-          cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/cursor:buildcache,mode=max
-            ${{ inputs.no_cache != true && 'type=gha,scope=cursor,mode=max' || '' }}
-
-  # Phase 2: Build remaining agents in parallel (cache is now warm)
-  build-agents:
-    needs: [build-runtime, warm-cache]
-    runs-on: [k8s-runner]
-    timeout-minutes: 45
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    strategy:
-      fail-fast: false
-      max-parallel: 6  # Higher parallelism now that cache is warm
-      matrix:
-        include:
-          - id: claude
-            image: claude
-            context: ./infra/images/claude
-            file: ./infra/images/claude/Dockerfile
-            version_type: npm
-            version_pkg: "@anthropic-ai/claude-code"
-            version_arg: CLAUDE_CODE_VERSION
-          # cursor is built in warm-cache phase
-          - id: opencode
-            image: opencode
-            context: ./infra/images/opencode
-            file: ./infra/images/opencode/Dockerfile
-            version_type: script_hash
-            script_url: https://opencode.ai/install
-          - id: codex
-            image: codex
-            context: ./infra/images/codex
-            file: ./infra/images/codex/Dockerfile
-            version_type: npm
-            version_pkg: "@openai/codex"
-          - id: code
-            image: code
-            context: ./infra/images/code
-            file: ./infra/images/code/Dockerfile
-            version_type: npm
-            version_pkg: "@just-every/code"
-          - id: factory
-            image: factory
-            context: ./infra/images/factory
-            file: ./infra/images/factory/Dockerfile
-            version_type: script_hash
-            script_url: https://app.factory.ai/cli
-          - id: gemini
-            image: gemini
-            context: ./infra/images/gemini
-            file: ./infra/images/gemini/Dockerfile
-            version_type: dir_hash
-          - id: openclaw
-            image: openclaw
-            context: ./infra/images/openclaw
-            file: ./infra/images/openclaw/Dockerfile
-            version_type: github_release
-            version_repo: openclaw/openclaw
-          # NOTE: dexter is temporarily disabled until ghcr.io/5dlabs/dexter package is created
-          # by an org admin. The GITHUB_TOKEN cannot create new org packages without prior setup.
-          # Error: "permission_denied: write_package" when pushing to non-existent package.
-          # To re-enable: uncomment below and ensure package exists in GHCR.
-          # - id: dexter
-          #   image: dexter
-          #   context: ./infra/images/dexter
-          #   file: ./infra/images/dexter/Dockerfile
-          #   version_type: dir_hash
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Pre-pull removed: docker-container driver has isolated cache
-      # Instead, we rely on registry buildcache to provide base image layers
-
-      - name: Setup Node.js (ensure npm available in runner)
+      - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '20'
           check-latest: true
-      - name: Verify Node/npm
-        run: |
-          node -v
-          npm -v
 
-      - name: Determine version (npm for npm agents, PyPI for pypi/pip agents, script-hash for remote installers, dir-hash otherwise)
-        id: version
+      - name: Resolve OpenClaw version
+        id: openclaw-version
         run: |
-          set -euo pipefail
-          if [ "${{ matrix.version_type }}" = "npm" ]; then
-            VERSION=$(npm view "${{ matrix.version_pkg }}" version || echo "latest")
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "arg_line=VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "📦 ${{ matrix.id }} npm version: $VERSION"
-          elif [ "${{ matrix.version_type }}" = "pip" ]; then
-            if command -v jq >/dev/null 2>&1; then
-              VERSION=$(curl -fsSL "https://pypi.org/pypi/${{ matrix.version_pkg }}/json" | jq -r .info.version)
-            else
-              VERSION=$(python3 -c "import json, urllib.request; print(json.load(urllib.request.urlopen('https://pypi.org/pypi/${{ matrix.version_pkg }}/json'))['info']['version'])")
-            fi
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "arg_line=VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "📦 ${{ matrix.id }} PyPI version: $VERSION"
-          elif [ "${{ matrix.version_type }}" = "script_hash" ]; then
-            # For Factory CLI, we need to install it and extract the actual version
-            # because the CLI has its own auto-update mechanism that checks against real versions
-            if [ "${{ matrix.id }}" = "factory" ]; then
-              # Check if version override is provided
-              if [ -n "${{ inputs.factory_version_override }}" ]; then
-                VERSION="${{ inputs.factory_version_override }}"
-                echo "📦 Using Factory CLI version override: $VERSION"
-              else
-                # Install Factory CLI temporarily to get the version
-                echo "📦 Installing Factory CLI to extract version..."
-                curl -fsSL "${{ matrix.script_url }}" | sh
-                if [ -f "$HOME/.local/bin/droid" ]; then
-                  # Extract version from droid --version output (format: "droid version X.Y.Z")
-                  VERSION=$(FACTORY_DISABLE_TELEMETRY=1 "$HOME/.local/bin/droid" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-                  if [ -z "$VERSION" ]; then
-                    # Fallback to script hash if version extraction fails
-                    SCRIPT_CONTENT=$(curl -fsSL "${{ matrix.script_url }}")
-                    VERSION=$(echo "$SCRIPT_CONTENT" | sha256sum | cut -c1-8)
-                    echo "⚠️ Failed to extract version, using script hash: $VERSION"
-                  else
-                    echo "📦 Extracted Factory CLI version: $VERSION"
-                  fi
-                else
-                  # Fallback to script hash if installation fails
-                  SCRIPT_CONTENT=$(curl -fsSL "${{ matrix.script_url }}")
-                  VERSION=$(echo "$SCRIPT_CONTENT" | sha256sum | cut -c1-8)
-                  echo "⚠️ Installation failed, using script hash: $VERSION"
-                fi
-              fi
-            else
-              # For other script_hash types, use the old hash method
-              SCRIPT_CONTENT=$(curl -fsSL "${{ matrix.script_url }}")
-              VERSION=$(echo "$SCRIPT_CONTENT" | sha256sum | cut -c1-8)
-              echo "📦 ${{ matrix.id }} version (script hash from ${{ matrix.script_url }}): $VERSION"
-            fi
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "arg_line=" >> "$GITHUB_OUTPUT"
-          elif [ "${{ matrix.version_type }}" = "dir_hash" ]; then
-            # Use latest commit hash touching the image context directory as image version (stable, offline)
-            VERSION=$(git log -1 --format="%h" -- "${{ matrix.context }}/")
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "arg_line=" >> "$GITHUB_OUTPUT"
-            echo "📦 ${{ matrix.id }} version (dir hash): $VERSION"
-          elif [ "${{ matrix.version_type }}" = "github_release" ]; then
-            # Fetch latest release tag from GitHub API
-            VERSION=$(curl -fsSL "https://api.github.com/repos/${{ matrix.version_repo }}/releases/latest" | jq -r '.tag_name' | sed 's/^v//')
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "arg_line=VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "📦 ${{ matrix.id }} GitHub release version: $VERSION"
+          if [ -n "${{ inputs.openclaw_version }}" ]; then
+            VERSION="${{ inputs.openclaw_version }}"
+            echo "📦 Using OpenClaw override: $VERSION"
           else
-            # Fallback to dir_hash for unknown types
-            VERSION=$(git log -1 --format="%h" -- "${{ matrix.context }}/")
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "arg_line=" >> "$GITHUB_OUTPUT"
-            echo "📦 ${{ matrix.id }} version (dir hash fallback): $VERSION"
+            VERSION=$(npm view openclaw version 2>/dev/null || echo "latest")
+            echo "📦 Latest OpenClaw: $VERSION"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Compute agents image tag
+        id: tag
+        run: |
+          # Tag from Dockerfile hash + openclaw version
+          DOCKERFILE_HASH=$(git log -1 --format="%h" -- infra/images/agents/Dockerfile infra/images/agents/entrypoint.sh)
+          OPENCLAW_VER="${{ steps.openclaw-version.outputs.version }}"
+          TAG="${DOCKERFILE_HASH}-oc$(echo "$OPENCLAW_VER" | tr '.' '-')"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "📦 Computed agents tag: $TAG"
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if agents image exists
+        id: check
+        run: |
+          if timeout 30 docker manifest inspect "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:v${{ steps.tag.outputs.tag }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Agents image exists: v${{ steps.tag.outputs.tag }}"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "📦 Agents image not found, will build"
           fi
 
-      - name: Debug resolved version and args
-        run: |
-          echo "Agent: ${{ matrix.id }}"
-          echo "VERSION (resolved): ${{ steps.version.outputs.version }}"
-          echo "ARG_LINE: ${{ steps.version.outputs.arg_line }}"
-
-      # QEMU disabled on self-hosted runners; building amd64 only for speed/stability
-
       - name: Set up Docker Buildx
+        if: steps.check.outputs.exists == 'false' || inputs.force_rebuild == true
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
-        # Using default docker-container driver for full push support
-        # Registry cache will help with base image layers
 
-      - name: Build and push image
+      - name: Build and push agents image
+        if: steps.check.outputs.exists == 'false' || inputs.force_rebuild == true
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v5
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.file }}
+          context: ./infra/images/agents
+          file: ./infra/images/agents/Dockerfile
           platforms: linux/amd64
-          # Allow pull but use registry cache for base image layers
           pull: true
           push: true
-          # Disable attestations - avoids GHCR permission issues for new packages
           provenance: false
           sbom: false
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:v${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:v${{ steps.tag.outputs.tag }}
           build-args: |
-            BUILDKIT_INLINE_CACHE=1
             BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:v${{ needs.build-runtime.outputs.tag }}
-            VERSION=${{ steps.version.outputs.version }}
-          # Use registry cache heavily - runtime buildcache contains all base layers
+            OPENCLAW_VERSION=${{ steps.openclaw-version.outputs.version }}
+            ${{ inputs.opencode_version != '' && format('OPENCODE_VERSION={0}', inputs.opencode_version) || '' }}
           no-cache: ${{ inputs.no_cache == true }}
           cache-from: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache
-            ${{ inputs.no_cache != true && format('type=gha,scope={0}', matrix.id) || '' }}
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:buildcache
+            ${{ inputs.no_cache != true && 'type=gha,scope=agents' || '' }}
           cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache,mode=max
-            ${{ inputs.no_cache != true && format('type=gha,scope={0},mode=max', matrix.id) || '' }}
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:buildcache,mode=max
+            ${{ inputs.no_cache != true && 'type=gha,scope=agents,mode=max' || '' }}
 
-      - name: Append summary
+      - name: Summary
         run: |
           {
-            echo "### ${{ matrix.image }}"
-            echo "✅ Built version ${{ steps.version.outputs.version }}"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:latest"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}:v${{ steps.version.outputs.version }}"
+            echo "### 🤖 Unified Agents Image"
+            echo ""
+            echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents\`"
+            echo "**OpenClaw version:** ${{ steps.openclaw-version.outputs.version }}"
+            echo ""
+            echo "**CLIs included:** claude, codex, code (every-code), gemini, cursor-agent, droid (factory), opencode, openclaw"
+            echo ""
+            echo "**Tags:**"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:latest\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/agents:v${{ steps.tag.outputs.tag }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # Summary job
   summary:
-    needs: [warm-cache, build-agents, build-sidecar]
+    needs: [build-runtime, build-agents, build-sidecar]
     if: always()
     runs-on: [k8s-runner]
     steps:
@@ -637,7 +434,7 @@ jobs:
             echo "## 🤖 Agent Images Update"
             echo ""
             echo "### 📋 Results"
-            echo "Each agent section above lists latest and versioned tags."
+            echo "Single unified image with all CLIs — see agent section above for details."
             echo ""
             echo "🔄 **Next run**: Tomorrow at 6 AM UTC (or trigger manually)"
           } >> "$GITHUB_STEP_SUMMARY"

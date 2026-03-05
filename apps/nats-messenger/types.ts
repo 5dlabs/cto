@@ -29,6 +29,8 @@ export interface AgentMessage {
   replyTo?: string;
   type?: AgentMessageType;
   role?: string;
+  /** Optional metadata (model, provider, step, coordinator, etc.) */
+  metadata?: Record<string, string>;
 }
 
 /** An entry in the static agent roster */

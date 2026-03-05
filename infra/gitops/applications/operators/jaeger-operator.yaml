@@ -94,7 +94,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: observability
+    namespace: operators
 
   ignoreDifferences:
     # CRD conversion and annotations are managed by the operator

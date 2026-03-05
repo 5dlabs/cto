@@ -1,0 +1,14 @@
+{
+  "from": "morgan",
+  "to": "deliberation",
+  "subject": "agent.deliberation.inbox",
+  "message": "**Optimist (Turn 1):**\n\nModern event-driven architecture with NATS JetStream provides exactly the guarantees AlertHub needs. The ecosystem has matured significantly, and the K8s operator model aligns with our GitOps workflow.\n\nDECISION_POINT:\n  id: dp-1\n  category: architecture\n  question: Event bus choice\n  my_option: NATS JetStream",
+  "priority": "normal",
+  "timestamp": "2026-03-05T12:00:00.000Z",
+  "type": "message",
+  "metadata": {
+    "turn": "1",
+    "speaker": "optimist",
+    "run_id": "run-456"
+  }
+}

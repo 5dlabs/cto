@@ -69,6 +69,84 @@ export async function searchX(
 }
 
 // ---------------------------------------------------------------------------
+// Open-ended query via Responses API
+// ---------------------------------------------------------------------------
+
+/**
+ * Send a free-form query to Grok with X search enabled.
+ *
+ * Unlike `searchX`, this returns Grok's natural language response rather than
+ * parsing structured tweet data. Useful for open-ended questions like
+ * "what are people saying about Claude Code?" or "summarize the latest drama
+ * around OpenAI".
+ */
+export async function queryX(
+  query: string,
+  options?: {
+    fromDate?: string;
+    toDate?: string;
+    enableImageUnderstanding?: boolean;
+    enableVideoUnderstanding?: boolean;
+  },
+  config?: GrokClientConfig,
+): Promise<string> {
+  const resolved = resolveConfig(config);
+
+  const body: Record<string, unknown> = {
+    model: resolved.model,
+    input: [{ role: 'user', content: query }],
+    tools: [
+      {
+        type: 'x_search',
+        ...(options?.fromDate ? { from_date: options.fromDate } : {}),
+        ...(options?.toDate ? { to_date: options.toDate } : {}),
+        enable_image_understanding: options?.enableImageUnderstanding ?? true,
+        enable_video_understanding: options?.enableVideoUnderstanding ?? true,
+      },
+    ],
+  };
+
+  const response = await fetch(`${resolved.apiUrl}/responses`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resolved.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Grok API error: ${response.status} - ${error}`);
+  }
+
+  const data = (await response.json()) as Record<string, unknown>;
+  return extractTextResponse(data);
+}
+
+/**
+ * Extract the full text response from a Grok API response.
+ */
+function extractTextResponse(data: Record<string, unknown>): string {
+  const output = data.output as Array<Record<string, unknown>> | undefined;
+  if (!output) return '(no response)';
+
+  const parts: string[] = [];
+  for (const item of output) {
+    const content = item.content as Array<Record<string, unknown>> | undefined;
+    if (!content || !Array.isArray(content)) continue;
+
+    for (const entry of content) {
+      if (entry.type === 'output_text' && typeof entry.text === 'string') {
+        parts.push(entry.text);
+      }
+    }
+  }
+
+  return parts.join('\n\n') || '(no response)';
+}
+
+// ---------------------------------------------------------------------------
 // Convenience wrappers for domain-specific searches
 // ---------------------------------------------------------------------------
 

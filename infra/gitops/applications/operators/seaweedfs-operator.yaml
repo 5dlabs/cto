@@ -149,13 +149,13 @@ spec:
 
         # Note: Buckets are created dynamically via S3 API or weed shell
         # The screenshots bucket will be created by init containers or manually:
-        #   kubectl exec -n seaweedfs seaweedfs-master-0 -- \
+        #   kubectl exec -n operators seaweedfs-master-0 -- \
         #     weed shell -master=localhost:9333 -filer=seaweedfs-filer:8888 \
         #     -shell.command='s3.bucket.create -name screenshots'
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: seaweedfs
+    namespace: operators
 
   ignoreDifferences:
     # StatefulSet replicas may be scaled, volumeClaimTemplates have API-defaulted fields,

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScaleTasks",
+  "description": "Production hardening tasks for Bolt",
+  "type": "object",
+  "properties": {
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "number" },
+          "title": { "type": "string" },
+          "agent": { "type": "string", "const": "bolt" },
+          "depends_on": { "type": "array", "items": { "type": "number" } },
+          "subtasks": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "string", "enum": ["high", "medium"] }
+        },
+        "required": ["task_id", "title", "agent", "subtasks", "priority"]
+      }
+    }
+  },
+  "required": ["tasks"]
+}

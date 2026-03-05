@@ -290,6 +290,12 @@ enum Commands {
         /// Project directory within docs repo - reads from `PROJECT_NAME` env if not provided
         #[arg(long, env = "PROJECT_NAME")]
         docs_project_directory: Option<String>,
+
+        /// Path to a pre-computed design brief (e.g., from deliberation).
+        /// When provided, the design brief is used instead of the raw PRD
+        /// for task generation.
+        #[arg(long, env = "DESIGN_BRIEF_PATH")]
+        design_brief_path: Option<PathBuf>,
     },
 
     /// Generate cto-config.json with per-agent tool configurations
@@ -1162,6 +1168,7 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
             service,
             docs_repository,
             docs_project_directory,
+            design_brief_path,
         } => {
             // Initialize if not already
             if !tasks_domain.is_initialized().await? {
@@ -1211,8 +1218,8 @@ async fn run(cli: Cli) -> Result<(), TasksError> {
                 docs_repository,
                 docs_project_directory,
                 auto_append_deploy_task: auto_append_deploy,
-                deliberate: false,
-                design_brief_path: None,
+                deliberate: design_brief_path.is_some(),
+                design_brief_path,
             };
 
             ui::print_info("Starting intake workflow...");
