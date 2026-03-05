@@ -2,6 +2,8 @@
   {
     "id": 1,
     "title": "Set up database schema (Rex - Rust/SQLx)",
+    "agent": "rex",
+    "stack": "Rust/SQLx",
     "description": "Design and implement the core database schema for user management.",
     "status": "pending",
     "dependencies": [],
@@ -54,6 +56,8 @@
   {
     "id": 2,
     "title": "Implement authentication service (Grizz - Go/JWT)",
+    "agent": "grizz",
+    "stack": "Go/JWT",
     "description": "Build JWT-based authentication with refresh token rotation.",
     "status": "pending",
     "dependencies": [1],
@@ -109,6 +113,8 @@
   {
     "id": 3,
     "title": "Build user management API (Grizz - Go/REST)",
+    "agent": "grizz",
+    "stack": "Go/REST",
     "description": "CRUD API for user profiles with role-based access control.",
     "status": "pending",
     "dependencies": [1, 2],
@@ -132,6 +138,8 @@
   {
     "id": 4,
     "title": "Implement audit logging (Blaze - TypeScript/React)",
+    "agent": "blaze",
+    "stack": "TypeScript/React",
     "description": "Create an audit log dashboard showing user actions and system events.",
     "status": "pending",
     "dependencies": [2, 3],
@@ -142,6 +150,8 @@
   {
     "id": 5,
     "title": "Write integration test suite (Tess - Testing)",
+    "agent": "tess",
+    "stack": "Testing",
     "description": "End-to-end test suite covering authentication and user management flows.",
     "status": "pending",
     "dependencies": [1, 2, 3, 4],

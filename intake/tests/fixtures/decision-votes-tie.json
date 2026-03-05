@@ -1,0 +1,37 @@
+[
+  {
+    "voter_id": "claude-opus",
+    "chosen_option": "postgres",
+    "confidence": 0.8,
+    "reasoning": "PostgreSQL is battle-tested for relational data",
+    "concerns": ["May need read replicas for scale"]
+  },
+  {
+    "voter_id": "gpt-5",
+    "chosen_option": "mongodb",
+    "confidence": 0.75,
+    "reasoning": "MongoDB is more flexible for evolving schemas",
+    "concerns": ["Transaction support is newer and less proven"]
+  },
+  {
+    "voter_id": "claude-sonnet",
+    "chosen_option": "postgres",
+    "confidence": 0.7,
+    "reasoning": "JSONB columns provide schema flexibility when needed",
+    "concerns": []
+  },
+  {
+    "voter_id": "o3-pro",
+    "chosen_option": "mongodb",
+    "confidence": 0.65,
+    "reasoning": "Document model fits event-sourcing patterns",
+    "concerns": ["Need careful index design"]
+  },
+  {
+    "voter_id": "gemini-pro",
+    "chosen_option": "abstain",
+    "confidence": 0.3,
+    "reasoning": "Both options are viable, depends on team expertise",
+    "concerns": []
+  }
+]

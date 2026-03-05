@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RemediationTasks",
+  "description": "Security remediation tasks generated from findings",
+  "type": "object",
+  "properties": {
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "number" },
+          "title": { "type": "string" },
+          "agent": { "type": "string", "const": "cipher" },
+          "finding_ids": { "type": "array", "items": { "type": "string" } },
+          "depends_on": { "type": "array", "items": { "type": "number" } },
+          "description": { "type": "string" },
+          "subtasks": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "string", "enum": ["critical", "high", "medium"] },
+          "acceptance_criteria": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["task_id", "title", "agent", "finding_ids", "description", "subtasks", "priority", "acceptance_criteria"]
+      }
+    }
+  },
+  "required": ["tasks"]
+}

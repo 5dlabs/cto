@@ -70,6 +70,36 @@ Additional required fields for subagent execution:
 5. **Context isolation** — each subagent works alone; subtasks must be self-contained
 {{/enable_subagents}}
 
+## Agent-Aware Expansion
+
+Each parent task has an `agent` field indicating the responsible agent (e.g., `"agent": "bolt"`) and a `stack` field for the primary technology. Use these to tailor subtask details:
+- **bolt**: Kubernetes CRs, Helm charts, YAML manifests
+- **rex**: Rust modules, Axum handlers, Effect patterns
+- **grizz**: Go packages, gRPC services, protobuf
+- **nova**: TypeScript/Bun modules, Elysia routes
+- **blaze**: React components, Next.js pages
+- **cipher**: Security audits, RBAC policies, secret management
+
+## Infrastructure Task Ordering (Bolt Tasks)
+
+When expanding a Bolt infrastructure task (identified by `"agent": "bolt"`), respect the infra-first / infra-last pattern from the parent plan:
+
+**If expanding the FIRST task (Development Infrastructure Bootstrap):**
+- Subtasks should follow the order: namespace creation → operator CRs (one per service) → secrets aggregation ConfigMap → validation
+- Each operator gets its own subtask (single-concern rule): e.g., "Deploy PostgreSQL Cluster", "Deploy Redis Instance", "Deploy NATS Server"
+- The final subtask MUST create the `{project}-infra-endpoints` ConfigMap aggregating all connection strings
+- All subtasks should be development-grade: single-replica, minimal storage, no HA
+
+**If expanding a FINAL task (Production Hardening):**
+- Subtasks should cover: HA scaling → CDN/TLS/ingress → network policies → RBAC → secret rotation → audit logging
+- Each concern gets its own subtask (single-concern rule)
+- Order: scale stateful services first, then configure networking, then apply security policies
+
+**For all other (implementation) tasks:**
+- Subtask details should reference the `{project}-infra-endpoints` ConfigMap for connection strings
+- Do NOT re-provision infrastructure — assume it exists from Task 1
+- Use `envFrom` to inject the ConfigMap into pod specs
+
 # Constraints
 
 **Always:**

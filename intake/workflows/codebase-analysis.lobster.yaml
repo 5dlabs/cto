@@ -16,6 +16,12 @@ inputs:
     type: string
     default: "main"
     description: "Branch to analyze"
+  - name: model_primary_provider
+    type: string
+    default: "anthropic"
+  - name: model_primary
+    type: string
+    default: "claude-sonnet-4-6"
 
 outputs:
   - name: codebase_context
@@ -86,8 +92,8 @@ steps:
             "search_results": $search_results,
             "prd_content": $prd_content
           },
-          "provider": "anthropic",
-          "model": "claude-sonnet-4-20250514",
+          "provider": "{{inputs.model_primary_provider}}",
+          "model": "{{inputs.model_primary}}",
           "temperature": 0.2
         }' | openclaw.invoke --tool llm-task --action text --args-json "$(cat)"
 

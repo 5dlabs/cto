@@ -60,6 +60,8 @@ Follow these steps in order:
 {
   "id": number,
   "title": "Action (AgentName - Stack)",
+  "agent": "agentname",
+  "stack": "Technology/Framework",
   "description": "What this task accomplishes and why it matters",
   "status": "pending",
   "dependencies": [task_ids],
@@ -90,6 +92,11 @@ Follow these steps in order:
 | React web frontend | Blaze | React/Next.js |
 | Mobile apps | Tap | Expo |
 | Desktop apps | Spark | Electron |
+| Security/compliance | Cipher | Security tooling |
+| Testing/QA | Tess | Test frameworks |
+| Data pipelines | Cleo | Data engineering |
+| DevOps/CI/CD | Atlas | CI/CD platforms |
+| Integration/glue | Stitch | Multi-stack |
 
 # Decision Point Categories
 
@@ -130,6 +137,8 @@ Follow these steps in order:
 {
   "id": 1,
   "title": "Deploy PostgreSQL and Redis (Bolt - Kubernetes)",
+  "agent": "bolt",
+  "stack": "Kubernetes",
   "description": "Provision the persistence layer: a PostgreSQL cluster via CloudNative-PG for relational data and a Redis Sentinel deployment for caching and session storage.",
   "status": "pending",
   "dependencies": [],
@@ -160,13 +169,47 @@ Follow these steps in order:
 ```
 This is bad because: no agent hint, vague description, no dependencies, no details, unmeasurable acceptance criteria.
 
+## Infrastructure Task Ordering
+
+When generating tasks, ALWAYS follow this infrastructure pattern:
+
+**Task 1 (mandatory)**: Bolt — Development Infrastructure Bootstrap
+- Agent: bolt (infrastructure specialist)
+- Purpose: Provision single-instance development operators needed by the project
+- Based on the infrastructure_context, provision only what the project needs (e.g., PostgreSQL via CloudNative-PG, Redis, NATS, SeaweedFS)
+- Create a shared ConfigMap `{project_name}-infra-endpoints` with connection strings for all provisioned services
+- All subsequent implementation tasks MUST depend on this task
+- Single-replica, no HA — development-grade only
+- Include: namespace creation, operator CRs, secrets, ConfigMap
+
+**Last 2 tasks (mandatory)**: Bolt — Production Hardening
+- Agent: bolt (infrastructure specialist)
+- Purpose: Scale infrastructure for production after all implementation is complete
+- Task N-1: Scale operators to HA configurations (3-replica PostgreSQL, Redis Sentinel, Kafka multi-broker, etc.), configure CDN, TLS certificates, ingress rules, network policies
+- Task N: Security hardening — pod security standards, RBAC policies, secret rotation, audit logging
+- These tasks depend on ALL implementation tasks completing
+
+## Secrets Distribution Pattern
+
+When Bolt provisions an operator in Task 1:
+1. The operator creates a Secret (e.g., CloudNative-PG creates `{cluster-name}-app` with host, port, dbname, user, password)
+2. Bolt creates a ConfigMap `{project_name}-infra-endpoints` aggregating all service endpoints:
+   - `POSTGRES_MAIN_URL=postgresql://user:pass@host:5432/dbname`
+   - `REDIS_URL=redis://host:6379`
+   - `NATS_URL=nats://host:4222`
+   - etc.
+3. All agent task pods reference this ConfigMap via `envFrom` in their pod spec
+4. Connection string naming convention: `{OPERATOR}_{INSTANCE}_URL`
+
 # Verification
 
 Before outputting, verify:
 - [ ] All dependencies reference only lower IDs
 - [ ] Every task has a `testStrategy` with specific, measurable criteria
 - [ ] No task requires work from two different agents
-- [ ] Agent hints in titles match the agent mapping table
+- [ ] Every task has an `agent` field matching the agent mapping table
+- [ ] Every task has a `stack` field matching the technology used
+- [ ] Agent hints in titles match the `agent` field
 - [ ] Decision points have at least two concrete options and a valid category
 - [ ] Total task count matches {{num_tasks}}
 

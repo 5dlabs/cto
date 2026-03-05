@@ -57,6 +57,22 @@ inputs:
     type: string
     default: "main"
     description: "Base branch for the PR"
+  - name: linear_session_id
+    type: string
+    default: ""
+    description: "Linear session ID for activity tracking"
+  - name: linear_issue_id
+    type: string
+    default: ""
+    description: "Linear issue ID for plan updates"
+  - name: verify
+    type: string
+    default: "true"
+    description: "When true, validate outputs after each major step"
+  - name: breakpoints
+    type: string
+    default: "false"
+    description: "When true, pause for human approval at key checkpoints"
 
 steps:
   # ─────────────────────────────────────────────────────────
@@ -86,6 +102,15 @@ steps:
       r['linear_team_id'] = lin.get('teamId','')
       print(json.dumps(r))
       "
+
+  - name: register-run
+    depends_on: [load-config]
+    description: "Register pipeline run for tracking"
+    command: >
+      intake-util register-run
+        --run-id "{{inputs.project_name}}-{{timestamp}}"
+        --session-id "{{inputs.linear_session_id}}"
+        --workflow pipeline
 
   # ─────────────────────────────────────────────────────────
   # Phase 0-repo: Ensure GitHub repository exists
@@ -239,8 +264,22 @@ steps:
       timebox_minutes: "{{inputs.timebox_minutes}}"
       session_id: "{{inputs.project_name}}-{{timestamp}}"
       infrastructure_context: "${{ steps.build-infra-context.output }}"
+      human_review_mode: "full_auto"
+      verify: "{{inputs.verify}}"
+      breakpoints: "{{inputs.breakpoints}}"
+      linear_session_id: "{{inputs.linear_session_id}}"
       model_frontier_provider: "${{ steps.load-config.output | jq -r '.frontier_provider' }}"
       model_frontier: "${{ steps.load-config.output | jq -r '.frontier_model' }}"
+      voter_1_provider: "${{ steps.load-config.output | jq -r '.voter_1_provider' }}"
+      voter_1_model: "${{ steps.load-config.output | jq -r '.voter_1_model' }}"
+      voter_2_provider: "${{ steps.load-config.output | jq -r '.voter_2_provider' }}"
+      voter_2_model: "${{ steps.load-config.output | jq -r '.voter_2_model' }}"
+      voter_3_provider: "${{ steps.load-config.output | jq -r '.voter_3_provider' }}"
+      voter_3_model: "${{ steps.load-config.output | jq -r '.voter_3_model' }}"
+      voter_4_provider: "${{ steps.load-config.output | jq -r '.voter_4_provider' }}"
+      voter_4_model: "${{ steps.load-config.output | jq -r '.voter_4_model' }}"
+      voter_5_provider: "${{ steps.load-config.output | jq -r '.voter_5_provider' }}"
+      voter_5_model: "${{ steps.load-config.output | jq -r '.voter_5_model' }}"
       codebase_context: >
         {{#if steps.codebase-analysis.outputs.codebase_context}}
           {{steps.codebase-analysis.outputs.codebase_context}}
@@ -274,6 +313,11 @@ steps:
       linear_team_id: "${{ steps.load-config.output | jq -r '.linear_team_id' }}"
       linear_agent_map: "${{ steps.create-linear-project.output | jq -c '.agentMap' }}"
       repository_url: "${{ steps.setup-repo.output | jq -r '.repository_url' }}"
+      verify: "{{inputs.verify}}"
+      breakpoints: "{{inputs.breakpoints}}"
+      linear_session_id: "{{inputs.linear_session_id}}"
+      linear_issue_id: "{{inputs.linear_issue_id}}"
+      run_id: "${{ steps.register-run.output | jq -r '.run_id // empty' }}"
       infrastructure_context: "${{ steps.build-infra-context.output }}"
       tool_context: "${{ steps.discover-tools.output }}"
       codebase_context: >
@@ -298,6 +342,14 @@ steps:
       voter_5_provider: "${{ steps.load-config.output | jq -r '.voter_5_provider' }}"
       voter_5_model: "${{ steps.load-config.output | jq -r '.voter_5_model' }}"
 
+  - name: deregister-run
+    depends_on: [intake]
+    description: "Deregister pipeline run"
+    command: >
+      intake-util deregister-run
+        --run-id "${{ steps.register-run.output | jq -r '.run_id // empty' }}"
+        --status completed
+
 output_mappings:
   repository_url: ${{ steps.setup-repo.output | jq -r '.repository_url' }}
   infrastructure_context: ${{ steps.build-infra-context.output }}
@@ -308,3 +360,4 @@ output_mappings:
   linear_project_id: ${{ steps.create-linear-project.output | jq -r '.projectId' }}
   linear_prd_issue_id: ${{ steps.create-linear-project.output | jq -r '.prdIssueId' }}
   linear_issues: ${{ steps.intake.outputs.linear_issues }}
+  run_id: ${{ steps.register-run.output | jq -r '.run_id // empty' }}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToolManifest",
+  "description": "Project-level declaration of required MCP tool servers",
+  "type": "object",
+  "properties": {
+    "required_tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Tool server name from catalog" },
+          "reason": { "type": "string", "description": "Why this tool is needed" },
+          "used_by_tasks": { "type": "array", "items": { "type": "number" }, "description": "Task IDs that need this tool" },
+          "requires_env": { "type": "array", "items": { "type": "string" }, "description": "Environment variables needed" }
+        },
+        "required": ["name", "reason", "used_by_tasks"]
+      }
+    },
+    "recommended_tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Tool server name from catalog" },
+          "reason": { "type": "string", "description": "Why this tool would be helpful" }
+        },
+        "required": ["name", "reason"]
+      }
+    }
+  },
+  "required": ["required_tools", "recommended_tools"]
+}

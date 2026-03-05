@@ -1,10 +1,9 @@
 name: deliberation
 description: >
-  PRD deliberation — Optimist vs Pessimist debate with multi-model committee
-  voting on decision points. All communication flows through a single shared
-  NATS subject (deliberation.room); intake-agent broadcasts the PRD and
-  orchestrates turns internally. Produces a resolved design-brief.md before
-  task generation begins.
+  PRD deliberation — Lobster-native Optimist vs Pessimist debate with
+  multi-model committee voting on decision points. Each debate turn is a
+  stateless LLM call; messaging flows through HTTP bridge for Discord and
+  Linear observability. Produces a resolved design-brief.md.
 
 inputs:
   - name: prd_content
@@ -25,6 +24,58 @@ inputs:
     type: string
     default: ""
     description: "Structured codebase context from codebase-analysis step (empty for greenfield)"
+  - name: human_review_mode
+    type: string
+    default: "full_auto"
+    description: "full_auto | semi_auto | manual"
+  - name: verify
+    type: string
+    default: "true"
+    description: "When true, validate outputs after each tally"
+  - name: breakpoints
+    type: string
+    default: "false"
+    description: "When true, pause for human approval at key checkpoints"
+  - name: linear_session_id
+    type: string
+    default: ""
+    description: "Linear session ID for activity tracking"
+  - name: model_frontier_provider
+    type: string
+    default: "anthropic"
+  - name: model_frontier
+    type: string
+    default: "claude-opus-4-6"
+  - name: voter_1_provider
+    type: string
+    default: "anthropic"
+  - name: voter_1_model
+    type: string
+    default: "claude-opus-4-6"
+  - name: voter_2_provider
+    type: string
+    default: "openai"
+  - name: voter_2_model
+    type: string
+    default: "gpt-5.2-pro"
+  - name: voter_3_provider
+    type: string
+    default: "anthropic"
+  - name: voter_3_model
+    type: string
+    default: "claude-sonnet-4-6"
+  - name: voter_4_provider
+    type: string
+    default: "openai"
+  - name: voter_4_model
+    type: string
+    default: "o3-pro"
+  - name: voter_5_provider
+    type: string
+    default: "google"
+  - name: voter_5_model
+    type: string
+    default: "gemini-2.5-pro"
 
 outputs:
   - name: design_brief
@@ -32,16 +83,14 @@ outputs:
     description: "Resolved design brief markdown — feeds into parse-prd"
   - name: deliberation_result
     type: object
-    description: "Full DeliberationResult JSON for audit logging"
+    description: "Full deliberation result JSON for audit logging"
 
 steps:
   # ─────────────────────────────────────────────────────────
-  # Step 1: Research PRD context via Tavily
-  # Fires targeted searches to give each debate agent evidence for
-  # their position before the debate begins.
+  # Research PRD context (unchanged from original)
   # ─────────────────────────────────────────────────────────
   - name: research-prd
-    description: "Research PRD context via Tavily before debate — gives each agent evidence for their position"
+    description: "Research PRD context via Tavily — gives each debate agent evidence"
     timeout: "5m"
     command: >
       jq -n
@@ -55,47 +104,549 @@ steps:
         }' | intake-agent
 
   # ─────────────────────────────────────────────────────────
-  # Step 2: Conduct the time-boxed debate
-  # intake-agent broadcasts the PRD to deliberation.room internally (Step 1 of
-  # runDeliberation), then orchestrates the debate loop, committee votes, and
-  # result collection — all via the single shared deliberation.room subject.
-  # NOTE: Timeout includes 10-minute buffer beyond internal timebox to allow
-  # for in-flight agent requests (5min), committee votes (2min), and post-loop
-  # processing, preventing premature termination during final iteration.
+  # Initialize debate session
   # ─────────────────────────────────────────────────────────
-  - name: conduct-deliberation
-    description: "Run conductor loop for timebox_minutes, collecting turns and votes"
+  - name: init-debate
     depends_on: [research-prd]
-    timeout: "{{inputs.timebox_minutes + 10}}m"
+    description: "Initialize debate session metadata"
     command: >
-      jq -n
-        --arg session_id "{{inputs.session_id}}"
-        --arg prd_content "{{inputs.prd_content}}"
-        --arg infra_context "{{inputs.infrastructure_context}}"
-        --arg codebase_context "{{inputs.codebase_context}}"
-        --argjson timebox {{inputs.timebox_minutes}}
-        --argjson research_memos '${{ steps.research-prd.output }}'
+      jq -n --arg session_id "{{inputs.session_id}}" --arg start "$(date +%s)" \
+        '{session_id: $session_id, start_epoch: ($start | tonumber), debate_log: [], resolved_dps: [], pending_dps: {}}'
+
+  - name: notify-start
+    depends_on: [init-debate]
+    description: "Notify bridges that deliberation has started"
+    command: >
+      echo "Deliberation started — session {{inputs.session_id}}" |
+      intake-util bridge-notify --from intake --to deliberation
+        --metadata '{"step":"deliberation-start","session_id":"{{inputs.session_id}}"}'
+
+  # ═══════════════════════════════════════════════════════════
+  # ROUND 1
+  # ═══════════════════════════════════════════════════════════
+  - name: optimist-turn-1
+    depends_on: [init-debate]
+    timeout: "5m"
+    description: "Optimist opening position"
+    command: >
+      openclaw.invoke --tool llm-task --action text --args-json '{
+        "prompt": "{{prompts/debate-optimist-soul.md}}",
+        "input": {
+          "prd": "{{inputs.prd_content}}",
+          "research": "${{ steps.research-prd.output | jq -r '.data.optimist // .optimist // empty' }}",
+          "infrastructure_context": "{{inputs.infrastructure_context}}",
+          "codebase_context": "{{inputs.codebase_context}}",
+          "debate_log": [],
+          "resolved_decisions": [],
+          "instruction": "Begin by proposing your architectural approach for this PRD."
+        },
+        "provider": "{{inputs.model_frontier_provider}}",
+        "model": "{{inputs.model_frontier}}"
+      }'
+
+  - name: notify-opt-1
+    depends_on: [optimist-turn-1]
+    command: >
+      echo '${{ steps.optimist-turn-1.output }}' |
+      intake-util bridge-notify --from optimist --to deliberation
+        --metadata '{"turn":"1","speaker":"optimist","session_id":"{{inputs.session_id}}"}'
+
+  - name: linear-activity-opt-1
+    depends_on: [optimist-turn-1]
+    when: "{{inputs.linear_session_id}}"
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Optimist Turn 1"
+        --body '${{ steps.optimist-turn-1.output }}'
+
+  - name: parse-dp-opt-1
+    depends_on: [optimist-turn-1]
+    command: >
+      jq -n --arg content '${{ steps.optimist-turn-1.output }}' --arg speaker optimist \
+        '{content: $content, speaker: $speaker}' |
+      intake-util parse-decision-points
+
+  - name: pessimist-turn-1
+    depends_on: [optimist-turn-1]
+    timeout: "5m"
+    description: "Pessimist response to optimist opening"
+    command: >
+      openclaw.invoke --tool llm-task --action text --args-json '{
+        "prompt": "{{prompts/debate-pessimist-soul.md}}",
+        "input": {
+          "prd": "{{inputs.prd_content}}",
+          "research": "${{ steps.research-prd.output | jq -r '.data.pessimist // .pessimist // empty' }}",
+          "infrastructure_context": "{{inputs.infrastructure_context}}",
+          "codebase_context": "{{inputs.codebase_context}}",
+          "debate_log": [{"turn": 1, "speaker": "optimist", "content": "${{ steps.optimist-turn-1.output }}"}],
+          "resolved_decisions": [],
+          "instruction": "Respond to the Optimist. Challenge weak points, raise risks, propose simpler alternatives where warranted."
+        },
+        "provider": "{{inputs.model_frontier_provider}}",
+        "model": "{{inputs.model_frontier}}"
+      }'
+
+  - name: notify-pes-1
+    depends_on: [pessimist-turn-1]
+    command: >
+      echo '${{ steps.pessimist-turn-1.output }}' |
+      intake-util bridge-notify --from pessimist --to deliberation
+        --metadata '{"turn":"1","speaker":"pessimist","session_id":"{{inputs.session_id}}"}'
+
+  - name: linear-activity-pes-1
+    depends_on: [pessimist-turn-1]
+    when: "{{inputs.linear_session_id}}"
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Pessimist Turn 1"
+        --body '${{ steps.pessimist-turn-1.output }}'
+
+  - name: parse-dp-pes-1
+    depends_on: [pessimist-turn-1]
+    command: >
+      jq -n --arg content '${{ steps.pessimist-turn-1.output }}' --arg speaker pessimist \
+        '{content: $content, speaker: $speaker}' |
+      intake-util parse-decision-points
+
+  - name: resolve-dps-1
+    depends_on: [parse-dp-opt-1, parse-dp-pes-1]
+    description: "Find decision points with both positions ready for vote"
+    command: >
+      jq -n \
+        --argjson opt '${{ steps.parse-dp-opt-1.output }}' \
+        --argjson pes '${{ steps.parse-dp-pes-1.output }}' \
         '{
-          "operation": "deliberate",
-          "payload": {
-            "session_id": $session_id,
-            "prd_content": $prd_content,
-            "infrastructure_context": (if $codebase_context != "" then ($infra_context + "\n\n## Existing Codebase\n" + $codebase_context) else $infra_context end),
-            "timebox_minutes": $timebox,
-            "research_memos": $research_memos,
-            "vote_timeout_seconds": 120,
-            "committee_ids": ["committee-1", "committee-2", "committee-3", "committee-4", "committee-5"]
-          }
-        }' | intake-agent
+          all_dps: ($opt + $pes),
+          votable: [
+            $opt[] as $o |
+            ($pes[] | select(.id == $o.id)) as $p |
+            {id: $o.id, question: $o.question, category: $o.category,
+             optimist_position: $o.proposing_option, pessimist_position: $p.proposing_option}
+          ],
+          pending: [($opt + $pes) | group_by(.id)[] | select(length == 1) | .[0]]
+        }'
+
+  - name: vote-dp-1
+    when: "${{ steps.resolve-dps-1.output | jq '.votable | length > 0' }}"
+    depends_on: [resolve-dps-1]
+    description: "Committee vote on round-1 decision points"
+    workflow: decision-voting.lobster.yaml
+    inputs:
+      question: "${{ steps.resolve-dps-1.output | jq -r '.votable[0].question' }}"
+      optimist_position: "${{ steps.resolve-dps-1.output | jq -r '.votable[0].optimist_position' }}"
+      pessimist_position: "${{ steps.resolve-dps-1.output | jq -r '.votable[0].pessimist_position' }}"
+      context: "{{inputs.prd_content}}"
+      decision_id: "${{ steps.resolve-dps-1.output | jq -r '.votable[0].id' }}"
+      session_id: "{{inputs.session_id}}"
+      human_review_mode: "{{inputs.human_review_mode}}"
+      voter_1_provider: "{{inputs.voter_1_provider}}"
+      voter_1_model: "{{inputs.voter_1_model}}"
+      voter_2_provider: "{{inputs.voter_2_provider}}"
+      voter_2_model: "{{inputs.voter_2_model}}"
+      voter_3_provider: "{{inputs.voter_3_provider}}"
+      voter_3_model: "{{inputs.voter_3_model}}"
+      voter_4_provider: "{{inputs.voter_4_provider}}"
+      voter_4_model: "{{inputs.voter_4_model}}"
+      voter_5_provider: "{{inputs.voter_5_provider}}"
+      voter_5_model: "{{inputs.voter_5_model}}"
+
+  - name: verify-vote-1
+    when: "{{inputs.verify}}"
+    depends_on: [vote-dp-1]
+    command: >
+      echo '${{ steps.vote-dp-1.outputs.decision_result }}' |
+      intake-util validate --type decision-vote
+
+  - name: check-consensus-1
+    depends_on: [pessimist-turn-1, vote-dp-1]
+    description: "Check if consensus reached or timebox expired"
+    command: >
+      jq -n \
+        --argjson elapsed $(( ($(date +%s) - ${{ steps.init-debate.output | jq -r '.start_epoch' }}) / 60 )) \
+        --argjson timebox {{inputs.timebox_minutes}} \
+        --arg pessimist_response '${{ steps.pessimist-turn-1.output }}' \
+        '{
+          continue: ($elapsed < $timebox and ($pessimist_response | test("(I agree|consensus|you.re right)"; "i") | not)),
+          elapsed_minutes: $elapsed,
+          round: 1
+        }'
+
+  # ═══════════════════════════════════════════════════════════
+  # ROUND 2 (conditional on round 1 not reaching consensus)
+  # ═══════════════════════════════════════════════════════════
+  - name: assemble-log-1
+    when: "${{ steps.check-consensus-1.output | jq -r '.continue' }}"
+    depends_on: [check-consensus-1]
+    command: >
+      jq -n '[
+        {turn: 1, speaker: "optimist", content: $opt},
+        {turn: 1, speaker: "pessimist", content: $pes}
+      ]'
+        --arg opt '${{ steps.optimist-turn-1.output }}'
+        --arg pes '${{ steps.pessimist-turn-1.output }}'
+
+  - name: resolved-after-1
+    when: "${{ steps.check-consensus-1.output | jq -r '.continue' }}"
+    depends_on: [vote-dp-1, check-consensus-1]
+    command: >
+      VOTE_RESULT='${{ steps.vote-dp-1.outputs.decision_result }}'
+      if [ -n "$VOTE_RESULT" ] && [ "$VOTE_RESULT" != "null" ]; then
+        echo "[$VOTE_RESULT]"
+      else
+        echo "[]"
+      fi
+
+  - name: optimist-turn-2
+    when: "${{ steps.check-consensus-1.output | jq -r '.continue' }}"
+    depends_on: [assemble-log-1, resolved-after-1]
+    timeout: "5m"
+    command: >
+      openclaw.invoke --tool llm-task --action text --args-json '{
+        "prompt": "{{prompts/debate-optimist-soul.md}}",
+        "input": {
+          "prd": "{{inputs.prd_content}}",
+          "research": "${{ steps.research-prd.output | jq -r '.data.optimist // .optimist // empty' }}",
+          "debate_log": ${{ steps.assemble-log-1.output }},
+          "resolved_decisions": ${{ steps.resolved-after-1.output }},
+          "instruction": "Continue the debate. Address the Pessimist concerns from the previous round."
+        },
+        "provider": "{{inputs.model_frontier_provider}}",
+        "model": "{{inputs.model_frontier}}"
+      }'
+
+  - name: notify-opt-2
+    depends_on: [optimist-turn-2]
+    command: >
+      echo '${{ steps.optimist-turn-2.output }}' |
+      intake-util bridge-notify --from optimist --to deliberation
+        --metadata '{"turn":"2","speaker":"optimist","session_id":"{{inputs.session_id}}"}'
+
+  - name: linear-activity-opt-2
+    depends_on: [optimist-turn-2]
+    when: "{{inputs.linear_session_id}}"
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Optimist Turn 2"
+        --body '${{ steps.optimist-turn-2.output }}'
+
+  - name: parse-dp-opt-2
+    depends_on: [optimist-turn-2]
+    command: >
+      jq -n --arg content '${{ steps.optimist-turn-2.output }}' --arg speaker optimist \
+        '{content: $content, speaker: $speaker}' |
+      intake-util parse-decision-points
+
+  - name: pessimist-turn-2
+    when: "${{ steps.check-consensus-1.output | jq -r '.continue' }}"
+    depends_on: [optimist-turn-2]
+    timeout: "5m"
+    command: >
+      openclaw.invoke --tool llm-task --action text --args-json '{
+        "prompt": "{{prompts/debate-pessimist-soul.md}}",
+        "input": {
+          "prd": "{{inputs.prd_content}}",
+          "research": "${{ steps.research-prd.output | jq -r '.data.pessimist // .pessimist // empty' }}",
+          "debate_log": ${{ steps.assemble-log-1.output | jq '. + [{turn: 2, speaker: "optimist", content: $opt}]' --arg opt '${{ steps.optimist-turn-2.output }}' }},
+          "resolved_decisions": ${{ steps.resolved-after-1.output }},
+          "instruction": "Respond to the Optimist round 2 arguments. Refine your positions."
+        },
+        "provider": "{{inputs.model_frontier_provider}}",
+        "model": "{{inputs.model_frontier}}"
+      }'
+
+  - name: notify-pes-2
+    depends_on: [pessimist-turn-2]
+    command: >
+      echo '${{ steps.pessimist-turn-2.output }}' |
+      intake-util bridge-notify --from pessimist --to deliberation
+        --metadata '{"turn":"2","speaker":"pessimist","session_id":"{{inputs.session_id}}"}'
+
+  - name: linear-activity-pes-2
+    depends_on: [pessimist-turn-2]
+    when: "{{inputs.linear_session_id}}"
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Pessimist Turn 2"
+        --body '${{ steps.pessimist-turn-2.output }}'
+
+  - name: parse-dp-pes-2
+    depends_on: [pessimist-turn-2]
+    command: >
+      jq -n --arg content '${{ steps.pessimist-turn-2.output }}' --arg speaker pessimist \
+        '{content: $content, speaker: $speaker}' |
+      intake-util parse-decision-points
+
+  - name: resolve-dps-2
+    depends_on: [parse-dp-opt-1, parse-dp-pes-1, parse-dp-opt-2, parse-dp-pes-2, resolved-after-1]
+    command: >
+      jq -n \
+        --argjson opt1 '${{ steps.parse-dp-opt-1.output }}' \
+        --argjson pes1 '${{ steps.parse-dp-pes-1.output }}' \
+        --argjson opt2 '${{ steps.parse-dp-opt-2.output }}' \
+        --argjson pes2 '${{ steps.parse-dp-pes-2.output }}' \
+        --argjson resolved '${{ steps.resolved-after-1.output }}' \
+        '($opt1 + $opt2) as $all_opt | ($pes1 + $pes2) as $all_pes |
+        ($resolved | map(.decision_id) // []) as $done |
+        {
+          votable: [
+            $all_opt[] as $o |
+            ($all_pes[] | select(.id == $o.id)) as $p |
+            select(($done | index($o.id)) == null) |
+            {id: $o.id, question: $o.question, category: $o.category,
+             optimist_position: $o.proposing_option, pessimist_position: $p.proposing_option}
+          ]
+        }'
+
+  - name: vote-dp-2
+    when: "${{ steps.resolve-dps-2.output | jq '.votable | length > 0' }}"
+    depends_on: [resolve-dps-2]
+    workflow: decision-voting.lobster.yaml
+    inputs:
+      question: "${{ steps.resolve-dps-2.output | jq -r '.votable[0].question' }}"
+      optimist_position: "${{ steps.resolve-dps-2.output | jq -r '.votable[0].optimist_position' }}"
+      pessimist_position: "${{ steps.resolve-dps-2.output | jq -r '.votable[0].pessimist_position' }}"
+      context: "{{inputs.prd_content}}"
+      decision_id: "${{ steps.resolve-dps-2.output | jq -r '.votable[0].id' }}"
+      session_id: "{{inputs.session_id}}"
+      human_review_mode: "{{inputs.human_review_mode}}"
+      voter_1_provider: "{{inputs.voter_1_provider}}"
+      voter_1_model: "{{inputs.voter_1_model}}"
+      voter_2_provider: "{{inputs.voter_2_provider}}"
+      voter_2_model: "{{inputs.voter_2_model}}"
+      voter_3_provider: "{{inputs.voter_3_provider}}"
+      voter_3_model: "{{inputs.voter_3_model}}"
+      voter_4_provider: "{{inputs.voter_4_provider}}"
+      voter_4_model: "{{inputs.voter_4_model}}"
+      voter_5_provider: "{{inputs.voter_5_provider}}"
+      voter_5_model: "{{inputs.voter_5_model}}"
+
+  - name: verify-vote-2
+    when: "{{inputs.verify}}"
+    depends_on: [vote-dp-2]
+    command: >
+      echo '${{ steps.vote-dp-2.outputs.decision_result }}' |
+      intake-util validate --type decision-vote
+
+  - name: check-consensus-2
+    depends_on: [pessimist-turn-2, vote-dp-2]
+    command: >
+      jq -n \
+        --argjson elapsed $(( ($(date +%s) - ${{ steps.init-debate.output | jq -r '.start_epoch' }}) / 60 )) \
+        --argjson timebox {{inputs.timebox_minutes}} \
+        --arg pessimist_response '${{ steps.pessimist-turn-2.output }}' \
+        '{
+          continue: ($elapsed < $timebox and ($pessimist_response | test("(I agree|consensus|you.re right)"; "i") | not)),
+          elapsed_minutes: $elapsed,
+          round: 2
+        }'
+
+  # ═══════════════════════════════════════════════════════════
+  # ROUND 3 (conditional on round 2 continuing)
+  # ═══════════════════════════════════════════════════════════
+  - name: assemble-log-2
+    when: "${{ steps.check-consensus-2.output | jq -r '.continue' }}"
+    depends_on: [check-consensus-2]
+    command: >
+      jq -n '[
+        {turn: 1, speaker: "optimist", content: $o1},
+        {turn: 1, speaker: "pessimist", content: $p1},
+        {turn: 2, speaker: "optimist", content: $o2},
+        {turn: 2, speaker: "pessimist", content: $p2}
+      ]'
+        --arg o1 '${{ steps.optimist-turn-1.output }}'
+        --arg p1 '${{ steps.pessimist-turn-1.output }}'
+        --arg o2 '${{ steps.optimist-turn-2.output }}'
+        --arg p2 '${{ steps.pessimist-turn-2.output }}'
+
+  - name: resolved-after-2
+    when: "${{ steps.check-consensus-2.output | jq -r '.continue' }}"
+    depends_on: [vote-dp-1, vote-dp-2, check-consensus-2]
+    command: >
+      R1='${{ steps.vote-dp-1.outputs.decision_result }}'
+      R2='${{ steps.vote-dp-2.outputs.decision_result }}'
+      jq -n --argjson r1 "${R1:-null}" --argjson r2 "${R2:-null}" \
+        '[[$r1, $r2] | .[] | select(. != null)]'
+
+  - name: optimist-turn-3
+    when: "${{ steps.check-consensus-2.output | jq -r '.continue' }}"
+    depends_on: [assemble-log-2, resolved-after-2]
+    timeout: "5m"
+    command: >
+      openclaw.invoke --tool llm-task --action text --args-json '{
+        "prompt": "{{prompts/debate-optimist-soul.md}}",
+        "input": {
+          "prd": "{{inputs.prd_content}}",
+          "research": "${{ steps.research-prd.output | jq -r '.data.optimist // .optimist // empty' }}",
+          "debate_log": ${{ steps.assemble-log-2.output }},
+          "resolved_decisions": ${{ steps.resolved-after-2.output }},
+          "instruction": "Round 3. Focus on remaining unresolved points. Seek convergence."
+        },
+        "provider": "{{inputs.model_frontier_provider}}",
+        "model": "{{inputs.model_frontier}}"
+      }'
+
+  - name: notify-opt-3
+    depends_on: [optimist-turn-3]
+    command: >
+      echo '${{ steps.optimist-turn-3.output }}' |
+      intake-util bridge-notify --from optimist --to deliberation
+        --metadata '{"turn":"3","speaker":"optimist","session_id":"{{inputs.session_id}}"}'
+
+  - name: linear-activity-opt-3
+    depends_on: [optimist-turn-3]
+    when: "{{inputs.linear_session_id}}"
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Optimist Turn 3"
+        --body '${{ steps.optimist-turn-3.output }}'
+
+  - name: parse-dp-opt-3
+    depends_on: [optimist-turn-3]
+    command: >
+      jq -n --arg content '${{ steps.optimist-turn-3.output }}' --arg speaker optimist \
+        '{content: $content, speaker: $speaker}' |
+      intake-util parse-decision-points
+
+  - name: pessimist-turn-3
+    when: "${{ steps.check-consensus-2.output | jq -r '.continue' }}"
+    depends_on: [optimist-turn-3]
+    timeout: "5m"
+    command: >
+      openclaw.invoke --tool llm-task --action text --args-json '{
+        "prompt": "{{prompts/debate-pessimist-soul.md}}",
+        "input": {
+          "prd": "{{inputs.prd_content}}",
+          "research": "${{ steps.research-prd.output | jq -r '.data.pessimist // .pessimist // empty' }}",
+          "debate_log": ${{ steps.assemble-log-2.output | jq '. + [{turn: 3, speaker: "optimist", content: $opt}]' --arg opt '${{ steps.optimist-turn-3.output }}' }},
+          "resolved_decisions": ${{ steps.resolved-after-2.output }},
+          "instruction": "Round 3. State your final positions on remaining points."
+        },
+        "provider": "{{inputs.model_frontier_provider}}",
+        "model": "{{inputs.model_frontier}}"
+      }'
+
+  - name: notify-pes-3
+    depends_on: [pessimist-turn-3]
+    command: >
+      echo '${{ steps.pessimist-turn-3.output }}' |
+      intake-util bridge-notify --from pessimist --to deliberation
+        --metadata '{"turn":"3","speaker":"pessimist","session_id":"{{inputs.session_id}}"}'
+
+  - name: parse-dp-pes-3
+    depends_on: [pessimist-turn-3]
+    command: >
+      jq -n --arg content '${{ steps.pessimist-turn-3.output }}' --arg speaker pessimist \
+        '{content: $content, speaker: $speaker}' |
+      intake-util parse-decision-points
+
+  - name: linear-activity-pes-3
+    depends_on: [pessimist-turn-3]
+    when: "{{inputs.linear_session_id}}"
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Pessimist Turn 3"
+        --body '${{ steps.pessimist-turn-3.output }}'
+
+  # ═══════════════════════════════════════════════════════════
+  # POST-DEBATE: Collect all DPs, assemble result, compile brief
+  # ═══════════════════════════════════════════════════════════
+
+  - name: collect-all-dps
+    depends_on: [parse-dp-opt-1, parse-dp-pes-1, parse-dp-opt-2, parse-dp-pes-2, parse-dp-opt-3, parse-dp-pes-3, vote-dp-1, vote-dp-2]
+    description: "Collect all decision points and their resolution status"
+    command: >
+      jq -n \
+        --argjson opt1 '${steps.parse-dp-opt-1.output:-[]}' \
+        --argjson pes1 '${steps.parse-dp-pes-1.output:-[]}' \
+        --argjson opt2 '${steps.parse-dp-opt-2.output:-[]}' \
+        --argjson pes2 '${steps.parse-dp-pes-2.output:-[]}' \
+        --argjson opt3 '${steps.parse-dp-opt-3.output:-[]}' \
+        --argjson pes3 '${steps.parse-dp-pes-3.output:-[]}' \
+        --argjson vote1 '${steps.vote-dp-1.outputs.decision_result:-null}' \
+        --argjson vote2 '${steps.vote-dp-2.outputs.decision_result:-null}' \
+        '{
+          all_decision_points: ($opt1 + $pes1 + $opt2 + $pes2 + $opt3 + $pes3 | group_by(.id) | map({
+            id: .[0].id,
+            question: .[0].question,
+            category: .[0].category,
+            raised_by: .[0].raised_by,
+            positions: map({speaker: .raised_by, option: .proposing_option})
+          })),
+          resolved: [[$vote1, $vote2] | .[] | select(. != null)],
+          unresolved_count: 0
+        }'
+
+  - name: assemble-result
+    depends_on: [collect-all-dps, check-consensus-1, check-consensus-2]
+    description: "Build full DeliberationResult JSON"
+    command: >
+      CONS1='${{ steps.check-consensus-1.output }}'
+      CONS2='${{ steps.check-consensus-2.output }}'
+      jq -n \
+        --arg session_id "{{inputs.session_id}}" \
+        --argjson timebox {{inputs.timebox_minutes}} \
+        --argjson dps '${{ steps.collect-all-dps.output }}' \
+        --argjson cons1 "$CONS1" \
+        --argjson cons2 "${CONS2:-null}" \
+        --arg o1 '${{ steps.optimist-turn-1.output }}' \
+        --arg p1 '${{ steps.pessimist-turn-1.output }}' \
+        --arg o2 '${steps.optimist-turn-2.output:-}' \
+        --arg p2 '${steps.pessimist-turn-2.output:-}' \
+        --arg o3 '${steps.optimist-turn-3.output:-}' \
+        --arg p3 '${steps.pessimist-turn-3.output:-}' \
+        '{
+          session_id: $session_id,
+          timebox_minutes: $timebox,
+          status: (
+            if ($cons1.continue | not) then
+              (if ($cons1 | .elapsed_minutes < $timebox) then "consensus" else "completed" end)
+            elif $cons2 != null and ($cons2.continue | not) then
+              (if ($cons2 | .elapsed_minutes < $timebox) then "consensus" else "completed" end)
+            else "completed"
+            end
+          ),
+          debate_turns: (
+            if $o3 != "" then 6
+            elif $o2 != "" then 4
+            else 2
+            end
+          ),
+          decision_points: $dps.all_decision_points,
+          resolved_decisions: $dps.resolved,
+          debate_log: (
+            [{turn:1, speaker:"optimist", content:$o1}, {turn:1, speaker:"pessimist", content:$p1}]
+            + (if $o2 != "" then [{turn:2, speaker:"optimist", content:$o2}, {turn:2, speaker:"pessimist", content:$p2}] else [] end)
+            + (if $o3 != "" then [{turn:3, speaker:"optimist", content:$o3}, {turn:3, speaker:"pessimist", content:$p3}] else [] end)
+          )
+        }'
+
+  - name: notify-complete
+    depends_on: [assemble-result]
+    command: >
+      echo "Deliberation complete — ${{ steps.assemble-result.output | jq -r '.status' }}, ${{ steps.assemble-result.output | jq -r '.debate_turns' }} turns" |
+      intake-util bridge-notify --from intake --to deliberation
+        --metadata '{"step":"deliberation-complete","session_id":"{{inputs.session_id}}"}'
 
   # ─────────────────────────────────────────────────────────
-  # Step 2: Compile resolved decisions into a design brief
+  # Compile design brief (LLM synthesis, unchanged pattern)
   # ─────────────────────────────────────────────────────────
   - name: compile-brief
     description: "Synthesize deliberation result + original PRD into design-brief.md"
-    depends_on: [conduct-deliberation]
+    depends_on: [assemble-result]
     command: >
-      echo '${{ steps.conduct-deliberation.output }}' > /tmp/delib_result.json &&
+      echo '${{ steps.assemble-result.output }}' > /tmp/delib_result.json &&
       jq -n
         --arg prompt "{{prompts/compile-design-brief-system.md}}"
         --arg prd_content "{{inputs.prd_content}}"
@@ -106,14 +657,11 @@ steps:
             "deliberation_result": $delib_result[0],
             "prd_content": $prd_content
           },
-          "provider": "anthropic",
-          "model": "claude-opus-4-20250514",
+          "provider": "{{inputs.model_frontier_provider}}",
+          "model": "{{inputs.model_frontier}}",
           "temperature": 0.2
         }' | xargs -I{} openclaw.invoke --tool llm-task --action text --args-json '{}'
 
-  # ─────────────────────────────────────────────────────────
-  # Step 3: Save design brief to .tasks/docs/design-brief.md
-  # ─────────────────────────────────────────────────────────
   - name: save-brief
     description: "Persist design brief for audit trail and downstream pipeline"
     depends_on: [compile-brief]
@@ -124,4 +672,4 @@ steps:
 
 output_mappings:
   design_brief: ${{ steps.compile-brief.output }}
-  deliberation_result: ${{ steps.conduct-deliberation.output }}
+  deliberation_result: ${{ steps.assemble-result.output }}

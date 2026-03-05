@@ -58,6 +58,26 @@ inputs:
     type: string
     default: ""
     description: "Discovered MCP tools from config and cluster (from discover-tools step)"
+  - name: verify
+    type: string
+    default: "true"
+    description: "When true, validate outputs after each major step"
+  - name: breakpoints
+    type: string
+    default: "false"
+    description: "When true, pause for human approval at key checkpoints"
+  - name: linear_session_id
+    type: string
+    default: ""
+    description: "Linear session ID for activity tracking"
+  - name: linear_issue_id
+    type: string
+    default: ""
+    description: "Linear issue ID for plan updates"
+  - name: run_id
+    type: string
+    default: ""
+    description: "Pipeline run ID for registration/deregistration"
   - name: model_primary_provider
     type: string
     default: "anthropic"
@@ -108,6 +128,27 @@ inputs:
     default: "gemini-3.1-pro-preview"
 
 steps:
+  # ─────────────────────────────────────────────────────────
+  # Run registration
+  # ─────────────────────────────────────────────────────────
+  - name: register-run
+    when: "{{inputs.run_id}}"
+    command: >
+      intake-util register-run
+        --run-id "{{inputs.run_id}}"
+        --session-id "{{inputs.linear_session_id}}"
+        --workflow intake
+
+  - name: linear-plan-parsing
+    when: "{{inputs.linear_issue_id}}"
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --issue-id "{{inputs.linear_issue_id}}"
+        --type plan
+        --title "Phase: PRD Parsing & Analysis"
+        --body "Starting PRD parse and complexity analysis"
+
   - name: parse-prd
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
@@ -123,6 +164,30 @@ steps:
         "model": "{{inputs.model_primary}}"
       }'
 
+  - name: verify-parse-prd
+    when: "{{inputs.verify}}"
+    depends_on: [parse-prd]
+    command: >
+      echo '${{ steps.parse-prd.output }}' |
+      intake-util validate --type generated-task
+
+  - name: breakpoint-parse-prd
+    when: "{{inputs.breakpoints}}"
+    depends_on: [verify-parse-prd]
+    approval:
+      message: "Review parse-prd output"
+
+  - name: linear-activity-parse-prd
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [parse-prd]
+    command: >
+      TASK_COUNT=$(echo '${{ steps.parse-prd.output }}' | jq 'length') &&
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "PRD Parsed"
+        --body "Parsed PRD into ${TASK_COUNT} tasks"
+
   - name: analyze-complexity
     depends_on: [parse-prd]
     command: >
@@ -133,6 +198,29 @@ steps:
         "provider": "{{inputs.model_primary_provider}}",
         "model": "{{inputs.model_primary}}"
       }'
+
+  - name: verify-analyze-complexity
+    when: "{{inputs.verify}}"
+    depends_on: [analyze-complexity]
+    command: >
+      echo '${{ steps.analyze-complexity.output }}' |
+      intake-util validate --type complexity-analysis
+
+  - name: breakpoint-analyze-complexity
+    when: "{{inputs.breakpoints}}"
+    depends_on: [verify-analyze-complexity]
+    approval:
+      message: "Review analyze-complexity output"
+
+  - name: linear-activity-analyze-complexity
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [analyze-complexity]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Complexity Analyzed"
+        --body '${{ steps.analyze-complexity.output }}'
 
   - name: review-tasks
     depends_on: [analyze-complexity]
@@ -168,6 +256,41 @@ steps:
       voter_5_provider: "{{inputs.voter_5_provider}}"
       voter_5_model: "{{inputs.voter_5_model}}"
 
+  - name: verify-refine-tasks
+    when: "{{inputs.verify}}"
+    depends_on: [refine-tasks]
+    command: >
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
+      intake-util validate --type expanded-tasks
+
+  - name: breakpoint-refine-tasks
+    when: "{{inputs.breakpoints}}"
+    depends_on: [verify-refine-tasks]
+    approval:
+      message: "Review refine-tasks output"
+
+  - name: linear-activity-refine-tasks
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [refine-tasks]
+    command: >
+      TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Tasks Refined"
+        --body "Refined ${TASK_COUNT} tasks — verdict: ${{ steps.refine-tasks.outputs.verdict }}"
+
+  - name: linear-plan-generation
+    when: "{{inputs.linear_issue_id}}"
+    depends_on: [refine-tasks]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --issue-id "{{inputs.linear_issue_id}}"
+        --type plan
+        --title "Phase: Artifact Generation"
+        --body "Generating scaffolds, docs, prompts, workflows, and security analysis"
+
   - name: generate-scaffolds
     depends_on: [refine-tasks]
     description: "Generate code scaffolds for each task based on agent, stack, and codebase context"
@@ -183,6 +306,29 @@ steps:
         "provider": "{{inputs.model_fast_provider}}",
         "model": "{{inputs.model_fast}}"
       }'
+
+  - name: verify-generate-scaffolds
+    when: "{{inputs.verify}}"
+    depends_on: [generate-scaffolds]
+    command: >
+      echo '${{ steps.generate-scaffolds.output }}' |
+      intake-util validate --type scaffold
+
+  - name: breakpoint-generate-scaffolds
+    when: "{{inputs.breakpoints}}"
+    depends_on: [verify-generate-scaffolds]
+    approval:
+      message: "Review generate-scaffolds output"
+
+  - name: linear-activity-generate-scaffolds
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [generate-scaffolds]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Scaffolds Generated"
+        --body "Generated code scaffolds for all tasks"
 
   - name: fan-out-docs
     depends_on: [refine-tasks, generate-scaffolds]
@@ -212,6 +358,16 @@ steps:
       echo '${{ steps.fan-out-docs.output }}' |
       intake-util write-files --base-path .tasks/docs --type docs
 
+  - name: linear-activity-write-docs
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [write-docs]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Docs Written"
+        --body "Task documentation written to .tasks/docs"
+
   - name: search-skills
     depends_on: [refine-tasks]
     description: "Search ClawHub for relevant skills per task"
@@ -237,6 +393,23 @@ steps:
         "provider": "{{inputs.model_fast_provider}}",
         "model": "{{inputs.model_fast}}"
       }'
+
+  - name: verify-discover-skills
+    when: "{{inputs.verify}}"
+    depends_on: [discover-skills]
+    command: >
+      echo '${{ steps.discover-skills.output }}' |
+      intake-util validate --type skill-recommendations
+
+  - name: linear-activity-discover-skills
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [discover-skills]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Skills Discovered"
+        --body "Skill recommendations generated for all tasks"
 
   - name: generate-tool-manifest
     depends_on: [refine-tasks]
@@ -282,6 +455,47 @@ steps:
       echo '${{ steps.fan-out-prompts.output }}' |
       intake-util write-files --base-path .tasks/docs --type prompts
 
+  - name: linear-activity-write-prompts
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [write-prompts]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Prompts Written"
+        --body "Per-agent implementation prompts written to .tasks/docs"
+
+  # ─────────────────────────────────────────────────────────
+  # Per-task implementation workflows (deterministic)
+  # Generates a Lobster workflow per task that controls the
+  # execution lifecycle: setup, subtask sequencing, validation
+  # gates, and PR creation. Runs parallel with docs/prompts.
+  # ─────────────────────────────────────────────────────────
+  - name: generate-workflows
+    depends_on: [refine-tasks, generate-scaffolds]
+    description: "Generate per-task Lobster implementation workflows (deterministic)"
+    command: >
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
+      intake-util generate-workflows
+        --scaffolds-json <(echo '${{ steps.generate-scaffolds.output }}')
+        --config cto-config.json
+        --repository-url "{{inputs.repository_url}}"
+
+  - name: validate-workflows
+    depends_on: [generate-workflows]
+    description: "Validate generated workflow structure and completeness"
+    command: >
+      TASK_IDS=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq '[.[].id]') &&
+      echo '${{ steps.generate-workflows.output }}' | jq '.task_workflows' |
+      intake-util validate --type workflows --task-ids "$TASK_IDS"
+
+  - name: write-workflows
+    depends_on: [validate-workflows]
+    description: "Write per-task implementation.lobster.yaml files to disk"
+    command: >
+      echo '${{ steps.generate-workflows.output }}' |
+      intake-util write-files --base-path .tasks/docs --type workflows
+
   # ─────────────────────────────────────────────────────────
   # Final pipeline stages: scale → security → remediation
   # These generate additional task specs that get included in
@@ -317,6 +531,17 @@ steps:
         "model": "{{inputs.model_frontier}}"
       }'
 
+  - name: linear-activity-security-report
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [generate-security-report]
+    command: >
+      FINDING_COUNT=$(echo '${{ steps.generate-security-report.output }}' | jq '.findings | length') &&
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Security Report"
+        --body "Security analysis found ${FINDING_COUNT} findings"
+
   - name: generate-remediation-tasks
     depends_on: [generate-security-report]
     description: "Generate remediation tasks from security findings"
@@ -349,9 +574,20 @@ steps:
         --base-url "{{inputs.repository_url}}"
         --agent-map '{{inputs.linear_agent_map}}'
 
+  - name: linear-plan-commit
+    when: "{{inputs.linear_issue_id}}"
+    depends_on: [write-prompts, write-workflows, generate-remediation-tasks]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --issue-id "{{inputs.linear_issue_id}}"
+        --type plan
+        --title "Phase: Commit & PR"
+        --body "Committing generated artifacts and opening PR"
+
   - name: commit-outputs
     description: "Stage all generated task files and open a PR"
-    depends_on: [write-prompts, generate-remediation-tasks]
+    depends_on: [write-prompts, write-workflows, generate-remediation-tasks]
     command: >
       TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
       SCALE_TASKS='${{ steps.generate-scale-tasks.output }}' &&
@@ -410,6 +646,24 @@ steps:
         --base "{{inputs.pr_base_branch}}" \
         --label "intake" 2>&1 | tee /tmp/pr-url.txt &&
       cat /tmp/pr-url.txt
+
+  - name: linear-activity-pr-created
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [create-pr]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "PR Created"
+        --body "Pull request opened: ${{ steps.create-pr.output }}"
+
+  - name: deregister-run
+    when: "{{inputs.run_id}}"
+    depends_on: [create-pr, sync-linear-issues]
+    command: >
+      intake-util deregister-run
+        --run-id "{{inputs.run_id}}"
+        --status completed
 
 output_mappings:
   task_count: ${{ steps.refine-tasks.outputs.expanded_tasks | jq 'length' }}

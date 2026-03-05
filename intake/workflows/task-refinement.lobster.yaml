@@ -19,6 +19,42 @@ inputs:
     type: number
     default: 2
     description: "Maximum revision rounds before proceeding regardless"
+  - name: model_primary_provider
+    type: string
+    default: "anthropic"
+  - name: model_primary
+    type: string
+    default: "claude-sonnet-4-6"
+  - name: voter_1_provider
+    type: string
+    default: "anthropic"
+  - name: voter_1_model
+    type: string
+    default: "claude-opus-4-6"
+  - name: voter_2_provider
+    type: string
+    default: "openai"
+  - name: voter_2_model
+    type: string
+    default: "gpt-5.2-pro"
+  - name: voter_3_provider
+    type: string
+    default: "anthropic"
+  - name: voter_3_model
+    type: string
+    default: "claude-sonnet-4-6"
+  - name: voter_4_provider
+    type: string
+    default: "openai"
+  - name: voter_4_model
+    type: string
+    default: "o3-pro"
+  - name: voter_5_provider
+    type: string
+    default: "google"
+  - name: voter_5_model
+    type: string
+    default: "gemini-2.5-pro"
 
 steps:
   # ─────────────────────────────────────────────────────────
@@ -33,8 +69,8 @@ steps:
           "complexity": {{inputs.complexity}}
         },
         "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514"
+        "provider": "{{inputs.model_primary_provider}}",
+        "model": "{{inputs.model_primary}}"
       }'
 
   - name: vote-round-0
@@ -43,6 +79,16 @@ steps:
     inputs:
       content_to_evaluate: ${{ steps.expand-round-0.output }}
       evaluation_criteria: "{{inputs.evaluation_criteria}}"
+      voter_1_provider: "{{inputs.voter_1_provider}}"
+      voter_1_model: "{{inputs.voter_1_model}}"
+      voter_2_provider: "{{inputs.voter_2_provider}}"
+      voter_2_model: "{{inputs.voter_2_model}}"
+      voter_3_provider: "{{inputs.voter_3_provider}}"
+      voter_3_model: "{{inputs.voter_3_model}}"
+      voter_4_provider: "{{inputs.voter_4_provider}}"
+      voter_4_model: "{{inputs.voter_4_model}}"
+      voter_5_provider: "{{inputs.voter_5_provider}}"
+      voter_5_model: "{{inputs.voter_5_model}}"
 
   - name: check-round-0
     depends_on: [vote-round-0]
@@ -72,8 +118,8 @@ steps:
           "additional_context": "This is revision round 1. The 5-model voting committee flagged issues with the previous expansion. Address the suggestions below while preserving what worked well."
         },
         "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514"
+        "provider": "{{inputs.model_primary_provider}}",
+        "model": "{{inputs.model_primary}}"
       }'
 
   - name: vote-round-1
@@ -83,6 +129,16 @@ steps:
     inputs:
       content_to_evaluate: ${{ steps.expand-round-1.output }}
       evaluation_criteria: "{{inputs.evaluation_criteria}}"
+      voter_1_provider: "{{inputs.voter_1_provider}}"
+      voter_1_model: "{{inputs.voter_1_model}}"
+      voter_2_provider: "{{inputs.voter_2_provider}}"
+      voter_2_model: "{{inputs.voter_2_model}}"
+      voter_3_provider: "{{inputs.voter_3_provider}}"
+      voter_3_model: "{{inputs.voter_3_model}}"
+      voter_4_provider: "{{inputs.voter_4_provider}}"
+      voter_4_model: "{{inputs.voter_4_model}}"
+      voter_5_provider: "{{inputs.voter_5_provider}}"
+      voter_5_model: "{{inputs.voter_5_model}}"
 
   - name: check-round-1
     when: "${{ steps.check-round-0.output | jq -r '.needs_revision' }}"
@@ -114,8 +170,8 @@ steps:
           "additional_context": "This is revision round 2 (final). The committee still has concerns. Make targeted fixes for the specific issues raised — do not restructure the entire decomposition."
         },
         "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514"
+        "provider": "{{inputs.model_primary_provider}}",
+        "model": "{{inputs.model_primary}}"
       }'
 
   - name: vote-round-2
@@ -125,6 +181,16 @@ steps:
     inputs:
       content_to_evaluate: ${{ steps.expand-round-2.output }}
       evaluation_criteria: "{{inputs.evaluation_criteria}}"
+      voter_1_provider: "{{inputs.voter_1_provider}}"
+      voter_1_model: "{{inputs.voter_1_model}}"
+      voter_2_provider: "{{inputs.voter_2_provider}}"
+      voter_2_model: "{{inputs.voter_2_model}}"
+      voter_3_provider: "{{inputs.voter_3_provider}}"
+      voter_3_model: "{{inputs.voter_3_model}}"
+      voter_4_provider: "{{inputs.voter_4_provider}}"
+      voter_4_model: "{{inputs.voter_4_model}}"
+      voter_5_provider: "{{inputs.voter_5_provider}}"
+      voter_5_model: "{{inputs.voter_5_model}}"
 
   - name: check-round-2
     when: "${{ steps.check-round-1.output | jq -r '.needs_revision' }}"

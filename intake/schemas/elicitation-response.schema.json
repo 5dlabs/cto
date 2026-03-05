@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elicitation-response.schema.json",
+  "title": "ElicitationResponse",
+  "description": "A human's response to an elicitation request, from either Linear or Discord.",
+  "type": "object",
+  "properties": {
+    "elicitation_id": { "type": "string" },
+    "source": {
+      "type": "string",
+      "enum": ["linear", "discord"]
+    },
+    "response_type": {
+      "type": "string",
+      "enum": ["selection", "redeliberate"]
+    },
+    "selected_option": { "type": "string" },
+    "user_id": { "type": "string" },
+    "user_context": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "elicitation_id",
+    "source",
+    "response_type",
+    "selected_option",
+    "user_id",
+    "timestamp"
+  ]
+}
