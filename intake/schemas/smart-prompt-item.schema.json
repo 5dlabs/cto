@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SmartPromptItem",
+  "description": "Single task prompt output from fan-out generation",
+  "type": "object",
+  "properties": {
+    "task_id": { "type": "number" },
+    "prompt_md": { "type": "string" },
+    "prompt_xml": { "type": "string" },
+    "subtasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "subtask_id": { "type": "number" },
+          "prompt_md": { "type": "string" }
+        },
+        "required": ["subtask_id", "prompt_md"]
+      }
+    }
+  },
+  "required": ["task_id", "prompt_md", "prompt_xml"]
+}

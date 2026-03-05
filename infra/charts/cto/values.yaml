@@ -471,8 +471,13 @@ tools:
           GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 
       # --- UI Components ---
-      # shadcn: removed - broken ESM dependencies, no working npm package
-      # ai-elements and better-auth are available for documentation needs
+      shadcn:
+        name: "shadcn/ui"
+        description: "Modern React UI component library - browse, search, and get component source code"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "shadcn@5.3.0", "mcp"]
+        workingDirectory: "/tmp"
 
       ai-elements:
         name: "AI Elements"

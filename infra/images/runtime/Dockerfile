@@ -364,7 +364,7 @@ RUN --mount=type=cache,target=/root/.cache \
         cross-env \
         dotenv-cli \
         zx \
-        shadcn@latest \
+        shadcn@5.3.0 \
         wrangler \
         @xdevplatform/xurl || true
 

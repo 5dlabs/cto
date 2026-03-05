@@ -9,14 +9,23 @@
       "includeCodebase": false,
       "sourceBranch": "main",
       "models": {
-        "primary": "claude-opus-4-6-20260205",
-        "research": "claude-opus-4-6-20260205",
-        "fallback": "claude-opus-4-6-20260205",
+        "tiers": {
+          "primary": { "provider": "anthropic", "model": "claude-opus-4-6" },
+          "fast": { "provider": "anthropic", "model": "claude-sonnet-4-6" },
+          "frontier": { "provider": "anthropic", "model": "claude-opus-4-6" }
+        },
+        "committee": [
+          { "provider": "anthropic", "model": "claude-opus-4-6" },
+          { "provider": "openai", "model": "gpt-5.2-pro" },
+          { "provider": "anthropic", "model": "claude-sonnet-4-6" },
+          { "provider": "openai", "model": "o3-pro" },
+          { "provider": "google", "model": "gemini-3.1-pro-preview" }
+        ],
         "cliModels": {
           "claude": "claude-opus-4-6-20260205",
           "codex": "gpt-5.2-codex",
           "cursor": "opus-4.6",
-          "gemini": "gemini-3-pro-preview",
+          "gemini": "gemini-3.1-pro-preview",
           "factory": "gpt-5.2",
           "opencode": "gpt-5.2",
           "dexter": "claude-opus-4-6-20260205"
@@ -655,8 +664,8 @@
       "modelRotation": {
         "enabled": true,
         "models": [
-          "claude-haiku-3-5-20241022",
-          "claude-sonnet-4-5-20250929",
+          "claude-haiku-4-5-20251001",
+          "claude-sonnet-4-6-20260205",
           "claude-opus-4-6-20260205"
         ]
       },
