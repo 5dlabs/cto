@@ -192,7 +192,7 @@ async function main(): Promise<void> {
     if (!validateRequest(request)) {
       writeStdout(
         errorResponse(
-          'Invalid request structure. Expected { operation: "ping" | "deliberate" | "prd_research", payload?: {...} }',
+          'Invalid request structure. Expected { operation: "ping" | "prd_research", payload?: {...} }',
           'validation_error'
         )
       );
