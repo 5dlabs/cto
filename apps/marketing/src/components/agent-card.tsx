@@ -11,6 +11,7 @@ export type Agent = {
   color: string;
   avatar?: string;
   description?: string;
+  badge?: string;
   tools?: string[];
   skills?: string[];
 };
@@ -99,13 +100,18 @@ export function AgentCard({ agent }: AgentCardProps) {
             <p className="text-xs sm:text-sm text-muted-foreground truncate">
               {agent.role}
             </p>
-            {hasDetails && (
+            {agent.badge && (
+              <p className="mt-0.5 text-[10px] uppercase tracking-widest text-[oklch(0.7_0.25_320)]/80 font-medium">
+                {agent.badge}
+              </p>
+            )}
+            {hasDetails && !agent.badge && (
               <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground/80">
                 Click to flip →
               </p>
             )}
           </div>
-          {hasDetails && (
+          {hasDetails && !agent.badge && (
             <div
               className={cn(
                 "relative z-10 size-2 shrink-0 rounded-full bg-gradient-to-r animate-[pulse_3s_ease-in-out_infinite]",

@@ -51,14 +51,14 @@ The flagship venture. Thirteen specialized AI agents ship complete features from
   - Atlas — Integration Master: PR merging, branch management, conflict resolution
   - Bolt — Deployment Specialist: Infrastructure, Helm, Kubernetes, GitOps, zero-downtime
 
-### Agentic Trading — HFT-Grade Autonomous Trading (Building)
+### Agentic Trading — Autonomous Trading Infrastructure (Building)
 
-Hedge-fund-grade trading technology for individuals. AI-driven strategy, execution, and risk management operating autonomously across DeFi markets 24/7.
+Agentic financial infrastructure for companies. AI-driven strategy, execution, and risk management operating autonomously across DeFi markets 24/7.
 
 - **Status**: Building
-- **Chains**: Solana (raw speed, HFT), Base (Ethereum composability), Near (AI-native smart contracts), Sui (Move, object-centric DeFi)
-- **Key Features**: High-frequency trading, autonomous execution, AI-driven risk management, 24/7 operation, multi-chain DeFi
-- **Value Proposition**: The same technology that powers Wall Street hedge funds — now accessible to individuals. Compete against institutional players with AI agents that never sleep.
+- **Chains**: Solana (low-latency execution), Base (Ethereum composability), Near (AI-native smart contracts), Sui (Move, object-centric DeFi)
+- **Key Features**: Programmable execution, autonomous operation, AI-driven risk management, 24/7 operation, multi-chain DeFi
+- **Value Proposition**: Enable companies to add programmable on-chain revenue rails with autonomous agents that can coordinate, decide, and execute continuously.
 
 ### OpenClaw Platform — Open-Source Agent Orchestration (Building)
 
@@ -102,7 +102,7 @@ Our open-source agent orchestration platform coordinates AI agents across:
 
 ### Supported Blockchains
 
-- **Solana**: Raw speed, sub-second finality, ideal for HFT and high-throughput trading
+- **Solana**: Raw speed, sub-second finality, ideal for low-latency and high-throughput execution
 - **Base (OP Stack)**: Ethereum L2 composability, DeFi ecosystem access, lower gas costs
 - **Near**: AI-native smart contracts, sharding for scalability
 
@@ -119,7 +119,7 @@ Jonathon Fritz / 5D Labs offers expert consulting for early-stage teams and ente
 3. **Infrastructure & DevOps**: Bare-metal Kubernetes, Talos Linux, ArgoCD GitOps, CI/CD pipelines, cloud-to-metal migration
 4. **Platform Engineering**: Self-healing systems, observability stacks, secret management, multi-tenant architectures
 5. **Security**: Threat modeling, supply chain security, runtime protection, audit automation
-6. **HFT Trading Systems**: High-frequency trading architecture, market data processing, execution optimization
+6. **Autonomous Trading Systems**: Trading architecture, market data processing, and execution optimization
 
 ### Pricing (USD)
 

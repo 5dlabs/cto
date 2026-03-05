@@ -3,6 +3,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { VentureGrid, type Venture } from "@/components/venture-card";
 import { WaitlistForm } from "@/components/waitlist-form";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 const ventures: Venture[] = [
   {
@@ -17,10 +18,10 @@ const ventures: Venture[] = [
   },
   {
     name: "Agentic Trading",
-    tagline: "Your own personal hedge fund.",
+    tagline: "Autonomous agent commerce infrastructure.",
     description:
-      "HFT-grade autonomous trading agents on Solana, Base, Near, and Sui — putting the same technology that powers Wall Street hedge funds into the hands of individuals. AI-driven strategy, execution, and risk management across DeFi markets, 24/7.",
-    tags: ["HFT", "Solana", "Base", "Near", "Sui", "DeFi", "AI Agents"],
+      "Autonomous trading agents on Solana, Base, Near, and Sui for teams that want programmable execution, risk controls, and continuous operation across DeFi markets. Built for companies expanding revenue streams through on-chain systems.",
+    tags: ["Agentic Finance", "Solana", "Base", "Near", "Sui", "DeFi", "AI Agents"],
     color: "from-purple-500 to-magenta",
     status: "building",
   },
@@ -102,7 +103,7 @@ export default function Home() {
                 <span>infra providers</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-foreground">3</span>
+                <span className="text-2xl font-bold text-foreground">4</span>
                 <span>blockchains</span>
               </div>
             </div>
@@ -228,7 +229,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Solana · Base · Near · Sui</h3>
                 <p className="text-sm text-muted-foreground">
-                  Four chains, one thesis. Solana for raw speed and HFT,
+                  Four chains, one thesis. Solana for low-latency execution,
                   Base for Ethereum-grade composability, Near for AI-native
                   smart contracts, Sui for Move and object-centric DeFi. We&apos;re building where the action is.
                 </p>
@@ -302,9 +303,9 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Business Agents Section */}
+        {/* Main Team Section — 5D Labs team (Legal, Marketing, Finance, Sales) */}
         <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <div className="text-center mb-12">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[oklch(0.7_0.25_320)]/20 bg-[oklch(0.7_0.25_320)]/5 mb-6">
                 <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.7_0.25_320)] animate-pulse" />
@@ -313,10 +314,10 @@ export default function Home() {
                 </span>
               </div>
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Beyond Engineering — <span className="gradient-text">Business Agents</span>
+                The <span className="gradient-text">Main Team</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                The next wave of specialized agents. Legal, marketing, finance, and sales — autonomous, expert, and always available.
+                Legal, marketing, finance, and sales — part of the 5D Labs team. Autonomous, expert, and always available.
               </p>
             </div>
 
@@ -325,47 +326,54 @@ export default function Home() {
                 {
                   name: "Lex",
                   role: "Legal Counsel",
+                  avatar: "/agents/lex-avatar-512.png",
                   color: "from-blue-600 to-indigo-600",
                   description: "Contract review, compliance checks, and legal risk assessment. Trained on your jurisdiction, your agreements, your standards.",
                 },
                 {
                   name: "Hype",
                   role: "Marketing Strategist",
+                  avatar: "/agents/hype-avatar-512.png",
                   color: "from-orange-500 to-rose-500",
                   description: "Campaign strategy, copy, and analytics. From brand voice to conversion — autonomous marketing that moves as fast as your product.",
                 },
                 {
                   name: "Tally",
                   role: "Accounting Specialist",
+                  avatar: "/agents/tally-avatar-512.png",
                   color: "from-emerald-600 to-teal-600",
                   description: "Bookkeeping, reconciliation, and financial reporting. Always accurate, always current, zero overhead.",
                 },
                 {
                   name: "Chase",
                   role: "Sales Agent",
+                  avatar: "/agents/chase-avatar-512.png",
                   color: "from-amber-500 to-yellow-500",
                   description: "Outreach, pipeline management, and closing. Handles discovery, follow-ups, and deal tracking so your team stays focused on building.",
                 },
               ].map((agent) => (
                 <div
                   key={agent.name}
-                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm flex flex-col gap-4"
+                  className="min-h-[150px] sm:min-h-[170px] lg:min-h-[180px] p-4 sm:p-5 lg:p-5 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm flex items-center gap-3 sm:gap-4 lg:gap-5"
                 >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`w-[80px] h-[80px] sm:w-[96px] sm:h-[96px] lg:w-[120px] lg:h-[120px] rounded-full bg-gradient-to-br ${agent.color} flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shrink-0 ring-2 ring-border/50`}
+                  <Avatar className="size-[72px] sm:size-[88px] lg:size-[112px] shrink-0 ring-2 ring-border/50">
+                    {agent.avatar ? (
+                      <AvatarImage src={agent.avatar} alt={agent.name} />
+                    ) : null}
+                    <AvatarFallback
+                      className={`bg-gradient-to-br text-white text-2xl sm:text-3xl font-bold ${agent.color}`}
                     >
                       {agent.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-lg text-foreground">{agent.name}</p>
-                      <p className="text-sm text-muted-foreground">{agent.role}</p>
-                      <span className="text-[10px] uppercase tracking-widest text-[oklch(0.7_0.25_320)]/70 font-medium">
-                        In Development
-                      </span>
-                    </div>
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-base sm:text-lg text-foreground">{agent.name}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">{agent.role}</p>
+                    <span className="text-[10px] uppercase tracking-widest text-[oklch(0.7_0.25_320)]/70 font-medium">
+                      In Development
+                    </span>
+                    <p className="mt-2 text-sm text-muted-foreground">{agent.description}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground">{agent.description}</p>
                 </div>
               ))}
             </div>
