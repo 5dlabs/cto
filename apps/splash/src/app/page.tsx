@@ -18,10 +18,10 @@ const ventures: Venture[] = [
   },
   {
     name: "Agentic Trading",
-    tagline: "Your own personal hedge fund.",
+    tagline: "Autonomous agent commerce infrastructure.",
     description:
-      "HFT-grade autonomous trading agents on Solana, Base, Near, and Sui — putting the same technology that powers Wall Street hedge funds into the hands of individuals. AI-driven strategy, execution, and risk management across DeFi markets, 24/7.",
-    tags: ["HFT", "Solana", "Base", "Near", "Sui", "DeFi", "AI Agents"],
+      "Autonomous trading agents on Solana, Base, Near, and Sui for teams that want programmable execution, risk controls, and continuous operation across DeFi markets. Built for companies expanding revenue streams through on-chain systems.",
+    tags: ["Agentic Finance", "Solana", "Base", "Near", "Sui", "DeFi", "AI Agents"],
     color: "from-purple-500 to-magenta",
     status: "building",
   },
@@ -103,7 +103,7 @@ export default function Home() {
                 <span>infra providers</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-foreground">3</span>
+                <span className="text-2xl font-bold text-foreground">4</span>
                 <span>blockchains</span>
               </div>
             </div>
@@ -229,7 +229,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Solana · Base · Near · Sui</h3>
                 <p className="text-sm text-muted-foreground">
-                  Four chains, one thesis. Solana for raw speed and HFT,
+                  Four chains, one thesis. Solana for low-latency execution,
                   Base for Ethereum-grade composability, Near for AI-native
                   smart contracts, Sui for Move and object-centric DeFi. We&apos;re building where the action is.
                 </p>
