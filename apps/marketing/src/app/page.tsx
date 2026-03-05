@@ -194,6 +194,44 @@ const squads: AgentSquad[] = [
       },
     ],
   },
+  {
+    title: "Main Team",
+    emoji: "🏢",
+    agents: [
+      {
+        name: "Lex",
+        role: "Legal Counsel",
+        avatar: "/agents/lex-avatar-512.png",
+        color: "from-blue-600 to-indigo-600",
+        description: "Contract review, compliance checks, and legal risk assessment. Trained on your jurisdiction, your agreements, your standards.",
+        badge: "In Development",
+      },
+      {
+        name: "Hype",
+        role: "Marketing Strategist",
+        avatar: "/agents/hype-avatar-512.png",
+        color: "from-orange-500 to-rose-500",
+        description: "Campaign strategy, copy, and analytics. From brand voice to conversion — autonomous marketing that moves as fast as your product.",
+        badge: "In Development",
+      },
+      {
+        name: "Tally",
+        role: "Accounting Specialist",
+        avatar: "/agents/tally-avatar-512.png",
+        color: "from-emerald-600 to-teal-600",
+        description: "Bookkeeping, reconciliation, and financial reporting. Always accurate, always current, zero overhead.",
+        badge: "In Development",
+      },
+      {
+        name: "Chase",
+        role: "Sales Agent",
+        avatar: "/agents/chase-avatar-512.png",
+        color: "from-amber-500 to-yellow-500",
+        description: "Outreach, pipeline management, and closing. Handles discovery, follow-ups, and deal tracking so your team stays focused on building.",
+        badge: "In Development",
+      },
+    ],
+  },
 ];
 
 export default function Home() {

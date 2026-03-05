@@ -153,6 +153,44 @@ const squads: Squad[] = [
       },
     ],
   },
+  {
+    title: "Main Team",
+    emoji: "🏢",
+    agents: [
+      {
+        name: "Lex",
+        role: "Legal Counsel",
+        avatar: "/agents/lex-avatar-512.png",
+        color: "from-blue-600 to-indigo-600",
+        personality: "Contract review, compliance checks, and legal risk assessment. Trained on your jurisdiction, your agreements, your standards.",
+        stack: ["In Development"],
+      },
+      {
+        name: "Hype",
+        role: "Marketing Strategist",
+        avatar: "/agents/hype-avatar-512.png",
+        color: "from-orange-500 to-rose-500",
+        personality: "Campaign strategy, copy, and analytics. From brand voice to conversion — autonomous marketing that moves as fast as your product.",
+        stack: ["In Development"],
+      },
+      {
+        name: "Tally",
+        role: "Accounting Specialist",
+        avatar: "/agents/tally-avatar-512.png",
+        color: "from-emerald-600 to-teal-600",
+        personality: "Bookkeeping, reconciliation, and financial reporting. Always accurate, always current, zero overhead.",
+        stack: ["In Development"],
+      },
+      {
+        name: "Chase",
+        role: "Sales Agent",
+        avatar: "/agents/chase-avatar-512.png",
+        color: "from-amber-500 to-yellow-500",
+        personality: "Outreach, pipeline management, and closing. Handles discovery, follow-ups, and deal tracking so your team stays focused on building.",
+        stack: ["In Development"],
+      },
+    ],
+  },
 ];
 
 function AgentTeamCard({ agent, index, squadIndex }: { agent: Agent; index: number; squadIndex: number }) {
@@ -160,7 +198,7 @@ function AgentTeamCard({ agent, index, squadIndex }: { agent: Agent; index: numb
     <div className="group">
       <div
         className={cn(
-          "relative p-5 rounded-xl",
+          "relative min-h-[150px] sm:min-h-[170px] lg:min-h-[180px] p-3 sm:p-4 lg:p-5 rounded-xl",
           "bg-card border border-border",
           "hover:border-primary/50",
           "transition-all duration-300"
@@ -175,15 +213,15 @@ function AgentTeamCard({ agent, index, squadIndex }: { agent: Agent; index: numb
           )}
         />
 
-        <div className="relative z-10 flex items-start gap-4">
-          {/* Avatar */}
-          <Avatar className="size-16 ring-2 ring-border group-hover:ring-primary/50 transition-all shrink-0">
+        <div className="relative z-10 flex items-center gap-3 sm:gap-4 lg:gap-5">
+          {/* Avatar — same size as CTO page */}
+          <Avatar className="size-[72px] sm:size-[88px] lg:size-[112px] ring-2 ring-border group-hover:ring-primary/50 transition-all shrink-0">
             {agent.avatar ? (
               <AvatarImage src={agent.avatar} alt={`${agent.name} — ${agent.role} AI agent at 5D Labs`} />
             ) : null}
             <AvatarFallback
               className={cn(
-                "bg-gradient-to-br text-white text-2xl font-bold",
+                "bg-gradient-to-br text-white text-2xl sm:text-3xl font-bold",
                 agent.color
               )}
             >
@@ -193,7 +231,7 @@ function AgentTeamCard({ agent, index, squadIndex }: { agent: Agent; index: numb
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <p className="font-semibold text-lg text-foreground">{agent.name}</p>
+              <p className="font-semibold text-base sm:text-lg text-foreground">{agent.name}</p>
               <div
                 className={cn(
                   "size-2 rounded-full shrink-0",
@@ -202,7 +240,7 @@ function AgentTeamCard({ agent, index, squadIndex }: { agent: Agent; index: numb
                 )}
               />
             </div>
-            <p className="text-xs text-cyan mb-2">{agent.role}</p>
+            <p className="text-xs sm:text-sm text-cyan mb-2">{agent.role}</p>
             <p className="text-sm text-muted-foreground mb-3">
               {agent.personality}
             </p>
@@ -287,7 +325,9 @@ export default function TeamPage() {
                     "grid gap-4",
                     squad.agents.length === 1
                       ? "grid-cols-1 max-w-lg"
-                      : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                      : squad.agents.length === 4
+                        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                        : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
                   )}
                 >
                   {squad.agents.map((agent, agentIndex) => (
