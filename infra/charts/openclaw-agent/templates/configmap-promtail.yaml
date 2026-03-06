@@ -37,8 +37,26 @@ data:
               expressions:
                 level: level
                 timestamp: timestamp
+                source: source
+                component: component
           - labels:
               level:
+          - regex:
+              expression: '"source"\s*:\s*"acp-(?P<cli_name>[^"]+)"'
+          - labels:
+              cli_name:
+          - regex:
+              expression: '"component"\s*:\s*"(?P<component_raw>[^"]+)"'
+          - template:
+              source: session_type
+              template: '{{ if eq .component_raw "agent/embedded" }}native{{ else if contains "acp" .source }}acp{{ else }}openclaw{{ end }}'
+          - labels:
+              session_type:
+          - json:
+              expressions:
+                type: type
+          - labels:
+              activity_type: type
           - timestamp:
               source: timestamp
               format: RFC3339Nano
