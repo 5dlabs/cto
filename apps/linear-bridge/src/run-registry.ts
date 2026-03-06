@@ -16,6 +16,14 @@ export interface RunEntry {
   lastAccessedAt: number;
 }
 
+export interface ActiveRunView {
+  runId: string;
+  agentPod: string;
+  sessionKey: string;
+  issueId: string;
+  linearSessionId?: string;
+}
+
 export interface RunRegistry {
   register(runId: string, data: Omit<RunEntry, 'registeredAt' | 'lastAccessedAt'>): void;
   deregister(runId: string): void;
@@ -25,6 +33,8 @@ export interface RunRegistry {
   /** Remove runs older than maxAgeMs */
   gc(maxAgeMs: number): number;
   size(): number;
+  /** Return a snapshot of all currently tracked runs */
+  getActiveRuns(): ActiveRunView[];
 }
 
 export function createRunRegistry(): RunRegistry {
@@ -71,6 +81,16 @@ export function createRunRegistry(): RunRegistry {
 
     size() {
       return runs.size;
+    },
+
+    getActiveRuns() {
+      return [...runs.entries()].map(([runId, entry]) => ({
+        runId,
+        agentPod: entry.agentPod,
+        sessionKey: entry.sessionKey,
+        issueId: entry.issueId,
+        linearSessionId: entry.linearSessionId,
+      }));
     },
   };
 }

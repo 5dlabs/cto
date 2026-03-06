@@ -6,6 +6,7 @@ import { createHttpServer } from "./http-server.js";
 import { createAgentSessionManager } from "./agent-session-manager.js";
 import { createElicitationHandler } from "./elicitation-handler.js";
 import { createRunRegistry } from "./run-registry.js";
+import { LokiActivityStream } from "./loki-activity-stream.js";
 
 const logger = {
   info: (...args: unknown[]) => console.log(`[linear-bridge]`, ...args),
@@ -21,6 +22,12 @@ async function main(): Promise<void> {
   logger.info(`  Discord bridge: ${config.discordBridgeUrl}`);
   logger.info(`  Inactivity timeout: ${config.inactivityTimeoutMs}ms`);
   logger.info(`  Agent sessions: ${config.agentSessionsEnabled ? "enabled" : "disabled"}`);
+  logger.info(`  ACP activity stream: ${config.acpActivityEnabled ? "enabled" : "disabled"}`);
+  if (config.acpActivityEnabled) {
+    logger.info(`  Loki URL: ${config.lokiUrl}`);
+    logger.info(`  Loki org: ${config.lokiOrgId}`);
+    logger.info(`  Loki poll interval: ${config.lokiPollIntervalMs}ms`);
+  }
   if (config.defaultProjectId) {
     logger.info(`  Default project: ${config.defaultProjectId}`);
   }
@@ -55,7 +62,22 @@ async function main(): Promise<void> {
     );
   }
 
-  // 6. Start HTTP server (webhooks + notifications + run management)
+  // 6. Wire up Loki activity stream
+  let lokiStream: LokiActivityStream | undefined;
+  if (config.acpActivityEnabled) {
+    lokiStream = new LokiActivityStream(
+      {
+        lokiUrl: config.lokiUrl,
+        lokiOrgId: config.lokiOrgId,
+        pollIntervalMs: config.lokiPollIntervalMs,
+      },
+      linearClient,
+      runRegistry,
+      logger,
+    );
+  }
+
+  // 7. Start HTTP server (webhooks + notifications + run management)
   const httpServer = createHttpServer(
     config.httpPort,
     config.linearWebhookSecret,
@@ -71,7 +93,10 @@ async function main(): Promise<void> {
   );
   await httpServer.start();
 
-  // 7. Schedule GC (every 60s)
+  // Start Loki activity stream after server is up
+  lokiStream?.start();
+
+  // 9. Schedule GC (every 60s)
   let gcInterval: ReturnType<typeof setInterval> | undefined;
   if (config.agentSessionsEnabled) {
     gcInterval = setInterval(() => {
@@ -89,6 +114,7 @@ async function main(): Promise<void> {
   const shutdown = async () => {
     logger.info("Shutting down...");
     if (gcInterval) clearInterval(gcInterval);
+    lokiStream?.stop();
     bridge.stop();
     elicitHandler?.destroy();
     await httpServer.stop();

@@ -15,6 +15,14 @@ export interface BridgeConfig {
   agentSessionsEnabled: boolean;
   /** Discord bridge URL for cross-cancel callbacks (default: http://discord-bridge.bots.svc:3200) */
   discordBridgeUrl: string;
+  /** Loki gateway URL for ACP activity stream polling */
+  lokiUrl: string;
+  /** Loki org ID sent as X-Scope-OrgID header */
+  lokiOrgId: string;
+  /** Interval in ms between Loki poll cycles (default: 2000) */
+  lokiPollIntervalMs: number;
+  /** Enable ACP activity stream (polls Loki and posts to Linear) — default: true */
+  acpActivityEnabled: boolean;
 }
 
 export function loadConfig(): BridgeConfig {
@@ -37,5 +45,11 @@ export function loadConfig(): BridgeConfig {
     linearWebhookSecret: process.env.LINEAR_WEBHOOK_SECRET || undefined,
     agentSessionsEnabled: process.env.AGENT_SESSIONS_ENABLED !== "false",
     discordBridgeUrl: process.env.DISCORD_BRIDGE_URL ?? "http://discord-bridge.bots.svc:3200",
+    lokiUrl:
+      process.env.LOKI_URL ??
+      "http://openclaw-observability-loki-gateway.openclaw.svc.cluster.local:80",
+    lokiOrgId: process.env.LOKI_ORG_ID ?? "openclaw",
+    lokiPollIntervalMs: parseInt(process.env.LOKI_POLL_INTERVAL_MS ?? "2000", 10),
+    acpActivityEnabled: process.env.ACP_ACTIVITY_ENABLED !== "false",
   };
 }
