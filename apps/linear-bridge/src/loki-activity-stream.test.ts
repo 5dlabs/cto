@@ -94,7 +94,7 @@ function makeMockLinearClient(): LinearClient & {
     getWorkflowStates: vi.fn(),
     createCustomView: vi.fn(),
     updateAgentSession: vi.fn(),
-    async createAgentActivity(input) {
+    async createAgentActivity(input: AgentActivityCreateInput) {
       calls.push(input);
       return { id: "act-" + calls.length };
     },
