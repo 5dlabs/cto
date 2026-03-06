@@ -49,7 +49,7 @@ data:
               expression: '"component"\s*:\s*"(?P<component_raw>[^"]+)"'
           - template:
               source: session_type
-              template: '{{ if eq .component_raw "agent/embedded" }}native{{ else if contains "acp" .source }}acp{{ else }}openclaw{{ end }}'
+              template: '{{`{{ if eq .component_raw "agent/embedded" }}native{{ else if contains "acp" .source }}acp{{ else }}openclaw{{ end }}`}}'
           - labels:
               session_type:
           - json:
@@ -61,3 +61,4 @@ data:
               source: timestamp
               format: RFC3339Nano
 {{- end }}
+
