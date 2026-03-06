@@ -3,7 +3,6 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { VentureGrid, type Venture } from "@/components/venture-card";
 import { WaitlistForm } from "@/components/waitlist-form";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 const ventures: Venture[] = [
   {
@@ -297,83 +296,6 @@ export default function Home() {
                 <div key={item.title} className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                   <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
                   <p className="text-muted-foreground text-sm">{item.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Main Team Section — 5D Labs team (Legal, Marketing, Finance, Sales) */}
-        <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[oklch(0.7_0.25_320)]/20 bg-[oklch(0.7_0.25_320)]/5 mb-6">
-                <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.7_0.25_320)] animate-pulse" />
-                <span className="text-xs text-[oklch(0.7_0.25_320)] font-medium uppercase tracking-wider">
-                  Coming Soon
-                </span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                The <span className="gradient-text">Main Team</span>
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Legal, marketing, finance, and sales — part of the 5D Labs team. Autonomous, expert, and always available.
-              </p>
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-6">
-              {[
-                {
-                  name: "Lex",
-                  role: "Legal Counsel",
-                  avatar: "/agents/lex-avatar-512.png",
-                  color: "from-blue-600 to-indigo-600",
-                  description: "Contract review, compliance checks, and legal risk assessment. Trained on your jurisdiction, your agreements, your standards.",
-                },
-                {
-                  name: "Hype",
-                  role: "Marketing Strategist",
-                  avatar: "/agents/hype-avatar-512.png",
-                  color: "from-orange-500 to-rose-500",
-                  description: "Campaign strategy, copy, and analytics. From brand voice to conversion — autonomous marketing that moves as fast as your product.",
-                },
-                {
-                  name: "Tally",
-                  role: "Accounting Specialist",
-                  avatar: "/agents/tally-avatar-512.png",
-                  color: "from-emerald-600 to-teal-600",
-                  description: "Bookkeeping, reconciliation, and financial reporting. Always accurate, always current, zero overhead.",
-                },
-                {
-                  name: "Chase",
-                  role: "Sales Agent",
-                  avatar: "/agents/chase-avatar-512.png",
-                  color: "from-amber-500 to-yellow-500",
-                  description: "Outreach, pipeline management, and closing. Handles discovery, follow-ups, and deal tracking so your team stays focused on building.",
-                },
-              ].map((agent) => (
-                <div
-                  key={agent.name}
-                  className="min-h-[150px] sm:min-h-[170px] lg:min-h-[180px] p-4 sm:p-5 lg:p-5 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm flex items-center gap-3 sm:gap-4 lg:gap-5"
-                >
-                  <Avatar className="size-[72px] sm:size-[88px] lg:size-[112px] shrink-0 ring-2 ring-border/50">
-                    {agent.avatar ? (
-                      <AvatarImage src={agent.avatar} alt={agent.name} />
-                    ) : null}
-                    <AvatarFallback
-                      className={`bg-gradient-to-br text-white text-2xl sm:text-3xl font-bold ${agent.color}`}
-                    >
-                      {agent.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-base sm:text-lg text-foreground">{agent.name}</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">{agent.role}</p>
-                    <span className="text-[10px] uppercase tracking-widest text-[oklch(0.7_0.25_320)]/70 font-medium">
-                      In Development
-                    </span>
-                    <p className="mt-2 text-sm text-muted-foreground">{agent.description}</p>
-                  </div>
                 </div>
               ))}
             </div>
