@@ -5,10 +5,9 @@ import Link from "next/link";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 
 const navLinks = [
-  { name: "Consulting", href: "/consulting" },
-  { name: "Founder", href: "/founder" },
   { name: "Team", href: "/team" },
   { name: "Investors", href: "/investors" },
+  { name: "Founder", href: "/founder" },
 ];
 
 const socials = [
