@@ -85,7 +85,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
               <span className="text-sm text-cyan font-semibold tracking-wide">
-                AI-Native Venture Studio · Proprietary Operating Stack
+                AI-Native Venture Studio
               </span>
             </div>
 
