@@ -28,8 +28,8 @@ const services = [
     name: "5D Vault",
     tagline: "Secrets and access control",
     description:
-      "API keys, credentials, and environment secrets stored behind a secure, managed layer with bring-your-own-key workflows supported.",
-    highlights: ["BYOK-ready", "Access controls", "Secret rotation"],
+      "API keys, credentials, and environment secrets fully managed behind a secure layer. Everything is included — nothing to configure.",
+    highlights: ["Fully managed", "Access controls", "Secret rotation"],
     color: "green",
   },
   {
@@ -82,7 +82,7 @@ export function TechStack() {
             <span className="gradient-text">Already Handled</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Bring the CLI you like and the repo you want to ship. CTO runs the
+            Pick any CLI — CTO runs the
             delivery, storage, observability, secrets, and inference layer
             underneath it.
           </p>

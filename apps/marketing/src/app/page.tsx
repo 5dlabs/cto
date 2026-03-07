@@ -342,7 +342,7 @@ export default function Home() {
                 Works With the Way Your <span className="gradient-text">Team Already Ships</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                The goal is not to make customers think about operators, runtimes, or platform plumbing. Bring your repo, your preferred interface, and your workflow. CTO handles the rest.
+                You don&apos;t have to think about operators, runtimes, or platform plumbing. Point CTO at a repo and it handles the rest — tooling, infrastructure, and delivery are already included.
               </p>
             </div>
 
@@ -411,7 +411,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
-                    <span>Bring your keys or use managed runtime options</span>
+                    <span>Keys and runtime managed for you</span>
                   </div>
                 </div>
               </div>
@@ -752,10 +752,10 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">5D Vault</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Bring your own API keys, credentials, and provider access or let us run the managed path. Either way, secrets stay behind a secure control layer.
+                  API keys, credentials, and provider access are fully managed behind a secure control layer. Everything is included — nothing to configure, nothing to wire up.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["BYOK", "Managed path", "Zero lock-in"].map(feature => (
+                  {["Fully managed", "Secure by default", "Zero config"].map(feature => (
                     <span key={feature} className="text-xs px-2 py-1 rounded bg-purple-500/10 text-purple-500">{feature}</span>
                   ))}
                 </div>

@@ -104,7 +104,7 @@ const categories: ServiceCategory[] = [
   {
     title: "Secrets & Identity",
     description:
-      "Secrets management, dynamic credentials, and automatic synchronization — hardened by default, with bring-your-own-key workflows supported.",
+      "Secrets management, dynamic credentials, and automatic synchronization — hardened by default, fully managed, nothing to configure.",
     color: "text-green-400",
     border: "border-green-400/20",
     bg: "bg-green-400/5",
@@ -113,7 +113,7 @@ const categories: ServiceCategory[] = [
         name: "5D Vault",
         tagline: "Secrets management and dynamic credentials",
         description:
-          "API keys, credentials, and environment secrets stored behind a secure, audited control layer. Dynamic secret generation, automatic rotation, lease management, and BYOK workflows. Kubernetes-native sync keeps secrets fresh without manual intervention.",
+          "API keys, credentials, and environment secrets fully managed behind a secure, audited control layer. Dynamic secret generation, automatic rotation, and lease management included. Kubernetes-native sync keeps secrets fresh without manual intervention.",
         poweredBy: "OpenBao (open-source Vault) + External Secrets Operator",
       },
     ],
@@ -137,7 +137,7 @@ const categories: ServiceCategory[] = [
         name: "5D Observe",
         tagline: "Unified monitoring, logs, and traces",
         description:
-          "Metrics, logs, distributed traces, and incident signals surfaced in one place. Pre-wired dashboards for every platform service. OpenTelemetry-native — bring your existing tooling or use the managed stack.",
+          "Metrics, logs, distributed traces, and incident signals surfaced in one place. Pre-wired dashboards for every platform service. OpenTelemetry-native — everything is included and ready to go.",
         poweredBy: "Prometheus + Grafana + Loki + Fluent Bit + Jaeger + OpenTelemetry Collector",
       },
     ],
