@@ -104,7 +104,7 @@ const categories: ServiceCategory[] = [
   {
     title: "Secrets & Identity",
     description:
-      "Secrets management, dynamic credentials, and automatic synchronization — hardened by default, with bring-your-own-key workflows supported.",
+      "Secrets management, dynamic credentials, and automatic synchronization — hardened by default, fully managed, nothing to configure.",
     color: "text-green-400",
     border: "border-green-400/20",
     bg: "bg-green-400/5",
@@ -113,7 +113,7 @@ const categories: ServiceCategory[] = [
         name: "5D Vault",
         tagline: "Secrets management and dynamic credentials",
         description:
-          "API keys, credentials, and environment secrets stored behind a secure, audited control layer. Dynamic secret generation, automatic rotation, lease management, and BYOK workflows. Kubernetes-native sync keeps secrets fresh without manual intervention.",
+          "API keys, credentials, and environment secrets fully managed behind a secure, audited control layer. Dynamic secret generation, automatic rotation, and lease management included. Kubernetes-native sync keeps secrets fresh without manual intervention.",
         poweredBy: "OpenBao (open-source Vault) + External Secrets Operator",
       },
     ],
@@ -137,7 +137,7 @@ const categories: ServiceCategory[] = [
         name: "5D Observe",
         tagline: "Unified monitoring, logs, and traces",
         description:
-          "Metrics, logs, distributed traces, and incident signals surfaced in one place. Pre-wired dashboards for every platform service. OpenTelemetry-native — bring your existing tooling or use the managed stack.",
+          "Metrics, logs, distributed traces, and incident signals surfaced in one place. Pre-wired dashboards for every platform service. OpenTelemetry-native — everything is included and ready to go.",
         poweredBy: "Prometheus + Grafana + Loki + Fluent Bit + Jaeger + OpenTelemetry Collector",
       },
     ],
@@ -268,20 +268,12 @@ export default function ServicesPage() {
             <p className="text-lg text-muted-foreground mb-8">
               Every service above runs as part of the CTO platform. Your team ships product — we run the stack.
             </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link
-                href="/"
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:opacity-90 transition-all"
-              >
-                Back to CTO
-              </Link>
-              <Link
-                href="/pricing"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 text-foreground font-semibold hover:border-cyan/30 hover:bg-cyan/5 transition-all"
-              >
-                View Pricing
-              </Link>
-            </div>
+            <Link
+              href="/"
+              className="inline-block px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:opacity-90 transition-all"
+            >
+              Back to CTO
+            </Link>
           </div>
         </section>
 
@@ -290,7 +282,7 @@ export default function ServicesPage() {
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <a href={homeHref} className="inline-flex items-center">
               <Image
-                src="/5dlabs-logo-dark.svg"
+                src="/5dlabs-logo-3d.jpg"
                 alt="5D Labs"
                 width={160}
                 height={40}

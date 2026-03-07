@@ -203,33 +203,35 @@ export default function FounderPage() {
                 </span>
               </div>
               <h2 className="text-2xl font-bold mb-4">
-                We Hire <span className="gradient-text">Entrepreneurs</span>,<br />
-                Not Employees
+                Every Hire Is a{" "}
+                <span className="gradient-text">CEO of Their Domain</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Every person at 5D Labs is expected to think and act like a founder.
-                We don&apos;t hire people who are looking for someone to hand them a task list.
-                We hire people who see what needs to be built and go build it.
+                We don&apos;t hire people who wait for instructions. Every person
+                at 5D Labs owns their area completely — strategy, execution, and
+                outcomes. If you need someone to tell you what to do next,
+                this isn&apos;t the right place. If you&apos;re the kind of person
+                who sees what needs to happen and makes it happen, keep reading.
               </p>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-6 mb-10">
               {[
                 {
-                  title: "Self-Starters",
-                  text: "You identify the problem, figure out the approach, and ship the solution — without waiting to be pointed at it. Ambiguity doesn't slow you down; it motivates you.",
+                  title: "Entrepreneurial by Nature",
+                  text: "You think like a founder, not an employee. You see gaps, form a plan, and ship — without waiting for permission or a detailed spec. You're driven by the outcome, not the process.",
                 },
                 {
-                  title: "Creative Problem-Solvers",
-                  text: "The best answers here rarely come from playbooks. We want people who bring original thinking, challenge assumptions, and find elegant solutions to hard problems.",
+                  title: "Smart Creatives",
+                  text: "Technical depth combined with creative instinct. You don't just execute — you invent better ways to solve the problem. Playbooks are starting points, not destinations.",
                 },
                 {
-                  title: "Ownership Mentality",
-                  text: "You treat the work like it's yours — because it is. Every team member has genuine stake in what we're building and is expected to operate with that level of care.",
+                  title: "Full Ownership",
+                  text: "Your domain is yours. You set the direction, make the calls, and own the results. We give people real authority because we hire people who know what to do with it.",
                 },
                 {
-                  title: "High Conviction",
-                  text: "We move fast and make bets. We want people who can form strong opinions quickly, defend them with evidence, and change their mind just as fast when the data says otherwise.",
+                  title: "Self-Driven Execution",
+                  text: "You don't need to be managed. You identify what matters, prioritize ruthlessly, and deliver. Ambiguity is fuel, not friction.",
                 },
               ].map((item) => (
                 <div key={item.title} className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
@@ -241,8 +243,8 @@ export default function FounderPage() {
 
             <div className="p-6 rounded-xl border border-cyan/20 bg-cyan/5 text-center">
               <p className="text-base text-muted-foreground max-w-2xl mx-auto">
-                If you&apos;re the kind of person who builds things on the weekend because you can&apos;t
-                stop thinking about a problem —{" "}
+                We&apos;re building a studio where every person operates like a founder
+                of their own piece of the business. If that&apos;s how you work best —{" "}
                 <span className="text-foreground font-medium">we should talk.</span>
               </p>
               <a
