@@ -47,9 +47,9 @@ const differentiators = [
     ),
   },
   {
-    title: "Proprietary Capital Engine",
+    title: "In-House Capital Engine",
     description:
-      "The trading engine stays internal. It helps finance experimentation and generate live market intelligence without turning our own edge into a commodity.",
+      "The trading engine helps finance experimentation and generate live market intelligence — giving the studio its own source of capital and real-time signal.",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -246,13 +246,13 @@ export default function InvestorsPage() {
                   </span>
                 </div>
                 <p className="text-[oklch(0.7_0.25_320)] text-sm font-medium mb-2">
-                  Proprietary Capital + Market-Intelligence Engine
+                  In-House Capital + Market-Intelligence Engine
                 </p>
                 <p className="text-muted-foreground">
                   This system helps 5D Labs generate internal revenue, stay close
                   to live on-chain markets, and finance venture creation. It is
-                  not offered as a public service because it is part of the firm&apos;s
-                  proprietary edge.
+                  built to keep the studio funded and informed with real market
+                  signal.
                 </p>
               </div>
 

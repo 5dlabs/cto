@@ -97,7 +97,7 @@ export default function TradingPage() {
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[oklch(0.7_0.25_320)]/20 bg-[oklch(0.7_0.25_320)]/5 mb-8">
               <span className="w-2 h-2 rounded-full bg-[oklch(0.7_0.25_320)] animate-[pulse_3s_ease-in-out_infinite]" />
               <span className="text-sm text-[oklch(0.7_0.25_320)] font-semibold tracking-wide">
-                Proprietary Capital Engine
+                In-House Capital Engine
               </span>
             </div>
 
@@ -108,7 +108,7 @@ export default function TradingPage() {
             </h1>
 
             <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10">
-              5D Labs operates a proprietary trading engine across Solana, Base, Near, and Sui.
+              5D Labs operates its own trading engine across Solana, Base, Near, and Sui.
               It finances the studio, sharpens our market intelligence, and gives us
               a front-row seat as{" "}
               <span className="text-foreground">on-chain finance becomes the new market infrastructure</span>.
@@ -139,7 +139,7 @@ export default function TradingPage() {
                 Why It <span className="gradient-text">Exists</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                The trading engine is not a product. It is the studio&apos;s capital and
+                The trading engine is the studio&apos;s capital and
                 intelligence layer — designed to keep 5D Labs funded, informed, and
                 operating close to where markets are actually moving.
               </p>

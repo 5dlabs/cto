@@ -186,7 +186,7 @@ const ventures = [
   { name: "OpenClaw", desc: "The orchestration layer beneath CTO. Multi-CLI, bare-metal native, and coming soon as open source.", href: "/#openclaw", status: "Coming Soon" },
   {
     name: "Trading Engine",
-    desc: "Proprietary capital and market-intelligence engine across Solana, Base, Near, and Sui",
+    desc: "In-house capital and market-intelligence engine across Solana, Base, Near, and Sui",
     href: "/trading",
     status: "Active",
   },
