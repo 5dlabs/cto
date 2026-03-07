@@ -122,9 +122,9 @@ export default function FounderPage() {
                     at machine speed.
                   </p>
                   <p>
-                    5D Labs exists to prove that thesis. By building OpenClaw and
+                    5D Labs exists to prove that thesis. By building CTO and
                     deploying it across multiple ventures, we&apos;re showing that
-                    the startup studio model + AI agents = a fundamentally
+                    the venture studio model combined with AI agents is a fundamentally
                     different — and better — way to build companies.
                   </p>
                 </div>
@@ -189,6 +189,70 @@ export default function FounderPage() {
                   </p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Who We Hire */}
+        <section className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-6">
+                <span className="text-xs text-cyan font-medium uppercase tracking-wider">
+                  How We Hire
+                </span>
+              </div>
+              <h2 className="text-2xl font-bold mb-4">
+                We Hire <span className="gradient-text">Entrepreneurs</span>,<br />
+                Not Employees
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Every person at 5D Labs is expected to think and act like a founder.
+                We don&apos;t hire people who are looking for someone to hand them a task list.
+                We hire people who see what needs to be built and go build it.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-6 mb-10">
+              {[
+                {
+                  title: "Self-Starters",
+                  text: "You identify the problem, figure out the approach, and ship the solution — without waiting to be pointed at it. Ambiguity doesn't slow you down; it motivates you.",
+                },
+                {
+                  title: "Creative Problem-Solvers",
+                  text: "The best answers here rarely come from playbooks. We want people who bring original thinking, challenge assumptions, and find elegant solutions to hard problems.",
+                },
+                {
+                  title: "Ownership Mentality",
+                  text: "You treat the work like it's yours — because it is. Every team member has genuine stake in what we're building and is expected to operate with that level of care.",
+                },
+                {
+                  title: "High Conviction",
+                  text: "We move fast and make bets. We want people who can form strong opinions quickly, defend them with evidence, and change their mind just as fast when the data says otherwise.",
+                },
+              ].map((item) => (
+                <div key={item.title} className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                  <h3 className="text-base font-semibold mb-2 text-foreground">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-6 rounded-xl border border-cyan/20 bg-cyan/5 text-center">
+              <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+                If you&apos;re the kind of person who builds things on the weekend because you can&apos;t
+                stop thinking about a problem —{" "}
+                <span className="text-foreground font-medium">we should talk.</span>
+              </p>
+              <a
+                href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-4 px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-sm hover:opacity-90 transition-all"
+              >
+                Schedule a Conversation
+              </a>
             </div>
           </div>
         </section>

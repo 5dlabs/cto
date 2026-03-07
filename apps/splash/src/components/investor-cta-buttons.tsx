@@ -9,17 +9,6 @@ export function InvestorCtaButtons() {
   return (
     <div className="flex flex-col sm:flex-row justify-center gap-4">
       <motion.a
-        href="/5dlabs-investor-one-pager.pdf"
-        download
-        className={buttonClass}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ duration: 0.2 }}
-        initial={false}
-      >
-        Download One-Pager (PDF)
-      </motion.a>
-      <motion.a
         href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
         target="_blank"
         rel="noopener noreferrer"
