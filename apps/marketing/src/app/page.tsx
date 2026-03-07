@@ -507,9 +507,9 @@ export default function Home() {
 
             <div className="mt-8 p-5 rounded-xl border border-border/30 bg-muted/20 text-center">
               <p className="text-sm text-muted-foreground max-w-3xl mx-auto">
-                The point is not to expose a marketplace of providers. The point
-                is to give customers a stable platform that can run where it
-                needs to run, with the operational complexity abstracted away.
+                One stable platform that runs wherever it needs to run. The
+                operational complexity is abstracted away so your team stays
+                focused on what they shipped here to build.
               </p>
             </div>
           </div>
@@ -635,7 +635,7 @@ export default function Home() {
                 The <span className="gradient-text">Platform</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Everything needed to move from idea to production, without forcing customers to assemble or understand the underlying platform.
+                Everything needed to move from idea to production — assembled, tested, and ready to go.
               </p>
             </div>
 

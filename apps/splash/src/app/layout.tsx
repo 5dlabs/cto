@@ -97,7 +97,7 @@ export const metadata: Metadata = {
   },
   other: {
     "ai:description":
-      "5D Labs is an AI-native venture studio powered by CTO, our commercial build engine, an internal trading engine that stays proprietary, and OpenClaw, the orchestration layer beneath both. The stack exists to discover, finance, and ship new ventures.",
+      "5D Labs is an AI-native venture studio powered by CTO, our commercial build engine, an in-house trading engine, and OpenClaw, the orchestration layer beneath both. The stack exists to discover, finance, and ship new ventures.",
     "ai:capabilities":
       "venture-studio, multi-agent-orchestration, internal-trading-infrastructure, AI-engineering, crypto, DeFi, open-source, kubernetes, gitops, technical-co-founder, fractional-cto, infrastructure-lead",
     "ai:ventures": "CTO, Internal Trading Engine, OpenClaw Platform, Venture Pipeline",

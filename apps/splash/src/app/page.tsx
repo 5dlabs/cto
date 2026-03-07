@@ -18,8 +18,8 @@ const operatingStack: Venture[] = [
     name: "Trading Engine",
     tagline: "The capital engine.",
     description:
-      "A proprietary system that generates revenue, sharpens market intelligence, and finances venture creation across Solana, Base, Near, and Sui.",
-    tags: ["Revenue Engine", "Market Intelligence", "Multi-Chain", "Proprietary"],
+      "Our in-house system that generates revenue, sharpens market intelligence, and finances venture creation across Solana, Base, Near, and Sui.",
+    tags: ["Revenue Engine", "Market Intelligence", "Multi-Chain", "In-House"],
     color: "from-purple-500 to-magenta",
     href: "/trading",
     status: "building",
@@ -46,7 +46,7 @@ const operatingModel = [
   },
   {
     title: "Trading Engine",
-    text: "The capital engine. A proprietary system that generates revenue and live market intelligence to finance and inform the work.",
+    text: "The capital engine. Our in-house system that generates revenue and live market intelligence to finance and inform the work.",
   },
   {
     title: "Ventures",
