@@ -268,20 +268,12 @@ export default function ServicesPage() {
             <p className="text-lg text-muted-foreground mb-8">
               Every service above runs as part of the CTO platform. Your team ships product — we run the stack.
             </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link
-                href="/"
-                className="px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:opacity-90 transition-all"
-              >
-                Back to CTO
-              </Link>
-              <Link
-                href="/pricing"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 text-foreground font-semibold hover:border-cyan/30 hover:bg-cyan/5 transition-all"
-              >
-                View Pricing
-              </Link>
-            </div>
+            <Link
+              href="/"
+              className="inline-block px-8 py-4 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:opacity-90 transition-all"
+            >
+              Back to CTO
+            </Link>
           </div>
         </section>
 
