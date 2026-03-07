@@ -46,7 +46,7 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Link href="/" aria-label="5D Labs home" className="inline-flex">
               <Image
-                src="/5dlabs-logo-dark.svg"
+                src="/5dlabs-logo.svg"
                 alt="5D Labs"
                 width={180}
                 height={45}

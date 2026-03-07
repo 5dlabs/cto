@@ -496,7 +496,7 @@ export default function PricingPage() {
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <a href={homeHref} className="flex items-center gap-2" aria-label="Back to 5D Labs">
               <Image
-                src="/5dlabs-logo-dark.svg"
+                src="/5dlabs-logo.svg"
                 alt="5D Labs"
                 width={160}
                 height={40}
