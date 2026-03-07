@@ -29,7 +29,7 @@ const footerLinks = [
     title: "Connect",
     links: [
       { name: "GitHub", href: "https://github.com/5dlabs" },
-      { name: "OpenClaw (Open Source)", href: "https://github.com/5dlabs/openclaw-platform" },
+      { name: "OpenClaw (Coming Soon)", href: "/#openclaw" },
       { name: "Discord", href: "https://discord.gg/r334tFP87Y" },
       { name: "X / Twitter", href: "https://x.com/5dlabs" },
       { name: "YouTube", href: "https://youtube.com/@5dlabs" },

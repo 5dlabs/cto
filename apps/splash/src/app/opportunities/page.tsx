@@ -183,12 +183,12 @@ const caseStudies = [
 
 const ventures = [
   { name: "CTO Platform", desc: "Multi-agent AI engineering platform", href: "https://cto.5dlabs.ai", status: "Pre-launch" },
-  { name: "OpenClaw Platform", desc: "Open-source Kubernetes-native agent orchestration", href: "https://github.com/5dlabs/openclaw-platform", status: "Building" },
+  { name: "OpenClaw", desc: "The orchestration layer beneath CTO. Multi-CLI, bare-metal native, and coming soon as open source.", href: "/#openclaw", status: "Coming Soon" },
   {
-    name: "Internal Trading Engine",
-    desc: "Proprietary internal capital and market-intelligence engine across Solana, Base, Near, and Sui",
+    name: "Trading Engine",
+    desc: "Proprietary capital and market-intelligence engine across Solana, Base, Near, and Sui",
     href: "/trading",
-    status: "Internal",
+    status: "Active",
   },
 ];
 

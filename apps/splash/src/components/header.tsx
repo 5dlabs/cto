@@ -7,8 +7,8 @@ import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 const navLinks = [
   { name: "CTO", href: "https://cto.5dlabs.ai" },
   { name: "Trading", href: "/trading" },
-  { name: "How It Works", href: "/#operating-model" },
-  { name: "OpenClaw", href: "https://github.com/5dlabs/openclaw-platform" },
+  { name: "Strategy", href: "/#operating-model" },
+  { name: "OpenClaw", href: "/#openclaw" },
 ];
 
 const socials = [

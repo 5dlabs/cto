@@ -229,8 +229,45 @@ export default function Home() {
           </div>
         </section>
 
+        {/* OpenClaw Section */}
+        <section id="openclaw" className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-6">
+              <span className="text-xs text-cyan font-medium uppercase tracking-wider">
+                The Engine Underneath
+              </span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+              Powered by <span className="gradient-text">OpenClaw</span>
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
+              OpenClaw is the orchestration layer beneath CTO and the rest of the operating stack.
+              It coordinates AI agents across multiple CLIs, bare-metal Kubernetes infrastructure,
+              and a growing ecosystem of MCP tools — turning a collection of specialized agents
+              into a coherent, self-healing system.
+            </p>
+            <div className="grid sm:grid-cols-3 gap-6 text-left">
+              {[
+                {
+                  title: "Multi-CLI Agnostic",
+                  text: "Works with Claude Code, Cursor, Codex, Factory, Gemini, and OpenCode. The orchestration layer doesn't care which model or interface runs the task.",
+                },
+                {
+                  title: "Bare-Metal Native",
+                  text: "Built from the ground up for Kubernetes on dedicated hardware. No cloud dependencies, no managed service lock-in.",
+                },
+                {
+                  title: "Coming Soon",
+                  text: "OpenClaw will be open-sourced. When it ships publicly, it will be the reusable foundation any team can use to run the same kind of agent infrastructure we run internally.",
+                },
+              ].map((item) => (
+                <div key={item.title} className="p-5 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                  <h3 className="text-base font-semibold mb-2 text-foreground">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <Footer />
-      </main>
-    </div>
-  );
-}
