@@ -290,7 +290,7 @@ export default function ServicesPage() {
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <a href={homeHref} className="inline-flex items-center">
               <Image
-                src="/5dlabs-logo.svg"
+                src="/5dlabs-logo-3d.jpg"
                 alt="5D Labs"
                 width={160}
                 height={40}
