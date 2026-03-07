@@ -30,6 +30,8 @@ spec:
         app: linear-bridge
     spec:
       serviceAccountName: linear-bridge
+      imagePullSecrets:
+        - name: ghcr-secret
       nodeSelector:
         node-role.kubernetes.io/worker: ""
       containers:
