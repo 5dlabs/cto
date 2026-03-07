@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { VentureGrid, type Venture } from "@/components/venture-card";
-import { WaitlistForm } from "@/components/waitlist-form";
 
 const ventures: Venture[] = [
   {
@@ -298,36 +297,6 @@ export default function Home() {
                   <p className="text-muted-foreground text-sm">{item.text}</p>
                 </div>
               ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Waitlist + CTA Section */}
-        <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-2xl mx-auto">
-            <WaitlistForm
-              source="waitlist"
-              heading="Stay in the Loop"
-              subheading="Join the waitlist to get early access to OpenClaw Platform, trading tools, and studio updates. No spam, ever."
-            />
-
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
-              <a
-                href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
-              >
-                Schedule a Call
-              </a>
-              <a
-                href="https://github.com/5dlabs"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
-              >
-                View on GitHub
-              </a>
             </div>
           </div>
         </section>

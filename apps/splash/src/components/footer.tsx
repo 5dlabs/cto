@@ -14,7 +14,6 @@ const footerLinks = [
   {
     title: "Company",
     links: [
-      { name: "Consulting", href: "/consulting" },
       { name: "Opportunities", href: "/opportunities" },
       { name: "Founder", href: "/founder" },
       { name: "Team", href: "/team" },
@@ -80,14 +79,6 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             &copy; {new Date().getFullYear()} 5D Labs. Building the future in parallel.
           </p>
-          <a
-            href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-cyan hover:text-cyan/80 transition-colors"
-          >
-            Schedule a Call
-          </a>
         </div>
       </div>
     </footer>
