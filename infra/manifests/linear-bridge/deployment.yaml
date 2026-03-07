@@ -57,7 +57,7 @@ spec:
 
             # Linear team ID
             - name: LINEAR_TEAM_ID
-              value: ""
+              value: "1409006087331512342"
 
             # Discord bridge URL for cross-cancel callbacks
             - name: DISCORD_BRIDGE_URL
