@@ -260,20 +260,22 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
               <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
               <span className="text-sm text-cyan font-medium">
-                From PRD to Production — Autonomously
+                Idea to Production — Autonomously
               </span>
             </div>
 
             {/* Headline - LCP element, must be visible immediately */}
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
-              <span className="gradient-text glow-text-cyan">Your Engineering Team</span>
+              <span className="gradient-text glow-text-cyan">Build at the Speed</span>
               <br />
-              <span className="text-foreground">Lives Here</span>
+              <span className="text-foreground">of Thought.</span>
             </h1>
 
             {/* Subheadline */}
             <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10">
-              A growing team of specialized AI agents that ship complete features. From requirements to deployed code—automatically.
+              Describe what you want. CTO plans it, builds it, tests it, and ships it —
+              with a full team of AI agents working in parallel. You think it,{" "}
+              <span className="text-foreground">it gets built.</span>
             </p>
 
             {/* CTA Buttons */}
@@ -840,7 +842,7 @@ export default function Home() {
                 Why <span className="gradient-text">CTO</span>?
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Other tools help you code. CTO ships complete features—from PRD to production—with specialized agents for every stage of development.
+                Other tools help you write code. CTO ships complete products — planned, built, tested, and deployed by a coordinated team of specialists.
               </p>
             </div>
 
@@ -934,7 +936,7 @@ export default function Home() {
               Start <span className="gradient-text">Shipping</span>
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
-              Your AI engineering team is ready. Give it a PRD—get production code.
+              Describe what you want to build. Watch it ship.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               {featureFlags.showStartNowButton && (
@@ -963,7 +965,7 @@ export default function Home() {
               />
             </a>
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} 5D Labs. From PRD to Production — Autonomously.
+              © {new Date().getFullYear()} 5D Labs. Idea to Production — Autonomously.
             </p>
           </div>
         </footer>

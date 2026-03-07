@@ -300,7 +300,7 @@ export default function ServicesPage() {
               />
             </a>
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} 5D Labs. From PRD to Production — Autonomously.
+              © {new Date().getFullYear()} 5D Labs. Idea to Production — Autonomously.
             </p>
           </div>
         </footer>
