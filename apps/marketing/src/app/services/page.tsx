@@ -214,11 +214,19 @@ export default function ServicesPage() {
               Everything Your Stack{" "}
               <span className="gradient-text">Needs to Run</span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
               CTO manages databases, storage, inference, secrets, delivery, networking, and
               blockchain infrastructure as productized platform services — all branded,
               all operated for you.
             </p>
+            <div className="inline-flex items-center gap-3 px-5 py-3 rounded-xl border border-cyan/20 bg-cyan/5">
+              <span className="text-sm text-foreground font-medium">
+                Near-complete parity with major cloud providers for the most common backend services
+              </span>
+              <span className="text-xs text-cyan font-medium uppercase tracking-wider whitespace-nowrap">
+                Without the cloud bill
+              </span>
+            </div>
           </div>
         </section>
 
