@@ -60,5 +60,78 @@ data:
           - timestamp:
               source: timestamp
               format: RFC3339Nano
+      - job_name: acp-cli
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: acp-cli
+              source: acp-opencode
+              agent_id: {{ .Values.agent.id | quote }}
+              namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
+              service_name: acp-cli
+              __path__: /workspace/.local/share/opencode/log/*.log
+          - targets:
+              - localhost
+            labels:
+              job: acp-cli
+              source: acp-claude
+              agent_id: {{ .Values.agent.id | quote }}
+              namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
+              service_name: acp-cli
+              __path__: /workspace/.claude/logs/*.log
+          - targets:
+              - localhost
+            labels:
+              job: acp-cli
+              source: acp-codex
+              agent_id: {{ .Values.agent.id | quote }}
+              namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
+              service_name: acp-cli
+              __path__: /workspace/.codex/logs/*.log
+          - targets:
+              - localhost
+            labels:
+              job: acp-cli
+              source: acp-droid
+              agent_id: {{ .Values.agent.id | quote }}
+              namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
+              service_name: acp-cli
+              __path__: /workspace/.factory/logs/*.log
+          - targets:
+              - localhost
+            labels:
+              job: acp-cli
+              source: acp-gemini
+              agent_id: {{ .Values.agent.id | quote }}
+              namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
+              service_name: acp-cli
+              __path__: /workspace/.gemini/tmp/*.log
+          - targets:
+              - localhost
+            labels:
+              job: acp-cli
+              source: acp-kimi
+              agent_id: {{ .Values.agent.id | quote }}
+              namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
+              service_name: acp-cli
+              __path__: /workspace/.kimi/logs/*.log
+          - targets:
+              - localhost
+            labels:
+              job: acp-cli
+              source: acp-cursor
+              agent_id: {{ .Values.agent.id | quote }}
+              namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
+              service_name: acp-cli
+              __path__: /workspace/.cursor/logs/*.log
+        pipeline_stages:
+          - regex:
+              expression: '(?P<cli_name>acp-[a-z]+)'
+              source: source
+          - labels:
+              cli_name:
+              source:
+              session_type:
 {{- end }}
 
