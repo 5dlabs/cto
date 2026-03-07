@@ -30,6 +30,8 @@ spec:
         app: discord-bridge
     spec:
       serviceAccountName: discord-bridge
+      imagePullSecrets:
+        - name: ghcr-secret
       nodeSelector:
         node-role.kubernetes.io/worker: ""
       containers:
