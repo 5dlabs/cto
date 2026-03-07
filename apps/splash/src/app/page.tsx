@@ -3,44 +3,69 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { VentureGrid, type Venture } from "@/components/venture-card";
 
-const ventures: Venture[] = [
+const operatingStack: Venture[] = [
   {
     name: "CTO",
-    tagline: "The thing to build the thing.",
+    tagline: "The build engine.",
     description:
-      "A multi-agent AI engineering platform. Specialized agents ship complete features — from PRD to production — autonomously on self-healing bare metal infrastructure.",
-    tags: ["Multi-Agent", "Kubernetes", "OpenClaw", "Bare Metal"],
+      "Our AI engineering platform. It is the system we use internally to ship software and the first commercial wedge we can offer to external teams.",
+    tags: ["Commercial Service", "Build Engine", "Multi-Agent", "AI OS"],
     color: "from-cyan-500 to-blue-500",
     href: "https://cto.5dlabs.ai",
     status: "building",
   },
   {
-    name: "Agentic Trading",
-    tagline: "Autonomous agent commerce infrastructure.",
+    name: "Trading Engine",
+    tagline: "The capital engine.",
     description:
-      "Autonomous trading agents on Solana, Base, Near, and Sui for teams that want programmable execution, risk controls, and continuous operation across DeFi markets. Built for companies expanding revenue streams through on-chain systems.",
-    tags: ["Agentic Finance", "Solana", "Base", "Near", "Sui", "DeFi", "AI Agents"],
+      "A proprietary system that generates revenue, sharpens market intelligence, and finances venture creation across Solana, Base, Near, and Sui.",
+    tags: ["Revenue Engine", "Market Intelligence", "Multi-Chain", "Proprietary"],
     color: "from-purple-500 to-magenta",
+    href: "/trading",
     status: "building",
   },
   {
-    name: "OpenClaw Platform",
-    tagline: "Deploy your own agent swarm.",
+    name: "Venture Pipeline",
+    tagline: "The products we bring to market.",
     description:
-      "Open-source Kubernetes-native platform for orchestrating AI agent fleets. One-command install via TUI, runs on desktop KinD clusters or enterprise EKS — with GitOps, NATS messaging, observability, and secrets management built in.",
-    tags: ["Open Source", "Kubernetes", "GitOps", "ArgoCD", "Helm"],
-    color: "from-orange-500 to-amber-500",
-    href: "https://github.com/5dlabs/openclaw-platform",
-    status: "building",
-  },
-  {
-    name: "What's Next?",
-    tagline: "Always building.",
-    description:
-      "The beauty of a startup studio is that we're always exploring. By validating many ideas in parallel, we find what sticks — faster than anyone else.",
-    tags: ["OpenClaw", "Crypto", "AI", "Web3"],
+      "These systems exist to help 5D Labs discover, validate, and launch customer-facing ventures faster than a traditional startup can.",
+    tags: ["Studio", "Validation", "Launch", "Product-Market Fit"],
     color: "from-yellow-500 to-orange-500",
     status: "exploring",
+  },
+];
+
+const operatingModel = [
+  {
+    title: "5D Labs",
+    text: "The studio. We choose where to focus, allocate resources, and decide what earns a deeper build cycle.",
+  },
+  {
+    title: "CTO",
+    text: "The build engine. It is both our internal production system and the first commercial service we can take to market.",
+  },
+  {
+    title: "Trading Engine",
+    text: "The capital engine. A proprietary system that generates revenue and live market intelligence to finance and inform the work.",
+  },
+  {
+    title: "Ventures",
+    text: "The products we bring to market. The studio exists to discover, validate, and launch customer-facing ventures at a pace a traditional startup cannot match.",
+  },
+];
+
+const capitalEnginePoints = [
+  {
+    title: "Revenue for Experimentation",
+    text: "Generating our own revenue gives the studio more room to test, learn, and build without relying on a single outside funding event.",
+  },
+  {
+    title: "Live Market Intelligence",
+    text: "Operating in real markets keeps the team close to execution quality, liquidity conditions, and where on-chain demand is actually moving.",
+  },
+  {
+    title: "Focused on Venture Creation",
+    text: "The right role for this system is as leverage inside the studio — helping finance the work and sharpen decisions as new ventures are built.",
   },
 ];
 
@@ -60,20 +85,21 @@ export default function Home() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
               <span className="text-sm text-cyan font-semibold tracking-wide">
-                Agentic &middot; Fully Autonomous &middot; On-Chain
+                AI-Native Venture Studio · Proprietary Operating Stack
               </span>
             </div>
 
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
-              <span className="gradient-text glow-text-cyan">Build in Parallel.</span>
+              <span className="gradient-text glow-text-cyan">We Built the Stack</span>
               <br />
-              <span className="text-foreground">Fail Fast. Double Down.</span>
+              <span className="text-foreground">That Helps Us Build Companies.</span>
             </h1>
 
-            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10">
-              5D Labs is a startup studio that leverages OpenClaw and autonomous
-              AI agents to validate many ideas simultaneously — transcending the
-              old &ldquo;pivot or perish&rdquo; model.
+            <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10">
+              5D Labs is an AI-native venture studio. <span className="text-foreground">CTO</span> is the build
+              engine — an operating system for software delivery, not just a coding tool. Our{" "}
+              <span className="text-foreground">trading engine</span> helps finance and
+              inform the work. The ventures are what we bring to market.
             </p>
 
             <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
@@ -84,17 +110,21 @@ export default function Home() {
                 Explore CTO
               </a>
               <Link
-                href="/investors"
+                href="/#operating-model"
                 className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all"
               >
-                Investor Relations
+                See How It Works
               </Link>
             </div>
 
             <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold text-foreground">1</span>
+                <span>operating stack</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">5+</span>
-                <span>ventures in flight</span>
+                <span>venture themes in flight</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">17+</span>
@@ -102,7 +132,7 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">4</span>
-                <span>blockchains</span>
+                <span>chains in production</span>
               </div>
             </div>
           </div>
@@ -120,181 +150,79 @@ export default function Home() {
             <p className="text-xl sm:text-2xl text-muted-foreground leading-relaxed">
               One idea. One team. One shot at product-market fit.
               <br className="hidden sm:block" />
-              We thought there might be a{" "}
-              <span className="text-foreground font-semibold">better way</span>.
+              We thought there{" "}
+              <span className="text-foreground font-semibold">must be a better way</span>.{" "}
+              <span className="text-foreground font-bold">We built it.</span>
             </p>
           </div>
         </section>
 
-        {/* Thesis Section */}
-        <section className="py-20 px-6 border-t border-border/30">
+        {/* Operating Model Section */}
+        <section id="operating-model" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                The <span className="gradient-text">Startup Studio</span> Model, Reimagined
+                How <span className="gradient-text">5D Labs</span> Works
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Traditional startups burn runway trying to find product-market
-                fit with a single idea. We take a different approach.
+                Not three unrelated bets. One studio, one operating stack, multiple
+                venture outcomes.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
-                <div className="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-7 h-7 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
+            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
+              {operatingModel.map((item) => (
+                <div
+                  key={item.title}
+                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                >
+                  <h3 className="text-lg font-semibold mb-3">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.text}</p>
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Parallel Validation</h3>
-                <p className="text-sm text-muted-foreground">
-                  Instead of one bet, we explore multiple ventures simultaneously.
-                  OpenClaw and AI agents let us move at startup speed across every idea.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
-                <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-7 h-7 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold mb-2">Faster Product-Market Fit</h3>
-                <p className="text-sm text-muted-foreground">
-                  Find what works before the money runs out. Our tooling lets us
-                  validate or kill ideas in weeks, not quarters.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
-                <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-7 h-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold mb-2">AI-Native Infrastructure</h3>
-                <p className="text-sm text-muted-foreground">
-                  Every venture is built with autonomous AI agents from day one.
-                  OpenClaw powers the orchestration layer across our entire portfolio.
-                </p>
-              </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* Ventures Section */}
-        <section id="ventures" className="py-20 px-6 border-t border-border/30">
+        {/* Operating Stack Section */}
+        <section id="stack" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Our <span className="gradient-text">Ventures</span>
+                The <span className="gradient-text">Stack</span> Behind the Studio
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                From AI engineering platforms to on-chain trading agents and open-source
-                tooling — here&apos;s what we&apos;re building.
+                CTO, the trading engine, and the venture pipeline are not separate company theses.
+                They are coordinated parts of one operating model.
               </p>
             </div>
 
-            <VentureGrid ventures={ventures} />
+            <VentureGrid ventures={operatingStack} />
           </div>
         </section>
 
-        {/* Crypto Vision Section */}
+        {/* Capital Engine Section */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-16">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[oklch(0.7_0.25_320)]/20 bg-[oklch(0.7_0.25_320)]/5 mb-6">
-                <span className="text-xs text-[oklch(0.7_0.25_320)] font-medium uppercase tracking-wider">
-                  Crypto Native
-                </span>
-              </div>
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Building for the <span className="gradient-text">New Economy</span>
+                Why the <span className="gradient-text">Trading Engine</span> Exists
               </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                We believe AI agents and crypto rails are converging into
-                something bigger — an agent economy where software transacts,
-                earns, and operates autonomously on-chain.
+              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                We built the trading engine to fund experimentation, stay close to live
+                on-chain markets, and generate the kind of market intelligence that only
+                comes from operating with real stakes.
               </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
-                <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-7 h-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold mb-2">Solana · Base · Near · Sui</h3>
-                <p className="text-sm text-muted-foreground">
-                  Four chains, one thesis. Solana for low-latency execution,
-                  Base for Ethereum-grade composability, Near for AI-native
-                  smart contracts, Sui for Move and object-centric DeFi. We&apos;re building where the action is.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
-                <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-7 h-7 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold mb-2">Multi-Chain</h3>
-                <p className="text-sm text-muted-foreground">
-                  Solana for speed, Ethereum and Base for composability, Near
-                  for AI-native smart contracts, Sui for Move and object-centric DeFi. We go where the opportunity is.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center">
-                <div className="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-7 h-7 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold mb-2">The Agent Economy</h3>
-                <p className="text-sm text-muted-foreground">
-                  Agents that don&apos;t just write code — they trade, settle
-                  payments, and coordinate on-chain. AI and crypto aren&apos;t
-                  separate bets; they&apos;re one thesis.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* OpenClaw Section */}
-        <section className="py-20 px-6 border-t border-border/30">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-6">
-                <span className="text-xs text-cyan font-medium uppercase tracking-wider">
-                  Our Foundation
-                </span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Built with <span className="gradient-text">OpenClaw</span>
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-                OpenClaw is our open-source agent orchestration layer.
-                Self-hosted models, every major provider, and infrastructure
-                we own — optimized for cost, speed, and staying ahead of an
-                industry that moves daily.
-              </p>
-            </div>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                { title: "Self-Hosted Models", text: "Run open-weight models on our own hardware. Full control over inference, zero vendor lock-in, dramatically lower costs." },
-                { title: "Every Major Model", text: "We use them all — frontier and open-weight. Best model for each task, swapped in as new ones drop." },
-                { title: "Cost Optimized", text: "Bare metal over cloud. Self-hosted inference over API calls. 60-80% savings on infrastructure without sacrificing performance." },
-                { title: "Always Current", text: "New model? Integrated within days. New CLI? Already supported. We move at the speed of the industry — or faster." },
-                { title: "Agent Orchestration", text: "Specialized agents coordinated across development, trading, and operations. Each with its own identity, skills, and tools — and the roster keeps growing." },
-                { title: "Open at the Core", text: "Key infrastructure and tooling released as open source. We contribute upstream and build on open standards wherever possible." },
-              ].map((item) => (
-                <div key={item.title} className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
-                  <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
-                  <p className="text-muted-foreground text-sm">{item.text}</p>
+              {capitalEnginePoints.map((item) => (
+                <div
+                  key={item.title}
+                  className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
+                >
+                  <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.text}</p>
                 </div>
               ))}
             </div>

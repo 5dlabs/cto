@@ -102,7 +102,7 @@ const jsonLd = {
       url: "https://cto.5dlabs.ai",
       logo: {
         "@type": "ImageObject",
-        url: "https://cto.5dlabs.ai/5dlabs-logo-header-v2.png",
+        url: "https://cto.5dlabs.ai/5dlabs-logo-dark.svg",
       },
       sameAs: ["https://github.com/5dlabs"],
     },

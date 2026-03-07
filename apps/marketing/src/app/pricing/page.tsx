@@ -1,7 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { Header } from "@/components/header";
+
+const homeHref =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3001"
+    : "https://5dlabs.ai";
 
 const tiers = [
   {
@@ -139,7 +145,7 @@ const faqs = [
   },
   {
     question: "Can I use my own API keys?",
-    answer: "Yes! BYOK (Bring Your Own Keys) is supported on all tiers. Use your Anthropic, OpenAI, or Google API keys directly. We never see your keys—they're stored encrypted in OpenBao (HashiCorp Vault fork).",
+    answer: "Yes. BYOK (Bring Your Own Keys) is supported on all tiers. Use your Anthropic, OpenAI, or Google API keys directly. We never see your keys. They stay encrypted behind 5D Vault, our managed secrets layer.",
   },
   {
     question: "What does 'Fully Managed' mean?",
@@ -488,10 +494,15 @@ export default function PricingPage() {
         {/* Footer */}
         <footer className="py-8 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/5dlabs-logo-header-v2.png" alt="5D Labs" className="h-16 opacity-90" />
-            </div>
+            <a href={homeHref} className="flex items-center gap-2" aria-label="Back to 5D Labs">
+              <Image
+                src="/5dlabs-logo-dark.svg"
+                alt="5D Labs"
+                width={160}
+                height={40}
+                className="h-10 w-auto opacity-90"
+              />
+            </a>
             <p className="text-sm text-muted-foreground">
               © {new Date().getFullYear()} 5D Labs. Transmitting from the Fifth Dimension.
             </p>

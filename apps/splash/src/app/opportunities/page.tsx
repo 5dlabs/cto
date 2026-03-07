@@ -184,7 +184,12 @@ const caseStudies = [
 const ventures = [
   { name: "CTO Platform", desc: "Multi-agent AI engineering platform", href: "https://cto.5dlabs.ai", status: "Pre-launch" },
   { name: "OpenClaw Platform", desc: "Open-source Kubernetes-native agent orchestration", href: "https://github.com/5dlabs/openclaw-platform", status: "Building" },
-  { name: "Agentic Trading", desc: "Autonomous on-chain trading agents on Solana, Base, Near, and Sui", href: null, status: "Building" },
+  {
+    name: "Internal Trading Engine",
+    desc: "Proprietary internal capital and market-intelligence engine across Solana, Base, Near, and Sui",
+    href: "/trading",
+    status: "Internal",
+  },
 ];
 
 export default function OpportunitiesPage() {
@@ -268,7 +273,7 @@ export default function OpportunitiesPage() {
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
-              {opportunities.map((opp, i) => {
+              {opportunities.map((opp) => {
                 const colors = colorMap[opp.badgeColor];
                 return (
                   <div
@@ -350,7 +355,7 @@ export default function OpportunitiesPage() {
 
             {/* Technical depth grid */}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {technicalDepth.map((area, i) => {
+              {technicalDepth.map((area) => {
                 const colors = colorMap[area.color];
                 return (
                   <div
@@ -433,12 +438,12 @@ export default function OpportunitiesPage() {
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 <a href="https://5dlabs.ai" className="text-cyan hover:underline">5D Labs</a>{" "}
-                — an AI-first startup studio operating multiple ventures in parallel.
+                — an AI-native venture studio building its operating stack and the ventures it enables.
               </p>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
-              {ventures.map((v, i) => (
+              {ventures.map((v) => (
                 <div
                   key={v.name}
                   className="relative p-5 rounded-2xl glass-card glass-shimmer overflow-hidden"

@@ -124,7 +124,7 @@ export default function FounderPage() {
                   <p>
                     5D Labs exists to prove that thesis. By building OpenClaw and
                     deploying it across multiple ventures, we&apos;re showing that
-                    the startup studio model + AI agents = a fundamentally
+                    the venture studio model + AI agents = a fundamentally
                     different — and better — way to build companies.
                   </p>
                 </div>

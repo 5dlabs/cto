@@ -5,9 +5,9 @@ import Link from "next/link";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 
 const navLinks = [
-  { name: "Team", href: "/team" },
-  { name: "Investors", href: "/investors" },
-  { name: "Founder", href: "/founder" },
+  { name: "CTO", href: "https://cto.5dlabs.ai" },
+  { name: "How It Works", href: "/#operating-model" },
+  { name: "OpenClaw", href: "https://github.com/5dlabs/openclaw-platform" },
 ];
 
 const socials = [
@@ -83,16 +83,26 @@ export function Header() {
         <div className="w-px h-4 bg-white/[0.08] mx-1" />
 
         {/* Nav links */}
-        {navLinks.map((link) => (
-          <Link
-            key={link.name}
-            href={link.href}
-            prefetch={false}
-            className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all"
-          >
-            {link.name}
-          </Link>
-        ))}
+        {navLinks.map((link) =>
+          link.href.startsWith("http") ? (
+            <a
+              key={link.name}
+              href={link.href}
+              className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all whitespace-nowrap"
+            >
+              {link.name}
+            </a>
+          ) : (
+            <Link
+              key={link.name}
+              href={link.href}
+              prefetch={false}
+              className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all whitespace-nowrap"
+            >
+              {link.name}
+            </Link>
+          )
+        )}
 
         {/* Divider */}
         <div className="w-px h-4 bg-white/[0.08] mx-1" />

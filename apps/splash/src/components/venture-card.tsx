@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export interface Venture {
@@ -23,9 +24,10 @@ const statusConfig = {
 
 export function VentureCard({ venture }: VentureCardProps) {
   const status = statusConfig[venture.status];
+  const isClickable = Boolean(venture.href);
 
   const card = (
-    <div className="group cursor-pointer">
+    <div className={cn("group", isClickable && "cursor-pointer")}>
       <div
         className={cn(
           "relative p-6 rounded-xl",
@@ -85,10 +87,18 @@ export function VentureCard({ venture }: VentureCardProps) {
   );
 
   if (venture.href) {
+    if (venture.href.startsWith("http")) {
+      return (
+        <a href={venture.href} target="_blank" rel="noopener noreferrer" className="block">
+          {card}
+        </a>
+      );
+    }
+
     return (
-      <a href={venture.href} target="_blank" rel="noopener noreferrer" className="block">
+      <Link href={venture.href} className="block">
         {card}
-      </a>
+      </Link>
     );
   }
 

@@ -101,6 +101,6 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 
 ## Contact
 
-- Waitlist: https://cto.5dlabs.ai/#cta
+- Waitlist: https://cto.5dlabs.ai
 - Sales: sales@5dlabs.ai
 - GitHub: https://github.com/5dlabs
