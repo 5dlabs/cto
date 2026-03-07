@@ -716,12 +716,12 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Managed Foundation</h3>
+                <h3 className="text-xl font-semibold mb-2">5D Runtime</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Databases, storage, runtime services, and inference live behind productized platform layers rather than a pile of visible infrastructure decisions.
+                  Databases, storage, and inference — the same managed services teams expect from cloud providers, already running and ready to use. No setup, no assembly, no surprise bills.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["5D Postgres", "5D Store", "5D Volume", "5D Inference"].map(db => (
+                  {["5D Data", "5D Store", "5D Volume", "5D Inference"].map(db => (
                     <span key={db} className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-500">{db}</span>
                   ))}
                 </div>

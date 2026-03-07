@@ -219,13 +219,15 @@ export default function ServicesPage() {
               blockchain infrastructure as productized platform services — all branded,
               all operated for you.
             </p>
-            <div className="inline-flex items-center gap-3 px-5 py-3 rounded-xl border border-cyan/20 bg-cyan/5">
-              <span className="text-sm text-foreground font-medium">
-                Near-complete parity with major cloud providers for the most common backend services
-              </span>
-              <span className="text-xs text-cyan font-medium uppercase tracking-wider whitespace-nowrap">
-                Without the cloud bill
-              </span>
+            <div className="max-w-2xl mx-auto p-5 rounded-xl border border-cyan/20 bg-cyan/5 text-center">
+              <p className="text-base text-foreground font-medium mb-2">
+                Every managed service your team relies on from AWS, GCP, or Azure — databases,
+                storage, secrets, inference, observability, networking — already runs here.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Same capabilities. Predictable costs. No egress fees, no surprise invoices,
+                no vendor lock-in.
+              </p>
             </div>
           </div>
         </section>
