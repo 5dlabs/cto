@@ -403,11 +403,11 @@ export default function Home() {
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
-                    <span>Claude Code, Cursor, Factory</span>
+                    <span>Claude Code, Cursor, Factory, Codex</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
-                    <span>Codex, Gemini, OpenCode</span>
+                    <span>Gemini, OpenCode, GitHub Copilot, Kimi</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
@@ -667,7 +667,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">5D Code</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Multiple CLIs, multiple model providers, one consistent experience. CTO abstracts the underlying toolchain so your team works with whatever interface fits — Claude Code, Cursor, Codex, Factory, Gemini — without the cognitive overhead of managing the stack beneath it.
+                  Multiple CLIs, multiple model providers, one consistent experience. CTO abstracts the underlying toolchain so your team works with whatever interface fits — Claude Code, Cursor, Codex, Factory, Gemini, GitHub Copilot, Kimi — without the cognitive overhead of managing the stack beneath it.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {["Multi-CLI", "Model-agnostic", "Zero config"].map(tool => (
@@ -853,7 +853,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Choose Your CLI</h3>
                 <p className="text-sm text-muted-foreground">
-                  Claude Code, Cursor, Factory, Codex, Gemini—use what you love. We&apos;re agnostic.
+                  Claude Code, Cursor, Factory, Codex, Gemini, GitHub Copilot, Kimi—use what you love. We&apos;re agnostic.
                 </p>
               </div>
 

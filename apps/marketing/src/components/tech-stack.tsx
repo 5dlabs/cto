@@ -5,6 +5,8 @@ const cliTools = [
   "Factory",
   "Gemini CLI",
   "OpenCode",
+  "GitHub Copilot",
+  "Kimi CLI",
 ];
 
 const services = [
