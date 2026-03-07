@@ -7,7 +7,6 @@ const homeHref =
     : "https://5dlabs.ai";
 
 const navLinks = [
-  { name: "Team", href: "/team" },
   { name: "Stack", href: "/#stack" },
   { name: "Services", href: "/services" },
   { name: "Infrastructure", href: "/#infrastructure" },
