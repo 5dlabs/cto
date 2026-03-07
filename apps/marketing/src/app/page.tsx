@@ -682,13 +682,30 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">5D Guard</h3>
+                <h3 className="text-xl font-semibold mb-2">5D Pulse</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Automated incident detection, remediation, and restart logic keep the platform running without turning your team into a 24/7 ops desk.
+                  The platform monitors its own vitals and fixes what breaks — before it becomes an incident. Automated detection, remediation, and restart logic keep everything running without turning your team into a 24/7 ops desk.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["Auto-remediation", "Health checks", "Auto-rollback"].map(feature => (
+                  {["Self-healing", "Auto-remediation", "Health checks", "Auto-rollback"].map(feature => (
                     <span key={feature} className="text-xs px-2 py-1 rounded bg-green-500/10 text-green-500">{feature}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-12 h-12 rounded-lg bg-rose-500/10 flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold mb-2">5D Sentinel</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Continuous vulnerability scanning, dependency analysis, and AI-native remediation running across every service. Cipher doesn&apos;t just flag issues — it ships the fix through the same agent pipeline as everything else.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {["Vuln scanning", "Dependency audit", "AI remediation", "Supply chain"].map(feature => (
+                    <span key={feature} className="text-xs px-2 py-1 rounded bg-rose-500/10 text-rose-400">{feature}</span>
                   ))}
                 </div>
               </div>
