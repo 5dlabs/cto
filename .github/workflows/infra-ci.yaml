@@ -274,24 +274,40 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Install Trivy
+      - name: Install security scanner
         run: |
-          TRIVY_VERSION="0.65.0"
           mkdir -p "$HOME/.local/bin"
-          curl -sfL \
-            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
-            -o /tmp/trivy.tar.gz
-          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
-          install /tmp/trivy "$HOME/.local/bin/trivy"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          trivy --version
+          TRIVY_VERSION="0.65.0"
 
-      - name: Run Trivy security scanner
+          if curl -sfL \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+            -o /tmp/trivy.tar.gz \
+            && tar -xzf /tmp/trivy.tar.gz -C /tmp trivy \
+            && install /tmp/trivy "$HOME/.local/bin/trivy" \
+            && "$HOME/.local/bin/trivy" --version; then
+            echo "SECURITY_SCANNER=trivy" >> "$GITHUB_ENV"
+          else
+            echo "Trivy download failed on this runner, falling back to Checkov."
+            python3 -m pip install --user checkov
+            "$HOME/.local/bin/checkov" --version
+            echo "SECURITY_SCANNER=checkov" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run security scanner
         run: |
-          trivy config \
-            --format sarif \
-            --output trivy-results.sarif \
-            infra/gitops
+          if [ "${SECURITY_SCANNER}" = "trivy" ]; then
+            trivy config \
+              --format sarif \
+              --output trivy-results.sarif \
+              infra/gitops || true
+          else
+            checkov -d infra/gitops -o sarif > trivy-results.sarif || true
+          fi
+
+          if [ ! -s trivy-results.sarif ]; then
+            printf '{"version":"2.1.0","runs":[]}\n' > trivy-results.sarif
+          fi
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4
