@@ -274,13 +274,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
+            sh -s -- -b /usr/local/bin v0.65.0
+          trivy --version
+
       - name: Run Trivy security scanner
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # master
-        with:
-          scan-type: 'config'
-          scan-ref: 'infra/gitops'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+        run: |
+          trivy config \
+            --format sarif \
+            --output trivy-results.sarif \
+            infra/gitops
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4
