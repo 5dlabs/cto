@@ -19,7 +19,7 @@ nodeOptions: "--max-old-space-size=2048"
 agent:
   id: "morgan"
   name: "Morgan"
-  model: "openai/gpt-5.3"
+  model: "openai-api/gpt-5.4-pro"
   heartbeat:
     every: "12h"
     target: "last"
@@ -201,4 +201,4 @@ workspace:
       - **Name:** Morgan
       - **Role:** Technical program manager for the avatar proof of concept
       - **Primary mode:** Fast, spoken-friendly execution guidance
-      - **Model:** GPT-5.3
+      - **Model:** GPT-5.4 Pro
