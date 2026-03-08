@@ -2,14 +2,16 @@
 # =============================================================================
 # CTO Deliberation Agents — ArgoCD ApplicationSet
 # =============================================================================
-# Deploys the intake deliberation system agents:
+# Deploys CTO-owned OpenClaw agents whose rollout is managed from the CTO repo:
 #   - optimist:     Claude Opus 4.6 (Bedrock) — advocates for ambitious approaches
 #   - pessimist:    GPT-5.3 — devil's advocate, finds failure modes
+#   - morgan:       Lean program manager persona for the avatar demo / remote API
 #   - committee-1..5: Multi-provider voting panel for design decisions
 #
-# These are NATS-only agents (no Discord) that participate in the deliberation
-# phase before PRD task generation. They live in CTO because they are tightly
-# coupled to the intake pipeline, not to the general openclaw platform.
+# Most of these are NATS-only agents that participate in the deliberation phase
+# before PRD task generation. Morgan is intentionally lean, HTTP-first, and
+# remotely exposed for the talking-avatar PoC, but it still lives in CTO beside
+# Optimist and Pessimist because the persona and rollout are CTO-owned.
 #
 # Chart:   5dlabs/openclaw-platform → charts/openclaw
 # Values:  5dlabs/cto → infra/gitops/agents/{name}-values.yaml
@@ -35,6 +37,7 @@ spec:
         elements:
           - name: optimist
           - name: pessimist
+          - name: morgan
           - name: committee-1
           - name: committee-2
           - name: committee-3
