@@ -6,4 +6,5 @@ metadata:
 spec:
   resourceRef:
     name: cto-service-network
+    namespace: operators
   principalId: R3JvdXA6NzQ2MDQy

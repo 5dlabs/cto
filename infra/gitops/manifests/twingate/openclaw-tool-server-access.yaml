@@ -6,4 +6,5 @@ metadata:
 spec:
   resourceRef:
     name: openclaw-tool-server
+    namespace: operators
   principalId: R3JvdXA6NzQ2MDQy
