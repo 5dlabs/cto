@@ -29,12 +29,12 @@ twingateOperator:
     name: placeholder-api-secret
     key: apiToken
   network: placeholder-network
-  remoteNetworkName: placeholder-remote-network
+  remoteNetworkId: UmVtb3RlTmV0d29yazow
 #  apiKey: "<api key>"
 #  existingRemoteNetworkIdSecret:
 #    name: my-secret
 #    key: TWINGATE_REMOTE_NETWORK_ID
-#  remoteNetworkId: "<remote network id>"
+#  remoteNetworkName: "<remote network name>"
 #  namespaces: []
 #  logFormat: "plain|full|json"
 #  logVerbosity: "quiet|verbose|debug"
