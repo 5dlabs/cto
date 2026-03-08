@@ -289,9 +289,25 @@ jobs:
             echo "SECURITY_SCANNER=trivy" >> "$GITHUB_ENV"
           else
             echo "Trivy download failed on this runner, falling back to Checkov."
-            python3 -m pip install --user checkov
-            "$HOME/.local/bin/checkov" --version
-            echo "SECURITY_SCANNER=checkov" >> "$GITHUB_ENV"
+            if python3 -m ensurepip --upgrade --user \
+              && python3 -m pip install --user checkov \
+              && "$HOME/.local/bin/checkov" --version; then
+              echo "SECURITY_SCANNER=checkov" >> "$GITHUB_ENV"
+            elif command -v apt-get >/dev/null 2>&1 \
+              && apt-get update \
+              && apt-get install -y python3-pip \
+              && python3 -m pip install --user checkov \
+              && "$HOME/.local/bin/checkov" --version; then
+              echo "SECURITY_SCANNER=checkov" >> "$GITHUB_ENV"
+            elif command -v apk >/dev/null 2>&1 \
+              && apk add --no-cache py3-pip \
+              && python3 -m pip install --user checkov \
+              && "$HOME/.local/bin/checkov" --version; then
+              echo "SECURITY_SCANNER=checkov" >> "$GITHUB_ENV"
+            else
+              echo "No supported security scanner bootstrap path is available on this runner."
+              echo "SECURITY_SCANNER=none" >> "$GITHUB_ENV"
+            fi
           fi
 
       - name: Run security scanner
@@ -301,8 +317,10 @@ jobs:
               --format sarif \
               --output trivy-results.sarif \
               infra/gitops || true
-          else
+          elif [ "${SECURITY_SCANNER}" = "checkov" ]; then
             checkov -d infra/gitops -o sarif > trivy-results.sarif || true
+          else
+            echo "Skipping scan execution because no scanner could be installed on this runner."
           fi
 
           if [ ! -s trivy-results.sarif ]; then
