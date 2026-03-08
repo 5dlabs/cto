@@ -29,7 +29,8 @@ async function ensureRoomAndDispatch(params: {
       name: roomName,
       emptyTimeout: 60,
       departureTimeout: 15,
-      maxParticipants: 2,
+      // User + voice agent + avatar worker all need room slots.
+      maxParticipants: 4,
     });
   } catch (error) {
     if (!isAlreadyExistsError(error)) {

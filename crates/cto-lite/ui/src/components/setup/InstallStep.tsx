@@ -81,7 +81,7 @@ export function InstallStep({ onComplete, onBack }: InstallStepProps) {
       <div>
         <h2 className="text-2xl font-bold">Create Local Cluster</h2>
         <p className="text-muted-foreground mt-2">
-          CTO App will create a local Kubernetes cluster using Kind.
+          CTO will create a local Kubernetes cluster using Kind.
         </p>
       </div>
 

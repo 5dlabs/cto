@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 from datetime import datetime
 
 from dotenv import load_dotenv
 from livekit import agents
 from livekit.agents import (
+    APIConnectOptions,
     Agent,
     AgentServer,
     AgentSession,
@@ -15,6 +18,8 @@ from livekit.agents import (
     metrics,
     room_io,
 )
+from livekit.agents._exceptions import APIStatusError
+from livekit.agents.voice.agent_session import SessionConnectOptions
 from livekit.plugins import lemonslice, noise_cancellation, silero
 
 from morgan_avatar_agent.config import AgentConfig
@@ -38,6 +43,13 @@ class MorganAgent(Agent):
     def __init__(self, config: AgentConfig) -> None:
         super().__init__(instructions=config.system_instructions)
         self._config = config
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 @server.rtc_session(agent_name="morgan-avatar")
@@ -68,6 +80,13 @@ async def entrypoint(ctx: JobContext) -> None:
         aec_warmup_duration=config.aec_warmup_duration,
         use_tts_aligned_transcript=config.use_tts_aligned_transcript,
         min_consecutive_speech_delay=0.0,
+        conn_options=SessionConnectOptions(
+            llm_conn_options=APIConnectOptions(
+                max_retry=3,
+                retry_interval=2.0,
+                timeout=config.llm_read_timeout_seconds,
+            ),
+        ),
     )
 
     usage_collector = metrics.UsageCollector()
@@ -123,8 +142,35 @@ async def entrypoint(ctx: JobContext) -> None:
         avatar_kwargs["agent_image_url"] = config.avatar_image_url
 
     avatar = lemonslice.AvatarSession(**avatar_kwargs)
+    allow_audio_only_fallback = _env_bool("MORGAN_ALLOW_AUDIO_ONLY_FALLBACK", True)
 
-    await avatar.start(session, room=ctx.room)
+    try:
+        await avatar.start(session, room=ctx.room)
+    except Exception as exc:
+        root = exc.__cause__ or exc
+        if isinstance(root, APIStatusError):
+            logger.error(
+                "LemonSlice session start failed: status=%s body=%r message=%s",
+                root.status_code,
+                root.body,
+                root.message,
+            )
+            body_text = str(root.body).lower() if root.body is not None else ""
+            if allow_audio_only_fallback and root.status_code == 402 and "insufficient funds" in body_text:
+                logger.warning(
+                    "LemonSlice credits unavailable, continuing in audio-only mode "
+                    "(set MORGAN_ALLOW_AUDIO_ONLY_FALLBACK=false to fail hard)"
+                )
+            else:
+                raise
+        else:
+            logger.error("LemonSlice session start failed: %r", root)
+            if not allow_audio_only_fallback:
+                raise
+            logger.warning(
+                "Continuing in audio-only mode after LemonSlice start failure "
+                "(set MORGAN_ALLOW_AUDIO_ONLY_FALLBACK=false to fail hard)"
+            )
 
     audio_input = room_io.AudioInputOptions(
         noise_cancellation=noise_cancellation.BVC() if config.use_noise_cancellation else None,
@@ -136,6 +182,8 @@ async def entrypoint(ctx: JobContext) -> None:
         room_options=room_io.RoomOptions(audio_input=audio_input),
     )
 
+    # Give the browser a moment to subscribe to the remote tracks before the greeting starts.
+    await asyncio.sleep(1.0)
     await session.say(config.greeting)
 
 

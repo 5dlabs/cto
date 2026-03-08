@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { AgentChat } from './components/AgentChat'
+import { AgentsView } from './components/AgentsView'
 import { PrdView } from './components/PrdView'
 import { ConfigView } from './components/ConfigView'
 import { Dashboard } from './components/Dashboard'
 import { Toaster } from './components/ui/toaster'
 import {
   MessageSquare,
+  AudioLines,
   FileText,
   Settings,
   LayoutDashboard,
@@ -16,7 +18,7 @@ import {
 // Navigation types
 // ============================================================================
 
-type NavView = 'chat' | 'prds' | 'config' | 'workflows'
+type NavView = 'chat' | 'avatar' | 'prds' | 'config' | 'workflows'
 
 interface NavItem {
   id: NavView
@@ -26,6 +28,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
+  { id: 'avatar', label: 'Avatar', icon: AudioLines },
   { id: 'prds', label: 'PRDs', icon: FileText },
   { id: 'workflows', label: 'Workflows', icon: LayoutDashboard },
   { id: 'config', label: 'Config', icon: Settings },
@@ -74,6 +77,7 @@ function App() {
       {/* Main content area */}
       <main className="flex-1 overflow-hidden">
         {activeView === 'chat' && <AgentChat />}
+        {activeView === 'avatar' && <AgentsView />}
         {activeView === 'prds' && <PrdView />}
         {activeView === 'config' && <ConfigView />}
         {activeView === 'workflows' && <Dashboard />}

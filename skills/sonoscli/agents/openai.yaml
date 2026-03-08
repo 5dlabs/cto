@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sonos CLI"
+  short_description: "Control Sonos speakers from CLI"
+  default_prompt: "Use $sonoscli to inspect or control Sonos speakers on the local network."

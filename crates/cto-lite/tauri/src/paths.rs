@@ -56,8 +56,8 @@ pub fn get_resources_dir() -> AppResult<PathBuf> {
     #[cfg(target_os = "macos")]
     {
         let exe = std::env::current_exe().map_err(AppError::IoError)?;
-        // /path/to/CTO Lite.app/Contents/MacOS/cto-lite-tauri
-        // -> /path/to/CTO Lite.app/Contents/Resources
+        // /path/to/CTO.app/Contents/MacOS/cto-lite-tauri
+        // -> /path/to/CTO.app/Contents/Resources
         let resources = exe
             .parent() // MacOS/
             .and_then(|p| p.parent()) // Contents/
@@ -69,7 +69,7 @@ pub fn get_resources_dir() -> AppResult<PathBuf> {
     #[cfg(target_os = "windows")]
     {
         let exe = std::env::current_exe().map_err(AppError::IoError)?;
-        // /path/to/CTO Lite/cto-lite.exe -> /path/to/CTO Lite/resources
+        // /path/to/CTO/cto-lite.exe -> /path/to/CTO/resources
         let resources = exe.parent().map(|p| p.join("resources"));
         resources.ok_or_else(|| AppError::ConfigError("Could not determine resources path".into()))
     }
@@ -156,21 +156,21 @@ pub fn get_data_dir() -> AppResult<PathBuf> {
     #[cfg(target_os = "macos")]
     {
         dirs::data_dir()
-            .map(|p| p.join("ai.5dlabs.cto-lite"))
+            .map(|p| p.join("ai.5dlabs.cto"))
             .ok_or_else(|| AppError::ConfigError("Could not determine data directory".into()))
     }
 
     #[cfg(target_os = "windows")]
     {
         dirs::data_dir()
-            .map(|p| p.join("ai.5dlabs").join("cto-lite"))
+            .map(|p| p.join("ai.5dlabs").join("cto"))
             .ok_or_else(|| AppError::ConfigError("Could not determine data directory".into()))
     }
 
     #[cfg(target_os = "linux")]
     {
         dirs::data_dir()
-            .map(|p| p.join("ai.5dlabs.cto-lite"))
+            .map(|p| p.join("ai.5dlabs.cto"))
             .ok_or_else(|| AppError::ConfigError("Could not determine data directory".into()))
     }
 }
@@ -239,6 +239,6 @@ mod tests {
     #[test]
     fn test_data_dir() {
         let dir = get_data_dir().unwrap();
-        assert!(dir.to_string_lossy().contains("cto-lite"));
+        assert!(dir.to_string_lossy().contains("cto"));
     }
 }

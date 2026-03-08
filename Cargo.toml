@@ -17,7 +17,6 @@ members = [
     "crates/tenant-operator",
     "crates/tools",
     "crates/utils",
-    "crates/cto-app/tauri",
     "crates/cto-lite/pm-lite-server",
 ]
 exclude = [
@@ -116,4 +115,3 @@ incremental = false
 [profile.dist]
 inherits = "release"
 lto = "thin"
-

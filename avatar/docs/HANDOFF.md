@@ -114,6 +114,7 @@ Then open `http://localhost:3000` and click **Talk to Morgan**.
 | `web/components/Room.tsx` | Room UI and client latency display |
 | `docs/decision-review.md` | Decision to stay on LiveKit + LemonSlice; decision gates for provider swaps |
 | `docs/provider-spikes.md` | Env-only provider swap recipes (STT, TTS, inference fallback) |
+| `docs/elevenlabs-playbook.md` | Practical ElevenLabs guide for the current debugging cycle |
 | `docs/morgan-image.md` | Morgan image prep for LemonSlice |
 
 ---
