@@ -1,0 +1,10 @@
+---
+apiVersion: twingate.com/v1beta
+kind: TwingateResourceAccess
+metadata:
+  name: cto-pod-network-everyone
+spec:
+  resourceRef:
+    name: cto-pod-network
+    namespace: operators
+  principalId: R3JvdXA6NzQ2MDQy

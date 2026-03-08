@@ -1,0 +1,14 @@
+apiVersion: v2
+name: twingate-operator
+description: A Helm chart for installing twingate-operator
+type: application
+version: 0.1.13  # This version value no longer used - its overridden when publishing the OCI in `release.yaml` CI workflow
+appVersion: latest  # This value is set by CI
+home: https://twingate.com
+sources:
+  - https://github.com/Twingate/kubernetes-operator
+dependencies:
+  - name: kubernetes-access-gateway
+    version: 0.11.0
+    repository: "oci://ghcr.io/twingate/helmcharts"
+    condition: kubernetes-access-gateway.enabled

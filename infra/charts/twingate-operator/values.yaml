@@ -1,0 +1,140 @@
+# Default values for twingate-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Twingate operator configurations
+#
+# **Required**: you have to specify `network` and
+#  - either `apiKey` or `existingAPIKeySecret`
+#  - either `remoteNetworkId`, `remoteNetworkName` or `existingRemoteNetworkIdSecret`
+#
+# **Restricting Operator to Specific Namespaces**
+# Use the `namespaces` property to restrict operator to monitor resources only in specific namespaces.
+# You can either:
+#  1. Specify a list of namespaces: ["foo-dev", "foo-stg"]
+#  2. Use globs to match multiple namespaces: ["*-dev", "*-stg"]
+#  3. Use negation to include all namespaces except those excluded: ["!kube-*"]
+#  4. Use multiple globs in one pattern: ["foo-*,!*-test"]
+#
+# Default value is an empty list (`[]`) which means operator will monitor or all namespaces.
+#
+# *Note:* Defining glob patterns as a separate array elements is different from defining
+# comma-separated patterns within a single element.
+# For example, `namespaces: ["foo-*", "!*-test"]` is not the same as `namespaces: ["foo-*,!*-test"]`
+# `namespaces: ["foo-*", "!*-test"]` will evaluate each glob pattern independently and combine the results.
+twingateOperator:
+  # Placeholder defaults keep local chart linting green in CI.
+  # The live ArgoCD application overrides these with cluster-specific values.
+  existingAPIKeySecret:
+    name: placeholder-api-secret
+    key: apiToken
+  network: placeholder-network
+  remoteNetworkId: UmVtb3RlTmV0d29yazow
+#  apiKey: "<api key>"
+#  existingRemoteNetworkIdSecret:
+#    name: my-secret
+#    key: TWINGATE_REMOTE_NETWORK_ID
+#  remoteNetworkName: "<remote network name>"
+#  namespaces: []
+#  logFormat: "plain|full|json"
+#  logVerbosity: "quiet|verbose|debug"
+#  defaultResourceTags:
+#    tag1: value_for_tag1
+#    tag2: value_for_tag2
+
+
+# Twingate Kubernetes Access is currently in beta. Sign up for early access at https://www.twingate.com/product/kubernetes-access.
+kubernetes-access-gateway:
+  enabled: false
+#  twingate:
+#    network: "<network slug>"
+#
+#    # Customize the `TwingateResource` to create for operator to sync to Twingate
+#    resource:
+#      # Enable/disable automatic Twingate Resource creation
+#      enabled: true
+#      extraAnnotations:
+#        # Resource alias is included in the auto-generated TLS cert
+#        resource.twingate.com/alias: "myk8s.int"
+
+image:
+  repository: twingate/kubernetes-operator
+  # This sets the pull policy for images.
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets: []
+
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# This is for setting Kubernetes Annotations to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+podAnnotations: {}
+# This is for setting Kubernetes Labels to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+podLabels: {}
+
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  runAsUser: 1000
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+priorityClassName: ""
+
+# Array with extra environment variables to add to the operator container
+# e.g:
+# extraEnvVars:
+#   - name: FOO
+#     value: "bar"
+#
+extraEnvVars: []
+
+
+pdb:
+  create: false
+  # minAvailable: 1
+  # maxUnavailable: ""
+
+rbac:
+  ## Create ClusterRoles that extend the existing view, edit and admin ClusterRoles to interact with Twingate's CRDs
+  ## Ref: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles
+  createAggregateClusterRoles: false

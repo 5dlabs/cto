@@ -2,15 +2,18 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# NOTE: Operator-based CRD manifests (TwingateConnector, TwingateRemoteNetwork, TwingateResource)
-# have been removed. The Twingate connector is deployed via the twingate-connector Helm app.
-#
-# Root causes why these can't be applied:
-# - TwingateRemoteNetwork CRD does NOT exist on this cluster
-# - TwingateConnector/TwingateResource only have v1beta (manifests used v1alpha1)
-# - Connector is already running healthy via twingate-connector Helm app in cto namespace
-#
-# To re-enable operator-based management:
-# 1. Ensure TwingateRemoteNetwork CRD is installed (use TWINGATE_REMOTE_NETWORK_NAME env var instead)
-# 2. Update manifests to v1beta API version
-resources: []
+namespace: operators
+
+resources:
+  - pod-network.yaml
+  - service-network.yaml
+  - openclaw-tool-server.yaml
+  - pod-network-access.yaml
+  - service-network-access.yaml
+  - openclaw-tool-server-access.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: twingate
+      app.kubernetes.io/part-of: networking
+      app.kubernetes.io/managed-by: argocd

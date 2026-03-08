@@ -1,13 +1,7 @@
 ---
 # Twingate Operator - Zero Trust Network Access
 # License: MPL-2.0 - Safe to distribute commercially
-# Source: https://github.com/Twingate/kubernetes-operator
-#
-# NOTE: OCI chart at oci://ghcr.io/twingate/helmcharts/twingate-operator uses a
-# 3-level ghcr.io path. ArgoCD's OCI resolver only supports 2-level (org/repo) paths,
-# stripping the chart name to ghcr.io/twingate/helmcharts:x.y.z (wrong).
-# To fix: bundle the chart tarball in git at infra/charts/twingate-operator/
-# or wait for ArgoCD to support 3-level OCI paths.
+# Source: infra/charts/twingate-operator (vendored from https://github.com/Twingate/kubernetes-operator)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -22,38 +16,40 @@ metadata:
     platform.5dlabs.io/distributable: "true"
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-    argocd.argoproj.io/skip-reconcile: "true"  # GHCR 3-level OCI path requires ghcr.io auth; twingate-connector already runs independently
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform
   source:
-    repoURL: oci://ghcr.io/twingate/helmcharts
-    chart: twingate-operator
-    targetRevision: 0.28.0
+    repoURL: https://github.com/5dlabs/cto
+    path: infra/charts/twingate-operator
+    targetRevision: main
     helm:
       values: |  # pragma: allowlist secret
         # Twingate Operator configuration
         twingateOperator:
-          apiToken:  # pragma: allowlist secret
-            secretRef:
-              name: twingate-api-secret
-              key: apiToken
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-          podLabels:
-            platform.5dlabs.io/log-collection: enabled
-          podAnnotations:
-            logs.platform.5dlabs.io/collect: "true"
-            logs.platform.5dlabs.io/service: twingate-operator
-          serviceAccount:
-            create: true
-            name: twingate-operator
+          network: turquoiseelephant631
+          remoteNetworkId: UmVtb3RlTmV0d29yazoyNzU4MDY=
+          existingAPIKeySecret:  # pragma: allowlist secret
+            name: twingate-api-secret
+            key: apiToken
+        image:
+          tag: 0.28.0
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        podLabels:
+          platform.5dlabs.io/log-collection: enabled
+        podAnnotations:
+          logs.platform.5dlabs.io/collect: "true"
+          logs.platform.5dlabs.io/service: twingate-operator
+        serviceAccount:
+          create: true
+          name: twingate-operator
         nodeSelector:
           node-role.kubernetes.io/worker: ""
   destination:

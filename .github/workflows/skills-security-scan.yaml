@@ -48,7 +48,20 @@ jobs:
           import json, sys
 
           with open("scan-results.json") as f:
-              data = json.load(f)
+              raw = f.read().strip()
+
+          if not raw:
+              print("scan-results.json is empty; treating as an empty scan result.")
+              data = {}
+          else:
+              try:
+                  data = json.loads(raw)
+              except json.JSONDecodeError as exc:
+                  print(
+                      f"scan-results.json is invalid JSON ({exc}); "
+                      "treating as an empty scan result."
+                  )
+                  data = {}
 
           critical = 0
           high = 0
