@@ -1,0 +1,117 @@
+{{- $logFormat := .Values.twingateOperator.logFormat | default "full" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "twingate-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "twingate-operator.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "twingate-operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "twingate-operator.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "twingate-operator.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - kopf
+          - run
+          - ./main.py
+          {{- with .Values.twingateOperator.namespaces  }}
+          {{- range . }}
+          - "--namespace={{ . }}"
+          {{- end }}
+          {{- else }}
+          - "--all-namespaces"
+          {{- end }}
+          - "--standalone"
+          - "--liveness=http://0.0.0.0:8080/healthz"
+          - "--log-format={{ $logFormat }}"
+          {{- if .Values.twingateOperator.logVerbosity }}
+          - {{ printf "--%s" .Values.twingateOperator.logVerbosity | quote }}
+          {{- end }}
+        env:
+          - name: TWINGATE_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "twingate-operator.secretName" . }}
+                key: {{ include "twingate-operator.secretKey" . }}
+          - name: TWINGATE_NETWORK
+            value: {{ required "Network name required" .Values.twingateOperator.network }}
+          - name: TWINGATE_HOST
+            value: {{ .Values.twingateOperator.host | default "twingate.com" }}
+          {{- if .Values.twingateOperator.defaultResourceTags }}
+          - name: TWINGATE_DEFAULT_RESOURCE_TAGS
+            value: {{ .Values.twingateOperator.defaultResourceTags | toJson | quote }}
+          {{- end }}
+          {{- if .Values.twingateOperator.existingRemoteNetworkIdSecret }}
+          - name: TWINGATE_REMOTE_NETWORK_ID
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.twingateOperator.existingRemoteNetworkIdSecret.name }}
+                key: {{ .Values.twingateOperator.existingRemoteNetworkIdSecret.key }}
+          {{- end }}
+          {{- if .Values.twingateOperator.remoteNetworkId }}
+          - name: TWINGATE_REMOTE_NETWORK_ID
+            value: {{ .Values.twingateOperator.remoteNetworkId }}
+          {{- end }}
+          {{- if .Values.twingateOperator.remoteNetworkName }}
+          - name: TWINGATE_REMOTE_NETWORK_NAME
+            value: {{ .Values.twingateOperator.remoteNetworkName }}
+          {{- end }}
+          {{- with .Values.extraEnvVars }}
+          {{- range . }}
+          - name: {{ .name }}
+            value: {{ .value | quote }}
+          {{- end }}
+          {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,50 @@
+{{- if index .Values "kubernetes-access-gateway" "enabled" }}
+{{- $kubernetesAccessGatewayName := include "gateway.fullname" (index .Subcharts "kubernetes-access-gateway") }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "twingate-operator.fullname" . }}-pre-delete-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "twingate-operator.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    spec:
+      serviceAccountName: {{ include "twingate-operator.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      containers:
+        - name: cleanup
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: rancher/kubectl:v1.34.0
+          command:
+            - kubectl
+            - delete
+            - svc
+            - --cascade=foreground
+            - --timeout=30s
+            - --ignore-not-found
+            - -n
+            - {{ .Release.Namespace }}
+            - {{ $kubernetesAccessGatewayName }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Never
+{{- end }}

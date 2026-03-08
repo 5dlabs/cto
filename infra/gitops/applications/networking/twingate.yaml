@@ -1,8 +1,6 @@
 ---
-# Argo CD Application for Twingate Operator-based Resources
-# NOTE: Currently empty - connector deployed via twingate-connector Helm app.
-# Operator-based CRD management is pending proper operator installation.
-# See infra/gitops/manifests/twingate/kustomization.yaml for details.
+# Argo CD Application for Twingate Operator-managed resources
+# The connector itself is deployed separately via the twingate-connector Helm app.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -29,7 +27,7 @@ spec:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: true
+      allowEmpty: false
     syncOptions:
       - CreateNamespace=false
       - ServerSideApply=true

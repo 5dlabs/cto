@@ -1,0 +1,9 @@
+---
+apiVersion: twingate.com/v1beta
+kind: TwingateResourceAccess
+metadata:
+  name: openclaw-tool-server-everyone
+spec:
+  resourceRef:
+    name: openclaw-tool-server
+  principalId: R3JvdXA6NzQ2MDQy

@@ -1,0 +1,9 @@
+---
+apiVersion: twingate.com/v1beta
+kind: TwingateResourceAccess
+metadata:
+  name: cto-service-network-everyone
+spec:
+  resourceRef:
+    name: cto-service-network
+  principalId: R3JvdXA6NzQ2MDQy

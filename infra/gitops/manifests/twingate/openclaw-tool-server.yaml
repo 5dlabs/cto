@@ -1,0 +1,11 @@
+---
+apiVersion: twingate.com/v1beta
+kind: TwingateResource
+metadata:
+  name: openclaw-tool-server
+spec:
+  name: OpenClaw Tool Server
+  address: openclaw-tool-server.openclaw.svc.cluster.local
+  protocols:
+    tcp:
+      policy: ALLOW_ALL

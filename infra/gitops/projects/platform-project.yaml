@@ -32,6 +32,7 @@ spec:
     - 'https://open-telemetry.github.io/opentelemetry-helm-charts'
     - 'https://actions-runner-controller.github.io/actions-runner-controller'
     - 'https://twingate.github.io/helm-charts'
+    - 'https://github.com/Twingate/kubernetes-operator'
     - 'https://github.com/actions/actions-runner-controller'
     # ARC OCI Helm charts
     - 'oci://ghcr.io/actions/actions-runner-controller-charts'
@@ -277,6 +278,8 @@ spec:
     - group: 'gateway.networking.k8s.io'
       kind: '*'
     - group: 'networking.cfargotunnel.com'
+      kind: '*'
+    - group: 'twingate.com'
       kind: '*'
     - group: 'rbac.authorization.k8s.io'
       kind: '*'
