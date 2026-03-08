@@ -259,26 +259,26 @@ cp "$PRD_FILE" ".tasks/docs/prd.txt"
 [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ] && cp "$ARCH_FILE" ".tasks/docs/architecture.md"
 
 # =========================================================================
-# Run Intake CLI (Rust binary for task generation)
+# Prepare Workspace
 # =========================================================================
 
 echo ""
-echo "🚀 Running intake workflow..."
+echo "🚀 Running intake pipeline..."
 
-# Clean workspace subdir to prevent stale artifacts from previous retries
 if [ -d "${WORKSPACE_DIR}" ]; then
     echo "  🧹 Cleaning previous workspace at ${WORKSPACE_DIR}"
-    rm -rf "${WORKSPACE_DIR}"
+    chmod -R 777 "${WORKSPACE_DIR}" 2>/dev/null || true
+    rm -rf "${WORKSPACE_DIR}" 2>/dev/null || {
+        find "${WORKSPACE_DIR}" -mindepth 1 -delete 2>/dev/null || true
+    }
 fi
 mkdir -p "${WORKSPACE_DIR}"
 
-# Stream output file for sidecar to parse (structured activities)
 STREAM_OUTPUT="/workspace/claude-stream.jsonl"
 rm -f "$STREAM_OUTPUT" 2>/dev/null || true
 touch "$STREAM_OUTPUT"
 chmod 666 "$STREAM_OUTPUT" || true
 
-# Agent log file for sidecar to stream to Linear
 AGENT_LOG="${LOG_FILE_PATH:-/workspace/agent.log}"
 rm -f "$AGENT_LOG" 2>/dev/null || true
 touch "$AGENT_LOG"
@@ -287,197 +287,13 @@ chmod 666 "$AGENT_LOG" || true
 echo "  ✓ Stream output: $STREAM_OUTPUT"
 echo "  ✓ Agent log: $AGENT_LOG"
 
-# Check for intake CLI binary
-if command -v intake >/dev/null 2>&1; then
-    echo "  ✅ intake CLI found: $(which intake)"
-    intake --version 2>&1 || true
-else
-    echo "  ❌ intake CLI not found in PATH"
-    echo "  Available binaries in /usr/local/bin:"
-    ls -la /usr/local/bin/ 2>/dev/null | head -20
-    exit 1
-fi
-
-# Build intake CLI arguments
-INTAKE_ARGS="--prd .tasks/docs/prd.txt"
-INTAKE_ARGS="$INTAKE_ARGS --num-tasks $NUM_TASKS"
-
-# Use CLI mode instead of API mode for AI operations
-# This uses the external CLI (claude, codex, etc.) instead of direct API calls
-INTAKE_ARGS="$INTAKE_ARGS --use-cli"
-
-# Add architecture if available
-if [ -f ".tasks/docs/architecture.md" ] && [ -s ".tasks/docs/architecture.md" ]; then
-    INTAKE_ARGS="$INTAKE_ARGS --architecture .tasks/docs/architecture.md"
-    echo "  ✓ Architecture document: .tasks/docs/architecture.md"
-fi
-
-# Skip expansion/analysis for faster initial generation (can be done later)
-if [ "${EXPAND_TASKS:-true}" = "false" ]; then
-    INTAKE_ARGS="$INTAKE_ARGS --no-expand"
-fi
-if [ "${ANALYZE_COMPLEXITY:-true}" = "false" ]; then
-    INTAKE_ARGS="$INTAKE_ARGS --no-analyze"
-fi
-
-# Set model if specified
-if [ -n "$PRIMARY_MODEL" ] && [ "$PRIMARY_MODEL" != "null" ]; then
-    INTAKE_ARGS="$INTAKE_ARGS --model $PRIMARY_MODEL"
-fi
-
-# Ensure fresh task generation — remove any partial tasks.json from previous attempts
-if [ -f ".tasks/tasks/tasks.json" ]; then
-    echo "  🔄 Removing stale tasks.json from previous attempt"
-    mv ".tasks/tasks/tasks.json" ".tasks/tasks/tasks.json.bak.$(date +%s)"
-fi
-
-echo ""
-echo "📋 Running: intake intake $INTAKE_ARGS"
-echo ""
-
-# Run intake CLI and capture output
-# shellcheck disable=SC2086
-intake intake $INTAKE_ARGS 2>&1 | tee -a "$AGENT_LOG"
-INTAKE_EXIT_CODE=${PIPESTATUS[0]}
-
-if [ $INTAKE_EXIT_CODE -ne 0 ]; then
-    echo "  ❌ intake CLI failed with exit code $INTAKE_EXIT_CODE"
-    exit $INTAKE_EXIT_CODE
-fi
-
-echo ""
-echo "  ✅ intake CLI completed successfully"
-
-# Verify tasks.json was created
-if [ -f ".tasks/tasks/tasks.json" ]; then
-    TASK_COUNT=$(jq '.tasks | length' .tasks/tasks/tasks.json 2>/dev/null || echo "0")
-    echo "  ✅ Generated $TASK_COUNT tasks in .tasks/tasks/tasks.json"
-else
-    echo "  ❌ tasks.json was not created"
-    echo "  Contents of .tasks/:"
-    find .tasks/ -type f 2>/dev/null | head -20
-    exit 1
-fi
-
 # =========================================================================
-# Optional: AI Enhancement Pass (Claude for research/enrichment)
+# Detect base branch for PR
 # =========================================================================
-
-INTAKE_CLI="${INTAKE_CLI:-intake}"
-echo ""
-echo "  ℹ️  CLI mode: $INTAKE_CLI"
-
-# If INTAKE_CLI is set to claude, run an enhancement pass
-if [ "$INTAKE_CLI" = "claude" ]; then
-    echo ""
-    echo "🔬 Running AI enhancement pass with Claude..."
-    
-    # Build MCP arguments if config available
-    MCP_ARGS=""
-    if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
-        if command -v jq >/dev/null 2>&1 && jq empty "$MCP_CONFIG_FILE" 2>/dev/null; then
-            echo "  ✅ Using MCP configuration: $MCP_CONFIG_FILE"
-            # Use --strict-mcp-config to only use servers from our config
-            MCP_ARGS="--mcp-config $MCP_CONFIG_FILE --strict-mcp-config"
-        fi
-    fi
-    
-    TASKS_JSON=$(cat .tasks/tasks/tasks.json)
-    
-    PROMPT="You are Morgan, a project management AI agent. The intake CLI has generated an initial task breakdown. Your job is to ENHANCE these tasks with research and additional context.
-
-## Generated Tasks
-\`\`\`json
-$TASKS_JSON
-\`\`\`
-
-## Instructions
-1. Review the generated tasks for completeness
-2. Use MCP tools to research and enrich task details:
-   - Firecrawl: Scrape any URLs mentioned in the PRD for context
-   - Context7: Look up documentation for mentioned technologies
-3. Update .tasks/tasks/tasks.json with enhanced details
-4. Do NOT change task structure or dependencies, only add details
-5. Complete your work - do NOT ask questions or wait for input
-
-Focus on adding implementation hints, technology references, and testing strategies.
-"
-
-    CLAUDE_CMD="claude -p \"$PROMPT\" --dangerously-skip-permissions --output-format stream-json --verbose $MCP_ARGS"
-    
-    if command -v script >/dev/null 2>&1; then
-        echo "  ✓ Using script for unbuffered output"
-        # shellcheck disable=SC2086
-        script -q -c "$CLAUDE_CMD" /dev/null | tee "$STREAM_OUTPUT" "$AGENT_LOG" || echo "  ⚠️ Claude enhancement pass had issues (non-fatal)"
-    else
-        # shellcheck disable=SC2086
-        eval "$CLAUDE_CMD" | tee "$STREAM_OUTPUT" "$AGENT_LOG" || echo "  ⚠️ Claude enhancement pass had issues (non-fatal)"
-    fi
-    
-    echo "  ✅ AI enhancement pass completed"
-fi
-
-# Tasks already verified above after intake CLI run
-TASKS_FILE=".tasks/tasks/tasks.json"
-
-# =========================================================================
-# Session 2: Prompt Generation
-# =========================================================================
-# Split tasks.json into individual task files for bounded-context processing
-echo ""
-echo "📝 Session 2: Generating per-task prompts..."
-
-# First, split tasks.json into individual task-N.json files
-echo "  → Splitting tasks.json into individual task files..."
-intake split-tasks --input "$TASKS_FILE" --output .tasks/tasks 2>&1 || {
-    echo "⚠️ Task splitting failed, falling back to template-based docs"
-    intake generate-docs --output .tasks/docs 2>&1 || echo "⚠️ Doc generation also failed"
-}
-
-# Check if we should run AI-based prompt generation
-GENERATE_AI_PROMPTS="${GENERATE_AI_PROMPTS:-true}"
-if [ "$GENERATE_AI_PROMPTS" = "true" ]; then
-    echo "  → Running AI-based prompt generation (Session 2)..."
-    # Build MCP args for prompt generation
-    PROMPT_MCP_ARGS=""
-    if [ -n "$MCP_CONFIG_FILE" ] && [ -f "$MCP_CONFIG_FILE" ]; then
-        PROMPT_MCP_ARGS="--mcp-config $MCP_CONFIG_FILE"
-    fi
-    
-    # Run prompt generation for all tasks
-    # shellcheck disable=SC2086
-    intake generate-prompts \
-        --all \
-        --tasks-dir .tasks/tasks \
-        --output .tasks/docs \
-        --cli "$INTAKE_CLI" \
-        --include-prd \
-        --include-arch \
-        --research \
-        $PROMPT_MCP_ARGS 2>&1 || {
-            echo "⚠️ AI prompt generation failed, falling back to template-based docs"
-            intake generate-docs --output .tasks/docs 2>&1 || echo "⚠️ Template doc generation also failed"
-        }
-else
-    # Use template-based generation (faster, no additional AI cost)
-    echo "  → Using template-based documentation (set GENERATE_AI_PROMPTS=false to skip AI prompts)..."
-    intake generate-docs --output .tasks/docs 2>&1 || echo "⚠️ Doc generation failed"
-fi
-
-echo "✅ Per-task documentation generated"
-
-# =========================================================================
-# Create Pull Request
-# =========================================================================
-
-echo ""
-echo "🔀 Creating Pull Request..."
 
 cd "$CLONE_DIR" || exit 1
 
-# Detect the repository's default branch for PR base
 if [ -z "${PR_BASE_BRANCH:-}" ]; then
-  # Try to detect from remote HEAD
   DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
   if [ -n "$DEFAULT_BRANCH" ] && git show-ref --verify --quiet "refs/remotes/origin/$DEFAULT_BRANCH"; then
     PR_BASE_BRANCH="$DEFAULT_BRANCH"
@@ -492,6 +308,12 @@ if [ -z "${PR_BASE_BRANCH:-}" ]; then
   fi
   echo "  ℹ️  Detected base branch: $PR_BASE_BRANCH"
 fi
+
+cd "$PROJECT_DIR" || exit 1
+
+# =========================================================================
+# Build Linear metadata for PR body
+# =========================================================================
 
 PROJECT_DIR_METADATA=""
 if [ "$REPO_CREATED" != "true" ]; then
@@ -514,54 +336,68 @@ INTAKE_METADATA=$(jq -c -n \
      + (if $project_name != "" and $project_name != "null" then {project_name: $project_name} else {} end)
      + (if $project_dir != "" and $project_dir != "null" then {project_dir: $project_dir} else {} end)')
 
-BRANCH_NAME="intake-${PROJECT_DIR_NAME}-$(date +%Y%m%d-%H%M%S)"
-git checkout -b "$BRANCH_NAME"
-git add -A
-git commit -m "feat: intake for $PROJECT_NAME
+# =========================================================================
+# Run Lobster Pipeline (deliberation + intake + PR)
+# =========================================================================
+# The pipeline.lobster.yaml workflow handles everything:
+#   1. Deliberation (if deliberate=true): Tavily research, Optimist/Pessimist
+#      debate via NATS, committee voting on decision points, design brief
+#   2. Intake: PRD parsing, complexity analysis, task expansion, 5-model
+#      quality voting, doc/prompt generation, commit, and PR creation
 
-- Session 1: $TASK_COUNT tasks generated (tasks.json)
-- Session 2: Per-task prompts (prompt.md, prompt.xml, acceptance.md)
-- Agent routing hints applied
-- AI prompts: $GENERATE_AI_PROMPTS
+DELIBERATE=$(jq -r '.deliberate // false' "$CONFIG_FILE")
+INCLUDE_CODEBASE=$(jq -r '.include_codebase // false' "$CONFIG_FILE")
+PRD_CONTENT=$(cat "$PRD_FILE")
+ARCH_CONTENT=""
+[ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ] && ARCH_CONTENT=$(cat "$ARCH_FILE")
 
-🤖 Generated by Morgan (two-session intake)"
+FULL_PRD_CONTENT="$PRD_CONTENT"
+if [ -n "$ARCH_CONTENT" ]; then
+    FULL_PRD_CONTENT="${PRD_CONTENT}
 
-git push -u origin "$BRANCH_NAME"
+## Architecture
+${ARCH_CONTENT}"
+fi
 
-gh pr create \
-    --title "🚀 Intake: $PROJECT_NAME" \
-    --body "## Intake: $PROJECT_NAME
+echo ""
+echo "📋 Launching Lobster intake pipeline..."
+echo "  ✓ Project: $PROJECT_NAME"
+echo "  ✓ Deliberate: $DELIBERATE"
+echo "  ✓ Include codebase: $INCLUDE_CODEBASE"
+echo "  ✓ Repository: ${REPOSITORY_URL:-<none>}"
+echo "  ✓ Num tasks: $NUM_TASKS"
+echo "  ✓ Base branch: $PR_BASE_BRANCH"
+echo ""
 
-### Two-Session Workflow
-- **Session 1**: Task planning (PRD → tasks.json)
-- **Session 2**: Prompt generation (tasks → per-task prompts)
+jq -n \
+    --arg prd_content "$FULL_PRD_CONTENT" \
+    --arg project_name "$PROJECT_NAME" \
+    --argjson num_tasks "$NUM_TASKS" \
+    --argjson deliberate "$DELIBERATE" \
+    --argjson include_codebase "$INCLUDE_CODEBASE" \
+    --arg repository_url "${REPOSITORY_URL:-}" \
+    --arg intake_metadata "$INTAKE_METADATA" \
+    --arg pr_base_branch "$PR_BASE_BRANCH" \
+    '{
+        "prd_content": $prd_content,
+        "project_name": $project_name,
+        "num_tasks": $num_tasks,
+        "deliberate": $deliberate,
+        "include_codebase": $include_codebase,
+        "repository_url": $repository_url,
+        "intake_metadata": $intake_metadata,
+        "pr_base_branch": $pr_base_branch
+    }' | openclaw.invoke --workflow pipeline.lobster.yaml 2>&1 | tee -a "$AGENT_LOG"
 
-### Generated Structure
-\`\`\`
-$PROJECT_DIR_NAME/
-├── .tasks/
-│   ├── docs/
-│   │   ├── prd.txt
-│   │   ├── architecture.md (if provided)
-│   │   └── task-*/           # Per-task prompts
-│   │       ├── prompt.xml
-│   │       ├── prompt.md
-│   │       └── acceptance.md
-│   └── tasks/
-│       ├── tasks.json        # Session 1: AI-generated task breakdown
-│       └── task-*.json       # Individual task files for Session 2
-\`\`\`
+PIPELINE_EXIT_CODE=${PIPESTATUS[0]}
 
-### Stats
-- **Tasks**: $TASK_COUNT
-- **Model**: $PRIMARY_MODEL
-- **AI Prompts**: $GENERATE_AI_PROMPTS
+if [ $PIPELINE_EXIT_CODE -ne 0 ]; then
+    echo "  ❌ Lobster pipeline failed with exit code $PIPELINE_EXIT_CODE"
+    exit $PIPELINE_EXIT_CODE
+fi
 
-<!-- intake-metadata: $INTAKE_METADATA -->
-
-🤖 Generated by Morgan (two-session intake)" \
-    --head "$BRANCH_NAME" \
-    --base "$PR_BASE_BRANCH" || echo "⚠️ PR creation failed, branch pushed: $BRANCH_NAME"
+echo ""
+echo "✅ Intake pipeline completed successfully"
 
 {{> completion }}
 

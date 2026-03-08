@@ -1248,6 +1248,23 @@ impl<'a> CodeResourceManager<'a> {
             }
         }));
 
+        // Mount intake-api-keys for Tavily and Gemini API keys
+        // This secret is NOT ArgoCD-managed (won't be reverted by Helm syncs)
+        env_from.push(json!({
+            "secretRef": {
+                "name": "intake-api-keys",
+                "optional": serde_json::Value::Bool(true)
+            }
+        }));
+
+        // Mount discord-pm-bot for DISCORD_PM_BOT_TOKEN (live debate channel posting)
+        env_from.push(json!({
+            "secretRef": {
+                "name": "discord-pm-bot",
+                "optional": serde_json::Value::Bool(true)
+            }
+        }));
+
         // Add envFrom if we have secrets to mount
         if !env_from.is_empty() {
             container_spec["envFrom"] = json!(env_from);
@@ -1514,7 +1531,7 @@ impl<'a> CodeResourceManager<'a> {
         // 1. Creates a unique subdirectory per CodeRun to prevent git lock conflicts
         // 2. Sets proper ownership for the agent (uid 1000)
         let workspace_setup_cmd = format!(
-            "mkdir -p /workspace/{workspace_subdir} && chown -R 1000:1000 /workspace/{workspace_subdir} && chmod -R ug+rwX /workspace/{workspace_subdir}"
+            "mkdir -p /workspace/{workspace_subdir} && chown -R 1000:1000 /workspace/runs && chmod -R ug+rwX /workspace/runs"
         );
         let mut init_containers = vec![json!({
             "name": "setup-workspace",

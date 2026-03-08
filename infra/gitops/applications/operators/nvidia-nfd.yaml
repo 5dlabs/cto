@@ -53,7 +53,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: node-feature-discovery
+    namespace: operators
 
   syncPolicy:
     automated:

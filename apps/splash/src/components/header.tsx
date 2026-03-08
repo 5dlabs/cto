@@ -1,13 +1,14 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
 import Link from "next/link";
+import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 
 const navLinks = [
-  { name: "Consulting", href: "/consulting" },
-  { name: "Founder", href: "/founder" },
-  { name: "Team", href: "/team" },
-  { name: "Investors", href: "/investors" },
+  { name: "CTO", href: "https://cto.5dlabs.ai" },
+  { name: "Trading", href: "/trading" },
+  { name: "Strategy", href: "/#operating-model" },
+  { name: "OpenClaw", href: "/#openclaw" },
 ];
 
 const socials = [
@@ -50,12 +51,24 @@ const socials = [
 ];
 
 export function Header() {
+  const { scrollY } = useScroll();
+  const [hidden, setHidden] = useState(false);
+
+  useMotionValueEvent(scrollY, "change", (current) => {
+    const previous = scrollY.getPrevious() ?? 0;
+    if (current > previous && current > 150) {
+      setHidden(true);
+    } else {
+      setHidden(false);
+    }
+  });
+
   return (
     <motion.header
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
       className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
+      initial={false}
+      animate={{ y: hidden ? "-100%" : "0%" }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
     >
       <nav className="flex items-center gap-1 px-2 py-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.3)]">
         {/* Logo */}
@@ -71,15 +84,26 @@ export function Header() {
         <div className="w-px h-4 bg-white/[0.08] mx-1" />
 
         {/* Nav links */}
-        {navLinks.map((link) => (
-          <Link
-            key={link.name}
-            href={link.href}
-            className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all"
-          >
-            {link.name}
-          </Link>
-        ))}
+        {navLinks.map((link) =>
+          link.href.startsWith("http") ? (
+            <a
+              key={link.name}
+              href={link.href}
+              className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all whitespace-nowrap"
+            >
+              {link.name}
+            </a>
+          ) : (
+            <Link
+              key={link.name}
+              href={link.href}
+              prefetch={false}
+              className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all whitespace-nowrap"
+            >
+              {link.name}
+            </Link>
+          )
+        )}
 
         {/* Divider */}
         <div className="w-px h-4 bg-white/[0.08] mx-1" />

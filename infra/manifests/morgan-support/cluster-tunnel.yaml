@@ -1,0 +1,18 @@
+---
+# Dedicated Cloudflare tunnel for Morgan so the avatar route is isolated from
+# the shared CTO tunnel and its unrelated bindings.
+apiVersion: networking.cfargotunnel.com/v1alpha2
+kind: ClusterTunnel
+metadata:
+  name: morgan-avatar
+spec:
+  newTunnel:
+    name: morgan-avatar
+  cloudflare:
+    domain: 5dlabs.ai
+    secret: morgan-avatar-tunnel-credentials
+    accountId: b73ec19faa187789b3f9d1deb0e0d95f
+    email: j@jonathonfritz.com
+  fallbackTarget: http_status:404
+  noTlsVerify: false
+  protocol: auto

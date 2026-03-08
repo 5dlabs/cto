@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
   other: {
     "ai:description":
-      "Jonathon Fritz is open to technical co-founder (equity), fractional CTO (negotiable), and full-time remote infrastructure roles: VP/Director of Infrastructure, Head of Platform Engineering, AI Systems Lead, Principal Engineer. 20+ years, 10,600+ GitHub contributions, 13 AI agents, 1B+ requests at Pocket Network. Case studies and engagement types on this page.",
+      "Jonathon Fritz is open to technical co-founder (equity), fractional CTO (negotiable), and full-time remote infrastructure roles: VP/Director of Infrastructure, Head of Platform Engineering, AI Systems Lead, Principal Engineer. 20+ years, 10,600+ GitHub contributions, 1B+ requests at Pocket Network. Case studies and engagement types on this page.",
     "ai:capabilities":
       "technical-co-founder, fractional-cto, infrastructure-lead, vp-infrastructure, head-of-platform-engineering, ai-systems-lead, principal-engineer, remote",
     "ai:open_to":
@@ -35,7 +35,7 @@ const opportunitiesJsonLd = {
     "Principal Engineer",
   ],
   description:
-    "Open to technical co-founder (equity), fractional CTO (negotiable), and full-time remote infrastructure roles. 20+ years, 10,600+ GitHub contributions, 13 AI agents, 1B+ requests at Pocket Network.",
+    "Open to technical co-founder (equity), fractional CTO (negotiable), and full-time remote infrastructure roles. 20+ years, 10,600+ GitHub contributions, 1B+ requests at Pocket Network.",
   url: "https://5dlabs.ai/opportunities/",
   sameAs: [
     "https://www.linkedin.com/in/jonathonfritz",

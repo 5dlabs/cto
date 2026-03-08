@@ -30,6 +30,8 @@ spec:
         app: discord-bridge
     spec:
       serviceAccountName: discord-bridge
+      imagePullSecrets:
+        - name: ghcr-secret
       nodeSelector:
         node-role.kubernetes.io/worker: ""
       containers:
@@ -49,9 +51,13 @@ spec:
             - name: GUILD_ID
               value: "1409006087331512342"
 
-            # NATS server URL
-            - name: NATS_URL
-              value: "nats://nats.messaging.svc.cluster.local:4222"
+            # HTTP notification API port
+            - name: HTTP_PORT
+              value: "3200"
+
+            # Linear bridge URL for cross-cancel callbacks
+            - name: LINEAR_BRIDGE_URL
+              value: "http://linear-bridge.bots.svc:3100"
 
             # Category name for bot conversations
             - name: CATEGORY_NAME
@@ -60,6 +66,11 @@ spec:
             # Inactivity timeout (1 hour = 3600000ms)
             - name: INACTIVITY_TIMEOUT_MS
               value: "3600000"
+
+          ports:
+            - name: http
+              containerPort: 3200
+              protocol: TCP
 
           resources:
             requests:

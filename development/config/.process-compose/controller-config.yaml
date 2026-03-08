@@ -6,25 +6,37 @@ job:
 
 agent:
   image:
-    repository: "ghcr.io/5dlabs/agent"
+    repository: "ghcr.io/5dlabs/agents"
     tag: "latest"
   imagePullSecrets:
     - ghcr-secret
   cliImages:
     claude:
-      repository: ghcr.io/5dlabs/claude
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     cursor:
-      repository: ghcr.io/5dlabs/cursor
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     codex:
-      repository: ghcr.io/5dlabs/codex
+      repository: ghcr.io/5dlabs/agents
+      tag: latest
+    code:
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     gemini:
-      repository: ghcr.io/5dlabs/gemini
+      repository: ghcr.io/5dlabs/agents
       tag: latest
     factory:
-      repository: ghcr.io/5dlabs/factory
+      repository: ghcr.io/5dlabs/agents
+      tag: latest
+    opencode:
+      repository: ghcr.io/5dlabs/agents
+      tag: latest
+    research:
+      repository: ghcr.io/5dlabs/agents
+      tag: latest
+    grok:
+      repository: ghcr.io/5dlabs/agents
       tag: latest
 
 # Agent definitions - maps GitHub App to CLI configuration

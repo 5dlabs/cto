@@ -123,6 +123,18 @@ sol.env
 # Cloudflare credentials
 cloudflare.env
 
+# Wrangler local cache (contains account IDs)
+**/.wrangler/
+
+# Next.js build cache
+.next/
+
+# Test results
+test-results/
+
+# Audit reports (local generated files)
+*_audit_report.md
+
 # Factory credentials
 factory.env
 

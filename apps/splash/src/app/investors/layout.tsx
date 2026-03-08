@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Investor Relations | 5D Labs — AI-Native Startup Studio",
+  title: "Investor Relations | 5D Labs — AI-Native Venture Studio",
   description:
-    "5D Labs is raising its first round. 5+ active ventures powered by 13 AI agents, 60-80% infrastructure cost savings, and OpenClaw orchestration. See our thesis, portfolio, and key metrics.",
+    "5D Labs is building an AI-native venture studio powered by CTO, an internal trading engine, and OpenClaw orchestration. See the thesis, operating model, and investment narrative.",
   alternates: {
     canonical: "/investors/",
   },
   openGraph: {
     title: "Investor Relations | 5D Labs",
     description:
-      "Invest in the future of AI-native startups. 5+ ventures in flight, 13 autonomous agents, open-source infrastructure.",
+      "Invest in an AI-native venture studio powered by CTO, an internal trading engine, and OpenClaw.",
   },
 };
 

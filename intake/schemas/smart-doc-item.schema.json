@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SmartDocItem",
+  "description": "Single task documentation output from fan-out generation",
+  "type": "object",
+  "properties": {
+    "task_id": { "type": "number" },
+    "task_md": { "type": "string" },
+    "decisions_md": { "type": "string" },
+    "acceptance_md": { "type": "string" }
+  },
+  "required": ["task_id", "task_md", "decisions_md", "acceptance_md"]
+}

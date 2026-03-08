@@ -1,39 +1,35 @@
-"use client";
-
-import { motion } from "framer-motion";
-import { RainEffect } from "@/components/rain-effect";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { WaitlistForm } from "@/components/waitlist-form";
+import { InvestorCtaButtons } from "@/components/investor-cta-buttons";
 
 const highlights = [
   {
-    metric: "13",
-    label: "AI Agents",
-    description: "Specialized autonomous agents powering our operations",
+    metric: "1",
+    label: "Operating Stack",
+    description: "CTO and the internal trading engine working as one coordinated system to launch ventures",
   },
   {
     metric: "5+",
-    label: "Active Ventures",
-    description: "Parallel initiatives across AI, crypto, open-source tooling, smart home, and infrastructure",
+    label: "Venture Themes",
+    description: "Multiple venture directions explored from a shared operating model",
   },
   {
-    metric: "3",
-    label: "Blockchains",
-    description: "Agentic trading on Solana, Base, Near, and Sui",
+    metric: "17+",
+    label: "Infra Providers",
+    description: "Global bare metal providers across every major region",
   },
   {
-    metric: "100%",
-    label: "Open Source Core",
-    description: "OpenClaw agent orchestration, built transparently",
+    metric: "4",
+    label: "On-Chain Environments",
+    description: "Internal trading infrastructure active across Solana, Base, Near, and Sui",
   },
 ];
 
 const differentiators = [
   {
-    title: "AI-Native Startup Studio",
+    title: "One Operating Model",
     description:
-      "We don't just use AI — it's our core operating model. Every venture is built by autonomous AI agents from day one, enabling us to move faster and iterate cheaper than traditional startups.",
+      "CTO and the internal trading engine are not separate company theses. They are coordinated parts of one venture creation system, each reinforcing the other.",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -41,9 +37,9 @@ const differentiators = [
     ),
   },
   {
-    title: "OpenClaw Platform",
+    title: "CTO as Commercial Wedge",
     description:
-      "Our proprietary agent orchestration layer is the engine behind everything. It coordinates AI agents across multiple ventures, CLIs, and infrastructure providers. This is the unfair advantage.",
+      "CTO is the build engine we use internally and the first service we can sell externally. It proves the system can win in the open market.",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -51,9 +47,9 @@ const differentiators = [
     ),
   },
   {
-    title: "Parallel Venture Validation",
+    title: "In-House Capital Engine",
     description:
-      "Traditional startups bet everything on one idea. We run multiple ventures simultaneously, identifying product-market fit faster and cheaper. When something works, we double down.",
+      "The trading engine helps finance experimentation and generate live market intelligence — giving the studio its own source of capital and real-time signal.",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -61,9 +57,9 @@ const differentiators = [
     ),
   },
   {
-    title: "Crypto + AI Convergence",
+    title: "Venture Acceleration",
     description:
-      "We operate at the intersection of two of the largest technological shifts in a generation. Our agentic trading platform and AI engineering tools sit at this convergence point.",
+      "Because the studio runs its own build engine and capital engine, new ventures start with infrastructure already in place — dramatically compressing the time from idea to market.",
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -76,10 +72,10 @@ export default function InvestorsPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       {/* Background layers */}
-      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
-      <div className="fixed inset-0 circuit-bg z-0" />
-      <RainEffect />
-      <div className="fixed inset-0 noise-overlay z-0" />
+      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.04_0.02_260)] z-0" />
+      <div className="fixed inset-0 circuit-bg z-[1]" />
+      {/* GridPulse at z-[2] from layout */}
+      <div className="fixed inset-0 noise-overlay z-[3]" />
 
       <Header />
 
@@ -87,11 +83,7 @@ export default function InvestorsPage() {
         {/* Hero */}
         <section className="py-20 px-6">
           <div className="max-w-4xl mx-auto text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-            >
+            <div>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
                 <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
                 <span className="text-sm text-cyan font-medium">
@@ -100,16 +92,16 @@ export default function InvestorsPage() {
               </div>
 
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-6">
-                <span className="gradient-text glow-text-cyan">Invest</span>{" "}
-                in the Future of Building
+                Invest in the <span className="gradient-text glow-text-cyan">Engine</span>{" "}
+                Behind the Ventures
               </h1>
 
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                5D Labs is raising its first round. We&apos;re building the
-                infrastructure for AI-native startups — and proving the model
-                with our own ventures.
+                5D Labs is building the operating stack behind an AI-native venture
+                studio. CTO is the commercial build engine. The internal trading engine
+                is the capital engine. Together they power venture creation.
               </p>
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -117,13 +109,9 @@ export default function InvestorsPage() {
         <section className="py-12 px-6">
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {highlights.map((item, i) => (
-                <motion.div
+              {highlights.map((item) => (
+                <div
                   key={item.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
                   className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
                 >
                   <p className="text-3xl font-bold gradient-text mb-1">
@@ -135,7 +123,7 @@ export default function InvestorsPage() {
                   <p className="text-xs text-muted-foreground">
                     {item.description}
                   </p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
@@ -144,12 +132,7 @@ export default function InvestorsPage() {
         {/* Mission */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-            >
+            <div>
               <h2 className="text-3xl sm:text-4xl font-bold mb-8 text-center">
                 The <span className="gradient-text">Opportunity</span>
               </h2>
@@ -159,37 +142,37 @@ export default function InvestorsPage() {
                   The cost of building software is collapsing. AI coding agents
                   are becoming good enough to ship production features
                   autonomously. This means the bottleneck is no longer
-                  engineering headcount — it&apos;s <span className="text-foreground font-medium">ideas, direction, and the
-                  infrastructure to orchestrate AI agents at scale</span>.
+                  engineering headcount — it&apos;s <span className="text-foreground font-medium">ideas, capital,
+                  direction, and the infrastructure to orchestrate execution at scale</span>.
                 </p>
                 <p>
-                  5D Labs is positioned at this inflection point. We&apos;ve
-                  built OpenClaw — an agent orchestration platform that
-                  coordinates 13 specialized AI agents across the full software
-                  development lifecycle. And we&apos;re using it to run a startup
-                  studio that validates multiple ventures in parallel.
+                  5D Labs is building an operating stack for venture creation.
+                  <span className="text-foreground font-medium"> CTO </span>
+                  is the build engine — an operating system for software delivery.
+                  The
+                  <span className="text-foreground font-medium"> internal trading engine </span>
+                  is the capital and market-intelligence engine that finances experimentation and keeps the team close to real markets.
                 </p>
                 <p>
-                  This isn&apos;t a bet on one product. It&apos;s a bet on the{" "}
+                  CTO can be commercialized and sold as a service. The trading
+                  engine is intentionally kept in-house because it is part of the
+                  firm&apos;s edge rather than a product we want to distribute.
+                </p>
+                <p>
+                  This isn&apos;t a bet on one app. It&apos;s a bet on a repeatable{" "}
                   <span className="text-foreground font-medium">
-                    operating system for AI-native companies
+                    system for discovering, financing, and shipping AI-native ventures
                   </span>.
                 </p>
               </div>
-            </motion.div>
+            </div>
           </div>
         </section>
 
         {/* Differentiators */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Why <span className="gradient-text">5D Labs</span>
               </h2>
@@ -197,16 +180,12 @@ export default function InvestorsPage() {
                 What makes us different from every other AI company you&apos;ll
                 hear a pitch from this year.
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              {differentiators.map((item, i) => (
-                <motion.div
+              {differentiators.map((item) => (
+                <div
                   key={item.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: i * 0.1 }}
                   className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
                 >
                   <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4 text-cyan">
@@ -216,7 +195,7 @@ export default function InvestorsPage() {
                   <p className="text-sm text-muted-foreground">
                     {item.description}
                   </p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
@@ -225,26 +204,14 @@ export default function InvestorsPage() {
         {/* Ventures Overview */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-12"
-            >
+            <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Current <span className="gradient-text">Portfolio</span>
+                How the Studio <span className="gradient-text">Works</span>
               </h2>
-            </motion.div>
+            </div>
 
             <div className="space-y-6">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-                className="p-8 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm"
-              >
+              <div className="p-8 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-2xl font-bold">CTO</h3>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
@@ -253,13 +220,12 @@ export default function InvestorsPage() {
                   </span>
                 </div>
                 <p className="text-cyan text-sm font-medium mb-2">
-                  Multi-Agent AI Engineering Platform
+                  Commercial Build Engine
                 </p>
                 <p className="text-muted-foreground mb-4">
-                  Thirteen specialized AI agents that ship complete features from
-                  PRD to production. Self-healing bare metal infrastructure with
-                  60-80% cost savings vs. cloud. Our flagship product and the
-                  first proof that the model works.
+                  CTO is the system we use internally to build software and the
+                  first service we can sell externally. It is both a product and
+                  the clearest proof that the operating model works.
                 </p>
                 <a
                   href="https://cto.5dlabs.ai"
@@ -269,131 +235,65 @@ export default function InvestorsPage() {
                 >
                   Visit cto.5dlabs.ai
                 </a>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-2xl font-bold">Agentic Trading</h3>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
-                    Building
+                  <h3 className="text-2xl font-bold">Internal Trading Engine</h3>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[oklch(0.7_0.25_320)]/10 text-[oklch(0.7_0.25_320)]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.7_0.25_320)] animate-pulse" />
+                    Internal
                   </span>
                 </div>
                 <p className="text-[oklch(0.7_0.25_320)] text-sm font-medium mb-2">
-                  HFT-Grade Autonomous Trading on Solana, Base, Near, and Sui
+                  In-House Capital + Market-Intelligence Engine
                 </p>
                 <p className="text-muted-foreground">
-                  Hedge-fund-grade trading technology for individuals. AI-driven
-                  strategy, execution, and risk management operating autonomously
-                  across DeFi markets 24/7. The same speed and precision that Wall
-                  Street uses — now accessible to everyone. Built on the same
-                  OpenClaw orchestration layer as CTO.
+                  This system helps 5D Labs generate internal revenue, stay close
+                  to live on-chain markets, and finance venture creation. It is
+                  built to keep the studio funded and informed with real market
+                  signal.
                 </p>
-              </motion.div>
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-2xl font-bold">OpenClaw Platform</h3>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
-                    Building
+                  <h3 className="text-2xl font-bold">Venture Pipeline</h3>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                    Exploring
                   </span>
                 </div>
-                <p className="text-orange-400 text-sm font-medium mb-2">
-                  Open-Source Agent Orchestration for Kubernetes
-                </p>
-                <p className="text-muted-foreground mb-4">
-                  Kubernetes-native platform for deploying and managing AI agent
-                  fleets. One-command TUI installer for desktop KinD clusters or
-                  enterprise EKS, with GitOps via ArgoCD, NATS inter-agent messaging,
-                  Grafana observability, and integrated secrets management. Will be
-                  fully open-sourced and free.
-                </p>
-                <a
-                  href="https://github.com/5dlabs/openclaw-platform"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-cyan hover:text-cyan/80 underline underline-offset-4 transition-colors"
-                >
-                  View on GitHub
-                </a>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="p-8 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-2xl font-bold">Sanctuary</h3>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan/10 text-cyan">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
-                    Building
-                  </span>
-                </div>
-                <p className="text-emerald-400 text-sm font-medium mb-2">
-                  AI Life Architect for Smart Homes
+                <p className="text-yellow-400 text-sm font-medium mb-2">
+                  The Products That Emerge from the System
                 </p>
                 <p className="text-muted-foreground">
-                  A privacy-forward AI system that turns multimodal life signals
-                  into textural orchestration — shaping lighting, sound, temperature,
-                  and microinterventions to improve wellbeing and household flow.
-                  Demonstrates the studio model extending beyond crypto and dev tools.
+                  The long-term outcome is not just CTO or trading. The stack exists
+                  to help 5D Labs discover, validate, and launch new customer-facing
+                  ventures with more speed and better economics than a traditional
+                  startup model.
                 </p>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Investor Interest + CTA */}
+        {/* Investor CTA */}
         <section className="py-20 px-6 border-t border-border/30">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl mx-auto"
-          >
-            <WaitlistForm
-              source="investor"
-              heading="Stay Updated on Our Raise"
-              subheading="Drop your email to receive investor updates, pitch deck access, and fundraise milestones."
-            />
-
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
-              <a
-                href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
-              >
-                Schedule a Call
-              </a>
-              <a
-                href="/founder"
-                className="px-8 py-4 rounded-lg border border-border/50 bg-card/30 backdrop-blur-sm text-foreground font-semibold text-lg hover:border-cyan/30 hover:bg-cyan/5 transition-all text-center"
-              >
-                Meet the Founder
-              </a>
-            </div>
-            <p className="text-sm text-muted-foreground mt-6 text-center">
-              Pitch deck available upon request.
+          <div className="max-w-2xl mx-auto text-center">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+              Let&apos;s <span className="gradient-text">Talk</span>
+            </h2>
+            <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
+              Interested in learning more? Schedule a conversation or meet the
+              founder.
             </p>
-          </motion.div>
+
+            <InvestorCtaButtons />
+            <p className="text-sm text-muted-foreground mt-6">
+              Full pitch deck available upon request.
+            </p>
+          </div>
         </section>
 
         <Footer />

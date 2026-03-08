@@ -1,0 +1,162 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bots
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: linear-bridge
+  namespace: bots
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: linear-bridge
+  namespace: bots
+  labels:
+    app: linear-bridge
+    app.kubernetes.io/name: linear-bridge
+    app.kubernetes.io/component: messaging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: linear-bridge
+  template:
+    metadata:
+      labels:
+        app: linear-bridge
+    spec:
+      serviceAccountName: linear-bridge
+      imagePullSecrets:
+        - name: ghcr-secret
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      containers:
+        - name: bridge
+          image: ghcr.io/5dlabs/linear-bridge:latest
+          imagePullPolicy: Always
+          env:
+            # Linear API key from OpenBao secret
+            - name: LINEAR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openclaw-linear
+                  key: LINEAR_API_KEY
+                  optional: false
+
+            # Linear webhook secret from OpenBao secret
+            - name: LINEAR_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: openclaw-linear
+                  key: LINEAR_WEBHOOK_SECRET
+                  optional: false
+
+            # Linear team ID
+            - name: LINEAR_TEAM_ID
+              value: "1409006087331512342"
+
+            # Discord bridge URL for cross-cancel callbacks
+            - name: DISCORD_BRIDGE_URL
+              value: "http://discord-bridge.bots.svc:3200"
+
+            # HTTP server port
+            - name: WEBHOOK_PORT
+              value: "3100"
+
+            # Enable agent session tracking
+            - name: AGENT_SESSIONS_ENABLED
+              value: "true"
+
+            # Inactivity timeout (1 hour = 3600000ms)
+            - name: INACTIVITY_TIMEOUT_MS
+              value: "3600000"
+
+          ports:
+            - name: webhook
+              containerPort: 3100
+              protocol: TCP
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # Liveness probe
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "ps aux | grep -v grep | grep node"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # Readiness probe
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "ps aux | grep -v grep | grep node"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      restartPolicy: Always
+---
+# Service to expose webhook port for Linear callbacks
+apiVersion: v1
+kind: Service
+metadata:
+  name: linear-bridge
+  namespace: bots
+  labels:
+    app: linear-bridge
+spec:
+  selector:
+    app: linear-bridge
+  ports:
+    - name: webhook
+      port: 3100
+      targetPort: 3100
+      protocol: TCP
+  type: ClusterIP
+---
+# ExternalSecret to pull Linear credentials from OpenBao
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: linear-bridge-secrets
+  namespace: bots
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: openclaw-linear
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        LINEAR_API_KEY: "{{ .apiKey }}"
+        LINEAR_WEBHOOK_SECRET: "{{ .webhookSecret }}"
+  data:
+    - secretKey: apiKey
+      remoteRef:
+        key: secret/openclaw-linear
+        property: LINEAR_API_KEY
+    - secretKey: webhookSecret
+      remoteRef:
+        key: secret/openclaw-linear
+        property: LINEAR_WEBHOOK_SECRET

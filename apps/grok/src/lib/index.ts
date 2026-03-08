@@ -8,6 +8,7 @@
 // Client
 export {
   searchX,
+  queryX,
   searchInvestors,
   searchStartupCredits,
   buildSearchQuery,

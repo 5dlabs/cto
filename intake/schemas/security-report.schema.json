@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SecurityReport",
+  "description": "Security analysis of the task plan",
+  "type": "object",
+  "properties": {
+    "overall_risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "severity": { "type": "string", "enum": ["info", "low", "medium", "high", "critical"] },
+          "category": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "affected_tasks": { "type": "array", "items": { "type": "number" } },
+          "recommendation": { "type": "string" }
+        },
+        "required": ["id", "severity", "category", "title", "description", "recommendation"]
+      }
+    },
+    "strengths": { "type": "array", "items": { "type": "string" } },
+    "summary": { "type": "string" }
+  },
+  "required": ["overall_risk_level", "findings", "summary"]
+}

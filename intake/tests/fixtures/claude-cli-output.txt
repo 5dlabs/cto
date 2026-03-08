@@ -1,0 +1,9 @@
+I'll implement the authentication middleware for the API.
+
+Tool: Read src/middleware/auth.ts
+
+Looking at the existing code, I need to add JWT verification. Let me write the implementation.
+
+Tool: Write src/middleware/auth.ts
+
+The authentication middleware is now implemented with JWT verification. It extracts the Bearer token from the Authorization header, verifies it, and attaches the decoded user to the request object.

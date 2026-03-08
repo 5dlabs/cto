@@ -23,11 +23,22 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: operators
+  # Ignore stale v1alpha1 resources that can't be pruned (CRDs no longer exist at v1alpha1)
+  ignoreDifferences:
+    - group: twingate.com
+      kind: TwingateConnector
+      name: latitude-connector
+    - group: twingate.com
+      kind: TwingateRemoteNetwork
+      name: latitude-cluster
+    - group: twingate.com
+      kind: TwingateResource
+      name: latitude-pod-network
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: false
+      allowEmpty: true
     syncOptions:
       - CreateNamespace=false
       - ServerSideApply=true

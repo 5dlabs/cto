@@ -1,10 +1,10 @@
 # 5D Labs
 
-> 5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio. We build and validate multiple ventures in parallel using autonomous AI agents — transcending the traditional startup model where you bet everything on one idea.
+> 5D Labs is an AI-native venture studio powered by an internal operating stack. CTO is the build engine, the internal trading engine helps finance experimentation and sharpen market intelligence, and OpenClaw orchestrates the system underneath.
 
 ## About 5D Labs
 
-5D Labs is a startup studio that leverages OpenClaw (our open-source agent orchestration platform) to run multiple ventures simultaneously. By deploying 13+ specialized AI agents across development, trading, and operations, we find product-market fit faster and cheaper than traditional startups.
+5D Labs is an AI-native venture studio that uses OpenClaw, our open-source agent orchestration platform, to coordinate specialized AI agents across development, operations, and venture execution. Rather than betting everything on one product, we built an internal operating stack that helps us discover, finance, validate, and ship new ventures with more speed and better economics than a traditional startup model.
 
 Founded by Jonathon Fritz — 15+ years shipping production systems across AI, blockchain, Kubernetes, and trading infrastructure.
 
@@ -13,10 +13,10 @@ Founded by Jonathon Fritz — 15+ years shipping production systems across AI, b
 Traditional startups burn runway trying to find product-market fit with a single idea. We take a different approach:
 
 1. **Parallel Validation** — Run multiple ventures simultaneously using AI agents
-2. **Faster Product-Market Fit** — Validate or kill ideas in weeks, not quarters
-3. **AI-Native Infrastructure** — Every venture is built by autonomous agents from day one
-4. **OpenClaw Foundation** — Our agent orchestration layer powers everything
-5. **Cost Optimization** — 60-80% infrastructure savings via bare metal and self-hosted models
+2. **Earlier Traction Detection** — Identify real pull sooner and reallocate quickly
+3. **Internal Capital Engine** — Use proprietary market systems to help finance experimentation
+4. **OpenClaw Foundation** — Our orchestration layer powers the operating stack
+5. **Cost Optimization** — Use bare metal and self-hosted models to improve economics
 
 ### What We Do Not Do
 
@@ -27,11 +27,11 @@ Traditional startups burn runway trying to find product-market fit with a single
 
 ---
 
-## Current Ventures
+## Operating Stack
 
 ### CTO — Multi-Agent AI Engineering Platform (Live)
 
-The flagship venture. Thirteen specialized AI agents ship complete features from PRD to production, autonomously, on self-healing bare metal infrastructure.
+The commercial build engine. Thirteen specialized AI agents ship complete features from PRD to production on self-healing infrastructure, and the same system is used internally across the studio.
 
 - **Website**: https://cto.5dlabs.ai
 - **Status**: Live and in active development
@@ -51,18 +51,18 @@ The flagship venture. Thirteen specialized AI agents ship complete features from
   - Atlas — Integration Master: PR merging, branch management, conflict resolution
   - Bolt — Deployment Specialist: Infrastructure, Helm, Kubernetes, GitOps, zero-downtime
 
-### Agentic Trading — HFT-Grade Autonomous Trading (Building)
+### Internal Trading Engine — Proprietary Capital + Market-Intelligence Engine (Internal)
 
-Hedge-fund-grade trading technology for individuals. AI-driven strategy, execution, and risk management operating autonomously across DeFi markets 24/7.
+This is 5D Labs' proprietary internal trading system. It helps generate internal revenue, sharpen market intelligence, and finance venture creation. It is not offered as a public service.
 
-- **Status**: Building
-- **Chains**: Solana (raw speed, HFT), Base (Ethereum composability), Near (AI-native smart contracts), Sui (Move, object-centric DeFi)
-- **Key Features**: High-frequency trading, autonomous execution, AI-driven risk management, 24/7 operation, multi-chain DeFi
-- **Value Proposition**: The same technology that powers Wall Street hedge funds — now accessible to individuals. Compete against institutional players with AI agents that never sleep.
+- **Status**: Internal and in active development
+- **Chains**: Solana (low-latency execution), Base (Ethereum composability), Near (AI-native smart contracts), Sui (Move, object-centric DeFi)
+- **Role**: Capital engine and live market-intelligence layer for the studio
+- **Reason It Stays Internal**: Selling the system broadly would expose trade secrets and increase direct competition against our own edge
 
 ### OpenClaw Platform — Open-Source Agent Orchestration (Building)
 
-Kubernetes-native platform for deploying and managing AI agent fleets. Will be fully open-sourced and free.
+Kubernetes-native platform for deploying and managing AI agent fleets. It is the open-source foundation beneath CTO, the internal trading engine, and future ventures.
 
 - **GitHub**: https://github.com/5dlabs/openclaw-platform
 - **Status**: Building (alpha)
@@ -77,14 +77,6 @@ Kubernetes-native platform for deploying and managing AI agent fleets. Will be f
   - EKS provisioner for production clusters
   - 16+ agent orchestration tested
 - **Architecture**: ArgoCD manages ApplicationSets that auto-deploy agents from Git. NATS provides direct messaging (agent.{id}.inbox) and broadcasts (agent.all.broadcast). Grafana + Loki provide dashboards and log aggregation.
-
-### Sanctuary — AI Life Architect for Smart Homes (Building)
-
-A privacy-forward AI system that turns multimodal life signals into textural orchestration — shaping lighting, sound, temperature, and microinterventions to improve wellbeing and household flow.
-
-- **Status**: Building
-- **Key Features**: Texture Engine, ambient scene generation, smart home integration (Matter, HomeKit, Z-Wave), privacy-first design, calendar/purchase signal ingestion
-- **Value Proposition**: Demonstrates the studio model extending beyond crypto and dev tools into consumer IoT and wellness.
 
 ---
 
@@ -110,7 +102,7 @@ Our open-source agent orchestration platform coordinates AI agents across:
 
 ### Supported Blockchains
 
-- **Solana**: Raw speed, sub-second finality, ideal for HFT and high-throughput trading
+- **Solana**: Raw speed, sub-second finality, ideal for low-latency and high-throughput execution
 - **Base (OP Stack)**: Ethereum L2 composability, DeFi ecosystem access, lower gas costs
 - **Near**: AI-native smart contracts, sharding for scalability
 
@@ -127,7 +119,7 @@ Jonathon Fritz / 5D Labs offers expert consulting for early-stage teams and ente
 3. **Infrastructure & DevOps**: Bare-metal Kubernetes, Talos Linux, ArgoCD GitOps, CI/CD pipelines, cloud-to-metal migration
 4. **Platform Engineering**: Self-healing systems, observability stacks, secret management, multi-tenant architectures
 5. **Security**: Threat modeling, supply chain security, runtime protection, audit automation
-6. **HFT Trading Systems**: High-frequency trading architecture, market data processing, execution optimization
+6. **Trading Infrastructure Architecture**: Trading architecture, market data processing, and execution optimization
 
 ### Pricing (USD)
 
@@ -170,7 +162,7 @@ Jonathon Fritz is open to technical co-founder, fractional CTO, and senior infra
 
 15+ years of experience shipping production systems across AI, blockchain, infrastructure, and trading. Building at the intersection of AI, crypto, and autonomous systems.
 
-- **Current Focus**: 5D Labs startup studio, OpenClaw agent orchestration, agentic trading on Solana/Base/Near/Sui
+- **Current Focus**: 5D Labs venture studio, OpenClaw agent orchestration, and the internal trading engine across Solana/Base/Near/Sui
 - **Background**: Full-stack engineering leadership across enterprise and startup environments
 - **Specialties**: Multi-agent AI systems, Kubernetes/bare-metal infrastructure, blockchain (Solana, Base, Near, Sui), Rust, Go, TypeScript, security, DevOps
 - **Profile**: https://5dlabs.ai/founder

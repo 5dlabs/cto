@@ -1,0 +1,570 @@
+/**
+ * Linear sync utilities for the intake pipeline.
+ *
+ * Two operations:
+ *   init   — Create a Linear project + PRD issue at pipeline start.
+ *   issues — Create task/subtask issues after docs/prompts are generated.
+ *
+ * Uses direct fetch to Linear GraphQL API (LINEAR_API_KEY env var).
+ */
+
+import type { GeneratedTask } from './types';
+
+const LINEAR_API_URL = 'https://api.linear.app/graphql';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface GraphQLResponse<T> {
+  data?: T;
+  errors?: Array<{ message: string }>;
+}
+
+interface LinearProject {
+  id: string;
+  name: string;
+  url: string;
+}
+
+interface LinearIssue {
+  id: string;
+  identifier: string;
+  title: string;
+  url: string;
+}
+
+interface LinearLabel {
+  id: string;
+  name: string;
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  displayName: string;
+}
+
+export interface InitResult {
+  projectId: string;
+  projectUrl: string;
+  prdIssueId: string;
+  prdIdentifier: string;
+  teamId: string;
+  agentMap: Record<string, string>;
+}
+
+export interface SyncIssueEntry {
+  taskId: number;
+  linearId: string;
+  identifier: string;
+  subtaskIssues: Array<{
+    subtaskId: number;
+    linearId: string;
+    identifier: string;
+  }>;
+}
+
+export interface SyncIssuesResult {
+  issueCount: number;
+  issues: SyncIssueEntry[];
+}
+
+// =============================================================================
+// GraphQL Executor
+// =============================================================================
+
+async function execute<T>(apiKey: string, query: string, variables: Record<string, unknown> = {}): Promise<T> {
+  const authHeader = apiKey.startsWith('lin_api_') ? apiKey : `Bearer ${apiKey}`;
+
+  const response = await fetch(LINEAR_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: authHeader,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Linear API returned ${response.status}: ${body}`);
+  }
+
+  const json = (await response.json()) as GraphQLResponse<T>;
+
+  if (json.errors?.length) {
+    const messages = json.errors.map((e) => e.message).join(', ');
+    throw new Error(`GraphQL errors: ${messages}`);
+  }
+
+  if (!json.data) {
+    throw new Error('No data in GraphQL response');
+  }
+
+  return json.data;
+}
+
+// =============================================================================
+// Team Key → UUID Resolution
+// =============================================================================
+
+/**
+ * Resolve a team identifier to a UUID.
+ * If it looks like a UUID already, return it as-is.
+ * Otherwise, query all teams and match by key (e.g., "CTOPA").
+ */
+export async function resolveTeamId(apiKey: string, teamIdOrKey: string): Promise<string> {
+  // UUIDs contain hyphens and are 36 chars; team keys are short alphanumeric
+  if (teamIdOrKey.includes('-') && teamIdOrKey.length > 20) {
+    return teamIdOrKey; // already a UUID
+  }
+
+  interface TeamsResponse {
+    teams: { nodes: Array<{ id: string; key: string; name: string }> };
+  }
+
+  const data = await execute<TeamsResponse>(
+    apiKey,
+    `query { teams { nodes { id key name } } }`,
+  );
+
+  const team = data.teams.nodes.find(
+    (t) => t.key.toLowerCase() === teamIdOrKey.toLowerCase(),
+  );
+
+  if (!team) {
+    const available = data.teams.nodes.map((t) => `${t.key} (${t.name})`).join(', ');
+    throw new Error(`Team key "${teamIdOrKey}" not found. Available teams: ${available}`);
+  }
+
+  return team.id;
+}
+
+// =============================================================================
+// Label Helpers
+// =============================================================================
+
+/** Cache of team labels to avoid re-fetching per label lookup. */
+const teamLabelCache = new Map<string, LinearLabel[]>();
+
+async function fetchTeamLabels(apiKey: string, teamId: string): Promise<LinearLabel[]> {
+  if (teamLabelCache.has(teamId)) return teamLabelCache.get(teamId)!;
+
+  interface FindResponse {
+    team: { labels: { nodes: LinearLabel[] } };
+  }
+
+  const findData = await execute<FindResponse>(
+    apiKey,
+    `query GetTeamLabels($teamId: String!) {
+      team(id: $teamId) {
+        labels { nodes { id name } }
+      }
+    }`,
+    { teamId },
+  );
+
+  const labels = findData.team.labels.nodes;
+  teamLabelCache.set(teamId, labels);
+  return labels;
+}
+
+/**
+ * Find an existing label by name, or try to create it.
+ * Returns the label ID, or null if the label doesn't exist and creation is forbidden.
+ */
+async function getOrCreateLabel(apiKey: string, teamId: string, name: string): Promise<string | null> {
+  const labels = await fetchTeamLabels(apiKey, teamId);
+  const existing = labels.find((l) => l.name.toLowerCase() === name.toLowerCase());
+  if (existing) return existing.id;
+
+  // Try to create — some OAuth tokens lack label-create permission
+  try {
+    interface CreateResponse {
+      issueLabelCreate: { success: boolean; issueLabel?: LinearLabel };
+    }
+
+    const createData = await execute<CreateResponse>(
+      apiKey,
+      `mutation CreateLabel($input: IssueLabelCreateInput!) {
+        issueLabelCreate(input: $input) {
+          success
+          issueLabel { id name }
+        }
+      }`,
+      { input: { teamId, name } },
+    );
+
+    if (createData.issueLabelCreate.issueLabel) {
+      // Add to cache so subsequent lookups find it
+      teamLabelCache.get(teamId)?.push(createData.issueLabelCreate.issueLabel);
+      return createData.issueLabelCreate.issueLabel.id;
+    }
+  } catch {
+    // Label creation forbidden — fall through
+  }
+
+  return null;
+}
+
+// =============================================================================
+// Agent Lookup
+// =============================================================================
+
+async function fetchWorkspaceUsers(apiKey: string): Promise<Record<string, string>> {
+  interface Response {
+    users: { nodes: TeamMember[] };
+  }
+
+  // Query all workspace users (not just team members) so agent bots are found
+  const data = await execute<Response>(
+    apiKey,
+    `query { users { nodes { id name displayName } } }`,
+  );
+
+  const map: Record<string, string> = {};
+  for (const member of data.users.nodes) {
+    // Match by lowercase name: "bolt" matches "Bolt" or "5DLabs-Bolt"
+    const name = member.name.toLowerCase();
+    const displayName = member.displayName.toLowerCase();
+
+    // Direct name match
+    map[name] = member.id;
+    map[displayName] = member.id;
+
+    // Strip "5dlabs-" or "5d-labs-" prefix for matching
+    for (const prefix of ['5dlabs-', '5d-labs-']) {
+      if (name.startsWith(prefix)) map[name.slice(prefix.length)] = member.id;
+      if (displayName.startsWith(prefix)) map[displayName.slice(prefix.length)] = member.id;
+    }
+  }
+
+  return map;
+}
+
+// =============================================================================
+// Init: Create project + PRD issue
+// =============================================================================
+
+export interface InitOptions {
+  projectName: string;
+  teamId: string;
+  prdContent: string;
+  apiKey: string;
+}
+
+export async function createProjectAndPrdIssue(opts: InitOptions): Promise<InitResult> {
+  const { projectName, prdContent, apiKey } = opts;
+
+  // Resolve team key (e.g., "CTOPA") → UUID
+  const teamId = await resolveTeamId(apiKey, opts.teamId);
+
+  // 1. Create project
+  interface ProjectResponse {
+    projectCreate: { success: boolean; project?: LinearProject };
+  }
+
+  const projectData = await execute<ProjectResponse>(
+    apiKey,
+    `mutation CreateProject($input: ProjectCreateInput!) {
+      projectCreate(input: $input) {
+        success
+        project { id name url }
+      }
+    }`,
+    { input: { name: projectName, teamIds: [teamId] } },
+  );
+
+  if (!projectData.projectCreate.success || !projectData.projectCreate.project) {
+    throw new Error('Failed to create Linear project');
+  }
+
+  const project = projectData.projectCreate.project;
+
+  // 2. Get/create labels
+  const [intakeLabelId, prdLabelId] = await Promise.all([
+    getOrCreateLabel(apiKey, teamId, 'intake'),
+    getOrCreateLabel(apiKey, teamId, 'prd'),
+  ]);
+
+  // 3. Fetch agent map
+  const agentMap = await fetchWorkspaceUsers(apiKey);
+
+  // 4. Create PRD issue (assigned to Morgan)
+  const morganId = agentMap['morgan'] || undefined;
+
+  interface IssueResponse {
+    issueCreate: { success: boolean; issue?: LinearIssue };
+  }
+
+  const prdLabelIds = [intakeLabelId, prdLabelId].filter((id): id is string => id !== null);
+
+  const issueInput: Record<string, unknown> = {
+    title: `PRD: ${projectName}`,
+    description: prdContent,
+    teamId,
+    projectId: project.id,
+  };
+  if (prdLabelIds.length > 0) issueInput.labelIds = prdLabelIds;
+  if (morganId) issueInput.assigneeId = morganId;
+
+  const issueData = await execute<IssueResponse>(
+    apiKey,
+    `mutation CreateIssue($input: IssueCreateInput!) {
+      issueCreate(input: $input) {
+        success
+        issue { id identifier title url }
+      }
+    }`,
+    { input: issueInput },
+  );
+
+  if (!issueData.issueCreate.success || !issueData.issueCreate.issue) {
+    throw new Error('Failed to create PRD issue');
+  }
+
+  const prdIssue = issueData.issueCreate.issue;
+
+  return {
+    projectId: project.id,
+    projectUrl: project.url,
+    prdIssueId: prdIssue.id,
+    prdIdentifier: prdIssue.identifier,
+    teamId,
+    agentMap,
+  };
+}
+
+// =============================================================================
+// Issues: Create task + subtask issues
+// =============================================================================
+
+export interface SyncIssuesOptions {
+  tasks: GeneratedTask[];
+  projectId: string;
+  prdIssueId: string;
+  teamId: string;
+  baseUrl: string;
+  agentMap: Record<string, string>;
+  apiKey: string;
+}
+
+function extractAgent(task: GeneratedTask): string {
+  if (task.agent) return task.agent.toLowerCase();
+  const match = task.title.match(/\((\w+)\s*-/);
+  if (match) return match[1].toLowerCase();
+  return 'unknown';
+}
+
+/**
+ * Build the task issue body as acceptance criteria:
+ * description, details, test strategy, subtask checklist, dependencies.
+ */
+function buildTaskDescription(task: GeneratedTask, baseUrl: string): string {
+  const lines: string[] = [];
+
+  // Acceptance criteria header
+  lines.push(`## Description\n${task.description}`);
+
+  if (task.details) {
+    lines.push('', `## Details\n${task.details}`);
+  }
+
+  if (task.test_strategy || task.testStrategy) {
+    lines.push('', `## Testing Strategy\n${task.test_strategy || task.testStrategy}`);
+  }
+
+  // Subtask checklist (acceptance view)
+  if (task.subtasks && task.subtasks.length > 0) {
+    lines.push('', '## Subtasks');
+    for (const st of task.subtasks) {
+      lines.push(`- [ ] ${st.title}`);
+    }
+  }
+
+  if (task.dependencies.length > 0) {
+    lines.push('', `**Blocked by:** tasks ${task.dependencies.join(', ')}`);
+  }
+
+  // Decision points
+  if (task.decision_points && task.decision_points.length > 0) {
+    lines.push('', '## Decision Points');
+    for (const dp of task.decision_points) {
+      const approval = dp.requires_approval || dp.requiresApproval ? ' ⚠️ requires approval' : '';
+      lines.push(`- **${dp.description}** (${dp.category})${approval}`);
+      lines.push(`  Options: ${dp.options.join(', ')}`);
+    }
+  }
+
+  // Links to generated docs
+  if (baseUrl) {
+    lines.push('', '---', '**Generated docs:**');
+    lines.push(`- [prompt.md](${baseUrl}/.tasks/docs/task-${task.id}/prompt.md)`);
+    lines.push(`- [acceptance.md](${baseUrl}/.tasks/docs/task-${task.id}/acceptance.md)`);
+    lines.push(`- [task.md](${baseUrl}/.tasks/docs/task-${task.id}/task.md)`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Build the subtask issue body as the implementation prompt.
+ */
+function buildSubtaskDescription(
+  subtask: { id: number; title: string; description: string; details?: string; test_strategy?: string; testStrategy?: string },
+  taskId: number,
+  baseUrl: string,
+  parentTask: GeneratedTask,
+): string {
+  const lines: string[] = [];
+
+  lines.push(`## What to Build\n${subtask.description}`);
+
+  if (subtask.details) {
+    lines.push('', `## Implementation Details\n${subtask.details}`);
+  }
+
+  const testStrategy = subtask.test_strategy || subtask.testStrategy;
+  if (testStrategy) {
+    lines.push('', `## Testing\n${testStrategy}`);
+  }
+
+  lines.push('', `**Parent task:** ${parentTask.title}`);
+
+  if (baseUrl) {
+    lines.push('', '---');
+    lines.push(`**Prompt:** [prompt.md](${baseUrl}/.tasks/docs/task-${taskId}/subtasks/task-${subtask.id}/prompt.md)`);
+  }
+
+  return lines.join('\n');
+}
+
+const PRIORITY_MAP: Record<string, number> = {
+  high: 1,    // Urgent in Linear
+  medium: 2,  // High in Linear
+  low: 3,     // Medium in Linear
+};
+
+export async function syncTaskIssues(opts: SyncIssuesOptions): Promise<SyncIssuesResult> {
+  const { tasks, projectId, prdIssueId, baseUrl, agentMap, apiKey } = opts;
+
+  // Resolve team key (e.g., "CTOPA") → UUID
+  const teamId = await resolveTeamId(apiKey, opts.teamId);
+
+  // Pre-fetch/create labels we'll need
+  const intakeLabelId = await getOrCreateLabel(apiKey, teamId, 'intake');
+
+  // Cache agent-name labels
+  const agentLabelCache = new Map<string, string | null>();
+
+  async function getAgentLabelId(agentName: string): Promise<string | null> {
+    if (agentLabelCache.has(agentName)) return agentLabelCache.get(agentName)!;
+    const id = await getOrCreateLabel(apiKey, teamId, agentName);
+    agentLabelCache.set(agentName, id);
+    return id;
+  }
+
+  const issues: SyncIssueEntry[] = [];
+
+  for (const task of tasks) {
+    const agent = extractAgent(task);
+    const agentLabelId = await getAgentLabelId(agent);
+    const assigneeId = agentMap[agent] || undefined;
+
+    const labelIds = [intakeLabelId, agentLabelId].filter((id): id is string => id !== null);
+
+    const issueInput: Record<string, unknown> = {
+      title: `[${agent}] ${task.title}`,
+      description: buildTaskDescription(task, baseUrl),
+      teamId,
+      projectId,
+    };
+    if (labelIds.length > 0) issueInput.labelIds = labelIds;
+    if (assigneeId) issueInput.assigneeId = assigneeId;
+    if (task.priority && PRIORITY_MAP[task.priority]) {
+      issueInput.priority = PRIORITY_MAP[task.priority];
+    }
+
+    interface IssueResponse {
+      issueCreate: { success: boolean; issue?: LinearIssue };
+    }
+
+    // Helper: create issue, retrying without assigneeId if assignment fails
+    async function createIssueWithFallback(input: Record<string, unknown>): Promise<LinearIssue> {
+      try {
+        const data = await execute<IssueResponse>(
+          apiKey,
+          `mutation CreateIssue($input: IssueCreateInput!) {
+            issueCreate(input: $input) {
+              success
+              issue { id identifier title url }
+            }
+          }`,
+          { input },
+        );
+        if (data.issueCreate.success && data.issueCreate.issue) {
+          return data.issueCreate.issue;
+        }
+      } catch (err) {
+        // If assignment failed ("App user not valid"), retry without assignee
+        if (input.assigneeId && String(err).includes('not valid')) {
+          const { assigneeId: _, ...withoutAssignee } = input;
+          const retry = await execute<IssueResponse>(
+            apiKey,
+            `mutation CreateIssue($input: IssueCreateInput!) {
+              issueCreate(input: $input) {
+                success
+                issue { id identifier title url }
+              }
+            }`,
+            { input: withoutAssignee },
+          );
+          if (retry.issueCreate.success && retry.issueCreate.issue) {
+            return retry.issueCreate.issue;
+          }
+        }
+        throw err;
+      }
+      throw new Error('Failed to create issue');
+    }
+
+    const taskIssue = await createIssueWithFallback(issueInput);
+    const subtaskIssues: SyncIssueEntry['subtaskIssues'] = [];
+
+    // Create subtask child issues
+    if (task.subtasks && task.subtasks.length > 0) {
+      for (const subtask of task.subtasks) {
+        const subtaskInput: Record<string, unknown> = {
+          title: subtask.title,
+          description: buildSubtaskDescription(subtask, task.id, baseUrl, task),
+          teamId,
+          projectId,
+          parentId: taskIssue.id,
+        };
+        if (intakeLabelId) subtaskInput.labelIds = [intakeLabelId];
+        if (assigneeId) subtaskInput.assigneeId = assigneeId;
+
+        const subtaskIssue = await createIssueWithFallback(subtaskInput);
+
+        subtaskIssues.push({
+          subtaskId: subtask.id,
+          linearId: subtaskIssue.id,
+          identifier: subtaskIssue.identifier,
+        });
+      }
+    }
+
+    issues.push({
+      taskId: task.id,
+      linearId: taskIssue.id,
+      identifier: taskIssue.identifier,
+      subtaskIssues,
+    });
+  }
+
+  return {
+    issueCount: issues.length,
+    issues,
+  };
+}

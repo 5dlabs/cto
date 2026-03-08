@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SmartDocs",
+  "description": "LLM-generated task documentation with architecture rationale and testable acceptance criteria",
+  "type": "object",
+  "properties": {
+    "task_docs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "number", "description": "Task ID matching the expanded task" },
+          "task_md": { "type": "string", "description": "Full task specification markdown with architecture rationale" },
+          "decisions_md": { "type": "string", "description": "Decision points with recommended approaches" },
+          "acceptance_md": { "type": "string", "description": "Testable acceptance criteria with specific assertions" }
+        },
+        "required": ["task_id", "task_md", "decisions_md", "acceptance_md"]
+      }
+    }
+  },
+  "required": ["task_docs"]
+}

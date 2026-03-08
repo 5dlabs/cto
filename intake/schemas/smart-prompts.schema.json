@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SmartPrompts",
+  "description": "LLM-generated agent-tailored implementation prompts with skill and scaffold context",
+  "type": "object",
+  "properties": {
+    "task_prompts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "number", "description": "Task ID matching the expanded task" },
+          "prompt_md": { "type": "string", "description": "Agent-specific implementation prompt in markdown" },
+          "prompt_xml": { "type": "string", "description": "Structured XML prompt with code_scaffold, skills, and tools elements" },
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "subtask_id": { "type": "number", "description": "Subtask ID within the parent task" },
+                "prompt_md": { "type": "string", "description": "Subtask implementation prompt in markdown" }
+              },
+              "required": ["subtask_id", "prompt_md"]
+            }
+          }
+        },
+        "required": ["task_id", "prompt_md", "prompt_xml"]
+      }
+    }
+  },
+  "required": ["task_prompts"]
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TaskScaffolds",
+  "type": "object",
+  "properties": {
+    "scaffolds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "integer" },
+          "file_structure": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" },
+                "description": { "type": "string" },
+                "action": { "type": "string", "enum": ["create", "modify"] }
+              },
+              "required": ["path", "description", "action"]
+            }
+          },
+          "interfaces": { "type": "string", "description": "Type/interface definitions as code" },
+          "function_signatures": { "type": "string", "description": "Function signatures with doc comments" },
+          "test_stubs": { "type": "string", "description": "Test file skeleton" },
+          "pattern_examples": { "type": "string", "description": "Existing codebase patterns to follow (non-greenfield only)" },
+          "skip_reason": { "type": "string", "description": "Why scaffold was skipped (e.g., 'documentation-only task')" }
+        },
+        "required": ["task_id"]
+      }
+    }
+  },
+  "required": ["scaffolds"]
+}

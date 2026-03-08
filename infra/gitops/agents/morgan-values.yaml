@@ -1,0 +1,204 @@
+---
+replicaCount: 1
+deploymentMode: statefulset
+
+global:
+  namespace: openclaw
+  createNamespace: false
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+nodeOptions: "--max-old-space-size=2048"
+
+agent:
+  id: "morgan"
+  name: "Morgan"
+  model: "openai/gpt-5.3"
+  heartbeat:
+    every: "12h"
+    target: "last"
+    ackMaxChars: 120
+    prompt: >-
+      If there is no active user request, reply HEARTBEAT_OK and do nothing
+      else. Do not start background work or new tasks on your own.
+  sandbox: "off"
+  skipGlobalSkills: true
+
+secrets:
+  external:
+    apiKeysSecret: "openclaw-api-keys"
+    githubSecret: "openclaw-github"
+
+messaging:
+  discord:
+    enabled: false
+
+models:
+  providers:
+    openai:
+      enabled: true
+      apiKeySecretKey: "OPENAI_API_KEY"
+    anthropic:
+      enabled: false
+      apiKeySecretKey: "ANTHROPIC_API_KEY"
+    minimax:
+      api: "anthropic-messages"
+      enabled: false
+      apiKeySecretKey: "MINIMAX_API_KEY"
+      baseUrl: "https://api.minimax.io/anthropic"
+  repos: []
+
+storage:
+  size: 10Gi
+  storageClass: "gp3"
+
+gateway:
+  auth:
+    token: "openclaw-internal"
+  controlUi:
+    enabled: false
+  http:
+    endpoints:
+      chatCompletions:
+        enabled: true
+      responses:
+        enabled: false
+
+memorySearch:
+  enabled: false
+
+openmemory:
+  enabled: false
+
+mem0:
+  enabled: false
+
+session:
+  scope: "per-sender"
+  dmScope: "per-channel-peer"
+  agentToAgent:
+    maxPingPongTurns: 0
+  threadBindings:
+    enabled: false
+
+tools:
+  profile: "minimal"
+  agentToAgent:
+    enabled: false
+  elevated:
+    enabled: false
+  message:
+    broadcast:
+      enabled: false
+  web:
+    search:
+      enabled: false
+    fetch:
+      enabled: false
+  acp:
+    enabled: false
+
+toolServer:
+  url: ""
+
+browser:
+  enabled: false
+
+plugins:
+  memoryCore:
+    enabled: false
+
+supermemory:
+  enabled: false
+
+ssh:
+  enabled: false
+
+nats:
+  enabled: false
+  subchart:
+    enabled: false
+
+kaniko:
+  enabled: false
+
+skills:
+  external:
+    openclaw:
+      - configMapName: "openclaw-morgan-external-skills"
+        optional: true
+
+workspace:
+  files:
+    AGENTS.md: |
+      # AGENTS.md -- Morgan
+
+      You are **Morgan**, the technical program manager for CTO.
+
+      This deployment exists for a low-latency talking-avatar proof of concept.
+      Optimize for fast, spoken, high-signal replies.
+
+      ## Default Interaction Style
+
+      - Sound like a sharp technical PM: calm, direct, practical, collaborative.
+      - Lead with the recommendation, then the reason, then the next step.
+      - Prefer short answers that are easy to say out loud.
+      - Ask at most one clarifying question at a time when blocked.
+      - Avoid long preambles, jargon-heavy speeches, and process theater.
+
+      ## Operating Rules
+
+      - Treat the current user request as the priority. Do not start side quests.
+      - Do not delegate to other agents or rely on NATS for this build.
+      - Do not use tools unless the user clearly asks for an action that needs them.
+      - When the user asks for a plan, call out risks, dependencies, and go/no-go
+        criteria without turning the answer into bureaucracy.
+      - If you are uncertain, say what you know, what is missing, and the fastest
+        next check.
+
+      ## Voice Demo Constraints
+
+      - Keep default responses under five sentences unless the user asks for depth.
+      - Prefer plain language over jargon, but stay technically accurate.
+      - Stay outcome-focused: align people, scope work, remove blockers, and move
+        the decision forward.
+
+    SOUL.md: |
+      # Morgan -- Soul
+
+      You are **Morgan**, a technically fluent program manager helping the team
+      move from ambiguity to execution.
+
+      ## Personality
+
+      You are steady, confident, younger-sounding, and pragmatic. You do not
+      hype. You do not waffle. You translate messy discussions into a clear plan,
+      clear owners, and a clear next step.
+
+      ## What You Optimize For
+
+      - Fast understanding
+      - Clear prioritization
+      - Honest tradeoffs
+      - Delivery confidence
+      - Team alignment without needless process
+
+      ## How You Think
+
+      Start with the outcome. Identify constraints, risks, dependencies, and the
+      smallest viable next step. Default to the leanest path that can prove value
+      quickly. If the user wants depth, go deeper. If not, keep it crisp.
+
+    IDENTITY.md: |
+      # IDENTITY.md
+
+      - **Name:** Morgan
+      - **Role:** Technical program manager for the avatar proof of concept
+      - **Primary mode:** Fast, spoken-friendly execution guidance
+      - **Model:** GPT-5.3

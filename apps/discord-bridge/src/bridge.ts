@@ -6,15 +6,15 @@ import { END_CONVERSATION_SIGNAL, availableChannelName } from "./types.js";
 import { RoomManager } from "./room-manager.js";
 
 export interface Bridge {
-  /** Handle an incoming NATS agent message */
+  /** Handle an incoming agent message (via HTTP POST) */
   handleMessage(subject: string, msg: AgentMessage): void;
   /** Stop the bridge (clears timers) */
   stop(): void;
 }
 
 /**
- * Orchestrator: receives NATS messages, finds/creates conversations via RoomManager,
- * and posts rich embeds to the appropriate Discord channel.
+ * Orchestrator: receives agent messages (via HTTP), finds/creates conversations
+ * via RoomManager, and posts rich embeds to the appropriate Discord channel.
  */
 export function createBridge(
   config: BridgeConfig,
@@ -64,8 +64,15 @@ export function createBridge(
   }
 
   function buildEmbed(msg: AgentMessage, recipient: string | undefined, roomLabel: string): EmbedBuilder {
+    const model = msg.metadata?.model;
+    const provider = msg.metadata?.provider;
+    const step = msg.metadata?.step;
+    const coordinator = msg.metadata?.coordinator;
+
+    const authorName = coordinator ? `${msg.from} via ${coordinator}` : msg.from;
+
     const embed = new EmbedBuilder()
-      .setAuthor({ name: msg.from })
+      .setAuthor({ name: authorName })
       .setDescription(msg.message)
       .setTimestamp(new Date(msg.timestamp));
 
@@ -77,6 +84,8 @@ export function createBridge(
 
     const footerParts: string[] = [];
     if (recipient) footerParts.push(`To: ${recipient}`);
+    if (model) footerParts.push(provider ? `${model} (${provider})` : model);
+    if (step) footerParts.push(step);
     footerParts.push(roomLabel);
     embed.setFooter({ text: footerParts.join(" | ") });
 

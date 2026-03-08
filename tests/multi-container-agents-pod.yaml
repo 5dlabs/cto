@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-agent-test
+  namespace: cto
+  labels:
+    app: multi-agent-test
+    openclaw.ai/component: agent-pod
+spec:
+  restartPolicy: Never
+  # Shared volume for inter-agent communication
+  volumes:
+    - name: shared-workspace
+      emptyDir: {}
+
+  containers:
+    # ── Morgan (PM) ──────────────────────────────────────
+    - name: morgan
+      image: ubuntu:22.04
+      command:
+        - /bin/bash
+        - -c
+        - |
+          echo '{"agent":"morgan","role":"pm","event":"start","ts":"'$(date -u +%FT%TZ)'"}'
+          while true; do
+            echo '{"agent":"morgan","role":"pm","model":"claude-opus-4-6","provider":"anthropic","step":"deliberation","msg":"Planning sprint tasks..."}'
+            sleep 3
+            echo '{"agent":"morgan","role":"pm","model":"claude-opus-4-6","provider":"anthropic","step":"deliberation","msg":"Reviewing task dependencies"}'
+            sleep 2
+            echo '{"agent":"morgan","role":"pm","model":"claude-opus-4-6","provider":"anthropic","step":"deliberation.assign","msg":"Assigning bolt to infra task #42"}'
+            sleep 4
+          done
+      volumeMounts:
+        - name: shared-workspace
+          mountPath: /workspace
+      resources:
+        requests:
+          memory: "32Mi"
+          cpu: "10m"
+        limits:
+          memory: "64Mi"
+          cpu: "100m"
+
+    # ── Rex (Rust engineer) ──────────────────────────────
+    - name: rex
+      image: ubuntu:22.04
+      command:
+        - /bin/bash
+        - -c
+        - |
+          echo '{"agent":"rex","role":"rust-engineer","event":"start","ts":"'$(date -u +%FT%TZ)'"}'
+          while true; do
+            echo '{"agent":"rex","role":"rust-engineer","model":"claude-opus-4-6","provider":"anthropic","step":"code.implement","msg":"Compiling crate controller..."}'
+            sleep 2
+            echo '{"agent":"rex","role":"rust-engineer","model":"claude-opus-4-6","provider":"anthropic","step":"code.test","msg":"Running cargo test..."}'
+            sleep 3
+            echo '{"agent":"rex","role":"rust-engineer","model":"claude-opus-4-6","provider":"anthropic","step":"code.test","msg":"42 tests passed, 0 failed"}'
+            sleep 2
+          done
+      volumeMounts:
+        - name: shared-workspace
+          mountPath: /workspace
+      resources:
+        requests:
+          memory: "32Mi"
+          cpu: "10m"
+        limits:
+          memory: "64Mi"
+          cpu: "100m"
+
+    # ── Bolt (Infra) ─────────────────────────────────────
+    - name: bolt
+      image: ubuntu:22.04
+      command:
+        - /bin/bash
+        - -c
+        - |
+          echo '{"agent":"bolt","role":"infra","event":"start","ts":"'$(date -u +%FT%TZ)'"}'
+          while true; do
+            echo '{"agent":"bolt","role":"infra","model":"claude-sonnet-4-6","provider":"anthropic","step":"infra.deploy","msg":"terraform plan..."}'
+            sleep 4
+            echo '{"agent":"bolt","role":"infra","model":"claude-sonnet-4-6","provider":"anthropic","step":"infra.deploy","msg":"3 resources to add, 0 to change"}'
+            sleep 3
+          done
+      volumeMounts:
+        - name: shared-workspace
+          mountPath: /workspace
+      resources:
+        requests:
+          memory: "32Mi"
+          cpu: "10m"
+        limits:
+          memory: "64Mi"
+          cpu: "100m"

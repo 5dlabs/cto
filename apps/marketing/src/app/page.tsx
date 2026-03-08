@@ -1,12 +1,14 @@
-"use client";
-
-import { motion } from "framer-motion";
-import { RainEffect } from "@/components/rain-effect";
+import Image from "next/image";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { AgentGrid, type AgentSquad } from "@/components/agent-card";
 import { Header } from "@/components/header";
 import { TechStack } from "@/components/tech-stack";
 import { featureFlags } from "@/config/feature-flags";
+
+const homeHref =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3001"
+    : "https://5dlabs.ai";
 
 const squads: AgentSquad[] = [
   {
@@ -18,8 +20,9 @@ const squads: AgentSquad[] = [
         role: "Technical Program Manager",
         avatar: "/agents/morgan-avatar-512.png",
         color: "from-cyan-400 to-pink-500",
-        description: "Orchestrates project lifecycles—syncing GitHub with Linear, decomposing PRDs into tasks.",
-        stack: ["Linear", "GitHub", "PRDs"],
+        description: "Orchestrates project lifecycles—syncing GitHub with Linear, decomposing PRDs into tasks. Research tools for docs, web, and codebase context.",
+        tools: ["Context7", "Firecrawl", "Perplexity", "Tavily", "Exa", "Repomix", "Linear", "GitHub"],
+        skills: ["PRD Analysis", "Deep Research", "Multi-Agent", "Brainstorming", "Writing Plans"],
       },
     ],
   },
@@ -33,7 +36,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/rex-avatar-512.png",
         color: "from-orange-500 to-red-500",
         description: "Builds high-performance APIs and systems-level infrastructure. When microseconds matter.",
-        stack: ["Rust", "Tokio", "Axum"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Rust Patterns", "Error Handling", "Axum/Tokio", "Compound Engineering"],
       },
       {
         name: "Grizz",
@@ -41,7 +45,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/grizz-avatar-512.png",
         color: "from-amber-500 to-orange-400",
         description: "Ships bulletproof backend services, REST/gRPC APIs, and Kubernetes operators.",
-        stack: ["Go", "gRPC", "PostgreSQL"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Go Patterns", "Concurrency", "gRPC/Chi", "Systematic Debugging"],
       },
       {
         name: "Nova",
@@ -49,7 +54,17 @@ const squads: AgentSquad[] = [
         avatar: "/agents/nova-avatar-512.png",
         color: "from-purple-500 to-cyan-400",
         description: "Rapid API development and third-party integrations. Speed-to-market specialist.",
-        stack: ["Node.js", "TypeScript", "Fastify"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Effect Patterns", "Elysia", "Drizzle", "Better Auth"],
+      },
+      {
+        name: "Viper",
+        role: "Python Specialist",
+        avatar: "/agents/viper-avatar-512.png",
+        color: "from-yellow-500 to-green-500",
+        description: "Data pipelines, ML workflows, automation scripts, and backend services in Python. Fast iteration, clean packages.",
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["FastAPI", "Pydantic", "Async Python", "Data Pipelines", "ML Tooling"],
       },
     ],
   },
@@ -63,7 +78,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/blaze-avatar-512.png",
         color: "from-blue-500 to-cyan-500",
         description: "Creates stunning web applications with modern component libraries.",
-        stack: ["React", "Next.js", "shadcn/ui"],
+        tools: ["Context7", "shadcn/ui", "AI Elements", "TanStack", "GitHub"],
+        skills: ["Frontend Excellence", "React Best Practices", "Anime.js", "Frontend Design"],
       },
       {
         name: "Tap",
@@ -71,7 +87,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/tap-avatar-512.png",
         color: "from-green-500 to-emerald-400",
         description: "Native-quality iOS and Android apps from a single TypeScript codebase.",
-        stack: ["Expo", "React Native", "NativeWind"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Expo Patterns", "React Native", "EAS Build", "Frontend Design"],
       },
       {
         name: "Spark",
@@ -79,7 +96,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/spark-avatar-512.png",
         color: "from-blue-500 to-yellow-400",
         description: "Cross-platform desktop apps with native integrations and offline-first architecture.",
-        stack: ["Electron", "Tauri", "React"],
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Electron Patterns", "Tauri", "Frontend Design"],
       },
     ],
   },
@@ -93,15 +111,17 @@ const squads: AgentSquad[] = [
         avatar: "/agents/cleo-avatar-512.png",
         color: "from-emerald-500 to-teal-500",
         description: "Refactors for maintainability and ensures enterprise-grade code quality.",
-        stack: ["Code Review", "Patterns", "Best Practices"],
+        tools: ["Context7", "Firecrawl", "Repomix", "GitHub"],
+        skills: ["Code Review", "Evaluation", "Code Maturity", "Advanced Evaluation"],
       },
       {
         name: "Cipher",
         role: "Security Sentinel",
         avatar: "/agents/cipher-avatar-512.png",
         color: "from-red-500 to-rose-500",
-        description: "Runs security audits, dependency scans, and ensures OWASP compliance.",
-        stack: ["Trivy", "Gitleaks", "OWASP"],
+        description: "Runs security audits, dependency scans, and pen tests. Scans at code level then attacks deployed apps to find what static analysis misses.",
+        tools: ["Context7", "Firecrawl", "Tavily", "OpenCode", "GitHub", "Snyk", "Nuclei", "Aikido"],
+        skills: ["Semgrep", "CodeQL", "Pen Testing", "Red Teaming", "SARIF", "Audit Prep", "Supply Chain"],
       },
       {
         name: "Tess",
@@ -109,7 +129,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/tess-avatar-512.png",
         color: "from-violet-500 to-purple-500",
         description: "Creates comprehensive test suites—unit, integration, and e2e.",
-        stack: ["Jest", "Playwright", "Vitest"],
+        tools: ["Context7", "Kubernetes", "GitHub"],
+        skills: ["Testing Strategies", "Playwright", "TDD", "Property-Based Testing"],
       },
     ],
   },
@@ -123,7 +144,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/stitch-avatar-512.png",
         color: "from-orange-500 to-blue-400",
         description: "Reviews every PR with surgical precision—catches bugs, suggests improvements.",
-        stack: ["PR Review", "Linting", "Standards"],
+        tools: ["Context7", "Octocode", "GitHub"],
+        skills: ["PR Review", "Code Review", "Differential Review"],
       },
       {
         name: "Atlas",
@@ -131,7 +153,8 @@ const squads: AgentSquad[] = [
         avatar: "/agents/atlas-avatar-512.png",
         color: "from-slate-500 to-zinc-500",
         description: "Manages PR merges, rebases stale branches, and ensures clean integration.",
-        stack: ["Git", "Rebasing", "CI/CD"],
+        tools: ["Context7", "Repomix", "GitHub"],
+        skills: ["Git Integration", "Git Worktrees", "Multi-Agent", "Finishing Branch"],
       },
       {
         name: "Bolt",
@@ -139,14 +162,79 @@ const squads: AgentSquad[] = [
         avatar: "/agents/bolt-avatar-512.png",
         color: "from-yellow-500 to-amber-500",
         description: "Your always-on SRE. Provisions bare metal, deploys services, monitors health, and triggers self-healing — so you never get paged.",
-        stack: ["Kubernetes", "Bare Metal", "GitOps"],
+        tools: ["Context7", "Kubernetes", "GitHub"],
+        skills: ["Kubernetes Operators", "ArgoCD/GitOps", "Secrets Mgmt", "Observability", "MCP Builder"],
+      },
+    ],
+  },
+  {
+    title: "Specialists",
+    emoji: "🔬",
+    agents: [
+      {
+        name: "Block",
+        role: "Blockchain Specialist",
+        avatar: "/agents/block-avatar-512.png",
+        color: "from-amber-500 to-orange-500",
+        description: "Deploys and operates blockchain nodes across every supported chain. Validator setup, RPC endpoints, archive nodes — all on bare metal.",
+        tools: ["Context7", "Firecrawl", "Tavily", "GitHub"],
+        skills: ["Ethereum", "NEAR", "Solana", "Node Ops", "Smart Contracts"],
       },
       {
-        name: "Healer",
-        role: "Self-Healing Agent",
-        color: "from-green-500 to-emerald-500",
-        description: "Detects failures, remediates incidents, restarts stuck workflows, and fixes CI — automatically, before you notice.",
-        stack: ["Incident Response", "Auto-Remediation", "Monitoring"],
+        name: "Vex",
+        role: "VR/Unity Developer",
+        avatar: "/agents/vex-avatar-512.png",
+        color: "from-violet-500 to-indigo-500",
+        description: "Builds cross-platform VR and XR experiences with Unity and OpenXR. From Quest to PC to spatial web.",
+        tools: ["Context7", "Octocode", "Firecrawl", "GitHub"],
+        skills: ["Unity", "OpenXR", "Meta XR", "Three.js", "Cross-Platform XR"],
+      },
+      {
+        name: "Glitch",
+        role: "Game Developer",
+        avatar: "/agents/glitch-avatar-512.png",
+        color: "from-fuchsia-500 to-pink-500",
+        description: "Builds games and interactive experiences — indie titles, serious games, and browser-based play. Unity, Godot, Unreal, and WebGL.",
+        tools: ["Context7", "GitHub", "Firecrawl", "Tavily"],
+        skills: ["Unity", "Godot", "Unreal Engine", "WebGL", "Game Physics", "Shader Programming"],
+      },
+    ],
+  },
+  {
+    title: "Business Team",
+    emoji: "🏢",
+    agents: [
+      {
+        name: "Lex",
+        role: "Legal Counsel",
+        avatar: "/agents/lex-avatar-512.png",
+        color: "from-blue-600 to-indigo-600",
+        description: "Contract review, compliance checks, and legal risk assessment. Trained on your jurisdiction, your agreements, your standards.",
+        badge: "In Development",
+      },
+      {
+        name: "Hype",
+        role: "Marketing Strategist",
+        avatar: "/agents/hype-avatar-512.png",
+        color: "from-orange-500 to-rose-500",
+        description: "Campaign strategy, copy, and analytics. From brand voice to conversion — autonomous marketing that moves as fast as your product.",
+        badge: "In Development",
+      },
+      {
+        name: "Tally",
+        role: "Accounting Specialist",
+        avatar: "/agents/tally-avatar-512.png",
+        color: "from-emerald-600 to-teal-600",
+        description: "Bookkeeping, reconciliation, and financial reporting. Always accurate, always current, zero overhead.",
+        badge: "In Development",
+      },
+      {
+        name: "Chase",
+        role: "Sales Agent",
+        avatar: "/agents/chase-avatar-512.png",
+        color: "from-amber-500 to-yellow-500",
+        description: "Outreach, pipeline management, and closing. Handles discovery, follow-ups, and deal tracking so your team stays focused on building.",
+        badge: "In Development",
       },
     ],
   },
@@ -156,9 +244,8 @@ export default function Home() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       {/* Background layers */}
-      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
+      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.04_0.02_260)] z-0" />
       <div className="fixed inset-0 circuit-bg z-0" />
-      <RainEffect />
       <div className="fixed inset-0 noise-overlay z-0" />
 
       {/* Header */}
@@ -168,54 +255,31 @@ export default function Home() {
       <main className="relative z-10">
         {/* Hero Section */}
         <section id="hero" className="min-h-screen flex flex-col items-center justify-center px-6 py-20 pt-24">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="max-w-4xl mx-auto text-center"
-          >
+          <div className="max-w-4xl mx-auto text-center">
             {/* Badge */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2, duration: 0.8, ease: "easeOut" }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8"
-            >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan/30 bg-cyan/5 mb-8">
               <span className="w-2 h-2 rounded-full bg-cyan animate-[pulse_3s_ease-in-out_infinite]" />
               <span className="text-sm text-cyan font-medium">
-                From PRD to Production — Autonomously
+                Idea to Production — Autonomously
               </span>
-            </motion.div>
+            </div>
 
-            {/* Headline */}
-            <motion.h1
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 1, ease: "easeOut" }}
-              className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6"
-            >
-              <span className="gradient-text glow-text-cyan">Your Engineering Team</span>
+            {/* Headline - LCP element, must be visible immediately */}
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
+              <span className="gradient-text glow-text-cyan">Build at the Speed</span>
               <br />
-              <span className="text-foreground">Lives Here</span>
-            </motion.h1>
+              <span className="text-foreground">of Thought.</span>
+            </h1>
 
             {/* Subheadline */}
-            <motion.p
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 1, ease: "easeOut" }}
-              className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10"
-            >
-              Thirteen specialized AI agents that ship complete features. From requirements to deployed code—automatically.
-            </motion.p>
+            <p className="text-xl sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10">
+              Describe what you want. CTO plans it, builds it, tests it, and ships it —
+              with a full team of AI agents working in parallel. You think it,{" "}
+              <span className="text-foreground">it gets built.</span>
+            </p>
 
             {/* CTA Buttons */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7, duration: 0.8 }}
-              className="flex flex-col sm:flex-row justify-center gap-4 mb-16"
-            >
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
               {featureFlags.showStartNowButton && (
                 <a
                   href="https://app.5dlabs.ai"
@@ -225,64 +289,44 @@ export default function Home() {
                 </a>
               )}
               <WaitlistForm />
-            </motion.div>
+            </div>
 
             {/* Stats */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.9, duration: 0.8 }}
-              className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground"
-            >
+            <div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">60-80%</span>
                 <span>cost savings vs cloud</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-foreground">13</span>
-                <span>specialized agents</span>
+                <span className="text-2xl font-bold text-foreground">17+</span>
+                <span>infra providers</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-foreground">∞</span>
                 <span>faster shipping</span>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
 
           {/* Scroll indicator */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.2, duration: 1 }}
-            className="absolute bottom-10 left-1/2 -translate-x-1/2"
-          >
-            <motion.div
-              animate={{ y: [0, 6, 0] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex justify-center pt-2"
-            >
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2">
+            <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex justify-center pt-2 scroll-bounce">
               <div className="w-1 h-2 rounded-full bg-cyan" />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         </section>
 
         {/* Agents Section */}
         <section id="agents" className="py-20 px-6">
           <div className="max-w-6xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className="text-center mb-16"
-            >
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 We Brought the <span className="gradient-text">Whole Team</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                Not one generic AI—thirteen domain experts working in parallel across your entire development lifecycle.
+                Not one generic AI — a full team of domain experts working in parallel across your entire development lifecycle.
               </p>
-            </motion.div>
+            </div>
 
             {/* Agent Grid */}
             <AgentGrid squads={squads} />
@@ -295,223 +339,292 @@ export default function Home() {
         {/* Ecosystem Section */}
         <section id="ecosystem" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Your <span className="gradient-text">Entire Stack</span>, Orchestrated
+                Works With the Way Your <span className="gradient-text">Team Already Ships</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                From languages to infrastructure. Bring your own keys, pick your CLIs—we handle everything else.
+                You don&apos;t have to think about operators, runtimes, or platform plumbing. Point CTO at a repo and it handles the rest — tooling, infrastructure, and delivery are already included.
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {/* Languages & Frameworks */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Languages & Frameworks</h3>
+                <h3 className="text-xl font-semibold mb-3">Your Stack, Supported</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan/60"></span>
-                    <span>Rust, Go, Node.js, Python</span>
+                    <span>Backend, frontend, mobile, and desktop workflows</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan/60"></span>
-                    <span>React, Vue, Svelte, Next.js</span>
+                    <span>Works with modern repos, frameworks, and APIs</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan/60"></span>
-                    <span>FastAPI, Express, Axum, Chi</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-cyan/60"></span>
-                    <span>Electron, Expo, Unity</span>
+                    <span>No rebuild of your stack required</span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
-              {/* Infrastructure & Databases */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-magenta/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Infrastructure & Databases</h3>
+                <h3 className="text-xl font-semibold mb-3">Infrastructure, Abstracted</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-magenta/60"></span>
-                    <span>Kubernetes, Helm, Terraform</span>
+                    <span>Managed databases, storage, and deployments</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-magenta/60"></span>
-                    <span>PostgreSQL, Redis, Kafka, MongoDB</span>
+                    <span>Self-healing infrastructure underneath the product</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-magenta/60"></span>
-                    <span>Bolt provisions &amp; monitors bare metal</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-magenta/60"></span>
-                    <span>Healer auto-remediates incidents</span>
+                    <span>Cloud today, bare metal when you are ready</span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
-              {/* AI CLIs & Models */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-yellow/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-3">AI CLIs & Models</h3>
+                <h3 className="text-xl font-semibold mb-3">Use the CLI You Like</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
-                    <span>Claude Code, Cursor, Factory</span>
+                    <span>Claude Code, Cursor, Factory, Codex</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
-                    <span>Codex, Gemini, OpenCode</span>
+                    <span>Gemini, OpenCode, GitHub Copilot, Kimi</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
-                    <span>GPT-4, Claude, Gemini models</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
-                    <span>Ollama, vLLM for local inference</span>
+                    <span>Keys and runtime managed for you</span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
-              {/* Integrations */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-green/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-3">Integrations</h3>
+                <h3 className="text-xl font-semibold mb-3">Your Workflow, Connected</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green/60"></span>
-                    <span>GitHub Apps for each agent</span>
+                    <span>GitHub, Linear, Slack, Teams, and more</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green/60"></span>
-                    <span>Linear project management</span>
+                    <span>Planning, progress, alerts, and releases in one loop</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green/60"></span>
-                    <span>Prometheus, Grafana, Loki</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green/60"></span>
-                    <span>Ever-growing MCP ecosystem</span>
+                    <span>No context-switch tax across the team</span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-              className="text-center mt-12"
-            >
+            <div className="text-center mt-12">
               <p className="text-muted-foreground">
                 Submit a PRD, connect your repo, and watch your AI team ship. No manual handoffs, no context switching.
               </p>
-            </motion.div>
+            </div>
           </div>
         </section>
 
-        {/* Infrastructure Providers Section */}
+        {/* Infrastructure Section */}
         <section id="infrastructure" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
+            <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Bare Metal <span className="gradient-text">Everywhere</span>
+                Infrastructure, <span className="gradient-text">Abstracted</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Deploy on dedicated servers worldwide. Skip the cloud tax and own your infrastructure.
+                CTO is designed so teams do not have to think about providers,
+                data-center inventory, or migration mechanics. Choose the
+                outcome you need and the platform handles the operational path
+                underneath it.
               </p>
-            </motion.div>
+            </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { name: "Latitude.sh", region: "Americas, Europe, Asia", desc: "Global bare-metal cloud" },
-                { name: "Hetzner", region: "Germany, Finland", desc: "European dedicated servers" },
-                { name: "OVH", region: "Europe, Americas, Asia", desc: "Global bare-metal & cloud" },
-                { name: "Vultr", region: "25+ locations", desc: "Worldwide infrastructure" },
-                { name: "Scaleway", region: "France, Netherlands", desc: "European cloud provider" },
-                { name: "Cherry Servers", region: "Lithuania, Netherlands", desc: "High-performance bare-metal" },
-                { name: "DigitalOcean", region: "Americas, Europe, Asia", desc: "Developer-friendly droplets" },
-                { name: "Servers.com", region: "Americas, Europe, Asia", desc: "Hybrid bare-metal cloud" },
-                { name: "PhoenixNAP", region: "Americas, Europe, Asia", desc: "Dedicated servers" },
-                { name: "i3D.net", region: "60+ locations, 6 continents", desc: "Low-latency bare metal" },
-                { name: "Hivelocity", region: "50+ locations", desc: "Instant dedicated servers" },
-                { name: "Denvr", region: "Canada, USA", desc: "GPU & AI compute" },
-                { name: "Zenlayer", region: "360+ edge locations", desc: "Distributed edge bare metal" },
-                { name: "NetActuate", region: "40+ locations", desc: "Edge bare metal" },
-                { name: "HOSTKEY", region: "Europe, USA, Turkey", desc: "GPU & dedicated servers" },
-                { name: "Leaseweb", region: "Global", desc: "Dedicated servers" },
-              ].map((provider, index) => (
-                <motion.div
-                  key={provider.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.05 }}
-                  className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center hover:border-cyan/30 transition-colors"
-                >
-                  <h4 className="font-semibold mb-1 text-foreground">{provider.name}</h4>
-                  <p className="text-xs text-muted-foreground mb-1">{provider.region}</p>
-                  <p className="text-xs text-muted-foreground">{provider.desc}</p>
-                </motion.div>
-              ))}
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="p-6 rounded-xl border border-cyan/20 bg-cyan/5 backdrop-blur-sm">
+                <p className="text-xs font-medium uppercase tracking-widest text-cyan mb-3">
+                  Launch Where You Need It
+                </p>
+                <h3 className="text-lg font-semibold mb-2 text-foreground">
+                  Cloud, dedicated hardware, or your own footprint
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Start in the environment that matches your current stage and
+                  compliance needs. CTO keeps the product surface consistent as
+                  the underlying infrastructure changes.
+                </p>
+              </div>
+              <div className="p-6 rounded-xl border border-[oklch(0.7_0.25_320)]/20 bg-[oklch(0.7_0.25_320)]/5 backdrop-blur-sm">
+                <p className="text-xs font-medium uppercase tracking-widest text-[oklch(0.7_0.25_320)] mb-3">
+                  Managed Migration Path
+                </p>
+                <h3 className="text-lg font-semibold mb-2 text-foreground">
+                  Move without re-platforming the team
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  You do not need to pause delivery to move off the cloud or
+                  into a more efficient setup. We handle the migration path,
+                  release flow, and operational cutover behind the scenes.
+                </p>
+              </div>
+              <div className="p-6 rounded-xl border border-green-500/20 bg-green-500/5 backdrop-blur-sm">
+                <p className="text-xs font-medium uppercase tracking-widest text-green-400 mb-3">
+                  Quiet Redundancy
+                </p>
+                <h3 className="text-lg font-semibold mb-2 text-foreground">
+                  Reliability without an infrastructure control room
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Region placement, failover strategy, and operational
+                  resilience are handled as part of the platform so your team
+                  can stay focused on shipping product.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8 p-5 rounded-xl border border-border/30 bg-muted/20 text-center">
+              <p className="text-sm text-muted-foreground max-w-3xl mx-auto">
+                One stable platform that runs wherever it needs to run. The
+                operational complexity is abstracted away so your team stays
+                focused on what they shipped here to build.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Integrations Section */}
+        <section id="integrations" className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Works With Your <span className="gradient-text">Entire Stack</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Native integrations with the tools your team already uses — from project management to alerting to observability.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+              {/* Project Management */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Project Management</h3>
+                <p className="text-xs text-muted-foreground mb-4">Linear is primary — full agent activity sync, PRD intake, and live task updates. Other platforms get task creation and status updates.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { name: "Linear", primary: true },
+                    { name: "GitHub Issues", primary: true },
+                    { name: "Jira", primary: false },
+                    { name: "Asana", primary: false },
+                    { name: "Trello", primary: false },
+                    { name: "Monday", primary: false },
+                    { name: "Notion", primary: false },
+                    { name: "ClickUp", primary: false },
+                  ].map(({ name, primary }) => (
+                    <span key={name} className={`text-[11px] px-2 py-0.5 rounded-md font-medium ${primary ? "bg-[oklch(0.7_0.25_320)]/15 text-[oklch(0.7_0.25_320)]" : "bg-muted/50 text-muted-foreground"}`}>{name}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Communication & Alerting */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Communication & Alerting</h3>
+                <p className="text-xs text-muted-foreground mb-4">Agents post progress updates, incident alerts, and deployment notifications to your channels in real time.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Discord", "Slack", "Microsoft Teams", "PagerDuty", "Email"].map(name => (
+                    <span key={name} className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-cyan/10 text-cyan">{name}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Observability */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Observability</h3>
+                <p className="text-xs text-muted-foreground mb-4">Self-hosted Grafana, Prometheus, and Loki pre-wired. Datadog supported for teams already invested in it.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { name: "Grafana", primary: true },
+                    { name: "Prometheus", primary: true },
+                    { name: "Loki", primary: true },
+                    { name: "Jaeger", primary: true },
+                    { name: "OpenTelemetry", primary: true },
+                    { name: "Datadog", primary: false },
+                  ].map(({ name, primary }) => (
+                    <span key={name} className={`text-[11px] px-2 py-0.5 rounded-md font-medium ${primary ? "bg-orange-500/10 text-orange-400" : "bg-muted/50 text-muted-foreground"}`}>{name}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Source Control & CI */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Source Control & CI</h3>
+                <p className="text-xs text-muted-foreground mb-4">Each agent has its own GitHub App. PRs, reviews, and deployments are fully automated through Git.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["GitHub Apps", "GitHub Actions", "ArgoCD", "Webhooks", "PR Automation"].map(name => (
+                    <span key={name} className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-green-500/10 text-green-400">{name}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Security Scanning */}
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center mb-4">
+                  <svg className="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold mb-1">Security Scanning</h3>
+                <p className="text-xs text-muted-foreground mb-4">Vulnerability scanning, SCA, AI-native remediation, and supply-chain protection — all surfaced through Cipher&apos;s agent interface.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Snyk", "Nuclei", "Aikido", "Socket", "Trivy", "Gitleaks", "Datadog", "Dynatrace"].map(name => (
+                    <span key={name} className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-rose-500/10 text-rose-400">{name}</span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -519,165 +632,204 @@ export default function Home() {
         {/* Platform Features Section */}
         <section id="platform" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 The <span className="gradient-text">Platform</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Everything you need to ship production software—orchestration, project management, and self-healing infrastructure.
+                Everything needed to move from idea to production — assembled, tested, and ready to go.
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid md:grid-cols-3 gap-6">
-              {/* MCP Tools */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
-                <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
-                  <svg className="w-6 h-6 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold mb-2">MCP Tool Aggregation</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Integrated MCP servers for GitHub, Kubernetes, Linear, Grafana, and more—always expanding.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {["GitHub", "K8s", "Linear", "Grafana"].map(tool => (
-                    <span key={tool} className="text-xs px-2 py-1 rounded bg-cyan/10 text-cyan">{tool}</span>
-                  ))}
-                </div>
-              </motion.div>
-
-              {/* Linear Integration */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Linear Agent API</h3>
+                <h3 className="text-xl font-semibold mb-2">5D Plan</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Native Linear integration with real-time agent activities. Watch your AI team work in your project board.
+                  PRDs become structured plans through deliberation — optimist and pessimist agents challenge each decision point before committing, the same way a real team would debate scope, risk, and tradeoffs. The result is a plan that has already survived scrutiny.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["PRD Intake", "Task Sync", "Live Updates"].map(feature => (
+                  {["PRD intake", "Deliberation", "Decision gates", "Task decomposition"].map(feature => (
                     <span key={feature} className="text-xs px-2 py-1 rounded bg-[oklch(0.7_0.25_320)]/10 text-[oklch(0.7_0.25_320)]">{feature}</span>
                   ))}
                 </div>
-              </motion.div>
+              </div>
 
-              {/* Self-Healing */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
+              <div
                 className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
               >
+                <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold mb-2">5D Code</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Multiple CLIs, multiple model providers, one consistent experience. CTO abstracts the underlying toolchain so your team works with whatever interface fits — Claude Code, Cursor, Codex, Factory, Gemini, GitHub Copilot, Kimi — without the cognitive overhead of managing the stack beneath it.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {["Multi-CLI", "Model-agnostic", "Zero config"].map(tool => (
+                    <span key={tool} className="text-xs px-2 py-1 rounded bg-cyan/10 text-cyan">{tool}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Self-Healing Infrastructure</h3>
+                <h3 className="text-xl font-semibold mb-2">5D Pulse</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Healer detects incidents, remediates failures, and restarts stuck workflows — automatically. Bolt provisions and monitors bare metal. No on-call rotation needed.
+                  The platform monitors its own vitals and fixes what breaks — before it becomes an incident. Automated detection, remediation, and restart logic keep everything running without turning your team into a 24/7 ops desk.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["Auto-Remediation", "Incident Detection", "Health Checks", "Auto-Rollback"].map(feature => (
+                  {["Self-healing", "Auto-remediation", "Health checks", "Auto-rollback"].map(feature => (
                     <span key={feature} className="text-xs px-2 py-1 rounded bg-green-500/10 text-green-500">{feature}</span>
                   ))}
                 </div>
-              </motion.div>
+              </div>
 
-              {/* Kubernetes Operators */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                <div className="w-12 h-12 rounded-lg bg-rose-500/10 flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold mb-2">5D Sentinel</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Continuous vulnerability scanning, dependency analysis, and AI-native remediation running across every service. Cipher doesn&apos;t just flag issues — it ships the fix through the same agent pipeline as everything else.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {["Vuln scanning", "Dependency audit", "AI remediation", "Supply chain"].map(feature => (
+                    <span key={feature} className="text-xs px-2 py-1 rounded bg-rose-500/10 text-rose-400">{feature}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Database Operators</h3>
+                <h3 className="text-xl font-semibold mb-2">5D Runtime</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Replace managed cloud services with open-source Kubernetes operators. 60-80% cost savings.
+                  Databases, storage, and inference — the same managed services teams expect from cloud providers, already running and ready to use. No setup, no assembly, no surprise bills.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["PostgreSQL", "Redis", "Kafka", "MongoDB"].map(db => (
+                  {["5D Data", "5D Store", "5D Volume", "5D Inference"].map(db => (
                     <span key={db} className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-500">{db}</span>
                   ))}
                 </div>
-              </motion.div>
+              </div>
 
-              {/* GitHub-Driven Deployment */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">GitHub-Driven Deployment</h3>
+                <h3 className="text-xl font-semibold mb-2">5D Deploy</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Every change goes through Git. PRs, reviews, and deployments—all automated, all tracked.
+                  Every change moves through a tracked release flow, from review to deploy, with clear auditability and fast rollback when needed.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["GitOps", "PRs", "Auto-deploy"].map(tool => (
+                  {["Tracked releases", "Rollbacks", "Automation"].map(tool => (
                     <span key={tool} className="text-xs px-2 py-1 rounded bg-orange-500/10 text-orange-500">{tool}</span>
                   ))}
                 </div>
-              </motion.div>
+              </div>
 
-              {/* BYOK */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.5 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Bring Your Own Keys</h3>
+                <h3 className="text-xl font-semibold mb-2">5D Vault</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Your API keys, your infrastructure credentials. Stored in OpenBao (HashiCorp Vault fork). Zero vendor lock-in.
+                  API keys, credentials, and provider access are fully managed behind a secure control layer. Everything is included — nothing to configure, nothing to wire up.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["OpenBao", "Zero Trust", "BYOK"].map(feature => (
+                  {["Fully managed", "Secure by default", "Zero config"].map(feature => (
                     <span key={feature} className="text-xs px-2 py-1 rounded bg-purple-500/10 text-purple-500">{feature}</span>
                   ))}
                 </div>
-              </motion.div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Blockchain & AI Section */}
+        <section id="web3-ai" className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                Built for <span className="gradient-text">Blockchain & AI Teams</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Teams building on-chain systems and AI products need the same thing: reliable execution, strong operational controls, and infrastructure that does not turn into a second product to manage.
+              </p>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div className="p-8 rounded-2xl border border-amber-500/20 bg-card/30 backdrop-blur-sm">
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold">On-Chain Infrastructure</h3>
+                </div>
+                <p className="text-muted-foreground mb-5">
+                  Run validator nodes, RPC endpoints, archive infrastructure, and execution systems on dedicated hardware with managed operations underneath.
+                </p>
+                <div className="flex flex-wrap gap-2 mb-5">
+                  {["Solana", "Base", "NEAR", "Sui", "Ethereum", "and more"].map((item) => (
+                    <span key={item} className="text-xs px-2 py-1 rounded bg-amber-500/10 text-amber-400 font-medium">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  <p>Managed upgrades, failover, and health monitoring.</p>
+                  <p>Dedicated infrastructure for latency-sensitive workloads.</p>
+                  <p>Key isolation and operational controls designed for serious teams.</p>
+                </div>
+              </div>
+
+              <div className="p-8 rounded-2xl border border-purple-500/20 bg-card/30 backdrop-blur-sm">
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold">AI Runtime, Without the Ops Burden</h3>
+                </div>
+                <p className="text-muted-foreground mb-5">
+                  Start with hosted providers, move to dedicated GPU infrastructure when usage justifies it, and keep the same product surface the entire way through.
+                </p>
+                <div className="flex flex-wrap gap-2 mb-5">
+                  {["Hosted models", "Dedicated GPU", "Open-weight support", "Consistent APIs"].map((item) => (
+                    <span key={item} className="text-xs px-2 py-1 rounded bg-purple-500/10 text-purple-300 font-medium">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  <p>Use leading hosted models now or self-host later.</p>
+                  <p>Keep one runtime contract as teams scale up.</p>
+                  <p>Focus on product behavior, not inference plumbing.</p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -685,30 +837,17 @@ export default function Home() {
         {/* Why CTO Section */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-16"
-            >
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Why <span className="gradient-text">CTO</span>?
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Other tools help you code. CTO ships complete features—from PRD to production—with specialized agents for every stage of development.
+                Other tools help you write code. CTO ships complete products — planned, built, tested, and deployed by a coordinated team of specialists.
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {/* CLI Agnostic */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5 }}
-                className="p-6 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm text-center h-full"
-              >
+              <div className="p-6 rounded-xl border border-cyan/30 bg-cyan/5 backdrop-blur-sm text-center h-full">
                 <div className="w-14 h-14 rounded-full bg-cyan/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -716,18 +855,11 @@ export default function Home() {
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Choose Your CLI</h3>
                 <p className="text-sm text-muted-foreground">
-                  Claude Code, Cursor, Factory, Codex, Gemini—use what you love. We&apos;re agnostic.
+                  Claude Code, Cursor, Factory, Codex, Gemini, GitHub Copilot, Kimi—use what you love. We&apos;re agnostic.
                 </p>
-              </motion.div>
+              </div>
 
-              {/* Multi-Agent */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-                className="p-6 rounded-xl border border-[oklch(0.7_0.25_320)]/30 bg-[oklch(0.7_0.25_320)]/5 backdrop-blur-sm text-center h-full"
-              >
+              <div className="p-6 rounded-xl border border-[oklch(0.7_0.25_320)]/30 bg-[oklch(0.7_0.25_320)]/5 backdrop-blur-sm text-center h-full">
                 <div className="w-14 h-14 rounded-full bg-[oklch(0.7_0.25_320)]/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -735,18 +867,11 @@ export default function Home() {
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Multi-Agent</h3>
                 <p className="text-sm text-muted-foreground">
-                  13 specialists working in parallel. PM, backend, frontend, QA, security, DevOps—all coordinated.
+                  A full team of specialists working in parallel. PM, backend, frontend, QA, security, DevOps — all coordinated.
                 </p>
-              </motion.div>
+              </div>
 
-              {/* Bare Metal */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="p-6 rounded-xl border border-green-500/30 bg-green-500/5 backdrop-blur-sm text-center h-full"
-              >
+              <div className="p-6 rounded-xl border border-green-500/30 bg-green-500/5 backdrop-blur-sm text-center h-full">
                 <div className="w-14 h-14 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
@@ -756,16 +881,9 @@ export default function Home() {
                 <p className="text-sm text-muted-foreground">
                   Self-healing infrastructure on dedicated servers. Zero cloud tax, zero ops burden.
                 </p>
-              </motion.div>
+              </div>
 
-              {/* Bleeding Edge */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                className="p-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 backdrop-blur-sm text-center h-full"
-              >
+              <div className="p-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 backdrop-blur-sm text-center h-full">
                 <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
                   <svg className="w-7 h-7 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -775,7 +893,7 @@ export default function Home() {
                 <p className="text-sm text-muted-foreground">
                   Always current. Latest models, newest CLIs, freshest integrations. We stay on the frontier.
                 </p>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
@@ -784,14 +902,7 @@ export default function Home() {
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-8">
-              {/* Feature 1 */}
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
@@ -801,16 +912,9 @@ export default function Home() {
                 <p className="text-muted-foreground">
                   Skip the cloud markup. Direct bare metal pricing with cloud-like reliability.
                 </p>
-              </motion.div>
+              </div>
 
-              {/* Feature 2 */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
-              >
+              <div className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
                 <div className="w-12 h-12 rounded-lg bg-magenta/10 flex items-center justify-center mb-4">
                   <svg className="w-6 h-6 text-[oklch(0.7_0.25_320)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -818,27 +922,21 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Complete Engineering Team</h3>
                 <p className="text-muted-foreground">
-                  Not an AI assistant. Thirteen specialists across PM, backend, frontend, quality, security, testing, and deployment.
+                  Not an AI assistant. Specialists across PM, backend, frontend, quality, security, testing, and deployment.
                 </p>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
 
         {/* CTA Section */}
         <section className="py-20 px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl mx-auto text-center"
-          >
+          <div className="max-w-2xl mx-auto text-center">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Start <span className="gradient-text">Shipping</span>
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
-              Your AI engineering team is ready. Give it a PRD—get production code.
+              Describe what you want to build. Watch it ship.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               {featureFlags.showStartNowButton && (
@@ -851,18 +949,23 @@ export default function Home() {
               )}
               <WaitlistForm />
             </div>
-          </motion.div>
+          </div>
         </section>
 
         {/* Footer */}
         <footer className="py-8 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/5dlabs-logo-header-v2.png" alt="5D Labs" className="h-16 opacity-90" />
-            </div>
+            <a href={homeHref} className="flex items-center gap-2" aria-label="Back to 5D Labs">
+              <Image
+                src="/5dlabs-logo-3d.jpg"
+                alt="5D Labs"
+                width={160}
+                height={40}
+                className="h-10 w-auto opacity-90"
+              />
+            </a>
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} 5D Labs. From PRD to Production — Autonomously.
+              © {new Date().getFullYear()} 5D Labs. Idea to Production — Autonomously.
             </p>
           </div>
         </footer>

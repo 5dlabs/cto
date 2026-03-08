@@ -84,7 +84,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: kubeai
+    namespace: operators
 
   syncPolicy:
     automated:

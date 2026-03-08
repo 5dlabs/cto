@@ -1,24 +1,19 @@
-"use client";
-
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { featureFlags } from "@/config/feature-flags";
 
+const homeHref =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3001"
+    : "https://5dlabs.ai";
+
 const navLinks = [
-  { name: "Team", href: "/#agents" },
   { name: "Stack", href: "/#stack" },
+  { name: "Services", href: "/services" },
   { name: "Infrastructure", href: "/#infrastructure" },
   { name: "Platform", href: "/#platform" },
 ];
 
 const socials = [
-  {
-    name: "5D Labs",
-    href: "https://5dlabs.ai",
-    icon: (
-      <span className="text-[10px] font-bold">5D</span>
-    ),
-  },
   {
     name: "GitHub",
     href: "https://github.com/5dlabs",
@@ -32,14 +27,19 @@ const socials = [
 
 export function Header() {
   return (
-    <motion.header
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-      className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
-    >
+    <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4">
       <nav className="flex items-center gap-1 px-2 py-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.3)]">
-        {/* Logo */}
+        {/* Brand switcher */}
+        <a
+          href={homeHref}
+          className="flex items-center justify-center h-8 px-3 rounded-full bg-white/[0.03] text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:bg-white/[0.08] transition-colors"
+          aria-label="Back to 5D Labs"
+        >
+          5D Labs
+        </a>
+
+        <div className="w-px h-4 bg-white/[0.08] mx-1" />
+
         <Link
           href="/"
           className="flex items-center justify-center h-8 px-3 rounded-full bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
@@ -104,6 +104,6 @@ export function Header() {
           </>
         )}
       </nav>
-    </motion.header>
+    </header>
   );
 }

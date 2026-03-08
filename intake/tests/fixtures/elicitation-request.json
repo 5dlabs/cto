@@ -1,0 +1,27 @@
+{
+  "elicitation_id": "session-123-dp-1",
+  "session_id": "session-123",
+  "decision_id": "dp-1",
+  "question": "Event bus choice — NATS JetStream vs. Kafka vs. Redis Streams?",
+  "category": "architecture",
+  "options": [
+    { "label": "NATS JetStream", "value": "nats", "description": "Lightweight, K8s-native with operator support" },
+    { "label": "Kafka", "value": "kafka", "description": "Industry standard, mature ecosystem" },
+    { "label": "Redis Streams", "value": "redis", "description": "Simple, already in stack as cache layer" }
+  ],
+  "recommended_option": "nats",
+  "vote_summary": {
+    "total_voters": 5,
+    "tally": { "nats": 3, "kafka": 1, "redis": 1 },
+    "consensus_strength": 0.6,
+    "escalated": false
+  },
+  "allow_redeliberation": true,
+  "timeout_seconds": 300,
+  "informational": false,
+  "timestamp": "2026-03-05T12:00:00.000Z",
+  "resume_token": "lobster-resume-abc123",
+  "metadata": {
+    "run_id": "run-456"
+  }
+}

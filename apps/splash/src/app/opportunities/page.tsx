@@ -1,7 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
-import { RainEffect } from "@/components/rain-effect";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { colorMap } from "@/lib/utils";
@@ -10,7 +6,7 @@ const stats = [
   { value: "20+", label: "years in production infra" },
   { value: "10,600+", label: "GitHub contributions (last year)" },
   { value: "1B+", label: "daily requests managed" },
-  { value: "13", label: "AI agents shipping code" },
+  { value: "60+", label: "MCP tools integrated" },
   { value: "60–80%", label: "cost savings on migrations" },
   { value: "SE→CTO", label: "in 3 months at Coinmiles" },
 ];
@@ -159,7 +155,7 @@ const caseStudies = [
     color: "cyan",
     problem:
       "Early-stage startups can't afford full engineering teams, but need production-grade software infrastructure from day one.",
-    what: "Built a Cognitive Task Orchestrator deploying 13 specialized AI agents — Rex (Orchestrator), Blaze (Implementer), Morgan (Architect), Sentinel (Security), Pixel (Frontend), Echo (QA) — across the full SDLC. Runs on bare-metal Kubernetes with Talos Linux, ArgoCD, Cilium, and a full observability stack. Custom MCP server with 60+ tools and a self-healing system with 9 automated remediation types.",
+    what: "Built a Cognitive Task Orchestrator deploying specialized AI agents — Rex (Orchestrator), Blaze (Implementer), Morgan (Architect), Sentinel (Security), Pixel (Frontend), Echo (QA) — across the full SDLC. Runs on bare-metal Kubernetes with Talos Linux, ArgoCD, Cilium, and a full observability stack. Custom MCP server with 60+ tools and a self-healing system with 9 automated remediation types.",
     result:
       "\"CTO as a Service\" platform replacing early engineering hires at 60–80% lower infrastructure cost than cloud. Open-sourced under AGPL-3.0.",
   },
@@ -187,23 +183,22 @@ const caseStudies = [
 
 const ventures = [
   { name: "CTO Platform", desc: "Multi-agent AI engineering platform", href: "https://cto.5dlabs.ai", status: "Pre-launch" },
-  { name: "OpenClaw Platform", desc: "Open-source Kubernetes-native agent orchestration", href: "https://github.com/5dlabs/openclaw-platform", status: "Building" },
-  { name: "Agentic Trading", desc: "Autonomous on-chain trading agents on Solana, Base, Near, and Sui", href: null, status: "Building" },
-  { name: "Sanctuary", desc: "AI-powered smart home orchestration", href: null, status: "Building" },
+  { name: "OpenClaw", desc: "The orchestration layer beneath CTO. Multi-CLI, bare-metal native, and coming soon as open source.", href: "/#openclaw", status: "Coming Soon" },
+  {
+    name: "Trading Engine",
+    desc: "In-house capital and market-intelligence engine across Solana, Base, Near, and Sui",
+    href: "/trading",
+    status: "Active",
+  },
 ];
 
 export default function OpportunitiesPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
-      <div className="fixed inset-0 circuit-bg z-0" />
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[5%] left-[20%] w-[500px] h-[500px] rounded-full bg-cyan/[0.04] blur-[120px]" />
-        <div className="absolute top-[50%] right-[5%] w-[400px] h-[400px] rounded-full bg-[oklch(0.7_0.25_320)]/[0.03] blur-[100px]" />
-        <div className="absolute bottom-[15%] left-[35%] w-[600px] h-[600px] rounded-full bg-blue-500/[0.03] blur-[140px]" />
-      </div>
-      <RainEffect />
-      <div className="fixed inset-0 noise-overlay z-0" />
+      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.04_0.02_260)] z-0" />
+      <div className="fixed inset-0 circuit-bg z-[1]" />
+      {/* GridPulse at z-[2] from layout */}
+      <div className="fixed inset-0 noise-overlay z-[3]" />
 
       <Header />
 
@@ -211,51 +206,36 @@ export default function OpportunitiesPage() {
 
         {/* Hero */}
         <section className="min-h-[60vh] flex flex-col items-center justify-center px-6 py-20 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.0 }}
+          <div
             className="max-w-4xl mx-auto"
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3, duration: 0.8 }}
+            <div
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-badge mb-8"
             >
               <span className="w-2 h-2 rounded-full bg-cyan animate-pulse" />
               <span className="text-sm text-cyan font-semibold tracking-wide">
                 Builder · Operator · Technical Co-Founder
               </span>
-            </motion.div>
+            </div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 1.0 }}
+            <h1
               className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6"
             >
               <span className="gradient-text glow-text-cyan">Let&apos;s Build</span>
               <br />
               <span className="text-foreground">Something Real.</span>
-            </motion.h1>
+            </h1>
 
-            <motion.p
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8, duration: 1.0 }}
+            <p
               className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10 leading-relaxed"
             >
               I build AI agent platforms and bare-metal infrastructure for a living —{" "}
               <span className="text-foreground font-semibold">10,600+ GitHub contributions</span> in
               the last year alone. I&apos;m looking to do more of it: as a technical co-founder, a
               fractional CTO, or the infrastructure lead at an early-stage AI or blockchain startup.
-            </motion.p>
+            </p>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.1, duration: 0.8 }}
+            <div
               className="flex flex-col sm:flex-row justify-center gap-4"
             >
               <a
@@ -273,18 +253,14 @@ export default function OpportunitiesPage() {
               >
                 See Consulting Options
               </a>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         </section>
 
         {/* What I'm Looking For */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
+            <div
               className="text-center mb-16"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -294,18 +270,14 @@ export default function OpportunitiesPage() {
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 Three types of engagement where I can make the most impact.
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid md:grid-cols-3 gap-8">
-              {opportunities.map((opp, i) => {
+              {opportunities.map((opp) => {
                 const colors = colorMap[opp.badgeColor];
                 return (
-                  <motion.div
+                  <div
                     key={opp.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: i * 0.1 }}
                     className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden flex flex-col"
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -347,7 +319,7 @@ export default function OpportunitiesPage() {
                         {opp.cta.label}
                       </a>
                     )}
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -357,11 +329,7 @@ export default function OpportunitiesPage() {
         {/* What I Bring — stats */}
         <section className="py-20 px-6 border-t border-border/30 glass-section">
           <div className="max-w-6xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
+            <div
               className="text-center mb-12"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -371,14 +339,10 @@ export default function OpportunitiesPage() {
                 20+ years shipping production systems. I&apos;ve held every role on the infrastructure
                 ladder: network engineer → DevOps → SRE → team lead → Head of Infra → CTO → founder.
               </p>
-            </motion.div>
+            </div>
 
             {/* Stats row */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+            <div
               className="flex flex-wrap justify-center gap-4 mb-16"
             >
               {stats.map((stat) => (
@@ -387,19 +351,15 @@ export default function OpportunitiesPage() {
                   <span className="text-sm text-muted-foreground">{stat.label}</span>
                 </div>
               ))}
-            </motion.div>
+            </div>
 
             {/* Technical depth grid */}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {technicalDepth.map((area, i) => {
+              {technicalDepth.map((area) => {
                 const colors = colorMap[area.color];
                 return (
-                  <motion.div
+                  <div
                     key={area.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: i * 0.08 }}
                     className="relative p-6 rounded-2xl glass-card glass-shimmer overflow-hidden"
                   >
                     <div className={`w-11 h-11 rounded-xl ${colors.bg} border ${colors.border} flex items-center justify-center mb-4`}>
@@ -407,7 +367,7 @@ export default function OpportunitiesPage() {
                     </div>
                     <h3 className="text-base font-semibold mb-2">{area.title}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">{area.description}</p>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -417,31 +377,23 @@ export default function OpportunitiesPage() {
         {/* Case Studies */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-5xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
+            <div
               className="text-center mb-16"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 How I&apos;ve <span className="gradient-text">Done It</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Three case studies. Same pattern every time: inherit a hard problem, build the solution, ship results.
+                Three case studies.                 Same pattern every time: inherit a hard problem, build the solution, ship results.
               </p>
-            </motion.div>
+            </div>
 
             <div className="space-y-8">
               {caseStudies.map((cs, i) => {
                 const colors = colorMap[cs.color];
                 return (
-                  <motion.div
+                  <div
                     key={cs.company}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: i * 0.1 }}
                     className="relative p-8 rounded-2xl glass-card glass-shimmer overflow-hidden"
                   >
                     <div className="flex items-start gap-4 mb-6">
@@ -468,7 +420,7 @@ export default function OpportunitiesPage() {
                         <p className={`text-sm leading-relaxed font-medium ${colors.text}`}>{cs.result}</p>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -478,11 +430,7 @@ export default function OpportunitiesPage() {
         {/* Currently Building */}
         <section className="py-20 px-6 border-t border-border/30 glass-section">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
+            <div
               className="text-center mb-12"
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -490,18 +438,14 @@ export default function OpportunitiesPage() {
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 <a href="https://5dlabs.ai" className="text-cyan hover:underline">5D Labs</a>{" "}
-                — an AI-first startup studio operating multiple ventures in parallel.
+                — an AI-native venture studio building its operating stack and the ventures it enables.
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
-              {ventures.map((v, i) => (
-                <motion.div
+              {ventures.map((v) => (
+                <div
                   key={v.name}
-                  initial={{ opacity: 0, y: 12 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.08 }}
                   className="relative p-5 rounded-2xl glass-card glass-shimmer overflow-hidden"
                 >
                   <div className="flex items-start justify-between mb-2">
@@ -519,7 +463,7 @@ export default function OpportunitiesPage() {
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground">{v.desc}</p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
@@ -528,11 +472,8 @@ export default function OpportunitiesPage() {
         {/* Let's Talk */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-2xl mx-auto text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
+            <div
+              className=""
             >
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
                 Let&apos;s <span className="gradient-text">Talk</span>
@@ -584,7 +525,7 @@ export default function OpportunitiesPage() {
               <p className="text-sm text-muted-foreground">
                 Based in Victoria, BC. Open to remote roles with US-based companies.
               </p>
-            </motion.div>
+            </div>
           </div>
         </section>
 

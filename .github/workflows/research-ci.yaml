@@ -154,6 +154,14 @@ jobs:
           output-path: research
           use-sccache: 'true'
 
+      - name: Build intake CLI binary
+        uses: ./.github/actions/rust-build
+        with:
+          package: intake
+          binary: intake
+          output-path: intake
+          use-sccache: 'true'
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:

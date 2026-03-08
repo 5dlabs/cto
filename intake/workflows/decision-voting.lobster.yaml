@@ -1,0 +1,253 @@
+name: decision-voting
+description: >
+  5-member committee vote on a single deliberation decision point.
+  Reuses the parallel voting pattern from voting.lobster.yaml but with
+  decision-point-specific prompts and elicitation for human-in-the-loop.
+
+inputs:
+  - name: question
+    type: string
+    description: "The decision point question"
+  - name: optimist_position
+    type: string
+    description: "The optimist's advocated approach"
+  - name: pessimist_position
+    type: string
+    description: "The pessimist's advocated approach"
+  - name: context
+    type: string
+    description: "Relevant PRD excerpt for context"
+  - name: decision_id
+    type: string
+    description: "Decision point ID (e.g. dp-auth-strategy)"
+  - name: session_id
+    type: string
+    description: "Deliberation session ID"
+  - name: human_review_mode
+    type: string
+    default: "full_auto"
+    description: "full_auto | semi_auto | manual"
+  - name: verify
+    type: string
+    default: "true"
+    description: "When true, validate tally output"
+  - name: linear_issue_id
+    type: string
+    default: ""
+  - name: discord_channel_id
+    type: string
+    default: ""
+  - name: voter_1_provider
+    type: string
+    default: "anthropic"
+  - name: voter_1_model
+    type: string
+    default: "claude-opus-4-6"
+  - name: voter_2_provider
+    type: string
+    default: "openai"
+  - name: voter_2_model
+    type: string
+    default: "gpt-5.2-pro"
+  - name: voter_3_provider
+    type: string
+    default: "anthropic"
+  - name: voter_3_model
+    type: string
+    default: "claude-sonnet-4-6"
+  - name: voter_4_provider
+    type: string
+    default: "openai"
+  - name: voter_4_model
+    type: string
+    default: "o3-pro"
+  - name: voter_5_provider
+    type: string
+    default: "google"
+  - name: voter_5_model
+    type: string
+    default: "gemini-2.5-pro"
+
+steps:
+  # ─────────────────────────────────────────────────────────
+  # Parallel committee votes (5 independent voters)
+  # ─────────────────────────────────────────────────────────
+  - name: voter-1
+    description: "Architect voter — structural soundness"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/voter-architect-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
+        "input": {
+          "question": "{{inputs.question}}",
+          "category": "architecture",
+          "optimist_position": "{{inputs.optimist_position}}",
+          "pessimist_position": "{{inputs.pessimist_position}}",
+          "context": "{{inputs.context}}"
+        },
+        "schema": "{{schemas/decision-vote-response.schema.json}}",
+        "provider": "{{inputs.voter_1_provider}}",
+        "model": "{{inputs.voter_1_model}}"
+      }'
+
+  - name: voter-2
+    description: "Pragmatist voter — implementability and timeline"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/voter-pragmatist-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
+        "input": {
+          "question": "{{inputs.question}}",
+          "category": "architecture",
+          "optimist_position": "{{inputs.optimist_position}}",
+          "pessimist_position": "{{inputs.pessimist_position}}",
+          "context": "{{inputs.context}}"
+        },
+        "schema": "{{schemas/decision-vote-response.schema.json}}",
+        "provider": "{{inputs.voter_2_provider}}",
+        "model": "{{inputs.voter_2_model}}"
+      }'
+
+  - name: voter-3
+    description: "Minimalist voter — simplicity and focus"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/voter-minimalist-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
+        "input": {
+          "question": "{{inputs.question}}",
+          "category": "architecture",
+          "optimist_position": "{{inputs.optimist_position}}",
+          "pessimist_position": "{{inputs.pessimist_position}}",
+          "context": "{{inputs.context}}"
+        },
+        "schema": "{{schemas/decision-vote-response.schema.json}}",
+        "provider": "{{inputs.voter_3_provider}}",
+        "model": "{{inputs.voter_3_model}}"
+      }'
+
+  - name: voter-4
+    description: "Operator voter — deployability and observability"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/voter-operator-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
+        "input": {
+          "question": "{{inputs.question}}",
+          "category": "architecture",
+          "optimist_position": "{{inputs.optimist_position}}",
+          "pessimist_position": "{{inputs.pessimist_position}}",
+          "context": "{{inputs.context}}"
+        },
+        "schema": "{{schemas/decision-vote-response.schema.json}}",
+        "provider": "{{inputs.voter_4_provider}}",
+        "model": "{{inputs.voter_4_model}}"
+      }'
+
+  - name: voter-5
+    description: "Strategist voter — maintainability and evolution"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/voter-strategist-soul.md}}\n\n---\n\n{{prompts/decision-vote-system.md}}",
+        "input": {
+          "question": "{{inputs.question}}",
+          "category": "architecture",
+          "optimist_position": "{{inputs.optimist_position}}",
+          "pessimist_position": "{{inputs.pessimist_position}}",
+          "context": "{{inputs.context}}"
+        },
+        "schema": "{{schemas/decision-vote-response.schema.json}}",
+        "provider": "{{inputs.voter_5_provider}}",
+        "model": "{{inputs.voter_5_model}}"
+      }'
+
+  # ─────────────────────────────────────────────────────────
+  # Tally votes
+  # ─────────────────────────────────────────────────────────
+  - name: tally
+    depends_on: [voter-1, voter-2, voter-3, voter-4, voter-5]
+    description: "Tally committee decision-point votes"
+    command: >
+      jq -n '[
+        ($v1 | . + {"voter_id": "architect"}),
+        ($v2 | . + {"voter_id": "pragmatist"}),
+        ($v3 | . + {"voter_id": "minimalist"}),
+        ($v4 | . + {"voter_id": "operator"}),
+        ($v5 | . + {"voter_id": "strategist"})
+      ]'
+        --argjson v1 '${{ steps.voter-1.output }}'
+        --argjson v2 '${{ steps.voter-2.output }}'
+        --argjson v3 '${{ steps.voter-3.output }}'
+        --argjson v4 '${{ steps.voter-4.output }}'
+        --argjson v5 '${{ steps.voter-5.output }}' |
+      intake-util tally-decision-votes
+
+  # ─────────────────────────────────────────────────────────
+  # Verify tally output
+  # ─────────────────────────────────────────────────────────
+  - name: verify-tally
+    when: "{{inputs.verify}}"
+    depends_on: [tally]
+    command: >
+      echo '${{ steps.tally.output }}' |
+      intake-util validate --type decision-vote
+
+  # ─────────────────────────────────────────────────────────
+  # Publish elicitation to bridges (human-in-the-loop)
+  # ─────────────────────────────────────────────────────────
+  - name: publish-elicitation
+    depends_on: [tally]
+    description: "Publish elicitation request via HTTP bridge"
+    command: >
+      intake-util bridge-elicitation
+        --session-id "{{inputs.session_id}}"
+        --decision-id "{{inputs.decision_id}}"
+        --vote-result '${{ steps.tally.output }}'
+        --resume-token "$LOBSTER_RESUME_TOKEN"
+        --human-review-mode "{{inputs.human_review_mode}}"
+
+  # ─────────────────────────────────────────────────────────
+  # Wait for human response (Lobster approval gate)
+  # ─────────────────────────────────────────────────────────
+  - name: wait-human
+    when: "{{inputs.human_review_mode != 'full_auto'}}"
+    depends_on: [publish-elicitation]
+    approval:
+      message: "Waiting for human decision on {{inputs.decision_id}}"
+
+  # ─────────────────────────────────────────────────────────
+  # Resolve: use human override or committee result
+  # ─────────────────────────────────────────────────────────
+  - name: resolve
+    depends_on: [tally, wait-human]
+    description: "Resolve decision: human override or committee result"
+    command: >
+      TALLY='${{ steps.tally.output }}'
+      HUMAN='${{ steps.wait-human.output }}'
+      jq -n \
+        --argjson tally "$TALLY" \
+        --argjson human "${HUMAN:-null}" \
+        '{
+          decision_id: "{{inputs.decision_id}}",
+          question: "{{inputs.question}}",
+          winning_option: (
+            if $human != null and $human.response_type == "selection" and $human.selected_option != null
+            then $human.selected_option
+            else $tally.winning_option
+            end
+          ),
+          escalated: (
+            if $human != null and $human.response_type == "redeliberate"
+            then true
+            elif $human != null and $human.response_type == "selection"
+            then false
+            else $tally.escalated
+            end
+          ),
+          consensus_strength: $tally.consensus_strength,
+          tally: $tally.tally,
+          human_override: ($human != null and $human.response_type == "selection"),
+          voter_notes: $tally.voter_notes
+        }'
+
+output_mappings:
+  winning_option: ${{ steps.resolve.output | jq -r '.winning_option' }}
+  escalated: ${{ steps.resolve.output | jq -r '.escalated' }}
+  consensus_strength: ${{ steps.resolve.output | jq -r '.consensus_strength' }}
+  decision_result: ${{ steps.resolve.output }}

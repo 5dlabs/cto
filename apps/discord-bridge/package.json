@@ -2,7 +2,7 @@
   "name": "@5dlabs/discord-bridge",
   "version": "0.1.0",
   "private": true,
-  "description": "NATS-to-Discord conversation bridge for OpenClaw agent visibility",
+  "description": "HTTP-to-Discord conversation bridge for OpenClaw agent visibility and elicitation",
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
@@ -11,8 +11,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "discord.js": "^14.16.0",
-    "nats": "^2.28.0"
+    "discord.js": "^14.16.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

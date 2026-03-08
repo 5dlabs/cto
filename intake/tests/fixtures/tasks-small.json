@@ -2,6 +2,8 @@
   {
     "id": 1,
     "title": "Initialize project structure",
+    "agent": "bolt",
+    "stack": "DevOps",
     "description": "Set up the base project directory layout with standard folders.",
     "status": "pending",
     "dependencies": [],
@@ -12,6 +14,8 @@
   {
     "id": 2,
     "title": "Add configuration loader (Grizz - Go/YAML)",
+    "agent": "grizz",
+    "stack": "Go/YAML",
     "description": "Implement a configuration file loader that reads YAML config files.",
     "status": "pending",
     "dependencies": [1],

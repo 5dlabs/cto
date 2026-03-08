@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elicitation-request.schema.json",
+  "title": "ElicitationRequest",
+  "description": "A request for human decision input, sent to both Discord and Linear bridges.",
+  "type": "object",
+  "properties": {
+    "elicitation_id": { "type": "string" },
+    "session_id": { "type": "string" },
+    "decision_id": { "type": "string" },
+    "question": { "type": "string" },
+    "category": { "type": "string" },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string" },
+          "value": { "type": "string" },
+          "description": { "type": "string" }
+        },
+        "required": ["label", "value"]
+      }
+    },
+    "recommended_option": { "type": "string" },
+    "vote_summary": {
+      "type": "object",
+      "properties": {
+        "total_voters": { "type": "integer", "minimum": 0 },
+        "tally": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "consensus_strength": { "type": "number", "minimum": 0, "maximum": 1 },
+        "escalated": { "type": "boolean" }
+      },
+      "required": ["total_voters", "tally", "consensus_strength", "escalated"]
+    },
+    "allow_redeliberation": { "type": "boolean" },
+    "timeout_seconds": { "type": "integer", "minimum": 0 },
+    "informational": { "type": "boolean" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "linear_issue_id": { "type": "string" },
+    "discord_channel_id": { "type": "string" },
+    "resume_token": { "type": "string" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "required": [
+    "elicitation_id",
+    "session_id",
+    "decision_id",
+    "question",
+    "category",
+    "options",
+    "vote_summary",
+    "allow_redeliberation",
+    "timeout_seconds",
+    "informational",
+    "timestamp"
+  ]
+}

@@ -555,6 +555,7 @@ morgan:
     - writing-plans
   intake:
     - prd-analysis
+    - intake-pipeline
     - multi-agent-patterns
     - frontend-stack-selection
     - doc-coauthoring

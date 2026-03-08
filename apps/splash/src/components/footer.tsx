@@ -1,24 +1,27 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+
+const teamHref =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3002/team"
+    : "https://cto.5dlabs.ai/team";
 
 const footerLinks = [
   {
-    title: "Ventures",
+    title: "Products",
     links: [
       { name: "CTO Platform", href: "https://cto.5dlabs.ai" },
-      { name: "Agentic Trading", href: "/#ventures" },
-      { name: "OpenClaw Platform", href: "https://github.com/5dlabs/openclaw-platform" },
-      { name: "Sanctuary", href: "/#ventures" },
+      { name: "Trading Engine", href: "/trading" },
     ],
   },
   {
     title: "Company",
     links: [
-      { name: "Consulting", href: "/consulting" },
       { name: "Opportunities", href: "/opportunities" },
       { name: "Founder", href: "/founder" },
-      { name: "Team", href: "/team" },
+      { name: "Team", href: teamHref },
       { name: "Investors", href: "/investors" },
     ],
   },
@@ -26,6 +29,7 @@ const footerLinks = [
     title: "Connect",
     links: [
       { name: "GitHub", href: "https://github.com/5dlabs" },
+      { name: "OpenClaw (Coming Soon)", href: "/#openclaw" },
       { name: "Discord", href: "https://discord.gg/r334tFP87Y" },
       { name: "X / Twitter", href: "https://x.com/5dlabs" },
       { name: "YouTube", href: "https://youtube.com/@5dlabs" },
@@ -40,15 +44,17 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand column */}
           <div className="col-span-2 md:col-span-1">
-            <Image
-              src="/5dlabs-logo-header-v2.png"
-              alt="5D Labs — OpenClaw-first AI startup studio logo"
-              width={120}
-              height={120}
-              className="opacity-90 mb-4"
-            />
+            <Link href="/" aria-label="5D Labs home" className="inline-flex">
+              <Image
+                src="/5dlabs-logo-3d.jpg"
+                alt="5D Labs"
+                width={180}
+                height={45}
+                className="h-10 w-auto opacity-90 mb-4"
+              />
+            </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
-              OpenClaw-first, crypto-first, AI-first startup studio.
+              AI-native venture studio powered by an internal operating stack.
             </p>
           </div>
 
@@ -81,14 +87,6 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             &copy; {new Date().getFullYear()} 5D Labs. Building the future in parallel.
           </p>
-          <a
-            href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-cyan hover:text-cyan/80 transition-colors"
-          >
-            Schedule a Call
-          </a>
         </div>
       </div>
     </footer>
