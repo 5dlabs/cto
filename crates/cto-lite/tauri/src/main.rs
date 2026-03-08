@@ -1,4 +1,4 @@
-//! CTO Lite - Desktop Application
+//! CTO - Desktop Application
 //!
 //! A freemium desktop application that runs the CTO AI development platform
 //! on a local Kind cluster. Built with Tauri for cross-platform native experience.
@@ -20,16 +20,49 @@ mod runtime;
 use tauri::Manager;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+fn get_legacy_data_dir() -> Option<std::path::PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        return dirs::data_dir().map(|p| p.join("ai.5dlabs.cto-lite"));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        return dirs::data_dir().map(|p| p.join("ai.5dlabs").join("cto-lite"));
+    }
+    #[cfg(target_os = "linux")]
+    {
+        return dirs::data_dir().map(|p| p.join("ai.5dlabs.cto-lite"));
+    }
+
+    #[allow(unreachable_code)]
+    None
+}
+
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else if !dst_path.exists() {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     // Initialize tracing
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "cto_lite=debug,info".into()),
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "cto_tauri=debug,info".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    tracing::info!("Starting CTO Lite v{}", env!("CARGO_PKG_VERSION"));
+    tracing::info!("Starting CTO v{}", env!("CARGO_PKG_VERSION"));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -38,8 +71,21 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            // Initialize database on startup
             let app_data_dir = app.path().app_data_dir()?;
+
+            // One-time migration for previous app identifier data directory.
+            if let Some(legacy_data_dir) = get_legacy_data_dir() {
+                if legacy_data_dir.exists() && !app_data_dir.exists() {
+                    tracing::info!(
+                        "Migrating app data directory from {:?} to {:?}",
+                        legacy_data_dir,
+                        app_data_dir
+                    );
+                    copy_dir_all(&legacy_data_dir, &app_data_dir)?;
+                }
+            }
+
+            // Initialize database on startup
             std::fs::create_dir_all(&app_data_dir)?;
 
             let db_path = app_data_dir.join("cto-lite.db");
@@ -50,6 +96,7 @@ fn main() {
 
             // Initialize MCP state
             app.manage(commands::mcp::McpState::new());
+            app.manage(commands::openclaw::LocalBridgeState::new());
 
             tracing::info!("Database initialized at {:?}", db_path);
             Ok(())
@@ -129,6 +176,9 @@ fn main() {
             commands::openclaw::openclaw_reject,
             commands::openclaw::openclaw_get_status,
             commands::openclaw::openclaw_exec_cli,
+            commands::openclaw::openclaw_start_local_bridge,
+            commands::openclaw::openclaw_stop_local_bridge,
+            commands::openclaw::openclaw_get_local_bridge_status,
             // Smart initialization & runtime
             commands::cluster::smart_init,
             commands::cluster::quick_health_check,

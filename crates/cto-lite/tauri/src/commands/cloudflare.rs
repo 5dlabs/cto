@@ -4,7 +4,7 @@ use crate::error::AppError;
 use crate::keychain::{self, CredentialKey};
 use serde::{Deserialize, Serialize};
 
-// Cloudflare OAuth App credentials (CTO Lite app)
+// Cloudflare OAuth App credentials (CTO app)
 // Register at: https://dash.cloudflare.com/profile/api-tokens
 const CLOUDFLARE_CLIENT_ID: &str = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"; // TODO: Replace with real client ID
 const CLOUDFLARE_REDIRECT_URI: &str = "http://localhost:19284/callback/cloudflare";

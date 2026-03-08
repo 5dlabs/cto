@@ -2,6 +2,9 @@
 
 A plan to adopt newer ElevenLabs features identified from the docs and changelog (March 2026) to improve Morgan’s voice quality, latency, and future integration options.
 
+Companion note:
+- [ElevenLabs cost savings and scope notes](/Users/jonathon/5dlabs/cto/avatar/docs/elevenlabs-cost-savings-and-scope.md)
+
 ---
 
 ## 1. Eleven v3 Conversational TTS (Priority: High)

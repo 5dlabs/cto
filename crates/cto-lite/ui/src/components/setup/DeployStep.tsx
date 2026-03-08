@@ -202,9 +202,9 @@ export function DeployStep({ onComplete, onBack }: DeployStepProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Deploy CTO App</h2>
+        <h2 className="text-2xl font-bold">Deploy CTO</h2>
         <p className="text-muted-foreground mt-2">
-          Deploy the CTO App platform to your local Kubernetes cluster.
+          Deploy the CTO platform to your local Kubernetes cluster.
         </p>
       </div>
 
@@ -260,7 +260,7 @@ export function DeployStep({ onComplete, onBack }: DeployStepProps) {
               <div className="space-y-2">
                 <Progress value={progress} className="h-2" />
                 <p className="text-sm text-muted-foreground text-center">
-                  Deploying CTO App to your cluster...
+                  Deploying CTO to your cluster...
                 </p>
               </div>
             )}
@@ -289,7 +289,7 @@ export function DeployStep({ onComplete, onBack }: DeployStepProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Existing Installation</CardTitle>
             <CardDescription>
-              CTO App is already deployed
+              CTO is already deployed
             </CardDescription>
           </CardHeader>
           <CardContent>

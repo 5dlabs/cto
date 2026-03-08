@@ -5,7 +5,17 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export function WaitlistForm() {
+type WaitlistFormProps = {
+  onSubmitStart?: () => void;
+  onSubmitSuccess?: () => void;
+  onSubmitError?: () => void;
+};
+
+export function WaitlistForm({
+  onSubmitStart,
+  onSubmitSuccess,
+  onSubmitError,
+}: WaitlistFormProps) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
@@ -14,6 +24,7 @@ export function WaitlistForm() {
     if (!email) return;
 
     setStatus("loading");
+    onSubmitStart?.();
     
     try {
       const response = await fetch("/api/waitlist", {
@@ -27,11 +38,14 @@ export function WaitlistForm() {
       if (data.success) {
         setStatus("success");
         setEmail("");
+        onSubmitSuccess?.();
       } else {
         setStatus("error");
+        onSubmitError?.();
       }
     } catch {
       setStatus("error");
+      onSubmitError?.();
     }
   };
 

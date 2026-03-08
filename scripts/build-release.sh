@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build script for CTO Lite release packages
+# Build script for CTO release packages
 #
 # This script:
 # 1. Downloads platform-specific binaries (kind, kubectl, helm, cloudflared)
@@ -52,7 +52,7 @@ case "$(uname -m)" in
         ;;
 esac
 
-echo "=== CTO Lite Build Script ==="
+echo "=== CTO Build Script ==="
 echo "Platform: $PLATFORM"
 echo "Architecture: $ARCH"
 echo "Resources directory: $RESOURCES_DIR"

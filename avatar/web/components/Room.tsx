@@ -3,8 +3,8 @@
 import "@livekit/components-styles";
 
 import {
+  AudioTrack,
   LiveKitRoom,
-  RoomAudioRenderer,
   TrackToggle,
   VideoTrack,
   useRoomContext,
@@ -12,7 +12,7 @@ import {
   useVoiceAssistant,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TokenResponse = {
   identity: string;
@@ -21,19 +21,133 @@ type TokenResponse = {
   token: string;
 };
 
+type RoomProps = {
+  autoConnect?: boolean;
+  compact?: boolean;
+};
+
 type AgentTelemetryProps = {
+  compact: boolean;
   connectionRequestedAt: number | null;
   roomConnectedAt: number | null;
+};
+
+type HostAvatarState = {
+  connectionState: "idle" | "connecting" | "connected" | "error";
+  voiceState: string;
+  latestUserText: string;
+  latestAgentText: string;
+  audioTrackReady: boolean;
+  videoTrackReady: boolean;
+  roomName?: string;
+  identity?: string;
+  error?: string;
+  metrics?: Record<string, unknown>;
+  trackDebug?: Record<string, unknown>;
 };
 
 function formatLatency(ms: number | null): string {
   if (ms === null) {
     return "waiting";
   }
+
   return `${Math.round(ms)} ms`;
 }
 
+function emitHostAvatarState(payload: HostAvatarState) {
+  if (typeof window === "undefined" || window.parent === window) {
+    return;
+  }
+
+  window.parent.postMessage(
+    {
+      type: "cto-avatar-state",
+      payload,
+    },
+    "*",
+  );
+}
+
+function StatusPill({
+  label,
+  tone = "neutral",
+}: {
+  label: string;
+  tone?: "neutral" | "emerald" | "violet";
+}) {
+  const toneClass =
+    tone === "emerald"
+      ? "border-emerald-400/35 bg-emerald-400/12 text-emerald-100"
+      : tone === "violet"
+        ? "border-fuchsia-400/35 bg-fuchsia-400/12 text-fuchsia-100"
+        : "border-white/12 bg-white/10 text-slate-200";
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] ${toneClass}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ActivityGlyph({
+  active,
+  tone,
+}: {
+  active: boolean;
+  tone: "emerald" | "violet";
+}) {
+  const activeClass =
+    tone === "emerald" ? "bg-emerald-300/90" : "bg-fuchsia-300/90";
+  const idleClass = "bg-white/10";
+
+  return (
+    <div className="flex items-end gap-1">
+      {[0, 1, 2, 3, 4].map((bar) => (
+        <span
+          key={bar}
+          className={`w-1.5 rounded-full transition-all duration-200 ${
+            active ? activeClass : idleClass
+          }`}
+          style={{
+            height: `${active ? 12 + ((bar % 3) + 1) * 8 : 8}px`,
+            opacity: active ? 0.65 + bar * 0.06 : 0.5,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function InsightCard({
+  eyebrow,
+  tone,
+  body,
+}: {
+  eyebrow: string;
+  tone: "emerald" | "violet";
+  body: string;
+}) {
+  const eyebrowClass =
+    tone === "emerald" ? "text-emerald-200/90" : "text-fuchsia-200/90";
+  const ringClass =
+    tone === "emerald"
+      ? "border-emerald-400/20 bg-emerald-950/35"
+      : "border-fuchsia-400/20 bg-fuchsia-950/25";
+
+  return (
+    <div className={`rounded-[1.6rem] border p-4 ${ringClass}`}>
+      <p className={`text-[11px] uppercase tracking-[0.28em] ${eyebrowClass}`}>
+        {eyebrow}
+      </p>
+      <p className="mt-3 text-sm leading-6 text-slate-100">{body}</p>
+    </div>
+  );
+}
+
 function AgentTelemetry({
+  compact,
   connectionRequestedAt,
   roomConnectedAt,
 }: AgentTelemetryProps) {
@@ -47,15 +161,14 @@ function AgentTelemetry({
   const userTranscriptions = useMemo(
     () =>
       allTranscriptions.filter(
-        (t) => t.participantInfo.identity === room.localParticipant.identity,
+        (transcription) =>
+          transcription.participantInfo.identity === room.localParticipant.identity,
       ),
     [allTranscriptions, room.localParticipant.identity],
   );
   const latestUserText = userTranscriptions.at(-1)?.text?.trim() ?? "";
-  const recentUserTexts = useMemo(
-    () => userTranscriptions.slice(-3).map((t) => t.text?.trim()).filter(Boolean),
-    [userTranscriptions],
-  );
+  const latestTranscript =
+    agentTranscriptions.at(-1)?.text?.trim() ?? "Morgan is ready when you are.";
 
   useEffect(() => {
     if (audioTrack && audioReadyAt === null) {
@@ -84,9 +197,50 @@ function AgentTelemetry({
     }
   }, [speakingAt, state]);
 
-  const latestTranscript = agentTranscriptions.at(-1)?.text ?? "Waiting for Morgan to speak.";
+  const trackDebug = useMemo(() => {
+    return {
+      selectedAudioTrack: audioTrack
+        ? {
+            participant: audioTrack.participant.identity,
+            source: audioTrack.source,
+            sid: audioTrack.publication.trackSid,
+            name: audioTrack.publication.trackName,
+            kind: audioTrack.publication.kind,
+            subscribed: audioTrack.publication.isSubscribed,
+            muted: audioTrack.publication.isMuted,
+            enabled: audioTrack.publication.isEnabled,
+          }
+        : null,
+      selectedVideoTrack: videoTrack
+        ? {
+            participant: videoTrack.participant.identity,
+            source: videoTrack.source,
+            sid: videoTrack.publication.trackSid,
+            name: videoTrack.publication.trackName,
+            kind: videoTrack.publication.kind,
+            subscribed: videoTrack.publication.isSubscribed,
+            muted: videoTrack.publication.isMuted,
+            enabled: videoTrack.publication.isEnabled,
+          }
+        : null,
+      remoteParticipants: Array.from(room.remoteParticipants.values()).map((participant) => ({
+        identity: participant.identity,
+        kind: participant.kind,
+        publishOnBehalf: participant.attributes["lk.publish_on_behalf"] ?? null,
+        tracks: Array.from(participant.trackPublications.values()).map((publication) => ({
+          sid: publication.trackSid,
+          name: publication.trackName,
+          source: publication.source,
+          kind: publication.kind,
+          subscribed: publication.isSubscribed,
+          muted: publication.isMuted,
+          enabled: publication.isEnabled,
+        })),
+      })),
+    };
+  }, [audioTrack, room, videoTrack]);
 
-  const exportedMetrics = useMemo(() => {
+  const metrics = useMemo(() => {
     return {
       connectionRequestedMs: connectionRequestedAt,
       roomConnectedMs:
@@ -118,19 +272,99 @@ function AgentTelemetry({
     videoReadyAt,
   ]);
 
-  const copyMetrics = useCallback(async () => {
-    await navigator.clipboard.writeText(JSON.stringify(exportedMetrics, null, 2));
-  }, [exportedMetrics]);
+  useEffect(() => {
+    emitHostAvatarState({
+      connectionState: "connected",
+      voiceState: String(state),
+      latestUserText,
+      latestAgentText: latestTranscript,
+      audioTrackReady: Boolean(audioTrack),
+      videoTrackReady: Boolean(videoTrack),
+      roomName: room.name || undefined,
+      identity: room.localParticipant.identity || undefined,
+      metrics,
+      trackDebug,
+    });
+  }, [
+    audioTrack,
+    latestTranscript,
+    latestUserText,
+    metrics,
+    room.localParticipant.identity,
+    room.name,
+    state,
+    trackDebug,
+    videoTrack,
+  ]);
+
+  if (compact) {
+    return (
+      <section className="grid gap-5">
+        <div className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-black/30 shadow-[0_30px_120px_-48px_rgba(14,165,233,0.75)]">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#155e75_0%,rgba(2,6,23,0.78)_34%,rgba(2,6,23,0.96)_100%)]" />
+
+          <div className="absolute left-5 top-5 z-10 flex flex-wrap gap-2">
+            <StatusPill label="Morgan" />
+            <StatusPill
+              label={String(state)}
+              tone={state === "speaking" ? "violet" : state === "listening" ? "emerald" : "neutral"}
+            />
+            <StatusPill
+              label={audioTrack ? "audio live" : "audio pending"}
+              tone={audioTrack ? "emerald" : "neutral"}
+            />
+            <StatusPill
+              label={videoTrack ? "video live" : "video pending"}
+              tone={videoTrack ? "violet" : "neutral"}
+            />
+          </div>
+
+          <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 p-5">
+            <div className="rounded-[1.4rem] border border-white/10 bg-slate-950/70 px-4 py-3 backdrop-blur-md">
+              <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-100/75">
+                {state === "listening" ? "Listening" : "Live session"}
+              </p>
+              <div className="mt-3 flex items-center gap-3 text-sm text-slate-100">
+                <ActivityGlyph
+                  active={state === "listening" || Boolean(latestUserText)}
+                  tone="emerald"
+                />
+                <span>
+                  {latestUserText ||
+                    (state === "connecting"
+                      ? "Joining the room"
+                      : "Waiting for your first turn")}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-full border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-slate-200 backdrop-blur-md">
+              Audio {formatLatency(connectionRequestedAt !== null && audioReadyAt ? audioReadyAt - connectionRequestedAt : null)}
+            </div>
+          </div>
+
+          <div className="aspect-[10/13] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
+            {videoTrack ? (
+              <VideoTrack trackRef={videoTrack} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center px-8 text-center text-sm text-slate-300">
+                {state === "connecting"
+                  ? "Connecting Morgan to the room."
+                  : "Morgan will appear here as soon as LemonSlice joins the session."}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black/40 shadow-2xl shadow-black/25">
         <div className="aspect-[9/14] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
           {videoTrack ? (
-            <VideoTrack
-              trackRef={videoTrack}
-              className="h-full w-full object-cover"
-            />
+            <VideoTrack trackRef={videoTrack} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center px-8 text-center text-sm text-slate-300">
               {state === "connecting"
@@ -149,29 +383,18 @@ function AgentTelemetry({
           <p className="mt-2 text-xl font-semibold capitalize text-white">{state}</p>
         </div>
 
-        <div className="rounded-2xl bg-emerald-950/50 border border-emerald-500/30 p-4">
-          <p className="text-xs uppercase tracking-[0.24em] text-emerald-300/90">
-            {state === "listening" ? "Listening to you…" : "Heard you"}
-          </p>
-          {latestUserText ? (
-            <p className="mt-3 font-medium text-emerald-100">{latestUserText}</p>
-          ) : (
-            <p className="mt-3 text-slate-400 italic">
-              {state === "listening"
-                ? "Say something — you’ll see your words here when we hear you."
-                : "Your words will appear here once you speak."}
-            </p>
-          )}
-          {recentUserTexts.length > 1 && (
-            <ul className="mt-2 space-y-1 text-xs text-slate-400">
-              {recentUserTexts.slice(0, -1).map((text, i) => (
-                <li key={i} className="truncate">
-                  “…{text}”
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <InsightCard
+          eyebrow={state === "listening" ? "Listening now" : "Heard you"}
+          tone="emerald"
+          body={
+            latestUserText ||
+            (state === "listening"
+              ? "Say something and your words will appear here."
+              : "Your words will appear here once you speak.")
+          }
+        />
+
+        <InsightCard eyebrow="Morgan said" tone="violet" body={latestTranscript} />
 
         <div className="grid gap-2 rounded-2xl bg-white/5 p-4">
           <div className="flex items-center justify-between">
@@ -218,28 +441,24 @@ function AgentTelemetry({
 
         <div className="rounded-2xl bg-white/5 p-4">
           <p className="text-xs uppercase tracking-[0.24em] text-cyan-300/80">
-            Morgan said
+            Track Debug
           </p>
-          <p className="mt-3 leading-6 text-slate-100">{latestTranscript}</p>
+          <pre className="mt-3 overflow-x-auto text-[11px] leading-5 text-slate-300">
+            {JSON.stringify(trackDebug, null, 2)}
+          </pre>
         </div>
-
-        <p className="rounded-xl bg-amber-950/40 border border-amber-500/20 px-3 py-2 text-xs text-amber-200/90">
-          Tip: Say one short sentence, then wait 10–15 seconds for Morgan’s reply (OpenClaw can be slow). Check “Heard you” to confirm we’re receiving your speech.
-        </p>
-
-        <button
-          type="button"
-          onClick={copyMetrics}
-          className="rounded-full border border-cyan-400/40 px-4 py-3 text-sm font-medium text-cyan-200 transition hover:border-cyan-300 hover:text-white"
-        >
-          Copy client metrics
-        </button>
       </aside>
     </section>
   );
 }
 
-function SessionControls({ onReset }: { onReset: () => void }) {
+function SessionControls({
+  compact,
+  onReset,
+}: {
+  compact: boolean;
+  onReset: () => void;
+}) {
   const room = useRoomContext();
 
   const disconnect = useCallback(async () => {
@@ -248,7 +467,13 @@ function SessionControls({ onReset }: { onReset: () => void }) {
   }, [onReset, room]);
 
   return (
-    <div className="mt-6 flex flex-wrap items-center gap-3">
+    <div
+      className={
+        compact
+          ? "flex flex-wrap items-center gap-3 rounded-[1.6rem] border border-white/10 bg-white/5 px-4 py-3"
+          : "mt-6 flex flex-wrap items-center gap-3"
+      }
+    >
       <TrackToggle
         source={Track.Source.Microphone}
         initialState
@@ -267,11 +492,29 @@ function SessionControls({ onReset }: { onReset: () => void }) {
   );
 }
 
-export default function Room() {
+function AssistantAudioRenderer() {
+  const { audioTrack } = useVoiceAssistant();
+
+  if (!audioTrack) {
+    return null;
+  }
+
+  return (
+    <div style={{ display: "none" }}>
+      <AudioTrack trackRef={audioTrack} />
+    </div>
+  );
+}
+
+export default function Room({
+  autoConnect = false,
+  compact = false,
+}: RoomProps) {
   const [connection, setConnection] = useState<TokenResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connectionRequestedAt, setConnectionRequestedAt] = useState<number | null>(null);
   const [roomConnectedAt, setRoomConnectedAt] = useState<number | null>(null);
+  const autoConnectTriggeredRef = useRef(false);
 
   const reset = useCallback(() => {
     setConnection(null);
@@ -310,7 +553,88 @@ export default function Room() {
     }
   }, [connect]);
 
+  useEffect(() => {
+    emitHostAvatarState({
+      connectionState: error
+        ? "error"
+        : connection
+          ? "connected"
+          : connectionRequestedAt !== null
+            ? "connecting"
+            : "idle",
+      voiceState: connection ? "connecting" : "idle",
+      latestUserText: "",
+      latestAgentText: "",
+      audioTrackReady: false,
+      videoTrackReady: false,
+      roomName: connection?.roomName,
+      identity: connection?.identity,
+      error: error ?? undefined,
+    });
+  }, [connection, connectionRequestedAt, error]);
+
+  useEffect(() => {
+    if (
+      !autoConnect ||
+      autoConnectTriggeredRef.current ||
+      connection ||
+      connectionRequestedAt !== null
+    ) {
+      return;
+    }
+
+    autoConnectTriggeredRef.current = true;
+    const timer = window.setTimeout(() => {
+      void handleConnect();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [autoConnect, connection, connectionRequestedAt, handleConnect]);
+
   if (!connection) {
+    if (compact) {
+      return (
+        <section className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-slate-950/80 shadow-[0_28px_120px_-52px_rgba(14,165,233,0.75)]">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#155e75_0%,rgba(2,6,23,0.82)_30%,rgba(2,6,23,0.98)_100%)]" />
+          <div className="relative flex min-h-[760px] items-center justify-center px-8 py-12 text-center">
+            <div className="max-w-md">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-400/10">
+                <div className="h-10 w-10 rounded-full bg-cyan-300/80 blur-[1px]" />
+              </div>
+              <p className="mt-8 text-[11px] uppercase tracking-[0.34em] text-cyan-200/70">
+                Morgan avatar
+              </p>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">
+                {error
+                  ? "Morgan couldn’t join the room."
+                  : connectionRequestedAt !== null
+                    ? "Bringing Morgan online."
+                    : "Preparing Morgan."}
+              </h2>
+              <p className="mt-4 text-sm leading-7 text-slate-300">
+                {error ??
+                  "LiveKit is connecting and LemonSlice is warming up. Morgan should appear automatically as soon as the session is ready."}
+              </p>
+              {error ? (
+                <button
+                  type="button"
+                  onClick={() => void handleConnect()}
+                  className="mt-8 rounded-full border border-cyan-300/35 bg-cyan-400/10 px-5 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/15"
+                >
+                  Retry connection
+                </button>
+              ) : (
+                <div className="mt-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.24em] text-slate-300">
+                  <span className="h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.9)]" />
+                  Connecting
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      );
+    }
+
     return (
       <section className="rounded-[2rem] border border-white/10 bg-slate-950/80 p-8 shadow-2xl shadow-black/25">
         <div className="max-w-2xl">
@@ -329,7 +653,7 @@ export default function Room() {
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <button
             type="button"
-            onClick={handleConnect}
+            onClick={() => void handleConnect()}
             className="rounded-full bg-cyan-400 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
           >
             Talk to Morgan
@@ -357,25 +681,28 @@ export default function Room() {
       video={false}
       onConnected={() => setRoomConnectedAt(performance.now())}
       onDisconnected={reset}
-      className="grid gap-6"
+      className={compact ? "grid gap-5" : "grid gap-6"}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-white/10 bg-white/5 px-5 py-4 text-sm text-slate-300">
-        <div>
-          <p className="font-medium text-white">Room</p>
-          <p>{connection.roomName}</p>
+      {!compact ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-white/10 bg-white/5 px-5 py-4 text-sm text-slate-300">
+          <div>
+            <p className="font-medium text-white">Room</p>
+            <p>{connection.roomName}</p>
+          </div>
+          <div>
+            <p className="font-medium text-white">Identity</p>
+            <p>{connection.identity}</p>
+          </div>
         </div>
-        <div>
-          <p className="font-medium text-white">Identity</p>
-          <p>{connection.identity}</p>
-        </div>
-      </div>
+      ) : null}
 
       <AgentTelemetry
+        compact={compact}
         connectionRequestedAt={connectionRequestedAt}
         roomConnectedAt={roomConnectedAt}
       />
-      <SessionControls onReset={reset} />
-      <RoomAudioRenderer />
+      <SessionControls compact={compact} onReset={reset} />
+      <AssistantAudioRenderer />
     </LiveKitRoom>
   );
 }

@@ -76,7 +76,7 @@ Each step creates commits in a feature branch, culminating in a PR.
 
 ```
 ┌─────────────────────────────────────────────┐
-│              CTO App                    │
+│                CTO                      │
 │  ┌─────────────┐  ┌───────────────────────┐ │
 │  │ Setup       │  │ Dashboard             │ │
 │  │ Wizard      │  │ (Workflows, Logs)     │ │

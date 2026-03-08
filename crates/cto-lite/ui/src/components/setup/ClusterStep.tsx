@@ -100,7 +100,7 @@ export function ClusterStep({ onComplete, onBack }: ClusterStepProps) {
       <div>
         <h2 className="text-2xl font-bold">Kubernetes Cluster</h2>
         <p className="text-muted-foreground mt-2">
-          CTO App runs on a local Kubernetes cluster. Choose an existing cluster or create a new one.
+          CTO runs on a local Kubernetes cluster. Choose an existing cluster or create a new one.
         </p>
       </div>
 

@@ -65,7 +65,7 @@ export function RuntimeStep({ onComplete }: RuntimeStepProps) {
         <div>
           <h2 className="text-2xl font-bold">Container Runtime</h2>
           <p className="text-muted-foreground mt-2">
-            CTO App needs Docker and Kind to run Kubernetes locally.
+            CTO needs Docker and Kind to run Kubernetes locally.
           </p>
         </div>
         <Card>
@@ -87,7 +87,7 @@ export function RuntimeStep({ onComplete }: RuntimeStepProps) {
       <div>
         <h2 className="text-2xl font-bold">Container Runtime</h2>
         <p className="text-muted-foreground mt-2">
-          CTO App needs Docker and Kind to run Kubernetes locally.
+          CTO needs Docker and Kind to run Kubernetes locally.
         </p>
       </div>
 
