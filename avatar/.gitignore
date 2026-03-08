@@ -1,0 +1,18 @@
+# Python
+agent/.venv/
+agent/.env
+agent/__pycache__/
+agent/.pytest_cache/
+agent/.ruff_cache/
+agent/runs/
+agent/KMS/
+agent/*.egg-info/
+
+# Node / Next.js
+web/node_modules/
+web/.next/
+web/.env.local
+
+# OS
+.DS_Store
+**/__pycache__/

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "morgan-avatar-agent"
+version = "0.1.0"
+description = "Low-latency talking avatar agent for Morgan."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "httpx",
+  "livekit-agents[cartesia,deepgram,elevenlabs,openai,silero,turn-detector]",
+  "livekit-plugins-lemonslice",
+  "livekit-plugins-noise-cancellation",
+  "python-dotenv",
+  "rich",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "ruff",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["morgan_avatar_agent*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
