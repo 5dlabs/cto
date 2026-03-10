@@ -57,6 +57,10 @@ fn default_monitor_source() -> String {
     "stakpak".to_string()
 }
 
+/// Maximum number of monitor events retained in memory before the oldest
+/// entries are evicted on insertion.
+const MAX_MONITOR_EVENTS: usize = 10_000;
+
 /// Shared in-memory monitor event store.
 #[derive(Debug, Clone, Default)]
 pub struct MonitorEventStore {
@@ -71,6 +75,20 @@ impl MonitorEventStore {
         let mut events = self.events.write().await;
         let duplicate = events.contains_key(&event.fingerprint);
         events.insert(event.fingerprint.clone(), event);
+
+        // Evict oldest events when the store exceeds capacity.
+        if events.len() > MAX_MONITOR_EVENTS {
+            let mut entries: Vec<_> = events
+                .iter()
+                .map(|(k, v)| (k.clone(), v.finished_at))
+                .collect();
+            entries.sort_by_key(|(_, ts)| *ts);
+            let to_remove = events.len() - MAX_MONITOR_EVENTS;
+            for (key, _) in entries.into_iter().take(to_remove) {
+                events.remove(&key);
+            }
+        }
+
         duplicate
     }
 
