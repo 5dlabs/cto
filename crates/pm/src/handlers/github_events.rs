@@ -199,10 +199,7 @@ pub async fn handle_github_events(
 // =============================================================================
 
 /// Route pull_request events to the appropriate handler.
-async fn handle_pr_event(
-    state: &CallbackState,
-    body: &[u8],
-) -> Result<Json<Value>, StatusCode> {
+async fn handle_pr_event(state: &CallbackState, body: &[u8]) -> Result<Json<Value>, StatusCode> {
     let payload: PrEventPayload = serde_json::from_slice(body).map_err(|e| {
         error!(error = %e, "Failed to parse pull_request payload");
         StatusCode::BAD_REQUEST
@@ -210,15 +207,11 @@ async fn handle_pr_event(
 
     match payload.action.as_str() {
         // PR opened, new commits pushed, or reopened → Stitch review
-        "opened" | "synchronize" | "reopened" => {
-            handle_pr_review_trigger(state, &payload).await
-        }
+        "opened" | "synchronize" | "reopened" => handle_pr_review_trigger(state, &payload).await,
 
         // PR closed + merged → Task completion or play trigger
         // Pass raw bytes so intake PRs can delegate to the existing handler
-        "closed" if payload.pull_request.merged => {
-            handle_pr_merged(state, body, &payload).await
-        }
+        "closed" if payload.pull_request.merged => handle_pr_merged(state, body, &payload).await,
 
         _ => {
             debug!(
@@ -387,8 +380,8 @@ async fn handle_pr_merged(
     );
 
     // Detect PR type from labels and title
-    let is_intake = pr.labels.iter().any(|l| l.name == "cto-intake")
-        || pr.title.contains("🚀 Intake:");
+    let is_intake =
+        pr.labels.iter().any(|l| l.name == "cto-intake") || pr.title.contains("🚀 Intake:");
     let task_id = extract_task_id(&pr.title, &pr.labels);
 
     if is_intake {
@@ -533,10 +526,7 @@ async fn handle_check_run_event(
         StatusCode::BAD_REQUEST
     })?;
 
-    let action = payload
-        .get("action")
-        .and_then(Value::as_str)
-        .unwrap_or("");
+    let action = payload.get("action").and_then(Value::as_str).unwrap_or("");
 
     match action {
         // Remediation button clicked
@@ -589,10 +579,7 @@ async fn handle_comment_event(
         StatusCode::BAD_REQUEST
     })?;
 
-    let action = payload
-        .get("action")
-        .and_then(Value::as_str)
-        .unwrap_or("");
+    let action = payload.get("action").and_then(Value::as_str).unwrap_or("");
 
     if action != "created" {
         debug!(action = %action, "Ignoring non-created comment");
@@ -726,5 +713,4 @@ mod tests {
             Some("7".to_string())
         );
     }
-
 }

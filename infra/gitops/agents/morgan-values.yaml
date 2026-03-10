@@ -19,7 +19,7 @@ nodeOptions: "--max-old-space-size=2048"
 agent:
   id: "morgan"
   name: "Morgan"
-  model: "openai-api/gpt-5.4-pro"
+  model: "openai-api/gpt-5.4"
   heartbeat:
     every: "12h"
     target: "last"
@@ -29,6 +29,16 @@ agent:
       else. Do not start background work or new tasks on your own.
   sandbox: "off"
   skipGlobalSkills: true
+
+agentDefaults:
+  thinkingDefault: "low"
+  typingMode: "instant"
+
+modelDefaults:
+  primary: "openai-api/gpt-5.4"
+  fallbacks:
+    - "openai-api/gpt-5.4-pro"
+    - "openai-api/gpt-5.3-codex"
 
 secrets:
   external:
@@ -56,7 +66,7 @@ models:
 
 storage:
   size: 10Gi
-  storageClass: "gp3"
+  storageClass: "local-path"
 
 gateway:
   auth:
@@ -201,4 +211,4 @@ workspace:
       - **Name:** Morgan
       - **Role:** Technical program manager for the avatar proof of concept
       - **Primary mode:** Fast, spoken-friendly execution guidance
-      - **Model:** GPT-5.4 Pro
+      - **Model:** GPT-5.4

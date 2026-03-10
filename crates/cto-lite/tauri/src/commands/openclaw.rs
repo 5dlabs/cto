@@ -13,11 +13,17 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::State;
 
-/// URL for the `OpenClaw` gateway. Matches OpenClaw's default port (18789).
-/// Override with `OPENCLAW_GATEWAY_URL` (e.g. `http://localhost:3100`) if you run the gateway on another port.
-const DEFAULT_GATEWAY_URL: &str = "http://localhost:18789";
+/// Default ingress endpoint for a local Morgan gateway in kind.
+const DEFAULT_LOCAL_INGRESS_URL: &str = "http://morgan.localhost";
+/// URL for the `OpenClaw` gateway when a local bridge is used.
 const DEFAULT_LOCAL_BRIDGE_URL: &str = "http://127.0.0.1:18789";
+/// Static auth token used by the local Morgan gateway.
+const DEFAULT_GATEWAY_TOKEN: &str = "openclaw-internal";
+/// Morgan is the only desktop-backed agent today.
+const DEFAULT_AGENT_ID: &str = "morgan";
 const DEFAULT_GATEWAY_PORT: u16 = 18789;
+/// Dedicated local kind context that CTO manages for Morgan.
+const LOCAL_KIND_CONTEXT: &str = "kind-cto-lite";
 
 /// Whether the gateway has been connected at least once.
 static GATEWAY_CONNECTED: AtomicBool = AtomicBool::new(false);
@@ -43,6 +49,27 @@ impl Default for LocalBridgeState {
     }
 }
 
+/// In-process conversation state used to preserve Morgan context between turns
+/// now that the gateway speaks chat-completions instead of the legacy /api/chat
+/// session contract.
+pub struct ConversationState {
+    sessions: Mutex<HashMap<String, Vec<OpenClawMessage>>>,
+}
+
+impl ConversationState {
+    pub fn new() -> Self {
+        Self {
+            sessions: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+impl Default for ConversationState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /// Response from the `OpenClaw` agent
@@ -50,6 +77,10 @@ impl Default for LocalBridgeState {
 pub struct OpenClawResponse {
     pub content: String,
     pub action: Option<OpenClawAction>,
+    #[serde(rename = "latencyMs")]
+    pub latency_ms: Option<u64>,
+    #[serde(rename = "gatewayUrl")]
+    pub gateway_url: Option<String>,
 }
 
 /// A structured action the agent requests the user to take
@@ -136,21 +167,81 @@ struct OpenClawHealthPayload {
     agents: Option<Vec<String>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenClawMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ChatCompletionsRequest {
+    model: String,
+    messages: Vec<OpenClawMessage>,
+    stream: bool,
+    max_completion_tokens: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionsResponse {
+    choices: Vec<ChatCompletionChoice>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionChoice {
+    message: ChatCompletionMessage,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionMessage {
+    content: serde_json::Value,
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 fn gateway_url() -> String {
-    std::env::var("OPENCLAW_GATEWAY_URL").unwrap_or_else(|_| DEFAULT_GATEWAY_URL.to_string())
+    std::env::var("OPENCLAW_GATEWAY_URL").unwrap_or_else(|_| DEFAULT_LOCAL_INGRESS_URL.to_string())
 }
 
 fn local_bridge_url() -> String {
     DEFAULT_LOCAL_BRIDGE_URL.to_string()
 }
 
-fn is_local_gateway_url() -> bool {
-    matches!(
-        gateway_url().as_str(),
-        DEFAULT_GATEWAY_URL | DEFAULT_LOCAL_BRIDGE_URL
-    )
+fn local_ingress_url() -> String {
+    DEFAULT_LOCAL_INGRESS_URL.to_string()
+}
+
+fn gateway_auth_token() -> String {
+    std::env::var("OPENCLAW_GATEWAY_TOKEN").unwrap_or_else(|_| DEFAULT_GATEWAY_TOKEN.to_string())
+}
+
+fn gateway_request(client: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
+    client
+        .get(url)
+        .bearer_auth(gateway_auth_token())
+        .header("x-openclaw-agent-id", DEFAULT_AGENT_ID)
+}
+
+fn extract_text_content(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => String::new(),
+        serde_json::Value::String(text) => text.clone(),
+        serde_json::Value::Array(items) => items
+            .iter()
+            .map(extract_text_content)
+            .filter(|item| !item.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        serde_json::Value::Object(map) => {
+            if let Some(text) = map.get("text").and_then(|value| value.as_str()) {
+                return text.to_string();
+            }
+            if let Some(content) = map.get("content") {
+                return extract_text_content(content);
+            }
+            String::new()
+        }
+        other => other.to_string(),
+    }
 }
 
 fn http_client() -> reqwest::Client {
@@ -167,9 +258,12 @@ fn fast_http_client() -> reqwest::Client {
         .unwrap_or_default()
 }
 
-async fn fetch_gateway_status_payload() -> Result<OpenClawStatus, AppError> {
-    let api_status_url = format!("{}/api/status", gateway_url());
-    if let Ok(response) = fast_http_client().get(&api_status_url).send().await {
+async fn fetch_gateway_status_payload(base_url: &str) -> Result<OpenClawStatus, AppError> {
+    let api_status_url = format!("{}/api/status", base_url);
+    if let Ok(response) = gateway_request(&fast_http_client(), &api_status_url)
+        .send()
+        .await
+    {
         if response.status().is_success() {
             let status: OpenClawStatus = response
                 .json()
@@ -179,9 +273,8 @@ async fn fetch_gateway_status_payload() -> Result<OpenClawStatus, AppError> {
         }
     }
 
-    let health_url = format!("{}/health", gateway_url());
-    let response = fast_http_client()
-        .get(&health_url)
+    let health_url = format!("{}/health", base_url);
+    let response = gateway_request(&fast_http_client(), &health_url)
         .send()
         .await
         .map_err(|e| AppError::CommandFailed(format!("Failed to reach OpenClaw gateway: {e}")))?;
@@ -205,8 +298,8 @@ async fn fetch_gateway_status_payload() -> Result<OpenClawStatus, AppError> {
     })
 }
 
-async fn gateway_is_reachable() -> bool {
-    fetch_gateway_status_payload()
+async fn gateway_url_is_reachable(base_url: &str) -> bool {
+    fetch_gateway_status_payload(base_url)
         .await
         .map(|status| status.connected)
         .unwrap_or(false)
@@ -233,11 +326,22 @@ fn discover_morgan_service() -> Result<MorganServiceTarget, AppError> {
         return Ok(target);
     }
 
-    let kubectl = which::which("kubectl")
-        .map_err(|_| AppError::CommandFailed("kubectl is required to resolve Morgan".to_string()))?;
+    let kubectl = which::which("kubectl").map_err(|_| {
+        AppError::CommandFailed("kubectl is required to resolve Morgan".to_string())
+    })?;
 
     let output = Command::new(kubectl)
-        .args(["get", "svc", "-A", "-l", "openclaw.io/agent=morgan", "-o", "json"])
+        .args([
+            "--context",
+            LOCAL_KIND_CONTEXT,
+            "get",
+            "svc",
+            "-A",
+            "-l",
+            "openclaw.io/agent=morgan",
+            "-o",
+            "json",
+        ])
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to inspect Morgan service: {e}")))?;
 
@@ -255,10 +359,9 @@ fn discover_morgan_service() -> Result<MorganServiceTarget, AppError> {
         .items
         .iter()
         .find(|item| {
-            item.spec
-                .ports
-                .iter()
-                .any(|port| port.port == DEFAULT_GATEWAY_PORT || port.name.as_deref() == Some("gateway"))
+            item.spec.ports.iter().any(|port| {
+                port.port == DEFAULT_GATEWAY_PORT || port.name.as_deref() == Some("gateway")
+            })
         })
         .or_else(|| services.items.first())
         .ok_or_else(|| {
@@ -326,7 +429,8 @@ async fn get_local_bridge_status_inner(
             .map_err(|e| AppError::CommandFailed(format!("Failed to acquire bridge lock: {e}")))?;
         bridge_pid(&mut *process)?
     };
-    let connected = gateway_is_reachable().await;
+    let connected = gateway_url_is_reachable(&local_ingress_url()).await
+        || gateway_url_is_reachable(&local_bridge_url()).await;
 
     Ok(build_bridge_status(
         target.as_ref(),
@@ -341,7 +445,11 @@ async fn start_local_bridge_inner(
 ) -> Result<OpenClawBridgeStatus, AppError> {
     let _startup = state.startup.lock().await;
 
-    if gateway_is_reachable().await {
+    if gateway_url_is_reachable(&local_ingress_url()).await {
+        return get_local_bridge_status_inner(state).await;
+    }
+
+    if gateway_url_is_reachable(&local_bridge_url()).await {
         return get_local_bridge_status_inner(state).await;
     }
 
@@ -369,6 +477,8 @@ async fn start_local_bridge_inner(
 
     let mut child = Command::new(kubectl)
         .args([
+            "--context",
+            LOCAL_KIND_CONTEXT,
             "port-forward",
             "-n",
             &target.namespace,
@@ -386,11 +496,10 @@ async fn start_local_bridge_inner(
     let started_at = Instant::now();
 
     loop {
-        if gateway_is_reachable().await {
-            let mut process = state
-                .process
-                .lock()
-                .map_err(|e| AppError::CommandFailed(format!("Failed to acquire bridge lock: {e}")))?;
+        if gateway_url_is_reachable(&local_bridge_url()).await {
+            let mut process = state.process.lock().map_err(|e| {
+                AppError::CommandFailed(format!("Failed to acquire bridge lock: {e}"))
+            })?;
             *process = Some(child);
             return Ok(build_bridge_status(Some(&target), true, true, Some(pid)));
         }
@@ -421,12 +530,57 @@ async fn start_local_bridge_inner(
     }
 }
 
-async fn ensure_local_gateway(state: &LocalBridgeState) -> Result<(), AppError> {
-    if !is_local_gateway_url() || gateway_is_reachable().await {
-        return Ok(());
+async fn resolve_gateway_url(
+    state: &LocalBridgeState,
+    allow_start_bridge: bool,
+) -> Result<String, AppError> {
+    if let Ok(url) = std::env::var("OPENCLAW_GATEWAY_URL") {
+        return Ok(url);
     }
 
-    start_local_bridge_inner(state).await.map(|_| ())
+    let ingress = local_ingress_url();
+    if gateway_url_is_reachable(&ingress).await {
+        return Ok(ingress);
+    }
+
+    let bridge = local_bridge_url();
+    if gateway_url_is_reachable(&bridge).await {
+        return Ok(bridge);
+    }
+
+    let allow_debug_port_forward = std::env::var("OPENCLAW_ALLOW_PORT_FORWARD")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false);
+
+    if allow_start_bridge && allow_debug_port_forward {
+        start_local_bridge_inner(state).await?;
+        return Ok(bridge);
+    }
+
+    Ok(gateway_url())
+}
+
+fn load_session_messages(
+    conversations: &ConversationState,
+    session_id: &str,
+) -> Result<Vec<OpenClawMessage>, AppError> {
+    let sessions = conversations.sessions.lock().map_err(|e| {
+        AppError::CommandFailed(format!("Failed to access conversation state: {e}"))
+    })?;
+    Ok(sessions.get(session_id).cloned().unwrap_or_default())
+}
+
+fn append_session_messages(
+    conversations: &ConversationState,
+    session_id: &str,
+    messages: &[OpenClawMessage],
+) -> Result<(), AppError> {
+    let mut sessions = conversations.sessions.lock().map_err(|e| {
+        AppError::CommandFailed(format!("Failed to update conversation state: {e}"))
+    })?;
+    let entry = sessions.entry(session_id.to_string()).or_default();
+    entry.extend_from_slice(messages);
+    Ok(())
 }
 
 // ─── Commands ───────────────────────────────────────────────────────────────
@@ -463,13 +617,9 @@ pub async fn openclaw_stop_local_bridge(
         }
     };
 
-    let connected = gateway_is_reachable().await;
-    Ok(build_bridge_status(
-        target.as_ref(),
-        false,
-        connected,
-        pid,
-    ))
+    let connected = gateway_url_is_reachable(&local_ingress_url()).await
+        || gateway_url_is_reachable(&local_bridge_url()).await;
+    Ok(build_bridge_status(target.as_ref(), false, connected, pid))
 }
 
 /// Get local Morgan bridge status.
@@ -486,18 +636,30 @@ pub async fn openclaw_send_message(
     session_id: String,
     message: String,
     bridge: State<'_, LocalBridgeState>,
+    conversations: State<'_, ConversationState>,
 ) -> Result<OpenClawResponse, AppError> {
-    ensure_local_gateway(bridge.inner()).await?;
+    let started_at = Instant::now();
+    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let url = format!("{}/v1/chat/completions", base_url);
 
-    let url = format!("{}/api/chat", gateway_url());
+    let mut messages = load_session_messages(conversations.inner(), &session_id)?;
+    let user_message = OpenClawMessage {
+        role: "user".to_string(),
+        content: message,
+    };
+    messages.push(user_message.clone());
 
-    let body = serde_json::json!({
-        "sessionId": session_id,
-        "message": message,
-    });
+    let body = ChatCompletionsRequest {
+        model: DEFAULT_AGENT_ID.to_string(),
+        messages: messages.clone(),
+        stream: false,
+        max_completion_tokens: 800,
+    };
 
     let resp = http_client()
         .post(&url)
+        .bearer_auth(gateway_auth_token())
+        .header("x-openclaw-agent-id", DEFAULT_AGENT_ID)
         .json(&body)
         .send()
         .await
@@ -514,12 +676,50 @@ pub async fn openclaw_send_message(
         )));
     }
 
-    let result: OpenClawResponse = resp.json().await.map_err(|e| {
-        AppError::CommandFailed(format!("Invalid response from OpenClaw gateway: {e}"))
+    let payload: ChatCompletionsResponse = resp.json().await.map_err(|e| {
+        AppError::CommandFailed(format!(
+            "Invalid chat completion response from OpenClaw: {e}"
+        ))
     })?;
 
+    let assistant_text = payload
+        .choices
+        .first()
+        .map(|choice| extract_text_content(&choice.message.content))
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+        .ok_or_else(|| {
+            AppError::CommandFailed(
+                "OpenClaw chat completion did not include assistant content".to_string(),
+            )
+        })?;
+
+    let assistant_message = OpenClawMessage {
+        role: "assistant".to_string(),
+        content: assistant_text.clone(),
+    };
+
+    append_session_messages(
+        conversations.inner(),
+        &session_id,
+        &[user_message, assistant_message],
+    )?;
+
+    let latency_ms = started_at.elapsed().as_millis() as u64;
+    tracing::info!(
+        session_id = %session_id,
+        latency_ms,
+        gateway_url = %base_url,
+        "Morgan chat completion finished"
+    );
+
     GATEWAY_CONNECTED.store(true, Ordering::Relaxed);
-    Ok(result)
+    Ok(OpenClawResponse {
+        content: assistant_text,
+        action: None,
+        latency_ms: Some(latency_ms),
+        gateway_url: Some(base_url),
+    })
 }
 
 /// Start a `Lobster` workflow via the `OpenClaw` gateway.
@@ -529,9 +729,8 @@ pub async fn openclaw_start_workflow(
     params: HashMap<String, String>,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<WorkflowStartResult, AppError> {
-    ensure_local_gateway(bridge.inner()).await?;
-
-    let url = format!("{}/api/workflows", gateway_url());
+    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let url = format!("{}/api/workflows", base_url);
 
     let body = serde_json::json!({
         "type": workflow_type,
@@ -540,6 +739,8 @@ pub async fn openclaw_start_workflow(
 
     let resp = http_client()
         .post(&url)
+        .bearer_auth(gateway_auth_token())
+        .header("x-openclaw-agent-id", DEFAULT_AGENT_ID)
         .json(&body)
         .send()
         .await
@@ -574,12 +775,13 @@ pub async fn openclaw_approve(
     workflow_id: String,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<(), AppError> {
-    ensure_local_gateway(bridge.inner()).await?;
-
-    let url = format!("{}/api/workflows/{}/approve", gateway_url(), workflow_id);
+    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let url = format!("{}/api/workflows/{}/approve", base_url, workflow_id);
 
     let resp = http_client()
         .post(&url)
+        .bearer_auth(gateway_auth_token())
+        .header("x-openclaw-agent-id", DEFAULT_AGENT_ID)
         .send()
         .await
         .map_err(|e| AppError::CommandFailed(format!("Failed to approve workflow: {e}")))?;
@@ -601,14 +803,12 @@ pub async fn openclaw_approve(
 pub async fn openclaw_get_status(
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<OpenClawStatus, AppError> {
-    if is_local_gateway_url() {
-        let _ = ensure_local_gateway(bridge.inner()).await;
-    }
+    let base_url = match resolve_gateway_url(bridge.inner(), false).await {
+        Ok(url) => url,
+        Err(_) => gateway_url(),
+    };
 
-    let url = format!("{}/api/status", gateway_url());
-    let _ = url;
-
-    match fetch_gateway_status_payload().await {
+    match fetch_gateway_status_payload(&base_url).await {
         Ok(status) => {
             GATEWAY_CONNECTED.store(true, Ordering::Relaxed);
             Ok(status)
@@ -625,32 +825,9 @@ pub async fn openclaw_get_status(
 #[tauri::command]
 pub async fn openclaw_get_messages(
     session_id: String,
-    bridge: State<'_, LocalBridgeState>,
-) -> Result<Vec<OpenClawResponse>, AppError> {
-    ensure_local_gateway(bridge.inner()).await?;
-
-    let url = format!("{}/api/chat/{}/messages", gateway_url(), session_id);
-
-    let resp = http_client()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::CommandFailed(format!("Failed to get messages: {e}")))?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(AppError::CommandFailed(format!(
-            "Get messages failed ({status}): {text}"
-        )));
-    }
-
-    let messages: Vec<OpenClawResponse> = resp
-        .json()
-        .await
-        .map_err(|e| AppError::CommandFailed(format!("Invalid messages response: {e}")))?;
-
-    Ok(messages)
+    conversations: State<'_, ConversationState>,
+) -> Result<Vec<OpenClawMessage>, AppError> {
+    load_session_messages(conversations.inner(), &session_id)
 }
 
 /// Reject a pending workflow approval gate.
@@ -660,14 +837,15 @@ pub async fn openclaw_reject(
     reason: String,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<(), AppError> {
-    ensure_local_gateway(bridge.inner()).await?;
-
-    let url = format!("{}/api/workflows/{}/reject", gateway_url(), workflow_id);
+    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let url = format!("{}/api/workflows/{}/reject", base_url, workflow_id);
 
     let body = serde_json::json!({ "reason": reason });
 
     let resp = http_client()
         .post(&url)
+        .bearer_auth(gateway_auth_token())
+        .header("x-openclaw-agent-id", DEFAULT_AGENT_ID)
         .json(&body)
         .send()
         .await
@@ -691,12 +869,13 @@ pub async fn openclaw_get_workflow_status(
     workflow_id: String,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<WorkflowStartResult, AppError> {
-    ensure_local_gateway(bridge.inner()).await?;
-
-    let url = format!("{}/api/workflows/{}", gateway_url(), workflow_id);
+    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let url = format!("{}/api/workflows/{}", base_url, workflow_id);
 
     let resp = http_client()
         .get(&url)
+        .bearer_auth(gateway_auth_token())
+        .header("x-openclaw-agent-id", DEFAULT_AGENT_ID)
         .send()
         .await
         .map_err(|e| AppError::CommandFailed(format!("Failed to get workflow status: {e}")))?;
@@ -728,9 +907,8 @@ pub async fn openclaw_exec_cli(
     args: Vec<String>,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<String, AppError> {
-    ensure_local_gateway(bridge.inner()).await?;
-
-    let url = format!("{}/api/cli", gateway_url());
+    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let url = format!("{}/api/cli", base_url);
 
     let body = serde_json::json!({
         "cli": cli,
@@ -739,6 +917,8 @@ pub async fn openclaw_exec_cli(
 
     let resp = http_client()
         .post(&url)
+        .bearer_auth(gateway_auth_token())
+        .header("x-openclaw-agent-id", DEFAULT_AGENT_ID)
         .json(&body)
         .send()
         .await

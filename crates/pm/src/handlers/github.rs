@@ -1077,10 +1077,7 @@ async fn trigger_play_workflow(
     let coderun_obj: kube::api::DynamicObject =
         serde_json::from_value(coderun_json).context("Failed to parse CodeRun JSON")?;
 
-    match coderuns
-        .create(&PostParams::default(), &coderun_obj)
-        .await
-    {
+    match coderuns.create(&PostParams::default(), &coderun_obj).await {
         Ok(_) => {
             info!(
                 coderun_name = %coderun_name,

@@ -46,6 +46,10 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         fsGroup: 1000
       initContainers:
@@ -107,19 +111,9 @@ spec:
               echo "[tools] tools-config.json written"
               {{- end }}
 
-              # ---------------------------------------------------------------
-              # 4c. ClawdStrike security skill (idempotent install)
-              # ---------------------------------------------------------------
-              if [ ! -f /workspace/.openclaw/skills/clawdstrike.md ]; then
-                cd /workspace && npx skills add https://github.com/cantinaxyz/clawdstrike --skill clawdstrike 2>/dev/null || true
-                echo "[skills] ClawdStrike security skill installed"
-              else
-                echo "[skills] ClawdStrike already present"
-              fi
-
               {{- if .Values.nats.enabled }}
               # ---------------------------------------------------------------
-              # 4d. NATS Messenger plugin
+              # 4c. NATS Messenger plugin
               # ---------------------------------------------------------------
               NATS_EXT="/workspace/.openclaw/extensions/nats-messenger"
               mkdir -p "$NATS_EXT"
@@ -242,6 +236,12 @@ spec:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: openai-api-key
                   optional: true
+            - name: PROVIDER_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: openai-api-key
+                  optional: true
             # Web tools API keys
             - name: BRAVE_API_KEY
               valueFrom:
@@ -338,10 +338,14 @@ spec:
           env:
             - name: HOME
               value: /workspace
+            - name: TZ
+              value: "UTC"
             - name: OPENCLAW_CONFIG
               value: /workspace/.openclaw/openclaw.json
             - name: NODE_ENV
               value: production
+            - name: OPENCLAW_NO_RESPAWN
+              value: "1"
             # Provider API keys (available at runtime for dynamic use)
             - name: ANTHROPIC_API_KEY
               valueFrom:
@@ -350,6 +354,12 @@ spec:
                   key: anthropic-api-key
                   optional: true
             - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: openai-api-key
+                  optional: true
+            - name: PROVIDER_OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}

@@ -97,6 +97,7 @@ fn main() {
             // Initialize MCP state
             app.manage(commands::mcp::McpState::new());
             app.manage(commands::openclaw::LocalBridgeState::new());
+            app.manage(commands::openclaw::ConversationState::new());
 
             tracing::info!("Database initialized at {:?}", db_path);
             Ok(())

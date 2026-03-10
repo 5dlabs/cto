@@ -6,6 +6,8 @@
 use crate::cli::bridge::ConfigurationBridge;
 use crate::cli::discovery::DiscoveryService;
 use crate::cli::types::{CLIExecutionContext, CLIProfile, CLIType, SessionType, UniversalConfig};
+use acp_runtime::{AcpRuntimeRegistry, RuntimeSelection};
+use cto_config::AcpDefaults;
 use std::collections::HashMap;
 
 /// CLI selection preferences
@@ -21,6 +23,10 @@ pub struct CLISelectionCriteria {
     pub cost_sensitive: bool,
     /// Performance priority (prefer faster CLIs)
     pub performance_priority: bool,
+    /// Prefer routing through an ACP runtime instead of a direct CLI.
+    pub prefer_acp: bool,
+    /// Optional ACP runtime ID override.
+    pub acp_runtime: Option<String>,
 }
 
 /// CLI router for selecting and preparing CLI execution
@@ -31,6 +37,8 @@ pub struct CLIRouter {
     bridge: ConfigurationBridge,
     /// Default fallback chain
     default_fallback_chain: Vec<CLIType>,
+    /// ACP runtime registry for sessionful delegation.
+    acp_registry: AcpRuntimeRegistry,
 }
 
 impl Default for CLIRouter {
@@ -53,7 +61,16 @@ impl CLIRouter {
                 CLIType::Factory,
                 CLIType::OpenCode,
             ],
+            acp_registry: AcpRuntimeRegistry::default(),
         }
+    }
+
+    /// Create a router with explicit ACP defaults.
+    #[must_use]
+    pub fn with_acp(acp: AcpDefaults) -> Self {
+        let mut router = Self::new();
+        router.acp_registry = AcpRuntimeRegistry::new(acp);
+        router
     }
 
     /// Prepare a CLI execution context for a task
@@ -229,6 +246,17 @@ impl CLIRouter {
     pub fn set_fallback_chain(&mut self, chain: Vec<CLIType>) {
         self.default_fallback_chain = chain;
     }
+
+    /// Resolve the ACP runtime selection for controller-owned sessions.
+    #[must_use]
+    pub fn select_acp_runtime(&self, criteria: &CLISelectionCriteria) -> Option<RuntimeSelection> {
+        if criteria.prefer_acp {
+            self.acp_registry
+                .select_runtime_for_service("controller", criteria.acp_runtime.as_deref())
+        } else {
+            None
+        }
+    }
 }
 
 /// Prepared CLI execution context
@@ -298,6 +326,8 @@ mod tests {
             required_capabilities: vec![],
             cost_sensitive: false,
             performance_priority: false,
+            prefer_acp: false,
+            acp_runtime: None,
         };
 
         let candidates = router.build_candidate_list(&criteria);

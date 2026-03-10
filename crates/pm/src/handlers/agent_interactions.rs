@@ -454,8 +454,7 @@ fn detect_mention_source(payload: &Value) -> String {
             || {
                 if payload.get("issue").is_some() && payload.get("comment").is_some() {
                     "issue_comment".to_string()
-                } else if payload.get("pull_request").is_some()
-                    && payload.get("comment").is_some()
+                } else if payload.get("pull_request").is_some() && payload.get("comment").is_some()
                 {
                     "pull_request_review_comment".to_string()
                 } else {
@@ -497,7 +496,11 @@ fn extract_mention_context(
                 html_url: format!("{}/pull/{}", event.repository.html_url, event.issue.number),
             };
 
-            Ok(Some((pr_context, event.comment.body, event.comment.html_url)))
+            Ok(Some((
+                pr_context,
+                event.comment.body,
+                event.comment.html_url,
+            )))
         }
         "pull_request_review_comment" => {
             let event: ReviewCommentPayload =
@@ -517,7 +520,11 @@ fn extract_mention_context(
                 html_url: event.pull_request.html_url.clone(),
             };
 
-            Ok(Some((pr_context, event.comment.body, event.comment.html_url)))
+            Ok(Some((
+                pr_context,
+                event.comment.body,
+                event.comment.html_url,
+            )))
         }
         _ => {
             warn!(source = %source, "Unknown mention source");
@@ -1079,7 +1086,9 @@ async fn handle_ci_failure_webhook_impl(
     let files = fetch_pr_files(&state.http_client, github_token, repo_full_name, pr_number).await?;
     if files.is_empty() {
         warn!("No files found for PR #{}", pr_number);
-        return Ok(Json(json!({ "status": "skipped", "reason": "no files in PR" })));
+        return Ok(Json(
+            json!({ "status": "skipped", "reason": "no files in PR" }),
+        ));
     }
 
     let agent = select_agent_for_files(&files);
@@ -1108,8 +1117,13 @@ async fn handle_ci_failure_webhook_impl(
         "actions": [{ "label": label, "description": description, "identifier": identifier }]
     });
 
-    post_remediation_check_run(&state.http_client, github_token, repo_full_name, &check_payload)
-        .await?;
+    post_remediation_check_run(
+        &state.http_client,
+        github_token,
+        repo_full_name,
+        &check_payload,
+    )
+    .await?;
 
     info!(
         pr = %pr_number, check_name = %check_run_name, agent = %agent_name,

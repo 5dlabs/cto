@@ -440,8 +440,13 @@ RUN --mount=type=cache,target=/root/.cache \
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Optional: sccache for root as well (helpful for scripts running as root)
+ARG INSTALL_SCCACHE=false
 RUN --mount=type=cache,target=/root/.cache \
-  . $HOME/.cargo/env && cargo install sccache || true
+  if [ "${INSTALL_SCCACHE:-false}" = "true" ]; then \
+    . "$HOME/.cargo/env" && cargo install sccache; \
+  else \
+    echo "Skipping sccache install"; \
+  fi
 
 # Configure mold defaults but disable problematic sccache by default
 ENV CC=clang \

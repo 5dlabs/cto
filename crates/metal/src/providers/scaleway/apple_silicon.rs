@@ -185,11 +185,7 @@ impl AppleSilicon {
     }
 
     /// Create an Apple Silicon server.
-    pub async fn create_server(
-        &self,
-        offer_id: &str,
-        name: &str,
-    ) -> Result<Server, ProviderError> {
+    pub async fn create_server(&self, offer_id: &str, name: &str) -> Result<Server, ProviderError> {
         info!(offer_id, name, region = %self.region, "Creating Apple Silicon server");
 
         let body = CreateAppleSiliconRequest {

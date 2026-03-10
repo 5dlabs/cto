@@ -60,6 +60,23 @@ export interface SetupState {
   clusterCreated: boolean;
 }
 
+export type InstallStep =
+  | 'CheckingPrerequisites'
+  | 'InstallingBinaries'
+  | 'CreatingCluster'
+  | 'PullingImages'
+  | 'DeployingServices'
+  | 'ConfiguringIngress'
+  | 'Complete'
+  | 'Failed';
+
+export interface InstallStatus {
+  step: InstallStep;
+  message: string;
+  progress: number;
+  error: string | null;
+}
+
 /** Workflow status from Argo */
 export interface WorkflowStatus {
   name: string;
@@ -126,6 +143,11 @@ export async function autoStartRuntime(): Promise<string | null> {
   return invoke<string | null>('auto_start_runtime');
 }
 
+/** Scan the local runtime environment without starting anything */
+export async function scanRuntimeEnvironment(): Promise<RuntimeEnvironment> {
+  return invoke<RuntimeEnvironment>('scan_runtime_environment');
+}
+
 /** Fully automated runtime detection and startup - zero touch */
 export async function autoDetectAndStartRuntime(): Promise<RuntimeEnvironment> {
   return invoke<RuntimeEnvironment>('auto_detect_and_start_runtime');
@@ -149,6 +171,18 @@ export async function saveSetupState(state: SetupState): Promise<void> {
 /** Mark setup as complete */
 export async function completeSetup(): Promise<void> {
   return invoke('complete_setup');
+}
+
+export async function runInstallation(): Promise<void> {
+  return invoke('run_installation');
+}
+
+export async function getInstallStatus(): Promise<boolean> {
+  return invoke<boolean>('get_install_status');
+}
+
+export async function resetInstallation(): Promise<void> {
+  return invoke('reset_installation');
 }
 
 // ============================================================================
@@ -388,6 +422,8 @@ export async function quickHealthCheck(): Promise<{
 /** Response from the OpenClaw agent */
 export interface OpenClawResponse {
   content: string;
+  latencyMs?: number;
+  gatewayUrl?: string;
   action?: {
     type: 'oauth' | 'approve' | 'link' | 'confirm';
     label: string;
@@ -409,6 +445,11 @@ export interface OpenClawStatus {
   connected: boolean;
   version: string | null;
   agents: string[];
+}
+
+export interface OpenClawMessage {
+  role: string;
+  content: string;
 }
 
 /** Local bridge status for connecting CTO to the Morgan OpenClaw service */
@@ -435,8 +476,8 @@ export async function openclawSendMessage(
 /** Get message history for a session */
 export async function openclawGetMessages(
   sessionId: string
-): Promise<OpenClawResponse[]> {
-  return invoke<OpenClawResponse[]>('openclaw_get_messages', { sessionId });
+): Promise<OpenClawMessage[]> {
+  return invoke<OpenClawMessage[]>('openclaw_get_messages', { sessionId });
 }
 
 /** Start a Lobster workflow via OpenClaw */

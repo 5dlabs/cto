@@ -27,7 +27,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; frame-src 'self' http://localhost:* https:; connect-src 'self' http://localhost:* https: ws://localhost:* wss://*;"
+      "csp": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; frame-src 'self' http://localhost:* http://127.0.0.1:* https:; connect-src 'self' http://localhost:* http://127.0.0.1:* https: ws://localhost:* ws://127.0.0.1:* wss://*;"
     }
   },
   "bundle": {
@@ -41,9 +41,10 @@
     "publisher": "5D Labs",
     "homepage": "https://cto.dev",
     "macOS": {
-      "entitlements": null,
+      "entitlements": "CTO.entitlements",
       "exceptionDomain": "",
       "frameworks": [],
+      "infoPlist": "Info.plist",
       "providerShortName": "5DLabs",
       "signingIdentity": "-",
       "minimumSystemVersion": "11.0"

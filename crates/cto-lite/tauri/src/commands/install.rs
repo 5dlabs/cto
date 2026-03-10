@@ -7,11 +7,14 @@
 //! 4. Deploy via Helm
 
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 use std::process::Command;
+use std::process::Stdio;
 use tauri::{Emitter, State};
 
 use crate::db::Database;
 use crate::error::{AppError, AppResult};
+use crate::keychain::{self, CredentialKey};
 use crate::runtime::{self as runtime, ContainerRuntime};
 
 /// Installation status
@@ -57,13 +60,56 @@ const BREW_INSTALLABLE: &[(&str, &str, bool)] = &[
     ("argo", "argo", false),
 ];
 
+/// kind v0.31.0 default Kubernetes node image.
+/// Keep this pinned to the release digest for reproducible local clusters.
+const KIND_NODE_IMAGE: &str =
+    "kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f";
+
 /// Images to pull for initial deployment
-const CORE_IMAGES: &[&str] = &[
-    "kindest/node:v1.31.0", // Kind node image - pulled automatically by kind
-];
+const CORE_IMAGES: &[&str] = &[KIND_NODE_IMAGE];
 
 /// Path to our Helm chart (relative to repo root)
 const CHART_PATH: &str = "infra/charts/cto-lite";
+const MORGAN_CHART_PATH: &str = "infra/charts/openclaw-agent";
+const MORGAN_VALUES_PATH: &str = "infra/gitops/agents/morgan-values.yaml";
+const REMOTE_RUNTIME_IMAGE_REPOSITORY: &str = "ghcr.io/5dlabs/runtime";
+const REMOTE_RUNTIME_IMAGE_TAG: &str = "full";
+const REMOTE_OPENCLAW_IMAGE_REPOSITORY: &str = "ghcr.io/5dlabs/openclaw-platform";
+const REMOTE_OPENCLAW_IMAGE_TAG_PREFIX: &str = "beta-local";
+const LOCAL_RUNTIME_DOCKERFILE_PATH: &str = "infra/images/runtime/Dockerfile";
+const LOCAL_RUNTIME_IMAGE_REPOSITORY: &str = "cto/runtime";
+const LOCAL_RUNTIME_IMAGE_TAG_PREFIX: &str = "full-local";
+const LOCAL_RUNTIME_TARGET: &str = "production";
+const LOCAL_OPENCLAW_DOCKERFILE_PATH: &str = "infra/images/openclaw-platform/Dockerfile";
+const LOCAL_OPENCLAW_IMAGE_REPOSITORY: &str = "cto/openclaw-platform";
+const LOCAL_OPENCLAW_IMAGE_TAG_PREFIX: &str = "beta-local";
+const LOCAL_OPENCLAW_CHANNEL: &str = "beta";
+const KIND_CONTEXT: &str = "kind-cto-lite";
+const LOCAL_PATH_PROVISIONER_URL: &str =
+    "https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.28/deploy/local-path-storage.yaml";
+const KIND_INGRESS_MANIFEST_URL: &str =
+    "https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.14.3/deploy/static/provider/kind/deploy.yaml";
+const MORGAN_INGRESS_MANIFEST_PATH: &str =
+    "crates/cto-lite/tauri/resources/manifests/openclaw-morgan-ingress.yaml";
+
+#[derive(Debug, Clone)]
+struct LocalImageRef {
+    repository: String,
+    tag: String,
+}
+
+impl LocalImageRef {
+    fn new(repository: impl Into<String>, tag: impl Into<String>) -> Self {
+        Self {
+            repository: repository.into(),
+            tag: tag.into(),
+        }
+    }
+
+    fn as_ref(&self) -> String {
+        format!("{}:{}", self.repository, self.tag)
+    }
+}
 
 /// Check for required binaries
 #[tauri::command]
@@ -103,6 +149,613 @@ pub async fn check_prerequisites() -> Result<Vec<BinaryCheck>, AppError> {
 /// Check if Homebrew is installed
 fn is_brew_installed() -> bool {
     which::which("brew").is_ok()
+}
+
+fn prepend_docker_path(command: &mut Command) {
+    if let Some(docker_path) = runtime::get_runtime_path(ContainerRuntime::Docker) {
+        if let Some(parent) = std::path::Path::new(&docker_path).parent() {
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            let parent_path = parent.to_string_lossy();
+            if !current_path.split(':').any(|entry| entry == parent_path) {
+                command.env("PATH", format!("{}:{}", parent_path, current_path));
+            }
+        }
+    }
+}
+
+fn kind_command() -> Command {
+    let mut command = Command::new("kind");
+    prepend_docker_path(&mut command);
+    command
+}
+
+fn docker_command() -> Command {
+    if let Some(path) = runtime::get_runtime_path(ContainerRuntime::Docker) {
+        return Command::new(path);
+    }
+
+    let mut command = Command::new("docker");
+    prepend_docker_path(&mut command);
+    command
+}
+
+fn run_kubectl_kind(args: &[&str]) -> AppResult<std::process::Output> {
+    Command::new("kubectl")
+        .args(args)
+        .args(["--context", KIND_CONTEXT])
+        .output()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to run kubectl: {}", e)))
+}
+
+fn ensure_namespace(name: &str) -> AppResult<()> {
+    let exists = run_kubectl_kind(&["get", "namespace", name])
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+
+    if exists {
+        return Ok(());
+    }
+
+    let output = run_kubectl_kind(&["create", "namespace", name])?;
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if stderr.contains("already exists") {
+        Ok(())
+    } else {
+        Err(AppError::CommandFailed(format!(
+            "Failed to create namespace {}: {}",
+            name, stderr
+        )))
+    }
+}
+
+fn apply_remote_manifest(url: &str) -> AppResult<()> {
+    let output = run_kubectl_kind(&["apply", "-f", url])?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(AppError::CommandFailed(format!(
+            "Failed to apply manifest {}: {}",
+            url, stderr
+        )))
+    }
+}
+
+fn wait_for_deployment(namespace: &str, name: &str, timeout: &str) -> AppResult<()> {
+    let output = run_kubectl_kind(&[
+        "rollout",
+        "status",
+        &format!("deployment/{}", name),
+        "-n",
+        namespace,
+        "--timeout",
+        timeout,
+    ])?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(AppError::CommandFailed(format!(
+            "Timed out waiting for {} in {}: {}",
+            name, namespace, stderr
+        )))
+    }
+}
+
+fn deployment_ready_replicas(namespace: &str, name: &str) -> AppResult<u32> {
+    let output = run_kubectl_kind(&[
+        "get",
+        "deployment",
+        name,
+        "-n",
+        namespace,
+        "-o",
+        "jsonpath={.status.readyReplicas}",
+    ])?;
+
+    if !output.status.success() {
+        return Ok(0);
+    }
+
+    let ready = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(ready.parse::<u32>().unwrap_or(0))
+}
+
+fn ingress_host(namespace: &str, name: &str) -> AppResult<Option<String>> {
+    let output = run_kubectl_kind(&[
+        "get",
+        "ingress",
+        name,
+        "-n",
+        namespace,
+        "-o",
+        "jsonpath={.spec.rules[0].host}",
+    ])?;
+
+    if !output.status.success() {
+        return Ok(None);
+    }
+
+    let host = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if host.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(host))
+    }
+}
+
+fn existing_local_installation_ready() -> AppResult<bool> {
+    if !kind_cluster_exists("cto-lite")? {
+        return Ok(false);
+    }
+
+    let ready_replicas = deployment_ready_replicas("openclaw", "openclaw-morgan")?;
+    let ingress = ingress_host("openclaw", "openclaw-morgan")?;
+
+    Ok(ready_replicas > 0 && ingress.as_deref() == Some("morgan.localhost"))
+}
+
+fn persist_installation_complete(
+    db: &Database,
+    runtime_image: Option<&LocalImageRef>,
+    openclaw_image: Option<&LocalImageRef>,
+) -> AppResult<()> {
+    if let Some(openclaw_image_ref) = openclaw_image {
+        db.set_config("local_openclaw_image", &openclaw_image_ref.as_ref())?;
+    }
+
+    if let Some(runtime_image_ref) = runtime_image {
+        db.set_config("local_runtime_image", &runtime_image_ref.as_ref())?;
+    }
+
+    db.set_config("installation_complete", "true")?;
+    let _ = db.set_setup_progress(6);
+    let _ = db.mark_setup_complete();
+
+    Ok(())
+}
+
+fn install_local_path_provisioner() -> AppResult<()> {
+    tracing::info!("Installing local-path provisioner for Kind");
+    apply_remote_manifest(LOCAL_PATH_PROVISIONER_URL)?;
+
+    let _ = run_kubectl_kind(&[
+        "patch",
+        "storageclass",
+        "local-path",
+        "-p",
+        r#"{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}"#,
+    ]);
+
+    Ok(())
+}
+
+fn install_kind_ingress_controller() -> AppResult<()> {
+    tracing::info!("Installing ingress-nginx for Kind");
+    apply_remote_manifest(KIND_INGRESS_MANIFEST_URL)?;
+    wait_for_deployment("ingress-nginx", "ingress-nginx-controller", "240s")
+}
+
+fn get_repo_relative_path(relative_path: &str) -> AppResult<String> {
+    let repo_path = std::path::Path::new(relative_path);
+    if repo_path.exists() {
+        return Ok(relative_path.to_string());
+    }
+
+    if let Ok(cwd) = std::env::current_dir() {
+        let direct = cwd.join(relative_path);
+        if direct.exists() {
+            return Ok(direct.to_string_lossy().to_string());
+        }
+
+        let mut parent = cwd.parent();
+        while let Some(path) = parent {
+            let candidate = path.join(relative_path);
+            if candidate.exists() {
+                return Ok(candidate.to_string_lossy().to_string());
+            }
+            parent = path.parent();
+        }
+    }
+
+    Err(AppError::ConfigError(format!(
+        "Could not find {} from the current working directory",
+        relative_path
+    )))
+}
+
+fn find_repo_root() -> AppResult<std::path::PathBuf> {
+    let cwd = std::env::current_dir()?;
+
+    for candidate in cwd.ancestors() {
+        if candidate.join(".git").exists() || candidate.join("infra").exists() {
+            return Ok(candidate.to_path_buf());
+        }
+    }
+
+    Err(AppError::ConfigError(
+        "Could not determine the repository root for local image builds.".to_string(),
+    ))
+}
+
+fn local_openclaw_image() -> LocalImageRef {
+    LocalImageRef::new(
+        LOCAL_OPENCLAW_IMAGE_REPOSITORY,
+        format!(
+            "{}-{}",
+            LOCAL_OPENCLAW_IMAGE_TAG_PREFIX,
+            local_container_arch_tag()
+        ),
+    )
+}
+
+fn local_runtime_image() -> LocalImageRef {
+    LocalImageRef::new(
+        LOCAL_RUNTIME_IMAGE_REPOSITORY,
+        format!(
+            "{}-{}",
+            LOCAL_RUNTIME_IMAGE_TAG_PREFIX,
+            local_container_arch_tag()
+        ),
+    )
+}
+
+fn remote_runtime_image() -> LocalImageRef {
+    LocalImageRef::new(REMOTE_RUNTIME_IMAGE_REPOSITORY, REMOTE_RUNTIME_IMAGE_TAG)
+}
+
+fn remote_openclaw_image() -> LocalImageRef {
+    let tag = match local_container_arch_tag() {
+        "arm64" => format!("{}-arm64", REMOTE_OPENCLAW_IMAGE_TAG_PREFIX),
+        "amd64" => REMOTE_OPENCLAW_IMAGE_TAG_PREFIX.to_string(),
+        other => format!("{}-{}", REMOTE_OPENCLAW_IMAGE_TAG_PREFIX, other),
+    };
+
+    LocalImageRef::new(REMOTE_OPENCLAW_IMAGE_REPOSITORY, tag)
+}
+
+fn local_container_arch_tag() -> &'static str {
+    match std::env::consts::ARCH {
+        "aarch64" | "arm64" => "arm64",
+        "x86_64" | "amd64" => "amd64",
+        other => other,
+    }
+}
+
+fn local_container_platform() -> &'static str {
+    match local_container_arch_tag() {
+        "arm64" => "linux/arm64",
+        "amd64" => "linux/amd64",
+        _ => "linux/amd64",
+    }
+}
+
+fn docker_image_exists(image: &str) -> bool {
+    docker_command()
+        .args(["image", "inspect", image])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+fn remove_docker_image_if_exists(image: &str) -> AppResult<()> {
+    if !docker_image_exists(image) {
+        return Ok(());
+    }
+
+    let output = docker_command()
+        .args(["image", "rm", "-f", image])
+        .output()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to remove image {}: {}", image, e)))?;
+
+    if output.status.success() {
+        tracing::info!("Removed obsolete image {}", image);
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(AppError::CommandFailed(format!(
+            "Failed to remove image {}: {}",
+            image, stderr
+        )))
+    }
+}
+
+fn cleanup_legacy_local_images() -> AppResult<()> {
+    let obsolete_images = match local_container_arch_tag() {
+        "arm64" => vec![
+            "cto/runtime:full-local".to_string(),
+            "cto/runtime:full-local-amd64".to_string(),
+            "cto/openclaw-platform:beta-local".to_string(),
+            "cto/openclaw-platform:beta-local-amd64".to_string(),
+        ],
+        "amd64" => vec![
+            "cto/runtime:full-local".to_string(),
+            "cto/runtime:full-local-arm64".to_string(),
+            "cto/openclaw-platform:beta-local".to_string(),
+            "cto/openclaw-platform:beta-local-arm64".to_string(),
+        ],
+        _ => vec![
+            "cto/runtime:full-local".to_string(),
+            "cto/openclaw-platform:beta-local".to_string(),
+        ],
+    };
+
+    for image in obsolete_images {
+        remove_docker_image_if_exists(&image)?;
+    }
+
+    Ok(())
+}
+
+fn build_local_runtime_image(force_rebuild: bool) -> AppResult<LocalImageRef> {
+    let image = local_runtime_image();
+    let image_ref = image.as_ref();
+
+    cleanup_legacy_local_images()?;
+
+    if !force_rebuild && docker_image_exists(&image_ref) {
+        tracing::info!("Reusing cached local runtime image {}", image_ref);
+        return Ok(image);
+    }
+
+    let dockerfile_path = get_repo_relative_path(LOCAL_RUNTIME_DOCKERFILE_PATH)?;
+    let repo_root = find_repo_root()?;
+    let platform = local_container_platform();
+
+    tracing::info!(
+        "Building local runtime image {} from {} for {}",
+        image_ref,
+        dockerfile_path,
+        platform
+    );
+
+    let repo_root_arg = repo_root.to_string_lossy().to_string();
+
+    let output = docker_command()
+        .args([
+            "build",
+            "--pull",
+            "--platform",
+            platform,
+            "--target",
+            LOCAL_RUNTIME_TARGET,
+            "-f",
+            &dockerfile_path,
+            "-t",
+            &image_ref,
+            &repo_root_arg,
+        ])
+        .output()
+        .map_err(|e| {
+            AppError::CommandFailed(format!("Failed to build local runtime image: {}", e))
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        tracing::error!(
+            "Local runtime image build failed:\nstdout: {}\nstderr: {}",
+            stdout,
+            stderr
+        );
+        return Err(AppError::CommandFailed(format!(
+            "Failed to build the local runtime image: {}",
+            stderr
+        )));
+    }
+
+    Ok(image)
+}
+
+fn pull_image_required(image: &str) -> AppResult<()> {
+    tracing::info!("Pulling required image: {}", image);
+
+    let output = docker_command()
+        .args(["pull", image])
+        .output()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to pull image: {}", e)))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    Err(AppError::CommandFailed(format!(
+        "Failed to pull required image {}: {}",
+        image, stderr
+    )))
+}
+
+fn prepare_bootstrap_images() -> AppResult<(LocalImageRef, LocalImageRef)> {
+    cleanup_legacy_local_images()?;
+
+    let runtime_image = remote_runtime_image();
+    let openclaw_image = remote_openclaw_image();
+
+    match pull_image_required(&openclaw_image.as_ref()) {
+        Ok(()) => {
+            load_image_to_kind(&openclaw_image.as_ref(), "cto-lite")?;
+            tracing::info!(
+                "Using remote OpenClaw bootstrap image {}",
+                openclaw_image.as_ref()
+            );
+            Ok((runtime_image, openclaw_image))
+        }
+        Err(remote_error) => {
+            tracing::warn!(
+                "Failed to pull remote bootstrap image {}: {}. Falling back to a local image build.",
+                openclaw_image.as_ref(),
+                remote_error
+            );
+
+            let local_runtime_image = build_local_runtime_image(true)?;
+            let local_openclaw_image = build_local_openclaw_image(&local_runtime_image, true)?;
+            load_image_to_kind(&local_openclaw_image.as_ref(), "cto-lite")?;
+            Ok((local_runtime_image, local_openclaw_image))
+        }
+    }
+}
+
+fn build_local_openclaw_image(
+    base_image: &LocalImageRef,
+    force_rebuild: bool,
+) -> AppResult<LocalImageRef> {
+    let image = local_openclaw_image();
+    let image_ref = image.as_ref();
+
+    if !force_rebuild && docker_image_exists(&image_ref) {
+        tracing::info!("Reusing cached local OpenClaw image {}", image_ref);
+        return Ok(image);
+    }
+
+    let dockerfile_path = get_repo_relative_path(LOCAL_OPENCLAW_DOCKERFILE_PATH)?;
+    let repo_root = find_repo_root()?;
+    let platform = local_container_platform();
+
+    tracing::info!(
+        "Building local OpenClaw image {} from {} for {}",
+        image_ref,
+        dockerfile_path,
+        platform
+    );
+
+    let base_image_arg = format!("BASE_IMAGE={}", base_image.as_ref());
+    let openclaw_version_arg = format!("OPENCLAW_VERSION={}", LOCAL_OPENCLAW_CHANNEL);
+    let repo_root_arg = repo_root.to_string_lossy().to_string();
+
+    let output = docker_command()
+        .args([
+            "build",
+            "--pull",
+            "--platform",
+            platform,
+            "-f",
+            &dockerfile_path,
+            "-t",
+            &image_ref,
+            "--build-arg",
+            &base_image_arg,
+            "--build-arg",
+            &openclaw_version_arg,
+            &repo_root_arg,
+        ])
+        .output()
+        .map_err(|e| {
+            AppError::CommandFailed(format!("Failed to build local OpenClaw image: {}", e))
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        tracing::error!(
+            "Local OpenClaw image build failed:\nstdout: {}\nstderr: {}",
+            stdout,
+            stderr
+        );
+        return Err(AppError::CommandFailed(format!(
+            "Failed to build the local OpenClaw image: {}",
+            stderr
+        )));
+    }
+
+    Ok(image)
+}
+
+fn apply_morgan_gateway_ingress() -> AppResult<()> {
+    ensure_namespace("openclaw")?;
+
+    let manifest_path = get_repo_relative_path(MORGAN_INGRESS_MANIFEST_PATH)?;
+    let output = run_kubectl_kind(&["apply", "-f", &manifest_path])?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(AppError::CommandFailed(format!(
+            "Failed to apply Morgan ingress: {}",
+            stderr
+        )))
+    }
+}
+
+fn apply_secret_manifest(namespace: &str, name: &str, data: &[(&str, String)]) -> AppResult<()> {
+    let mut string_data = serde_json::Map::new();
+    for (key, value) in data {
+        string_data.insert((*key).to_string(), serde_json::Value::String(value.clone()));
+    }
+
+    let manifest = serde_json::json!({
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+        },
+        "type": "Opaque",
+        "stringData": serde_json::Value::Object(string_data),
+    });
+
+    let mut child = Command::new("kubectl")
+        .args(["apply", "--context", KIND_CONTEXT, "-f", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to apply secret {}: {}", name, e)))?;
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin.write_all(manifest.to_string().as_bytes())?;
+    }
+
+    let output = child.wait_with_output().map_err(|e| {
+        AppError::CommandFailed(format!("Failed to finish applying {}: {}", name, e))
+    })?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(AppError::CommandFailed(format!(
+            "Failed to apply secret {}: {}",
+            name, stderr
+        )))
+    }
+}
+
+fn sync_local_openclaw_secrets() -> AppResult<()> {
+    ensure_namespace("openclaw")?;
+
+    let openai = keychain::get_credential(CredentialKey::OpenAiApiKey)?;
+    let anthropic = keychain::get_credential(CredentialKey::AnthropicApiKey)?;
+
+    let mut api_key_data = Vec::new();
+    if let Some(value) = openai {
+        api_key_data.push(("openai-api-key", value));
+    }
+    if let Some(value) = anthropic {
+        api_key_data.push(("anthropic-api-key", value));
+    }
+
+    if api_key_data.is_empty() {
+        tracing::warn!(
+            "No local OpenAI or Anthropic API key was found; continuing bootstrap without provider credentials"
+        );
+    } else {
+        apply_secret_manifest("openclaw", "openclaw-api-keys", &api_key_data)?;
+    }
+
+    apply_secret_manifest(
+        "openclaw",
+        "openclaw-discord-tokens",
+        &[("morgan", "disabled".to_string())],
+    )?;
+
+    Ok(())
 }
 
 /// Install a binary via Homebrew
@@ -248,10 +901,17 @@ pub async fn run_installation(
         );
     };
 
+    if existing_local_installation_ready()? {
+        tracing::info!("Existing local Kind + Morgan installation is already healthy");
+        persist_installation_complete(&db, None, None)?;
+        emit_progress(InstallStep::Complete, "Launching CTO...", 100);
+        return Ok(());
+    }
+
     // Step 1: Check prerequisites
     emit_progress(
         InstallStep::CheckingPrerequisites,
-        "Checking prerequisites...",
+        "Preparing your local environment...",
         5,
     );
 
@@ -260,15 +920,12 @@ pub async fn run_installation(
 
     // Auto-install missing dependencies, including the container runtime on supported platforms.
     if !missing.is_empty() {
-        let missing_names: Vec<_> = missing
-            .iter()
-            .map(|b| b.name.as_str())
-            .collect();
+        let missing_names: Vec<_> = missing.iter().map(|b| b.name.as_str()).collect();
 
         if !missing_names.is_empty() {
             emit_progress(
                 InstallStep::InstallingBinaries,
-                &format!("Installing {}...", missing_names.join(", ")),
+                "Installing dependencies...",
                 10,
             );
             install_missing_dependencies(&window)?;
@@ -277,7 +934,7 @@ pub async fn run_installation(
 
     emit_progress(
         InstallStep::CheckingPrerequisites,
-        "Starting container runtime...",
+        "Preparing your local environment...",
         18,
     );
     let runtime_env = runtime::fully_auto_runtime()?;
@@ -290,7 +947,7 @@ pub async fn run_installation(
     // Step 2: Create Kind cluster
     emit_progress(
         InstallStep::CreatingCluster,
-        "Creating Kubernetes cluster...",
+        "Starting local services...",
         20,
     );
 
@@ -300,28 +957,62 @@ pub async fn run_installation(
         tracing::info!("Kind cluster 'cto-lite' already exists");
     }
 
-    // Step 3: Pull images
+    emit_progress(
+        InstallStep::ConfiguringIngress,
+        "Configuring the local runtime...",
+        28,
+    );
+    install_local_path_provisioner()?;
+
+    emit_progress(
+        InstallStep::ConfiguringIngress,
+        "Configuring the local runtime...",
+        32,
+    );
+    install_kind_ingress_controller()?;
+
+    emit_progress(
+        InstallStep::ConfiguringIngress,
+        "Configuring the local runtime...",
+        36,
+    );
+    sync_local_openclaw_secrets()?;
+
     emit_progress(
         InstallStep::PullingImages,
-        "Pulling container images...",
+        "Preparing the local engine...",
         40,
     );
 
     for (i, image) in CORE_IMAGES.iter().enumerate() {
-        let progress = 40 + ((i as u8 + 1) * 20 / CORE_IMAGES.len() as u8);
+        let progress = 40 + ((i as u8 + 1) * 8 / CORE_IMAGES.len() as u8);
         emit_progress(
             InstallStep::PullingImages,
-            &format!("Pulling {}...", image),
+            "Preparing the local engine...",
             progress,
         );
         pull_image(image)?;
     }
 
+    emit_progress(
+        InstallStep::PullingImages,
+        "Preparing the local engine...",
+        50,
+    );
+    let (runtime_image, openclaw_image) = prepare_bootstrap_images()?;
+
+    emit_progress(
+        InstallStep::ConfiguringIngress,
+        "Configuring the local runtime...",
+        60,
+    );
+    apply_morgan_gateway_ingress()?;
+
     // Step 4: Add Helm repos and update dependencies
     emit_progress(
         InstallStep::PullingImages,
-        "Setting up Helm repositories...",
-        50,
+        "Preparing the local environment...",
+        64,
     );
     add_argo_helm_repo()?;
 
@@ -331,39 +1022,47 @@ pub async fn run_installation(
 
     emit_progress(
         InstallStep::PullingImages,
-        "Updating Helm dependencies...",
-        55,
+        "Preparing the local environment...",
+        68,
     );
     update_helm_dependencies(&chart_path)?;
 
-    // Step 5: Deploy services via Helm
     emit_progress(
         InstallStep::DeployingServices,
-        "Deploying CTO services...",
-        70,
+        "Starting local services...",
+        74,
     );
+    let morgan_chart_path = get_morgan_chart_path()?;
+    let morgan_values_path = get_morgan_values_path()?;
+    helm_install_morgan(&morgan_chart_path, &morgan_values_path, &openclaw_image)?;
+
+    emit_progress(
+        InstallStep::ConfiguringIngress,
+        "Starting local services...",
+        80,
+    );
+    wait_for_pods("openclaw")?;
+
+    // Step 5: Deploy services via Helm
+    emit_progress(InstallStep::DeployingServices, "Finalizing setup...", 86);
     helm_install(&chart_path, "cto-lite")?;
 
     // Step 6: Wait for services to be ready
-    emit_progress(
-        InstallStep::ConfiguringIngress,
-        "Waiting for services to start...",
-        90,
-    );
+    emit_progress(InstallStep::ConfiguringIngress, "Finalizing setup...", 92);
     wait_for_pods("cto-lite")?;
 
     // Complete
-    emit_progress(InstallStep::Complete, "Installation complete!", 100);
+    emit_progress(InstallStep::Complete, "Launching CTO...", 100);
 
     // Mark installation done in DB
-    db.set_config("installation_complete", "true")?;
+    persist_installation_complete(&db, Some(&runtime_image), Some(&openclaw_image))?;
 
     Ok(())
 }
 
 /// Check if Kind cluster exists
 fn kind_cluster_exists(name: &str) -> AppResult<bool> {
-    let output = Command::new("kind")
+    let output = kind_command()
         .args(["get", "clusters"])
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to list Kind clusters: {}", e)))?;
@@ -380,11 +1079,13 @@ fn kind_cluster_exists(name: &str) -> AppResult<bool> {
 fn create_kind_cluster() -> AppResult<()> {
     tracing::info!("Creating Kind cluster 'cto-lite'");
 
-    let config = r#"
+    let config = format!(
+        r#"
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
+  image: {kind_node_image}
   kubeadmConfigPatches:
   - |
     kind: InitConfiguration
@@ -401,14 +1102,16 @@ nodes:
   - containerPort: 8080
     hostPort: 8080
     protocol: TCP
-"#;
+"#,
+        kind_node_image = KIND_NODE_IMAGE
+    );
 
     // Write config to temp file
     let temp_dir = std::env::temp_dir();
     let config_path = temp_dir.join("cto-lite-kind-config.yaml");
     std::fs::write(&config_path, config)?;
 
-    let output = Command::new("kind")
+    let output = kind_command()
         .args([
             "create",
             "cluster",
@@ -441,7 +1144,7 @@ nodes:
 fn pull_image(image: &str) -> AppResult<()> {
     tracing::info!("Pulling image: {}", image);
 
-    let output = Command::new("docker")
+    let output = docker_command()
         .args(["pull", image])
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to pull image: {}", e)))?;
@@ -460,14 +1163,17 @@ fn pull_image(image: &str) -> AppResult<()> {
 fn load_image_to_kind(image: &str, cluster: &str) -> AppResult<()> {
     tracing::info!("Loading image {} into cluster {}", image, cluster);
 
-    let output = Command::new("kind")
+    let output = kind_command()
         .args(["load", "docker-image", image, "--name", cluster])
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to load image: {}", e)))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        tracing::warn!("Failed to load {} into Kind: {}", image, stderr);
+        return Err(AppError::CommandFailed(format!(
+            "Failed to load {} into Kind: {}",
+            image, stderr
+        )));
     }
 
     Ok(())
@@ -602,6 +1308,114 @@ fn helm_install(chart_path: &str, namespace: &str) -> AppResult<()> {
     Ok(())
 }
 
+fn write_morgan_override_values(image: &LocalImageRef) -> AppResult<std::path::PathBuf> {
+    let override_values = format!(
+        r#"
+namespace: openclaw
+createNamespace: false
+imagePullSecrets: []
+nodeSelector: null
+tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Exists"
+    effect: "NoSchedule"
+  - key: "node-role.kubernetes.io/master"
+    operator: "Exists"
+    effect: "NoSchedule"
+storage:
+  storageClass: local-path
+image:
+  repository: {repository}
+  tag: {tag}
+  pullPolicy: IfNotPresent
+discord:
+  tokenSecretKey: henry
+telemetry:
+  enabled: false
+cloudProviders:
+  bedrock:
+    enabled: false
+"#,
+        repository = image.repository,
+        tag = image.tag
+    );
+
+    let path = std::env::temp_dir().join("cto-lite-morgan-kind-values.yaml");
+    std::fs::write(&path, override_values.trim_start())?;
+    Ok(path)
+}
+
+fn helm_install_morgan(
+    chart_path: &str,
+    values_path: &str,
+    image: &LocalImageRef,
+) -> AppResult<()> {
+    tracing::info!("Installing local Morgan chart from {}", chart_path);
+
+    let release = "openclaw-morgan";
+    let namespace = "openclaw";
+    let override_path = write_morgan_override_values(image)?;
+
+    let check = Command::new("helm")
+        .args([
+            "status",
+            release,
+            "--namespace",
+            namespace,
+            "--kube-context",
+            KIND_CONTEXT,
+        ])
+        .output();
+
+    let release_exists = check.map(|output| output.status.success()).unwrap_or(false);
+
+    let mut args = vec![
+        if release_exists { "upgrade" } else { "install" },
+        release,
+        chart_path,
+        "--namespace",
+        namespace,
+        "--create-namespace",
+        "--kube-context",
+        KIND_CONTEXT,
+        "--wait",
+        "--timeout",
+        "8m",
+        "-f",
+        values_path,
+        "-f",
+        override_path.to_str().unwrap_or_default(),
+    ];
+
+    if release_exists {
+        args.push("--reuse-values");
+    }
+
+    let output = Command::new("helm")
+        .args(&args)
+        .output()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to run helm for Morgan: {}", e)))?;
+
+    let _ = std::fs::remove_file(&override_path);
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        tracing::error!(
+            "Morgan helm install failed:\nstdout: {}\nstderr: {}",
+            stdout,
+            stderr
+        );
+        return Err(AppError::CommandFailed(format!(
+            "Morgan helm install failed: {}",
+            stderr
+        )));
+    }
+
+    tracing::info!("Morgan deployed successfully");
+    Ok(())
+}
+
 /// Wait for pods to be ready
 fn wait_for_pods(namespace: &str) -> AppResult<()> {
     tracing::info!("Waiting for pods in namespace {} to be ready", namespace);
@@ -678,11 +1492,29 @@ fn get_chart_path() -> AppResult<String> {
     )))
 }
 
+fn get_morgan_chart_path() -> AppResult<String> {
+    get_repo_relative_path(MORGAN_CHART_PATH)
+}
+
+fn get_morgan_values_path() -> AppResult<String> {
+    get_repo_relative_path(MORGAN_VALUES_PATH)
+}
+
 /// Get installation status
 #[tauri::command]
 pub async fn get_install_status(db: State<'_, Database>) -> Result<bool, AppError> {
     let complete = db.get_config("installation_complete")?;
-    Ok(complete.map(|v| v == "true").unwrap_or(false))
+    if complete.as_deref() == Some("true") {
+        return Ok(true);
+    }
+
+    if existing_local_installation_ready()? {
+        tracing::info!("Recovered installation state from local Kind + Morgan health");
+        persist_installation_complete(&db, None, None)?;
+        return Ok(true);
+    }
+
+    Ok(false)
 }
 
 /// Delete installation (for testing/reset)
@@ -691,7 +1523,7 @@ pub async fn reset_installation(db: State<'_, Database>) -> Result<(), AppError>
     tracing::info!("Resetting installation");
 
     // Delete Kind cluster
-    let _ = Command::new("kind")
+    let _ = kind_command()
         .args(["delete", "cluster", "--name", "cto-lite"])
         .output();
 

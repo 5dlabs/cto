@@ -33,6 +33,9 @@ resources:
 nodeSelector:
   node-role.kubernetes.io/worker: ""
 
+# Optional tolerations for clusters that schedule agents on tainted nodes
+tolerations: []
+
 # -- Storage configuration
 storage:
   storageClass: mayastor
@@ -62,8 +65,8 @@ agent:
   id: ""
   # -- Display name (e.g., "Metal", "Trader", "Forge")
   name: ""
-  # -- Primary model (e.g., "openai/gpt-5.3")
-  model: "openai/gpt-5.3"
+  # -- Primary model (e.g., "openai-api/gpt-5.4-pro")
+  model: "openai-api/gpt-5.4-pro"
   # -- Heartbeat interval
   heartbeat: "15m"
   # -- Sandbox mode
@@ -123,6 +126,10 @@ models:
     anthropic:
       api: "anthropic-messages"
       baseUrl: "https://api.anthropic.com"
+      auth: "api-key"
+      apiKey: "${ANTHROPIC_API_KEY}"
+      authHeader: true
+      headers: {}
       models:
         - id: "claude-3-5-haiku-latest"
           name: "Claude 3.5 Haiku"
@@ -135,11 +142,32 @@ models:
     openai:
       api: "openai-responses"
       baseUrl: "https://api.openai.com/v1"
+      auth: "api-key"
+      apiKey: "${OPENAI_API_KEY}"
+      authHeader: true
+      headers: {}
       models:
-        - id: "gpt-5.3"
-          name: "GPT-5.3"
+        - id: "gpt-4o"
+          name: "GPT-4o"
         - id: "text-embedding-3-small"
           name: "Text Embedding 3 Small"
+        - id: "text-embedding-3-large"
+          name: "Text Embedding 3 Large"
+    openai-api:
+      api: "openai-responses"
+      baseUrl: "https://api.openai.com/v1"
+      auth: "api-key"
+      enabled: true
+      apiKey: "${OPENAI_API_KEY}"
+      authHeader: true
+      headers: {}
+      models:
+        - id: "gpt-5.4-pro"
+          name: "GPT-5.4 Pro"
+        - id: "gpt-5.4"
+          name: "GPT-5.4"
+        - id: "gpt-5.3-codex"
+          name: "GPT-5.3 Codex"
 
 # =============================================================================
 # Agent Defaults (global across all agents)
@@ -255,9 +283,10 @@ gateway:
 # Model Fallback Configuration
 # =============================================================================
 modelDefaults:
-  primary: "openai/gpt-5.3"
+  primary: "openai-api/gpt-5.4-pro"
   fallbacks:
-    - "openai/gpt-5.3"
+    - "openai-api/gpt-5.4"
+    - "openai-api/gpt-5.3-codex"
     - "anthropic/claude-opus-4-6-20260201"
     - "anthropic/claude-sonnet-4-20250514"
     - "anthropic/claude-3-5-haiku-latest"

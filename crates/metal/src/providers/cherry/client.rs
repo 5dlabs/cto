@@ -382,9 +382,8 @@ impl Cherry {
 
         let data: serde_json::Value = self.get(&format!("/plans/{slug}")).await?;
 
-        Self::to_plan_with_pricing(&data).ok_or_else(|| {
-            ProviderError::Config(format!("Failed to parse plan: {slug}"))
-        })
+        Self::to_plan_with_pricing(&data)
+            .ok_or_else(|| ProviderError::Config(format!("Failed to parse plan: {slug}")))
     }
 
     /// List available regions.

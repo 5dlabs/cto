@@ -7,6 +7,13 @@ metadata:
     {{- include "openclaw-agent.labels" . | nindent 4 }}
 data:
   openclaw.json: |
+    {{- $messaging := index .Values "messaging" | default dict }}
+    {{- $discordConfig := index $messaging "discord" | default .Values.discord }}
+    {{- $plugins := index .Values "plugins" | default dict }}
+    {{- $memoryCore := index $plugins "memoryCore" | default dict }}
+    {{- $webTools := index .Values.tools "web" | default dict }}
+    {{- $webSearch := index $webTools "search" | default dict }}
+    {{- $webFetch := index $webTools "fetch" | default dict }}
     {
       "agents": {
         "defaults": {
@@ -73,7 +80,38 @@ data:
           {
             "agentDir": "/workspace/.openclaw/agents/{{ .Values.agent.id }}/agent",
             "heartbeat": {
+              {{- if kindIs "string" .Values.agent.heartbeat }}
               "every": {{ .Values.agent.heartbeat | quote }}
+              {{- else if .Values.agent.heartbeat }}
+              "every": {{ .Values.agent.heartbeat.every | default "15m" | quote }},
+              "target": {{ .Values.agent.heartbeat.target | default "last" | quote }},
+              "ackMaxChars": {{ .Values.agent.heartbeat.ackMaxChars | default 500 }}
+              {{- if .Values.agent.heartbeat.prompt }},
+              "prompt": {{ .Values.agent.heartbeat.prompt | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.model }},
+              "model": {{ .Values.agent.heartbeat.model | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.to }},
+              "to": {{ .Values.agent.heartbeat.to | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.session }},
+              "session": {{ .Values.agent.heartbeat.session | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.accountId }},
+              "accountId": {{ .Values.agent.heartbeat.accountId | quote }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.includeReasoning }},
+              "includeReasoning": {{ .Values.agent.heartbeat.includeReasoning }}
+              {{- end }}
+              {{- if .Values.agent.heartbeat.activeHours }},
+              "activeHours": {
+                "start": {{ .Values.agent.heartbeat.activeHours.start | default "" | quote }},
+                "end": {{ .Values.agent.heartbeat.activeHours.end | default "" | quote }},
+                "timezone": {{ .Values.agent.heartbeat.activeHours.timezone | default "" | quote }}
+              }
+              {{- end }}
+              {{- end }}
             },
             "id": {{ .Values.agent.id | quote }},
             "model": {{ .Values.agent.model | quote }},
@@ -93,16 +131,26 @@ data:
       },
       "channels": {
         "discord": {
+          {{- if $discordConfig.enabled }}
           "accounts": {
-            {{ .Values.discord.accountId | default .Values.agent.id | quote }}: {
+            "default": {
               "token": "${DISCORD_TOKEN}"
+              ,
+              "allowBots": {{ if hasKey $discordConfig "allowBots" }}{{ $discordConfig.allowBots }}{{ else }}true{{ end }},
+              {{- if $discordConfig.dm }}
+              "dmPolicy": {{ $discordConfig.dm.policy | default "allowlist" | quote }},
+              {{- if $discordConfig.dm.allowFrom }}
+              "allowFrom": {{ $discordConfig.dm.allowFrom | toJson }},
+              {{- end }}
+              {{- end }}
+              "groupPolicy": {{ $discordConfig.groupPolicy | default "allowlist" | quote }},
+              "guilds": {{ $discordConfig.guilds | default dict | toJson }}
             }
           },
-          "allowBots": {{ .Values.discord.allowBots | default true }},
-          "dm": {{ .Values.discord.dm | toJson }},
-          "enabled": {{ .Values.discord.enabled | default true }},
-          "groupPolicy": {{ .Values.discord.groupPolicy | quote }},
-          "guilds": {{ .Values.discord.guilds | toJson }}
+          "enabled": true
+          {{- else }}
+          "enabled": false
+          {{- end }}
         }
       },
       "gateway": {
@@ -110,10 +158,23 @@ data:
           "token": {{ .Values.gateway.auth.token | quote }}
         },
         "bind": {{ .Values.gateway.bind | quote }},
+        {{- if .Values.gateway.http }}
+        "http": {
+          "endpoints": {
+            "chatCompletions": {
+              "enabled": {{ .Values.gateway.http.endpoints.chatCompletions.enabled }}
+            },
+            "responses": {
+              "enabled": {{ .Values.gateway.http.endpoints.responses.enabled }},
+              "maxBodyBytes": {{ .Values.gateway.http.endpoints.responses.maxBodyBytes | default 20971520 }}
+            }
+          }
+        },
+        {{- end }}
         "mode": {{ .Values.gateway.mode | quote }},
         "port": {{ .Values.gateway.port }},
         "controlUi": {
-          "enabled": {{ if .Values.gateway.controlUi }}{{ .Values.gateway.controlUi.enabled | default true }}{{ else }}true{{ end }},
+          "enabled": {{ if and .Values.gateway.controlUi (hasKey .Values.gateway.controlUi "enabled") }}{{ .Values.gateway.controlUi.enabled }}{{ else }}true{{ end }},
           "basePath": {{ if .Values.gateway.controlUi }}{{ .Values.gateway.controlUi.basePath | default "/openclaw" | quote }}{{ else }}"/openclaw"{{ end }},
           "dangerouslyAllowHostHeaderOriginFallback": true
         }
@@ -134,7 +195,7 @@ data:
             "enabled": true
           },
           "memory-core": {
-            "enabled": true
+            "enabled": {{ if hasKey $memoryCore "enabled" }}{{ $memoryCore.enabled }}{{ else }}true{{ end }}
           }
           {{- if .Values.nats.enabled }},
           "nats-messenger": {
@@ -169,13 +230,28 @@ data:
       "models": {
         "providers": {
           {{- $first := true }}
+          {{- $enabledProviders := dict }}
           {{- range $name, $provider := .Values.models.providers }}
+          {{- if or (not (hasKey $provider "enabled")) $provider.enabled }}
+          {{- $_ := set $enabledProviders $name $provider }}
+          {{- end }}
+          {{- end }}
+          {{- range $name, $provider := $enabledProviders }}
           {{- if not $first }},{{ end }}
           {{ $name | quote }}: {
             "api": {{ $provider.api | quote }},
             "apiKey": "${PROVIDER_{{ $name | upper | replace "-" "_" }}_KEY}",
             "baseUrl": {{ $provider.baseUrl | quote }},
-            "models": {{ $provider.models | toJson }}
+            "models": {{ $provider.models | default list | toJson }}
+            {{- if $provider.auth }},
+            "auth": {{ $provider.auth | quote }}
+            {{- end }}
+            {{- if hasKey $provider "authHeader" }},
+            "authHeader": {{ $provider.authHeader }}
+            {{- end }}
+            {{- if $provider.headers }},
+            "headers": {{ $provider.headers | toJson }}
+            {{- end }}
           }
           {{- $first = false }}
           {{- end }}
@@ -229,8 +305,8 @@ data:
         },
         "profile": {{ .Values.tools.profile | quote }},
         "web": {
-          "search": { "enabled": true },
-          "fetch": { "enabled": true }
+          "search": { "enabled": {{ if hasKey $webSearch "enabled" }}{{ $webSearch.enabled }}{{ else }}true{{ end }} },
+          "fetch": { "enabled": {{ if hasKey $webFetch "enabled" }}{{ $webFetch.enabled }}{{ else }}true{{ end }} }
         }
       },
       {{- if .Values.logging }}

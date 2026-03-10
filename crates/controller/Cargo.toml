@@ -77,6 +77,7 @@ notify = { path = "../notify" }
 
 # CTO config types
 cto-config = { path = "../config", package = "config" }
+acp-runtime = { path = "../acp-runtime" }
 
 # Binary configurations with proper naming
 [[bin]]
