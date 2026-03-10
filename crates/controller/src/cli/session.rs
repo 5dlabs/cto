@@ -4,6 +4,7 @@
 //! Handles state transitions and maintains context between CLI executions.
 
 use crate::cli::types::{CLIType, UniversalConfig};
+use acp_runtime::{AcpRunState, AcpSessionMetadata};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -29,6 +30,9 @@ pub struct SessionState {
     pub execution_history: Vec<ExecutionRecord>,
     /// Session status
     pub status: SessionStatus,
+    /// ACP runtime/session metadata when this session delegates through ACP.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acp: Option<AcpSessionMetadata>,
 }
 
 /// Execution record for tracking session activity
@@ -187,6 +191,7 @@ impl SessionManager {
             cli_specific_state: serde_json::json!({}),
             execution_history: vec![],
             status: SessionStatus::Active,
+            acp: None,
         };
 
         // Save to persistence
@@ -266,6 +271,80 @@ impl SessionManager {
         self.persistence.save_session(&session).await?;
         self.update_cache(&session).await;
 
+        Ok(())
+    }
+
+    /// Attach an ACP runtime to an existing session.
+    pub async fn set_acp_runtime(&self, session_id: &str, runtime_id: String) -> Result<()> {
+        let mut session = self
+            .get_session(session_id)
+            .await?
+            .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
+
+        let mut acp = session.acp.unwrap_or_default();
+        acp.runtime_id = Some(runtime_id);
+        session.acp = Some(acp);
+        session.last_active = chrono::Utc::now();
+
+        self.persistence.save_session(&session).await?;
+        self.update_cache(&session).await;
+        Ok(())
+    }
+
+    /// Bind a concrete ACP session identifier to a controller session.
+    pub async fn bind_acp_session(
+        &self,
+        session_id: &str,
+        acp_session_id: String,
+        run_state: AcpRunState,
+    ) -> Result<()> {
+        let mut session = self
+            .get_session(session_id)
+            .await?
+            .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
+
+        let mut acp = session.acp.unwrap_or_default();
+        acp.session_id = Some(acp_session_id);
+        acp.run_state = run_state;
+        session.acp = Some(acp);
+        session.last_active = chrono::Utc::now();
+
+        self.persistence.save_session(&session).await?;
+        self.update_cache(&session).await;
+        Ok(())
+    }
+
+    /// Update only the ACP run state.
+    pub async fn set_acp_run_state(&self, session_id: &str, run_state: AcpRunState) -> Result<()> {
+        let mut session = self
+            .get_session(session_id)
+            .await?
+            .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
+
+        let mut acp = session.acp.unwrap_or_default();
+        acp.run_state = run_state;
+        session.acp = Some(acp);
+        session.last_active = chrono::Utc::now();
+
+        self.persistence.save_session(&session).await?;
+        self.update_cache(&session).await;
+        Ok(())
+    }
+
+    /// Update the tracked ACP event cursor.
+    pub async fn set_acp_cursor(&self, session_id: &str, cursor: String) -> Result<()> {
+        let mut session = self
+            .get_session(session_id)
+            .await?
+            .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
+
+        let mut acp = session.acp.unwrap_or_default();
+        acp.last_event_cursor = Some(cursor);
+        session.acp = Some(acp);
+        session.last_active = chrono::Utc::now();
+
+        self.persistence.save_session(&session).await?;
+        self.update_cache(&session).await;
         Ok(())
     }
 

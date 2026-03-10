@@ -18,7 +18,7 @@
  *   linear-plan              --session-id <id> --plan <json>
  *   register-run             --run-id <id> --agent <name> [--issue-id <id>]
  *   deregister-run           --run-id <id>
- *   invoke-agent             --mode <subagent|acp> --agent <name> [--prompt-file <path>]
+ *   invoke-agent             --mode <subagent|a2a> --agent <name> [--prompt-file <path>]
  *   classify-output          --cli <claude|codex|openclaw> [--intermediate]
  *
  * All subcommands also accept JSON on stdin when file args are omitted.
@@ -127,8 +127,8 @@ Subcommands:
   deregister-run     Deregister pipeline run
     --run-id <id>        Run ID (required)
 
-  invoke-agent       Invoke an agent (subagent or ACP mode)
-    --mode <mode>        subagent | acp (required)
+  invoke-agent       Invoke an agent (subagent or A2A mode)
+    --mode <mode>        subagent | a2a (required, acp accepted as deprecated alias)
     --agent <name>       Agent name (required)
     --prompt-file <path> Prompt file path
     --session-key <key>  Session key for subagent mode
@@ -638,7 +638,7 @@ async function main(): Promise<void> {
     }
 
     case 'invoke-agent': {
-      const mode = getArg(args, '--mode') as 'subagent' | 'acp' | undefined;
+      const mode = getArg(args, '--mode') as 'subagent' | 'a2a' | 'acp' | undefined;
       const agent = getArg(args, '--agent');
       const promptFile = getArg(args, '--prompt-file');
       const prompt = getArg(args, '--prompt');
@@ -647,6 +647,11 @@ async function main(): Promise<void> {
 
       if (!mode || !agent) {
         console.error('Error: --mode and --agent are required');
+        process.exit(1);
+      }
+
+      if (!['subagent', 'a2a', 'acp'].includes(mode)) {
+        console.error('Error: --mode must be "subagent" or "a2a" (or deprecated alias "acp")');
         process.exit(1);
       }
 

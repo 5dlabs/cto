@@ -2,13 +2,19 @@
 //!
 //! Standalone HTTP service for PM webhook handling (Linear, Asana, Jira, etc.).
 
+use acp_runtime::AcpRuntimeRegistry;
 use anyhow::{Context, Result};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-use pm::{config::Config, server, state::TokenHealthManager, LinearClient};
+use pm::{
+    config::Config,
+    server,
+    state::{SessionTracker, TokenHealthManager},
+    LinearClient,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -63,6 +69,8 @@ async fn main() -> Result<()> {
         config: config.clone(),
         kube_client,
         linear_client,
+        session_tracker: SessionTracker::default(),
+        acp_registry: AcpRuntimeRegistry::default(),
     };
 
     // Build router

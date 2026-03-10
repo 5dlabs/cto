@@ -1,11 +1,13 @@
 /**
- * invoke-agent — Unified agent invocation supporting subagent and ACP modes.
+ * invoke-agent — Unified agent invocation supporting subagent and A2A modes.
  */
 
 import * as fs from 'fs';
 
+type InvokeMode = 'subagent' | 'a2a' | 'acp';
+
 interface InvokeAgentArgs {
-  mode: 'subagent' | 'acp';
+  mode: InvokeMode;
   agent: string;
   sessionKey?: string;
   taskContext?: string;
@@ -13,11 +15,21 @@ interface InvokeAgentArgs {
   prompt?: string;
 }
 
+function normalizeMode(mode: InvokeMode): 'subagent' | 'a2a' {
+  if (mode === 'acp') {
+    console.warn('invoke-agent: --mode acp is deprecated; use --mode a2a');
+    return 'a2a';
+  }
+
+  return mode;
+}
+
 export async function invokeAgent(args: InvokeAgentArgs): Promise<{ success: boolean; response?: string; error?: string }> {
   const agentHost = `http://${args.agent}.agents.svc:18789`;
   const promptContent = args.promptFile ? fs.readFileSync(args.promptFile, 'utf-8') : (args.prompt ?? '');
+  const mode = normalizeMode(args.mode);
 
-  if (args.mode === 'subagent') {
+  if (mode === 'subagent') {
     // Native OpenClaw /hooks/agent
     const hooksToken = process.env['HOOKS_TOKEN'] ?? '';
     try {
@@ -40,7 +52,7 @@ export async function invokeAgent(args: InvokeAgentArgs): Promise<{ success: boo
     }
   }
 
-  if (args.mode === 'acp') {
+  if (mode === 'a2a') {
     // A2A JSON-RPC
     try {
       const res = await fetch(`${agentHost}/a2a`, {

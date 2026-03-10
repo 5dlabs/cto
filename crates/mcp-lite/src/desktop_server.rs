@@ -4,6 +4,7 @@
 //! designed to be spawned by Tauri as a child process.
 
 use anyhow::{Context, Result};
+use acp_runtime::AcpRuntimeRegistry;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -64,6 +65,10 @@ pub struct ServerConfig {
     pub kubectl_path: String,
     /// Path to argo CLI
     pub argo_path: String,
+    /// Whether ACP-backed delegation is enabled for the desktop caller.
+    pub acp_enabled: bool,
+    /// Preferred ACP runtime ID when ACP delegation is enabled.
+    pub acp_runtime_id: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -75,6 +80,10 @@ impl Default for ServerConfig {
             default_model: "claude-sonnet-4-20250514".to_string(),
             kubectl_path: "kubectl".to_string(),
             argo_path: "argo".to_string(),
+            acp_enabled: false,
+            acp_runtime_id: AcpRuntimeRegistry::default()
+                .select_runtime_for_service("mcp-lite", None)
+                .map(|selection| selection.runtime_id),
         }
     }
 }
@@ -102,6 +111,15 @@ impl DesktopServer {
     pub fn with_config(config: ServerConfig) -> Self {
         Self {
             config: Arc::new(config),
+        }
+    }
+
+    /// Return the preferred ACP runtime ID for desktop delegation, if configured.
+    fn preferred_acp_runtime(&self) -> Option<&str> {
+        if self.config.acp_enabled {
+            self.config.acp_runtime_id.as_deref()
+        } else {
+            None
         }
     }
 
@@ -210,6 +228,9 @@ impl DesktopServer {
                 "name": "cto-mcp-lite",
                 "title": "CTO Lite MCP Server",
                 "version": "0.1.0"
+            },
+            "experimental": {
+                "acpRuntime": self.preferred_acp_runtime()
             }
         })
     }
