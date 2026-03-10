@@ -1,6 +1,6 @@
 //! Update management commands
 //!
-//! CTO Lite components are distributed as Docker images, making updates
+//! CTO components are distributed as Docker images, making updates
 //! simple: just pull new images and restart the cluster.
 
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ pub struct UpdateStatus {
     pub last_checked: Option<String>,
 }
 
-/// Core images that CTO Lite uses
+/// Core images that CTO uses
 const CORE_IMAGES: &[&str] = &[
     "ghcr.io/5dlabs/controller",
     "ghcr.io/5dlabs/pm-lite",
@@ -245,7 +245,7 @@ pub async fn apply_updates() -> AppResult<String> {
     Ok(messages.join("\n"))
 }
 
-/// Get the current version of CTO Lite components
+/// Get the current version of CTO components
 #[tauri::command]
 pub async fn get_component_versions() -> AppResult<Vec<ComponentVersion>> {
     let mut versions = Vec::new();

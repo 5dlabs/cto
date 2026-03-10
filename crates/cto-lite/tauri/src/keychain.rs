@@ -7,7 +7,8 @@
 use crate::error::{AppError, AppResult};
 use keyring::Entry;
 
-const SERVICE_NAME: &str = "cto-lite";
+const SERVICE_NAME: &str = "cto";
+const LEGACY_SERVICE_NAME: &str = "cto-lite";
 
 /// Credential types we store in the keychain
 #[derive(Debug, Clone, Copy)]
@@ -75,7 +76,21 @@ pub fn get_credential(key: CredentialKey) -> AppResult<Option<String>> {
 
     match entry.get_password() {
         Ok(password) => Ok(Some(password)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(keyring::Error::NoEntry) => {
+            // Backward compatibility: read from the previous service name and migrate forward.
+            let legacy = Entry::new(LEGACY_SERVICE_NAME, key.as_str())
+                .map_err(|e| AppError::KeychainError(e.to_string()))?;
+            match legacy.get_password() {
+                Ok(password) => {
+                    if let Err(err) = set_credential(key, &password) {
+                        tracing::warn!("Failed to migrate legacy keychain item: {}", err);
+                    }
+                    Ok(Some(password))
+                }
+                Err(keyring::Error::NoEntry) => Ok(None),
+                Err(e) => Err(AppError::KeychainError(e.to_string())),
+            }
+        }
         Err(e) => Err(AppError::KeychainError(e.to_string())),
     }
 }
@@ -84,13 +99,19 @@ pub fn get_credential(key: CredentialKey) -> AppResult<Option<String>> {
 pub fn delete_credential(key: CredentialKey) -> AppResult<()> {
     let entry = Entry::new(SERVICE_NAME, key.as_str())
         .map_err(|e| AppError::KeychainError(e.to_string()))?;
+    let legacy = Entry::new(LEGACY_SERVICE_NAME, key.as_str())
+        .map_err(|e| AppError::KeychainError(e.to_string()))?;
 
     match entry.delete_credential() {
         Ok(()) => {
             tracing::debug!("Deleted credential: {}", key.as_str());
-            Ok(())
         }
-        Err(keyring::Error::NoEntry) => Ok(()), // Already deleted
+        Err(keyring::Error::NoEntry) => {}
+        Err(e) => return Err(AppError::KeychainError(e.to_string())),
+    }
+
+    match legacy.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(AppError::KeychainError(e.to_string())),
     }
 }

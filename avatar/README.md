@@ -92,6 +92,7 @@ Browser -> Next.js /api/token -> LiveKit Cloud
 | `docs/HANDOFF.md` | Handoff doc for Claude / continuing work (context, issues, next steps) |
 | `docs/morgan-image.md` | Asset prep guidance for Morgan's portrait |
 | `docs/provider-spikes.md` | Zero-code provider swap instructions |
+| `docs/elevenlabs-playbook.md` | Practical guide for using ElevenLabs well in the current stack |
 | `docs/decision-review.md` | Architecture decision record |
 | `docs/morgan-openclaw-setup.md` | Morgan + OpenClaw agent config (openclaw-platform reference, pod logs) |
 

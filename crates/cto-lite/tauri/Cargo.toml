@@ -2,9 +2,9 @@
 [workspace]
 
 [package]
-name = "cto-lite-tauri"
+name = "cto-tauri"
 version = "0.1.0"
-description = "CTO Lite - AI Development Platform for Individual Developers"
+description = "CTO - AI Development Platform for Individual Developers"
 authors = ["5D Labs"]
 license = "AGPL-3.0"
 repository = "https://github.com/5dlabs/cto"

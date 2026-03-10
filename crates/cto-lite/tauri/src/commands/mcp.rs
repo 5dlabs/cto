@@ -206,7 +206,7 @@ pub async fn get_mcp_status(state: State<'_, McpState>) -> AppResult<McpStatus> 
 pub async fn get_mcp_config() -> AppResult<serde_json::Value> {
     let config = serde_json::json!({
         "mcpServers": {
-            "cto-lite": {
+            "cto": {
                 "command": get_mcp_binary_path().to_string_lossy(),
                 "args": [],
                 "env": {

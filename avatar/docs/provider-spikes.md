@@ -6,11 +6,28 @@ These swaps are already wired into the agent via environment variables so latenc
 
 ```env
 MORGAN_STT_MODE=livekit-flux
-MORGAN_TTS_MODE=elevenlabs
+MORGAN_TTS_MODE=livekit-elevenlabs
 MORGAN_LLM_BACKEND=openclaw
 ```
 
-Why: fastest path to a working room-backed avatar while keeping the OpenClaw reasoning path intact.
+Why: simplest path to a working room-backed avatar while keeping the OpenClaw reasoning path intact.
+
+See also:
+
+- [elevenlabs-playbook.md](/Users/jonathon/5dlabs/cto/avatar/docs/elevenlabs-playbook.md)
+
+## TTS spike: direct ElevenLabs
+
+```env
+MORGAN_TTS_MODE=elevenlabs
+ELEVEN_API_KEY=your_elevenlabs_key
+MORGAN_ELEVEN_MODEL=eleven_flash_v2_5
+MORGAN_ELEVEN_STREAMING_LATENCY=3
+MORGAN_ELEVEN_CHUNK_LENGTH_SCHEDULE=80,120,200,260
+```
+
+Why: uses our own ElevenLabs account and credits directly, unlocks custom voice
+work, and enables the direct plugin tuning knobs already wired in this repo.
 
 ## STT spike: direct Deepgram Flux
 

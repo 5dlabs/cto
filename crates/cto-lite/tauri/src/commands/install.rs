@@ -12,6 +12,7 @@ use tauri::{Emitter, State};
 
 use crate::db::Database;
 use crate::error::{AppError, AppResult};
+use crate::runtime::{self as runtime, ContainerRuntime};
 
 /// Installation status
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,15 +45,16 @@ pub struct BinaryCheck {
     pub version: Option<String>,
 }
 
-/// Required binaries for CTO Lite
+/// Required binaries for CTO
 const REQUIRED_BINARIES: &[&str] = &["docker", "kind", "kubectl", "helm", "argo"];
 
 /// Binaries we can auto-install via brew
-const BREW_INSTALLABLE: &[(&str, &str)] = &[
-    ("kind", "kind"),
-    ("kubectl", "kubernetes-cli"),
-    ("helm", "helm"),
-    ("argo", "argo"),
+const BREW_INSTALLABLE: &[(&str, &str, bool)] = &[
+    ("docker", "docker", true),
+    ("kind", "kind", false),
+    ("kubectl", "kubernetes-cli", false),
+    ("helm", "helm", false),
+    ("argo", "argo", false),
 ];
 
 /// Images to pull for initial deployment
@@ -69,15 +71,22 @@ pub async fn check_prerequisites() -> Result<Vec<BinaryCheck>, AppError> {
     let mut results = Vec::new();
 
     for name in REQUIRED_BINARIES {
-        let found = which::which(name).is_ok();
-        let path = which::which(name)
-            .ok()
-            .map(|p| p.to_string_lossy().to_string());
-
-        let version = if found {
-            get_binary_version(name)
+        let (found, path, version) = if *name == "docker" {
+            let found = runtime::is_docker_available();
+            let path = runtime::get_runtime_path(ContainerRuntime::Docker);
+            let version = runtime::get_runtime_version(ContainerRuntime::Docker);
+            (found, path, version)
         } else {
-            None
+            let found = which::which(name).is_ok();
+            let path = which::which(name)
+                .ok()
+                .map(|p| p.to_string_lossy().to_string());
+            let version = if found {
+                get_binary_version(name)
+            } else {
+                None
+            };
+            (found, path, version)
         };
 
         results.push(BinaryCheck {
@@ -97,11 +106,21 @@ fn is_brew_installed() -> bool {
 }
 
 /// Install a binary via Homebrew
-fn brew_install(formula: &str) -> AppResult<()> {
-    tracing::info!("Installing {} via Homebrew...", formula);
+fn brew_install(formula: &str, cask: bool) -> AppResult<()> {
+    tracing::info!(
+        "Installing {} via Homebrew{}...",
+        formula,
+        if cask { " cask" } else { "" }
+    );
+
+    let mut args = vec!["install"];
+    if cask {
+        args.push("--cask");
+    }
+    args.push(formula);
 
     let output = Command::new("brew")
-        .args(["install", formula])
+        .args(&args)
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to run brew: {}", e)))?;
 
@@ -112,8 +131,10 @@ fn brew_install(formula: &str) -> AppResult<()> {
             return Ok(());
         }
         return Err(AppError::CommandFailed(format!(
-            "brew install {} failed: {}",
-            formula, stderr
+            "brew install {}{} failed: {}",
+            if cask { "--cask " } else { "" },
+            formula,
+            stderr
         )));
     }
 
@@ -137,7 +158,13 @@ fn install_missing_dependencies(window: &tauri::Window) -> AppResult<()> {
     // Check what's missing
     let missing: Vec<_> = BREW_INSTALLABLE
         .iter()
-        .filter(|(bin, _)| which::which(bin).is_err())
+        .filter(|(bin, _, _)| {
+            if *bin == "docker" {
+                !runtime::is_docker_available()
+            } else {
+                which::which(bin).is_err()
+            }
+        })
         .collect();
 
     if missing.is_empty() {
@@ -167,9 +194,9 @@ fn install_missing_dependencies(window: &tauri::Window) -> AppResult<()> {
     }
 
     // Install each missing dependency
-    for (bin, formula) in missing {
+    for (bin, formula, cask) in missing {
         emit(&format!("Installing {}...", bin));
-        brew_install(formula)?;
+        brew_install(formula, *cask)?;
         tracing::info!("Successfully installed {}", bin);
     }
 
@@ -231,19 +258,10 @@ pub async fn run_installation(
     let prereqs = check_prerequisites().await?;
     let missing: Vec<_> = prereqs.iter().filter(|b| !b.found).collect();
 
-    // Docker must be present - we can't auto-install it
-    if prereqs.iter().any(|b| b.name == "docker" && !b.found) {
-        return Err(AppError::CommandFailed(
-            "Docker is required. Please install Docker Desktop, OrbStack, or Colima first."
-                .to_string(),
-        ));
-    }
-
-    // Auto-install other missing dependencies
+    // Auto-install missing dependencies, including the container runtime on supported platforms.
     if !missing.is_empty() {
         let missing_names: Vec<_> = missing
             .iter()
-            .filter(|b| b.name != "docker")
             .map(|b| b.name.as_str())
             .collect();
 
@@ -255,6 +273,18 @@ pub async fn run_installation(
             );
             install_missing_dependencies(&window)?;
         }
+    }
+
+    emit_progress(
+        InstallStep::CheckingPrerequisites,
+        "Starting container runtime...",
+        18,
+    );
+    let runtime_env = runtime::fully_auto_runtime()?;
+    if !runtime_env.docker_available {
+        return Err(AppError::CommandFailed(
+            "A Docker-compatible runtime is still unavailable after bootstrap.".to_string(),
+        ));
     }
 
     // Step 2: Create Kind cluster
@@ -309,7 +339,7 @@ pub async fn run_installation(
     // Step 5: Deploy services via Helm
     emit_progress(
         InstallStep::DeployingServices,
-        "Deploying CTO Lite services...",
+        "Deploying CTO services...",
         70,
     );
     helm_install(&chart_path, "cto-lite")?;
@@ -346,7 +376,7 @@ fn kind_cluster_exists(name: &str) -> AppResult<bool> {
     }
 }
 
-/// Create Kind cluster with CTO Lite config
+/// Create Kind cluster with CTO config
 fn create_kind_cluster() -> AppResult<()> {
     tracing::info!("Creating Kind cluster 'cto-lite'");
 
@@ -513,9 +543,9 @@ fn update_helm_dependencies(chart_path: &str) -> AppResult<()> {
     Ok(())
 }
 
-/// Install CTO Lite via Helm
+/// Install CTO via Helm
 fn helm_install(chart_path: &str, namespace: &str) -> AppResult<()> {
-    tracing::info!("Installing CTO Lite chart from {}", chart_path);
+    tracing::info!("Installing CTO chart from {}", chart_path);
 
     // Check if release already exists
     let check = Command::new("helm")
@@ -568,7 +598,7 @@ fn helm_install(chart_path: &str, namespace: &str) -> AppResult<()> {
         )));
     }
 
-    tracing::info!("CTO Lite installed successfully");
+    tracing::info!("CTO installed successfully");
     Ok(())
 }
 

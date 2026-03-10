@@ -1,5 +1,5 @@
 /**
- * Tauri API bindings for CTO App
+ * Tauri API bindings for CTO
  * 
  * These functions wrap Tauri's invoke() to call Rust backend commands
  * with full TypeScript type safety.
@@ -181,12 +181,12 @@ export async function hasApiKey(keyType: ApiKeyType): Promise<boolean> {
 // Cluster Commands
 // ============================================================================
 
-/** Create the CTO App Kind cluster */
+/** Create the CTO Kind cluster */
 export async function createCluster(): Promise<void> {
   return invoke('create_cluster');
 }
 
-/** Delete the CTO App Kind cluster */
+/** Delete the CTO Kind cluster */
 export async function deleteCluster(): Promise<void> {
   return invoke('delete_cluster');
 }
@@ -331,7 +331,7 @@ export async function checkHelm(): Promise<string | null> {
   return invoke<string | null>('check_helm');
 }
 
-/** Deploy the CTO App Helm chart */
+/** Deploy the CTO Helm chart */
 export async function deployChart(values: HelmValues): Promise<void> {
   return invoke('deploy_chart', { values });
 }
@@ -341,7 +341,7 @@ export async function getReleaseStatus(): Promise<HelmRelease | null> {
   return invoke<HelmRelease | null>('get_release_status');
 }
 
-/** Uninstall the CTO App Helm chart */
+/** Uninstall the CTO Helm chart */
 export async function uninstallChart(): Promise<void> {
   return invoke('uninstall_chart');
 }
@@ -411,6 +411,16 @@ export interface OpenClawStatus {
   agents: string[];
 }
 
+/** Local bridge status for connecting CTO to the Morgan OpenClaw service */
+export interface OpenClawBridgeStatus {
+  running: boolean;
+  connected: boolean;
+  pid: number | null;
+  namespace: string | null;
+  service: string | null;
+  localUrl: string;
+}
+
 /** Send a message to the OpenClaw PM agent (Morgan) */
 export async function openclawSendMessage(
   sessionId: string,
@@ -465,6 +475,21 @@ export async function openclawReject(
 /** Get OpenClaw gateway connection status */
 export async function openclawGetStatus(): Promise<OpenClawStatus> {
   return invoke<OpenClawStatus>('openclaw_get_status');
+}
+
+/** Start the local Morgan bridge */
+export async function openclawStartLocalBridge(): Promise<OpenClawBridgeStatus> {
+  return invoke<OpenClawBridgeStatus>('openclaw_start_local_bridge');
+}
+
+/** Stop the local Morgan bridge */
+export async function openclawStopLocalBridge(): Promise<OpenClawBridgeStatus> {
+  return invoke<OpenClawBridgeStatus>('openclaw_stop_local_bridge');
+}
+
+/** Get the local Morgan bridge status */
+export async function openclawGetLocalBridgeStatus(): Promise<OpenClawBridgeStatus> {
+  return invoke<OpenClawBridgeStatus>('openclaw_get_local_bridge_status');
 }
 
 /** Execute a CLI command through the OpenClaw proxy */
