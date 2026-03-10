@@ -27,6 +27,7 @@ thiserror = { workspace = true }
 
 # Async runtime
 tokio = { workspace = true }
+async-trait = { workspace = true }
 
 # HTTP Client for Victoria Logs API
 reqwest = { workspace = true }
@@ -48,12 +49,15 @@ regex = { workspace = true }
 # Logging
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+agent-client-protocol = { workspace = true }
 
 # Template rendering
 handlebars = { workspace = true }
 
 # Notifications
 notify = { path = "../notify" }
+acp-runtime = { path = "../acp-runtime" }
+cto-config = { path = "../config", package = "config" }
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
@@ -80,4 +84,3 @@ too_many_arguments = "allow"
 
 [lints.rust]
 unexpected_cfgs = "allow"
-

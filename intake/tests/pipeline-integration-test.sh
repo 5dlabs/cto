@@ -1356,10 +1356,10 @@ fi
 # Check invoke-agent supports both modes
 invoke_src="$BRIDGE_DIR/intake-util/src/invoke-agent.ts"
 if [ -f "$invoke_src" ]; then
-  if grep -q "subagent" "$invoke_src" && grep -q "acp" "$invoke_src"; then
-    pass "invoke-agent supports subagent and acp modes"
+  if grep -q "subagent" "$invoke_src" && grep -q "a2a" "$invoke_src" && grep -q "acp" "$invoke_src"; then
+    pass "invoke-agent supports subagent and a2a modes with acp alias"
   else
-    fail "invoke-agent modes" "invoke-agent.ts missing subagent or acp mode"
+    fail "invoke-agent modes" "invoke-agent.ts missing subagent/a2a mode support"
   fi
 else
   fail "invoke-agent.ts" "invoke-agent.ts not found"

@@ -43,7 +43,8 @@ pub use tools::{
     analyze_task_for_tools, ToolAnalyzable, TECH_TOOL_MAPPINGS,
 };
 pub use types::{
-    AgentConfig, AgentSkills, AgentTools, CtoConfig, Defaults, IntakeDefaults, IntakeModels,
-    LinearDefaults, LinearIntakeSettings, MultiModelConfig, PlayDefaults, SubagentConfig,
-    CTO_CONFIG_VERSION,
+    AcpDefaults, AcpRuntimeConfig, AcpServerConfig, AcpServiceConfig, AcpServicesConfig,
+    AcpTransport, AgentCommunicationMode, AgentConfig, AgentSkills, AgentTools, CtoConfig,
+    Defaults, IntakeDefaults, IntakeModels, LinearDefaults, LinearIntakeSettings, MultiModelConfig,
+    PlayDefaults, SubagentConfig, CTO_CONFIG_VERSION,
 };

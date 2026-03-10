@@ -7,8 +7,8 @@ use std::collections::{HashMap, HashSet};
 use crate::agents::{capitalize, get_agent_config, workflow_agents};
 use crate::tools::{analyze_agent_tasks_for_tools, analyze_all_tasks_for_tools, ToolAnalyzable};
 use crate::types::{
-    CtoConfig, Defaults, IntakeDefaults, IntakeModels, LinearDefaults, LinearIntakeSettings,
-    MultiModelConfig, PlayDefaults, CTO_CONFIG_VERSION,
+    AcpDefaults, CtoConfig, Defaults, IntakeDefaults, IntakeModels, LinearDefaults,
+    LinearIntakeSettings, MultiModelConfig, PlayDefaults, CTO_CONFIG_VERSION,
 };
 
 /// Input for generating a project CTO config.
@@ -105,6 +105,7 @@ pub fn generate_project_config(input: &ProjectConfigInput) -> CtoConfig {
                     project_template: "Play Workflow".to_string(),
                 },
             },
+            acp: AcpDefaults::default(),
             play: PlayDefaults {
                 // Agent names are derived from orgName, no need to set them explicitly
                 repository: repository.clone(),
@@ -239,6 +240,7 @@ pub fn generate_config_with_tasks<T: ToolAnalyzable>(
                     project_template: "Play Workflow".to_string(),
                 },
             },
+            acp: AcpDefaults::default(),
             play: PlayDefaults {
                 // Override implementation/frontend agents based on task analysis
                 implementation_agent: Some(format!("5DLabs-{}", capitalize(primary_impl))),

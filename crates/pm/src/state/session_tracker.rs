@@ -2,6 +2,7 @@
 //!
 //! Maps Linear session IDs to running Argo workflows and agent pods.
 
+use acp_runtime::{AcpRunState, AcpSessionMetadata};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -31,6 +32,8 @@ pub struct SessionInfo {
     pub updated_at: Instant,
     /// Session status.
     pub status: SessionStatus,
+    /// ACP metadata for sessionful runtimes such as Stakpak.
+    pub acp: AcpSessionMetadata,
 }
 
 /// Session status.
@@ -69,6 +72,7 @@ impl SessionInfo {
             created_at: now,
             updated_at: now,
             status: SessionStatus::Pending,
+            acp: AcpSessionMetadata::default(),
         }
     }
 
@@ -95,6 +99,31 @@ impl SessionInfo {
     /// Mark the session as failed.
     pub fn fail(&mut self) {
         self.status = SessionStatus::Failed;
+        self.updated_at = Instant::now();
+    }
+
+    /// Set the ACP runtime selected for this session.
+    pub fn set_acp_runtime(&mut self, runtime_id: String) {
+        self.acp.runtime_id = Some(runtime_id);
+        self.updated_at = Instant::now();
+    }
+
+    /// Bind an ACP session identifier to this session.
+    pub fn bind_acp_session(&mut self, session_id: String, run_state: AcpRunState) {
+        self.acp.session_id = Some(session_id);
+        self.acp.run_state = run_state;
+        self.updated_at = Instant::now();
+    }
+
+    /// Update the ACP run state.
+    pub fn set_acp_run_state(&mut self, run_state: AcpRunState) {
+        self.acp.run_state = run_state;
+        self.updated_at = Instant::now();
+    }
+
+    /// Record the last ACP event cursor observed for this session.
+    pub fn set_acp_cursor(&mut self, cursor: String) {
+        self.acp.last_event_cursor = Some(cursor);
         self.updated_at = Instant::now();
     }
 
@@ -201,6 +230,39 @@ impl SessionTracker {
     pub async fn set_pod(&self, session_id: &str, pod_name: String, pod_ip: Option<String>) {
         if let Some(info) = self.sessions.write().await.get_mut(session_id) {
             info.set_pod(pod_name, pod_ip);
+        }
+    }
+
+    /// Set the ACP runtime for a session.
+    pub async fn set_acp_runtime(&self, session_id: &str, runtime_id: String) {
+        if let Some(info) = self.sessions.write().await.get_mut(session_id) {
+            info.set_acp_runtime(runtime_id);
+        }
+    }
+
+    /// Bind the runtime session identifier for a tracked session.
+    pub async fn bind_acp_session(
+        &self,
+        session_id: &str,
+        acp_session_id: String,
+        run_state: AcpRunState,
+    ) {
+        if let Some(info) = self.sessions.write().await.get_mut(session_id) {
+            info.bind_acp_session(acp_session_id, run_state);
+        }
+    }
+
+    /// Update the tracked ACP run state.
+    pub async fn set_acp_run_state(&self, session_id: &str, run_state: AcpRunState) {
+        if let Some(info) = self.sessions.write().await.get_mut(session_id) {
+            info.set_acp_run_state(run_state);
+        }
+    }
+
+    /// Update the tracked ACP cursor.
+    pub async fn set_acp_cursor(&self, session_id: &str, cursor: String) {
+        if let Some(info) = self.sessions.write().await.get_mut(session_id) {
+            info.set_acp_cursor(cursor);
         }
     }
 
@@ -498,5 +560,30 @@ mod tests {
         assert_eq!(stats.total, 2);
         assert_eq!(stats.running, 1);
         assert_eq!(stats.completed, 1);
+    }
+
+    #[tokio::test]
+    async fn test_acp_metadata_tracking() {
+        let tracker = SessionTracker::new();
+        tracker
+            .register(
+                "s1".to_string(),
+                "atlas".to_string(),
+                "i1".to_string(),
+                "TSK-1".to_string(),
+            )
+            .await;
+
+        tracker.set_acp_runtime("s1", "stakpak".to_string()).await;
+        tracker
+            .bind_acp_session("s1", "acp-session-1".to_string(), AcpRunState::Running)
+            .await;
+        tracker.set_acp_cursor("s1", "7".to_string()).await;
+
+        let info = tracker.get("s1").await.unwrap();
+        assert_eq!(info.acp.runtime_id.as_deref(), Some("stakpak"));
+        assert_eq!(info.acp.session_id.as_deref(), Some("acp-session-1"));
+        assert_eq!(info.acp.run_state, AcpRunState::Running);
+        assert_eq!(info.acp.last_event_cursor.as_deref(), Some("7"));
     }
 }
