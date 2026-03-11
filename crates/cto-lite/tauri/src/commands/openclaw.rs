@@ -5,8 +5,11 @@
 //! workflow execution, and CLI proxying.
 
 use crate::error::AppError;
+use acp_runtime::{run_oneshot_prompt, AcpClientProfile, AcpPermissionPolicy, AcpPromptRequest};
+use agent_client_protocol::{ContentBlock, SessionNotification, SessionUpdate};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -27,6 +30,11 @@ const LOCAL_KIND_CONTEXT: &str = "kind-cto-lite";
 
 /// Whether the gateway has been connected at least once.
 static GATEWAY_CONNECTED: AtomicBool = AtomicBool::new(false);
+const IN_CLUSTER_ACP_GATEWAY_URL: &str = "ws://127.0.0.1:18789";
+const MORGAN_DEPLOYMENT_NAMESPACE: &str = "openclaw";
+const MORGAN_DEPLOYMENT_NAME: &str = "openclaw-morgan";
+const MORGAN_AGENT_CONTAINER: &str = "agent";
+const AVATAR_USER_PREFIX: &str = "morgan-avatar";
 
 /// Local bridge state for `kubectl port-forward`.
 pub struct LocalBridgeState {
@@ -49,11 +57,17 @@ impl Default for LocalBridgeState {
     }
 }
 
-/// In-process conversation state used to preserve Morgan context between turns
-/// now that the gateway speaks chat-completions instead of the legacy /api/chat
-/// session contract.
+#[derive(Debug, Clone, Default)]
+struct ConversationSessionRecord {
+    messages: Vec<OpenClawMessage>,
+    last_acp_session_id: Option<String>,
+    gateway_session_key: String,
+}
+
+/// In-process conversation state used to preserve the desktop-visible message
+/// history while Morgan itself owns the authoritative session in OpenClaw.
 pub struct ConversationState {
-    sessions: Mutex<HashMap<String, Vec<OpenClawMessage>>>,
+    sessions: Mutex<HashMap<String, ConversationSessionRecord>>,
 }
 
 impl ConversationState {
@@ -81,6 +95,12 @@ pub struct OpenClawResponse {
     pub latency_ms: Option<u64>,
     #[serde(rename = "gatewayUrl")]
     pub gateway_url: Option<String>,
+    #[serde(rename = "gatewaySessionKey")]
+    pub gateway_session_key: Option<String>,
+    #[serde(rename = "acpSessionId")]
+    pub acp_session_id: Option<String>,
+    #[serde(rename = "stopReason")]
+    pub stop_reason: Option<String>,
 }
 
 /// A structured action the agent requests the user to take
@@ -122,6 +142,19 @@ pub struct OpenClawBridgeStatus {
     pub namespace: Option<String>,
     pub service: Option<String>,
     pub local_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MorganDiagnostics {
+    pub healthy: bool,
+    pub model_primary: Option<String>,
+    pub model_fallbacks: Vec<String>,
+    pub catalog_source: Option<String>,
+    pub catalog_generated_at: Option<String>,
+    pub catalog_provider_count: usize,
+    pub catalog_model_count: usize,
+    pub recent_errors: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -173,29 +206,6 @@ pub struct OpenClawMessage {
     content: String,
 }
 
-#[derive(Debug, Serialize)]
-struct ChatCompletionsRequest {
-    model: String,
-    messages: Vec<OpenClawMessage>,
-    stream: bool,
-    max_completion_tokens: u32,
-}
-
-#[derive(Debug, Deserialize)]
-struct ChatCompletionsResponse {
-    choices: Vec<ChatCompletionChoice>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ChatCompletionChoice {
-    message: ChatCompletionMessage,
-}
-
-#[derive(Debug, Deserialize)]
-struct ChatCompletionMessage {
-    content: serde_json::Value,
-}
-
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 fn gateway_url() -> String {
@@ -221,29 +231,6 @@ fn gateway_request(client: &reqwest::Client, url: &str) -> reqwest::RequestBuild
         .header("x-openclaw-agent-id", DEFAULT_AGENT_ID)
 }
 
-fn extract_text_content(value: &serde_json::Value) -> String {
-    match value {
-        serde_json::Value::Null => String::new(),
-        serde_json::Value::String(text) => text.clone(),
-        serde_json::Value::Array(items) => items
-            .iter()
-            .map(extract_text_content)
-            .filter(|item| !item.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join("\n"),
-        serde_json::Value::Object(map) => {
-            if let Some(text) = map.get("text").and_then(|value| value.as_str()) {
-                return text.to_string();
-            }
-            if let Some(content) = map.get("content") {
-                return extract_text_content(content);
-            }
-            String::new()
-        }
-        other => other.to_string(),
-    }
-}
-
 fn http_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(120))
@@ -256,6 +243,110 @@ fn fast_http_client() -> reqwest::Client {
         .timeout(Duration::from_secs(3))
         .build()
         .unwrap_or_default()
+}
+
+fn sanitize_session_component(raw: &str) -> String {
+    raw.chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect()
+}
+
+fn desktop_gateway_session_key(session_id: &str) -> String {
+    format!(
+        "agent:{DEFAULT_AGENT_ID}:desktop-{}",
+        sanitize_session_component(session_id)
+    )
+}
+
+fn avatar_gateway_session_key(room_name: &str) -> String {
+    format!(
+        "agent:{DEFAULT_AGENT_ID}:openai-user:{AVATAR_USER_PREFIX}:{}",
+        sanitize_session_component(room_name)
+    )
+}
+
+fn desktop_acp_cwd() -> PathBuf {
+    std::env::var("OPENCLAW_ACP_CWD")
+        .map(PathBuf::from)
+        .or_else(|_| std::env::current_dir())
+        .unwrap_or_else(|_| PathBuf::from("/workspace"))
+}
+
+fn morgan_acp_runtime(session_key: &str) -> Result<cto_config::AcpRuntimeConfig, AppError> {
+    let kubectl = which::which("kubectl")
+        .map_err(|_| AppError::CommandFailed("kubectl is required for Morgan ACP".to_string()))?;
+
+    Ok(cto_config::AcpRuntimeConfig::stdio(
+        kubectl.to_string_lossy().to_string(),
+        [
+            "--context".to_string(),
+            LOCAL_KIND_CONTEXT.to_string(),
+            "exec".to_string(),
+            "-i".to_string(),
+            "-n".to_string(),
+            MORGAN_DEPLOYMENT_NAMESPACE.to_string(),
+            format!("deploy/{MORGAN_DEPLOYMENT_NAME}"),
+            "-c".to_string(),
+            MORGAN_AGENT_CONTAINER.to_string(),
+            "--".to_string(),
+            "openclaw".to_string(),
+            "acp".to_string(),
+            "--url".to_string(),
+            IN_CLUSTER_ACP_GATEWAY_URL.to_string(),
+            "--token".to_string(),
+            gateway_auth_token(),
+            "--session".to_string(),
+            session_key.to_string(),
+            "--no-prefix-cwd".to_string(),
+        ],
+    ))
+}
+
+fn chunk_text(content: &ContentBlock) -> Option<&str> {
+    match content {
+        ContentBlock::Text(text) => Some(text.text.as_str()),
+        _ => None,
+    }
+}
+
+fn extract_agent_reply(notifications: &[SessionNotification]) -> String {
+    notifications
+        .iter()
+        .filter_map(|notification| match &notification.update {
+            SessionUpdate::AgentMessageChunk(chunk) => chunk_text(&chunk.content),
+            _ => None,
+        })
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+async fn run_morgan_acp_turn(
+    runtime: cto_config::AcpRuntimeConfig,
+    request: AcpPromptRequest,
+    profile: AcpClientProfile,
+) -> Result<acp_runtime::AcpPromptResult, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| {
+                AppError::CommandFailed(format!("Failed to create ACP runtime: {error}"))
+            })?;
+
+        rt.block_on(run_oneshot_prompt(&runtime, request, profile))
+            .map_err(|error| {
+                AppError::CommandFailed(format!("Failed to run Morgan via ACP: {error:#}"))
+            })
+    })
+    .await
+    .map_err(|error| AppError::CommandFailed(format!("Morgan ACP task failed: {error}")))?
 }
 
 async fn fetch_gateway_status_payload(base_url: &str) -> Result<OpenClawStatus, AppError> {
@@ -418,6 +509,47 @@ fn build_bridge_status(
     }
 }
 
+fn kubectl_output(args: &[&str]) -> Result<Vec<u8>, AppError> {
+    let kubectl = which::which("kubectl")
+        .map_err(|_| AppError::CommandFailed("kubectl is required to inspect Morgan".to_string()))?;
+
+    let output = Command::new(kubectl)
+        .args(args)
+        .output()
+        .map_err(|error| AppError::CommandFailed(format!("Failed to run kubectl: {error}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(AppError::CommandFailed(format!(
+            "kubectl command failed: {}",
+            stderr.trim()
+        )));
+    }
+
+    Ok(output.stdout)
+}
+
+fn recent_backend_errors(logs: &str) -> Vec<String> {
+    logs.lines()
+        .filter(|line| {
+            let lower = line.to_ascii_lowercase();
+            lower.contains("rate limit")
+                || lower.contains("failovererror")
+                || lower.contains("lane task error")
+                || lower.contains("timed out")
+                || lower.contains("error=")
+        })
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .rev()
+        .take(8)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect()
+}
+
 async fn get_local_bridge_status_inner(
     state: &LocalBridgeState,
 ) -> Result<OpenClawBridgeStatus, AppError> {
@@ -567,19 +699,32 @@ fn load_session_messages(
     let sessions = conversations.sessions.lock().map_err(|e| {
         AppError::CommandFailed(format!("Failed to access conversation state: {e}"))
     })?;
-    Ok(sessions.get(session_id).cloned().unwrap_or_default())
+    Ok(sessions
+        .get(session_id)
+        .map(|session| session.messages.clone())
+        .unwrap_or_default())
 }
 
-fn append_session_messages(
+fn update_session_record(
     conversations: &ConversationState,
     session_id: &str,
+    gateway_session_key: &str,
     messages: &[OpenClawMessage],
+    acp_session_id: Option<String>,
 ) -> Result<(), AppError> {
     let mut sessions = conversations.sessions.lock().map_err(|e| {
         AppError::CommandFailed(format!("Failed to update conversation state: {e}"))
     })?;
-    let entry = sessions.entry(session_id.to_string()).or_default();
-    entry.extend_from_slice(messages);
+    let entry =
+        sessions
+            .entry(session_id.to_string())
+            .or_insert_with(|| ConversationSessionRecord {
+                gateway_session_key: gateway_session_key.to_string(),
+                ..ConversationSessionRecord::default()
+            });
+    entry.gateway_session_key = gateway_session_key.to_string();
+    entry.last_acp_session_id = acp_session_id;
+    entry.messages.extend_from_slice(messages);
     Ok(())
 }
 
@@ -630,87 +775,155 @@ pub async fn openclaw_get_local_bridge_status(
     get_local_bridge_status_inner(state.inner()).await
 }
 
+#[tauri::command]
+pub async fn openclaw_get_morgan_diagnostics(
+    bridge: State<'_, LocalBridgeState>,
+) -> Result<MorganDiagnostics, AppError> {
+    let healthy = gateway_url_is_reachable(&resolve_gateway_url(bridge.inner(), false).await?)
+        .await;
+
+    let config_bytes = kubectl_output(&[
+        "--context",
+        LOCAL_KIND_CONTEXT,
+        "-n",
+        MORGAN_DEPLOYMENT_NAMESPACE,
+        "exec",
+        &format!("deploy/{MORGAN_DEPLOYMENT_NAME}"),
+        "-c",
+        MORGAN_AGENT_CONTAINER,
+        "--",
+        "sh",
+        "-lc",
+        "cat /workspace/.openclaw/openclaw.json",
+    ])?;
+
+    let config: serde_json::Value = serde_json::from_slice(&config_bytes)?;
+    let model_primary = config
+        .pointer("/agents/defaults/model/primary")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let model_fallbacks = config
+        .pointer("/agents/defaults/model/fallbacks")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let catalog_source = config
+        .pointer("/models/catalog/source")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let catalog_generated_at = config
+        .pointer("/models/catalog/generatedAt")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let (catalog_provider_count, catalog_model_count) = config
+        .pointer("/models/providers")
+        .and_then(|value| value.as_object())
+        .map(|providers| {
+            let model_count = providers
+                .values()
+                .filter_map(|provider| provider.get("models").and_then(|models| models.as_array()))
+                .map(std::vec::Vec::len)
+                .sum::<usize>();
+            (providers.len(), model_count)
+        })
+        .unwrap_or((0, 0));
+
+    let logs = String::from_utf8(
+        kubectl_output(&[
+            "--context",
+            LOCAL_KIND_CONTEXT,
+            "-n",
+            MORGAN_DEPLOYMENT_NAMESPACE,
+            "logs",
+            &format!("deploy/{MORGAN_DEPLOYMENT_NAME}"),
+            "-c",
+            MORGAN_AGENT_CONTAINER,
+            "--since=10m",
+            "--tail=200",
+        ])?,
+    )
+    .map_err(|error| AppError::CommandFailed(format!("Invalid Morgan logs: {error}")))?;
+
+    Ok(MorganDiagnostics {
+        healthy,
+        model_primary,
+        model_fallbacks,
+        catalog_source,
+        catalog_generated_at,
+        catalog_provider_count,
+        catalog_model_count,
+        recent_errors: recent_backend_errors(&logs),
+    })
+}
+
 /// Send a message to the PM agent (`Morgan`) via the `OpenClaw` gateway.
 #[tauri::command]
 pub async fn openclaw_send_message(
     session_id: String,
     message: String,
-    bridge: State<'_, LocalBridgeState>,
+    _bridge: State<'_, LocalBridgeState>,
     conversations: State<'_, ConversationState>,
 ) -> Result<OpenClawResponse, AppError> {
     let started_at = Instant::now();
-    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
-    let url = format!("{}/v1/chat/completions", base_url);
-
-    let mut messages = load_session_messages(conversations.inner(), &session_id)?;
+    let gateway_session_key = desktop_gateway_session_key(&session_id);
+    let runtime = morgan_acp_runtime(&gateway_session_key)?;
     let user_message = OpenClawMessage {
         role: "user".to_string(),
-        content: message,
+        content: message.clone(),
     };
-    messages.push(user_message.clone());
+    let result = run_morgan_acp_turn(
+        runtime,
+        AcpPromptRequest {
+            runtime_id: DEFAULT_AGENT_ID.to_string(),
+            cwd: desktop_acp_cwd(),
+            prompt: message,
+            // We intentionally create a fresh ACP session per turn and bind it
+            // to a stable OpenClaw session key. That keeps Morgan's context in
+            // the Gateway without depending on bridge-local ACP session ids.
+            session_id: None,
+        },
+        AcpClientProfile {
+            name: "cto-morgan-desktop".to_string(),
+            title: "CTO Morgan Desktop".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            permission_policy: AcpPermissionPolicy::AllowAll,
+        },
+    )
+    .await?;
 
-    let body = ChatCompletionsRequest {
-        model: DEFAULT_AGENT_ID.to_string(),
-        messages: messages.clone(),
-        stream: false,
-        max_completion_tokens: 800,
-    };
-
-    let resp = http_client()
-        .post(&url)
-        .bearer_auth(gateway_auth_token())
-        .header("x-openclaw-agent-id", DEFAULT_AGENT_ID)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| {
-            tracing::error!("OpenClaw gateway request failed: {}", e);
-            AppError::CommandFailed(format!("Failed to reach OpenClaw gateway: {e}"))
-        })?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
+    let assistant_text = extract_agent_reply(&result.notifications);
+    if assistant_text.is_empty() {
         return Err(AppError::CommandFailed(format!(
-            "OpenClaw gateway returned {status}: {text}"
+            "Morgan ACP session ended without assistant text ({:?})",
+            result.stop_reason
         )));
     }
-
-    let payload: ChatCompletionsResponse = resp.json().await.map_err(|e| {
-        AppError::CommandFailed(format!(
-            "Invalid chat completion response from OpenClaw: {e}"
-        ))
-    })?;
-
-    let assistant_text = payload
-        .choices
-        .first()
-        .map(|choice| extract_text_content(&choice.message.content))
-        .map(|text| text.trim().to_string())
-        .filter(|text| !text.is_empty())
-        .ok_or_else(|| {
-            AppError::CommandFailed(
-                "OpenClaw chat completion did not include assistant content".to_string(),
-            )
-        })?;
 
     let assistant_message = OpenClawMessage {
         role: "assistant".to_string(),
         content: assistant_text.clone(),
     };
 
-    append_session_messages(
+    update_session_record(
         conversations.inner(),
         &session_id,
+        &gateway_session_key,
         &[user_message, assistant_message],
+        Some(result.session_id.clone()),
     )?;
 
     let latency_ms = started_at.elapsed().as_millis() as u64;
     tracing::info!(
         session_id = %session_id,
+        gateway_session_key = %gateway_session_key,
         latency_ms,
-        gateway_url = %base_url,
-        "Morgan chat completion finished"
+        stop_reason = ?result.stop_reason,
+        "Morgan ACP turn finished"
     );
 
     GATEWAY_CONNECTED.store(true, Ordering::Relaxed);
@@ -718,7 +931,99 @@ pub async fn openclaw_send_message(
         content: assistant_text,
         action: None,
         latency_ms: Some(latency_ms),
-        gateway_url: Some(base_url),
+        gateway_url: Some(format!(
+            "k8s://{}/{}/{}",
+            LOCAL_KIND_CONTEXT, MORGAN_DEPLOYMENT_NAMESPACE, MORGAN_DEPLOYMENT_NAME
+        )),
+        gateway_session_key: Some(gateway_session_key),
+        acp_session_id: Some(result.session_id),
+        stop_reason: Some(format!("{:?}", result.stop_reason)),
+    })
+}
+
+/// Inject pasted context into the active Morgan avatar room session.
+#[tauri::command]
+pub async fn openclaw_send_avatar_context(
+    room_name: String,
+    content: String,
+    conversations: State<'_, ConversationState>,
+) -> Result<OpenClawResponse, AppError> {
+    let trimmed_room = room_name.trim();
+    let trimmed_content = content.trim();
+
+    if trimmed_room.is_empty() {
+        return Err(AppError::CommandFailed(
+            "Avatar room name is required before sending context".to_string(),
+        ));
+    }
+
+    if trimmed_content.is_empty() {
+        return Err(AppError::CommandFailed(
+            "Context cannot be empty".to_string(),
+        ));
+    }
+
+    let started_at = Instant::now();
+    let gateway_session_key = avatar_gateway_session_key(trimmed_room);
+    let runtime = morgan_acp_runtime(&gateway_session_key)?;
+    let prompt = format!(
+        "The user has pasted supporting context for the active voice call. \
+Treat it as additional material for the current task and use it in the next reply.\n\n\
+Context:\n{trimmed_content}\n\nReply exactly: CONTEXT_STORED"
+    );
+
+    let result = run_morgan_acp_turn(
+        runtime,
+        AcpPromptRequest {
+            runtime_id: DEFAULT_AGENT_ID.to_string(),
+            cwd: desktop_acp_cwd(),
+            prompt,
+            session_id: None,
+        },
+        AcpClientProfile {
+            name: "cto-morgan-avatar-context".to_string(),
+            title: "CTO Morgan Avatar Context".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            permission_policy: AcpPermissionPolicy::AllowAll,
+        },
+    )
+    .await?;
+
+    let assistant_text = extract_agent_reply(&result.notifications);
+    if assistant_text.is_empty() {
+        return Err(AppError::CommandFailed(
+            "Morgan did not acknowledge the pasted context".to_string(),
+        ));
+    }
+
+    let user_message = OpenClawMessage {
+        role: "user".to_string(),
+        content: format!("[Shared context]\n{trimmed_content}"),
+    };
+    let assistant_message = OpenClawMessage {
+        role: "assistant".to_string(),
+        content: assistant_text.clone(),
+    };
+
+    update_session_record(
+        conversations.inner(),
+        &format!("avatar:{trimmed_room}"),
+        &gateway_session_key,
+        &[user_message, assistant_message],
+        Some(result.session_id.clone()),
+    )?;
+
+    Ok(OpenClawResponse {
+        content: assistant_text,
+        action: None,
+        latency_ms: Some(started_at.elapsed().as_millis() as u64),
+        gateway_url: Some(format!(
+            "k8s://{}/{}/{}",
+            LOCAL_KIND_CONTEXT, MORGAN_DEPLOYMENT_NAMESPACE, MORGAN_DEPLOYMENT_NAME
+        )),
+        gateway_session_key: Some(gateway_session_key),
+        acp_session_id: Some(result.session_id),
+        stop_reason: Some(format!("{:?}", result.stop_reason)),
     })
 }
 
@@ -938,4 +1243,39 @@ pub async fn openclaw_exec_cli(
         .map_err(|e| AppError::CommandFailed(format!("Failed to read CLI output: {e}")))?;
 
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore = "requires a running local kind cluster with Morgan deployed"]
+    async fn smoke_morgan_acp_turn_returns_text() {
+        let runtime = morgan_acp_runtime("agent:morgan:test-acp-smoke").expect("runtime");
+        let result = run_morgan_acp_turn(
+            runtime,
+            AcpPromptRequest {
+                runtime_id: DEFAULT_AGENT_ID.to_string(),
+                cwd: desktop_acp_cwd(),
+                prompt: "Reply with exactly CTO_ACP_SMOKE.".to_string(),
+                session_id: None,
+            },
+            AcpClientProfile {
+                name: "cto-acp-smoke".to_string(),
+                title: "CTO ACP Smoke".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                permission_policy: AcpPermissionPolicy::AllowAll,
+            },
+        )
+        .await
+        .expect("acp turn should succeed");
+
+        let assistant_text = extract_agent_reply(&result.notifications);
+        assert!(
+            !assistant_text.trim().is_empty(),
+            "expected assistant text, stop_reason={:?}",
+            result.stop_reason
+        );
+    }
 }

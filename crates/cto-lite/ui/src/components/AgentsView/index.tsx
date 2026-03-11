@@ -5,6 +5,7 @@ import {
   CircleDot,
   ExternalLink,
   Link2,
+  Loader2,
   Mic,
   MicOff,
   RefreshCw,
@@ -13,10 +14,10 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BarVisualizer } from '@/components/ui/bar-visualizer'
-import { LiveWaveform } from '@/components/ui/live-waveform'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import {
   MorganAvatarRoom,
   type MorganAvatarState,
@@ -25,11 +26,56 @@ import * as tauri from '@/lib/tauri'
 
 type PanelMode = 'live' | 'debug'
 
+type DebugEvent = {
+  at: string
+  type: string
+  detail: string
+}
+
+type DebugTranscript = {
+  at: string
+  identity: string
+  source: 'user' | 'agent'
+  text: string
+  final: boolean | null
+}
+
+type TrackPublicationDebug = {
+  participant?: string
+  sid?: string | null
+  name?: string | null
+  source?: string | null
+  kind?: string | null
+  subscribed?: boolean | null
+  muted?: boolean | null
+  enabled?: boolean | null
+}
+
+type RemoteParticipantDebug = {
+  identity: string
+  kind?: string | null
+  publishOnBehalf?: string | null
+  tracks: TrackPublicationDebug[]
+}
+
+type AvatarTrackDebug = {
+  roomState?: string
+  microphoneEnabled?: boolean
+  selectedAudioTrack?: TrackPublicationDebug | null
+  selectedVideoTrack?: TrackPublicationDebug | null
+  remoteParticipants?: RemoteParticipantDebug[]
+  localMicrophoneTrack?: TrackPublicationDebug | null
+  recentTranscripts?: DebugTranscript[]
+  recentEvents?: DebugEvent[]
+}
+
 const DEFAULT_AVATAR_STATE: MorganAvatarState = {
   connectionState: 'idle',
+  callActive: false,
   voiceState: 'idle',
   latestUserText: '',
   latestAgentText: '',
+  microphoneEnabled: false,
   audioTrackReady: false,
   videoTrackReady: false,
 }
@@ -48,9 +94,11 @@ function sameRecord(
 function sameAvatarState(left: MorganAvatarState, right: MorganAvatarState): boolean {
   return (
     left.connectionState === right.connectionState &&
+    left.callActive === right.callActive &&
     left.voiceState === right.voiceState &&
     left.latestUserText === right.latestUserText &&
     left.latestAgentText === right.latestAgentText &&
+    left.microphoneEnabled === right.microphoneEnabled &&
     left.audioTrackReady === right.audioTrackReady &&
     left.videoTrackReady === right.videoTrackReady &&
     left.roomName === right.roomName &&
@@ -59,6 +107,10 @@ function sameAvatarState(left: MorganAvatarState, right: MorganAvatarState): boo
     sameRecord(left.metrics, right.metrics) &&
     sameRecord(left.trackDebug, right.trackDebug)
   )
+}
+
+function normalizeTrackDebug(input: Record<string, unknown> | undefined): AvatarTrackDebug {
+  return (input ?? {}) as AvatarTrackDebug
 }
 
 export function AgentsView() {
@@ -73,23 +125,21 @@ export function AgentsView() {
   const [panelMode, setPanelMode] = useState<PanelMode>('live')
   const [avatarState, setAvatarState] = useState<MorganAvatarState>(DEFAULT_AVATAR_STATE)
   const [bridgeStatus, setBridgeStatus] = useState<tauri.OpenClawBridgeStatus | null>(null)
+  const [backendDiagnostics, setBackendDiagnostics] = useState<tauri.MorganDiagnostics | null>(null)
   const [bridgeBooting, setBridgeBooting] = useState(true)
   const [runtimeEnvironment, setRuntimeEnvironment] = useState<tauri.RuntimeEnvironment | null>(
     null
   )
   const [clusterStatus, setClusterStatus] = useState<tauri.ClusterInfo | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
+  const [sharedContextValue, setSharedContextValue] = useState('')
+  const [sharedContextStatus, setSharedContextStatus] = useState<string | null>(null)
+  const [sharedContextSending, setSharedContextSending] = useState(false)
   const [micEnabled, setMicEnabled] = useState(false)
   const [micLevel, setMicLevel] = useState(0)
-  const [agentLevel, setAgentLevel] = useState(0)
-  const [userLevel, setUserLevel] = useState(0)
   const audioContextRef = useRef<AudioContext | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const animationRef = useRef<number | null>(null)
-  const lastUserTextRef = useRef('')
-  const lastAgentTextRef = useRef('')
-  const lastUserActivityAtRef = useRef<number>(0)
-  const lastAgentActivityAtRef = useRef<number>(0)
 
   useEffect(() => {
     let cancelled = false
@@ -101,6 +151,9 @@ export function AgentsView() {
           tauri.scanRuntimeEnvironment(),
           tauri.getClusterStatus(),
         ])
+        const diagnostics = await tauri
+          .openclawGetMorganDiagnostics()
+          .catch(() => null)
 
         if (!cancelled) {
           if (gateway.status === 'fulfilled') {
@@ -117,6 +170,8 @@ export function AgentsView() {
           if (cluster.status === 'fulfilled') {
             setClusterStatus(cluster.value)
           }
+
+          setBackendDiagnostics(diagnostics)
         }
       } finally {
         if (!cancelled) {
@@ -135,51 +190,6 @@ export function AgentsView() {
       window.clearInterval(poll)
     }
   }, [])
-
-  useEffect(() => {
-    if (
-      avatarState.latestUserText &&
-      avatarState.latestUserText !== lastUserTextRef.current
-    ) {
-      lastUserTextRef.current = avatarState.latestUserText
-      lastUserActivityAtRef.current = Date.now()
-    }
-  }, [avatarState.latestUserText])
-
-  useEffect(() => {
-    if (
-      avatarState.latestAgentText &&
-      avatarState.latestAgentText !== lastAgentTextRef.current
-    ) {
-      lastAgentTextRef.current = avatarState.latestAgentText
-      lastAgentActivityAtRef.current = Date.now()
-    }
-  }, [avatarState.latestAgentText])
-
-  useEffect(() => {
-    const tick = window.setInterval(() => {
-      const now = Date.now()
-      const userActive =
-        avatarState.voiceState === 'listening' ||
-        now - lastUserActivityAtRef.current < 2000
-      const agentActive =
-        avatarState.voiceState === 'speaking' ||
-        now - lastAgentActivityAtRef.current < 2200
-
-      setUserLevel((previous) =>
-        userActive
-          ? 0.34 + Math.random() * 0.48
-          : clamp(previous * 0.76, 0, 1)
-      )
-      setAgentLevel((previous) =>
-        agentActive
-          ? 0.38 + Math.random() * 0.5
-          : clamp(previous * 0.76, 0, 1)
-      )
-    }, 120)
-
-    return () => window.clearInterval(tick)
-  }, [avatarState.voiceState])
 
   useEffect(() => {
     return () => {
@@ -278,6 +288,38 @@ export function AgentsView() {
     await openUrl(avatarBrowserUrl)
   }
 
+  const sendSharedContext = async () => {
+    const roomName = avatarState.roomName?.trim()
+    const content = sharedContextValue.trim()
+
+    if (!roomName) {
+      setSharedContextStatus('Join the call first so CTO can target the active Morgan room.')
+      return
+    }
+
+    if (!content) {
+      setSharedContextStatus('Paste a URL, brief, or note before sending shared context.')
+      return
+    }
+
+    setSharedContextSending(true)
+    setSharedContextStatus(null)
+
+    try {
+      const response = await tauri.openclawSendAvatarContext(roomName, content)
+      setSharedContextStatus(
+        response.content === 'CONTEXT_STORED'
+          ? 'Shared with Morgan. Speak naturally and refer to “this link” or “this brief.”'
+          : response.content
+      )
+      setSharedContextValue('')
+    } catch (error) {
+      setSharedContextStatus(`Morgan did not accept the shared context: ${String(error)}`)
+    } finally {
+      setSharedContextSending(false)
+    }
+  }
+
   const runningRuntime = runtimeEnvironment?.runtimes.find((runtime) => runtime.running)
   const installedRuntime = runtimeEnvironment?.runtimes.find((runtime) => runtime.installed)
   const runtimeSummary = runningRuntime
@@ -295,17 +337,131 @@ export function AgentsView() {
     : bridgeStatus?.running
       ? 'Port-forward fallback active'
       : 'Ingress offline'
-  const bridgeTone = bridgeStatus?.connected
-    ? 'emerald'
-    : bridgeStatus?.running
-      ? 'amber'
-      : 'slate'
-  const voiceTone =
-    avatarState.voiceState === 'speaking'
+  const callActive = Boolean(avatarState.callActive)
+  const sessionTone =
+    !callActive
+      ? 'slate'
+      : avatarState.voiceState === 'speaking'
       ? 'violet'
       : avatarState.voiceState === 'listening'
         ? 'emerald'
         : 'slate'
+  const liveSessionTitle =
+    !callActive
+      ? 'Morgan is off call'
+      : avatarState.voiceState === 'speaking'
+      ? 'Morgan is responding'
+      : avatarState.voiceState === 'listening'
+        ? 'Morgan is listening'
+        : avatarState.connectionState === 'connected'
+          ? 'Morgan is ready'
+          : runtimeEnvironment && !runtimeEnvironment.docker_available
+            ? 'Docker is required'
+            : clusterStatus && !clusterStatus.exists
+              ? 'Local stack not created'
+              : clusterStatus && !clusterStatus.running
+                ? 'Local cluster offline'
+                : bridgeBooting
+                  ? 'Checking Morgan'
+                  : 'Waiting for Morgan'
+  const liveSessionDescription =
+    callActive && avatarState.connectionState === 'connected'
+      ? `${avatarState.roomName ?? 'morgan'} · ${avatarState.identity ?? 'guest'}`
+      : avatarState.connectionState === 'idle'
+        ? 'Start a call when you want Morgan live. Off call, he stays disconnected and does not listen.'
+      : bridgeStatus?.connected
+        ? 'The live stage is ready. Start a call on the stage when you want Morgan live.'
+        : runtimeEnvironment && !runtimeEnvironment.docker_available
+          ? 'Start Docker so CTO can keep the local stack online.'
+          : clusterStatus && !clusterStatus.exists
+            ? 'Bootstrap the local kind cluster and deploy Morgan.'
+            : clusterStatus && !clusterStatus.running
+              ? 'The cluster exists but is not reachable yet.'
+              : 'The avatar surface will connect as soon as the local ingress is ready.'
+  const sessionStatusLabel =
+    !callActive
+      ? 'off call'
+      : avatarState.voiceState === 'speaking'
+      ? 'speaking'
+      : avatarState.voiceState === 'listening'
+        ? 'listening'
+        : avatarState.connectionState === 'connected'
+          ? 'ready'
+          : avatarState.connectionState === 'connecting'
+          ? 'joining'
+            : 'standby'
+  const userSignalLevel = avatarState.latestUserText
+    ? 0.82
+    : callActive && avatarState.microphoneEnabled
+      ? 0.22
+      : 0
+  const agentSignalLevel = avatarState.voiceState === 'speaking'
+    ? 0.84
+    : avatarState.latestAgentText &&
+        avatarState.latestAgentText !== 'Morgan is ready when you are.'
+      ? 0.34
+      : 0
+  const userSignalDetail = avatarState.latestUserText
+    ? 'Transcript received'
+    : callActive && avatarState.microphoneEnabled
+      ? 'Push-to-talk live'
+      : 'Off call'
+  const agentSignalDetail = avatarState.voiceState === 'speaking'
+    ? 'Speaking now'
+    : !callActive
+      ? 'Waiting for call start'
+    : avatarState.latestAgentText &&
+        avatarState.latestAgentText !== 'Morgan is ready when you are.'
+      ? 'Latest reply ready'
+      : 'Waiting for OpenClaw turn'
+  const avatarDebug = normalizeTrackDebug(avatarState.trackDebug)
+  const recentEvents = avatarDebug.recentEvents ?? []
+  const recentTranscripts = avatarDebug.recentTranscripts ?? []
+  const remoteParticipants = avatarDebug.remoteParticipants ?? []
+  const sessionSnapshot = [
+    {
+      label: 'Connection',
+      value: avatarState.connectionState,
+    },
+    {
+      label: 'Voice state',
+      value: avatarState.voiceState,
+    },
+    {
+      label: 'Room state',
+      value: avatarDebug.roomState ?? 'unknown',
+    },
+    {
+      label: 'Room',
+      value: avatarState.roomName ?? 'morgan',
+    },
+    {
+      label: 'Identity',
+      value: avatarState.identity ?? 'guest',
+    },
+    {
+      label: 'Mic publication',
+      value: avatarDebug.microphoneEnabled ? 'enabled' : 'disabled',
+    },
+    {
+      label: 'Audio track',
+      value: avatarState.audioTrackReady ? 'ready' : 'pending',
+    },
+    {
+      label: 'Video track',
+      value: avatarState.videoTrackReady ? 'ready' : 'pending',
+    },
+  ]
+  const timingSnapshot = Object.entries(avatarState.metrics ?? {}).map(([label, rawValue]) => {
+    const value =
+      typeof rawValue === 'number'
+        ? `${Math.round(rawValue)} ms`
+        : rawValue === null || rawValue === undefined
+          ? 'pending'
+          : String(rawValue)
+
+    return { label, value }
+  })
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#090f1a] text-slate-100">
@@ -326,62 +482,16 @@ export function AgentsView() {
               Call-style surface for the local Morgan persona running in your private cluster.
             </p>
           </div>
-          <Separator orientation="vertical" className="hidden h-10 bg-white/8 xl:block" />
-          <StatusBadge
-            label={
-              bridgeStatus?.connected
-                ? 'Gateway live'
-                : bridgeBooting
-                  ? 'Checking local stack'
-                  : clusterStatus?.running
-                    ? 'Gateway offline'
-                    : 'Kind offline'
-            }
-            tone={bridgeTone}
-          />
-          <StatusBadge
-            label={
-              avatarState.connectionState === 'connected'
-                ? avatarState.voiceState || 'ready'
-                : avatarState.connectionState === 'connecting'
-                  ? 'connecting'
-                  : 'standby'
-            }
-            tone={voiceTone}
-          />
         </div>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[minmax(0,1.2fr)_380px]">
-        <section className="relative min-h-0 overflow-hidden rounded-[28px] border border-white/10 bg-black/30 shadow-[0_26px_80px_-42px_rgba(8,145,178,0.7)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#164e63_0%,rgba(2,6,23,0.38)_24%,rgba(2,6,23,0.9)_100%)]" />
-          <div className="absolute left-4 top-4 z-10 flex flex-wrap items-center gap-2">
-            <StatusBadge
-              label={
-                avatarLoaded
-                  ? 'Avatar loaded'
-                  : bridgeStatus?.connected
-                    ? 'Preparing session'
-                    : runtimeEnvironment && !runtimeEnvironment.docker_available
-                      ? 'Docker required'
-                      : clusterStatus?.running
-                        ? 'Waiting for ingress'
-                        : 'Waiting for local stack'
-              }
-              tone={avatarLoaded ? 'emerald' : 'slate'}
-            />
-            {avatarState.audioTrackReady ? (
-              <StatusBadge label="Audio active" tone="emerald" />
-            ) : null}
-            {avatarState.videoTrackReady ? (
-              <StatusBadge label="Video active" tone="violet" />
-            ) : null}
-          </div>
-          <div className="relative z-[1] h-full min-h-[760px] w-full">
+        <section className="min-h-0">
+          <div className="h-[min(78vh,760px)] min-h-[560px] w-full">
             <MorganAvatarRoom
               key={avatarSessionKey}
               compact
-              autoConnect
+              autoConnect={false}
               tokenEndpoint={avatarTokenEndpoint}
               onStateChange={handleAvatarStateChange}
             />
@@ -392,7 +502,7 @@ export function AgentsView() {
           <Tabs
             value={panelMode}
             onValueChange={(value) => setPanelMode(value as PanelMode)}
-            className="h-full"
+            className="flex h-full min-h-0 flex-col"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -418,198 +528,164 @@ export function AgentsView() {
 
             <Separator className="my-4 bg-white/8" />
 
-            <TabsContent value="live" className="mt-0 overflow-auto pr-1">
+            <TabsContent value="live" className="mt-0 min-h-0 flex-1 overflow-auto pr-1">
               <div className="space-y-4">
-              <GlassCard
-                eyebrow="Voice deck"
-                title={
-                  bridgeStatus?.connected
-                    ? 'Morgan is on the local stack'
-                    : runtimeEnvironment && !runtimeEnvironment.docker_available
-                      ? 'Docker is required'
-                      : clusterStatus && !clusterStatus.exists
-                        ? 'Local stack not created'
-                        : clusterStatus && !clusterStatus.running
-                          ? 'Local cluster offline'
-                          : bridgeBooting
-                            ? 'Checking Morgan'
-                            : 'Morgan ingress offline'
-                }
-                description={
-                  avatarState.connectionState === 'connected'
-                    ? `${avatarState.roomName ?? 'morgan'} · ${avatarState.identity ?? 'guest'}`
-                    : bridgeStatus?.connected
-                      ? 'Avatar surface is ready. Press Talk in the stage to enter the call.'
-                    : runtimeEnvironment && !runtimeEnvironment.docker_available
-                      ? 'Start Docker so CTO can keep the local stack online.'
-                      : clusterStatus && !clusterStatus.exists
-                        ? 'Bootstrap the local kind cluster and deploy Morgan.'
-                        : clusterStatus && !clusterStatus.running
-                          ? 'The cluster exists but is not reachable yet.'
-                          : 'The avatar surface will connect as soon as the local ingress is ready.'
-                }
-              >
-                <div className="grid gap-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <SignalTile
-                      label="Gateway"
-                      value={
-                        bridgeStatus?.connected
-                          ? 'Live'
-                          : bridgeBooting
-                            ? 'Checking'
-                            : 'Offline'
-                      }
-                      tone={bridgeStatus?.connected ? 'emerald' : 'slate'}
-                    />
-                    <SignalTile
-                      label="Room"
-                      value={
-                        avatarState.connectionState === 'connected'
-                          ? 'Joined'
-                          : avatarState.connectionState === 'connecting'
-                            ? 'Joining'
-                            : 'Standby'
-                      }
-                      tone={
-                        avatarState.connectionState === 'connected'
-                          ? 'violet'
-                          : 'slate'
-                      }
-                    />
-                    <SignalTile
-                      label="Audio"
-                      value={avatarState.audioTrackReady ? 'Live' : 'Pending'}
-                      tone={avatarState.audioTrackReady ? 'emerald' : 'slate'}
-                    />
-                    <SignalTile
-                      label="Video"
-                      value={avatarState.videoTrackReady ? 'Live' : 'Pending'}
-                      tone={avatarState.videoTrackReady ? 'violet' : 'slate'}
-                    />
-                  </div>
-                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-100/70">
-                          Call surface
-                        </p>
-                        <p className="mt-2 text-sm text-slate-200">
-                          {avatarState.voiceState === 'speaking'
-                            ? 'Morgan is responding.'
-                            : avatarState.voiceState === 'listening'
-                              ? 'Morgan is listening.'
-                              : avatarState.connectionState === 'connected'
-                                ? 'Press Talk on the stage when you want to speak.'
-                                : 'Waiting for the room to settle.'}
-                        </p>
+                <GlassCard
+                  eyebrow="Session"
+                  title={liveSessionTitle}
+                  description={liveSessionDescription}
+                >
+                  <div className="grid gap-3">
+                    <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-100/70">
+                            Current turn
+                          </p>
+                          <p className="mt-2 text-sm text-slate-200">
+                            {!callActive
+                              ? 'Morgan is standing by. Start a call on the stage when you want him live.'
+                              : avatarState.voiceState === 'speaking'
+                              ? 'Morgan is actively responding on the live stage.'
+                              : avatarState.voiceState === 'listening'
+                                ? 'Hold the talk button while you speak.'
+                                : avatarState.connectionState === 'connected'
+                                  ? 'The call is live. Hold to talk when you want Morgan to listen.'
+                                  : 'The live stage will settle as soon as the local stack is ready.'}
+                          </p>
+                        </div>
+                        <StatusBadge label={sessionStatusLabel} tone={sessionTone} />
                       </div>
-                      <StatusBadge
-                        label={
-                          avatarState.voiceState === 'speaking'
-                            ? 'speaking'
-                            : avatarState.voiceState === 'listening'
-                              ? 'listening'
-                              : avatarState.connectionState === 'connected'
-                                ? 'ready'
-                                : 'standby'
-                        }
-                        tone={
-                          avatarState.voiceState === 'speaking'
-                            ? 'violet'
-                            : avatarState.voiceState === 'listening'
-                              ? 'emerald'
-                              : 'slate'
-                        }
-                      />
-                    </div>
-                    <div className="mt-4 overflow-hidden rounded-[18px] border border-white/8 bg-slate-950/60 px-3 py-2">
-                      <LiveWaveform
-                        active={false}
-                        processing={avatarState.connectionState !== 'idle'}
-                        mode="static"
-                        height={48}
-                        fadeEdges={false}
-                        barWidth={4}
-                        barGap={2}
-                        className="h-12 rounded-[14px] bg-transparent"
-                      />
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <SignalTile
+                          label="Room"
+                          value={avatarState.roomName ?? 'morgan'}
+                          tone="slate"
+                        />
+                        <SignalTile
+                          label="Identity"
+                          value={avatarState.identity ?? 'guest'}
+                          tone="slate"
+                        />
+                        <SignalTile
+                          label="Stack"
+                          value={bridgeStatus?.connected ? 'Local cluster live' : gatewaySummary}
+                          tone={bridgeStatus?.connected ? 'emerald' : 'slate'}
+                        />
+                        <SignalTile
+                          label="Stage"
+                          value={avatarLoaded ? 'Attached' : 'Waiting'}
+                          tone={avatarLoaded ? 'violet' : 'slate'}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </GlassCard>
+                </GlassCard>
 
-              <GlassCard eyebrow="Audio" title="Live voice activity">
-                <AudioVisualizerCard
-                  icon={<AudioLines className="h-4 w-4 text-emerald-200" />}
-                  label="You"
-                  detail={
-                    avatarState.voiceState === 'listening'
-                      ? 'Listening now'
-                      : avatarState.latestUserText
-                        ? 'Recent input detected'
-                        : 'Standing by'
-                  }
-                  level={userLevel}
-                  tone="emerald"
-                  state={
-                    avatarState.connectionState === 'connecting'
-                      ? 'connecting'
-                      : avatarState.voiceState === 'listening'
-                        ? 'listening'
-                        : undefined
-                  }
-                />
-                <AudioVisualizerCard
-                  icon={<Link2 className="h-4 w-4 text-fuchsia-200" />}
-                  label="Morgan"
-                  detail={
-                    avatarState.voiceState === 'speaking'
-                      ? 'Responding'
-                      : avatarState.latestAgentText
-                        ? 'Response buffered'
-                        : 'Waiting for turn'
-                  }
-                  level={agentLevel}
-                  tone="violet"
-                  state={
-                    avatarState.connectionState === 'connecting'
-                      ? 'connecting'
-                      : avatarState.voiceState === 'speaking'
-                        ? 'speaking'
-                        : avatarState.connectionState === 'connected'
-                          ? 'thinking'
-                          : undefined
-                  }
-                />
-              </GlassCard>
-
-              <GlassCard eyebrow="Exchange" title="Latest turn">
-                <div className="space-y-3">
-                  <TranscriptBlock
+                <GlassCard eyebrow="Audio" title="Session signals">
+                  <AudioVisualizerCard
+                    icon={<AudioLines className="h-4 w-4 text-emerald-200" />}
                     label="You"
-                    icon={<CircleDot className="h-3.5 w-3.5 text-emerald-200" />}
+                    detail={userSignalDetail}
+                    level={userSignalLevel}
                     tone="emerald"
-                    text={
-                      avatarState.latestUserText ||
-                      'Your latest utterance will appear here when Morgan hears you.'
+                    state={
+                      avatarState.connectionState === 'connecting'
+                        ? 'connecting'
+                        : avatarState.microphoneEnabled
+                          ? 'listening'
+                          : undefined
                     }
                   />
-                  <TranscriptBlock
+                  <AudioVisualizerCard
+                    icon={<Link2 className="h-4 w-4 text-fuchsia-200" />}
                     label="Morgan"
-                    icon={<Volume2 className="h-3.5 w-3.5 text-fuchsia-200" />}
+                    detail={agentSignalDetail}
+                    level={agentSignalLevel}
                     tone="violet"
-                    text={
-                      avatarState.latestAgentText ||
-                      'Morgan’s latest spoken reply will appear here.'
+                    state={
+                      avatarState.connectionState === 'connecting'
+                        ? 'connecting'
+                        : avatarState.voiceState === 'speaking'
+                          ? 'speaking'
+                          : avatarState.connectionState === 'connected'
+                            ? 'thinking'
+                            : undefined
                     }
                   />
-                </div>
-              </GlassCard>
+                </GlassCard>
+
+                <GlassCard eyebrow="Exchange" title="Latest turn">
+                  <div className="space-y-3">
+                    <TranscriptBlock
+                      label="You"
+                      icon={<CircleDot className="h-3.5 w-3.5 text-emerald-200" />}
+                      tone="emerald"
+                      text={
+                        avatarState.latestUserText ||
+                        (callActive
+                          ? 'Your latest utterance will appear here when Morgan hears you.'
+                          : 'Start a call and your voice transcript will appear here.')
+                      }
+                    />
+                    <TranscriptBlock
+                      label="Morgan"
+                      icon={<Volume2 className="h-3.5 w-3.5 text-fuchsia-200" />}
+                      tone="violet"
+                      text={
+                        avatarState.latestAgentText ||
+                        (callActive
+                          ? 'Morgan’s latest spoken reply will appear here.'
+                          : 'Start a call and Morgan’s spoken reply will appear here.')
+                      }
+                    />
+                  </div>
+                </GlassCard>
+
+                <GlassCard eyebrow="Shared context" title="Paste links or briefs for this call">
+                  <div className="space-y-3">
+                    <p className="text-sm leading-6 text-slate-300">
+                      Send Morgan the URL or structured payload here, then say the task out loud.
+                      He will receive both in the same room-backed session.
+                    </p>
+                    <Textarea
+                      value={sharedContextValue}
+                      onChange={(event) => setSharedContextValue(event.target.value)}
+                      placeholder="Paste a URL, PRD snippet, or notes for Morgan to use in the current call."
+                      className="min-h-[112px] border-white/10 bg-black/20 text-slate-100 placeholder:text-slate-500"
+                    />
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs text-slate-400">
+                        {avatarState.roomName
+                          ? `Targets room ${avatarState.roomName}.`
+                          : 'Start a call first, then send the pasted context.'}
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={() => void sendSharedContext()}
+                        disabled={sharedContextSending || !avatarState.roomName}
+                      >
+                        {sharedContextSending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Sending
+                          </>
+                        ) : (
+                          'Send to Morgan'
+                        )}
+                      </Button>
+                    </div>
+                    {sharedContextStatus ? (
+                      <div className="rounded-[18px] border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-200">
+                        {sharedContextStatus}
+                      </div>
+                    ) : null}
+                  </div>
+                </GlassCard>
               </div>
             </TabsContent>
 
-            <TabsContent value="debug" className="mt-0 overflow-auto pr-1">
+            <TabsContent value="debug" className="mt-0 min-h-0 flex-1 overflow-auto pr-1">
               <div className="space-y-4">
               <GlassCard eyebrow="Debug" title="Local prerequisites">
                 <div className="space-y-3 text-sm text-slate-200">
@@ -672,6 +748,59 @@ export function AgentsView() {
                 </div>
               </GlassCard>
 
+              <GlassCard eyebrow="Debug" title="Morgan backend">
+                <div className="space-y-3 text-sm text-slate-200">
+                  <DebugRow
+                    label="Gateway health"
+                    value={backendDiagnostics?.healthy ? 'healthy' : 'unknown'}
+                  />
+                  <DebugRow
+                    label="Primary model"
+                    value={backendDiagnostics?.modelPrimary ?? 'unresolved'}
+                  />
+                  <DebugRow
+                    label="Fallbacks"
+                    value={
+                      backendDiagnostics?.modelFallbacks.length
+                        ? backendDiagnostics.modelFallbacks.join(', ')
+                        : 'none'
+                    }
+                  />
+                  <DebugRow
+                    label="Catalog source"
+                    value={backendDiagnostics?.catalogSource ?? 'values'}
+                  />
+                  <DebugRow
+                    label="Catalog generated"
+                    value={backendDiagnostics?.catalogGeneratedAt ?? 'unknown'}
+                  />
+                  <DebugRow
+                    label="Catalog coverage"
+                    value={
+                      backendDiagnostics
+                        ? `${backendDiagnostics.catalogProviderCount} providers · ${backendDiagnostics.catalogModelCount} models`
+                        : 'unknown'
+                    }
+                  />
+                </div>
+              </GlassCard>
+
+              <GlassCard eyebrow="Debug" title="Latest backend issues">
+                {backendDiagnostics?.recentErrors.length ? (
+                  <DebugFeed
+                    entries={backendDiagnostics.recentErrors.map((entry, index) => ({
+                      key: `backend-error-${index}`,
+                      tone: 'slate' as const,
+                      eyebrow: 'morgan backend',
+                      body: entry,
+                      meta: 'last 10m',
+                    }))}
+                  />
+                ) : (
+                  <EmptyDebugState text="No recent Morgan backend errors detected." />
+                )}
+              </GlassCard>
+
               <GlassCard eyebrow="Debug" title="Local mic monitor">
                 <LevelRow
                   icon={
@@ -716,7 +845,121 @@ export function AgentsView() {
                 </GlassCard>
               ) : null}
 
-              <GlassCard eyebrow="Debug" title="Avatar telemetry">
+              <GlassCard eyebrow="Debug" title="Session snapshot">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {sessionSnapshot.map((entry) => (
+                    <DebugRow key={entry.label} label={entry.label} value={entry.value} />
+                  ))}
+                </div>
+              </GlassCard>
+
+              <GlassCard eyebrow="Debug" title="Timing">
+                {timingSnapshot.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {timingSnapshot.map((entry) => (
+                      <DebugRow key={entry.label} label={entry.label} value={entry.value} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyDebugState text="Timing telemetry will appear once the room starts connecting." />
+                )}
+              </GlassCard>
+
+              <GlassCard eyebrow="Debug" title="Track publication">
+                <div className="space-y-3">
+                  <TrackPublicationCard
+                    title="Local microphone"
+                    publication={avatarDebug.localMicrophoneTrack ?? null}
+                    emptyLabel="No local microphone publication yet."
+                  />
+                  <TrackPublicationCard
+                    title="Selected audio track"
+                    publication={avatarDebug.selectedAudioTrack ?? null}
+                    emptyLabel="No remote audio track selected yet."
+                  />
+                  <TrackPublicationCard
+                    title="Selected video track"
+                    publication={avatarDebug.selectedVideoTrack ?? null}
+                    emptyLabel="No remote video track selected yet."
+                  />
+                </div>
+              </GlassCard>
+
+              <GlassCard eyebrow="Debug" title="Recent transcripts">
+                {recentTranscripts.length > 0 ? (
+                  <DebugFeed
+                    entries={recentTranscripts.map((entry, index) => ({
+                      key: `${entry.at}-${entry.identity}-${index}`,
+                      tone: entry.source === 'user' ? 'emerald' : 'violet',
+                      eyebrow: `${entry.source} · ${entry.identity}`,
+                      body: entry.text,
+                      meta: `${formatEventTime(entry.at)}${entry.final === null ? '' : entry.final ? ' · final' : ' · interim'}`,
+                    }))}
+                  />
+                ) : (
+                  <EmptyDebugState text="No transcript events have reached the desktop UI yet." />
+                )}
+              </GlassCard>
+
+              <GlassCard eyebrow="Debug" title="Recent client events">
+                {recentEvents.length > 0 ? (
+                  <DebugFeed
+                    entries={recentEvents.map((entry, index) => ({
+                      key: `${entry.at}-${entry.type}-${index}`,
+                      tone: eventTone(entry.type),
+                      eyebrow: entry.type,
+                      body: entry.detail,
+                      meta: formatEventTime(entry.at),
+                    }))}
+                  />
+                ) : (
+                  <EmptyDebugState text="Client-side room events will appear here as you connect and speak." />
+                )}
+              </GlassCard>
+
+              <GlassCard eyebrow="Debug" title="Remote participants">
+                {remoteParticipants.length > 0 ? (
+                  <div className="space-y-3">
+                    {remoteParticipants.map((participant) => (
+                      <div
+                        key={participant.identity}
+                        className="rounded-[20px] border border-white/8 bg-black/20 p-4"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <StatusBadge
+                            label={participant.identity}
+                            tone="slate"
+                          />
+                          <span className="text-xs text-slate-400">
+                            {participant.kind ?? 'unknown'}
+                          </span>
+                          {participant.publishOnBehalf ? (
+                            <span className="text-xs text-slate-500">
+                              behalf: {participant.publishOnBehalf}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {participant.tracks.length > 0 ? (
+                            participant.tracks.map((track, index) => (
+                              <TrackLine
+                                key={`${participant.identity}-${track.sid ?? index}`}
+                                track={track}
+                              />
+                            ))
+                          ) : (
+                            <p className="text-sm text-slate-400">No track publications.</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyDebugState text="No remote participants are attached to the room yet." />
+                )}
+              </GlassCard>
+
+              <GlassCard eyebrow="Debug" title="Raw avatar telemetry">
                 <pre className="overflow-x-auto rounded-[20px] bg-black/35 p-4 text-[11px] leading-5 text-slate-300">
                   {JSON.stringify(avatarState, null, 2)}
                 </pre>
@@ -901,6 +1144,142 @@ function DebugRow({ label, value }: { label: string; value: string }) {
       <span className="text-right text-slate-100">{value}</span>
     </div>
   )
+}
+
+function TrackPublicationCard({
+  title,
+  publication,
+  emptyLabel,
+}: {
+  title: string
+  publication: TrackPublicationDebug | null
+  emptyLabel: string
+}) {
+  return (
+    <div className="rounded-[20px] border border-white/8 bg-black/20 p-4">
+      <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-100/70">{title}</p>
+      {publication ? (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <DebugRow label="Participant" value={publication.participant ?? 'unknown'} />
+          <DebugRow label="Source" value={publication.source ?? 'unknown'} />
+          <DebugRow label="Track SID" value={publication.sid ?? 'pending'} />
+          <DebugRow label="Track name" value={publication.name ?? 'unnamed'} />
+          <DebugRow label="Kind" value={publication.kind ?? 'unknown'} />
+          <DebugRow
+            label="Flags"
+            value={[
+              publication.subscribed ? 'subscribed' : 'unsubscribed',
+              publication.enabled ? 'enabled' : 'disabled',
+              publication.muted ? 'muted' : 'unmuted',
+            ].join(' · ')}
+          />
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-slate-400">{emptyLabel}</p>
+      )}
+    </div>
+  )
+}
+
+function TrackLine({ track }: { track: TrackPublicationDebug }) {
+  return (
+    <div className="rounded-[16px] border border-white/8 bg-slate-950/60 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-slate-100">
+          {track.name ?? track.source ?? 'track'}
+        </span>
+        <span className="text-xs text-slate-500">{track.kind ?? 'unknown'}</span>
+      </div>
+      <p className="mt-1 text-xs text-slate-400">
+        {[
+          track.source ?? 'unknown source',
+          track.subscribed ? 'subscribed' : 'unsubscribed',
+          track.enabled ? 'enabled' : 'disabled',
+          track.muted ? 'muted' : 'unmuted',
+        ].join(' · ')}
+      </p>
+    </div>
+  )
+}
+
+function DebugFeed({
+  entries,
+}: {
+  entries: Array<{
+    key: string
+    tone: 'emerald' | 'violet' | 'slate'
+    eyebrow: string
+    body: string
+    meta: string
+  }>
+}) {
+  return (
+    <div className="space-y-3">
+      {entries
+        .slice()
+        .reverse()
+        .map((entry) => (
+          <div
+            key={entry.key}
+            className={`rounded-[20px] border px-4 py-3 ${debugFeedTone(entry.tone)}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-300">
+                {entry.eyebrow}
+              </p>
+              <span className="text-[11px] text-slate-500">{entry.meta}</span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-100">{entry.body}</p>
+          </div>
+        ))}
+    </div>
+  )
+}
+
+function EmptyDebugState({ text }: { text: string }) {
+  return (
+    <div className="rounded-[20px] border border-dashed border-white/10 bg-black/15 px-4 py-6 text-sm text-slate-400">
+      {text}
+    </div>
+  )
+}
+
+function debugFeedTone(tone: 'emerald' | 'violet' | 'slate'): string {
+  if (tone === 'emerald') {
+    return 'border-emerald-400/20 bg-emerald-950/20'
+  }
+
+  if (tone === 'violet') {
+    return 'border-fuchsia-400/20 bg-fuchsia-950/20'
+  }
+
+  return 'border-white/8 bg-black/20'
+}
+
+function eventTone(type: string): 'emerald' | 'violet' | 'slate' {
+  if (type.includes('transcript') || type.includes('mic')) {
+    return 'emerald'
+  }
+
+  if (type.includes('voice')) {
+    return 'violet'
+  }
+
+  return 'slate'
+}
+
+function formatEventTime(value: string): string {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }
 
 function StatusBadge({

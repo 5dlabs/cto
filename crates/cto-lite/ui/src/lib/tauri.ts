@@ -424,6 +424,9 @@ export interface OpenClawResponse {
   content: string;
   latencyMs?: number;
   gatewayUrl?: string;
+  gatewaySessionKey?: string;
+  acpSessionId?: string;
+  stopReason?: string;
   action?: {
     type: 'oauth' | 'approve' | 'link' | 'confirm';
     label: string;
@@ -462,6 +465,17 @@ export interface OpenClawBridgeStatus {
   localUrl: string;
 }
 
+export interface MorganDiagnostics {
+  healthy: boolean;
+  modelPrimary: string | null;
+  modelFallbacks: string[];
+  catalogSource: string | null;
+  catalogGeneratedAt: string | null;
+  catalogProviderCount: number;
+  catalogModelCount: number;
+  recentErrors: string[];
+}
+
 /** Send a message to the OpenClaw PM agent (Morgan) */
 export async function openclawSendMessage(
   sessionId: string,
@@ -470,6 +484,17 @@ export async function openclawSendMessage(
   return invoke<OpenClawResponse>('openclaw_send_message', {
     sessionId,
     message,
+  });
+}
+
+/** Send pasted supporting context into the active Morgan avatar room session */
+export async function openclawSendAvatarContext(
+  roomName: string,
+  content: string
+): Promise<OpenClawResponse> {
+  return invoke<OpenClawResponse>('openclaw_send_avatar_context', {
+    roomName,
+    content,
   });
 }
 
@@ -531,6 +556,10 @@ export async function openclawStopLocalBridge(): Promise<OpenClawBridgeStatus> {
 /** Get the local Morgan bridge status */
 export async function openclawGetLocalBridgeStatus(): Promise<OpenClawBridgeStatus> {
   return invoke<OpenClawBridgeStatus>('openclaw_get_local_bridge_status');
+}
+
+export async function openclawGetMorganDiagnostics(): Promise<MorganDiagnostics> {
+  return invoke<MorganDiagnostics>('openclaw_get_morgan_diagnostics');
 }
 
 /** Execute a CLI command through the OpenClaw proxy */

@@ -28,10 +28,10 @@ resources:
   limits:
     memory: "4Gi"
 
-# -- Node selector (schedule agents onto specific nodes)
-# Default to worker nodes only (keeps bots off control-plane nodes)
-nodeSelector:
-  node-role.kubernetes.io/worker: ""
+# -- Node selector (optional)
+# Leave empty by default so local kind clusters can schedule agents without
+# requiring a separate worker pool.
+nodeSelector: {}
 
 # Optional tolerations for clusters that schedule agents on tainted nodes
 tolerations: []
@@ -65,10 +65,13 @@ agent:
   id: ""
   # -- Display name (e.g., "Metal", "Trader", "Forge")
   name: ""
-  # -- Primary model (e.g., "openai-api/gpt-5.4-pro")
-  model: "openai-api/gpt-5.4-pro"
+  # -- Primary model for the agent runtime.
+  model: "anthropic/claude-sonnet-4-20250514"
   # -- Heartbeat interval
-  heartbeat: "15m"
+  heartbeat:
+    every: "15m"
+    target: "last"
+    ackMaxChars: 500
   # -- Sandbox mode
   sandbox: "off"
   # -- Allowed tool groups (empty = all tools available, no restrictions)
@@ -122,6 +125,15 @@ discord:
 # =============================================================================
 # API keys are injected via environment variables from ExternalSecrets
 models:
+  catalog:
+    enabled: false
+    generatedPath: "files/model-catalog.generated.json"
+    # Optional operator override when generated artifact metadata is absent.
+    syncedAt: ""
+    # Empty list means all configured providers are eligible.
+    allowProviders: []
+    # Block specific model ids even if they exist in generated catalog.
+    denyModels: []
   providers:
     anthropic:
       api: "anthropic-messages"
@@ -213,6 +225,7 @@ agentDefaults:
 # Memory Search Configuration
 # =============================================================================
 memorySearch:
+  enabled: true
   model: "text-embedding-3-small"
   provider: "openai"
   maxResults: 6
@@ -283,30 +296,69 @@ gateway:
 # Model Fallback Configuration
 # =============================================================================
 modelDefaults:
-  primary: "openai-api/gpt-5.4-pro"
+  primary: "anthropic/claude-sonnet-4-20250514"
   fallbacks:
+    - "anthropic/claude-3-5-haiku-latest"
     - "openai-api/gpt-5.4"
     - "openai-api/gpt-5.3-codex"
     - "anthropic/claude-opus-4-6-20260201"
-    - "anthropic/claude-sonnet-4-20250514"
-    - "anthropic/claude-3-5-haiku-latest"
 
 # =============================================================================
 # Tools Configuration (Linux-adapted, no macOS paths)
 # =============================================================================
 tools:
   profile: "full"
+  deny: []
+  alsoAllow: []
+  byProvider: {}
   agentToAgent:
     enabled: true
   elevated:
     enabled: true
+    allowFrom: {}
   exec:
     # Linux paths only - no macOS /opt/homebrew or /Users paths
+    host: "gateway"
+    security: "full"
+    ask: "off"
+    node: ""
+    safeBins: []
+    safeBinTrustedDirs: []
     pathPrepend:
       - "/usr/local/bin"
+      - "/usr/local/share/npm-global/bin"
+      - "/workspace/.local/bin"
+      - "/root/.local/bin"
     timeoutSec: 0          # No auto-kill — CLIs are long-lived services
     backgroundMs: 5000     # Auto-background after 5s (default 10s)
+    cleanupMs: 1800000
     notifyOnExit: true     # Agent gets system event when a CLI exits/crashes
+    applyPatch:
+      enabled: true
+      allowModels: []
+  message:
+    crossContext: {}
+    broadcast:
+      enabled: true
+  acp:
+    enabled: false
+    backend: "acpx"
+    acpxVersion: ""
+    defaultAgent: "codex"
+    allowedAgents: []
+    agentOverrides: {}
+    maxConcurrentSessions: 4
+    permissionMode: "approve-all"
+    nonInteractivePermissions: "deny"
+    dispatch:
+      enabled: true
+    stream:
+      coalesceIdleMs: 300
+      maxChunkChars: 1200
+    runtime:
+      ttlMinutes: 120
+    wsUrl: ""
+    tokenFile: ""
 
 # =============================================================================
 # Kaniko Sidecar (daemonless container builds)
@@ -431,6 +483,9 @@ toolsConfig:
         - "search_nodes"
         - "open_nodes"
 
+toolServer:
+  url: ""
+
 # =============================================================================
 # Secrets Configuration
 # =============================================================================
@@ -445,17 +500,23 @@ secrets:
 # =============================================================================
 probes:
   # OpenClaw gateway exposes a health endpoint
+  startup:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 18
   liveness:
     enabled: true
-    initialDelaySeconds: 30
+    initialDelaySeconds: 10
     periodSeconds: 60
     timeoutSeconds: 10
     failureThreshold: 5
   readiness:
     enabled: true
-    initialDelaySeconds: 15
+    initialDelaySeconds: 30
     periodSeconds: 30
-    timeoutSeconds: 5
+    timeoutSeconds: 10
     failureThreshold: 3
 
 # =============================================================================
