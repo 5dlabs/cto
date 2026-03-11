@@ -267,7 +267,7 @@ export default function ConsultingPage() {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {expertise.map((item, i) => {
+              {expertise.map((item) => {
                 const colors = colorMap[item.color] || colorMap.cyan;
                 return (
                   <div
@@ -306,7 +306,7 @@ export default function ConsultingPage() {
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {rates.map((rate, i) => (
+              {rates.map((rate) => (
                 <div
                   key={rate.name}
                   className={`p-6 rounded-xl border backdrop-blur-sm relative ${
@@ -361,7 +361,7 @@ export default function ConsultingPage() {
             </div>
 
             <div className="space-y-6">
-              {phases.map((phase, i) => (
+              {phases.map((phase) => (
                 <div
                   key={phase.title}
                   className="flex gap-6 items-start"
@@ -407,7 +407,7 @@ export default function ConsultingPage() {
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-              {stats.map((stat, i) => (
+              {stats.map((stat) => (
                 <div
                   key={stat.label}
                   className="text-center p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm"
