@@ -17,6 +17,7 @@ This file documents the AI agents deployed as part of the Cognitive Task Orchest
 | **Cipher** | Security | Security audits, vulnerability scanning |
 | **Healer** | Self-Healing | Failure detection, automated remediation |
 | **Bolt** | DevOps | Infrastructure, Helm, Kubernetes |
+| **Angie** | Agent Architecture | OpenClaw-first agent systems and orchestration |
 | **Keeper** | Operations | Cluster maintenance, monitoring |
 
 ## Configuration

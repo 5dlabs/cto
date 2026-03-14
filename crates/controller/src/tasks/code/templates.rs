@@ -3955,7 +3955,7 @@ Be constructive and explain the "why" behind your suggestions.
             ],
 
             // Implementation agents: need GitHub, context docs, and memory
-            ("rex" | "grizz" | "nova" | "blaze" | "tap" | "spark", "implementation" | "coder") => {
+            ("rex" | "grizz" | "nova" | "blaze" | "tap" | "spark" | "angie", "implementation" | "coder") => {
                 vec![
                     "mcp_tools_github_*".to_string(),
                     "mcp_tools_context7_*".to_string(),
@@ -4162,6 +4162,7 @@ Be constructive and explain the "why" behind your suggestions.
             "5DLabs-Tap" => "tap",
             "5DLabs-Spark" => "spark",
             "5DLabs-Stitch" => "stitch",
+            "5DLabs-Angie" => "angie",
             "5DLabs-Vex" => "vex",
             // Rex variants and unknown agents default to rex
             _ => "rex",
@@ -4331,6 +4332,7 @@ Be constructive and explain the "why" behind your suggestions.
             "5DLabs-Tess" => "tess",
             "5DLabs-Atlas" => "atlas",
             "5DLabs-Bolt" => "bolt",
+            "5DLabs-Angie" => "angie",
             "5DLabs-Vex" => "vex",
             _ => {
                 return Err(crate::tasks::types::Error::ConfigError(format!(

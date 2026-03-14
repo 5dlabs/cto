@@ -246,7 +246,7 @@ export default function Home() {
               and a growing ecosystem of MCP tools — turning a collection of specialized agents
               into a coherent, self-healing system.
             </p>
-            <div className="grid sm:grid-cols-3 gap-6 text-left">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
               {[
                 {
                   title: "Multi-CLI Agnostic",
@@ -259,6 +259,10 @@ export default function Home() {
                 {
                   title: "Coming Soon",
                   text: "OpenClaw will be open-sourced. When it ships publicly, it will be the reusable foundation any team can use to run the same kind of agent infrastructure we run internally.",
+                },
+                {
+                  title: "Specialist Builders",
+                  text: "Specialists like Angie focus on OpenClaw-first agent architecture: MCP tool routing, runtime integration, and practical voice-agent patterns on top of the core orchestration layer.",
                 },
               ].map((item) => (
                 <div key={item.title} className="p-5 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">

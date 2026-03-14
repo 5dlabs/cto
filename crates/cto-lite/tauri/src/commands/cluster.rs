@@ -1,6 +1,7 @@
 //! Kind cluster management commands
 
 use crate::error::{AppError, AppResult};
+use crate::runtime::{self as runtime, ContainerRuntime};
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use tracing;
@@ -105,8 +106,24 @@ pub struct NodeStatus {
 }
 
 /// Run a kind command and return stdout
+fn kind_command() -> Command {
+    let mut command = Command::new("kind");
+
+    if let Some(docker_path) = runtime::get_runtime_path(ContainerRuntime::Docker) {
+        if let Some(parent) = std::path::Path::new(&docker_path).parent() {
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            let parent_path = parent.to_string_lossy();
+            if !current_path.split(':').any(|entry| entry == parent_path) {
+                command.env("PATH", format!("{}:{}", parent_path, current_path));
+            }
+        }
+    }
+
+    command
+}
+
 fn run_kind(args: &[&str]) -> AppResult<String> {
-    let output = Command::new("kind")
+    let output = kind_command()
         .args(args)
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to run kind: {}", e)))?;
@@ -806,7 +823,7 @@ nodes:
     std::fs::write(&config_path, config)?;
 
     // Create cluster
-    let output = Command::new("kind")
+    let output = kind_command()
         .args([
             "create",
             "cluster",
@@ -1039,7 +1056,8 @@ pub async fn smart_init(
     }
 
     // Step 2: Wait for Docker specifically if Docker Desktop was the runtime that came up.
-    if result.docker_started && crate::runtime::is_runtime_running(crate::runtime::ContainerRuntime::Docker)
+    if result.docker_started
+        && crate::runtime::is_runtime_running(crate::runtime::ContainerRuntime::Docker)
     {
         tracing::info!("Waiting for Docker daemon to be ready...");
         if let Err(e) = wait_for_docker_ready(30) {

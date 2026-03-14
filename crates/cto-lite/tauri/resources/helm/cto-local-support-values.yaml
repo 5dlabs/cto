@@ -1,0 +1,73 @@
+global:
+  namespace: cto
+  createNamespace: false
+  imagePullSecrets:
+    - name: ghcr-secret
+  storageClass: local-path
+
+controller:
+  enabled: false
+
+pm:
+  enabled: false
+
+tools:
+  enabled: true
+  replicaCount: 1
+  image:
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+    nodePort: null
+  ingress:
+    enabled: false
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  persistence:
+    enabled: true
+    size: 10Gi
+  config:
+    secrets:
+      context7: ""
+      github: "tools-github-secrets"
+
+healer:
+  enabled: false
+
+openmemory:
+  enabled: true
+  image:
+    pullPolicy: IfNotPresent
+  persistence:
+    enabled: true
+    size: 5Gi
+
+sensors:
+  enabled: false
+
+webhooks:
+  enabled: false
+
+tweakcn:
+  enabled: false
+
+web:
+  enabled: false
+
+grok:
+  enabled: false
+
+research:
+  enabled: false
+
+maintenance:
+  enabled: false
+
+cloudflare:
+  enabled: false

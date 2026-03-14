@@ -29,6 +29,8 @@ pub enum Agent {
     Bolt,
     /// Integration/Merge engineer (Atlas)
     Atlas,
+    /// Agent architecture and orchestration specialist (Angie)
+    Angie,
 }
 
 impl Agent {
@@ -46,6 +48,7 @@ impl Agent {
             Self::Cipher => "cipher",
             Self::Bolt => "bolt",
             Self::Atlas => "atlas",
+            Self::Angie => "angie",
         }
     }
 
@@ -78,6 +81,9 @@ impl Agent {
             Self::Bolt => "Senior DevOps Engineer with expertise in Kubernetes, GitOps, and CI/CD",
             Self::Atlas => {
                 "Senior Integration Engineer with expertise in system integration and merging"
+            }
+            Self::Angie => {
+                "Senior Agent Architect with expertise in OpenClaw orchestration, MCP, and agent systems"
             }
         }
     }
@@ -285,6 +291,23 @@ pub fn infer_agent_hint(title: &str, description: &str) -> Option<Agent> {
         // Backend context: service, api, delivery, kafka, queue, stream, elysia, bun
         // Default Effect to Nova (backend) since it's primarily used there
         return Some(Agent::Nova);
+    }
+
+    // Agent architecture/orchestration specialist
+    if content.contains("openclaw")
+        || content.contains("agent orchestration")
+        || content.contains("orchestration layer")
+        || content.contains("multi-agent")
+        || content.contains("multi agent")
+        || content.contains("agent runtime")
+        || content.contains("agent platform")
+        || content.contains("mcp server")
+        || content.contains("model context protocol")
+        || content.contains("agent routing")
+        || content.contains("tool routing")
+        || content.contains("agent memory")
+    {
+        return Some(Agent::Angie);
     }
 
     // Node.js - check BEFORE general backend
@@ -495,6 +518,7 @@ pub fn get_role_for_hint(hint: &str) -> &'static str {
         "cipher" => Agent::Cipher.role_description(),
         "bolt" => Agent::Bolt.role_description(),
         "atlas" => Agent::Atlas.role_description(),
+        "angie" => Agent::Angie.role_description(),
         _ => "Senior Software Engineer",
     }
 }
@@ -512,6 +536,7 @@ pub fn parse_agent(hint: &str) -> Agent {
         "cipher" => Agent::Cipher,
         "bolt" => Agent::Bolt,
         "atlas" => Agent::Atlas,
+        "angie" => Agent::Angie,
         // Default to Rex (including explicit "rex")
         _ => Agent::Rex,
     }
@@ -530,6 +555,7 @@ pub const fn is_implementation_agent(agent: Agent) -> bool {
             | Agent::Tap
             | Agent::Spark
             | Agent::Bolt
+            | Agent::Angie
     )
 }
 
@@ -619,6 +645,9 @@ fn check_explicit_agent(title: &str, description: &str) -> Option<Agent> {
     if title_lower.starts_with("atlas:") || title_lower.starts_with("atlas :") {
         return Some(Agent::Atlas);
     }
+    if title_lower.starts_with("angie:") || title_lower.starts_with("angie :") {
+        return Some(Agent::Angie);
+    }
     if title_lower.starts_with("cleo:") || title_lower.starts_with("cleo :") {
         return Some(Agent::Tess); // Cleo maps to Tess
     }
@@ -653,6 +682,9 @@ fn check_explicit_agent(title: &str, description: &str) -> Option<Agent> {
     }
     if content.contains("(atlas") || content.contains("- atlas") {
         return Some(Agent::Atlas);
+    }
+    if content.contains("(angie") || content.contains("- angie") {
+        return Some(Agent::Angie);
     }
     if content.contains("(cleo") || content.contains("- cleo") {
         // Cleo is an alias for quality review, maps to Tess for now
@@ -772,6 +804,10 @@ mod tests {
         assert_eq!(
             infer_agent_hint("Spark: Desktop Notifications", "System tray"),
             Some(Agent::Spark)
+        );
+        assert_eq!(
+            infer_agent_hint("Angie: OpenClaw MCP routing", "Agent orchestration update"),
+            Some(Agent::Angie)
         );
     }
 
@@ -1422,9 +1458,21 @@ mod tests {
         assert!(is_implementation_agent(Agent::Tap));
         assert!(is_implementation_agent(Agent::Spark));
         assert!(is_implementation_agent(Agent::Bolt));
+        assert!(is_implementation_agent(Agent::Angie));
         // Support agents
         assert!(!is_implementation_agent(Agent::Tess));
         assert!(!is_implementation_agent(Agent::Cipher));
         assert!(!is_implementation_agent(Agent::Atlas));
+    }
+
+    #[test]
+    fn test_angie_orchestration_detection() {
+        assert_eq!(
+            infer_agent_hint(
+                "OpenClaw orchestration upgrade",
+                "Improve multi-agent tool routing and MCP server coordination"
+            ),
+            Some(Agent::Angie)
+        );
     }
 }

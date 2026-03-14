@@ -553,6 +553,38 @@ export default function Room({
     }
   }, [connect]);
 
+  const failEmbeddedMedia = useCallback((message: string) => {
+    setConnection(null);
+    setConnectionRequestedAt(null);
+    setRoomConnectedAt(null);
+    setError(message);
+  }, []);
+
+  const handleRoomError = useCallback(
+    (cause: Error) => {
+      if (cause.name === "NotAllowedError") {
+        failEmbeddedMedia(
+          "Microphone access is blocked in the embedded avatar view. Allow microphone access for CTO and reload the avatar tab.",
+        );
+        return;
+      }
+
+      failEmbeddedMedia(cause.message || "Unable to keep the Morgan session connected.");
+    },
+    [failEmbeddedMedia],
+  );
+
+  const handleMediaDeviceFailure = useCallback(
+    (failure?: unknown, kind?: MediaDeviceKind) => {
+      const source = kind === "audioinput" ? "microphone" : kind ?? "media device";
+      const detail = failure ? ` (${String(failure)})` : "";
+      failEmbeddedMedia(
+        `Access to the ${source} was denied in the embedded avatar view. Allow it for CTO and retry.${detail}`,
+      );
+    },
+    [failEmbeddedMedia],
+  );
+
   useEffect(() => {
     emitHostAvatarState({
       connectionState: error
@@ -681,6 +713,8 @@ export default function Room({
       video={false}
       onConnected={() => setRoomConnectedAt(performance.now())}
       onDisconnected={reset}
+      onError={handleRoomError}
+      onMediaDeviceFailure={handleMediaDeviceFailure}
       className={compact ? "grid gap-5" : "grid gap-6"}
     >
       {!compact ? (

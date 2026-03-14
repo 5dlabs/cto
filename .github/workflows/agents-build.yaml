@@ -235,7 +235,7 @@ jobs:
           context: .
           file: ./infra/images/runtime/Dockerfile
           target: production
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           pull: true
           push: true
           provenance: false
@@ -249,6 +249,7 @@ jobs:
             PLAY_MONITOR_VERSION=${{ steps.binaries-version.outputs.play_monitor_version }}
             TASKS_VERSION=${{ steps.binaries-version.outputs.tasks_version }}
             INTAKE_AGENT_VERSION=${{ steps.binaries-version.outputs.intake_agent_version }}
+            INSTALL_SCCACHE=false
           no-cache: ${{ inputs.no_cache == true }}
           cache-from: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/runtime:buildcache
@@ -299,7 +300,7 @@ jobs:
           context: .
           file: ./infra/images/linear-sidecar/Dockerfile
           target: local
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
           sbom: false
@@ -387,7 +388,7 @@ jobs:
         with:
           context: ./infra/images/agents
           file: ./infra/images/agents/Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           pull: true
           push: true
           provenance: false

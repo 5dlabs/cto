@@ -54,12 +54,10 @@ impl RuntimeClient {
     }
 
     fn take_notifications(&self) -> Vec<SessionNotification> {
-        std::mem::take(
-            &mut *self
-                .notifications
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()),
-        )
+        self.notifications
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
     }
 }
 

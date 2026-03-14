@@ -97,6 +97,7 @@ fn main() {
             // Initialize MCP state
             app.manage(commands::mcp::McpState::new());
             app.manage(commands::openclaw::LocalBridgeState::new());
+            app.manage(commands::openclaw::ConversationState::new());
 
             tracing::info!("Database initialized at {:?}", db_path);
             Ok(())
@@ -169,6 +170,7 @@ fn main() {
             commands::install::reset_installation,
             // OpenClaw gateway
             commands::openclaw::openclaw_send_message,
+            commands::openclaw::openclaw_send_avatar_context,
             commands::openclaw::openclaw_get_messages,
             commands::openclaw::openclaw_start_workflow,
             commands::openclaw::openclaw_get_workflow_status,
@@ -179,6 +181,13 @@ fn main() {
             commands::openclaw::openclaw_start_local_bridge,
             commands::openclaw::openclaw_stop_local_bridge,
             commands::openclaw::openclaw_get_local_bridge_status,
+            commands::openclaw::openclaw_get_morgan_diagnostics,
+            // Studio state
+            commands::studio::studio_get_state,
+            commands::studio::studio_save_state,
+            commands::studio::studio_render_agent_config,
+            commands::studio::studio_export_agent_config,
+            commands::studio::studio_apply_agent_config,
             // Smart initialization & runtime
             commands::cluster::smart_init,
             commands::cluster::quick_health_check,

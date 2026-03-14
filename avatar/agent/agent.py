@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime
 
 from dotenv import load_dotenv
 from livekit import agents
@@ -69,7 +68,10 @@ async def entrypoint(ctx: JobContext) -> None:
         stt=build_stt(config),
         llm=build_llm(
             config,
-            session_id=f"{ctx.room.name}:{datetime.utcnow().isoformat(timespec='seconds')}",
+            # Keep the OpenClaw user/session identifier stable for the life of
+            # the room so the desktop app can target the same conversation with
+            # supplemental pasted context.
+            session_id=ctx.room.name,
         ),
         tts=build_tts(config),
         vad=ctx.proc.userdata["vad"],

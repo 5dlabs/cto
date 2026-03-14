@@ -140,6 +140,7 @@ Return a single JSON object (not wrapped in an array):
 | cleo | Data & Analytics | SQL, pipelines, ETL |
 | atlas | Architecture | System design, integration |
 | stitch | Code review & integration | Cross-cutting concerns |
+| angie | Agent architecture | OpenClaw, MCP, orchestration |
 | vex | API design | OpenAPI, GraphQL |
 | pixel | Design implementation | CSS, animations, UI |
 | morgan | Project management | Planning, coordination |

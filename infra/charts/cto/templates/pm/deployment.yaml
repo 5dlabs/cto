@@ -93,7 +93,7 @@ spec:
                   key: secret  # pragma: allowlist secret
                   optional: true
             # Linear OAuth App credentials for each agent
-            {{- $agents := list "morgan" "rex" "blaze" "grizz" "nova" "tap" "spark" "cleo" "cipher" "tess" "atlas" "bolt" }}
+            {{- $agents := list "morgan" "rex" "blaze" "grizz" "nova" "tap" "spark" "cleo" "cipher" "tess" "atlas" "bolt" "stitch" "vex" "angie" }}
             {{- range $agents }}
             {{- $upper := . | upper }}
             - name: LINEAR_APP_{{ $upper }}_CLIENT_ID

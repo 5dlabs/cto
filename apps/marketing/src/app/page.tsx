@@ -191,6 +191,15 @@ const squads: AgentSquad[] = [
         skills: ["Unity", "OpenXR", "Meta XR", "Three.js", "Cross-Platform XR"],
       },
       {
+        name: "Angie",
+        role: "Agent Builder",
+        avatar: "/agents/angie-avatar-512.png",
+        color: "from-indigo-500 to-cyan-400",
+        description: "Designs OpenClaw-first agent systems, including orchestration, runtime patterns, and MCP-connected toolchains.",
+        tools: ["OpenClaw", "MCP", "Context7", "Octocode", "GitHub"],
+        skills: ["Agent Architecture", "OpenClaw", "LiveKit", "ElevenLabs", "LangGraph", "CrewAI", "AutoGen"],
+      },
+      {
         name: "Glitch",
         role: "Game Developer",
         avatar: "/agents/glitch-avatar-512.png",

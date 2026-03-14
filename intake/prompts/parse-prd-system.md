@@ -97,6 +97,7 @@ Follow these steps in order:
 | Data pipelines | Cleo | Data engineering |
 | DevOps/CI/CD | Atlas | CI/CD platforms |
 | Integration/glue | Stitch | Multi-stack |
+| Agent architecture/orchestration | Angie | OpenClaw/MCP |
 
 # Decision Point Categories
 

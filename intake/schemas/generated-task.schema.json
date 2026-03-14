@@ -36,8 +36,8 @@
         },
         "agent": {
           "type": "string",
-          "description": "Agent name responsible for this task (bolt, rex, grizz, nova, blaze, tap, spark, cipher, tess, cleo, atlas, stitch)",
-          "enum": ["bolt", "rex", "grizz", "nova", "blaze", "tap", "spark", "cipher", "tess", "cleo", "atlas", "stitch"]
+          "description": "Agent name responsible for this task (bolt, rex, grizz, nova, blaze, tap, spark, cipher, tess, cleo, atlas, stitch, angie)",
+          "enum": ["bolt", "rex", "grizz", "nova", "blaze", "tap", "spark", "cipher", "tess", "cleo", "atlas", "stitch", "angie"]
         },
         "stack": {
           "type": "string",

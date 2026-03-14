@@ -68,7 +68,10 @@ impl DigestAnalyzer {
     ///
     /// NOTE: AI analysis disabled (requires intake dependency).
     /// Returns a basic summary without AI enrichment.
-    pub async fn analyze_rich(&self, entries: &[RichEntry<'_>]) -> Result<DigestAnalysis, anyhow::Error> {
+    pub async fn analyze_rich(
+        &self,
+        entries: &[RichEntry<'_>],
+    ) -> Result<DigestAnalysis, anyhow::Error> {
         let high_priority: Vec<ActionItem> = entries
             .iter()
             .filter(|e| e.entry.score >= 0.7)
@@ -77,7 +80,11 @@ impl DigestAnalyzer {
                 description: e.entry.preview.clone(),
                 related_entries: vec![e.entry.id.clone()],
                 effort: "unknown".to_string(),
-                impact: if e.entry.score >= 0.9 { "high".to_string() } else { "medium".to_string() },
+                impact: if e.entry.score >= 0.9 {
+                    "high".to_string()
+                } else {
+                    "medium".to_string()
+                },
             })
             .collect();
 

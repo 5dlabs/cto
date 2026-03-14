@@ -570,9 +570,7 @@ async fn main() -> Result<()> {
 
     // Resolve Latitude credentials (optionally via 1Password) when using Latitude provider
     let (api_key, project_id) = match cli.provider {
-        ProviderKind::Latitude => {
-            resolve_latitude_creds(&cli)?
-        }
+        ProviderKind::Latitude => resolve_latitude_creds(&cli)?,
         _ => (cli.api_key.clone(), cli.project_id.clone()),
     };
 

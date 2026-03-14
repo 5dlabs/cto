@@ -179,7 +179,11 @@ impl RelevanceAnalyzer {
         })
     }
 
-    pub fn with_context(client: AnthropicClient, model: String, context: PlatformContext) -> Result<Self> {
+    pub fn with_context(
+        client: AnthropicClient,
+        model: String,
+        context: PlatformContext,
+    ) -> Result<Self> {
         let prompts = PromptManager::new()?;
         Ok(Self {
             client,
@@ -199,14 +203,24 @@ impl RelevanceAnalyzer {
         let prompt = self.prompts.render("relevance", &prompt_data)?;
 
         let system_prompt = if let Some(ctx) = &self.context {
-            format!("{}\n\n## Platform Context\n\n{}", SYSTEM_PROMPT, ctx.to_prompt_context())
+            format!(
+                "{}\n\n## Platform Context\n\n{}",
+                SYSTEM_PROMPT,
+                ctx.to_prompt_context()
+            )
         } else {
             SYSTEM_PROMPT.to_string()
         };
 
         let messages = vec![
-            Message { role: Role::System, content: system_prompt },
-            Message { role: Role::User, content: prompt },
+            Message {
+                role: Role::System,
+                content: system_prompt,
+            },
+            Message {
+                role: Role::User,
+                content: prompt,
+            },
         ];
 
         let response = self

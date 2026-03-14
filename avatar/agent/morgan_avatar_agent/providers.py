@@ -34,6 +34,18 @@ def build_llm(config: AgentConfig, *, session_id: str):
 
 def build_stt(config: AgentConfig):
     match config.stt_mode:
+        case "openai-realtime":
+            return openai.STT(
+                model="gpt-4o-mini-transcribe",
+                language=config.stt_language,
+                use_realtime=True,
+            )
+        case "openai-transcribe":
+            return openai.STT(
+                model="gpt-4o-mini-transcribe",
+                language=config.stt_language,
+                use_realtime=False,
+            )
         case "deepgram-flux":
             return deepgram.STTv2(
                 model=config.deepgram_flux_model,
@@ -56,7 +68,7 @@ def build_stt(config: AgentConfig):
 
 
 def build_turn_detection(config: AgentConfig):
-    if "flux" in config.stt_mode:
+    if "flux" in config.stt_mode or config.stt_mode == "openai-realtime":
         return "stt"
     return MultilingualModel()
 

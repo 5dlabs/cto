@@ -748,7 +748,7 @@ And create the corresponding partial in `templates/_shared/partials/`.
 
 | Category | Workspace Sharing | Examples |
 |----------|-------------------|----------|
-| **Implementation** | Shared PVC | Rex, Blaze, Grizz, Nova, Tap, Spark |
+| **Implementation** | Shared PVC | Rex, Blaze, Grizz, Nova, Tap, Spark, Angie |
 | **Support** | Isolated PVC | Cleo, Cipher, Tess, Morgan |
 | **Integration** | Isolated PVC | Atlas, Bolt, Stitch |
 

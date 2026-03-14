@@ -83,6 +83,8 @@ class AgentConfig:
     @classmethod
     def from_env(cls, project_root: Path | None = None) -> AgentConfig:
         root = project_root or Path(__file__).resolve().parents[2]
+        llm_backend = os.getenv("MORGAN_LLM_BACKEND", "openclaw").strip().lower()
+        default_preemptive_generation = llm_backend != "openclaw"
         return cls(
             agent_name=os.getenv("MORGAN_AGENT_NAME", "morgan-avatar"),
             greeting=os.getenv(
@@ -113,7 +115,7 @@ class AgentConfig:
             avatar_idle_timeout=_env_int("MORGAN_AVATAR_IDLE_TIMEOUT_SECONDS", 60),
             use_noise_cancellation=_env_bool("MORGAN_USE_NOISE_CANCELLATION", True),
             latency_log_dir=Path(os.getenv("MORGAN_LATENCY_LOG_DIR", root / "agent" / "runs")),
-            llm_backend=os.getenv("MORGAN_LLM_BACKEND", "openclaw").strip().lower(),
+            llm_backend=llm_backend,
             llm_model=os.getenv("MORGAN_LLM_MODEL", "openclaw:main").strip(),
             llm_api_key=(
                 os.getenv("MORGAN_LLM_API_KEY")
@@ -157,7 +159,9 @@ class AgentConfig:
             ).strip(),
             cartesia_model=os.getenv("MORGAN_CARTESIA_MODEL", "sonic-turbo").strip(),
             cartesia_speed=_env_float("MORGAN_CARTESIA_SPEED", 1.0),
-            preemptive_generation=_env_bool("MORGAN_PREEMPTIVE_GENERATION", True),
+            preemptive_generation=_env_bool(
+                "MORGAN_PREEMPTIVE_GENERATION", default_preemptive_generation
+            ),
             resume_false_interruption=_env_bool("MORGAN_RESUME_FALSE_INTERRUPTION", True),
             false_interruption_timeout=_env_float("MORGAN_FALSE_INTERRUPTION_TIMEOUT", 1.0),
             aec_warmup_duration=_env_float("MORGAN_AEC_WARMUP_DURATION", 3.0),
