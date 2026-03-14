@@ -1,6 +1,6 @@
 # CTO by 5D Labs
 
-> CTO is the first AI engineering platform that ships complete features autonomously—from PRD to production. Thirteen specialized AI agents collaborate across project management, implementation, testing, security, and deployment on self-healing bare metal infrastructure.
+> CTO is the first AI engineering platform that ships complete features autonomously—from PRD to production. Fifteen specialized AI agents collaborate across project management, implementation, testing, security, and deployment on self-healing bare metal infrastructure.
 
 ## What Makes CTO Different
 
@@ -27,6 +27,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 - **Tap** - Mobile Developer: Expo, React Native, expo-router
 - **Spark** - Desktop Developer: Electron, Tauri, cross-platform apps
 - **Vex** - XR Developer: Unity, OpenXR, Meta XR SDK
+- **Angie** - Agent Builder: OpenClaw-first agent orchestration, MCP tool routing, and practical voice-agent/runtime patterns (LiveKit, ElevenLabs, LangGraph, CrewAI, AutoGen)
 
 ### Quality & Security
 - **Cleo** - Quality Guardian: Code review, refactoring, best practices
@@ -41,7 +42,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 ## Key Differentiators
 
 ### vs. AI Coding Assistants (Cursor, Copilot, Devin)
-- **Multi-agent specialization**: 13 domain experts vs one generic AI
+- **Multi-agent specialization**: 15 domain experts vs one generic AI
 - **Full workflow automation**: PRD → Production, not just code suggestions
 - **Built-in infrastructure**: Deployment included, not a separate concern
 - **Self-healing**: Automatic issue detection and remediation

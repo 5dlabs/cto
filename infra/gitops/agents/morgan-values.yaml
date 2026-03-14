@@ -1,4 +1,6 @@
 ---
+namespace: openclaw
+
 replicaCount: 1
 deploymentMode: statefulset
 
@@ -6,20 +8,29 @@ global:
   namespace: openclaw
   createNamespace: false
 
+nodeSelector: {}
+tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: "Exists"
+    effect: "NoSchedule"
+  - key: "node-role.kubernetes.io/master"
+    operator: "Exists"
+    effect: "NoSchedule"
+
 resources:
   requests:
     cpu: "200m"
-    memory: "512Mi"
+    memory: "1Gi"
   limits:
-    cpu: "1000m"
-    memory: "2Gi"
+    cpu: "1500m"
+    memory: "4Gi"
 
-nodeOptions: "--max-old-space-size=2048"
+nodeOptions: "--max-old-space-size=4096"
 
 agent:
   id: "morgan"
   name: "Morgan"
-  model: "openai-api/gpt-5.4"
+  model: "anthropic/claude-3-5-haiku-latest"
   heartbeat:
     every: "12h"
     target: "last"
@@ -28,16 +39,17 @@ agent:
       If there is no active user request, reply HEARTBEAT_OK and do nothing
       else. Do not start background work or new tasks on your own.
   sandbox: "off"
-  skipGlobalSkills: true
+  skipGlobalSkills: false
 
 agentDefaults:
   thinkingDefault: "low"
   typingMode: "instant"
 
 modelDefaults:
-  primary: "openai-api/gpt-5.4"
+  primary: "anthropic/claude-3-5-haiku-latest"
   fallbacks:
-    - "openai-api/gpt-5.4-pro"
+    - "anthropic/claude-sonnet-4-20250514"
+    - "openai-api/gpt-5.4"
     - "openai-api/gpt-5.3-codex"
 
 secrets:
@@ -47,7 +59,18 @@ secrets:
 
 messaging:
   discord:
-    enabled: false
+    enabled: true
+    accountId: "morgan"
+    tokenSecretKey: "henry"
+    allowBots: "mentions"
+    threadBindings:
+      enabled: true
+      spawnSubagentSessions: true
+      spawnAcpSessions: true
+    dm:
+      policy: "allowlist"
+    allowFrom:
+      - "444519104808878090"
 
 models:
   providers:
@@ -55,7 +78,7 @@ models:
       enabled: true
       apiKeySecretKey: "OPENAI_API_KEY"
     anthropic:
-      enabled: false
+      enabled: true
       apiKeySecretKey: "ANTHROPIC_API_KEY"
     minimax:
       api: "anthropic-messages"
@@ -64,87 +87,20 @@ models:
       baseUrl: "https://api.minimax.io/anthropic"
   repos: []
 
-storage:
-  size: 10Gi
-  storageClass: "local-path"
-
-gateway:
-  auth:
-    token: "openclaw-internal"
-  controlUi:
-    enabled: false
-  http:
-    endpoints:
-      chatCompletions:
-        enabled: true
-      responses:
-        enabled: false
-
-memorySearch:
-  enabled: false
-
-openmemory:
-  enabled: false
-
-mem0:
-  enabled: false
-
-session:
-  scope: "per-sender"
-  dmScope: "per-channel-peer"
-  agentToAgent:
-    maxPingPongTurns: 0
-  threadBindings:
-    enabled: false
-
-tools:
-  profile: "minimal"
-  agentToAgent:
-    enabled: false
-  elevated:
-    enabled: false
-  message:
-    broadcast:
-      enabled: false
-  web:
-    search:
-      enabled: false
-    fetch:
-      enabled: false
-  acp:
-    enabled: false
-
-toolServer:
-  url: ""
-
-browser:
-  enabled: false
-
-plugins:
-  memoryCore:
-    enabled: false
-
-supermemory:
-  enabled: false
-
-ssh:
-  enabled: false
-
-nats:
-  enabled: false
-  subchart:
-    enabled: false
-
-kaniko:
-  enabled: false
-
-skills:
-  external:
-    openclaw:
-      - configMapName: "openclaw-morgan-external-skills"
-        optional: true
-
 workspace:
+  repos:
+    - name: cto
+      url: "https://github.com/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+    - name: openclaw-platform
+      url: "https://github.com/5dlabs/openclaw-platform.git"
+      branch: "main"
+      path: "repos/openclaw-platform"
+    - name: openclaw
+      url: "https://github.com/openclaw/openclaw.git"
+      branch: "main"
+      path: "repos/openclaw"
   files:
     AGENTS.md: |
       # AGENTS.md -- Morgan
@@ -165,8 +121,16 @@ workspace:
       ## Operating Rules
 
       - Treat the current user request as the priority. Do not start side quests.
-      - Do not delegate to other agents or rely on NATS for this build.
-      - Do not use tools unless the user clearly asks for an action that needs them.
+      - Use available tools when the user asks for action; do not self-limit to chat.
+      - For coding and diagnostic tasks, prefer ACP harnesses over generic shell
+        prose. If the user asks whether a coding CLI works, prove it with a real
+        check instead of speculating.
+      - Do not rely on NATS for the user-facing avatar loop, but do use ACP
+        sessions when the user wants work done with Claude, Codex, Gemini,
+        Kimi, Cursor, OpenCode, Copilot, Droid, or Pi.
+      - In avatar or web chat conversations, prefer one-shot ACP runs first.
+        Do not assume a thread-bound persistent ACP session is needed unless the
+        user explicitly asks for a long-running coding session.
       - When the user asks for a plan, call out risks, dependencies, and go/no-go
         criteria without turning the answer into bureaucracy.
       - If you are uncertain, say what you know, what is missing, and the fastest
@@ -178,6 +142,8 @@ workspace:
       - Prefer plain language over jargon, but stay technically accurate.
       - Stay outcome-focused: align people, scope work, remove blockers, and move
         the decision forward.
+      - When a tool check succeeds or fails, summarize the result directly and
+        name the next step.
 
     SOUL.md: |
       # Morgan -- Soul
@@ -211,4 +177,283 @@ workspace:
       - **Name:** Morgan
       - **Role:** Technical program manager for the avatar proof of concept
       - **Primary mode:** Fast, spoken-friendly execution guidance
-      - **Model:** GPT-5.4
+      - **Model:** Claude Sonnet 4
+
+    TOOLS.md: |
+      # TOOLS.md -- Morgan
+
+      ## Workspace
+
+      - Root workspace: `/workspace`
+      - CTO repo: `/workspace/repos/cto`
+      - OpenClaw platform: `/workspace/repos/openclaw-platform`
+      - OpenClaw core: `/workspace/repos/openclaw`
+
+      ## Operating Principle
+
+      - When the user asks whether a CLI or runtime works, run a real smoke
+        check.
+      - Prefer ACP sessions for coding agents. Use raw `exec` for one-shot
+        availability checks or non-ACP commands.
+      - In the avatar or web chat path, prefer ACP `mode: run` with an explicit
+        `cwd` for coding tasks. Only use persistent ACP sessions when the user
+        explicitly wants a long-lived coding session.
+      - Do not claim a tool is unavailable until you have checked `command -v`,
+        the ACP registry, or a direct smoke command.
+      - Do not reference `acp-router` or other skills unless you have verified
+        they exist on disk.
+
+      ## Available Coding CLIs
+
+      - Claude Code: `claude --version`
+      - Claude ACP harness: `claude-agent-acp --help`
+      - Codex: `codex --version`
+      - Codex ACP harness: `codex-acp --help`
+      - Gemini: `gemini --version`
+      - Kimi: `kimi --version`
+      - Copilot: `copilot --help`
+      - OpenCode: `opencode --help`
+      - Cursor: `cursor-agent --help`
+      - Droid: `droid --help`
+      - Pi ACP runtime: `pi-acp --help`
+
+      ## ACP Sessions
+
+      Preferred way to delegate coding work from voice or web chat:
+
+      - `sessions_spawn` with `runtime: "acp"`, `mode: "run"`, and explicit
+        `cwd` set to a real repo such as `/workspace/repos/cto` or
+        `/workspace/repos/openclaw-platform`
+      - Use `agentId: "claude"` or `agentId: "codex"` first for coding tasks
+      - Use persistent thread-bound ACP sessions only when the user explicitly
+        asks for a long-lived coding session or wants to monitor it in Discord
+
+      Examples:
+
+      - `{"task":"Implement the splash page","runtime":"acp","agentId":"claude","mode":"run","cwd":"/workspace/repos/cto"}`
+      - `{"task":"Smoke test the coding harness","runtime":"acp","agentId":"codex","mode":"run","cwd":"/workspace/repos/openclaw-platform"}`
+
+      For quick proof that a harness is wired correctly, a direct command check
+      is acceptable:
+
+      - `claude-agent-acp --help >/dev/null && echo ACP_OK`
+      - `codex-acp --help >/dev/null && echo ACP_OK`
+
+      ## Web and Research
+
+      - Firecrawl MCP is available to Claude Code sessions.
+      - OpenClaw web search/fetch tools are enabled for Morgan directly.
+
+    HEARTBEAT.md: |
+      # HEARTBEAT.md -- Morgan
+
+      If there is active user work, continue that work first.
+
+      If idle, keep checks lightweight:
+
+      - Verify the local gateway is healthy.
+      - Verify Discord is connected.
+      - Verify ACP harness commands still resolve on PATH.
+      - Record meaningful findings in `memory/YYYY-MM-DD.md`.
+
+      Do not start unrelated projects on your own.
+
+    MEMORY.md: |
+      # MEMORY.md -- Morgan
+
+      - This Morgan instance backs the CTO desktop avatar and chat experience.
+      - The backend runs inside the local kind cluster that CTO manages.
+      - Coding CLI delegation should prefer ACP sessions over generic shell-only
+        claims.
+      - On March 10, 2026, the local Morgan runtime was brought closer to
+        Intake parity by enabling the full tool profile, ACP runtime support,
+        and bundled coding CLIs.
+      - In the avatar flow, one-shot ACP runs are the safest default for coding
+        tasks until persistent thread-bound ACP sessions are proven stable.
+      - When asked whether a CLI works, prove it with a concrete smoke check and
+        report the result plainly.
+
+storage:
+  size: 10Gi
+  storageClass: "local-path"
+
+gateway:
+  auth:
+    token: "openclaw-internal"
+  controlUi:
+    enabled: false
+  http:
+    endpoints:
+      chatCompletions:
+        enabled: true
+      responses:
+        enabled: false
+
+memorySearch:
+  enabled: false
+
+openmemory:
+  enabled: false
+
+mem0:
+  enabled: false
+
+session:
+  scope: "per-sender"
+  dmScope: "per-channel-peer"
+  agentToAgent:
+    maxPingPongTurns: 5
+  threadBindings:
+    enabled: true
+    idleHours: 24
+    maxAgeHours: 0
+
+tools:
+  profile: "full"
+  agentToAgent:
+    enabled: true
+  elevated:
+    enabled: true
+  exec:
+    host: "gateway"
+    security: "full"
+    pathPrepend:
+      - "/usr/local/bin"
+      - "/usr/local/share/npm-global/bin"
+      - "/workspace/.local/bin"
+      - "/root/.local/bin"
+    backgroundMs: 5000
+    cleanupMs: 1800000
+    notifyOnExit: true
+    applyPatch:
+      enabled: true
+  message:
+    broadcast:
+      enabled: true
+  web:
+    search:
+      enabled: true
+    fetch:
+      enabled: true
+  acp:
+    enabled: true
+    backend: "acpx"
+    acpxVersion: "0.1.16"
+    defaultAgent: "codex"
+    allowedAgents: ["pi", "claude", "copilot", "codex", "opencode", "gemini", "kimi", "droid", "cursor"]
+    maxConcurrentSessions: 8
+    permissionMode: "approve-all"
+    nonInteractivePermissions: "deny"
+    dispatch:
+      enabled: true
+    stream:
+      coalesceIdleMs: 300
+      maxChunkChars: 1200
+    runtime:
+      ttlMinutes: 120
+    agentOverrides:
+      claude:
+        command: "claude-agent-acp"
+      codex:
+        command: "codex-acp"
+      opencode:
+        command: "opencode acp"
+      gemini:
+        command: "gemini --experimental-acp --yolo"
+      copilot:
+        command: "copilot --acp --stdio --yolo"
+      kimi:
+        command: "kimi acp"
+      droid:
+        command: "droid exec --output-format acp"
+      cursor:
+        command: "cursor-agent acp --yolo --trust"
+      pi:
+        command: "pi-acp"
+
+toolServer:
+  url: "http://cto-tools.cto.svc.cluster.local:3000/sse"
+
+claudeCode:
+  mcp:
+    servers:
+      tool-server:
+        command: "/workspace/.local/bin/tools"
+        args: []
+        cwd: "/workspace"
+
+browser:
+  enabled: false
+
+plugins:
+  memoryCore:
+    enabled: true
+
+supermemory:
+  enabled: false
+
+ssh:
+  enabled: false
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  agentRole: "intake"
+  maxPingPongTurns: 10
+  pingPongWindowMs: 300000
+  roster:
+    - { id: atlas, role: "merge-gate" }
+    - { id: blaze, role: "frontend" }
+    - { id: bolt, role: "devops" }
+    - { id: cipher, role: "security" }
+    - { id: cleo, role: "code-quality" }
+    - { id: grizz, role: "go-implementation" }
+    - { id: healer, role: "self-healing" }
+    - { id: keeper, role: "operations" }
+    - { id: rex, role: "rust-implementation" }
+    - { id: stitch, role: "code-review" }
+    - { id: tess, role: "testing" }
+
+kaniko:
+  enabled: true
+
+toolsConfig:
+  remoteTools:
+    - "argocd_*"
+    - "context7_*"
+    - "exa_*"
+    - "firecrawl_*"
+    - "github_*"
+    - "kubernetes_*"
+    - "linear_*"
+    - "loki_*"
+    - "octocode_*"
+    - "openmemory_*"
+    - "playwright_*"
+    - "shadcn_*"
+    - "tavily_*"
+
+cliBackends:
+  claude-cli:
+    command: "/usr/local/share/npm-global/bin/claude"
+  codex-cli:
+    command: "/usr/local/share/npm-global/bin/codex"
+  gemini-cli:
+    command: "/usr/local/share/npm-global/bin/gemini"
+  kimi-cli:
+    command: "/usr/local/bin/kimi"
+  cursor-cli:
+    command: "/usr/local/bin/cursor-agent"
+  opencode-cli:
+    command: "/usr/local/bin/opencode"
+  droid-cli:
+    command: "/usr/local/bin/droid"
+    args:
+      - "--json"
+    output: "json"
+
+skills:
+  external:
+    openclaw:
+      - configMapName: "openclaw-morgan-external-skills"
+        optional: true

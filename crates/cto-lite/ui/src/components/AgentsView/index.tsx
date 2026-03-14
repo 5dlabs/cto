@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { BarVisualizer } from '@/components/ui/bar-visualizer'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
@@ -113,7 +114,19 @@ function normalizeTrackDebug(input: Record<string, unknown> | undefined): Avatar
   return (input ?? {}) as AvatarTrackDebug
 }
 
-export function AgentsView() {
+interface AgentsViewProps {
+  agentId?: string
+  agentName?: string
+  projectName?: string
+  roomName?: string
+}
+
+export function AgentsView({
+  agentId = 'morgan',
+  agentName = 'Morgan',
+  projectName,
+  roomName,
+}: AgentsViewProps) {
   const avatarBrowserUrl =
     ((import.meta as { env?: Record<string, string> }).env?.VITE_MORGAN_AVATAR_BROWSER_URL as string) ??
     'http://localhost:3000'
@@ -147,12 +160,12 @@ export function AgentsView() {
     const syncLocalState = async () => {
       try {
         const [gateway, runtime, cluster] = await Promise.allSettled([
-          tauri.openclawGetLocalBridgeStatus(),
+          tauri.openclawGetLocalBridgeStatus(agentId),
           tauri.scanRuntimeEnvironment(),
           tauri.getClusterStatus(),
         ])
         const diagnostics = await tauri
-          .openclawGetMorganDiagnostics()
+          .openclawGetMorganDiagnostics(agentId)
           .catch(() => null)
 
         if (!cancelled) {
@@ -189,7 +202,7 @@ export function AgentsView() {
       cancelled = true
       window.clearInterval(poll)
     }
-  }, [])
+  }, [agentId])
 
   useEffect(() => {
     return () => {
@@ -254,7 +267,7 @@ export function AgentsView() {
     setBridgeBooting(true)
     setLastError(null)
     try {
-      const status = await tauri.openclawStartLocalBridge()
+      const status = await tauri.openclawStartLocalBridge(agentId)
       setBridgeStatus(status)
     } catch (error) {
       setLastError(String(error))
@@ -265,7 +278,7 @@ export function AgentsView() {
 
   const stopBridge = async () => {
     try {
-      const status = await tauri.openclawStopLocalBridge()
+      const status = await tauri.openclawStopLocalBridge(agentId)
       setBridgeStatus(status)
     } catch (error) {
       setLastError(String(error))
@@ -289,10 +302,10 @@ export function AgentsView() {
   }
 
   const sendSharedContext = async () => {
-    const roomName = avatarState.roomName?.trim()
+    const activeRoomName = (avatarState.roomName ?? roomName)?.trim()
     const content = sharedContextValue.trim()
 
-    if (!roomName) {
+    if (!activeRoomName) {
       setSharedContextStatus('Join the call first so CTO can target the active Morgan room.')
       return
     }
@@ -306,15 +319,15 @@ export function AgentsView() {
     setSharedContextStatus(null)
 
     try {
-      const response = await tauri.openclawSendAvatarContext(roomName, content)
+      const response = await tauri.openclawSendAvatarContext(activeRoomName, content, agentId)
       setSharedContextStatus(
         response.content === 'CONTEXT_STORED'
-          ? 'Shared with Morgan. Speak naturally and refer to “this link” or “this brief.”'
+          ? `Shared with ${agentName}. Speak naturally and refer to “this link” or “this brief.”`
           : response.content
       )
       setSharedContextValue('')
     } catch (error) {
-      setSharedContextStatus(`Morgan did not accept the shared context: ${String(error)}`)
+      setSharedContextStatus(`${agentName} did not accept the shared context: ${String(error)}`)
     } finally {
       setSharedContextSending(false)
     }
@@ -348,13 +361,13 @@ export function AgentsView() {
         : 'slate'
   const liveSessionTitle =
     !callActive
-      ? 'Morgan is off call'
+      ? `${agentName} is off call`
       : avatarState.voiceState === 'speaking'
-      ? 'Morgan is responding'
+      ? `${agentName} is responding`
       : avatarState.voiceState === 'listening'
-        ? 'Morgan is listening'
+        ? `${agentName} is listening`
         : avatarState.connectionState === 'connected'
-          ? 'Morgan is ready'
+          ? `${agentName} is ready`
           : runtimeEnvironment && !runtimeEnvironment.docker_available
             ? 'Docker is required'
             : clusterStatus && !clusterStatus.exists
@@ -368,7 +381,7 @@ export function AgentsView() {
     callActive && avatarState.connectionState === 'connected'
       ? `${avatarState.roomName ?? 'morgan'} · ${avatarState.identity ?? 'guest'}`
       : avatarState.connectionState === 'idle'
-        ? 'Start a call when you want Morgan live. Off call, he stays disconnected and does not listen.'
+      ? `Start a call when you want ${agentName} live. Off call, the agent stays disconnected and does not listen.`
       : bridgeStatus?.connected
         ? 'The live stage is ready. Start a call on the stage when you want Morgan live.'
         : runtimeEnvironment && !runtimeEnvironment.docker_available
@@ -465,40 +478,48 @@ export function AgentsView() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#090f1a] text-slate-100">
-      <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top,#10324f_0%,rgba(7,13,24,0.96)_52%,rgba(7,13,24,1)_100%)] px-6 py-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Avatar
-            size="lg"
-            className="ring-1 ring-cyan-300/20 shadow-[0_18px_44px_-28px_rgba(34,211,238,0.65)]"
-          >
-            <AvatarFallback className="bg-cyan-400/15 text-cyan-50">MO</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge label="Avatar" tone="cyan" />
-              <h1 className="text-lg font-semibold tracking-tight">Morgan</h1>
-            </div>
-            <p className="mt-1 text-sm text-slate-300">
-              Call-style surface for the local Morgan persona running in your private cluster.
-            </p>
+      <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top,#10324f_0%,rgba(7,13,24,0.96)_52%,rgba(7,13,24,1)_100%)] px-6 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {projectName ? (
+            <Badge variant="outline" className="rounded-full border-white/12 bg-white/[0.04]">
+              {projectName}
+            </Badge>
+          ) : null}
+          <div className="flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 text-slate-200">
+            <Avatar className="h-5 w-5 border border-white/10">
+              <AvatarFallback className="bg-cyan-400/15 text-[9px] text-cyan-50">MO</AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium text-slate-100">{agentName}</span>
           </div>
+          <Badge variant="secondary" className="rounded-full">
+            Video
+          </Badge>
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[minmax(0,1.2fr)_380px]">
-        <section className="min-h-0">
-          <div className="h-[min(78vh,760px)] min-h-[560px] w-full">
+      <div
+        className={`grid min-h-0 min-w-0 flex-1 gap-4 p-4 ${
+          panelMode === 'debug'
+            ? 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(320px,34vw)]'
+            : 'grid-cols-1'
+        }`}
+      >
+        <section className="min-h-0 min-w-0">
+          <div className="h-full min-h-[320px] w-full sm:min-h-[360px] xl:min-h-[440px]">
             <MorganAvatarRoom
               key={avatarSessionKey}
               compact
               autoConnect={false}
               tokenEndpoint={avatarTokenEndpoint}
+              roomName={roomName}
+              mediaMode="video"
               onStateChange={handleAvatarStateChange}
             />
           </div>
         </section>
 
-        <aside className="min-h-0 overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-b from-[#111c2f] to-[#0b1322] p-4">
+        {panelMode === 'debug' ? (
+          <aside className="min-h-0 min-w-0 overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-b from-[#111c2f] to-[#0b1322] p-4">
           <Tabs
             value={panelMode}
             onValueChange={(value) => setPanelMode(value as PanelMode)}
@@ -509,9 +530,7 @@ export function AgentsView() {
                 <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-100/70">
                   Control deck
                 </p>
-                <p className="mt-1 text-sm text-slate-300">
-                  Keep the live view clean, and push the operational noise into debug.
-                </p>
+                <p className="mt-1 text-sm text-slate-300">Live by default. Debug only when needed.</p>
               </div>
               <TabsList
                 className="rounded-full border border-white/10 bg-white/[0.05]"
@@ -544,13 +563,13 @@ export function AgentsView() {
                           </p>
                           <p className="mt-2 text-sm text-slate-200">
                             {!callActive
-                              ? 'Morgan is standing by. Start a call on the stage when you want him live.'
+                              ? `${agentName} is standing by. Start a call on the stage when you want them live.`
                               : avatarState.voiceState === 'speaking'
-                              ? 'Morgan is actively responding on the live stage.'
+                              ? `${agentName} is actively responding on the live stage.`
                               : avatarState.voiceState === 'listening'
                                 ? 'Hold the talk button while you speak.'
                                 : avatarState.connectionState === 'connected'
-                                  ? 'The call is live. Hold to talk when you want Morgan to listen.'
+                                  ? `The call is live. Hold to talk when you want ${agentName} to listen.`
                                   : 'The live stage will settle as soon as the local stack is ready.'}
                           </p>
                         </div>
@@ -599,7 +618,7 @@ export function AgentsView() {
                   />
                   <AudioVisualizerCard
                     icon={<Link2 className="h-4 w-4 text-fuchsia-200" />}
-                    label="Morgan"
+                    label={agentName}
                     detail={agentSignalDetail}
                     level={agentSignalLevel}
                     tone="violet"
@@ -624,19 +643,19 @@ export function AgentsView() {
                       text={
                         avatarState.latestUserText ||
                         (callActive
-                          ? 'Your latest utterance will appear here when Morgan hears you.'
+                          ? `Your latest utterance will appear here when ${agentName} hears you.`
                           : 'Start a call and your voice transcript will appear here.')
                       }
                     />
                     <TranscriptBlock
-                      label="Morgan"
+                      label={agentName}
                       icon={<Volume2 className="h-3.5 w-3.5 text-fuchsia-200" />}
                       tone="violet"
                       text={
                         avatarState.latestAgentText ||
                         (callActive
-                          ? 'Morgan’s latest spoken reply will appear here.'
-                          : 'Start a call and Morgan’s spoken reply will appear here.')
+                          ? `${agentName}'s latest spoken reply will appear here.`
+                          : `Start a call and ${agentName}'s spoken reply will appear here.`)
                       }
                     />
                   </div>
@@ -645,19 +664,21 @@ export function AgentsView() {
                 <GlassCard eyebrow="Shared context" title="Paste links or briefs for this call">
                   <div className="space-y-3">
                     <p className="text-sm leading-6 text-slate-300">
-                      Send Morgan the URL or structured payload here, then say the task out loud.
+                      Send the URL or structured payload here, then say the task out loud.
                       He will receive both in the same room-backed session.
                     </p>
                     <Textarea
                       value={sharedContextValue}
                       onChange={(event) => setSharedContextValue(event.target.value)}
-                      placeholder="Paste a URL, PRD snippet, or notes for Morgan to use in the current call."
+                      placeholder={`Paste a URL, PRD snippet, or notes for ${agentName} to use in the current call.`}
                       className="min-h-[112px] border-white/10 bg-black/20 text-slate-100 placeholder:text-slate-500"
                     />
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-xs text-slate-400">
                         {avatarState.roomName
                           ? `Targets room ${avatarState.roomName}.`
+                          : roomName
+                            ? `Targets room ${roomName}.`
                           : 'Start a call first, then send the pasted context.'}
                       </p>
                       <Button
@@ -671,7 +692,7 @@ export function AgentsView() {
                             Sending
                           </>
                         ) : (
-                          'Send to Morgan'
+                          `Send to ${agentName}`
                         )}
                       </Button>
                     </div>
@@ -968,6 +989,7 @@ export function AgentsView() {
             </TabsContent>
           </Tabs>
         </aside>
+        ) : null}
       </div>
     </div>
   )

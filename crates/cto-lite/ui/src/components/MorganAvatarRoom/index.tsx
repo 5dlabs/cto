@@ -4,24 +4,29 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   VideoTrack,
-  useAudioPlayback,
   useLocalParticipant,
   useRoomContext,
   useTranscriptions,
   useVoiceAssistant,
 } from '@livekit/components-react'
+import { Track } from 'livekit-client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Mic } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import {
   VoiceButton,
   type VoiceButtonState,
 } from '@/components/ui/voice-button'
 import { LiveWaveform } from '@/components/ui/live-waveform'
+import { cn } from '@/lib/utils'
 
 export type MorganAvatarState = {
   connectionState: 'idle' | 'connecting' | 'connected' | 'error'
+  callActive?: boolean
   voiceState: string
   latestUserText: string
   latestAgentText: string
+  microphoneEnabled: boolean
   audioTrackReady: boolean
   videoTrackReady: boolean
   roomName?: string
@@ -29,6 +34,20 @@ export type MorganAvatarState = {
   error?: string
   metrics?: Record<string, unknown>
   trackDebug?: Record<string, unknown>
+}
+
+type DebugEvent = {
+  at: string
+  type: string
+  detail: string
+}
+
+type DebugTranscript = {
+  at: string
+  identity: string
+  source: 'user' | 'agent'
+  text: string
+  final: boolean | null
 }
 
 type TokenResponse = {
@@ -42,14 +61,18 @@ type MorganAvatarRoomProps = {
   autoConnect?: boolean
   compact?: boolean
   tokenEndpoint: string
+  roomName?: string
+  mediaMode?: 'video' | 'voice'
   onStateChange?: (state: MorganAvatarState) => void
 }
 
 const DEFAULT_STATE: MorganAvatarState = {
   connectionState: 'idle',
+  callActive: false,
   voiceState: 'idle',
   latestUserText: '',
   latestAgentText: '',
+  microphoneEnabled: false,
   audioTrackReady: false,
   videoTrackReady: false,
 }
@@ -61,12 +84,147 @@ function emitState(
   onStateChange?.(payload)
 }
 
-function formatLatency(ms: number | null): string {
-  if (ms === null) {
-    return 'waiting'
+function pushDebugEvent(
+  current: DebugEvent[],
+  next: DebugEvent
+): DebugEvent[] {
+  return [...current, next].slice(-12)
+}
+
+function isoNow(): string {
+  return new Date().toISOString()
+}
+
+type StageTone = 'neutral' | 'emerald' | 'violet' | 'cyan'
+
+type StageChip = {
+  label: string
+  tone: StageTone
+}
+
+type StageViewModel = {
+  callHeadline: string
+  identityChip: StageChip
+  voiceChip: StageChip
+  roomChip: StageChip
+  audioChip: StageChip
+  videoChip: StageChip
+  transcriptEyebrow: string
+  transcriptText: string
+  transcriptTone: 'emerald' | 'violet'
+  placeholderCopy: string
+}
+
+function createStageViewModel({
+  callActive,
+  voiceState,
+  latestUserText,
+  latestAgentText,
+  audioTrackReady,
+  videoTrackReady,
+}: Pick<
+  MorganAvatarState,
+  | 'callActive'
+  | 'voiceState'
+  | 'latestUserText'
+  | 'latestAgentText'
+  | 'audioTrackReady'
+  | 'videoTrackReady'
+>): StageViewModel {
+  const normalizedVoiceState = voiceState.toLowerCase()
+  if (!callActive) {
+    return {
+      callHeadline: 'Off call',
+      identityChip: { label: 'Morgan', tone: 'cyan' },
+      voiceChip: { label: 'Standby', tone: 'neutral' },
+      roomChip: { label: 'Call idle', tone: 'neutral' },
+      audioChip: { label: 'Mic off', tone: 'neutral' },
+      videoChip: { label: 'Stage idle', tone: 'neutral' },
+      transcriptEyebrow: 'Ready',
+      transcriptText:
+        'Start a call when you want Morgan live. While off call, he stays disconnected and does not listen.',
+      transcriptTone: 'violet',
+      placeholderCopy: 'Morgan stays off call until you start a session.',
+    }
   }
 
-  return `${Math.round(ms)} ms`
+  const voiceChip: StageChip =
+    normalizedVoiceState === 'speaking'
+      ? { label: 'Speaking', tone: 'violet' }
+      : normalizedVoiceState === 'listening'
+        ? { label: 'Listening', tone: 'emerald' }
+        : normalizedVoiceState === 'connecting' || normalizedVoiceState === 'initializing'
+          ? { label: 'Joining', tone: 'neutral' }
+          : normalizedVoiceState === 'thinking'
+            ? { label: 'Thinking', tone: 'neutral' }
+            : { label: 'Ready', tone: 'neutral' }
+
+  const roomChip: StageChip =
+    normalizedVoiceState === 'connecting' || normalizedVoiceState === 'initializing'
+      ? { label: 'Room joining', tone: 'neutral' }
+      : { label: 'Room live', tone: 'violet' }
+
+  const audioChip: StageChip = audioTrackReady
+    ? { label: 'Audio live', tone: 'emerald' }
+    : { label: 'Audio pending', tone: 'neutral' }
+
+  const videoChip: StageChip = videoTrackReady
+    ? { label: 'Video live', tone: 'violet' }
+    : { label: 'Video pending', tone: 'neutral' }
+
+  if (latestUserText) {
+    return {
+      callHeadline: 'In call',
+      identityChip: { label: 'Morgan', tone: 'cyan' },
+      voiceChip,
+      roomChip,
+      audioChip,
+      videoChip,
+      transcriptEyebrow: 'Heard',
+      transcriptText: latestUserText,
+      transcriptTone: 'emerald',
+      placeholderCopy: 'Morgan will appear here once LemonSlice publishes video.',
+    }
+  }
+
+  if (latestAgentText && latestAgentText !== 'Morgan is ready when you are.') {
+    return {
+      callHeadline: 'In call',
+      identityChip: { label: 'Morgan', tone: 'cyan' },
+      voiceChip,
+      roomChip,
+      audioChip,
+      videoChip,
+      transcriptEyebrow: 'Morgan',
+      transcriptText: latestAgentText,
+      transcriptTone: 'violet',
+      placeholderCopy: 'Morgan will appear here once LemonSlice publishes video.',
+    }
+  }
+
+  return {
+    callHeadline: 'In call',
+    identityChip: { label: 'Morgan', tone: 'cyan' },
+    voiceChip,
+    roomChip,
+    audioChip,
+    videoChip,
+    transcriptEyebrow:
+      normalizedVoiceState === 'connecting' || normalizedVoiceState === 'initializing'
+        ? 'Joining'
+        : normalizedVoiceState === 'listening'
+          ? 'Listening'
+          : 'Ready',
+    transcriptText:
+      normalizedVoiceState === 'connecting' || normalizedVoiceState === 'initializing'
+        ? 'Bringing Morgan into the room.'
+        : normalizedVoiceState === 'listening'
+          ? 'Hold to talk when you want Morgan to listen.'
+          : 'Hold to talk whenever you want Morgan to listen.',
+    transcriptTone:
+      normalizedVoiceState === 'listening' ? 'emerald' : 'violet',
+    placeholderCopy: 'Morgan will appear here once LemonSlice publishes video.',
+  }
 }
 
 function StatusPill({
@@ -74,88 +232,201 @@ function StatusPill({
   tone = 'neutral',
 }: {
   label: string
-  tone?: 'neutral' | 'emerald' | 'violet'
+  tone?: StageTone
 }) {
   const toneClass =
-    tone === 'emerald'
-      ? 'border-emerald-400/35 bg-emerald-400/12 text-emerald-100'
-      : tone === 'violet'
-        ? 'border-fuchsia-400/35 bg-fuchsia-400/12 text-fuchsia-100'
-        : 'border-white/12 bg-white/10 text-slate-200'
+    tone === 'cyan'
+      ? 'border-cyan-300/30 bg-cyan-400/12 text-cyan-100'
+      : tone === 'emerald'
+        ? 'border-emerald-400/35 bg-emerald-400/12 text-emerald-100'
+        : tone === 'violet'
+          ? 'border-fuchsia-400/35 bg-fuchsia-400/12 text-fuchsia-100'
+          : 'border-white/12 bg-slate-950/72 text-slate-200'
 
   return (
-    <span
-      className={`rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] ${toneClass}`}
+    <Badge
+      variant="outline"
+      className={cn(
+        'rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] shadow-[0_10px_30px_-24px_rgba(15,23,42,0.95)] backdrop-blur-xl sm:text-[11px]',
+        toneClass
+      )}
     >
       {label}
-    </span>
+    </Badge>
   )
 }
 
-function ActivityGlyph({
-  active,
-  tone,
+function StageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-slate-950/85 shadow-[0_30px_110px_-62px_rgba(34,211,238,0.52)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#12324a_0%,rgba(3,7,18,0.44)_28%,rgba(2,6,23,0.96)_100%)]" />
+      <div className="absolute inset-x-[22%] top-[-10%] h-[18%] rounded-full bg-cyan-300/10 blur-[92px]" />
+      <div className="relative z-[1] h-[min(58vh,42rem)] min-h-[18rem] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black sm:h-[min(62vh,46rem)] sm:min-h-[22rem]">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function StageStateBadge({
+  callActive,
+  voiceState,
 }: {
-  active: boolean
-  tone: 'emerald' | 'violet'
+  callActive: boolean
+  voiceState: string
 }) {
-  const activeClass =
-    tone === 'emerald' ? 'bg-emerald-300/90' : 'bg-fuchsia-300/90'
-  const idleClass = 'bg-white/10'
+  const normalized = voiceState.toLowerCase()
+  const chip = !callActive
+    ? { label: 'Off call', tone: 'neutral' as StageTone }
+    : normalized === 'speaking'
+      ? { label: 'Speaking', tone: 'violet' as StageTone }
+      : normalized === 'listening'
+        ? { label: 'Listening', tone: 'emerald' as StageTone }
+        : normalized === 'connecting' || normalized === 'initializing'
+          ? { label: 'Joining', tone: 'neutral' as StageTone }
+          : normalized === 'thinking'
+            ? { label: 'Thinking', tone: 'neutral' as StageTone }
+            : { label: 'Ready', tone: 'cyan' as StageTone }
 
   return (
-    <div className="flex items-end gap-1">
-      {[0, 1, 2, 3, 4].map((bar) => (
-        <span
-          key={bar}
-          className={`w-1.5 rounded-full transition-all duration-200 ${
-            active ? activeClass : idleClass
-          }`}
-          style={{
-            height: `${active ? 12 + ((bar % 3) + 1) * 8 : 8}px`,
-            opacity: active ? 0.65 + bar * 0.06 : 0.5,
-          }}
+    <div className="absolute left-4 top-4 z-20 sm:left-5 sm:top-5">
+      <StatusPill label={chip.label} tone={chip.tone} />
+    </div>
+  )
+}
+
+function StageControlDock({
+  callActive,
+  hasVideo,
+  mediaMode,
+  voiceState,
+  onEndCall,
+  compact,
+}: {
+  callActive: boolean
+  hasVideo: boolean
+  mediaMode: 'video' | 'voice'
+  voiceState: string
+  onEndCall: () => void
+  compact: boolean
+}) {
+  const waitingLabel = !callActive
+    ? mediaMode === 'voice'
+      ? 'Start a call when you want Morgan live.'
+      : 'Start a call when you want Morgan on screen.'
+    : voiceState === 'connecting' || voiceState === 'initializing'
+      ? 'Joining the room...'
+      : voiceState === 'speaking'
+        ? 'Morgan is speaking'
+        : 'Mic live'
+
+  return (
+    <div className="absolute inset-x-4 bottom-4 z-20 flex flex-col items-center gap-3 sm:inset-x-5 sm:bottom-5">
+      <div className="rounded-full border border-white/10 bg-slate-950/78 px-4 py-2 text-[11px] uppercase tracking-[0.24em] text-slate-200 shadow-[0_18px_48px_-32px_rgba(15,23,42,0.92)] backdrop-blur-xl">
+        {waitingLabel}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-3 rounded-[1.6rem] border border-white/10 bg-slate-950/82 px-3 py-3 shadow-[0_26px_70px_-40px_rgba(15,23,42,0.98)] backdrop-blur-xl sm:px-4">
+        {callActive ? <CallMicButton compact={compact} /> : null}
+        <CallSessionButton
+          compact={compact}
+          active={callActive}
+          onClick={onEndCall}
         />
-      ))}
+      </div>
+      {callActive && mediaMode === 'video' && !hasVideo ? (
+        <div className="rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs text-slate-300 backdrop-blur-xl">
+          Morgan camera is warming up
+        </div>
+      ) : null}
     </div>
   )
 }
 
 function AvatarTelemetry({
   compact,
+  onEndCall,
   connectionRequestedAt,
   roomConnectedAt,
+  mediaMode,
   onStateChange,
 }: {
   compact: boolean
+  onEndCall: () => void
   connectionRequestedAt: number | null
   roomConnectedAt: number | null
+  mediaMode: 'video' | 'voice'
   onStateChange?: (state: MorganAvatarState) => void
 }) {
   const room = useRoomContext()
   const { state, audioTrack, videoTrack, agentTranscriptions } = useVoiceAssistant()
+  const { isMicrophoneEnabled } = useLocalParticipant()
   const allTranscriptions = useTranscriptions({ room })
   const [audioReadyAt, setAudioReadyAt] = useState<number | null>(null)
   const [videoReadyAt, setVideoReadyAt] = useState<number | null>(null)
   const [speakingAt, setSpeakingAt] = useState<number | null>(null)
+  const [debugEvents, setDebugEvents] = useState<DebugEvent[]>([])
+  const previousVoiceStateRef = useRef<string | null>(null)
+  const previousMicEnabledRef = useRef<boolean | null>(null)
+  const previousRoomStateRef = useRef<string | null>(null)
 
-  const userTranscriptions = useMemo(
-    () =>
-      allTranscriptions.filter(
-        (transcription) =>
-          transcription.participantInfo.identity === room.localParticipant.identity
-      ),
-    [allTranscriptions, room.localParticipant.identity]
-  )
-  const latestUserText =
-    userTranscriptions.length > 0
-      ? userTranscriptions[userTranscriptions.length - 1]?.text?.trim() ?? ''
-      : ''
+  const latestUserText = useMemo(() => {
+    const preferredIdentity = room.localParticipant.identity
+    const userTranscript = [...allTranscriptions]
+      .reverse()
+      .find((transcription) => {
+        const identity = transcription.participantInfo.identity ?? ''
+        return identity === preferredIdentity || identity.startsWith('user-')
+      })
+
+    return userTranscript?.text?.trim() ?? ''
+  }, [allTranscriptions, room.localParticipant.identity])
   const latestTranscript =
     agentTranscriptions.length > 0
       ? agentTranscriptions[agentTranscriptions.length - 1]?.text?.trim() ??
         'Morgan is ready when you are.'
       : 'Morgan is ready when you are.'
+  const recentTranscriptEvents = useMemo<DebugTranscript[]>(() => {
+    const userEvents = allTranscriptions.map((transcription) => ({
+      at: isoNow(),
+      identity: transcription.participantInfo.identity ?? 'unknown',
+      source: 'user' as const,
+      text: transcription.text?.trim() ?? '',
+      final:
+        typeof (transcription as { final?: boolean }).final === 'boolean'
+          ? (transcription as { final?: boolean }).final ?? null
+          : null,
+    }))
+    const agentEvents = agentTranscriptions.map((transcription) => ({
+      at: isoNow(),
+      identity: 'morgan-avatar',
+      source: 'agent' as const,
+      text: transcription.text?.trim() ?? '',
+      final:
+        typeof (transcription as { final?: boolean }).final === 'boolean'
+          ? (transcription as { final?: boolean }).final ?? null
+          : null,
+    }))
+
+    return [...userEvents, ...agentEvents]
+      .filter((entry) => entry.text.length > 0)
+      .slice(-10)
+  }, [agentTranscriptions, allTranscriptions])
+
+  useEffect(() => {
+    const roomState = String(room.state)
+    if (previousRoomStateRef.current === roomState) {
+      return
+    }
+
+    previousRoomStateRef.current = roomState
+    setDebugEvents((current) =>
+      pushDebugEvent(current, {
+        at: isoNow(),
+        type: 'room-state',
+        detail: roomState,
+      })
+    )
+  }, [room.state])
 
   useEffect(() => {
     if (audioTrack && audioReadyAt === null) {
@@ -184,8 +455,68 @@ function AvatarTelemetry({
     }
   }, [speakingAt, state])
 
+  useEffect(() => {
+    if (previousVoiceStateRef.current === String(state)) {
+      return
+    }
+
+    previousVoiceStateRef.current = String(state)
+    setDebugEvents((current) =>
+      pushDebugEvent(current, {
+        at: isoNow(),
+        type: 'voice-state',
+        detail: String(state),
+      })
+    )
+  }, [state])
+
+  useEffect(() => {
+    if (previousMicEnabledRef.current === isMicrophoneEnabled) {
+      return
+    }
+
+    previousMicEnabledRef.current = isMicrophoneEnabled
+    setDebugEvents((current) =>
+      pushDebugEvent(current, {
+        at: isoNow(),
+        type: 'mic-publication',
+        detail: isMicrophoneEnabled ? 'enabled' : 'disabled',
+      })
+    )
+  }, [isMicrophoneEnabled])
+
+  useEffect(() => {
+    if (!latestUserText) {
+      return
+    }
+
+    setDebugEvents((current) =>
+      pushDebugEvent(current, {
+        at: isoNow(),
+        type: 'user-transcript',
+        detail: latestUserText,
+      })
+    )
+  }, [latestUserText])
+
+  useEffect(() => {
+    if (!latestTranscript || latestTranscript === 'Morgan is ready when you are.') {
+      return
+    }
+
+    setDebugEvents((current) =>
+      pushDebugEvent(current, {
+        at: isoNow(),
+        type: 'agent-transcript',
+        detail: latestTranscript,
+      })
+    )
+  }, [latestTranscript])
+
   const trackDebug = useMemo(() => {
     return {
+      roomState: String(room.state),
+      microphoneEnabled: isMicrophoneEnabled,
       selectedAudioTrack: audioTrack
         ? {
             participant: audioTrack.participant.identity,
@@ -221,11 +552,25 @@ function AvatarTelemetry({
           kind: publication.kind,
           subscribed: publication.isSubscribed,
           muted: publication.isMuted,
-          enabled: publication.isEnabled,
+            enabled: publication.isEnabled,
         })),
       })),
+      localMicrophoneTrack: room.localParticipant.getTrackPublication(Track.Source.Microphone)
+        ? {
+            sid:
+              room.localParticipant.getTrackPublication(Track.Source.Microphone)?.trackSid ?? null,
+            source:
+              room.localParticipant.getTrackPublication(Track.Source.Microphone)?.source ?? null,
+            muted:
+              room.localParticipant.getTrackPublication(Track.Source.Microphone)?.isMuted ?? null,
+            enabled:
+              room.localParticipant.getTrackPublication(Track.Source.Microphone)?.isEnabled ?? null,
+          }
+        : null,
+      recentTranscripts: recentTranscriptEvents,
+      recentEvents: debugEvents,
     }
-  }, [audioTrack, room, videoTrack])
+  }, [audioTrack, debugEvents, isMicrophoneEnabled, recentTranscriptEvents, room, videoTrack])
 
   const metrics = useMemo(() => {
     return {
@@ -247,24 +592,69 @@ function AvatarTelemetry({
           ? speakingAt - connectionRequestedAt
           : null,
       agentState: state,
+      roomState: String(room.state),
+      microphoneEnabled: isMicrophoneEnabled,
       latestTranscript,
     }
   }, [
     audioReadyAt,
     connectionRequestedAt,
+    isMicrophoneEnabled,
     latestTranscript,
+    room.state,
     roomConnectedAt,
     speakingAt,
     state,
     videoReadyAt,
   ])
+  const stageView = useMemo(
+    () =>
+      createStageViewModel({
+        callActive: true,
+        voiceState: String(state),
+        latestUserText,
+        latestAgentText: latestTranscript,
+        audioTrackReady: Boolean(audioTrack),
+        videoTrackReady: Boolean(videoTrack),
+      }),
+    [audioTrack, latestTranscript, latestUserText, state, videoTrack]
+  )
+  const voiceStage = (
+    <div className="flex h-full items-center justify-center px-8">
+      <div className="w-full max-w-[27rem] rounded-[2rem] border border-white/10 bg-slate-950/72 p-6 shadow-[0_24px_70px_-42px_rgba(34,211,238,0.4)] backdrop-blur-xl">
+        <div className="mx-auto flex size-24 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-400/10 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_20px_80px_-40px_rgba(34,211,238,0.75)]">
+          <div className="size-16 rounded-full bg-linear-to-br from-cyan-200/90 via-cyan-300/70 to-fuchsia-300/55 blur-[1px]" />
+        </div>
+        <p className="mt-6 text-center text-[11px] uppercase tracking-[0.34em] text-cyan-100/70">
+          Voice channel
+        </p>
+        <p className="mt-3 text-center text-sm leading-7 text-slate-300">
+          {stageView.transcriptText}
+        </p>
+        <div className="mt-5 overflow-hidden rounded-[1.2rem] border border-white/8 bg-black/30 px-3 py-3">
+          <LiveWaveform
+            active={String(state) === 'listening' || isMicrophoneEnabled}
+            processing={String(state) === 'thinking' || String(state) === 'connecting'}
+            mode="static"
+            height={46}
+            fadeEdges={false}
+            barWidth={4}
+            barGap={2}
+            className="h-11 rounded-[0.9rem] bg-transparent"
+          />
+        </div>
+      </div>
+    </div>
+  )
 
   useEffect(() => {
     emitState(onStateChange, {
       connectionState: 'connected',
+      callActive: true,
       voiceState: String(state),
       latestUserText,
       latestAgentText: latestTranscript,
+      microphoneEnabled: isMicrophoneEnabled,
       audioTrackReady: Boolean(audioTrack),
       videoTrackReady: Boolean(videoTrack),
       roomName: room.name || undefined,
@@ -277,6 +667,7 @@ function AvatarTelemetry({
     latestTranscript,
     latestUserText,
     metrics,
+    isMicrophoneEnabled,
     onStateChange,
     room.localParticipant.identity,
     room.name,
@@ -286,104 +677,38 @@ function AvatarTelemetry({
   ])
 
   return (
-    <section className="grid gap-5">
-      <div className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-black/30 shadow-[0_30px_120px_-48px_rgba(14,165,233,0.75)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#155e75_0%,rgba(2,6,23,0.78)_34%,rgba(2,6,23,0.96)_100%)]" />
-        <div className="absolute inset-x-[18%] top-[-14%] h-[32%] rounded-full bg-cyan-300/14 blur-[110px]" />
-        <div className="absolute inset-x-[26%] bottom-[-10%] h-[26%] rounded-full bg-fuchsia-400/10 blur-[120px]" />
-
-        <div className="absolute left-5 top-5 z-10 flex flex-wrap gap-2">
-          <StatusPill label="Morgan" />
-          <StatusPill
-            label={String(state)}
-            tone={state === 'speaking' ? 'violet' : state === 'listening' ? 'emerald' : 'neutral'}
-          />
-          <StatusPill
-            label={audioTrack ? 'audio live' : 'audio pending'}
-            tone={audioTrack ? 'emerald' : 'neutral'}
-          />
-          <StatusPill
-            label={videoTrack ? 'video live' : 'video pending'}
-            tone={videoTrack ? 'violet' : 'neutral'}
-          />
-        </div>
-
-        <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 p-5">
-          <div className="max-w-[62%] rounded-[1.6rem] border border-white/10 bg-slate-950/70 px-4 py-3 backdrop-blur-md">
-            <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-100/75">
-              {state === 'listening' ? 'Listening' : 'Live session'}
-            </p>
-            <div className="mt-3 flex items-center gap-3 text-sm text-slate-100">
-              <ActivityGlyph
-                active={state === 'listening' || Boolean(latestUserText)}
-                tone="emerald"
-              />
-                <span>
-                {latestUserText ||
-                  (state === 'connecting'
-                    ? 'Joining the room'
-                    : 'Waiting for your first turn')}
-              </span>
-            </div>
-            <div className="mt-4 overflow-hidden rounded-[1.15rem] border border-white/8 bg-black/30 px-3 py-2">
-              <LiveWaveform
-                active={false}
-                processing={state !== 'idle'}
-                mode="static"
-                height={28}
-                fadeEdges={false}
-                barWidth={3}
-                barGap={2}
-                className="h-7 rounded-[0.9rem] bg-transparent"
+    <section className="grid h-full">
+      <StageShell>
+        <StageStateBadge callActive voiceState={String(state)} />
+        <div className="h-full w-full">
+          {mediaMode === 'voice' ? (
+            voiceStage
+          ) : videoTrack ? (
+            <div className="morgan-stage-video relative h-full w-full overflow-hidden">
+              <div className="absolute inset-0 bg-radial-[circle_at_center] from-cyan-400/10 via-transparent to-transparent" />
+              <VideoTrack
+                trackRef={videoTrack}
+                className="h-full w-full"
               />
             </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-3">
-            <VoiceEntryButton compact />
-            <div className="flex flex-wrap justify-end gap-2">
-              <div className="rounded-full border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-slate-200 backdrop-blur-md">
-                Audio{' '}
-                {formatLatency(
-                  connectionRequestedAt !== null && audioReadyAt
-                    ? audioReadyAt - connectionRequestedAt
-                    : null
-                )}
-              </div>
-              <div className="rounded-full border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-slate-200 backdrop-blur-md">
-                Room{' '}
-                {formatLatency(
-                  connectionRequestedAt !== null && roomConnectedAt
-                    ? roomConnectedAt - connectionRequestedAt
-                    : null
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="aspect-[10/13] w-full bg-linear-to-b from-slate-900 via-slate-950 to-black">
-          {videoTrack ? (
-            <VideoTrack
-              trackRef={videoTrack}
-              className="h-full w-full scale-[1.06] object-cover object-[center_18%]"
-            />
           ) : (
             <div className="flex h-full items-center justify-center px-8 text-center text-sm text-slate-300">
-              {state === 'connecting'
-                ? 'Connecting Morgan to the room.'
-                : 'Morgan will appear here as soon as LemonSlice joins the session.'}
+              {stageView.placeholderCopy}
             </div>
           )}
         </div>
-      </div>
-
-      {!compact ? null : (
-        <div className="rounded-[1.6rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-          Press <span className="font-medium text-white">Talk</span> once to enter the call,
-          unlock audio, and arm your mic.
-        </div>
-      )}
+        <StageControlDock
+          callActive
+          hasVideo={Boolean(videoTrack)}
+          mediaMode={mediaMode}
+          voiceState={String(state)}
+          compact={compact}
+          onEndCall={() => {
+            void room.disconnect()
+            onEndCall()
+          }}
+        />
+      </StageShell>
     </section>
   )
 }
@@ -392,13 +717,51 @@ function AssistantAudioRenderer() {
   return <RoomAudioRenderer />
 }
 
-function VoiceEntryButton({ compact }: { compact: boolean }) {
-  const { canPlayAudio, startAudio } = useAudioPlayback()
-  const { isMicrophoneEnabled, localParticipant, lastMicrophoneError } =
-    useLocalParticipant()
-  const [busy, setBusy] = useState(false)
+function AutoEnableMic() {
+  const room = useRoomContext()
+  const { isMicrophoneEnabled } = useLocalParticipant()
+  const attemptedRef = useRef(false)
 
-  const buttonState: VoiceButtonState = busy
+  useEffect(() => {
+    if (String(room.state).toLowerCase() !== 'connected') {
+      attemptedRef.current = false
+      return
+    }
+
+    if (attemptedRef.current || isMicrophoneEnabled) {
+      return
+    }
+
+    attemptedRef.current = true
+    void room.localParticipant.setMicrophoneEnabled(true).catch((error) => {
+      console.error('Auto-enable microphone error', error)
+      attemptedRef.current = false
+    })
+  }, [isMicrophoneEnabled, room])
+
+  return null
+}
+
+function CallMicButton({ compact }: { compact: boolean }) {
+  const room = useRoomContext()
+  const { isMicrophoneEnabled, lastMicrophoneError } = useLocalParticipant()
+  const [pending, setPending] = useState(false)
+
+  const setMic = useCallback(
+    async (enabled: boolean) => {
+      setPending(true)
+      try {
+        await room.localParticipant.setMicrophoneEnabled(enabled)
+      } catch (error) {
+        console.error('Call microphone toggle error', error)
+      } finally {
+        setPending(false)
+      }
+    },
+    [room]
+  )
+
+  const state: VoiceButtonState = pending
     ? 'processing'
     : lastMicrophoneError
       ? 'error'
@@ -406,36 +769,67 @@ function VoiceEntryButton({ compact }: { compact: boolean }) {
         ? 'recording'
         : 'idle'
 
-  const label = isMicrophoneEnabled ? 'In call' : 'Talk'
-  const trailing = busy ? 'Joining' : isMicrophoneEnabled ? 'Live' : 'Press'
-
   return (
     <VoiceButton
-      state={buttonState}
-      label={label}
-      trailing={trailing}
-      onClick={() => {
-        void (async () => {
-          setBusy(true)
-          try {
-            if (!canPlayAudio) {
-              await startAudio()
-            }
-            await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)
-          } finally {
-            setBusy(false)
-          }
-        })()
-      }}
+      state={state}
+      label={isMicrophoneEnabled ? 'Mute' : 'Unmute'}
+      trailing={pending ? '...' : isMicrophoneEnabled ? 'Live' : 'Muted'}
       title={lastMicrophoneError?.message}
       variant="ghost"
-      className={`border px-1.5 ${
+      className={`border px-2 ${
         isMicrophoneEnabled
-          ? 'border-emerald-400/35 bg-emerald-400/12 text-emerald-100 hover:bg-emerald-400/18'
-          : 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/15'
-      } ${compact ? 'h-10 min-w-[124px]' : 'h-11 min-w-[156px]'}`}
+          ? 'border-cyan-300/40 bg-cyan-400/14 text-cyan-50 hover:bg-cyan-400/18'
+          : 'border-white/12 bg-slate-950/72 text-slate-100 hover:bg-white/10'
+      } ${compact ? 'h-12 min-w-[188px]' : 'h-14 min-w-[220px]'}`}
       waveformClassName={
         isMicrophoneEnabled
+          ? 'border-cyan-300/30 bg-cyan-950/40'
+          : 'border-white/12 bg-slate-950/40'
+      }
+      onClick={(event) => {
+        event.preventDefault()
+        void setMic(!isMicrophoneEnabled)
+      }}
+    />
+  )
+}
+
+function CallSessionButton({
+  compact,
+  active,
+  pending = false,
+  error = false,
+  onClick,
+}: {
+  compact: boolean
+  active: boolean
+  pending?: boolean
+  error?: boolean
+  onClick: () => void
+}) {
+  const resolvedState: VoiceButtonState = pending
+    ? 'processing'
+    : error
+      ? 'error'
+      : active
+        ? 'recording'
+        : 'idle'
+  const label = active ? 'End call' : 'Start call'
+  const trailing = pending ? 'Joining' : active ? 'Live' : 'Connect'
+  return (
+    <VoiceButton
+      state={resolvedState}
+      label={label}
+      trailing={trailing}
+      onClick={onClick}
+      variant="ghost"
+      className={`border px-2 ${
+        active
+          ? 'border-emerald-400/35 bg-emerald-400/12 text-emerald-100 hover:bg-emerald-400/18'
+          : 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/15'
+      } ${compact ? 'h-12 min-w-[168px]' : 'h-14 min-w-[188px]'}`}
+      waveformClassName={
+        active
           ? 'border-emerald-300/30 bg-emerald-950/40'
           : 'border-cyan-300/20 bg-cyan-950/30'
       }
@@ -443,44 +837,12 @@ function VoiceEntryButton({ compact }: { compact: boolean }) {
   )
 }
 
-function SessionControls({
-  compact,
-  onReset,
-}: {
-  compact: boolean
-  onReset: () => void
-}) {
-  const room = useRoomContext()
-
-  const disconnect = useCallback(async () => {
-    await room.disconnect()
-    onReset()
-  }, [onReset, room])
-
-  if (compact) {
-    return null
-  }
-
-  return (
-    <div className="mt-6 flex flex-wrap items-center gap-3">
-      <VoiceEntryButton compact={compact} />
-      <button
-        type="button"
-        onClick={() => {
-          void disconnect()
-        }}
-        className="rounded-full border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
-      >
-        Disconnect
-      </button>
-    </div>
-  )
-}
-
 export function MorganAvatarRoom({
-  autoConnect = true,
+  autoConnect = false,
   compact = true,
   tokenEndpoint,
+  roomName,
+  mediaMode = 'video',
   onStateChange,
 }: MorganAvatarRoomProps) {
   const [connection, setConnection] = useState<TokenResponse | null>(null)
@@ -505,7 +867,7 @@ export function MorganAvatarRoom({
     const response = await fetch(tokenEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify(roomName ? { roomName } : {}),
     })
 
     if (!response.ok) {
@@ -515,7 +877,7 @@ export function MorganAvatarRoom({
 
     const payload = (await response.json()) as TokenResponse
     setConnection(payload)
-  }, [tokenEndpoint])
+  }, [roomName, tokenEndpoint])
 
   const failEmbeddedMedia = useCallback(
     (message: string) => {
@@ -607,26 +969,40 @@ export function MorganAvatarRoom({
   if (!connection) {
     return (
       <section className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-slate-950/80 shadow-[0_28px_120px_-52px_rgba(14,165,233,0.75)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#155e75_0%,rgba(2,6,23,0.82)_30%,rgba(2,6,23,0.98)_100%)]" />
-        <div className="relative flex min-h-[760px] items-center justify-center px-8 py-12 text-center">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#12324a_0%,rgba(2,6,23,0.82)_30%,rgba(2,6,23,0.98)_100%)]" />
+        <div className="absolute inset-0 backdrop-blur-[2px]" />
+        <div className="relative flex min-h-[24rem] items-center justify-center px-6 py-10 text-center sm:min-h-[28rem] lg:px-8 lg:py-12">
           <div className="max-w-md">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-400/10">
-              <div className="h-10 w-10 rounded-full bg-cyan-300/80 blur-[1px]" />
+              <Mic className="h-7 w-7 text-cyan-100" />
             </div>
             <p className="mt-8 text-[11px] uppercase tracking-[0.34em] text-cyan-200/70">
-              Morgan avatar
+              {mediaMode === 'voice' ? 'Morgan voice' : 'Morgan avatar'}
             </p>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">
               {error
                 ? 'Morgan could not join the room.'
                 : connectionRequestedAt !== null
-                  ? 'Bringing Morgan online.'
-                  : 'Preparing Morgan.'}
+                  ? 'Starting the call.'
+                  : 'Morgan is off call.'}
             </h2>
             <p className="mt-4 text-sm leading-7 text-slate-300">
               {error ??
-                'Connecting LiveKit, LemonSlice, and the Morgan voice session inside CTO.'}
+                (connectionRequestedAt !== null
+                  ? 'Connecting the live Morgan session.'
+                  : 'Start a call when you want Morgan live. While off call, the mic stays off and the room is disconnected.')}
             </p>
+            <div className="mt-8 flex justify-center">
+              <CallSessionButton
+                compact={compact}
+                active={false}
+                pending={connectionRequestedAt !== null}
+                error={Boolean(error)}
+                onClick={() => {
+                  void handleConnect()
+                }}
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -646,13 +1022,17 @@ export function MorganAvatarRoom({
       onMediaDeviceFailure={handleMediaDeviceFailure}
       className="grid gap-5"
     >
+      <AutoEnableMic />
       <AvatarTelemetry
         compact={compact}
+        onEndCall={() => {
+          void reset()
+        }}
         connectionRequestedAt={connectionRequestedAt}
         roomConnectedAt={roomConnectedAt}
+        mediaMode={mediaMode}
         onStateChange={onStateChange}
       />
-      <SessionControls compact={compact} onReset={reset} />
       <AssistantAudioRenderer />
     </LiveKitRoom>
   )

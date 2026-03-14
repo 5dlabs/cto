@@ -66,7 +66,7 @@ agent:
   # -- Display name (e.g., "Metal", "Trader", "Forge")
   name: ""
   # -- Primary model for the agent runtime.
-  model: "anthropic/claude-sonnet-4-20250514"
+  model: "anthropic/claude-3-5-haiku-latest"
   # -- Heartbeat interval
   heartbeat:
     every: "15m"
@@ -296,9 +296,9 @@ gateway:
 # Model Fallback Configuration
 # =============================================================================
 modelDefaults:
-  primary: "anthropic/claude-sonnet-4-20250514"
+  primary: "anthropic/claude-3-5-haiku-latest"
   fallbacks:
-    - "anthropic/claude-3-5-haiku-latest"
+    - "anthropic/claude-sonnet-4-20250514"
     - "openai-api/gpt-5.4"
     - "openai-api/gpt-5.3-codex"
     - "anthropic/claude-opus-4-6-20260201"

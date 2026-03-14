@@ -12,6 +12,7 @@ pub mod logs;
 pub mod mcp;
 pub mod openclaw;
 pub mod runtime;
+pub mod studio;
 pub mod tunnel;
 pub mod updates;
 pub mod workflow;

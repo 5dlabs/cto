@@ -2,29 +2,19 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
-import { LiveWaveform } from '@/components/ui/live-waveform'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Separator } from '@/components/ui/separator'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   AlertCircle,
+  AudioLines,
   Bot,
   CheckCircle2,
   Loader2,
   Plus,
   Send,
   User,
-  Wifi,
-  WifiOff,
-  Wrench,
 } from 'lucide-react'
 import * as tauri from '@/lib/tauri'
+import { getAgentBranding } from '@/lib/agent-branding'
 
 const CHAT_SESSION_STORAGE_KEY = 'cto.morganChatSessionId'
 
@@ -57,7 +47,13 @@ interface AgentStatus {
   message: string
 }
 
-type GatewayState = 'connecting' | 'online' | 'offline'
+interface AgentChatProps {
+  sessionId?: string
+  agentId?: string
+  agentName?: string
+  projectName?: string
+  onOpenVoice?: () => void
+}
 
 function createSessionId(): string {
   return crypto.randomUUID()
@@ -84,11 +80,11 @@ function persistSessionId(sessionId: string) {
   }
 }
 
-function buildGreeting(): ChatMessage {
+function buildGreeting(agentName: string): ChatMessage {
   return {
     id: crypto.randomUUID(),
     role: 'agent',
-    content: 'Morgan is ready on your local cluster. Ask for anything.',
+    content: `${agentName} is ready.`,
     timestamp: new Date(),
   }
 }
@@ -107,17 +103,23 @@ function mapHistoryMessage(
   }
 }
 
-export function AgentChat() {
+export function AgentChat({
+  sessionId: externalSessionId,
+  agentId = 'morgan',
+  agentName = 'Morgan',
+  projectName,
+  onOpenVoice,
+}: AgentChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [agentStatus, setAgentStatus] = useState<AgentStatus>({
     state: 'idle',
     message: '',
   })
-  const [gatewayState, setGatewayState] = useState<GatewayState>('connecting')
-  const [gatewayVersion, setGatewayVersion] = useState<string | null>(null)
   const [historyLoaded, setHistoryLoaded] = useState(false)
-  const [sessionId, setSessionId] = useState<string>(() => getPersistedSessionId())
+  const [sessionId, setSessionId] = useState<string>(() =>
+    externalSessionId ?? getPersistedSessionId()
+  )
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -131,16 +133,14 @@ export function AgentChat() {
     inputRef.current?.focus()
   }, [])
 
-  const syncGatewayStatus = useCallback(async () => {
-    try {
-      const status = await tauri.openclawGetStatus()
-      setGatewayState(status.connected ? 'online' : 'offline')
-      setGatewayVersion(status.version ?? null)
-    } catch {
-      setGatewayState('offline')
-      setGatewayVersion(null)
+  useEffect(() => {
+    if (externalSessionId && externalSessionId !== sessionId) {
+      setSessionId(externalSessionId)
+      setMessages([])
+      setInputValue('')
+      setAgentStatus({ state: 'idle', message: '' })
     }
-  }, [])
+  }, [externalSessionId, sessionId])
 
   useEffect(() => {
     let cancelled = false
@@ -156,14 +156,14 @@ export function AgentChat() {
         if (history.length > 0) {
           setMessages(history.map((message, index) => mapHistoryMessage(message, index, history.length)))
         } else {
-          setMessages([buildGreeting()])
+          setMessages([buildGreeting(agentName)])
         }
       } catch (error) {
         if (cancelled) {
           return
         }
         setMessages([
-          buildGreeting(),
+          buildGreeting(agentName),
           {
             id: crypto.randomUUID(),
             role: 'system',
@@ -183,28 +183,7 @@ export function AgentChat() {
     return () => {
       cancelled = true
     }
-  }, [sessionId])
-
-  useEffect(() => {
-    let cancelled = false
-
-    const refresh = async () => {
-      if (cancelled) {
-        return
-      }
-      await syncGatewayStatus()
-    }
-
-    void refresh()
-    const intervalId = window.setInterval(() => {
-      void refresh()
-    }, 5000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(intervalId)
-    }
-  }, [syncGatewayStatus])
+  }, [agentName, sessionId])
 
   const addMessage = useCallback(
     (
@@ -228,13 +207,16 @@ export function AgentChat() {
   )
 
   const startNewThread = useCallback(() => {
+    if (externalSessionId) {
+      return
+    }
     const nextSessionId = createSessionId()
     persistSessionId(nextSessionId)
     setSessionId(nextSessionId)
     setMessages([])
     setInputValue('')
     setAgentStatus({ state: 'idle', message: '' })
-  }, [])
+  }, [externalSessionId])
 
   const sendMessage = useCallback(async () => {
     const text = inputValue.trim()
@@ -242,11 +224,10 @@ export function AgentChat() {
 
     setInputValue('')
     addMessage('user', text)
-    setAgentStatus({ state: 'thinking', message: 'Morgan is thinking...' })
+    setAgentStatus({ state: 'thinking', message: `${agentName} is thinking...` })
 
     try {
-      const response = await tauri.openclawSendMessage(sessionId, text)
-      setGatewayState('online')
+      const response = await tauri.openclawSendMessage(sessionId, text, agentId)
       setAgentStatus({ state: 'idle', message: '' })
       addMessage('agent', response.content, response.action, {
         latencyMs: response.latencyMs,
@@ -254,11 +235,9 @@ export function AgentChat() {
       })
     } catch (error) {
       setAgentStatus({ state: 'idle', message: '' })
-      setGatewayState('offline')
-      addMessage('system', `Morgan could not reply: ${String(error)}`)
-      void syncGatewayStatus()
+      addMessage('system', `${agentName} could not reply: ${String(error)}`)
     }
-  }, [addMessage, inputValue, sessionId, syncGatewayStatus])
+  }, [addMessage, agentId, agentName, inputValue, sessionId])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -289,90 +268,16 @@ export function AgentChat() {
     }
   }
 
-  const gatewayTone =
-    gatewayState === 'online'
-      ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-100'
-      : gatewayState === 'offline'
-        ? 'border-rose-400/20 bg-rose-500/10 text-rose-100'
-        : 'border-sky-400/20 bg-sky-500/10 text-sky-100'
+  const activeBranding = getAgentBranding(agentId)
 
   return (
     <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top,#0f2033_0%,rgba(7,13,24,0.92)_44%,rgba(5,8,16,1)_100%)] text-white">
-      <div className="border-b border-white/8 bg-black/10 px-6 py-5 backdrop-blur-xl">
-        <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <Card className="overflow-hidden rounded-[28px] border-white/10 bg-white/[0.045] shadow-[0_28px_80px_-48px_rgba(34,211,238,0.45)]">
-            <CardHeader className="gap-4 p-5">
-              <div className="flex items-start gap-4">
-                <Avatar
-                  size="lg"
-                  className="ring-1 ring-cyan-300/20 shadow-[0_18px_44px_-28px_rgba(34,211,238,0.65)]"
-                >
-                  <AvatarFallback className="bg-cyan-400/15 text-cyan-50">MO</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className={`rounded-full border ${gatewayTone}`}>
-                      {gatewayState === 'online' ? (
-                        <Wifi className="mr-1 h-3.5 w-3.5" />
-                      ) : gatewayState === 'offline' ? (
-                        <WifiOff className="mr-1 h-3.5 w-3.5" />
-                      ) : (
-                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                      )}
-                      {gatewayState === 'online'
-                        ? 'Local Morgan Connected'
-                        : gatewayState === 'offline'
-                          ? 'Gateway Offline'
-                          : 'Checking Local Morgan'}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className="rounded-full border-white/12 bg-white/[0.04] text-slate-200"
-                    >
-                      Shared session
-                    </Badge>
-                  </div>
-                  <CardTitle className="mt-4 text-[1.6rem] text-white">
-                    Morgan chat stays on the local stack.
-                  </CardTitle>
-                  <CardDescription className="mt-2 max-w-2xl leading-6 text-slate-300">
-                    Ask through text first, validate latency and turn quality, then compare that
-                    exact flow with the avatar path. {gatewayVersion ? `Gateway ${gatewayVersion}.` : ''}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <InsightTile
-              label="Runtime"
-              value={gatewayState === 'online' ? 'Healthy' : gatewayState === 'offline' ? 'Offline' : 'Checking'}
-              detail="Morgan lives behind the local ingress in kind."
-            />
-            <InsightTile
-              label="Thread"
-              value={historyLoaded ? 'Restored' : 'Loading'}
-              detail="The chat and avatar surfaces share the same backend persona."
-              action={
-                <Button variant="secondary" size="sm" onClick={startNewThread}>
-                  <Plus data-icon="inline-start" />
-                  New thread
-                </Button>
-              }
-            />
-          </div>
-        </div>
-      </div>
-
-      <AgentStatusBar status={agentStatus} />
-
       <ScrollArea ref={scrollRef} className="flex-1 px-6 py-6">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4">
+        <div className="mx-auto flex max-w-3xl flex-col gap-4">
           {!historyLoaded && (
             <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm text-slate-300">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Restoring the current Morgan thread.
+              Restoring thread
             </div>
           )}
 
@@ -381,17 +286,24 @@ export function AgentChat() {
               key={msg.id}
               message={msg}
               onActionClick={handleActionClick}
+              avatarSrc={activeBranding.avatar}
+              agentName={agentName}
             />
           ))}
 
           {agentStatus.state === 'thinking' && (
             <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500/10">
-                <Bot className="h-4 w-4 text-sky-300" />
-              </div>
+              <Avatar className="h-9 w-9 border border-sky-400/10 bg-sky-500/10">
+                {activeBranding.avatar ? <AvatarImage src={activeBranding.avatar} alt={agentName} /> : null}
+                <AvatarFallback className="bg-sky-500/10 text-sky-300">
+                  <Bot className="h-4 w-4 text-sky-300" />
+                </AvatarFallback>
+              </Avatar>
               <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-white/10 bg-white/6 px-4 py-3">
                 <Loader2 className="h-4 w-4 animate-spin text-sky-300" />
-                <span className="text-sm text-slate-200">{agentStatus.message}</span>
+                <span className="text-sm text-slate-200">
+                  {agentStatus.state === 'thinking' ? `${agentName} is thinking…` : agentStatus.message}
+                </span>
               </div>
             </div>
           )}
@@ -399,54 +311,46 @@ export function AgentChat() {
       </ScrollArea>
 
       <div className="border-t border-white/8 bg-black/10 p-5 backdrop-blur-xl">
-        <div className="mx-auto max-w-5xl">
-          <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,15,28,0.98)_0%,rgba(5,10,20,0.98)_100%)] p-4 shadow-[0_24px_70px_-42px_rgba(34,211,238,0.45)]">
-            <div className="flex flex-wrap items-center gap-4">
-              <Avatar className="ring-1 ring-white/10">
-                <AvatarFallback className="bg-white/10 text-slate-100">Y</AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-100/70">
-                  Composer
-                </p>
-                <p className="mt-1 text-sm text-slate-300">
-                  Ask through text, validate the reply, then compare it against the avatar turn.
-                </p>
-              </div>
-              <Badge variant="secondary" className="rounded-full">
-                Text path
-              </Badge>
-            </div>
-
-            <Separator className="my-4 bg-white/8" />
-
-            <div className="overflow-hidden rounded-[22px] border border-white/8 bg-slate-950/70 px-3 py-2">
-              <LiveWaveform
-                active={false}
-                processing={agentStatus.state === 'thinking'}
-                mode="static"
-                height={40}
-                fadeEdges={false}
-                barWidth={3}
-                barGap={2}
-                className="h-10 rounded-[16px] bg-transparent"
-              />
-            </div>
-
-            <div className="mt-4 flex items-end gap-3">
-              <div className="flex-1 rounded-[24px] border border-white/10 bg-black/35 px-4 py-3 shadow-inner shadow-black/20">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,15,28,0.98)_0%,rgba(5,10,20,0.98)_100%)] p-3 shadow-[0_24px_70px_-42px_rgba(34,211,238,0.45)]">
+            <div className="flex items-end gap-3">
+              <div className="flex-1 rounded-[22px] border border-white/10 bg-black/35 px-4 py-3 shadow-inner shadow-black/20">
                 <textarea
                   ref={inputRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Message Morgan..."
+                  placeholder={`Message ${agentName}...`}
                   rows={1}
                   style={{ WebkitTextFillColor: 'rgb(241 245 249)' }}
                   className="min-h-[32px] w-full resize-none border-0 bg-transparent text-sm leading-7 text-slate-100 outline-none placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={agentStatus.state === 'thinking'}
                 />
               </div>
+
+              {onOpenVoice ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onOpenVoice}
+                  className="size-12 rounded-[20px] border border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]"
+                  title="Voice"
+                >
+                  <AudioLines className="h-5 w-5" />
+                </Button>
+              ) : null}
+
+              {!externalSessionId ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={startNewThread}
+                  className="size-12 rounded-[20px] border border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]"
+                  title="New thread"
+                >
+                  <Plus className="h-5 w-5" />
+                </Button>
+              ) : null}
 
               <Button
                 className="size-14 rounded-[22px] shadow-[0_18px_40px_-26px_rgba(34,211,238,0.85)]"
@@ -460,9 +364,9 @@ export function AgentChat() {
               </Button>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-1 text-[11px] uppercase tracking-[0.22em] text-slate-500">
+            <div className="mt-2 flex items-center justify-between gap-3 px-1 text-[11px] text-slate-500">
+              <span>{projectName ?? agentName}</span>
               <span>Enter to send</span>
-              <span>Shift+Enter for newline</span>
             </div>
           </div>
         </div>
@@ -471,30 +375,16 @@ export function AgentChat() {
   )
 }
 
-function AgentStatusBar({ status }: { status: AgentStatus }) {
-  if (status.state === 'idle') return null
-
-  const icon =
-    status.state === 'thinking' ? (
-      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-    ) : (
-      <Wrench className="h-3.5 w-3.5 animate-pulse" />
-    )
-
-  return (
-    <div className="flex items-center gap-2 border-b border-sky-500/15 bg-sky-500/10 px-6 py-2 text-xs text-sky-100">
-      {icon}
-      <span>{status.message}</span>
-    </div>
-  )
-}
-
 function MessageBubble({
   message,
   onActionClick,
+  avatarSrc,
+  agentName,
 }: {
   message: ChatMessage
   onActionClick: (action: ChatAction) => void
+  avatarSrc?: string
+  agentName: string
 }) {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
@@ -519,12 +409,13 @@ function MessageBubble({
             : 'bg-sky-500/10 ring-1 ring-sky-400/10'
         }
       >
+        {!isUser && avatarSrc ? <AvatarImage src={avatarSrc} alt={agentName} /> : null}
         <AvatarFallback className={isUser ? 'bg-white text-slate-950' : 'bg-sky-500/10 text-sky-300'}>
-        {isUser ? (
-          <User className="h-4 w-4" />
-        ) : (
-          <Bot className="h-4 w-4 text-sky-300" />
-        )}
+          {isUser ? (
+            <User className="h-4 w-4" />
+          ) : (
+            <Bot className="h-4 w-4 text-sky-300" />
+          )}
         </AvatarFallback>
       </Avatar>
 
@@ -614,30 +505,5 @@ function ActionCard({
         )}
       </div>
     </button>
-  )
-}
-
-function InsightTile({
-  label,
-  value,
-  detail,
-  action,
-}: {
-  label: string
-  value: string
-  detail: string
-  action?: React.ReactNode
-}) {
-  return (
-    <Card className="rounded-[24px] border-white/10 bg-white/[0.045]">
-      <CardContent className="flex h-full flex-col gap-3 p-4">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.26em] text-slate-500">{label}</p>
-          <p className="mt-2 text-lg font-semibold text-white">{value}</p>
-          <p className="mt-1 text-sm leading-6 text-slate-300">{detail}</p>
-        </div>
-        {action ? <div className="pt-1">{action}</div> : null}
-      </CardContent>
-    </Card>
   )
 }

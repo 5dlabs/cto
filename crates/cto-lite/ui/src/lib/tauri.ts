@@ -476,25 +476,79 @@ export interface MorganDiagnostics {
   recentErrors: string[];
 }
 
+export interface ProjectRecord {
+  id: string;
+  name: string;
+  summary: string;
+  repository: string | null;
+  prdTitle: string;
+  prdContent: string;
+  workflowSummary: string;
+  workflowNotes: string;
+  configNotes: string;
+}
+
+export interface AgentUiConfig {
+  id: string;
+  displayName: string;
+  role: string;
+  summary: string;
+  avatarLabel: string;
+  enabled: boolean;
+  skills: string[];
+  capabilities: string[];
+  tools: string[];
+  systemPrompt: string;
+  heartbeatEvery: string;
+  model: string;
+}
+
+export interface StudioState {
+  selectedProjectId: string;
+  projects: ProjectRecord[];
+  agents: AgentUiConfig[];
+}
+
+export interface RenderedAgentConfig {
+  agentId: string;
+  projectId: string | null;
+  target: string;
+  renderedAt: string;
+  content: string;
+}
+
+export interface ApplyAgentConfigResult {
+  applied: boolean;
+  agentId: string;
+  projectId: string | null;
+  target: string;
+  renderedAt: string;
+  message: string;
+}
+
 /** Send a message to the OpenClaw PM agent (Morgan) */
 export async function openclawSendMessage(
   sessionId: string,
-  message: string
+  message: string,
+  agentId?: string
 ): Promise<OpenClawResponse> {
   return invoke<OpenClawResponse>('openclaw_send_message', {
     sessionId,
     message,
+    agentId: agentId ?? null,
   });
 }
 
 /** Send pasted supporting context into the active Morgan avatar room session */
 export async function openclawSendAvatarContext(
   roomName: string,
-  content: string
+  content: string,
+  agentId?: string
 ): Promise<OpenClawResponse> {
   return invoke<OpenClawResponse>('openclaw_send_avatar_context', {
     roomName,
     content,
+    agentId: agentId ?? null,
   });
 }
 
@@ -544,22 +598,22 @@ export async function openclawGetStatus(): Promise<OpenClawStatus> {
 }
 
 /** Start the local Morgan bridge */
-export async function openclawStartLocalBridge(): Promise<OpenClawBridgeStatus> {
-  return invoke<OpenClawBridgeStatus>('openclaw_start_local_bridge');
+export async function openclawStartLocalBridge(agentId?: string): Promise<OpenClawBridgeStatus> {
+  return invoke<OpenClawBridgeStatus>('openclaw_start_local_bridge', { agentId: agentId ?? null });
 }
 
 /** Stop the local Morgan bridge */
-export async function openclawStopLocalBridge(): Promise<OpenClawBridgeStatus> {
-  return invoke<OpenClawBridgeStatus>('openclaw_stop_local_bridge');
+export async function openclawStopLocalBridge(agentId?: string): Promise<OpenClawBridgeStatus> {
+  return invoke<OpenClawBridgeStatus>('openclaw_stop_local_bridge', { agentId: agentId ?? null });
 }
 
 /** Get the local Morgan bridge status */
-export async function openclawGetLocalBridgeStatus(): Promise<OpenClawBridgeStatus> {
-  return invoke<OpenClawBridgeStatus>('openclaw_get_local_bridge_status');
+export async function openclawGetLocalBridgeStatus(agentId?: string): Promise<OpenClawBridgeStatus> {
+  return invoke<OpenClawBridgeStatus>('openclaw_get_local_bridge_status', { agentId: agentId ?? null });
 }
 
-export async function openclawGetMorganDiagnostics(): Promise<MorganDiagnostics> {
-  return invoke<MorganDiagnostics>('openclaw_get_morgan_diagnostics');
+export async function openclawGetMorganDiagnostics(agentId?: string): Promise<MorganDiagnostics> {
+  return invoke<MorganDiagnostics>('openclaw_get_morgan_diagnostics', { agentId: agentId ?? null });
 }
 
 /** Execute a CLI command through the OpenClaw proxy */
@@ -568,4 +622,46 @@ export async function openclawExecCli(
   args: string[]
 ): Promise<string> {
   return invoke<string>('openclaw_exec_cli', { cli, args });
+}
+
+// ============================================================================
+// Studio Commands
+// ============================================================================
+
+export async function studioGetState(): Promise<StudioState> {
+  return invoke<StudioState>('studio_get_state');
+}
+
+export async function studioSaveState(state: StudioState): Promise<StudioState> {
+  return invoke<StudioState>('studio_save_state', { state });
+}
+
+export async function studioRenderAgentConfig(
+  agentId: string,
+  projectId?: string | null
+): Promise<RenderedAgentConfig> {
+  return invoke<RenderedAgentConfig>('studio_render_agent_config', {
+    agentId,
+    projectId: projectId ?? null,
+  });
+}
+
+export async function studioExportAgentConfig(
+  agentId: string,
+  projectId?: string | null
+): Promise<RenderedAgentConfig> {
+  return invoke<RenderedAgentConfig>('studio_export_agent_config', {
+    agentId,
+    projectId: projectId ?? null,
+  });
+}
+
+export async function studioApplyAgentConfig(
+  agentId: string,
+  projectId?: string | null
+): Promise<ApplyAgentConfigResult> {
+  return invoke<ApplyAgentConfigResult>('studio_apply_agent_config', {
+    agentId,
+    projectId: projectId ?? null,
+  });
 }

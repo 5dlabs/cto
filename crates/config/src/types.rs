@@ -1090,6 +1090,7 @@ pub const AGENT_TESS: &str = "Tess";
 pub const AGENT_MORGAN: &str = "Morgan";
 pub const AGENT_ATLAS: &str = "Atlas";
 pub const AGENT_VEX: &str = "Vex";
+pub const AGENT_ANGIE: &str = "Angie";
 
 /// Construct a full agent GitHub App name from org name and agent suffix.
 #[must_use]

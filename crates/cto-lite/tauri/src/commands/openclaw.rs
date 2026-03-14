@@ -22,7 +22,6 @@ const DEFAULT_LOCAL_INGRESS_URL: &str = "http://morgan.localhost";
 const DEFAULT_LOCAL_BRIDGE_URL: &str = "http://127.0.0.1:18789";
 /// Static auth token used by the local Morgan gateway.
 const DEFAULT_GATEWAY_TOKEN: &str = "openclaw-internal";
-/// Morgan is the only desktop-backed agent today.
 const DEFAULT_AGENT_ID: &str = "morgan";
 const DEFAULT_GATEWAY_PORT: u16 = 18789;
 /// Dedicated local kind context that CTO manages for Morgan.
@@ -31,9 +30,8 @@ const LOCAL_KIND_CONTEXT: &str = "kind-cto-lite";
 /// Whether the gateway has been connected at least once.
 static GATEWAY_CONNECTED: AtomicBool = AtomicBool::new(false);
 const IN_CLUSTER_ACP_GATEWAY_URL: &str = "ws://127.0.0.1:18789";
-const MORGAN_DEPLOYMENT_NAMESPACE: &str = "openclaw";
-const MORGAN_DEPLOYMENT_NAME: &str = "openclaw-morgan";
-const MORGAN_AGENT_CONTAINER: &str = "agent";
+const AGENT_DEPLOYMENT_NAMESPACE: &str = "openclaw";
+const AGENT_CONTAINER_NAME: &str = "agent";
 const AVATAR_USER_PREFIX: &str = "morgan-avatar";
 
 /// Local bridge state for `kubectl port-forward`.
@@ -257,18 +255,27 @@ fn sanitize_session_component(raw: &str) -> String {
         .collect()
 }
 
-fn desktop_gateway_session_key(session_id: &str) -> String {
+fn normalize_agent_id(agent_id: Option<String>) -> String {
+    let candidate = agent_id
+        .unwrap_or_else(|| DEFAULT_AGENT_ID.to_string())
+        .trim()
+        .to_lowercase();
+    if candidate.is_empty() {
+        DEFAULT_AGENT_ID.to_string()
+    } else {
+        sanitize_session_component(&candidate)
+    }
+}
+
+fn project_gateway_session_key(agent_id: &str, session_id: &str) -> String {
     format!(
-        "agent:{DEFAULT_AGENT_ID}:desktop-{}",
+        "agent:{agent_id}:openai-user:{AVATAR_USER_PREFIX}:{}",
         sanitize_session_component(session_id)
     )
 }
 
-fn avatar_gateway_session_key(room_name: &str) -> String {
-    format!(
-        "agent:{DEFAULT_AGENT_ID}:openai-user:{AVATAR_USER_PREFIX}:{}",
-        sanitize_session_component(room_name)
-    )
+fn agent_deployment_name(agent_id: &str) -> String {
+    format!("openclaw-{agent_id}")
 }
 
 fn desktop_acp_cwd() -> PathBuf {
@@ -278,9 +285,10 @@ fn desktop_acp_cwd() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("/workspace"))
 }
 
-fn morgan_acp_runtime(session_key: &str) -> Result<cto_config::AcpRuntimeConfig, AppError> {
+fn agent_acp_runtime(session_key: &str, agent_id: &str) -> Result<cto_config::AcpRuntimeConfig, AppError> {
     let kubectl = which::which("kubectl")
-        .map_err(|_| AppError::CommandFailed("kubectl is required for Morgan ACP".to_string()))?;
+        .map_err(|_| AppError::CommandFailed("kubectl is required for agent ACP".to_string()))?;
+    let deployment_name = agent_deployment_name(agent_id);
 
     Ok(cto_config::AcpRuntimeConfig::stdio(
         kubectl.to_string_lossy().to_string(),
@@ -290,10 +298,10 @@ fn morgan_acp_runtime(session_key: &str) -> Result<cto_config::AcpRuntimeConfig,
             "exec".to_string(),
             "-i".to_string(),
             "-n".to_string(),
-            MORGAN_DEPLOYMENT_NAMESPACE.to_string(),
-            format!("deploy/{MORGAN_DEPLOYMENT_NAME}"),
+            AGENT_DEPLOYMENT_NAMESPACE.to_string(),
+            format!("deploy/{deployment_name}"),
             "-c".to_string(),
-            MORGAN_AGENT_CONTAINER.to_string(),
+            AGENT_CONTAINER_NAME.to_string(),
             "--".to_string(),
             "openclaw".to_string(),
             "acp".to_string(),
@@ -412,7 +420,7 @@ fn configured_bridge_target() -> Option<MorganServiceTarget> {
     })
 }
 
-fn discover_morgan_service() -> Result<MorganServiceTarget, AppError> {
+fn discover_agent_service(agent_id: &str) -> Result<MorganServiceTarget, AppError> {
     if let Some(target) = configured_bridge_target() {
         return Ok(target);
     }
@@ -429,7 +437,7 @@ fn discover_morgan_service() -> Result<MorganServiceTarget, AppError> {
             "svc",
             "-A",
             "-l",
-            "openclaw.io/agent=morgan",
+            &format!("openclaw.io/agent={agent_id}"),
             "-o",
             "json",
         ])
@@ -456,9 +464,9 @@ fn discover_morgan_service() -> Result<MorganServiceTarget, AppError> {
         })
         .or_else(|| services.items.first())
         .ok_or_else(|| {
-            AppError::CommandFailed(
-                "No Kubernetes service with label openclaw.io/agent=morgan was found".to_string(),
-            )
+            AppError::CommandFailed(format!(
+                "No Kubernetes service with label openclaw.io/agent={agent_id} was found"
+            ))
         })?;
 
     let port = service
@@ -552,8 +560,9 @@ fn recent_backend_errors(logs: &str) -> Vec<String> {
 
 async fn get_local_bridge_status_inner(
     state: &LocalBridgeState,
+    agent_id: &str,
 ) -> Result<OpenClawBridgeStatus, AppError> {
-    let target = discover_morgan_service().ok();
+    let target = discover_agent_service(agent_id).ok();
     let pid = {
         let mut process = state
             .process
@@ -574,15 +583,16 @@ async fn get_local_bridge_status_inner(
 
 async fn start_local_bridge_inner(
     state: &LocalBridgeState,
+    agent_id: &str,
 ) -> Result<OpenClawBridgeStatus, AppError> {
     let _startup = state.startup.lock().await;
 
     if gateway_url_is_reachable(&local_ingress_url()).await {
-        return get_local_bridge_status_inner(state).await;
+        return get_local_bridge_status_inner(state, agent_id).await;
     }
 
     if gateway_url_is_reachable(&local_bridge_url()).await {
-        return get_local_bridge_status_inner(state).await;
+        return get_local_bridge_status_inner(state, agent_id).await;
     }
 
     let bridge_running = {
@@ -594,10 +604,10 @@ async fn start_local_bridge_inner(
     };
 
     if bridge_running {
-        return get_local_bridge_status_inner(state).await;
+        return get_local_bridge_status_inner(state, agent_id).await;
     }
 
-    let target = discover_morgan_service()?;
+    let target = discover_agent_service(agent_id)?;
     let kubectl = which::which("kubectl")
         .map_err(|_| AppError::CommandFailed("kubectl is required to start Morgan".to_string()))?;
 
@@ -664,6 +674,7 @@ async fn start_local_bridge_inner(
 
 async fn resolve_gateway_url(
     state: &LocalBridgeState,
+    agent_id: &str,
     allow_start_bridge: bool,
 ) -> Result<String, AppError> {
     if let Ok(url) = std::env::var("OPENCLAW_GATEWAY_URL") {
@@ -685,7 +696,7 @@ async fn resolve_gateway_url(
         .unwrap_or(false);
 
     if allow_start_bridge && allow_debug_port_forward {
-        start_local_bridge_inner(state).await?;
+        start_local_bridge_inner(state, agent_id).await?;
         return Ok(bridge);
     }
 
@@ -733,18 +744,22 @@ fn update_session_record(
 /// Start the local Morgan bridge.
 #[tauri::command]
 pub async fn openclaw_start_local_bridge(
+    agent_id: Option<String>,
     state: State<'_, LocalBridgeState>,
 ) -> Result<OpenClawBridgeStatus, AppError> {
-    start_local_bridge_inner(state.inner()).await
+    let agent_id = normalize_agent_id(agent_id);
+    start_local_bridge_inner(state.inner(), &agent_id).await
 }
 
 /// Stop the local Morgan bridge.
 #[tauri::command]
 pub async fn openclaw_stop_local_bridge(
+    agent_id: Option<String>,
     state: State<'_, LocalBridgeState>,
 ) -> Result<OpenClawBridgeStatus, AppError> {
     let _startup = state.startup.lock().await;
-    let target = discover_morgan_service().ok();
+    let agent_id = normalize_agent_id(agent_id);
+    let target = discover_agent_service(&agent_id).ok();
 
     let pid = {
         let mut process = state
@@ -770,27 +785,32 @@ pub async fn openclaw_stop_local_bridge(
 /// Get local Morgan bridge status.
 #[tauri::command]
 pub async fn openclaw_get_local_bridge_status(
+    agent_id: Option<String>,
     state: State<'_, LocalBridgeState>,
 ) -> Result<OpenClawBridgeStatus, AppError> {
-    get_local_bridge_status_inner(state.inner()).await
+    let agent_id = normalize_agent_id(agent_id);
+    get_local_bridge_status_inner(state.inner(), &agent_id).await
 }
 
 #[tauri::command]
 pub async fn openclaw_get_morgan_diagnostics(
+    agent_id: Option<String>,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<MorganDiagnostics, AppError> {
-    let healthy = gateway_url_is_reachable(&resolve_gateway_url(bridge.inner(), false).await?)
+    let agent_id = normalize_agent_id(agent_id);
+    let deployment_name = agent_deployment_name(&agent_id);
+    let healthy = gateway_url_is_reachable(&resolve_gateway_url(bridge.inner(), &agent_id, false).await?)
         .await;
 
     let config_bytes = kubectl_output(&[
         "--context",
         LOCAL_KIND_CONTEXT,
         "-n",
-        MORGAN_DEPLOYMENT_NAMESPACE,
+        AGENT_DEPLOYMENT_NAMESPACE,
         "exec",
-        &format!("deploy/{MORGAN_DEPLOYMENT_NAME}"),
+        &format!("deploy/{deployment_name}"),
         "-c",
-        MORGAN_AGENT_CONTAINER,
+        AGENT_CONTAINER_NAME,
         "--",
         "sh",
         "-lc",
@@ -838,11 +858,11 @@ pub async fn openclaw_get_morgan_diagnostics(
             "--context",
             LOCAL_KIND_CONTEXT,
             "-n",
-            MORGAN_DEPLOYMENT_NAMESPACE,
+            AGENT_DEPLOYMENT_NAMESPACE,
             "logs",
-            &format!("deploy/{MORGAN_DEPLOYMENT_NAME}"),
+            &format!("deploy/{deployment_name}"),
             "-c",
-            MORGAN_AGENT_CONTAINER,
+            AGENT_CONTAINER_NAME,
             "--since=10m",
             "--tail=200",
         ])?,
@@ -866,12 +886,15 @@ pub async fn openclaw_get_morgan_diagnostics(
 pub async fn openclaw_send_message(
     session_id: String,
     message: String,
+    agent_id: Option<String>,
     _bridge: State<'_, LocalBridgeState>,
     conversations: State<'_, ConversationState>,
 ) -> Result<OpenClawResponse, AppError> {
     let started_at = Instant::now();
-    let gateway_session_key = desktop_gateway_session_key(&session_id);
-    let runtime = morgan_acp_runtime(&gateway_session_key)?;
+    let agent_id = normalize_agent_id(agent_id);
+    let deployment_name = agent_deployment_name(&agent_id);
+    let gateway_session_key = project_gateway_session_key(&agent_id, &session_id);
+    let runtime = agent_acp_runtime(&gateway_session_key, &agent_id)?;
     let user_message = OpenClawMessage {
         role: "user".to_string(),
         content: message.clone(),
@@ -879,7 +902,7 @@ pub async fn openclaw_send_message(
     let result = run_morgan_acp_turn(
         runtime,
         AcpPromptRequest {
-            runtime_id: DEFAULT_AGENT_ID.to_string(),
+            runtime_id: agent_id.clone(),
             cwd: desktop_acp_cwd(),
             prompt: message,
             // We intentionally create a fresh ACP session per turn and bind it
@@ -933,7 +956,7 @@ pub async fn openclaw_send_message(
         latency_ms: Some(latency_ms),
         gateway_url: Some(format!(
             "k8s://{}/{}/{}",
-            LOCAL_KIND_CONTEXT, MORGAN_DEPLOYMENT_NAMESPACE, MORGAN_DEPLOYMENT_NAME
+            LOCAL_KIND_CONTEXT, AGENT_DEPLOYMENT_NAMESPACE, deployment_name
         )),
         gateway_session_key: Some(gateway_session_key),
         acp_session_id: Some(result.session_id),
@@ -946,6 +969,7 @@ pub async fn openclaw_send_message(
 pub async fn openclaw_send_avatar_context(
     room_name: String,
     content: String,
+    agent_id: Option<String>,
     conversations: State<'_, ConversationState>,
 ) -> Result<OpenClawResponse, AppError> {
     let trimmed_room = room_name.trim();
@@ -964,8 +988,10 @@ pub async fn openclaw_send_avatar_context(
     }
 
     let started_at = Instant::now();
-    let gateway_session_key = avatar_gateway_session_key(trimmed_room);
-    let runtime = morgan_acp_runtime(&gateway_session_key)?;
+    let agent_id = normalize_agent_id(agent_id);
+    let deployment_name = agent_deployment_name(&agent_id);
+    let gateway_session_key = project_gateway_session_key(&agent_id, trimmed_room);
+    let runtime = agent_acp_runtime(&gateway_session_key, &agent_id)?;
     let prompt = format!(
         "The user has pasted supporting context for the active voice call. \
 Treat it as additional material for the current task and use it in the next reply.\n\n\
@@ -975,7 +1001,7 @@ Context:\n{trimmed_content}\n\nReply exactly: CONTEXT_STORED"
     let result = run_morgan_acp_turn(
         runtime,
         AcpPromptRequest {
-            runtime_id: DEFAULT_AGENT_ID.to_string(),
+            runtime_id: agent_id.clone(),
             cwd: desktop_acp_cwd(),
             prompt,
             session_id: None,
@@ -1007,7 +1033,7 @@ Context:\n{trimmed_content}\n\nReply exactly: CONTEXT_STORED"
 
     update_session_record(
         conversations.inner(),
-        &format!("avatar:{trimmed_room}"),
+        trimmed_room,
         &gateway_session_key,
         &[user_message, assistant_message],
         Some(result.session_id.clone()),
@@ -1019,7 +1045,7 @@ Context:\n{trimmed_content}\n\nReply exactly: CONTEXT_STORED"
         latency_ms: Some(started_at.elapsed().as_millis() as u64),
         gateway_url: Some(format!(
             "k8s://{}/{}/{}",
-            LOCAL_KIND_CONTEXT, MORGAN_DEPLOYMENT_NAMESPACE, MORGAN_DEPLOYMENT_NAME
+            LOCAL_KIND_CONTEXT, AGENT_DEPLOYMENT_NAMESPACE, deployment_name
         )),
         gateway_session_key: Some(gateway_session_key),
         acp_session_id: Some(result.session_id),
@@ -1034,7 +1060,7 @@ pub async fn openclaw_start_workflow(
     params: HashMap<String, String>,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<WorkflowStartResult, AppError> {
-    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let base_url = resolve_gateway_url(bridge.inner(), DEFAULT_AGENT_ID, false).await?;
     let url = format!("{}/api/workflows", base_url);
 
     let body = serde_json::json!({
@@ -1080,7 +1106,7 @@ pub async fn openclaw_approve(
     workflow_id: String,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<(), AppError> {
-    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let base_url = resolve_gateway_url(bridge.inner(), DEFAULT_AGENT_ID, false).await?;
     let url = format!("{}/api/workflows/{}/approve", base_url, workflow_id);
 
     let resp = http_client()
@@ -1108,7 +1134,7 @@ pub async fn openclaw_approve(
 pub async fn openclaw_get_status(
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<OpenClawStatus, AppError> {
-    let base_url = match resolve_gateway_url(bridge.inner(), false).await {
+    let base_url = match resolve_gateway_url(bridge.inner(), DEFAULT_AGENT_ID, false).await {
         Ok(url) => url,
         Err(_) => gateway_url(),
     };
@@ -1142,7 +1168,7 @@ pub async fn openclaw_reject(
     reason: String,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<(), AppError> {
-    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let base_url = resolve_gateway_url(bridge.inner(), DEFAULT_AGENT_ID, false).await?;
     let url = format!("{}/api/workflows/{}/reject", base_url, workflow_id);
 
     let body = serde_json::json!({ "reason": reason });
@@ -1174,7 +1200,7 @@ pub async fn openclaw_get_workflow_status(
     workflow_id: String,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<WorkflowStartResult, AppError> {
-    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let base_url = resolve_gateway_url(bridge.inner(), DEFAULT_AGENT_ID, false).await?;
     let url = format!("{}/api/workflows/{}", base_url, workflow_id);
 
     let resp = http_client()
@@ -1212,7 +1238,7 @@ pub async fn openclaw_exec_cli(
     args: Vec<String>,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<String, AppError> {
-    let base_url = resolve_gateway_url(bridge.inner(), false).await?;
+    let base_url = resolve_gateway_url(bridge.inner(), DEFAULT_AGENT_ID, false).await?;
     let url = format!("{}/api/cli", base_url);
 
     let body = serde_json::json!({
@@ -1252,7 +1278,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires a running local kind cluster with Morgan deployed"]
     async fn smoke_morgan_acp_turn_returns_text() {
-        let runtime = morgan_acp_runtime("agent:morgan:test-acp-smoke").expect("runtime");
+        let runtime = agent_acp_runtime("agent:morgan:test-acp-smoke", DEFAULT_AGENT_ID).expect("runtime");
         let result = run_morgan_acp_turn(
             runtime,
             AcpPromptRequest {

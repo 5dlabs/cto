@@ -94,6 +94,15 @@
   html {
     @apply font-sans;
   }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  #root {
+    min-height: 100vh;
+    min-width: 0;
+  }
 }
 
 @layer base {
@@ -138,4 +147,27 @@
 [data-tauri-drag-region] a,
 [data-tauri-drag-region] input {
   -webkit-app-region: no-drag;
+}
+
+.morgan-stage-video,
+.morgan-stage-video .lk-video-track,
+.morgan-stage-video .lk-participant-media-video {
+  width: 100%;
+  height: 100%;
+}
+
+.morgan-stage-video .participant-media-video,
+.morgan-stage-video .lk-participant-media-video .participant-media-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  background-color: transparent !important;
+}
+
+.morgan-stage-video video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
 }

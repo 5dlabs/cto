@@ -35,7 +35,7 @@ CATEGORY=""
 OP_VAULT=""
 
 # Agent list (used for GitHub Apps and Linear Apps)
-AGENTS=(atlas blaze bolt cipher cleo grizz morgan nova rex spark stitch tap tess vex)
+AGENTS=(atlas blaze bolt cipher cleo grizz morgan nova rex spark stitch tap tess vex angie)
 
 # Colors
 RED='\033[0;31m'

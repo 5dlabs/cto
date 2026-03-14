@@ -33,6 +33,7 @@ pub enum Agent {
     Blaze,
     Tap,
     Spark,
+    Angie,
     Vex,
     Forge,
     // Support agents
@@ -53,6 +54,7 @@ impl Agent {
             Self::Blaze => "5DLabs-Blaze",
             Self::Tap => "5DLabs-Tap",
             Self::Spark => "5DLabs-Spark",
+            Self::Angie => "5DLabs-Angie",
             Self::Vex => "5DLabs-Vex",
             Self::Forge => "5DLabs-Forge",
             Self::Stitch => "5DLabs-Stitch",
@@ -72,6 +74,7 @@ impl Agent {
             Self::Blaze => "blaze",
             Self::Tap => "tap",
             Self::Spark => "spark",
+            Self::Angie => "angie",
             Self::Vex => "vex",
             Self::Forge => "forge",
             Self::Stitch => "stitch",
@@ -92,6 +95,7 @@ impl Agent {
             "blaze" | "5dlabs-blaze" | "@5dlabs-blaze" => Some(Self::Blaze),
             "tap" | "5dlabs-tap" | "@5dlabs-tap" => Some(Self::Tap),
             "spark" | "5dlabs-spark" | "@5dlabs-spark" => Some(Self::Spark),
+            "angie" | "5dlabs-angie" | "@5dlabs-angie" => Some(Self::Angie),
             "vex" | "5dlabs-vex" | "@5dlabs-vex" => Some(Self::Vex),
             "forge" | "5dlabs-forge" | "@5dlabs-forge" => Some(Self::Forge),
             "stitch" | "5dlabs-stitch" | "@5dlabs-stitch" => Some(Self::Stitch),
@@ -123,6 +127,7 @@ impl Agent {
             Self::Blaze => Some("react"),
             Self::Tap => Some("react-native"),
             Self::Spark => Some("electron"),
+            Self::Angie => Some("agentic"),
             Self::Vex => Some("unity"),
             Self::Forge => Some("unreal"),
             _ => None,
@@ -361,7 +366,7 @@ pub struct RequestedAction {
 #[must_use]
 pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
     let re = Regex::new(
-        r"(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|vex|forge|cleo|cipher|tess)\s*(.*)",
+        r"(?i)@5dlabs-(stitch|rex|grizz|nova|blaze|tap|spark|angie|vex|forge|cleo|cipher|tess)\s*(.*)",
     )
     .unwrap();
 
@@ -391,7 +396,7 @@ pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
 /// Panics if the regex pattern is invalid (this is a compile-time constant).
 #[must_use]
 pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
-    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|vex|forge)-pr(\d+)-(\d+)$").unwrap();
+    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|angie|vex|forge)-pr(\d+)-(\d+)$").unwrap();
 
     if let Some(cap) = re.captures(identifier) {
         let agent_name = cap.get(1)?.as_str();
@@ -1000,6 +1005,7 @@ const fn remediation_label(agent: Agent) -> &'static str {
         Agent::Nova => "✨ Fix with Nova",
         Agent::Tap => "📱 Fix with Tap",
         Agent::Spark => "💻 Fix with Spark",
+        Agent::Angie => "🧠 Fix with Angie",
         Agent::Vex => "🎮 Fix with Vex",
         Agent::Forge => "🔥 Fix with Forge",
         _ => "🤖 Fix with Agent",
@@ -1015,6 +1021,7 @@ const fn remediation_description(agent: Agent) -> &'static str {
         Agent::Nova => "Nova will analyze and fix Node.js issues",
         Agent::Tap => "Tap will analyze and fix React Native issues",
         Agent::Spark => "Spark will analyze and fix Electron issues",
+        Agent::Angie => "Angie will analyze and fix agent platform/orchestration issues",
         Agent::Vex => "Vex will analyze and fix Unity/C# issues",
         Agent::Forge => "Forge will analyze and fix Unreal/C++ issues",
         _ => "Agent will analyze and fix issues",
