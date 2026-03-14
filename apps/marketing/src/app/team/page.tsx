@@ -242,7 +242,7 @@ const squads: TeamSquad[] = [
       {
         name: "Angie",
         role: "Agent Builder",
-        avatar: "/agents/angie-avatar-512.png",
+        avatar: "/agents/angie-avatar-512.png?v=20260314",
         color: "from-indigo-500 to-cyan-400",
         personality: "Thinks in agent systems first: orchestration, tool routing, and runtime behavior before UI polish.",
         description: "Designs OpenClaw-first agent architecture, including MCP tool integration and multi-agent execution patterns.",
