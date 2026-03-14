@@ -165,8 +165,7 @@ export default function Home() {
                 How <span className="gradient-text">5D Labs</span> Works
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Not three unrelated bets. One studio, one operating stack, multiple
-                venture outcomes.
+                One studio, one operating stack, multiple venture outcomes.
               </p>
             </div>
 
@@ -206,12 +205,11 @@ export default function Home() {
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Why the <span className="gradient-text">Trading Engine</span> Exists
+                The <span className="gradient-text">Trading Engine</span> in the Model
               </h2>
               <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                We built the trading engine to fund experimentation, stay close to live
-                on-chain markets, and generate the kind of market intelligence that only
-                comes from operating with real stakes.
+                It funds experimentation, keeps the studio close to live on-chain markets,
+                and compounds market intelligence that only comes from operating with real stakes.
               </p>
             </div>
 
