@@ -12,7 +12,7 @@ spec:
   project: default
 
   source:
-    repoURL: ghcr.io/5dlabs/helm-charts
+    repoURL: registry.5dlabs.ai/5dlabs/helm-charts
     targetRevision: "0.1.0"
     chart: mcp-tools
     helm:

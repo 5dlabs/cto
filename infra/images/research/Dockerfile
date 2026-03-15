@@ -10,10 +10,10 @@
 #     cp target/release/research research
 #     cd apps/intake-agent && bun run build
 #     cp apps/intake-agent/dist/intake-agent intake-agent
-#     docker build -f infra/images/research/Dockerfile -t ghcr.io/5dlabs/research .
+#     docker build -f infra/images/research/Dockerfile -t registry.5dlabs.ai/5dlabs/research .
 #
 #   Local/Kind build (compiles from source):
-#     docker build --target local -f infra/images/research/Dockerfile -t ghcr.io/5dlabs/research:local .
+#     docker build --target local -f infra/images/research/Dockerfile -t registry.5dlabs.ai/5dlabs/research:local .
 #
 # Includes Chromium for headless browser automation and intake-agent for AI
 #

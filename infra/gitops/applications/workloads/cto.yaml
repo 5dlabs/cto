@@ -32,14 +32,14 @@ metadata:
     # Uses digest strategy to track the 'latest' tag specifically
     # NOTE: Version constraint (:latest) required for digest strategy
     argocd-image-updater.argoproj.io/image-list: |
-      controller=ghcr.io/5dlabs/controller:latest,
-      pm=ghcr.io/5dlabs/pm-server:latest,
-      tools=ghcr.io/5dlabs/tools:latest,
-      openmemory=ghcr.io/5dlabs/openmemory:latest,
-      healer=ghcr.io/5dlabs/healer:latest,
-      tweakcn=ghcr.io/5dlabs/tweakcn:latest,
-      research=ghcr.io/5dlabs/research:latest,
-      web=ghcr.io/5dlabs/web:latest
+      controller=registry.5dlabs.ai/5dlabs/controller:latest,
+      pm=registry.5dlabs.ai/5dlabs/pm-server:latest,
+      tools=registry.5dlabs.ai/5dlabs/tools:latest,
+      openmemory=registry.5dlabs.ai/5dlabs/openmemory:latest,
+      healer=registry.5dlabs.ai/5dlabs/healer:latest,
+      tweakcn=registry.5dlabs.ai/5dlabs/tweakcn:latest,
+      research=registry.5dlabs.ai/5dlabs/research:latest,
+      web=registry.5dlabs.ai/5dlabs/web:latest
     # Use 'digest' strategy to track the 'latest' tag and auto-update on new pushes
     # This ensures we always get the latest digest when CI pushes a new image
     argocd-image-updater.argoproj.io/controller.update-strategy: "digest"
@@ -65,7 +65,7 @@ spec:
   project: platform
 
   source:
-    repoURL: https://github.com/5dlabs/cto
+    repoURL: https://git.5dlabs.ai/5dlabs/cto.git
     targetRevision: main
     path: infra/charts/cto
     helm:
@@ -75,7 +75,7 @@ spec:
       # =======================================================================
       # CLUSTER: Latitude.sh (cto-dal)
       # Worker: hardware-219s058355, Control: hardware-21bs002557
-      # Registry: ghcr.io/5dlabs (GitHub Container Registry)
+      # Registry: registry.5dlabs.ai/5dlabs (GitHub Container Registry)
       # Storage: mayastor (OpenEBS Mayastor for distributed storage)
       # Dev Registry: 10.8.0.2:30500 (internal VPN IP, disabled by default)
       # =======================================================================
@@ -96,13 +96,13 @@ spec:
         controller:
           enabled: true
           image:
-            repository: ghcr.io/5dlabs/controller
+            repository: registry.5dlabs.ai/5dlabs/controller
             tag: latest
 
         pm:
           enabled: true
           image:
-            repository: ghcr.io/5dlabs/pm-server
+            repository: registry.5dlabs.ai/5dlabs/pm-server
             tag: latest
           github:
             defaultOrg: "5dlabs"
@@ -111,26 +111,26 @@ spec:
         tools:
           enabled: true
           image:
-            repository: ghcr.io/5dlabs/tools
+            repository: registry.5dlabs.ai/5dlabs/tools
             tag: latest
 
         healer:
           enabled: true
           image:
-            repository: ghcr.io/5dlabs/healer
+            repository: registry.5dlabs.ai/5dlabs/healer
             tag: latest
 
         openmemory:
           enabled: true
           image:
-            repository: ghcr.io/5dlabs/openmemory
+            repository: registry.5dlabs.ai/5dlabs/openmemory
             tag: latest
 
         # Web App - CTO Platform Dashboard
         web:
           enabled: true
           image:
-            repository: ghcr.io/5dlabs/web
+            repository: registry.5dlabs.ai/5dlabs/web
             tag: latest
           # Public URL for OAuth and external access
           publicUrl: "https://app.5dlabs.ai"
@@ -148,14 +148,14 @@ spec:
         tweakcn:
           enabled: true
           image:
-            repository: ghcr.io/5dlabs/tweakcn
+            repository: registry.5dlabs.ai/5dlabs/tweakcn
             tag: latest
 
         # Research - Twitter/X bookmark research pipeline
         research:
           enabled: true
           image:
-            repository: ghcr.io/5dlabs/research
+            repository: registry.5dlabs.ai/5dlabs/research
             tag: latest
             pullPolicy: Always
           # CronJob schedule (every 5 minutes)

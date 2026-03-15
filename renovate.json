@@ -1,0 +1,59 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScopeDisabled"
+  ],
+  "timezone": "America/Los_Angeles",
+  "schedule": ["before 9am on Monday"],
+  "prHourlyLimit": 5,
+  "prConcurrentLimit": 10,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Group Rust minor/patch updates",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "Rust dependencies (minor/patch)",
+      "labels": ["dependencies", "rust"],
+      "schedule": ["before 9am on Monday"]
+    },
+    {
+      "description": "Group npm minor/patch updates for web app",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["apps/web/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "Web app npm dependencies",
+      "labels": ["dependencies", "javascript"]
+    },
+    {
+      "description": "Group npm minor/patch updates for marketing",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["apps/marketing/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "Marketing npm dependencies",
+      "labels": ["dependencies", "javascript", "marketing"],
+      "prConcurrentLimit": 3
+    },
+    {
+      "description": "Docker base image updates",
+      "matchManagers": ["dockerfile"],
+      "matchFileNames": ["infra/images/**"],
+      "labels": ["dependencies", "docker"],
+      "schedule": ["before 9am on the first day of the month"]
+    },
+    {
+      "description": "Helm chart updates",
+      "matchManagers": ["helmv3"],
+      "labels": ["dependencies", "helm"],
+      "schedule": ["before 9am on Monday"]
+    },
+    {
+      "description": "Pin GitLab CI image digests",
+      "matchManagers": ["gitlabci"],
+      "labels": ["dependencies", "ci"]
+    }
+  ],
+  "commitMessagePrefix": "chore(deps):"
+}

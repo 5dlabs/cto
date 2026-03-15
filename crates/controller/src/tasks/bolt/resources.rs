@@ -288,7 +288,7 @@ pub async fn create_bolt_job(
                         name: "bolt".to_string(),
                         // Use runtime:dev which includes the installer binary
                         // TODO: Change to runtime:latest once installer is in production images
-                        image: Some("ghcr.io/5dlabs/runtime:dev".to_string()),
+                        image: Some("registry.5dlabs.ai/5dlabs/runtime:dev".to_string()),
                         command: Some(command),
                         env: Some(env_vars),
                         // BOLT-003: Inject credentials from ExternalSecret as env vars

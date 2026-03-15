@@ -70,7 +70,7 @@ spec:
       - name: healer-scan
         # Use script template to capture output as parameter
         script:
-          image: ghcr.io/5dlabs/healer:latest
+          image: registry.5dlabs.ai/5dlabs/healer:latest
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh"]
           source: |
@@ -185,7 +185,7 @@ spec:
           parameters:
             - name: scan-output
         script:
-          image: ghcr.io/5dlabs/healer:latest
+          image: registry.5dlabs.ai/5dlabs/healer:latest
           command: ["/bin/sh"]
           source: |
             #!/bin/sh

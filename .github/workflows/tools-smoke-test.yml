@@ -1,0 +1,91 @@
+name: Tools Smoke Test
+
+on:
+  pull_request:
+    paths:
+      - 'crates/tools/**'
+      - '.github/workflows/tools-smoke-test.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'crates/tools/**'
+
+jobs:
+  smoke-test:
+    name: MCP Tools Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      
+      - name: Build tools server
+        run: |
+          # Build from workspace root to use workspace Cargo.lock
+          cargo build --release --bin tools-server
+      
+      - name: Create minimal test config
+        run: |
+          mkdir -p /tmp/tools-test-config
+          cat > /tmp/tools-test-config/mcp-servers.json << 'EOF'
+          {
+            "servers": {
+              "ai-elements": {
+                "transport": "http",
+                "url": "https://registry.ai-sdk.dev/api/mcp"
+              },
+              "better-auth": {
+                "transport": "http",
+                "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp"
+              },
+              "exa-mcp": {
+                "transport": "http",
+                "url": "https://mcp.exa.ai/mcp"
+              },
+              "pg-aiguide": {
+                "transport": "http",
+                "url": "https://mcp.tigerdata.com/docs"
+              }
+            }
+          }
+          EOF
+      
+      - name: Start tools server
+        run: |
+          export PROJECT_DIR=/tmp/tools-test-config
+          export SYSTEM_CONFIG_PATH=/tmp/tools-test-config
+          export PORT=3000
+          ./target/release/tools-server > /tmp/tools-server.log 2>&1 &
+          echo $! > /tmp/tools-server.pid
+      
+      - name: Run smoke test
+        run: |
+          # Wait a bit for server to initialize
+          sleep 10
+          
+          # Run smoke test (expect at least 10 tools from 4 HTTP servers)
+          # ai-elements: 2, better-auth: 4, exa-mcp: 3, pg-aiguide: 2 = 11+ tools
+          export TOOLS_URL=http://localhost:3000
+          ./scripts/smoke-test-tools.sh 10
+      
+      - name: Stop tools server
+        if: always()
+        run: |
+          if [ -f /tmp/tools-server.pid ]; then
+            kill $(cat /tmp/tools-server.pid) || true
+          fi
+      
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tools-server-logs
+          path: /tmp/tools-*.log
+          retention-days: 7

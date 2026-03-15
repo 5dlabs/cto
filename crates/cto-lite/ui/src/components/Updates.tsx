@@ -63,7 +63,7 @@ export function Updates() {
   };
 
   const formatImageName = (image: string) => {
-    return image.replace("ghcr.io/5dlabs/", "");
+    return image.replace("registry.5dlabs.ai/5dlabs/", "");
   };
 
   const formatTime = (iso: string) => {

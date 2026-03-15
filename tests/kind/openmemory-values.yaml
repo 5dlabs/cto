@@ -8,7 +8,7 @@ replicaCount: 1
 tier: "hybrid"
 
 image:
-  repository: ghcr.io/5dlabs/openmemory
+  repository: registry.5dlabs.ai/5dlabs/openmemory
   pullPolicy: IfNotPresent
   tag: "kind-local"
 

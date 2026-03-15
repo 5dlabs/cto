@@ -36,7 +36,7 @@ spec:
         node-role.kubernetes.io/worker: ""
       containers:
         - name: bridge
-          image: ghcr.io/5dlabs/linear-bridge:latest
+          image: registry.5dlabs.ai/5dlabs/linear-bridge:latest
           imagePullPolicy: Always
           env:
             # Linear API key from OpenBao secret

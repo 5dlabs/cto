@@ -401,7 +401,7 @@ seed_infrastructure() {
         # Create dockerconfigjson format
         local auth
         auth=$(echo -n "$ghcr_user:$ghcr_pass" | base64)
-        local dockerconfig="{\"auths\":{\"ghcr.io\":{\"username\":\"$ghcr_user\",\"password\":\"$ghcr_pass\",\"auth\":\"$auth\"}}}"
+        local dockerconfig="{\"auths\":{\"registry.5dlabs.ai\":{\"username\":\"$ghcr_user\",\"password\":\"$ghcr_pass\",\"auth\":\"$auth\"}}}"
         bao_put "ghcr-secret" ".dockerconfigjson" "$dockerconfig"
     else
         log_warning "Missing: GHCR Pull Secret"
@@ -457,6 +457,55 @@ seed_infrastructure() {
     
     # seaweedfs-s3-credentials - Check if item exists
     log_warning "seaweedfs-s3-credentials: Needs manual configuration (no 1Password item found)"
+}
+
+seed_gitlab() {
+    log_header "GitLab Secrets"
+
+    # gitlab root password
+    local gitlab_root_password
+    gitlab_root_password=$(op_get_field "GitLab Root Password" "credential")
+    if [[ -n "$gitlab_root_password" ]]; then
+        bao_put "gitlab" "root-password" "$gitlab_root_password"
+    else
+        # Generate a random password if not in 1Password
+        local generated_password
+        generated_password=$(openssl rand -base64 32 | tr -d '=/+' | head -c 24)
+        bao_put "gitlab" "root-password" "$generated_password"
+        log_warning "Generated random GitLab root password (save to 1Password)"
+    fi
+
+    # gitlab registry docker config
+    local registry_user registry_pass
+    registry_user=$(op_get_field "GitLab Registry Credentials" "username")
+    registry_pass=$(op_get_field "GitLab Registry Credentials" "credential")
+    if [[ -n "$registry_user" && -n "$registry_pass" ]]; then
+        local auth
+        auth=$(echo -n "$registry_user:$registry_pass" | base64)
+        local dockerconfig="{\"auths\":{\"registry.5dlabs.ai\":{\"username\":\"$registry_user\",\"password\":\"$registry_pass\",\"auth\":\"$auth\"}}}"
+        bao_put "gitlab-registry" ".dockerconfigjson" "$dockerconfig"
+    else
+        log_warning "Missing: GitLab Registry Credentials (will be configured post-deploy)"
+    fi
+
+    # gitlab oauth app credentials
+    local oauth_client_id oauth_client_secret
+    oauth_client_id=$(op_get_field "GitLab OAuth App" "client_id")
+    oauth_client_secret=$(op_get_field "GitLab OAuth App" "credential")
+    if [[ -n "$oauth_client_id" && -n "$oauth_client_secret" ]]; then
+        bao_put "gitlab-oauth" "client-id" "$oauth_client_id" "client-secret" "$oauth_client_secret"
+    else
+        log_warning "Missing: GitLab OAuth App (will be created by gitlab-setup.sh)"
+    fi
+
+    # gitlab runner registration token
+    local runner_token
+    runner_token=$(op_get_field "GitLab Runner Token" "credential")
+    if [[ -n "$runner_token" ]]; then
+        bao_put "gitlab-runner" "registration-token" "$runner_token"
+    else
+        log_warning "Missing: GitLab Runner Token (will be created by gitlab-setup.sh)"
+    fi
 }
 
 seed_research() {
@@ -549,6 +598,7 @@ main() {
             seed_api_keys
             seed_tools
             seed_infrastructure
+            seed_gitlab
             seed_research
             ;;
         github-apps)
@@ -566,12 +616,15 @@ main() {
         infrastructure)
             seed_infrastructure
             ;;
+        gitlab)
+            seed_gitlab
+            ;;
         research)
             seed_research
             ;;
         *)
             log_error "Unknown category: $CATEGORY"
-            log_info "Valid categories: github-apps, linear-apps, api-keys, tools, infrastructure, research"
+            log_info "Valid categories: github-apps, linear-apps, api-keys, tools, infrastructure, gitlab, research"
             exit 1
             ;;
     esac

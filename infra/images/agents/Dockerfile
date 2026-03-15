@@ -25,16 +25,16 @@
 #   /etc/cto/templates/    - Agent prompt templates and skills
 #
 # Build:
-#   docker build -t ghcr.io/5dlabs/agents .
-#   docker build --build-arg OPENCLAW_VERSION=1.2.3 -t ghcr.io/5dlabs/agents:1.2.3 .
+#   docker build -t registry.5dlabs.ai/5dlabs/agents .
+#   docker build --build-arg OPENCLAW_VERSION=1.2.3 -t registry.5dlabs.ai/5dlabs/agents:1.2.3 .
 #
 # =============================================================================
 
-ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:full
+ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/runtime:full
 
 FROM ${BASE_IMAGE}
 
-LABEL org.opencontainers.image.source="https://github.com/5dlabs/cto"
+LABEL org.opencontainers.image.source="https://git.5dlabs.ai/5dlabs/cto"
 LABEL org.opencontainers.image.description="CTO AI Agent - Unified multi-agent platform image"
 LABEL org.opencontainers.image.licenses="MIT"
 

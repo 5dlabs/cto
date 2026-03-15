@@ -73,7 +73,7 @@ print_banner() {
         echo -e "${BLUE}║  🚀 CTO Production Mode                                           ║${NC}"
         echo -e "${BLUE}╠═══════════════════════════════════════════════════════════════════╣${NC}"
         printf "${BLUE}║${NC}  Branch:   ${CYAN}%-54s${NC}${BLUE} ║${NC}\n" "$branch"
-        printf "${BLUE}║${NC}  Registry: ${YELLOW}%-54s${NC}${BLUE} ║${NC}\n" "ghcr.io/5dlabs/*"
+        printf "${BLUE}║${NC}  Registry: ${YELLOW}%-54s${NC}${BLUE} ║${NC}\n" "registry.5dlabs.ai/5dlabs/*"
         echo -e "${BLUE}║${NC}                                                                   ${BLUE}║${NC}"
         echo -e "${BLUE}║${NC}  Builds handled by CI/CD. Local builds disabled.                 ${BLUE}║${NC}"
         echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════════╝${NC}"

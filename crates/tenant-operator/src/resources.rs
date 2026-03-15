@@ -362,7 +362,7 @@ pub async fn create_argocd_app(client: &Client, tenant: &Tenant) -> Result<()> {
         "spec": {
             "project": "tenants",
             "source": {
-                "repoURL": "https://github.com/5dlabs/cto",
+                "repoURL": "https://git.5dlabs.ai/5dlabs/cto.git",
                 "targetRevision": "main",
                 "path": "infra/charts/tenant-agents",
                 "helm": {

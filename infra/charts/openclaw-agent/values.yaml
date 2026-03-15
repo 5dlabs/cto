@@ -12,7 +12,7 @@ createNamespace: false
 
 # -- Image configuration
 image:
-  repository: ghcr.io/5dlabs/openclaw
+  repository: registry.5dlabs.ai/5dlabs/openclaw
   tag: "v2026.2.12"
   pullPolicy: Always
 
@@ -53,7 +53,7 @@ workspace:
   # Example: clone the CTO repo for each agent
   # repos:
   #   - name: cto
-  #     url: "https://github.com/5dlabs/cto.git"
+  #     url: "https://git.5dlabs.ai/5dlabs/cto.git"
   #     branch: "main"
   #     path: "repos/cto"   # relative to /workspace
 
@@ -369,9 +369,9 @@ kaniko:
   enabled: true
   image: gcr.io/kaniko-project/executor:debug
   # Registry to push built images
-  registry: "ghcr.io/5dlabs"
+  registry: "registry.5dlabs.ai/5dlabs"
   # Cache repo for layer caching
-  cacheRepo: "ghcr.io/5dlabs/kaniko-cache"
+  cacheRepo: "registry.5dlabs.ai/5dlabs/kaniko-cache"
   cache: true
   resources:
     requests:

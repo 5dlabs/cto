@@ -65,7 +65,7 @@ fn default_linear_service_url() -> String {
 impl Default for LinearConfig {
     fn default() -> Self {
         Self {
-            sidecar_image: Some("ghcr.io/5dlabs/linear-sidecar:latest".to_string()),
+            sidecar_image: Some("registry.5dlabs.ai/5dlabs/linear-sidecar:latest".to_string()),
             service_url: default_linear_service_url(),
         }
     }
@@ -110,7 +110,7 @@ pub struct AgentConfig {
 /// Image configuration
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ImageConfig {
-    /// Image repository (e.g., "ghcr.io/5dlabs/claude")
+    /// Image repository (e.g., "registry.5dlabs.ai/5dlabs/claude")
     pub repository: String,
 
     /// Image tag (e.g., "latest", "v2.1.0")
@@ -767,7 +767,7 @@ cleanup:
         config.agent.cli_images.insert(
             "CODEX".to_string(),
             ImageConfig {
-                repository: "ghcr.io/5dlabs/codex".to_string(),
+                repository: "registry.5dlabs.ai/5dlabs/codex".to_string(),
                 tag: "v1.2.3".to_string(),
             },
         );

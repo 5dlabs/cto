@@ -417,7 +417,7 @@ impl Default for IntakeConfig {
         Self {
             // Container image for intake workflows (derived from CLI selection)
             runtime_image: env::var("RUNTIME_IMAGE")
-                .unwrap_or_else(|_| "ghcr.io/5dlabs/claude:latest".to_string()),
+                .unwrap_or_else(|_| "registry.5dlabs.ai/5dlabs/claude:latest".to_string()),
             // Morgan is the designated intake/PM agent
             github_app: env::var("GITHUB_APP_NAME").unwrap_or_else(|_| "5DLabs-Morgan".to_string()),
             // Opus 4.5 with extended thinking for complex intake tasks

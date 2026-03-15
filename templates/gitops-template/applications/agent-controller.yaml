@@ -14,7 +14,7 @@ spec:
   project: default
 
   source:
-    repoURL: ghcr.io/5dlabs/charts
+    repoURL: registry.5dlabs.ai/5dlabs/charts
     chart: agent-controller
     targetRevision: "0.2.17"
     helm:
@@ -38,7 +38,7 @@ spec:
         # Agent pod defaults
         agent:
           image:
-            repository: ghcr.io/5dlabs/cto-agent
+            repository: registry.5dlabs.ai/5dlabs/cto-agent
             tag: "0.2.17"
           defaultModel: claude-sonnet-4-20250514
 

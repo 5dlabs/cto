@@ -617,9 +617,9 @@ dev-sidecar-image:
     cp target/x86_64-unknown-linux-gnu/release/status-sync .
     docker buildx build --platform linux/amd64 --push --target production \
         -f infra/images/linear-sidecar/Dockerfile \
-        -t ghcr.io/5dlabs/linear-sidecar:dev .
+        -t registry.5dlabs.ai/5dlabs/linear-sidecar:dev .
     rm status-sync
-    @echo "✅ Dev sidecar image pushed to ghcr.io/5dlabs/linear-sidecar:dev"
+    @echo "✅ Dev sidecar image pushed to registry.5dlabs.ai/5dlabs/linear-sidecar:dev"
 
 
 # Install cross-compilation tools for dev builds
@@ -629,8 +629,8 @@ install-cross-tools:
     @echo ""
     @echo "✅ cargo-zigbuild installed"
     @echo ""
-    @echo "For GHCR authentication, run:"
-    @echo '  echo $$GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin'
+    @echo "For registry authentication, run:"
+    @echo '  echo $$GITHUB_TOKEN | docker login registry.5dlabs.ai -u YOUR_USERNAME --password-stdin'
 
 # =============================================================================
 # Utility Commands
@@ -708,9 +708,9 @@ dev-sidecar-image-cross:
     @echo "Cross-compiling status-sync for linux-x86_64..."
     cargo zigbuild --release --target x86_64-unknown-linux-gnu -p pm --bin status-sync
     cp target/x86_64-unknown-linux-gnu/release/status-sync .
-    @echo "Building and pushing ghcr.io/5dlabs/linear-sidecar:dev..."
+    @echo "Building and pushing registry.5dlabs.ai/5dlabs/linear-sidecar:dev..."
     docker buildx build --platform linux/amd64 --push --target production \
         -f infra/images/linear-sidecar/Dockerfile \
-        -t ghcr.io/5dlabs/linear-sidecar:dev .
+        -t registry.5dlabs.ai/5dlabs/linear-sidecar:dev .
     rm status-sync
-    @echo "✅ Dev sidecar image pushed to ghcr.io/5dlabs/linear-sidecar:dev"
+    @echo "✅ Dev sidecar image pushed to registry.5dlabs.ai/5dlabs/linear-sidecar:dev"
