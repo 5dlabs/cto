@@ -23,7 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Configuration
-REGISTRY="${REGISTRY:-ghcr.io}"
+REGISTRY="${REGISTRY:-registry.5dlabs.ai}"
 ORG="${ORG:-5dlabs}"
 NAMESPACE="${NAMESPACE:-cto}"
 DEV_TAG="${DEV_TAG:-dev-$(whoami)}"
@@ -76,7 +76,7 @@ print_help() {
     echo "  $0 --tag feature-x healer  # Use custom tag 'feature-x'"
     echo ""
     echo "Environment Variables:"
-    echo "  REGISTRY        Container registry (default: ghcr.io)"
+    echo "  REGISTRY        Container registry (default: registry.5dlabs.ai)"
     echo "  ORG             Organization/namespace (default: 5dlabs)"
     echo "  NAMESPACE       Kubernetes namespace (default: cto)"
     echo "  DEV_TAG         Default tag (default: dev-\$USER)"

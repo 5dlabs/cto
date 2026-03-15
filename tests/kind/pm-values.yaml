@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/5dlabs/pm-server
+  repository: registry.5dlabs.ai/5dlabs/pm-server
   pullPolicy: IfNotPresent
   tag: kind-local
 

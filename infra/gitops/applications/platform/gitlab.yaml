@@ -1,0 +1,81 @@
+---
+# GitLab CE (Self-Hosted)
+# Primary Git hosting, container registry, and CI/CD platform
+# Replaces GitHub for repos, CI/CD, and container registry
+# Accessible at git.5dlabs.ai with registry at registry.5dlabs.ai
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitlab
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: gitlab
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: git-platform
+  annotations:
+    # Deploy after core infrastructure (ingress, cert-manager, external-secrets)
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://charts.gitlab.io/
+    chart: gitlab
+    targetRevision: 8.7.1  # GitLab CE 17.7
+
+    helm:
+      releaseName: gitlab
+      valueFiles:
+        - $values/infra/charts/gitlab/values.yaml
+
+  sources:
+    - repoURL: https://charts.gitlab.io/
+      chart: gitlab
+      targetRevision: 8.7.1
+      helm:
+        releaseName: gitlab
+        valueFiles:
+          - $values/infra/charts/gitlab/values.yaml
+
+    - repoURL: https://git.5dlabs.ai/5dlabs/cto.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitlab
+
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+    - group: batch
+      kind: Job
+      jqPathExpressions:
+        - .spec.template.spec.containers[].env
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+
+  revisionHistoryLimit: 5

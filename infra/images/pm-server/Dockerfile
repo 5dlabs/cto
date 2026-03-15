@@ -8,10 +8,10 @@
 #   CI/GHCR build (default - expects pre-built binary in context):
 #     cargo build --release --package pm --bin pm-server
 #     cp target/release/pm-server pm-server
-#     docker build -f infra/images/pm-server/Dockerfile -t ghcr.io/5dlabs/pm-server .
+#     docker build -f infra/images/pm-server/Dockerfile -t registry.5dlabs.ai/5dlabs/pm-server .
 #
 #   Local/Kind build (compiles from source):
-#     docker build --target local -f infra/images/pm-server/Dockerfile -t ghcr.io/5dlabs/pm-server:local .
+#     docker build --target local -f infra/images/pm-server/Dockerfile -t registry.5dlabs.ai/5dlabs/pm-server:local .
 #
 # Note: Uses Rust nightly for edition 2024 support
 #

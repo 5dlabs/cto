@@ -18,13 +18,14 @@ spec:
 
   # Source repositories that applications in this project can deploy from
   sourceRepos:
-    - 'https://github.com/5dlabs/cto'
-    - 'https://github.com/5dlabs/cto-apps'  # GitOps repo for Bolt-managed applications
-    - 'https://github.com/5dlabs/docs'
+    - 'https://git.5dlabs.ai/5dlabs/cto.git'
+    - 'https://git.5dlabs.ai/5dlabs/cto-apps.git'  # GitOps repo for Bolt-managed applications
+    - 'https://git.5dlabs.ai/5dlabs/docs.git'
     # Note: toolman repo has been integrated into cto as the 'tools' crate
-    - 'https://5dlabs.github.io/cto'
+    - 'https://git.5dlabs.ai/5dlabs/cto'
 
-    - 'https://github.com/5dlabs/*'
+    - 'https://git.5dlabs.ai/5dlabs/*'
+    - 'https://charts.gitlab.io/'
     - 'https://argoproj.github.io/argo-helm'
     - 'https://fluent.github.io/helm-charts'
     - 'https://prometheus-community.github.io/helm-charts'
@@ -152,6 +153,11 @@ spec:
       server: https://kubernetes.default.svc
     # Headscale VPN control server
     - namespace: headscale
+      server: https://kubernetes.default.svc
+    # GitLab
+    - namespace: gitlab
+      server: https://kubernetes.default.svc
+    - namespace: gitlab-runners
       server: https://kubernetes.default.svc
 
   # Cluster resource whitelist

@@ -76,7 +76,7 @@ const MORGAN_CHART_PATH: &str = "infra/charts/openclaw-agent";
 const MORGAN_VALUES_PATH: &str = "infra/gitops/agents/morgan-values.yaml";
 const CTO_SUPPORT_VALUES_PATH: &str =
     "crates/cto-lite/tauri/resources/helm/cto-local-support-values.yaml";
-const REMOTE_RUNTIME_IMAGE_REPOSITORY: &str = "ghcr.io/5dlabs/runtime";
+const REMOTE_RUNTIME_IMAGE_REPOSITORY: &str = "registry.5dlabs.ai/5dlabs/runtime";
 const REMOTE_RUNTIME_IMAGE_TAG: &str = "full";
 const LOCAL_AGENT_BASE_DOCKERFILE_PATH: &str = "infra/images/agents/Dockerfile";
 const LOCAL_AGENT_BASE_IMAGE_REPOSITORY: &str = "cto/agents";

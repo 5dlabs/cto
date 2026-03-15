@@ -3,7 +3,7 @@ set -euo pipefail
 
 # OpenMemory Image Build Script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_NAME="ghcr.io/5dlabs/openmemory"
+IMAGE_NAME="registry.5dlabs.ai/5dlabs/openmemory"
 VERSION="${1:-latest}"
 
 echo "🐳 Building OpenMemory image..."

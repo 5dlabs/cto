@@ -9,7 +9,7 @@
 # Prerequisites:
 #   - cargo-zigbuild: cargo install cargo-zigbuild
 #   - Docker with buildx
-#   - GHCR authentication: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+#   - Registry authentication: echo $GITHUB_TOKEN | docker login registry.5dlabs.ai -u USERNAME --password-stdin
 #
 # Usage:
 #   ./scripts/build-dev-image.sh [--binary intake|pm-activity|all] [--image runtime|claude] [--push]
@@ -28,7 +28,7 @@ BINARY="intake"
 IMAGE="runtime"
 PUSH=false
 DEV_TAG="dev"
-REGISTRY="ghcr.io/5dlabs"
+REGISTRY="registry.5dlabs.ai/5dlabs"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -192,12 +192,12 @@ echo "✅ Image built: $FINAL_IMAGE"
 
 if [[ "$PUSH" == "true" ]]; then
   echo ""
-  echo "═══ Step 3: Pushing to GHCR ═══"
+  echo "═══ Step 3: Pushing to registry ═══"
   
   # Check if logged in
   if ! docker manifest inspect "$BASE_IMAGE" &> /dev/null; then
-    echo "⚠️  Not logged into GHCR. Run:"
-    echo "   echo \$GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin"
+    echo "⚠️  Not logged into registry. Run:"
+    echo "   echo \$GITHUB_TOKEN | docker login registry.5dlabs.ai -u YOUR_USERNAME --password-stdin"
     exit 1
   fi
   

@@ -40,9 +40,9 @@ spec:
 
           # Registry configuration for GitHub Container Registry
           registries:
-            - name: GitHub Container Registry
-              api_url: https://ghcr.io
-              prefix: ghcr.io
+            - name: 5D Labs Container Registry
+              api_url: https://registry.5dlabs.ai
+              prefix: registry.5dlabs.ai
               # Uses the same credentials as ArgoCD for pulling images
               credentials: pullsecret:argocd/ghcr-credentials
               default: true

@@ -18,7 +18,7 @@ spec:
 
   # Source configuration
   source:
-    repoURL: https://github.com/5dlabs/cto
+    repoURL: https://git.5dlabs.ai/5dlabs/cto.git
     targetRevision: main
     path: infra/gitops
 

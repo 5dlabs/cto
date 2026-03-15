@@ -1,0 +1,38 @@
+# Shared Rust build template for GitLab CI
+# Replaces GitHub composite actions: setup-rust, setup-rust-k8s, rust-build, rust-test, rust-lint
+
+.rust-setup:
+  image: rust:latest
+  variables:
+    CARGO_HOME: /usr/local/cargo
+    RUSTUP_HOME: /usr/local/rustup
+    SCCACHE_DIR: /tmp/sccache
+  before_script:
+    - rustup component add rustfmt clippy
+    - cargo install cargo-nextest --locked 2>/dev/null || true
+  tags:
+    - k8s
+
+.rust-build:
+  extends: .rust-setup
+  script:
+    - cargo build --release --package $RUST_PACKAGE
+  artifacts:
+    paths:
+      - target/release/$RUST_BINARY
+
+.rust-test:
+  extends: .rust-setup
+  script:
+    - |
+      if command -v cargo-nextest &> /dev/null; then
+        cargo nextest run --package $RUST_PACKAGE --all-targets
+      else
+        cargo test --package $RUST_PACKAGE --all-targets
+      fi
+
+.rust-lint:
+  extends: .rust-setup
+  script:
+    - cargo fmt --package $RUST_PACKAGE -- --check
+    - cargo clippy --package $RUST_PACKAGE -- -D warnings -W clippy::pedantic

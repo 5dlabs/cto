@@ -14,7 +14,7 @@ spec:
   project: default
 
   source:
-    repoURL: ghcr.io/5dlabs/charts
+    repoURL: registry.5dlabs.ai/5dlabs/charts
     chart: mcp-tools
     targetRevision: "0.2.17"
     helm:
@@ -30,7 +30,7 @@ spec:
           github:
             enabled: true
             image:
-              repository: ghcr.io/5dlabs/mcp-github
+              repository: registry.5dlabs.ai/5dlabs/mcp-github
               tag: "0.2.17"
             resources:
               requests:
@@ -44,14 +44,14 @@ spec:
           linear:
             enabled: false
             image:
-              repository: ghcr.io/5dlabs/mcp-linear
+              repository: registry.5dlabs.ai/5dlabs/mcp-linear
               tag: "0.2.17"
 
           # Provider MCP for infrastructure self-healing
           latitude:
             enabled: true
             image:
-              repository: ghcr.io/5dlabs/mcp-latitude
+              repository: registry.5dlabs.ai/5dlabs/mcp-latitude
               tag: "0.2.17"
             resources:
               requests:

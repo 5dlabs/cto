@@ -2,13 +2,13 @@
 # Local Kind cluster deployment
 
 global:
-  imageRegistry: ghcr.io/5dlabs
+  imageRegistry: registry.5dlabs.ai/5dlabs
 
 # Controller - reuse existing controller image
 controller:
   enabled: true
   image:
-    repository: ghcr.io/5dlabs/cto-controller
+    repository: registry.5dlabs.ai/5dlabs/cto-controller
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -24,7 +24,7 @@ controller:
 pmLite:
   enabled: true
   image:
-    repository: ghcr.io/5dlabs/cto-pm-lite
+    repository: registry.5dlabs.ai/5dlabs/cto-pm-lite
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -62,24 +62,24 @@ argo-workflows:
 agents:
   # Frontend agent (always included)
   blaze:
-    image: ghcr.io/5dlabs/cto-agent-blaze:latest
+    image: registry.5dlabs.ai/5dlabs/cto-agent-blaze:latest
   # Quality agent (always included)  
   cleo:
-    image: ghcr.io/5dlabs/cto-agent-cleo:latest
+    image: registry.5dlabs.ai/5dlabs/cto-agent-cleo:latest
   # Security agent (always included)
   cipher:
-    image: ghcr.io/5dlabs/cto-agent-cipher:latest
+    image: registry.5dlabs.ai/5dlabs/cto-agent-cipher:latest
   # Testing agent (always included)
   tess:
-    image: ghcr.io/5dlabs/cto-agent-tess:latest
+    image: registry.5dlabs.ai/5dlabs/cto-agent-tess:latest
   # Deployment agent (always included)
   bolt:
-    image: ghcr.io/5dlabs/cto-agent-bolt:latest
+    image: registry.5dlabs.ai/5dlabs/cto-agent-bolt:latest
   # Backend agents - user picks one
   grizz:  # Rust/Go
-    image: ghcr.io/5dlabs/cto-agent-grizz:latest
+    image: registry.5dlabs.ai/5dlabs/cto-agent-grizz:latest
   nova:   # TypeScript
-    image: ghcr.io/5dlabs/cto-agent-nova:latest
+    image: registry.5dlabs.ai/5dlabs/cto-agent-nova:latest
 
 # Cloudflare tunnel for webhook ingress
 tunnel:

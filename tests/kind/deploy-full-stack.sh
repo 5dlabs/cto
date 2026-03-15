@@ -719,11 +719,11 @@ echo ""
 echo "1️⃣6️⃣  Deploying tweakcn..."
 
 # Check if image exists
-if docker images | grep -q "ghcr.io/5dlabs/tweakcn.*kind-local"; then
+if docker images | grep -q "registry.5dlabs.ai/5dlabs/tweakcn.*kind-local"; then
   helm upgrade --install tweakcn "${CHARTS_DIR}/universal-app" \
     --namespace cto \
     --set fullnameOverride=tweakcn \
-    --set image.repository=ghcr.io/5dlabs/tweakcn \
+    --set image.repository=registry.5dlabs.ai/5dlabs/tweakcn \
     --set image.tag=kind-local \
     --set image.pullPolicy=IfNotPresent \
     --set imagePullSecrets=null \
@@ -745,8 +745,8 @@ if docker images | grep -q "ghcr.io/5dlabs/tweakcn.*kind-local"; then
     --wait --timeout 3m
   echo "   ✅ tweakcn deployed"
 else
-  echo "   ⚠️  tweakcn image not found (ghcr.io/5dlabs/tweakcn:kind-local)"
-  echo "      Build and load with: docker build -t ghcr.io/5dlabs/tweakcn:kind-local -f infra/images/tweakcn/Dockerfile . && kind load docker-image ghcr.io/5dlabs/tweakcn:kind-local"
+  echo "   ⚠️  tweakcn image not found (registry.5dlabs.ai/5dlabs/tweakcn:kind-local)"
+  echo "      Build and load with: docker build -t registry.5dlabs.ai/5dlabs/tweakcn:kind-local -f infra/images/tweakcn/Dockerfile . && kind load docker-image registry.5dlabs.ai/5dlabs/tweakcn:kind-local"
 fi
 
 # ============================================================================

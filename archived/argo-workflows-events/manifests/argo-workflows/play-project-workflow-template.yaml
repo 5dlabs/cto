@@ -2032,7 +2032,7 @@ spec:
     - name: morgan-project-manager
       daemon: true  # Run as background daemon - doesn't block workflow progression
       script:
-        image: ghcr.io/5dlabs/claude:dev
+        image: registry.5dlabs.ai/5dlabs/claude:dev
         command: ["/bin/bash"]
         # Run as root to fix PVC permissions issue (Mayastor mounts as root:root)
         securityContext:

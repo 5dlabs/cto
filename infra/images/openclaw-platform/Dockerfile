@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1.7-labs
 
-ARG BASE_IMAGE=ghcr.io/5dlabs/agents:latest-arm64
+ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/agents:latest-arm64
 FROM ${BASE_IMAGE}
 
 ARG OPENCLAW_VERSION=beta
 
-LABEL org.opencontainers.image.source="https://github.com/5dlabs/cto"
+LABEL org.opencontainers.image.source="https://git.5dlabs.ai/5dlabs/cto"
 LABEL org.opencontainers.image.description="Local OpenClaw platform image for CTO desktop bootstrap"
 
 USER root

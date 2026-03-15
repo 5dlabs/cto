@@ -46,7 +46,7 @@ echo "   ✓ Healer server deployed"
 # 5. Deploy PM (Project Management) server (if image exists)
 echo ""
 echo "5. Deploying PM server..."
-if docker images | grep -q "ghcr.io/5dlabs/pm-server.*kind-local"; then
+if docker images | grep -q "registry.5dlabs.ai/5dlabs/pm-server.*kind-local"; then
   # Create placeholder secrets for PM
   kubectl create secret generic pm-secrets \
     --namespace cto \
@@ -63,10 +63,10 @@ if docker images | grep -q "ghcr.io/5dlabs/pm-server.*kind-local"; then
     --wait --timeout 5m
   echo "   ✓ PM server deployed"
 else
-  echo "   ⚠️  PM server image not found (ghcr.io/5dlabs/pm-server:kind-local)"
+  echo "   ⚠️  PM server image not found (registry.5dlabs.ai/5dlabs/pm-server:kind-local)"
   echo "      Build and load with:"
-  echo "      cd infra/images/pm-server && docker build -f Dockerfile.build -t ghcr.io/5dlabs/pm-server:kind-local ../../../"
-  echo "      kind load docker-image ghcr.io/5dlabs/pm-server:kind-local"
+  echo "      cd infra/images/pm-server && docker build -f Dockerfile.build -t registry.5dlabs.ai/5dlabs/pm-server:kind-local ../../../"
+  echo "      kind load docker-image registry.5dlabs.ai/5dlabs/pm-server:kind-local"
 fi
 
 echo ""

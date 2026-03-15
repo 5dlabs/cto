@@ -1,0 +1,7 @@
+{
+  "wallets": "0x02227b8f5a9636e895607edd3185ed6ee5598ff7,0x019782cab5d844f02bafb71f512758be78579f3c,0x9d84ce0306f8551e02efef1680475fc0f1dc1344",
+  "max_usd": 5,
+  "top_n": "5",
+  "max_trades_per_run": 5,
+  "venue": "simmer"
+}

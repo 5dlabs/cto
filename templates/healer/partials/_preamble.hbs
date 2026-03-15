@@ -30,14 +30,14 @@ You have a Docker-in-Docker sidecar running with full Docker capabilities. Use t
 Example commands:
 ```bash
 # Pull and inspect the failing image
-docker pull ghcr.io/5dlabs/some-image:tag
-docker run --rm -it --entrypoint sh ghcr.io/5dlabs/some-image:tag
+docker pull registry.5dlabs.ai/5dlabs/some-image:tag
+docker run --rm -it --entrypoint sh registry.5dlabs.ai/5dlabs/some-image:tag
 
 # Check if binary exists in image
-docker run --rm ghcr.io/5dlabs/some-image:tag ls -la /usr/local/bin/
+docker run --rm registry.5dlabs.ai/5dlabs/some-image:tag ls -la /usr/local/bin/
 
 # Inspect image layers and config
-docker inspect ghcr.io/5dlabs/some-image:tag
+docker inspect registry.5dlabs.ai/5dlabs/some-image:tag
 ```
 {{/if}}
 

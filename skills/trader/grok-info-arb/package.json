@@ -1,0 +1,19 @@
+{
+  "name": "@5dlabs/grok-info-arb",
+  "version": "0.1.0",
+  "description": "Grok X search information arbitrage engine for event-driven Polymarket trading",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "start:live": "node index.js --live",
+    "scan": "node index.js --once",
+    "test": "node grok_scanner.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0"
+  },
+  "author": "Jonathon Fritz",
+  "license": "MIT"
+}
