@@ -200,3 +200,6 @@ local/
 CREDENTIALS.md
 credentials.md
 *.credentials.*
+skills/trader/.env
+skills/trader/**/.env
+skills/trader/**/.secrets/

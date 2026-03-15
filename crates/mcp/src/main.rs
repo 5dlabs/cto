@@ -7,6 +7,7 @@
 #![allow(clippy::format_push_string)]
 #![allow(clippy::no_effect_underscore_binding)]
 
+use acp_runtime::AcpRuntimeRegistry;
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -105,6 +106,8 @@ struct WorkflowDefaults {
     intake: IntakeDefaults,
     #[serde(default)]
     linear: LinearDefaults,
+    #[serde(default)]
+    acp: cto_config::AcpDefaults,
     #[serde(default)]
     play: PlayDefaults,
 }
@@ -378,6 +381,14 @@ fn load_cto_config() -> Result<CtoConfig> {
                     &config.defaults.linear.team_id
                 }
             );
+            if let Some(selection) =
+                AcpRuntimeRegistry::new(config.defaults.acp.clone()).select_runtime_for_service("mcp", None)
+            {
+                eprintln!(
+                    "🔍 DEBUG: mcp ACP runtime enabled via {}",
+                    selection.runtime_id
+                );
+            }
             return Ok(config);
         }
     }
@@ -5213,8 +5224,8 @@ fn create_mcp_server_coderun(
         "spec": {
             "taskId": 0,
             "service": "cto",
-            "repositoryUrl": "https://github.com/5dlabs/cto",
-            "docsRepositoryUrl": "https://github.com/5dlabs/cto",
+            "repositoryUrl": "https://git.5dlabs.ai/5dlabs/cto.git",
+            "docsRepositoryUrl": "https://git.5dlabs.ai/5dlabs/cto.git",
             "workingDirectory": ".",
             "model": model,
             "githubApp": github_app,
@@ -5637,8 +5648,8 @@ fn create_add_skills_coderun(
         "spec": {
             "taskId": 0,
             "service": format!("skills-{}", short_name),
-            "repositoryUrl": "https://github.com/5dlabs/cto",
-            "docsRepositoryUrl": "https://github.com/5dlabs/cto",
+            "repositoryUrl": "https://git.5dlabs.ai/5dlabs/cto.git",
+            "docsRepositoryUrl": "https://git.5dlabs.ai/5dlabs/cto.git",
             "workingDirectory": ".",
             "model": model,
             "githubApp": github_app,

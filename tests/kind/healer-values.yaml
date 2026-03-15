@@ -6,7 +6,7 @@ replicaCount: 1
 revisionHistoryLimit: 5
 
 image:
-  repository: ghcr.io/5dlabs/healer
+  repository: registry.5dlabs.ai/5dlabs/healer
   pullPolicy: IfNotPresent
   tag: "kind-local"
 

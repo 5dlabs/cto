@@ -1,0 +1,219 @@
+---
+name: Controller CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# LESSON LEARNED: Without concurrency controls, multiple runs for the same branch
+# compete for limited runners, causing queue buildup. This cancels outdated runs.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-005
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Change detection job (lightweight - stays on ubuntu)
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      controller: ${{ steps.filter.outputs.controller }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            controller:
+              - 'crates/controller/**'
+              - 'templates/**'
+              - '!crates/controller/**/*.md'
+
+  # Rust linting using composite action
+  lint-rust:
+    needs: changes
+    if: needs.changes.outputs.controller == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    outputs:
+      format-needed: ${{ steps.lint.outputs.format-needed }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          components: rustfmt, clippy
+          sccache-size: '50G'
+
+      - name: Lint controller
+        id: lint
+        uses: ./.github/actions/rust-lint
+        with:
+          package: controller
+          working-directory: ./crates/controller
+          use-sccache: 'true'
+
+  # Run tests using composite action
+  test-rust:
+    needs: changes
+    if: needs.changes.outputs.controller == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Test controller
+        uses: ./.github/actions/rust-test
+        with:
+          package: controller
+          working-directory: ./crates/controller
+          features: all
+          use-sccache: 'true'
+
+  # Integration tests (Helm chart validation)
+  integration-tests:
+    needs: [changes, lint-rust, test-rust]
+    if: |
+      always() && !cancelled() &&
+      (needs.changes.outputs.controller == 'true' || github.event_name == 'push')
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v3
+        with:
+          version: 'latest'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test Helm Chart Structure
+        run: |
+          helm version
+          helm lint ./infra/charts/cto
+          # Template to verify rendering works
+          helm template cto ./infra/charts/cto --set argo.enabled=false > /tmp/default.yaml
+          echo "✅ Helm template rendered $(wc -l < /tmp/default.yaml) lines"
+
+      - name: Validate CRD definitions
+        run: |
+          echo "🏗️ Validating CRD files..."
+          CRD_COUNT=$(ls -1 infra/charts/cto/crds/*.yaml 2>/dev/null | wc -l)
+          echo "Found $CRD_COUNT CRD file(s)"
+          
+          # CRDs are already validated by helm template above
+          # Just verify the files exist and list them
+          for crd in infra/charts/cto/crds/*.yaml; do
+            if [ -f "$crd" ]; then
+              echo "  ✓ $crd"
+            fi
+          done
+          echo "✅ CRD validation passed"
+
+  # Security scanning (non-blocking)
+  # Uses shell-based Trivy installation to avoid transient GitHub API failures
+  # when downloading external actions during job setup phase
+  security-scan:
+    needs: changes
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install and run Trivy vulnerability scanner
+        run: |
+          # Install Trivy using shell script (more resilient than external action)
+          echo "📥 Installing Trivy..."
+          for attempt in 1 2 3 4 5; do
+            if curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.58.1; then
+              echo "✅ Trivy installed on attempt $attempt"
+              break
+            fi
+            echo "⚠️ Trivy install attempt $attempt failed, retrying in $((attempt * 10))s..."
+            sleep $((attempt * 10))
+            if [ "$attempt" -eq 5 ]; then
+              echo "⚠️ Failed to install Trivy after 5 attempts, skipping scan"
+              exit 0
+            fi
+          done
+          
+          # Run Trivy filesystem scan
+          echo "🔍 Running Trivy vulnerability scan..."
+          trivy fs --format sarif --output trivy-results.sarif --severity CRITICAL,HIGH . || true
+          echo "✅ Trivy scan complete"
+
+      - name: Upload Trivy scan results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: trivy-results
+          path: trivy-results.sarif
+          if-no-files-found: ignore
+
+      - name: Setup Rust for cargo-audit
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust security audit
+        run: |
+          cargo install cargo-audit --version 0.21.2 2>/dev/null || true
+          cd crates/controller && cargo audit || true
+
+  # Docker Build & Push (main branch only)
+  # Runs on: push events when controller/templates files change, or manual workflow_dispatch
+  build-and-push:
+    needs: [changes, lint-rust, test-rust]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && needs.changes.outputs.controller == 'true')
+      )
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Build controller binary
+        uses: ./.github/actions/rust-build
+        with:
+          package: controller
+          binary: agent-controller
+          working-directory: ./crates/controller
+          output-path: ../../agent-controller
+          use-sccache: 'true'
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(cargo metadata --manifest-path crates/controller/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "controller") | .version')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: controller
+          context: .
+          dockerfile: ./infra/images/controller/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ steps.version.outputs.short-sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,19 @@
+{
+  "name": "temporal-arb",
+  "version": "1.0.0",
+  "description": "Temporal arbitrage on Polymarket 5-min crypto markets — exploit CEX-to-Polymarket latency",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "start:live": "node index.js --live",
+    "cex-only": "node cex_feed.js",
+    "scan": "node polymarket_scanner.js"
+  },
+  "dependencies": {
+    "ccxt": "^4.4.0",
+    "ws": "^8.18.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0"
+  }
+}

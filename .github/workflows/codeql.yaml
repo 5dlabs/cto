@@ -1,0 +1,65 @@
+---
+name: CodeQL
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 8 * * 1"
+
+# LESSON LEARNED: Without concurrency controls, multiple runs for the same branch
+# compete for limited runners, causing queue buildup. This cancels outdated runs.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-005
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    # Only run on main branch - skip any stale runs from develop or other branches
+    # This guards against queued runs from before develop was removed from triggers
+    # For push/schedule: check ref is main. For PRs: check base_ref is main (not develop)
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')
+    runs-on: [k8s-runner]
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["rust"]
+    env:
+      RUSTUP_HOME: ${{ github.workspace }}/.rustup
+      CARGO_HOME: ${{ github.workspace }}/.cargo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          config-file: .github/codeql/codeql-config.yaml
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

@@ -239,12 +239,12 @@ impl IntakeDomain {
                 .cloned()
                 .unwrap_or_else(|| config.output_dir.join("docs/design-brief.md"));
             if brief_path.exists() {
-                let brief = tokio::fs::read_to_string(&brief_path)
-                    .await
-                    .map_err(|e| TasksError::FileReadError {
+                let brief = tokio::fs::read_to_string(&brief_path).await.map_err(|e| {
+                    TasksError::FileReadError {
                         path: brief_path.display().to_string(),
                         reason: e.to_string(),
-                    })?;
+                    }
+                })?;
                 tracing::info!("Using design brief from {:?}", brief_path);
                 brief
             } else {

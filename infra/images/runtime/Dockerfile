@@ -6,21 +6,21 @@
 # Multi-target build supporting different use cases:
 #
 #   Minimal (for agents - default target):
-#     docker build -t ghcr.io/5dlabs/runtime .
-#     docker build --target minimal -t ghcr.io/5dlabs/runtime:minimal .
+#     docker build -t registry.5dlabs.ai/5dlabs/runtime .
+#     docker build --target minimal -t registry.5dlabs.ai/5dlabs/runtime:minimal .
 #     Contains: git, Node.js, npm, ripgrep, jq, curl, GitHub CLI
 #     Size: ~500MB (vs ~2GB for full)
 #
 #   Full development environment:
-#     docker build --target production -t ghcr.io/5dlabs/runtime:full .
+#     docker build --target production -t registry.5dlabs.ai/5dlabs/runtime:full .
 #     Contains: All development tools, languages, k8s CLIs, security scanners
 #     Size: ~2GB
 #
 #   CI/GHCR build (downloads binaries from releases):
-#     docker build -t ghcr.io/5dlabs/runtime .
+#     docker build -t registry.5dlabs.ai/5dlabs/runtime .
 #
 #   Local/Kind build (compiles intake/pm-activity from source):
-#     docker build --target local -t ghcr.io/5dlabs/runtime:local .
+#     docker build --target local -t registry.5dlabs.ai/5dlabs/runtime:local .
 #
 # =============================================================================
 
@@ -149,6 +149,82 @@ FROM minimal-base AS minimal
 
 # Verify essential tools
 RUN node --version && npm --version && git --version && gh --version && op --version
+
+# =============================================================================
+# TRADER TARGET (for autonomous trading agent)
+# =============================================================================
+#   docker build --target trader -t registry.5dlabs.ai/5dlabs/runtime:trader .
+#   Contains: minimal + Python 3.12 + all npm/pip trading deps + Solana CLI
+#   Size: ~800MB estimated
+# =============================================================================
+FROM minimal-base AS trader
+
+# Python 3.12 + pip (needed by 9 trading skills)
+USER root
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get -o Acquire::ForceIPv4=true update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true install -y --no-install-recommends \
+      python3 python3-pip python3-venv python-is-python3 python3-dev \
+      build-essential pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Solana CLI tools (solana, spl-token — needed by solana-swaps, solana-transfer)
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" && \
+    ln -sf /root/.local/share/solana/install/active_release/bin/solana /usr/local/bin/solana && \
+    ln -sf /root/.local/share/solana/install/active_release/bin/spl-token /usr/local/bin/spl-token && \
+    ln -sf /root/.local/share/solana/install/active_release/bin/solana-keygen /usr/local/bin/solana-keygen || true
+
+# npm: all trading skill dependencies (pre-installed globally to avoid per-skill npm install)
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g --no-fund \
+      @solana/web3.js \
+      @solana/spl-token \
+      @coral-xyz/borsh \
+      @raydium-io/raydium-sdk \
+      bs58 \
+      ws \
+      axios \
+      dotenv \
+      commander \
+      express \
+      bn.js \
+      pngjs \
+      tweetnacl \
+      tsx \
+    && chown -R node:node /usr/local/share/npm-global
+
+# pip: all trading skill dependencies (pre-installed to avoid per-skill pip install)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install --break-system-packages --no-cache-dir \
+      simmer-sdk \
+      simmer-mcp \
+      ccxt \
+      httpx \
+      aiohttp \
+      matplotlib \
+      numpy \
+      pandas \
+      scipy \
+      statsmodels \
+      python-dotenv \
+      requests \
+      solana \
+      solders
+
+# Grok X Search MCP server (for sentiment-driven Polymarket trading)
+COPY apps/grok/ /opt/grok-x-search/
+RUN cd /opt/grok-x-search && npm install --no-fund && npm run build 2>/dev/null || true
+
+USER node
+WORKDIR /workspace
+
+# Verify critical tools
+RUN node --version && npm --version && python3 --version && pip3 --version && \
+    node -e "require('@solana/web3.js')" && \
+    python3 -c "import simmer_sdk; print('simmer-sdk OK')" && \
+    echo "Trader runtime ready"
 
 # =============================================================================
 # MAIN RUNTIME IMAGE (full development environment)
@@ -440,8 +516,13 @@ RUN --mount=type=cache,target=/root/.cache \
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Optional: sccache for root as well (helpful for scripts running as root)
+ARG INSTALL_SCCACHE=false
 RUN --mount=type=cache,target=/root/.cache \
-  . $HOME/.cargo/env && cargo install sccache || true
+  if [ "${INSTALL_SCCACHE:-false}" = "true" ]; then \
+    . "$HOME/.cargo/env" && cargo install sccache; \
+  else \
+    echo "Skipping sccache install"; \
+  fi
 
 # Configure mold defaults but disable problematic sccache by default
 ENV CC=clang \

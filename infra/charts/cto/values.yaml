@@ -97,6 +97,8 @@ secrets:
       baoKey: github-app-stitch
     - name: vex
       baoKey: github-app-vex
+    - name: angie
+      baoKey: github-app-angie
 
   # API keys for agent CLIs (used by Argo Workflow pods)
   agentPlatformKeys:
@@ -206,7 +208,7 @@ controller:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/controller
+    repository: registry.5dlabs.ai/5dlabs/controller
     pullPolicy: Always
     tag: "main"
 
@@ -238,7 +240,7 @@ controller:
 
   # Linear sidecar configuration (whip cracking enabled)
   linear:
-    sidecarImage: ghcr.io/5dlabs/linear-sidecar:dev
+    sidecarImage: registry.5dlabs.ai/5dlabs/linear-sidecar:dev
     serviceUrl: http://pm-server:8080
 
 # =============================================================================
@@ -246,37 +248,37 @@ controller:
 # =============================================================================
 agent:
   image:
-    repository: ghcr.io/5dlabs/agents
+    repository: registry.5dlabs.ai/5dlabs/agents
     tag: latest
   serviceAccountName: ""
   # Single unified image with all CLIs installed (claude, codex, cursor, gemini, factory, opencode, openclaw)
   cliImages:
     claude:
-      repository: ghcr.io/5dlabs/agents
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     cursor:
-      repository: ghcr.io/5dlabs/agents
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     codex:
-      repository: ghcr.io/5dlabs/agents
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     code:
-      repository: ghcr.io/5dlabs/agents
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     gemini:
-      repository: ghcr.io/5dlabs/agents
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     factory:
-      repository: ghcr.io/5dlabs/agents
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     opencode:
-      repository: ghcr.io/5dlabs/agents
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     research:
-      repository: ghcr.io/5dlabs/agents
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     grok:
-      repository: ghcr.io/5dlabs/agents
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
   cliProviders: {}
   agentCliConfigs: {}
@@ -295,7 +297,7 @@ pm:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/pm-server
+    repository: registry.5dlabs.ai/5dlabs/pm-server
     pullPolicy: Always
     tag: "latest"
 
@@ -359,7 +361,7 @@ tools:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/tools
+    repository: registry.5dlabs.ai/5dlabs/tools
     pullPolicy: Always
     tag: "latest"
 
@@ -717,7 +719,7 @@ healer:
   replicaCount: 0
 
   image:
-    repository: ghcr.io/5dlabs/healer
+    repository: registry.5dlabs.ai/5dlabs/healer
     pullPolicy: Always
     tag: "latest"
 
@@ -780,8 +782,8 @@ healer:
       namespace: "cto"
       githubApp: "5DLabs-Rex"
       model: "claude-opus-4-6-20260205"
-      repositoryUrl: "https://github.com/5dlabs/cto"
-      docsRepositoryUrl: "https://github.com/5dlabs/cto"
+      repositoryUrl: "https://git.5dlabs.ai/5dlabs/cto"
+      docsRepositoryUrl: "https://git.5dlabs.ai/5dlabs/cto"
       docsProjectDirectory: "docs"
       docsBranch: "main"
       workingDirectory: "."
@@ -875,7 +877,7 @@ openmemory:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/openmemory
+    repository: registry.5dlabs.ai/5dlabs/openmemory
     pullPolicy: Always
     tag: "latest"
 
@@ -934,7 +936,7 @@ tweakcn:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/tweakcn
+    repository: registry.5dlabs.ai/5dlabs/tweakcn
     pullPolicy: Always
     tag: "latest"
 
@@ -958,7 +960,7 @@ web:
   replicaCount: 2
 
   image:
-    repository: ghcr.io/5dlabs/web
+    repository: registry.5dlabs.ai/5dlabs/web
     pullPolicy: Always
     tag: "latest"
 
@@ -966,7 +968,7 @@ web:
   migrations:
     enabled: true
     image:
-      repository: ghcr.io/5dlabs/web-migrate
+      repository: registry.5dlabs.ai/5dlabs/web-migrate
       pullPolicy: Always
       tag: "latest"
 
@@ -1020,7 +1022,7 @@ grok:
   enabled: true
 
   image:
-    repository: ghcr.io/5dlabs/grok
+    repository: registry.5dlabs.ai/5dlabs/grok
     pullPolicy: Always
     tag: "latest"
 
@@ -1049,7 +1051,7 @@ research:
   enabled: false  # Deprecated: use grok section above
 
   image:
-    repository: ghcr.io/5dlabs/research
+    repository: registry.5dlabs.ai/5dlabs/research
     pullPolicy: Always
     tag: "latest"
 

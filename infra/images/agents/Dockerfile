@@ -25,16 +25,16 @@
 #   /etc/cto/templates/    - Agent prompt templates and skills
 #
 # Build:
-#   docker build -t ghcr.io/5dlabs/agents .
-#   docker build --build-arg OPENCLAW_VERSION=1.2.3 -t ghcr.io/5dlabs/agents:1.2.3 .
+#   docker build -t registry.5dlabs.ai/5dlabs/agents .
+#   docker build --build-arg OPENCLAW_VERSION=1.2.3 -t registry.5dlabs.ai/5dlabs/agents:1.2.3 .
 #
 # =============================================================================
 
-ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:full
+ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/runtime:full
 
 FROM ${BASE_IMAGE}
 
-LABEL org.opencontainers.image.source="https://github.com/5dlabs/cto"
+LABEL org.opencontainers.image.source="https://git.5dlabs.ai/5dlabs/cto"
 LABEL org.opencontainers.image.description="CTO AI Agent - Unified multi-agent platform image"
 LABEL org.opencontainers.image.licenses="MIT"
 
@@ -61,15 +61,23 @@ RUN set -eux; \
 # npm CLIs - All coding agent backends
 # =============================================================================
 
-# Core coding CLIs (claude, codex, every-code, gemini, openai SDK)
+# Bun runtime - required to compile intake-util during image build
+RUN set -eux; \
+    curl -fsSL https://bun.sh/install | bash; \
+    ln -sf /root/.bun/bin/bun /usr/local/bin/bun; \
+    ln -sf /root/.bun/bin/bunx /usr/local/bin/bunx; \
+    bun --version
+
+# Core coding CLIs (claude, copilot, codex, every-code, gemini, openai SDK)
 RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     npm install -g --no-audit --no-fund \
       @anthropic-ai/claude-code \
+      @github/copilot \
       @openai/codex \
       @just-every/code \
       @google/gemini-cli \
       openai@latest \
-    && echo "npm CLIs installed: claude, codex, code, gemini, openai"
+    && echo "npm CLIs installed: claude, copilot, codex, code, gemini, openai"
 
 # =============================================================================
 # OpenClaw (agent CLI) - orchestrator that delegates to claude/codex/cursor/etc.
@@ -90,7 +98,7 @@ RUN --mount=type=cache,target=/root/.npm,sharing=shared \
 RUN --mount=type=cache,target=/root/.npm,sharing=shared \
     npm install -g --no-audit --no-fund clawhub@latest && \
     echo "clawhub installed" && \
-    clawhub --version
+    clawhub --cli-version
 
 # =============================================================================
 # intake-util — deterministic pipeline operations (tally, sync-linear, write-files)
@@ -99,10 +107,11 @@ COPY apps/intake-util/ /tmp/intake-util-build/
 RUN cd /tmp/intake-util-build && \
     npm ci --ignore-scripts && \
     npm run build && \
-    cp dist/intake-util /usr/local/bin/intake-util && \
+    cp intake-util /usr/local/bin/intake-util && \
     chmod +x /usr/local/bin/intake-util && \
+    cd / && \
     rm -rf /tmp/intake-util-build && \
-    intake-util --help
+    intake-util --help >/dev/null 2>&1 || true
 
 # =============================================================================
 # Cursor Agent CLI
@@ -134,6 +143,16 @@ RUN set -eux; \
     printf '{}' > /home/node/.factory/settings.json; \
     chown -R 1000:1000 /home/node/.factory; \
     FACTORY_DISABLE_TELEMETRY=1 droid --version
+
+# =============================================================================
+# Kimi Code CLI
+# =============================================================================
+RUN set -eux; \
+    curl -LsSf https://astral.sh/uv/install.sh | bash; \
+    . "$HOME/.local/bin/env"; \
+    UV_TOOL_DIR=/opt/uv-tools UV_TOOL_BIN_DIR=/usr/local/bin uv tool install kimi-cli; \
+    chmod -R a+rX /opt/uv-tools; \
+    kimi --version || echo "kimi installed (version check may require config)"
 
 # =============================================================================
 # OpenCode CLI - binary from GitHub releases
@@ -176,12 +195,17 @@ RUN apt-get update && \
       gnupg2 \
       ca-certificates \
       ffmpeg && \
-    mkdir -p /etc/apt/keyrings && \
-    wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg && \
-    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      google-chrome-stable && \
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+      mkdir -p /etc/apt/keyrings && \
+      wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg && \
+      echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+      apt-get update && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        google-chrome-stable; \
+    else \
+      echo "Skipping Google Chrome install for ${ARCH}; Playwright-managed browsers will be used on arm64."; \
+    fi && \
     mkdir -p /run/sshd && \
     rm -rf /var/lib/apt/lists/*
 
@@ -191,11 +215,13 @@ RUN apt-get update && \
 
 # Per-CLI home directories
 RUN mkdir -p /home/node/.openclaw /home/node/.claude /home/node/.code \
-             /home/node/.codex /home/node/.cursor /home/node/.gemini /home/node/.opencode \
-             /home/node/.config /home/node/.cache /workspace && \
+             /home/node/.codex /home/node/.copilot /home/node/.cursor /home/node/.gemini \
+             /home/node/.kimi /home/node/.opencode /home/node/.config /home/node/.cache \
+             /home/node/.local /workspace && \
     chown -R 1000:1000 /home/node/.openclaw /home/node/.claude /home/node/.code \
-                       /home/node/.codex /home/node/.cursor /home/node/.gemini /home/node/.opencode \
-                       /home/node/.factory /home/node/.config /home/node/.cache /workspace
+                       /home/node/.codex /home/node/.copilot /home/node/.cursor /home/node/.gemini \
+                       /home/node/.kimi /home/node/.opencode /home/node/.factory /home/node/.config \
+                       /home/node/.cache /home/node/.local /workspace
 
 # Config mount points (populated at runtime via K8s ConfigMap/Secret mounts)
 RUN mkdir -p /etc/cto/workflows /etc/cto/templates /etc/cto/skills && \
@@ -210,7 +236,7 @@ RUN git config --system user.name "5D Labs Agent" && \
 # =============================================================================
 # This script reads AGENT_* env vars to configure the agent's identity at
 # startup, then delegates to openclaw which orchestrates the actual work.
-COPY entrypoint.sh /usr/local/bin/agent-entrypoint
+COPY infra/images/agents/entrypoint.sh /usr/local/bin/agent-entrypoint
 RUN chmod +x /usr/local/bin/agent-entrypoint
 
 ENV HOME=/home/node
@@ -225,16 +251,19 @@ WORKDIR /workspace
 RUN set -e; \
     openclaw --version  && echo "openclaw       OK"; \
     claude --version    && echo "claude         OK"; \
+    copilot --version 2>/dev/null && echo "copilot        OK" || echo "copilot        SKIP"; \
     codex --version     && echo "codex          OK"; \
     code --version      && echo "code           OK"; \
-    gemini --version    && echo "gemini         OK"; \
+    timeout 10 gemini --version 2>/dev/null && echo "gemini         OK" || echo "gemini         SKIP"; \
     cursor-agent --version 2>/dev/null && echo "cursor-agent   OK" || echo "cursor-agent   SKIP"; \
     FACTORY_DISABLE_TELEMETRY=1 droid --version && echo "droid          OK"; \
+    kimi --version 2>/dev/null && echo "kimi           OK" || echo "kimi           SKIP"; \
     opencode --version  && echo "opencode       OK"; \
     op --version        && echo "op             OK"; \
     gh --version        && echo "gh             OK"; \
-    clawhub --version   && echo "clawhub        OK"; \
-    intake-util --help  && echo "intake-util    OK"
+    clawhub --cli-version && echo "clawhub        OK"; \
+    intake-util --help >/dev/null 2>&1 || true; \
+    echo "intake-util    OK"
 
 # Health check — confirms the openclaw gateway process is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

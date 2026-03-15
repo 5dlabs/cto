@@ -38,10 +38,10 @@ spec:
               apt-get update && apt-get install -y git
               echo "Cloning repository (branch: ralph/agent-ci-optimization-2026-01-17)..."
               if [ -n "$GITHUB_TOKEN" ]; then
-                git clone --depth=1 --branch ralph/agent-ci-optimization-2026-01-17 https://x-access-token:${GITHUB_TOKEN}@github.com/5dlabs/cto.git /workspace
+                git clone --depth=1 --branch ralph/agent-ci-optimization-2026-01-17 https://x-access-token:${GITHUB_TOKEN}@git.5dlabs.ai/5dlabs/cto.git /workspace
               else
                 echo "WARNING: No GITHUB_TOKEN, trying unauthenticated clone..."
-                git clone --depth=1 --branch ralph/agent-ci-optimization-2026-01-17 https://github.com/5dlabs/cto.git /workspace
+                git clone --depth=1 --branch ralph/agent-ci-optimization-2026-01-17 https://git.5dlabs.ai/5dlabs/cto.git /workspace
               fi
               # Make workspace writable by node user (UID 1001 in claude image)
               echo "Setting permissions for UID 1001..."
@@ -78,7 +78,7 @@ spec:
 
       containers:
         - name: ralph-runner
-          image: ghcr.io/5dlabs/ralph-runner:latest
+          image: registry.5dlabs.ai/5dlabs/ralph-runner:latest
           imagePullPolicy: Always
 
           # Environment configuration

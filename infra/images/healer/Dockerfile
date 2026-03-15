@@ -8,10 +8,10 @@
 #   CI/GHCR build (default - expects pre-built binary in context):
 #     cargo build --release --package healer
 #     cp target/release/healer healer
-#     docker build -f infra/images/healer/Dockerfile -t ghcr.io/5dlabs/healer .
+#     docker build -f infra/images/healer/Dockerfile -t registry.5dlabs.ai/5dlabs/healer .
 #
 #   Local/Kind build (compiles from source):
-#     docker build --target local -f infra/images/healer/Dockerfile -t ghcr.io/5dlabs/healer:local .
+#     docker build --target local -f infra/images/healer/Dockerfile -t registry.5dlabs.ai/5dlabs/healer:local .
 #
 # =============================================================================
 

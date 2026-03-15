@@ -17,10 +17,8 @@ use metal::Provider;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let secret_key = env::var("SCALEWAY_SECRET_KEY")
-        .expect("Set SCALEWAY_SECRET_KEY env var");
-    let project_id = env::var("SCALEWAY_PROJECT_ID")
-        .expect("Set SCALEWAY_PROJECT_ID env var");
+    let secret_key = env::var("SCALEWAY_SECRET_KEY").expect("Set SCALEWAY_SECRET_KEY env var");
+    let project_id = env::var("SCALEWAY_PROJECT_ID").expect("Set SCALEWAY_PROJECT_ID env var");
     let zone = env::var("SCALEWAY_ZONE").unwrap_or_else(|_| "fr-par-1".to_string());
 
     println!("\n🧪 Scaleway Elastic Metal Provider Test\n");
@@ -39,7 +37,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let em_servers = em.list_servers().await?;
     println!("   Found {} Elastic Metal server(s)", em_servers.len());
     for s in &em_servers {
-        println!("   - {} | {} | {:?}", s.hostname, s.ipv4.clone().unwrap_or_default(), s.status);
+        println!(
+            "   - {} | {} | {:?}",
+            s.hostname,
+            s.ipv4.clone().unwrap_or_default(),
+            s.status
+        );
     }
 
     // Check for create flag
@@ -48,20 +51,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Create a test server (hourly billing)
         println!("   Creating Elastic Metal server 'test-em'...");
-        let server = em.create_server(metal::CreateServerRequest {
-            hostname: "test-em".to_string(),
-            plan: "8779d2c1-cd10-4a34-a006-cb5b1fb5cbc7".to_string(), // EM-A116X-SSD (offer ID)
-            os: "7d1914e1-f4ab-47fc-bd8c-b3a23143e87a".to_string(), // Ubuntu (OS ID)
-            ssh_keys: vec!["97bb8cbc-5757-4cb2-ad2f-f272e189f223".to_string()], // SSH key ID
-            ip_addresses: vec![],
-            region: zone.clone(),
-        }).await?;
+        let server = em
+            .create_server(metal::CreateServerRequest {
+                hostname: "test-em".to_string(),
+                plan: "8779d2c1-cd10-4a34-a006-cb5b1fb5cbc7".to_string(), // EM-A116X-SSD (offer ID)
+                os: "7d1914e1-f4ab-47fc-bd8c-b3a23143e87a".to_string(),   // Ubuntu (OS ID)
+                ssh_keys: vec!["97bb8cbc-5757-4cb2-ad2f-f272e189f223".to_string()], // SSH key ID
+                ip_addresses: vec![],
+                region: zone.clone(),
+            })
+            .await?;
         println!("   ✅ Created: {} ({})", server.hostname, server.id);
 
         // Wait for it to be ready
         println!("   Waiting for server to be ready...");
         let ready = em.wait_ready(&server.id, 300).await?;
-        println!("   ✅ Server ready: {} ({})", ready.hostname, ready.ipv4.clone().unwrap_or_default());
+        println!(
+            "   ✅ Server ready: {} ({})",
+            ready.hostname,
+            ready.ipv4.clone().unwrap_or_default()
+        );
 
         // Delete immediately
         println!("   Deleting server...");

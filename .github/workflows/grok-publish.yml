@@ -1,0 +1,193 @@
+name: Grok – Publish MCP Server & Cron Binary
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/grok/**"
+      - "infra/images/grok/**"
+      - ".github/workflows/grok-publish.yml"
+  pull_request:
+    paths:
+      - "apps/grok/**"
+      - "infra/images/grok/**"
+      - ".github/workflows/grok-publish.yml"
+
+permissions:
+  contents: write # for creating releases
+  packages: write # for publishing to GitHub Packages
+
+defaults:
+  run:
+    working-directory: apps/grok
+
+jobs:
+  # ─── Lint & Test (runs on PRs and pushes) ──────────────────────────
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check
+        run: bun run build
+
+      - name: Run tests
+        run: bun run test
+
+  # ─── Publish npm package to GitHub Packages (main only) ────────────
+  publish-npm:
+    name: Publish MCP Server (npm)
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Configure npm for GitHub Packages
+        run: |
+          cat > .npmrc << 'NPMRC'
+          @5dlabs:registry=https://npm.pkg.github.com/
+          NPMRC
+          echo "//npm.pkg.github.com/:_authToken=$NODE_AUTH_TOKEN" >> .npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if version already published
+        id: check
+        run: |
+          VERSION=$(jq -r .version package.json)
+          NAME=$(jq -r .name package.json)
+          if npm view "${NAME}@${VERSION}" version 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${NAME}@${VERSION} already published — skipping"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish
+        if: steps.check.outputs.exists == 'false'
+        run: npm publish --access restricted
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─── Build standalone cron binary and attach to release ────────────
+  publish-cron:
+    name: Publish Cron Binary
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Read package version
+        id: version
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build standalone cron binary (linux-x64)
+        run: |
+          bun build src/cron.ts \
+            --compile \
+            --target=bun-linux-x64 \
+            --outfile=grok-cron-linux-x64
+
+      - name: Build standalone cron binary (darwin-arm64)
+        run: |
+          bun build src/cron.ts \
+            --compile \
+            --target=bun-darwin-arm64 \
+            --outfile=grok-cron-darwin-arm64
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: grok-v${{ steps.version.outputs.version }}
+          name: "Grok v${{ steps.version.outputs.version }}"
+          body: |
+            ## Grok X Search v${{ steps.version.outputs.version }}
+
+            ### MCP Server
+            ```bash
+            npm install @5dlabs/grok-x-search@${{ steps.version.outputs.version }} --registry=https://npm.pkg.github.com
+            ```
+
+            ### Cron Binary
+            Download the standalone binary for your platform and run directly — no Node/Bun runtime needed.
+
+            ```bash
+            chmod +x grok-cron-linux-x64
+            GROK_API_KEY=your-key ./grok-cron-linux-x64
+            ```
+          files: |
+            apps/grok/grok-cron-linux-x64
+            apps/grok/grok-cron-darwin-arm64
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+
+  # ─── Build and push Docker image to GHCR ─────────────────────────
+  publish-docker:
+    name: Publish Docker Image
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Read package version
+        id: version
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build standalone cron binary for Docker
+        run: |
+          bun build src/cron.ts \
+            --compile \
+            --target=bun-linux-x64 \
+            --outfile=../../grok-cron
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: grok
+          context: .
+          dockerfile: infra/images/grok/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ github.sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

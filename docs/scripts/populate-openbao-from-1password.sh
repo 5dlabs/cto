@@ -202,7 +202,7 @@ if [[ -n "$GHCR_CRED" ]]; then
         GHCR_USER=$(get_op_field "GHCR Pull Secret" "username")
         if [[ -n "$GHCR_USER" ]]; then
             AUTH_B64=$(echo -n "${GHCR_USER}:${GHCR_CRED}" | base64)
-            DOCKER_CONFIG="{\"auths\":{\"ghcr.io\":{\"auth\":\"${AUTH_B64}\"}}}"
+            DOCKER_CONFIG="{\"auths\":{\"registry.5dlabs.ai\":{\"auth\":\"${AUTH_B64}\"}}}"
             update_openbao "ghcr-secret" ".dockerconfigjson=$DOCKER_CONFIG"
         else
             echo -e "${YELLOW}⚠ GHCR username not found${NC}"

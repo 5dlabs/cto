@@ -1,5 +1,6 @@
 //! HTTP server for Linear webhooks.
 
+use acp_runtime::AcpRuntimeRegistry;
 use axum::{
     body::Bytes,
     extract::State,
@@ -25,6 +26,7 @@ use crate::handlers::callbacks::{
 use crate::handlers::github::handle_github_webhook;
 use crate::handlers::intake::{extract_intake_request, submit_intake_coderun};
 use crate::handlers::play::{cancel_play_workflow, extract_play_request, submit_play_workflow};
+use crate::state::SessionTracker;
 use crate::webhooks::{
     identify_agent_or_legacy, validate_webhook_timestamp, WebhookAction, WebhookPayload,
     WebhookType,
@@ -167,6 +169,10 @@ pub struct AppState {
     pub kube_client: kube::Client,
     /// Linear API client.
     pub linear_client: Option<LinearClient>,
+    /// In-memory session tracker for agent sessions.
+    pub session_tracker: SessionTracker,
+    /// ACP runtime registry for sessionful agent delegation.
+    pub acp_registry: AcpRuntimeRegistry,
 }
 
 /// Build the HTTP router for the Linear service.

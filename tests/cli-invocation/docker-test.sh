@@ -7,7 +7,7 @@
 #
 # Prerequisites:
 #   - Docker running (colima start)
-#   - GHCR authentication (echo $GITHUB_TOKEN | docker login ghcr.io -u <user> --password-stdin)
+#   - Registry authentication (echo $GITHUB_TOKEN | docker login registry.5dlabs.ai -u <user> --password-stdin)
 #   - Twingate connected (for tools server access)
 #
 # Usage:
@@ -23,7 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Configuration
-GHCR_REGISTRY="ghcr.io/5dlabs"
+GHCR_REGISTRY="registry.5dlabs.ai/5dlabs"
 TOOLS_SERVER_URL="${TOOLS_SERVER_URL:-http://cto-tools.cto.svc.cluster.local:3000}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-/tmp/cto-docker-test}"
 
@@ -69,8 +69,8 @@ check_prereqs() {
     
     # Check GHCR auth
     if ! docker pull "$GHCR_REGISTRY/runtime:latest" --quiet >/dev/null 2>&1; then
-        warn "May need GHCR authentication"
-        log "Run: echo \$GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin"
+        warn "May need registry authentication"
+        log "Run: echo \$GITHUB_TOKEN | docker login registry.5dlabs.ai -u YOUR_USERNAME --password-stdin"
     fi
     
     # Check tools server

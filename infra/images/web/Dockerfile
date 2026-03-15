@@ -9,7 +9,7 @@
 #   3. Production stage - runtime with minimal dependencies
 #
 # Build commands:
-#   docker build --target production -f infra/images/web/Dockerfile -t ghcr.io/5dlabs/web:latest .
+#   docker build --target production -f infra/images/web/Dockerfile -t registry.5dlabs.ai/5dlabs/web:latest .
 # =============================================================================
 
 # =============================================================================
@@ -95,7 +95,7 @@ CMD ["node", "server.js"]
 # =============================================================================
 # Migration stage - for database schema migrations
 # =============================================================================
-# Build with: docker build --target migrate -f infra/images/web/Dockerfile -t ghcr.io/5dlabs/web-migrate:latest .
+# Build with: docker build --target migrate -f infra/images/web/Dockerfile -t registry.5dlabs.ai/5dlabs/web-migrate:latest .
 # This is a separate image used as an init container to run database migrations
 FROM node:25-bookworm-slim AS migrate
 

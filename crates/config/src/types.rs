@@ -180,6 +180,253 @@ impl SubagentConfig {
     }
 }
 
+/// Agent communication mode for Play workflow delegations.
+///
+/// `a2a` is the HTTP JSON-RPC path used by OpenClaw today. `acp` remains a
+/// deprecated config alias for backward compatibility when deserializing.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentCommunicationMode {
+    /// Native OpenClaw subagent hook invocation.
+    #[default]
+    Subagent,
+    /// HTTP A2A JSON-RPC transport.
+    #[serde(alias = "acp")]
+    A2a,
+}
+
+impl AgentCommunicationMode {
+    /// Get the canonical serialized value for this transport.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Subagent => "subagent",
+            Self::A2a => "a2a",
+        }
+    }
+}
+
+/// ACP runtime transport type.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AcpTransport {
+    /// ACP over stdio.
+    #[default]
+    Stdio,
+}
+
+/// Shared ACP runtime definition.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpRuntimeConfig {
+    /// Whether this runtime is available for selection.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// ACP transport implementation.
+    #[serde(default)]
+    pub transport: AcpTransport,
+
+    /// Binary or shell command to execute.
+    pub command: String,
+
+    /// Arguments passed to the runtime command.
+    #[serde(default)]
+    pub args: Vec<String>,
+
+    /// Optional working directory override for the runtime.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+
+    /// Additional environment variables for the runtime.
+    #[serde(default)]
+    pub env: HashMap<String, String>,
+}
+
+impl AcpRuntimeConfig {
+    /// Create a stdio runtime definition.
+    #[must_use]
+    pub fn stdio(
+        command: impl Into<String>,
+        args: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        Self {
+            enabled: true,
+            transport: AcpTransport::Stdio,
+            command: command.into(),
+            args: args.into_iter().map(Into::into).collect(),
+            cwd: None,
+            env: HashMap::new(),
+        }
+    }
+}
+
+impl Default for AcpRuntimeConfig {
+    fn default() -> Self {
+        Self::stdio("stakpak", ["acp"])
+    }
+}
+
+/// ACP service-level configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpServiceConfig {
+    /// Whether ACP delegation is enabled for this service.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Explicit runtime IDs this service is allowed to use.
+    #[serde(default, rename = "runtimeIds")]
+    pub runtime_ids: Vec<String>,
+
+    /// Default runtime ID for this service.
+    #[serde(skip_serializing_if = "Option::is_none", rename = "defaultRuntime")]
+    pub default_runtime: Option<String>,
+
+    /// Internal-only caller allowlist for ACP server surfaces.
+    #[serde(default, rename = "allowedCallers")]
+    pub allowed_callers: Vec<String>,
+}
+
+impl Default for AcpServiceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            runtime_ids: Vec::new(),
+            default_runtime: None,
+            allowed_callers: Vec::new(),
+        }
+    }
+}
+
+impl AcpServiceConfig {
+    /// Create a disabled service configuration bound to the given runtime IDs.
+    #[must_use]
+    pub fn disabled_with_runtimes(
+        runtime_ids: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        Self {
+            enabled: false,
+            runtime_ids: runtime_ids.into_iter().map(Into::into).collect(),
+            default_runtime: None,
+            allowed_callers: Vec::new(),
+        }
+    }
+}
+
+/// Per-service ACP defaults across CTO services.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpServicesConfig {
+    /// Healer ACP client/server settings.
+    #[serde(default)]
+    pub healer: AcpServiceConfig,
+
+    /// PM ACP bridge settings.
+    #[serde(default)]
+    pub pm: AcpServiceConfig,
+
+    /// Controller ACP runtime selection settings.
+    #[serde(default)]
+    pub controller: AcpServiceConfig,
+
+    /// MCP ACP caller settings.
+    #[serde(default)]
+    pub mcp: AcpServiceConfig,
+
+    /// MCP Lite ACP caller settings.
+    #[serde(default, rename = "mcpLite")]
+    pub mcp_lite: AcpServiceConfig,
+}
+
+impl Default for AcpServicesConfig {
+    fn default() -> Self {
+        Self {
+            healer: AcpServiceConfig {
+                runtime_ids: vec!["stakpak".to_string()],
+                default_runtime: Some("stakpak".to_string()),
+                allowed_callers: vec!["openclaw".to_string()],
+                ..AcpServiceConfig::default()
+            },
+            pm: AcpServiceConfig::disabled_with_runtimes(["stakpak"]),
+            controller: AcpServiceConfig::disabled_with_runtimes(["stakpak"]),
+            mcp: AcpServiceConfig::disabled_with_runtimes(["stakpak"]),
+            mcp_lite: AcpServiceConfig::disabled_with_runtimes(["stakpak"]),
+        }
+    }
+}
+
+fn default_acp_bind() -> String {
+    "127.0.0.1:8890".to_string()
+}
+
+/// Shared ACP server defaults for internal-only services.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpServerConfig {
+    /// Whether the ACP server surface is enabled.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Bind address for internal-only ACP servers.
+    #[serde(default = "default_acp_bind")]
+    pub bind: String,
+
+    /// Environment variable containing a bearer token for internal callers.
+    #[serde(skip_serializing_if = "Option::is_none", rename = "authTokenEnv")]
+    pub auth_token_env: Option<String>,
+
+    /// Allowlisted caller IDs accepted by the server.
+    #[serde(default, rename = "allowedCallers")]
+    pub allowed_callers: Vec<String>,
+}
+
+impl Default for AcpServerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            bind: default_acp_bind(),
+            auth_token_env: Some("CTO_ACP_SERVER_TOKEN".to_string()),
+            allowed_callers: vec!["openclaw".to_string()],
+        }
+    }
+}
+
+/// Shared ACP defaults for CTO services.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AcpDefaults {
+    /// Global ACP feature flag for the workspace.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Default runtime ID when a service does not specify one explicitly.
+    #[serde(skip_serializing_if = "Option::is_none", rename = "defaultRuntime")]
+    pub default_runtime: Option<String>,
+
+    /// Registered ACP runtimes.
+    #[serde(default)]
+    pub runtimes: HashMap<String, AcpRuntimeConfig>,
+
+    /// Per-service ACP enablement and runtime policies.
+    #[serde(default)]
+    pub services: AcpServicesConfig,
+
+    /// Shared ACP server settings for internal-only services.
+    #[serde(default)]
+    pub server: AcpServerConfig,
+}
+
+impl Default for AcpDefaults {
+    fn default() -> Self {
+        let mut runtimes = HashMap::new();
+        runtimes.insert("stakpak".to_string(), AcpRuntimeConfig::default());
+
+        Self {
+            enabled: false,
+            default_runtime: Some("stakpak".to_string()),
+            runtimes,
+            services: AcpServicesConfig::default(),
+            server: AcpServerConfig::default(),
+        }
+    }
+}
+
 /// Default watcher check interval in seconds (2 minutes).
 fn default_watcher_check_interval() -> u64 {
     120
@@ -406,6 +653,13 @@ pub struct PlayDefaults {
     #[serde(rename = "workingDirectory", default = "default_working_directory")]
     pub working_directory: String,
 
+    /// Agent-to-agent communication mode used by Play workflows.
+    #[serde(
+        rename = "agentCommunication",
+        default = "default_agent_communication_mode"
+    )]
+    pub agent_communication: AgentCommunicationMode,
+
     /// Healer API endpoint for session notifications.
     /// When configured, the MCP server notifies Healer when a Play starts,
     /// enabling real-time monitoring of the workflow lifecycle.
@@ -440,6 +694,10 @@ fn default_working_directory() -> String {
     ".".to_string()
 }
 
+fn default_agent_communication_mode() -> AgentCommunicationMode {
+    AgentCommunicationMode::Subagent
+}
+
 impl Default for PlayDefaults {
     fn default() -> Self {
         Self {
@@ -459,6 +717,7 @@ impl Default for PlayDefaults {
             docs_repository: String::new(),
             docs_project_directory: default_docs_project_directory(),
             working_directory: default_working_directory(),
+            agent_communication: default_agent_communication_mode(),
             healer_endpoint: None,
             fresh_start_threshold: default_fresh_start_threshold(),
             watcher: WatcherDefaults::default(),
@@ -805,6 +1064,10 @@ pub struct Defaults {
     #[serde(default)]
     pub linear: LinearDefaults,
 
+    /// Shared ACP defaults.
+    #[serde(default)]
+    pub acp: AcpDefaults,
+
     /// Play workflow defaults.
     #[serde(default)]
     pub play: PlayDefaults,
@@ -827,6 +1090,7 @@ pub const AGENT_TESS: &str = "Tess";
 pub const AGENT_MORGAN: &str = "Morgan";
 pub const AGENT_ATLAS: &str = "Atlas";
 pub const AGENT_VEX: &str = "Vex";
+pub const AGENT_ANGIE: &str = "Angie";
 
 /// Construct a full agent GitHub App name from org name and agent suffix.
 #[must_use]

@@ -80,7 +80,7 @@ else:
     print('║  🚀 PROD MODE - Using GHCR images (builds disabled)               ║')
     print('║                                                                   ║')
     print('║  Branch: %-55s ║' % BRANCH)
-    print('║  Registry: ghcr.io/5dlabs/*                                       ║')
+    print('║  Registry: registry.5dlabs.ai/5dlabs/*                             ║')
     print('║                                                                   ║')
     print('║  Builds are handled by CI/CD on this branch.                      ║')
     print('║  Only deploy commands are available.                              ║')

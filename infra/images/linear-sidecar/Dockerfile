@@ -8,10 +8,10 @@
 #   CI/GHCR build (default - expects pre-built binary in context):
 #     cargo build --release -p linear-sync --bin linear-sidecar
 #     cp target/release/linear-sidecar linear-sidecar
-#     docker build -f infra/images/linear-sidecar/Dockerfile -t ghcr.io/5dlabs/linear-sidecar .
+#     docker build -f infra/images/linear-sidecar/Dockerfile -t registry.5dlabs.ai/5dlabs/linear-sidecar .
 #
 #   Local/Kind build (compiles from source):
-#     docker build --target local -f infra/images/linear-sidecar/Dockerfile -t ghcr.io/5dlabs/linear-sidecar:local .
+#     docker build --target local -f infra/images/linear-sidecar/Dockerfile -t registry.5dlabs.ai/5dlabs/linear-sidecar:local .
 #
 # Note: Uses Rust nightly for edition 2024 support
 #

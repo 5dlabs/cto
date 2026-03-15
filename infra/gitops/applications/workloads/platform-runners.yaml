@@ -35,7 +35,7 @@ spec:
     helm:
       values: |
         # Scoped to the CTO repo (previously org-level)
-        githubConfigUrl: "https://github.com/5dlabs/cto"
+        githubConfigUrl: "https://git.5dlabs.ai/5dlabs/cto"
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
         # Elastic scaling: keep 2 warm runners, burst to 8 for concurrent PRs
@@ -105,7 +105,7 @@ spec:
             - name: runner
               # Custom rust-builder image with pre-installed Rust toolchain, sccache, and mold linker
               # Built by infrastructure-build.yaml workflow from infra/images/builder/Dockerfile
-              image: ghcr.io/5dlabs/rust-builder:latest
+              image: registry.5dlabs.ai/5dlabs/rust-builder:latest
               imagePullPolicy: Always
               command: ["/home/runner/run.sh"]
               resources:

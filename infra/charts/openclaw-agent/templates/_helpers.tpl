@@ -40,7 +40,11 @@ Pod annotations — informational settings visible via kubectl describe pod
 */}}
 {{- define "openclaw-agent.podAnnotations" -}}
 openclaw.io/model: {{ .Values.agent.model | quote }}
+{{- if kindIs "string" .Values.agent.heartbeat }}
 openclaw.io/heartbeat: {{ .Values.agent.heartbeat | quote }}
+{{- else if .Values.agent.heartbeat }}
+openclaw.io/heartbeat: {{ .Values.agent.heartbeat.every | default "15m" | quote }}
+{{- end }}
 openclaw.io/sandbox: {{ .Values.agent.sandbox | quote }}
 openclaw.io/tools-profile: {{ .Values.tools.profile | quote }}
 {{- end }}

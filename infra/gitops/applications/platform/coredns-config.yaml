@@ -10,7 +10,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/5dlabs/cto.git
+    repoURL: https://git.5dlabs.ai/5dlabs/cto.git
     targetRevision: HEAD
     path: infra/gitops/manifests/coredns
   destination:

@@ -115,7 +115,10 @@ impl AnthropicClient {
             .context("Failed to send request to Anthropic")?;
 
         if !response.status().is_success() {
-            let text = response.text().await.context("Failed to read error response")?;
+            let text = response
+                .text()
+                .await
+                .context("Failed to read error response")?;
             anyhow::bail!("Anthropic API error: {}", text);
         }
 

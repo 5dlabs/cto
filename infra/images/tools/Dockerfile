@@ -6,10 +6,10 @@
 # Supports both CI (pre-built binary) and local (from source) builds:
 #
 #   CI/GHCR build (default - expects pre-built binaries in context):
-#     docker build -t ghcr.io/5dlabs/tools .
+#     docker build -t registry.5dlabs.ai/5dlabs/tools .
 #
 #   Local/Kind build (compiles from source):
-#     docker build --target local -t ghcr.io/5dlabs/tools:local .
+#     docker build --target local -t registry.5dlabs.ai/5dlabs/tools:local .
 #
 # =============================================================================
 

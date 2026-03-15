@@ -1,3 +1,5 @@
+{{- $messaging := .Values.messaging | default dict -}}
+{{- $discordConfig := index $messaging "discord" | default .Values.discord -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,6 +22,9 @@ spec:
         {{- include "openclaw-agent.podAnnotations" . | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/openclaw-skills: {{ include (print $.Template.BasePath "/configmap-openclaw-skills.yaml") . | sha256sum }}
+        {{- if .Values.workspace.files }}
+        checksum/workspace-files: {{ include (print $.Template.BasePath "/configmap-workspace-files.yaml") . | sha256sum }}
+        {{- end }}
         {{- if .Values.toolsConfig }}
         checksum/tools-config: {{ include (print $.Template.BasePath "/configmap-tools-config.yaml") . | sha256sum }}
         {{- end }}
@@ -36,6 +41,9 @@ spec:
         checksum/claude-mcp: {{ include (print $.Template.BasePath "/configmap-claude-mcp.yaml") . | sha256sum }}
         {{- end }}
         {{- end }}
+        {{- if .Values.toolServer.url }}
+        checksum/cli-backend-configs: {{ include (print $.Template.BasePath "/configmap-cli-backend-configs.yaml") . | sha256sum }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "openclaw-agent.fullname" . }}
       {{- if .Values.imagePullSecrets }}
@@ -46,6 +54,10 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         fsGroup: 1000
       initContainers:
@@ -53,6 +65,10 @@ spec:
         - name: init-workspace
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
           command:
             - /bin/sh
             - -c
@@ -64,6 +80,8 @@ spec:
               # 1. Core workspace directories (idempotent)
               # ---------------------------------------------------------------
               mkdir -p /workspace/.openclaw/agents/{{ .Values.agent.id }}/agent
+              mkdir -p /workspace/.openclaw/extensions
+              mkdir -p /workspace/.local/bin
               mkdir -p /workspace/memory
               mkdir -p /workspace/sessions
               echo "[dirs] Core workspace directories OK"
@@ -73,6 +91,7 @@ spec:
               # ---------------------------------------------------------------
               envsubst < /config-template/openclaw.json > /workspace/.openclaw/openclaw.json
               echo "[config] openclaw.json rendered"
+              openclaw doctor --non-interactive >/dev/null 2>&1 || true
 
               # ---------------------------------------------------------------
               # 3. OpenClaw orchestrator skills (always overwrite from ConfigMap)
@@ -95,8 +114,20 @@ spec:
 
               {{- if .Values.claudeCode.mcp.servers }}
               cp /claude-mcp-template/claude.json /workspace/.claude.json
+              cp /claude-mcp-template/mcp.json /workspace/.mcp.json
               echo "[claude] .claude.json (MCP config) written"
               {{- end }}
+              {{- end }}
+
+              {{- if .Values.tools.acp.agentOverrides }}
+              # ---------------------------------------------------------------
+              # 4a. ACPX agent registry overrides (.acpxrc.json)
+              # ---------------------------------------------------------------
+              rm -f /workspace/.acpxrc.json /workspace/.acpxrc.json.chart 2>/dev/null || true
+              printf '%s\n' {{ dict "agents" .Values.tools.acp.agentOverrides | toJson | squote }} > /workspace/.acpxrc.json
+              cp /workspace/.acpxrc.json /workspace/.acpxrc.json.chart
+              chmod 444 /workspace/.acpxrc.json.chart
+              echo "[acpx] .acpxrc.json written"
               {{- end }}
 
               {{- if .Values.toolsConfig }}
@@ -107,19 +138,62 @@ spec:
               echo "[tools] tools-config.json written"
               {{- end }}
 
+              {{- if .Values.toolServer.url }}
               # ---------------------------------------------------------------
-              # 4c. ClawdStrike security skill (idempotent install)
+              # 4b2. tools-client proxy for CLI MCP stdio integrations
               # ---------------------------------------------------------------
-              if [ ! -f /workspace/.openclaw/skills/clawdstrike.md ]; then
-                cd /workspace && npx skills add https://github.com/cantinaxyz/clawdstrike --skill clawdstrike 2>/dev/null || true
-                echo "[skills] ClawdStrike security skill installed"
+              mkdir -p /workspace/.npm-global
+              if [ ! -f /workspace/.npm-global/bin/supergateway ]; then
+                npm install -g --prefix /workspace/.npm-global --no-audit --no-fund supergateway 2>&1 | tail -2
+                echo "[tools] supergateway installed"
               else
-                echo "[skills] ClawdStrike already present"
+                echo "[tools] supergateway already present"
               fi
+              printf '#!/bin/sh\nBASE_URL="${TOOL_SERVER_URL:-{{ .Values.toolServer.url }}}"\nBASE_URL="${BASE_URL%%/sse}"\nexec /workspace/.npm-global/bin/supergateway --streamableHttp "${BASE_URL}/mcp" "$@"\n' > /workspace/.local/bin/tools
+              chmod +x /workspace/.local/bin/tools
+              echo "[tools] tools MCP proxy ready"
+
+              mkdir -p /workspace/.codex /workspace/.gemini /workspace/.factory /workspace/.cursor
+              cp /cli-backend-configs-template/codex-config.toml /workspace/.codex/config.toml
+              cp /cli-backend-configs-template/gemini-settings.json /workspace/.gemini/settings.json
+              cp /cli-backend-configs-template/factory-mcp.json /workspace/.factory/mcp.json
+              cp /cli-backend-configs-template/cursor-mcp.json /workspace/.cursor/mcp.json
+              cp /cli-backend-configs-template/opencode.json /workspace/opencode.json
+              echo "[cli] backend configs written"
+              {{- end }}
+
+              {{- if .Values.tools.acp.enabled }}
+              # ---------------------------------------------------------------
+              # 4b3. ACPX runtime binary
+              # ---------------------------------------------------------------
+              ACPX_DIR="/usr/local/share/npm-global/lib/node_modules/openclaw/extensions/acpx"
+              {{- if .Values.tools.acp.acpxVersion }}
+              echo "[plugin] acpx: upgrading to {{ .Values.tools.acp.acpxVersion }}..."
+              cd "$ACPX_DIR"
+              if sed -i 's/"acpx": "[^"]*"/"acpx": "{{ .Values.tools.acp.acpxVersion }}"/' package.json && \
+                npm install --omit=dev --no-save 2>&1 | tail -3; then
+                echo "[plugin] acpx: $(node_modules/.bin/acpx --version 2>/dev/null || echo installed)"
+              else
+                echo "[plugin] acpx: install failed"
+              fi
+              {{- else }}
+              echo "[plugin] acpx: installing binary..."
+              cd "$ACPX_DIR"
+              if npm install --omit=dev --no-save 2>&1 | tail -2; then
+                echo "[plugin] acpx: ready"
+              else
+                echo "[plugin] acpx: install failed"
+              fi
+              {{- end }}
+              echo "[plugin] pi-acp: installing..."
+              npm install -g pi-acp 2>&1 | tail -2 && \
+                echo "[plugin] pi-acp: ready" || echo "[plugin] pi-acp: install failed"
+              cd /workspace
+              {{- end }}
 
               {{- if .Values.nats.enabled }}
               # ---------------------------------------------------------------
-              # 4d. NATS Messenger plugin
+              # 4c. NATS Messenger plugin
               # ---------------------------------------------------------------
               NATS_EXT="/workspace/.openclaw/extensions/nats-messenger"
               mkdir -p "$NATS_EXT"
@@ -139,10 +213,16 @@ spec:
               # ---------------------------------------------------------------
               if [ ! -f /workspace/.local/bin/kubectl ]; then
                 mkdir -p /workspace/.local/bin
+                KUBECTL_ARCH="amd64"
+                case "$(uname -m)" in
+                  aarch64|arm64)
+                    KUBECTL_ARCH="arm64"
+                    ;;
+                esac
                 curl -sLo /workspace/.local/bin/kubectl \
-                  "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
+                  "https://dl.k8s.io/release/v1.35.0/bin/linux/${KUBECTL_ARCH}/kubectl"
                 chmod +x /workspace/.local/bin/kubectl
-                echo "[tools] kubectl v1.31.0 installed"
+                echo "[tools] kubectl v1.35.0 installed (${KUBECTL_ARCH})"
               else
                 echo "[tools] kubectl already present"
               fi
@@ -182,6 +262,8 @@ spec:
 
                 # Check for uncommitted changes
                 cd "$REPO_DIR"
+                git config --global --add safe.directory "$REPO_DIR" 2>/dev/null || true
+                DESIRED_BRANCH="{{ .branch | default "main" }}"
                 if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
                   echo "⚠ WARNING: {{ .name }} has uncommitted changes!"
                   git status --short 2>/dev/null || true
@@ -195,6 +277,26 @@ spec:
                   WARNINGS=$((WARNINGS + 1))
                 else
                   echo "[repo] {{ .name }}: on branch $BRANCH"
+                  if [ "$BRANCH" != "$DESIRED_BRANCH" ]; then
+                    if git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null; then
+                  echo "[repo] {{ .name }}: switching branch $BRANCH -> $DESIRED_BRANCH"
+                  if git fetch origin "$DESIRED_BRANCH":"refs/remotes/origin/$DESIRED_BRANCH" --depth=1 >/dev/null 2>&1; then
+                    if git show-ref --verify --quiet "refs/heads/$DESIRED_BRANCH"; then
+                      git checkout "$DESIRED_BRANCH" >/dev/null 2>&1 || true
+                    elif git show-ref --verify --quiet "refs/remotes/origin/$DESIRED_BRANCH"; then
+                      git checkout -B "$DESIRED_BRANCH" "origin/$DESIRED_BRANCH" >/dev/null 2>&1 || true
+                    fi
+                  else
+                    echo "⚠ WARNING: {{ .name }} remote branch $DESIRED_BRANCH not found; staying on $BRANCH"
+                    WARNINGS=$((WARNINGS + 1))
+                  fi
+                  BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "DETACHED")
+                  echo "[repo] {{ .name }}: now on branch $BRANCH"
+                    else
+                      echo "⚠ WARNING: {{ .name }} left on $BRANCH because the workspace is dirty (wanted $DESIRED_BRANCH)"
+                      WARNINGS=$((WARNINGS + 1))
+                    fi
+                  fi
                 fi
 
                 # Check for unpushed commits
@@ -208,10 +310,22 @@ spec:
               else
                 echo "[repo] {{ .name }}: cloning {{ .url }} (branch: {{ .branch | default "main" }})"
                 mkdir -p "$(dirname "$REPO_DIR")"
-                git clone --branch {{ .branch | default "main" }} --single-branch {{ .url }} "$REPO_DIR"
-                echo "[repo] {{ .name }}: clone complete"
+                if git clone --branch {{ .branch | default "main" }} --single-branch {{ .url }} "$REPO_DIR"; then
+                  echo "[repo] {{ .name }}: clone complete"
+                else
+                  echo "⚠ WARNING: {{ .name }} clone failed; continuing without local mirror"
+                  WARNINGS=$((WARNINGS + 1))
+                fi
               fi
               {{- end }}
+
+              # ---------------------------------------------------------------
+              # 7. Normalize ownership for the runtime user
+              # ---------------------------------------------------------------
+              RUNTIME_UID="$(id -u node 2>/dev/null || echo 1000)"
+              RUNTIME_GID="$(id -g node 2>/dev/null || echo 1000)"
+              chown -R "${RUNTIME_UID}:${RUNTIME_GID}" /workspace
+              echo "[dirs] Workspace ownership normalized"
 
               # ---------------------------------------------------------------
               # Summary
@@ -228,7 +342,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.discordTokensSecret }}
-                  key: {{ .Values.discord.tokenSecretKey | default .Values.agent.id }}
+                  key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
             # Provider API keys
             - name: PROVIDER_ANTHROPIC_KEY
               valueFrom:
@@ -237,6 +351,12 @@ spec:
                   key: anthropic-api-key
                   optional: true
             - name: PROVIDER_OPENAI_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: openai-api-key
+                  optional: true
+            - name: PROVIDER_OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
@@ -314,14 +434,57 @@ spec:
               mountPath: /claude-mcp-template
             {{- end }}
             {{- end }}
+            {{- if .Values.toolServer.url }}
+            - name: cli-backend-configs-template
+              mountPath: /cli-backend-configs-template
+            {{- end }}
             {{- if .Values.toolsConfig }}
             - name: tools-config-template
               mountPath: /tools-config-template
+            {{- end }}
+            {{- if .Values.tools.acp.enabled }}
+            - name: acpx-node-modules
+              mountPath: /usr/local/share/npm-global/lib/node_modules/openclaw/extensions/acpx/node_modules
             {{- end }}
             {{- if .Values.nats.enabled }}
             - name: nats-plugin-template
               mountPath: /nats-plugin-template
             {{- end }}
+        {{- if .Values.workspace.files }}
+        - name: init-workspace-files
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+          command:
+            - /bin/sh
+            - -c
+            - |
+              for src in /workspace-files-template/*; do
+                [ -f "$src" ] || continue
+                name="$(basename "$src")"
+                dest="/workspace/$name"
+                case "$name" in
+                  AGENTS.md|HEARTBEAT.md|IDENTITY.md|SOUL.md|TOOLS.md)
+                    cp "$src" "$dest" && echo "[workspace-files] Updated $dest"
+                    ;;
+                  *)
+                    if [ ! -f "$dest" ]; then
+                      cp "$src" "$dest" && echo "[workspace-files] Created $dest"
+                    else
+                      echo "[workspace-files] Skipped $dest (exists)"
+                    fi
+                    ;;
+                esac
+              done
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: workspace-files-template
+              mountPath: /workspace-files-template
+        {{- end }}
       containers:
         - name: agent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -332,16 +495,38 @@ spec:
             - |
               cd /workspace
               export HOME=/workspace
-              export PATH="/workspace/.local/bin:$PATH"
+              export PATH="/workspace/.local/bin:/usr/local/share/npm-global/bin:/usr/local/bin:$PATH"
               export OPENCLAW_CONFIG=/workspace/.openclaw/openclaw.json
+              if [ -f /workspace/.acpxrc.json.chart ]; then
+                cp -f /workspace/.acpxrc.json.chart /workspace/.acpxrc.json 2>/dev/null || true
+                chmod 644 /workspace/.acpxrc.json 2>/dev/null || true
+              fi
               exec openclaw gateway
           env:
             - name: HOME
               value: /workspace
+            - name: TZ
+              value: "UTC"
             - name: OPENCLAW_CONFIG
               value: /workspace/.openclaw/openclaw.json
+            {{- if .Values.toolServer.url }}
+            - name: TOOL_SERVER_URL
+              value: {{ .Values.toolServer.url | quote }}
+            {{- end }}
             - name: NODE_ENV
               value: production
+            - name: OPENCLAW_NO_RESPAWN
+              value: "1"
+            {{- if .Values.tools.acp.enabled }}
+            - name: KIMI_SHARE_DIR
+              value: /workspace/.kimi
+            {{- end }}
+            - name: DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.discordTokensSecret }}
+                  key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
+                  optional: true
             # Provider API keys (available at runtime for dynamic use)
             - name: ANTHROPIC_API_KEY
               valueFrom:
@@ -350,6 +535,12 @@ spec:
                   key: anthropic-api-key
                   optional: true
             - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: openai-api-key
+                  optional: true
+            - name: PROVIDER_OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
@@ -449,9 +640,20 @@ spec:
             - name: gateway
               containerPort: {{ .Values.gateway.port }}
               protocol: TCP
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: gateway
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          {{- end }}
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthz
               port: gateway
             initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
@@ -460,8 +662,13 @@ spec:
           {{- end }}
           {{- if .Values.probes.readiness.enabled }}
           readinessProbe:
-            tcpSocket:
-              port: gateway
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  HEALTH=$(curl -sf --max-time 3 http://localhost:{{ .Values.gateway.port }}/healthz 2>/dev/null) || exit 1
+                  echo "$HEALTH" | grep -q '"ok":true' || exit 1
             initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
             timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
@@ -472,6 +679,10 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+            {{- if .Values.tools.acp.enabled }}
+            - name: acpx-node-modules
+              mountPath: /usr/local/share/npm-global/lib/node_modules/openclaw/extensions/acpx/node_modules
+            {{- end }}
         {{- if .Values.kaniko.enabled }}
         - name: kaniko
           image: {{ .Values.kaniko.image }}
@@ -512,6 +723,11 @@ spec:
         - name: openclaw-skills-template
           configMap:
             name: {{ include "openclaw-agent.fullname" . }}-openclaw-skills
+        {{- if .Values.workspace.files }}
+        - name: workspace-files-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-workspace-files
+        {{- end }}
         {{- if .Values.claudeCode.enabled }}
         - name: claude-settings-template
           configMap:
@@ -525,10 +741,19 @@ spec:
             name: {{ include "openclaw-agent.fullname" . }}-claude-mcp
         {{- end }}
         {{- end }}
+        {{- if .Values.toolServer.url }}
+        - name: cli-backend-configs-template
+          configMap:
+            name: {{ include "openclaw-agent.fullname" . }}-cli-backend-configs
+        {{- end }}
         {{- if .Values.toolsConfig }}
         - name: tools-config-template
           configMap:
             name: {{ include "openclaw-agent.fullname" . }}-tools-config
+        {{- end }}
+        {{- if .Values.tools.acp.enabled }}
+        - name: acpx-node-modules
+          emptyDir: {}
         {{- end }}
         {{- if .Values.nats.enabled }}
         - name: nats-plugin-template

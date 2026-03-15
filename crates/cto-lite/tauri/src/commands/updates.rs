@@ -29,22 +29,22 @@ pub struct UpdateStatus {
 
 /// Core images that CTO uses
 const CORE_IMAGES: &[&str] = &[
-    "ghcr.io/5dlabs/controller",
-    "ghcr.io/5dlabs/pm-lite",
-    "ghcr.io/5dlabs/tool-server",
-    "ghcr.io/5dlabs/intake",
+    "registry.5dlabs.ai/5dlabs/controller",
+    "registry.5dlabs.ai/5dlabs/pm-lite",
+    "registry.5dlabs.ai/5dlabs/tool-server",
+    "registry.5dlabs.ai/5dlabs/intake",
 ];
 
 /// Agent images
 const AGENT_IMAGES: &[&str] = &[
-    "ghcr.io/5dlabs/agent-morgan",
-    "ghcr.io/5dlabs/agent-grizz",
-    "ghcr.io/5dlabs/agent-nova",
-    "ghcr.io/5dlabs/agent-blaze",
-    "ghcr.io/5dlabs/agent-cleo",
-    "ghcr.io/5dlabs/agent-cipher",
-    "ghcr.io/5dlabs/agent-tess",
-    "ghcr.io/5dlabs/agent-bolt",
+    "registry.5dlabs.ai/5dlabs/agent-morgan",
+    "registry.5dlabs.ai/5dlabs/agent-grizz",
+    "registry.5dlabs.ai/5dlabs/agent-nova",
+    "registry.5dlabs.ai/5dlabs/agent-blaze",
+    "registry.5dlabs.ai/5dlabs/agent-cleo",
+    "registry.5dlabs.ai/5dlabs/agent-cipher",
+    "registry.5dlabs.ai/5dlabs/agent-tess",
+    "registry.5dlabs.ai/5dlabs/agent-bolt",
 ];
 
 /// Check for available updates

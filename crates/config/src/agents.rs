@@ -347,6 +347,30 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
             subagents: None,
             watcher: None,
         },
+        "angie" => AgentConfig {
+            github_app: "5DLabs-Angie".to_string(),
+            cli: DEFAULT_CLI.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            tools: AgentTools {
+                remote: {
+                    let mut tools = default_remote_tools();
+                    tools.extend([
+                        "firecrawl_scrape".to_string(),
+                        "firecrawl_search".to_string(),
+                        "github_create_pull_request".to_string(),
+                        "github_push_files".to_string(),
+                        "github_create_branch".to_string(),
+                    ]);
+                    tools
+                },
+                local_servers: HashMap::new(),
+            },
+            skills: None,
+            frontend_stack: None,
+            features: None,
+            subagents: None,
+            watcher: None,
+        },
         // Default to Rex-like config for unknown agents
         _ => AgentConfig {
             github_app: format!("5DLabs-{}", capitalize(agent_name)),
@@ -370,7 +394,7 @@ pub fn get_agent_config(agent_name: &str) -> AgentConfig {
 pub fn all_agent_names() -> Vec<&'static str> {
     vec![
         "morgan", "rex", "grizz", "stitch", "nova", "blaze", "tap", "spark", "cleo", "cipher",
-        "tess", "atlas", "bolt",
+        "tess", "atlas", "bolt", "angie",
     ]
 }
 
@@ -448,6 +472,7 @@ mod tests {
         assert!(names.contains(&"rex"));
         assert!(names.contains(&"blaze"));
         assert!(names.contains(&"bolt"));
-        assert_eq!(names.len(), 13);
+        assert!(names.contains(&"angie"));
+        assert_eq!(names.len(), 14);
     }
 }

@@ -1497,7 +1497,7 @@ impl<'a> CodeResourceManager<'a> {
                     .linear
                     .sidecar_image
                     .clone()
-                    .unwrap_or_else(|| "ghcr.io/5dlabs/linear-sidecar:latest".to_string());
+                    .unwrap_or_else(|| "registry.5dlabs.ai/5dlabs/linear-sidecar:latest".to_string());
                 let sidecar_pull_policy =
                     if sidecar_image.ends_with(":latest") || sidecar_image.ends_with(":dev") {
                         "Always"
@@ -2533,7 +2533,7 @@ mod tests {
     fn test_linear_sidecar_spec_structure() {
         // When linear_integration is enabled, the sidecar should have these properties:
         // - name: "linear-sidecar"
-        // - image: configurable (defaults to ghcr.io/5dlabs/linear-sidecar:latest)
+        // - image: configurable (defaults to registry.5dlabs.ai/5dlabs/linear-sidecar:latest)
         // - volumeMounts: linear-status and workspace
         // - ports: 8080 for HTTP
         // - env: STATUS_FILE, LINEAR_SERVICE_URL, session/issue/team IDs

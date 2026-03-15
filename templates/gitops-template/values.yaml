@@ -33,7 +33,7 @@ argocd:
 # Container registry settings
 registry:
   # GHCR for public images
-  server: ghcr.io
+  server: registry.5dlabs.ai
   # Image pull secret (if private)
   pullSecret: null
 
@@ -50,12 +50,12 @@ applications:
   - name: agent-controller
     enabled: true
     namespace: cto-system
-    chart: ghcr.io/5dlabs/charts/agent-controller
+    chart: registry.5dlabs.ai/5dlabs/charts/agent-controller
 
   - name: mcp-tools
     enabled: true
     namespace: cto-system
-    chart: ghcr.io/5dlabs/charts/mcp-tools
+    chart: registry.5dlabs.ai/5dlabs/charts/mcp-tools
 
   - name: cilium
     enabled: true

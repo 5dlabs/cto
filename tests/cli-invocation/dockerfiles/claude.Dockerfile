@@ -12,7 +12,7 @@ ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 
 # OCI image labels for traceability
-LABEL org.opencontainers.image.source="https://github.com/5dlabs/cto"
+LABEL org.opencontainers.image.source="https://git.5dlabs.ai/5dlabs/cto"
 LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 LABEL org.opencontainers.image.ref.name="${GIT_BRANCH}"
 LABEL ai.5dlabs.cto.component="claude"

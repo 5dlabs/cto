@@ -55,7 +55,7 @@ resources:
 
 # Image configuration
 image:
-  repository: ghcr.io/5dlabs/agent-runner
+  repository: registry.5dlabs.ai/5dlabs/agent-runner
   tag: "latest"
   pullPolicy: IfNotPresent
 

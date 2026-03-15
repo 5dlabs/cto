@@ -2,6 +2,30 @@
 
 This guide explains how to iterate quickly without waiting for CI.
 
+## Daily Market Sync Baseline
+
+Use this baseline when running the model-catalog sync workflow so generated
+catalog diffs are always based on the remote default branch.
+
+```bash
+# Start from the repo root
+git fetch --prune origin
+
+# Resolve the remote default branch (origin/HEAD -> origin/main, etc)
+DEFAULT_BRANCH="$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's|^origin/||')"
+
+# Update local default branch from origin
+git switch "$DEFAULT_BRANCH"
+git pull --ff-only origin "$DEFAULT_BRANCH"
+
+# Create a short-lived sync branch and run the sync script
+git switch -c "chore/model-catalog-sync-$(date +%Y%m%d)"
+./scripts/sync-model-catalog.sh
+```
+
+The sync PR should include model-catalog artifacts and derived config files
+only. Avoid bundling unrelated infrastructure or application changes.
+
 ## Development Options
 
 | Method | Network | Speed | Best For |

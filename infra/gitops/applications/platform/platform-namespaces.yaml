@@ -18,11 +18,11 @@ spec:
   project: platform
 
   source:
-    repoURL: https://github.com/5dlabs/cto
+    repoURL: https://git.5dlabs.ai/5dlabs/cto.git
     targetRevision: main
     path: infra/cluster-config
     directory:
-      include: "{cto-namespace.yaml,external-dns-namespace.yaml,headscale-namespace.yaml,mayastor-namespace.yaml,observability-namespace.yaml,openbao-namespace.yaml}"
+      include: "{cto-namespace.yaml,external-dns-namespace.yaml,gitlab-namespace.yaml,headscale-namespace.yaml,mayastor-namespace.yaml,observability-namespace.yaml,openbao-namespace.yaml}"
 
   destination:
     server: https://kubernetes.default.svc

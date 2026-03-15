@@ -223,7 +223,7 @@ fn get_chart_path() -> Result<String> {
     // Option 3: Use embedded tarball
 
     // Fallback to OCI registry
-    Ok("oci://ghcr.io/5dlabs/charts/cto-lite".to_string())
+    Ok("oci://registry.5dlabs.ai/5dlabs/charts/cto-lite".to_string())
 }
 
 /// Update Argo Workflows dependency

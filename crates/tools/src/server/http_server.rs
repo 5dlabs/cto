@@ -1512,7 +1512,7 @@ impl BridgeState {
                     all_configured_servers.len()
                 ));
             }
-            
+
             // Log warning but continue if some tools were discovered
             tracing::warn!(
                 "⚠️  Continuing with {} tools from {} working servers ({} servers failed)",

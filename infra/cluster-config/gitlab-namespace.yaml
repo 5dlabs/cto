@@ -1,0 +1,31 @@
+---
+# Managed Namespace for GitLab CE platform
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitlab
+  labels:
+    app.kubernetes.io/name: gitlab
+    app.kubernetes.io/part-of: cto-platform
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/warn-version: latest
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/audit-version: latest
+
+---
+# Managed Namespace for GitLab Runner job pods
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitlab-runners
+  labels:
+    app.kubernetes.io/name: gitlab-runners
+    app.kubernetes.io/part-of: cto-platform
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/warn-version: latest
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/audit-version: latest

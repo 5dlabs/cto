@@ -165,8 +165,7 @@ export default function Home() {
                 How <span className="gradient-text">5D Labs</span> Works
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Not three unrelated bets. One studio, one operating stack, multiple
-                venture outcomes.
+                One studio, one operating stack, multiple venture outcomes.
               </p>
             </div>
 
@@ -206,12 +205,11 @@ export default function Home() {
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Why the <span className="gradient-text">Trading Engine</span> Exists
+                The <span className="gradient-text">Trading Engine</span> in the Model
               </h2>
               <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                We built the trading engine to fund experimentation, stay close to live
-                on-chain markets, and generate the kind of market intelligence that only
-                comes from operating with real stakes.
+                It funds experimentation, keeps the studio close to live on-chain markets,
+                and compounds market intelligence that only comes from operating with real stakes.
               </p>
             </div>
 
@@ -246,7 +244,7 @@ export default function Home() {
               and a growing ecosystem of MCP tools — turning a collection of specialized agents
               into a coherent, self-healing system.
             </p>
-            <div className="grid sm:grid-cols-3 gap-6 text-left">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
               {[
                 {
                   title: "Multi-CLI Agnostic",
@@ -259,6 +257,10 @@ export default function Home() {
                 {
                   title: "Coming Soon",
                   text: "OpenClaw will be open-sourced. When it ships publicly, it will be the reusable foundation any team can use to run the same kind of agent infrastructure we run internally.",
+                },
+                {
+                  title: "Specialist Builders",
+                  text: "Specialists like Angie focus on OpenClaw-first agent architecture: MCP tool routing, runtime integration, and practical voice-agent patterns on top of the core orchestration layer.",
                 },
               ].map((item) => (
                 <div key={item.title} className="p-5 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">

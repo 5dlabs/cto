@@ -1,0 +1,272 @@
+# GitLab CE Helm Chart Values
+# Tuned-down for resource efficiency on existing K8s cluster
+# Chart: https://docs.gitlab.com/charts/
+#
+# Deployed via ArgoCD: infra/gitops/applications/platform/gitlab.yaml
+
+global:
+  edition: ce
+
+  hosts:
+    domain: 5dlabs.ai
+    gitlab:
+      name: git.5dlabs.ai
+    registry:
+      name: registry.5dlabs.ai
+    minio:
+      name: minio.5dlabs.ai
+    kas:
+      name: kas.5dlabs.ai
+
+  ingress:
+    # Disable cert-manager integration — TLS is handled by Cloudflare tunnel
+    configureCertmanager: false
+    enabled: false  # We use Cloudflare tunnel, not K8s Ingress
+
+  # Initial root password — override via OpenBao/ExternalSecrets in production
+  initialRootPassword:
+    secret: gitlab-initial-root-password
+    key: password
+
+  # Container registry
+  registry:
+    enabled: true
+
+  # GitLab Shell (SSH access)
+  shell:
+    port: 22
+
+  # Time zone
+  time_zone: UTC
+
+  # GitLab Pages (disabled — we use Cloudflare Pages)
+  pages:
+    enabled: false
+
+  # Email (use existing mailpit or configure SMTP later)
+  email:
+    from: gitlab@5dlabs.ai
+    display_name: 5D Labs GitLab
+    reply_to: noreply@5dlabs.ai
+
+  # Application settings
+  appConfig:
+    # Enable container registry
+    registry:
+      enabled: true
+
+    # Disable features we don't need
+    terraformState:
+      enabled: false
+    ciSecureFiles:
+      enabled: false
+    dependencyProxy:
+      enabled: false
+    sentryDSN: ""
+
+    # OAuth / OmniAuth (for future SSO integration)
+    omniauth:
+      enabled: false
+
+    # Default project features
+    defaultProjectsFeatures:
+      issues: true
+      mergeRequests: true
+      wiki: false
+      snippets: false
+      builds: true
+      containerRegistry: true
+
+# -------------------------------------------------------------------
+# GitLab Webservice (Rails / Puma)
+# -------------------------------------------------------------------
+gitlab:
+  webservice:
+    replicaCount: 1
+    workerProcesses: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: "2"
+        memory: 4Gi
+
+  # Sidekiq (background jobs)
+  sidekiq:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+
+  # Gitaly (git storage backend)
+  gitaly:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: ""  # Use cluster default
+
+  # GitLab Shell (SSH)
+  gitlab-shell:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+  # Toolbox (rake tasks, backups)
+  toolbox:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 512Mi
+
+  # GitLab Exporter (Prometheus metrics)
+  gitlab-exporter:
+    enabled: false  # We have our own observability stack
+
+  # GitLab KAS (Kubernetes Agent Server) — useful for future agent-K8s integration
+  kas:
+    enabled: false
+
+  # Migrations job
+  migrations:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+# -------------------------------------------------------------------
+# Container Registry
+# -------------------------------------------------------------------
+registry:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  storage:
+    # Use filesystem storage (backed by PVC)
+    # For S3-compatible storage, configure s3 block instead
+    filesystem:
+      rootdirectory: /var/lib/registry
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClass: ""
+  # Garbage collection
+  maintenance:
+    readonly:
+      enabled: false
+  # Enable delete for GC
+  delete:
+    enabled: true
+
+# -------------------------------------------------------------------
+# PostgreSQL (bundled)
+# -------------------------------------------------------------------
+postgresql:
+  install: true
+  image:
+    tag: "16.2"
+  primary:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: ""
+
+# -------------------------------------------------------------------
+# Redis (bundled)
+# -------------------------------------------------------------------
+redis:
+  install: true
+  architecture: standalone
+  master:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# -------------------------------------------------------------------
+# MinIO (object storage for artifacts, uploads, etc.)
+# -------------------------------------------------------------------
+minio:
+  install: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+  persistence:
+    enabled: true
+    size: 20Gi
+
+# -------------------------------------------------------------------
+# Disable components we don't need
+# -------------------------------------------------------------------
+certmanager:
+  install: false
+
+nginx-ingress:
+  enabled: false  # We use our own ingress-nginx + Cloudflare tunnel
+
+prometheus:
+  install: false  # We have our own Prometheus stack
+
+grafana:
+  install: false  # We have our own Grafana
+
+gitlab-runner:
+  install: false  # Deployed separately for more control
+
+# -------------------------------------------------------------------
+# Shared storage (for workhorse uploads, etc.)
+# -------------------------------------------------------------------
+shared-secrets:
+  enabled: true
+
+gitlab-zoekt:
+  install: false
+
+# -------------------------------------------------------------------
+# Upgrade check
+# -------------------------------------------------------------------
+upgradeCheck:
+  enabled: false
