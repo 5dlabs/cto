@@ -1,0 +1,64 @@
+name: Linear Bridge – Build and Publish Docker Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/linear-bridge/**"
+      - ".github/workflows/linear-bridge-publish.yml"
+  pull_request:
+    paths:
+      - "apps/linear-bridge/**"
+      - ".github/workflows/linear-bridge-publish.yml"
+
+permissions:
+  contents: read
+  packages: write # for publishing to GitHub Container Registry
+
+defaults:
+  run:
+    working-directory: apps/linear-bridge
+
+jobs:
+  # ─── Test & Build (runs on PRs and pushes) ────────────────────────
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check and build
+        run: npm run build
+
+  # ─── Build and push Docker image to GHCR (main only) ──────────────
+  publish-docker:
+    name: Publish Docker Image
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read package version
+        id: version
+        working-directory: apps/linear-bridge
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: linear-bridge
+          context: apps/linear-bridge
+          dockerfile: apps/linear-bridge/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ github.sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

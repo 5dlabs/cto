@@ -1,0 +1,195 @@
+---
+name: Research CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/research/**'
+      - 'infra/images/research/**'
+      - 'apps/intake-agent/**'
+      - '.github/workflows/research-ci.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/research/**'
+      - 'infra/images/research/**'
+      - 'apps/intake-agent/**'
+      - '.github/workflows/research-ci.yaml'
+  workflow_dispatch:
+
+# LESSON LEARNED: Without concurrency controls, multiple runs for the same branch
+# compete for limited runners, causing queue buildup. This cancels outdated runs.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-005
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: 5dlabs
+
+jobs:
+  # Change detection job (lightweight - stays on ubuntu)
+  # LESSON LEARNED: Path filter jobs should use ubuntu-latest, not k8s-runner,
+  # to avoid consuming expensive self-hosted runner capacity for simple git operations.
+  # See: pr-merge-loop/lessons-learned.md#ISSUE-010
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      research: ${{ steps.filter.outputs.research }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            research:
+              - 'crates/research/**'
+              - '!crates/research/**/*.md'
+            docker:
+              - 'infra/images/research/**'
+
+  # Rust linting using composite action
+  lint-rust:
+    needs: changes
+    if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    outputs:
+      format-needed: ${{ steps.lint.outputs.format-needed }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          components: rustfmt, clippy
+          sccache-size: '50G'
+
+      - name: Lint research
+        id: lint
+        uses: ./.github/actions/rust-lint
+        with:
+          package: research
+          # Research crate has its own [lints.clippy] config in Cargo.toml
+          # with pedantic deny + specific allows, so don't pass extra args
+          clippy-args: ''
+          use-sccache: 'true'
+
+  # Run tests using composite action
+  test-rust:
+    needs: changes
+    if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Test research
+        uses: ./.github/actions/rust-test
+        with:
+          package: research
+          use-sccache: 'true'
+
+  # Build check using composite action
+  build-check:
+    needs: changes
+    if: needs.changes.outputs.research == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Build research
+        uses: ./.github/actions/rust-build
+        with:
+          package: research
+          binary: research
+          use-sccache: 'true'
+
+  # Dockerfile validation
+  docker-lint:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' || github.event_name == 'push'
+    runs-on: [k8s-runner]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: infra/images/research/Dockerfile
+          failure-threshold: error
+
+  # Build and push Docker image (only on push to main)
+  build-docker:
+    needs: [lint-rust, test-rust, build-check, docker-lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust (k8s-runner)
+        uses: ./.github/actions/setup-rust-k8s
+        with:
+          sccache-size: '50G'
+
+      - name: Build research binary
+        uses: ./.github/actions/rust-build
+        with:
+          package: research
+          binary: research
+          output-path: research
+          use-sccache: 'true'
+
+      - name: Build intake CLI binary
+        uses: ./.github/actions/rust-build
+        with:
+          package: intake
+          binary: intake
+          output-path: intake
+          use-sccache: 'true'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build intake-agent
+        run: |
+          cd apps/intake-agent
+          # Note: Using regular install instead of --frozen-lockfile due to known
+          # issues with bun 1.3.x and text-based lockfiles (see oven-sh/bun#12801)
+          bun install
+          bun run build
+          cp dist/intake-agent ../../intake-agent
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(cargo metadata --manifest-path crates/research/Cargo.toml --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "research") | .version')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: ./.github/actions/docker-build-push
+        with:
+          image-name: research
+          context: .
+          dockerfile: ./infra/images/research/Dockerfile
+          version: ${{ steps.version.outputs.version }}
+          short-sha: ${{ steps.version.outputs.short-sha }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

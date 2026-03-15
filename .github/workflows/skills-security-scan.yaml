@@ -1,0 +1,118 @@
+name: Skills Security Scan
+
+on:
+  push:
+
+jobs:
+  scan-skills:
+    name: Scan agent skills for security issues
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Prepare OpenClaw skills for scanning
+        run: |
+          # OpenClaw skills are plain .md files without SKILL.md naming or
+          # YAML frontmatter. Wrap each into a directory structure that
+          # mcp-scan can discover (subdirectory containing SKILL.md).
+          shopt -s globstar nullglob
+          for f in infra/charts/openclaw-agent/skills/**/*.md; do
+            name=$(basename "$f" .md)
+            mkdir -p /tmp/openclaw-skills-scan/$name
+            if ! head -1 "$f" | grep -q '^---'; then
+              printf -- '---\nname: %s\ndescription: OpenClaw skill\n---\n' "$name" \
+                | cat - "$f" > /tmp/openclaw-skills-scan/$name/SKILL.md
+            else
+              cp "$f" /tmp/openclaw-skills-scan/$name/SKILL.md
+            fi
+          done
+          echo "Prepared $(find /tmp/openclaw-skills-scan -name SKILL.md | wc -l) OpenClaw skills for scanning"
+
+      - name: Run mcp-scan
+        run: |
+          uvx mcp-scan@latest --skills --json \
+            .claude/skills \
+            .factory/skills \
+            templates/skills \
+            /tmp/openclaw-skills-scan \
+            > scan-results.json || true
+          cat scan-results.json
+
+      - name: Check for critical findings
+        run: |
+          python3 << 'SCRIPT'
+          import json, sys
+
+          with open("scan-results.json") as f:
+              raw = f.read().strip()
+
+          if not raw:
+              print("scan-results.json is empty; treating as an empty scan result.")
+              data = {}
+          else:
+              try:
+                  data = json.loads(raw)
+              except json.JSONDecodeError as exc:
+                  print(
+                      f"scan-results.json is invalid JSON ({exc}); "
+                      "treating as an empty scan result."
+                  )
+                  data = {}
+
+          critical = 0
+          high = 0
+          total_skills = 0
+
+          for path, entry in data.items():
+              if not isinstance(entry, dict):
+                  continue
+              for server in entry.get("servers", []):
+                  sig = server.get("signature", {})
+                  for entity_type in ["tools", "prompts", "resources"]:
+                      for entity in sig.get(entity_type, []):
+                          total_skills += 1
+                          for issue in entity.get("issues", []):
+                              severity = issue.get("severity", "")
+                              code = issue.get("code", "")
+                              desc = issue.get("description", "")[:120]
+                              if severity == "critical" or code.startswith("E"):
+                                  critical += 1
+                                  print(f"CRITICAL [{code}] {path}: {desc}")
+                              elif severity == "high" or code.startswith("W"):
+                                  high += 1
+                                  print(f"HIGH [{code}] {path}: {desc}")
+
+              for skill in entry.get("skills", []):
+                  total_skills += 1
+                  for issue in skill.get("issues", []):
+                      severity = issue.get("severity", "")
+                      code = issue.get("code", "")
+                      desc = issue.get("description", "")[:120]
+                      if severity == "critical" or code.startswith("E"):
+                          critical += 1
+                          print(f"CRITICAL [{code}] {path}: {desc}")
+                      elif severity == "high" or code.startswith("W"):
+                          high += 1
+                          print(f"HIGH [{code}] {path}: {desc}")
+
+          print(f"\nScanned {total_skills} skill entities across {len(data)} paths")
+          print(f"Critical: {critical}, High: {high}")
+
+          if critical > 0:
+              print("\nFailing due to critical security findings.")
+              sys.exit(1)
+
+          print("\nNo critical findings. Passed.")
+          SCRIPT
+
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skills-scan-results
+          path: scan-results.json
+          retention-days: 30
