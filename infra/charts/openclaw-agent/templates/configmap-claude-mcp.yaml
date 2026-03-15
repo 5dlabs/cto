@@ -28,4 +28,8 @@ data:
     {
       "mcpServers": {{ .Values.claudeCode.mcp.servers | toJson }}
     }
+  mcp.json: |
+    {
+      "mcpServers": {{ .Values.claudeCode.mcp.servers | toJson }}
+    }
 {{- end }}

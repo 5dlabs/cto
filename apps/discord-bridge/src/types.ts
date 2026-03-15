@@ -1,4 +1,4 @@
-/** A parsed NATS agent message (matches nats-messenger wire format) */
+/** Agent message format (transport-agnostic, received via HTTP POST) */
 export interface AgentMessage {
   from: string;
   to?: string;
@@ -7,8 +7,10 @@ export interface AgentMessage {
   priority: "normal" | "urgent";
   timestamp: string;
   replyTo?: string;
-  type?: "message" | "discovery_ping" | "discovery_pong";
+  type?: "message";
   role?: string;
+  /** Optional metadata (model, provider, step, coordinator, etc.) */
+  metadata?: Record<string, string>;
 }
 
 /** Tracks an active conversation between agents */

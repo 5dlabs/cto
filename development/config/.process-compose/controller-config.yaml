@@ -6,25 +6,37 @@ job:
 
 agent:
   image:
-    repository: "ghcr.io/5dlabs/agent"
+    repository: "registry.5dlabs.ai/5dlabs/agents"
     tag: "latest"
   imagePullSecrets:
     - ghcr-secret
   cliImages:
     claude:
-      repository: ghcr.io/5dlabs/claude
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     cursor:
-      repository: ghcr.io/5dlabs/cursor
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     codex:
-      repository: ghcr.io/5dlabs/codex
+      repository: registry.5dlabs.ai/5dlabs/agents
+      tag: latest
+    code:
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     gemini:
-      repository: ghcr.io/5dlabs/gemini
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     factory:
-      repository: ghcr.io/5dlabs/factory
+      repository: registry.5dlabs.ai/5dlabs/agents
+      tag: latest
+    opencode:
+      repository: registry.5dlabs.ai/5dlabs/agents
+      tag: latest
+    research:
+      repository: registry.5dlabs.ai/5dlabs/agents
+      tag: latest
+    grok:
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
 
 # Agent definitions - maps GitHub App to CLI configuration
@@ -126,5 +138,5 @@ cleanup:
   deleteConfigMap: true
 
 linear:
-  sidecarImage: "ghcr.io/5dlabs/linear-sidecar:latest"
+  sidecarImage: "registry.5dlabs.ai/5dlabs/linear-sidecar:latest"
   serviceUrl: "http://localhost:8081"

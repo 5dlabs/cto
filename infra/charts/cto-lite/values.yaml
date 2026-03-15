@@ -10,8 +10,8 @@ tier: free
 global:
   # Image pull policy (Always, IfNotPresent, Never)
   imagePullPolicy: IfNotPresent
-  # Image registry (ghcr.io for public images)
-  imageRegistry: ghcr.io/5dlabs
+  # Image registry
+  imageRegistry: registry.5dlabs.ai/5dlabs
 
 # Namespace
 namespace: cto-lite
@@ -21,7 +21,7 @@ namespace: cto-lite
 controller:
   enabled: false
   image:
-    repository: ghcr.io/5dlabs/controller
+    repository: registry.5dlabs.ai/5dlabs/controller
     tag: main
     pullPolicy: IfNotPresent
   resources:
@@ -96,7 +96,7 @@ cloudflared:
 # Agent configuration
 agents:
   # Default image registry for agent images
-  imageRegistry: ghcr.io/5dlabs
+  imageRegistry: registry.5dlabs.ai/5dlabs
   
   # Agent definitions (used by controller for pod specs)
   morgan:

@@ -1,7 +1,5 @@
 # CTO Platform Agents
 
-This file documents the AI agents deployed as part of the Cognitive Task Orchestrator platform.
-
 ## Agent Roster
 
 | Agent | Role | Specialty |
@@ -17,10 +15,23 @@ This file documents the AI agents deployed as part of the Cognitive Task Orchest
 | **Cipher** | Security | Security audits, vulnerability scanning |
 | **Healer** | Self-Healing | Failure detection, automated remediation |
 | **Bolt** | DevOps | Infrastructure, Helm, Kubernetes |
+| **Angie** | Agent Architecture | OpenClaw-first agent systems and orchestration |
 | **Keeper** | Operations | Cluster maintenance, monitoring |
+| **Nova** | Research | Web research, documentation |
+| **Spark** | Rapid Prototyping | Quick iterations, experiments |
+| **Tap** | Integration | API integration, webhooks |
+| **Vex** | Debugging | Root cause analysis, troubleshooting |
+| **Pixel** | Desktop App | CTO Lite Tauri app |
 
 ## Configuration
 
-Agent configurations are defined in `infra/charts/cto/` via Helm values. Each agent runs as an OpenClaw container with its own identity, skills, and tool permissions.
+- Agent configs: `cto-config.json` (models, tools, skills per agent)
+- Deployment: `infra/charts/cto/` (Helm values)
+- Agent expertise docs: `.codex/agents/`
+- Skill mappings: `templates/skills/skill-mappings.yaml`
 
-See the [OpenClaw Helm chart](https://github.com/5dlabs/openclaw-helm) for agent deployment configuration.
+## Tools & Skills
+
+All agents have access to the tools and skills documented in [TOOLS.md](TOOLS.md).
+
+Per-agent tool assignments are defined in `cto-config.json`. See `docs/agent-inventory.md` for the full breakdown of which agent gets which tools.

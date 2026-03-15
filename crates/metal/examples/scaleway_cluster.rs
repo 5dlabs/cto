@@ -15,10 +15,8 @@ use metal::Provider;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let secret_key = env::var("SCALEWAY_SECRET_KEY")
-        .expect("Set SCALEWAY_SECRET_KEY env var");
-    let project_id = env::var("SCALEWAY_PROJECT_ID")
-        .expect("Set SCALEWAY_PROJECT_ID env var");
+    let secret_key = env::var("SCALEWAY_SECRET_KEY").expect("Set SCALEWAY_SECRET_KEY env var");
+    let project_id = env::var("SCALEWAY_PROJECT_ID").expect("Set SCALEWAY_PROJECT_ID env var");
     let zone = env::var("SCALEWAY_ZONE").unwrap_or_else(|_| "fr-par-1".to_string());
     let ssh_key_id = env::var("SCALEWAY_SSH_KEY_ID")
         .unwrap_or_else(|_| "97bb8cbc-5757-4cb2-ad2f-f272e189f223".to_string());
@@ -28,12 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Zone: {}", zone);
     println!("SSH Key: {}", ssh_key_id);
 
-    let em = metal::providers::scaleway::Scaleway::new(
-        &secret_key,
-        "",
-        &project_id,
-        &zone,
-    )?;
+    let em = metal::providers::scaleway::Scaleway::new(&secret_key, "", &project_id, &zone)?;
 
     // Cluster config
     let cluster_nodes = vec![
@@ -50,14 +43,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (i, (hostname, offer_id)) in cluster_nodes.iter().enumerate() {
         println!("[{}/2] Creating {}...", i + 1, hostname);
 
-        let server = em.create_server(metal::CreateServerRequest {
-            hostname: hostname.to_string(),
-            plan: offer_id.to_string(),
-            os: os_id.to_string(),
-            ssh_keys: vec![ssh_key_id.clone()],
-            ip_addresses: vec![],
-            region: zone.clone(),
-        }).await?;
+        let server = em
+            .create_server(metal::CreateServerRequest {
+                hostname: hostname.to_string(),
+                plan: offer_id.to_string(),
+                os: os_id.to_string(),
+                ssh_keys: vec![ssh_key_id.clone()],
+                ip_addresses: vec![],
+                region: zone.clone(),
+            })
+            .await?;
 
         println!("   ✅ Created: {} ({})", server.hostname, server.id);
         created_servers.push(server);
@@ -100,7 +95,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let servers = em.list_servers().await?;
     println!("📋 Final cluster state:\n");
     for s in &servers {
-        println!("   - {} | {} | {:?}", s.hostname, s.ipv4.clone().unwrap_or_default(), s.status);
+        println!(
+            "   - {} | {} | {:?}",
+            s.hostname,
+            s.ipv4.clone().unwrap_or_default(),
+            s.status
+        );
     }
 
     // Delete cluster on Ctrl+C or with DELETE env var

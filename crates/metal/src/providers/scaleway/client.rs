@@ -235,7 +235,10 @@ impl Scaleway {
 
 #[async_trait]
 impl Provider for Scaleway {
-    async fn create_server(&self, req: CreateServerRequest) -> Result<crate::providers::Server, ProviderError> {
+    async fn create_server(
+        &self,
+        req: CreateServerRequest,
+    ) -> Result<crate::providers::Server, ProviderError> {
         info!(
             hostname = %req.hostname,
             plan = %req.plan,
@@ -275,7 +278,11 @@ impl Provider for Scaleway {
         Ok(Self::to_server(&server))
     }
 
-    async fn wait_ready(&self, id: &str, timeout_secs: u64) -> Result<crate::providers::Server, ProviderError> {
+    async fn wait_ready(
+        &self,
+        id: &str,
+        timeout_secs: u64,
+    ) -> Result<crate::providers::Server, ProviderError> {
         info!(server_id = %id, timeout_secs, "Waiting for server to be ready");
 
         let start = std::time::Instant::now();

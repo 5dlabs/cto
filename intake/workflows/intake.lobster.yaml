@@ -1,72 +1,674 @@
 name: intake
-description: "PRD intake pipeline with voting committee"
+description: >
+  PRD intake pipeline — parses a PRD (or design brief) into tasks, analyzes
+  complexity, expands into subtasks, runs 5-model quality voting, generates
+  documentation and prompts, then commits and opens a PR.
 inputs:
   - name: prd_content
     type: string
+    description: "Full PRD or design brief markdown content"
   - name: prd_path
     type: string
+    description: "Path to the PRD file (for reference in docs)"
   - name: num_tasks
     type: number
     default: 10
+    description: "Target number of top-level tasks to generate"
   - name: project_name
     type: string
     default: "project"
+    description: "Short project slug used for branch names and PR titles"
+  - name: intake_metadata
+    type: string
+    default: ""
+    description: "JSON string of Linear metadata (session_id, prd_issue_id, etc.) for PR body"
+  - name: pr_base_branch
+    type: string
+    default: "main"
+    description: "Base branch for the PR"
+  - name: codebase_context
+    type: string
+    default: ""
+    description: "Structured codebase context from codebase-analysis step (empty for greenfield)"
+  - name: infrastructure_context
+    type: string
+    default: ""
+    description: "Available operators and services (built from operator catalog)"
+  - name: linear_project_id
+    type: string
+    default: ""
+    description: "Linear project ID (from create-linear-project step)"
+  - name: linear_prd_issue_id
+    type: string
+    default: ""
+    description: "Linear PRD issue ID (from create-linear-project step)"
+  - name: linear_team_id
+    type: string
+    default: ""
+    description: "Linear team ID (from cto-config.json)"
+  - name: linear_agent_map
+    type: string
+    default: "{}"
+    description: "JSON map of agent name → Linear user ID"
+  - name: repository_url
+    type: string
+    default: ""
+    description: "Repository URL for linking to generated prompt files"
+  - name: tool_context
+    type: string
+    default: ""
+    description: "Discovered MCP tools from config and cluster (from discover-tools step)"
+  - name: verify
+    type: string
+    default: "true"
+    description: "When true, validate outputs after each major step"
+  - name: breakpoints
+    type: string
+    default: "false"
+    description: "When true, pause for human approval at key checkpoints"
+  - name: linear_session_id
+    type: string
+    default: ""
+    description: "Linear session ID for activity tracking"
+  - name: linear_issue_id
+    type: string
+    default: ""
+    description: "Linear issue ID for plan updates"
+  - name: run_id
+    type: string
+    default: ""
+    description: "Pipeline run ID for registration/deregistration"
+  - name: model_primary_provider
+    type: string
+    default: "anthropic"
+  - name: model_primary
+    type: string
+    default: "claude-sonnet-4-6"
+  - name: model_fast_provider
+    type: string
+    default: "anthropic"
+  - name: model_fast
+    type: string
+    default: "claude-sonnet-4-6"
+  - name: model_frontier_provider
+    type: string
+    default: "anthropic"
+  - name: model_frontier
+    type: string
+    default: "claude-opus-4-6"
+  - name: voter_1_provider
+    type: string
+    default: "anthropic"
+  - name: voter_1_model
+    type: string
+    default: "claude-opus-4-6"
+  - name: voter_2_provider
+    type: string
+    default: "openai"
+  - name: voter_2_model
+    type: string
+    default: "gpt-5.2-pro"
+  - name: voter_3_provider
+    type: string
+    default: "anthropic"
+  - name: voter_3_model
+    type: string
+    default: "claude-sonnet-4-6"
+  - name: voter_4_provider
+    type: string
+    default: "openai"
+  - name: voter_4_model
+    type: string
+    default: "o3-pro"
+  - name: voter_5_provider
+    type: string
+    default: "google"
+  - name: voter_5_model
+    type: string
+    default: "gemini-3.1-pro-preview"
 
 steps:
+  # ─────────────────────────────────────────────────────────
+  # Run registration
+  # ─────────────────────────────────────────────────────────
+  - name: register-run
+    when: "{{inputs.run_id}}"
+    command: >
+      intake-util register-run
+        --run-id "{{inputs.run_id}}"
+        --session-id "{{inputs.linear_session_id}}"
+        --workflow intake
+
+  - name: linear-plan-parsing
+    when: "{{inputs.linear_issue_id}}"
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --issue-id "{{inputs.linear_issue_id}}"
+        --type plan
+        --title "Phase: PRD Parsing & Analysis"
+        --body "Starting PRD parse and complexity analysis"
+
   - name: parse-prd
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
         "prompt": "{{prompts/parse-prd-system.md}}\n\n{{prompts/parse-prd-user.md}}",
         "input": {
           "prd_content": "{{inputs.prd_content}}",
+          "codebase_context": "{{inputs.codebase_context}}",
           "num_tasks": {{inputs.num_tasks}},
           "next_id": 1
         },
         "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514"
+        "provider": "{{inputs.model_primary_provider}}",
+        "model": "{{inputs.model_primary}}"
       }'
 
+  - name: verify-parse-prd
+    when: "{{inputs.verify}}"
+    depends_on: [parse-prd]
+    command: >
+      echo '${{ steps.parse-prd.output }}' |
+      intake-util validate --type generated-task
+
+  - name: breakpoint-parse-prd
+    when: "{{inputs.breakpoints}}"
+    depends_on: [verify-parse-prd]
+    approval:
+      message: "Review parse-prd output"
+
+  - name: linear-activity-parse-prd
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [parse-prd]
+    command: >
+      TASK_COUNT=$(echo '${{ steps.parse-prd.output }}' | jq 'length') &&
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "PRD Parsed"
+        --body "Parsed PRD into ${TASK_COUNT} tasks"
+
   - name: analyze-complexity
+    depends_on: [parse-prd]
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
         "prompt": "{{prompts/analyze-complexity-system.md}}",
         "input": { "tasks": ${{ steps.parse-prd.output }} },
         "schema": "{{schemas/complexity-analysis.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514"
+        "provider": "{{inputs.model_primary_provider}}",
+        "model": "{{inputs.model_primary}}"
       }'
 
+  - name: verify-analyze-complexity
+    when: "{{inputs.verify}}"
+    depends_on: [analyze-complexity]
+    command: >
+      echo '${{ steps.analyze-complexity.output }}' |
+      intake-util validate --type complexity-analysis
+
+  - name: breakpoint-analyze-complexity
+    when: "{{inputs.breakpoints}}"
+    depends_on: [verify-analyze-complexity]
+    approval:
+      message: "Review analyze-complexity output"
+
+  - name: linear-activity-analyze-complexity
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [analyze-complexity]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Complexity Analyzed"
+        --body '${{ steps.analyze-complexity.output }}'
+
   - name: review-tasks
+    depends_on: [analyze-complexity]
     approval:
       message: "Review generated tasks and complexity analysis before expanding"
       show:
         - tasks: ${{ steps.parse-prd.output }}
         - complexity: ${{ steps.analyze-complexity.output }}
 
-  - name: expand-tasks
+  # ─────────────────────────────────────────────────────────
+  # Task refinement: expand -> vote -> revise loop (max 2 rounds)
+  # Replaces the old expand-tasks + vote-on-quality steps with a
+  # sub-workflow that gates on committee approval.
+  # ─────────────────────────────────────────────────────────
+  - name: refine-tasks
+    depends_on: [review-tasks]
+    workflow: task-refinement.lobster.yaml
+    inputs:
+      tasks: ${{ steps.parse-prd.output }}
+      complexity: ${{ steps.analyze-complexity.output }}
+      evaluation_criteria: "task decomposition quality, dependency ordering, decision point coverage"
+      max_revisions: 2
+      model_primary_provider: "{{inputs.model_primary_provider}}"
+      model_primary: "{{inputs.model_primary}}"
+      voter_1_provider: "{{inputs.voter_1_provider}}"
+      voter_1_model: "{{inputs.voter_1_model}}"
+      voter_2_provider: "{{inputs.voter_2_provider}}"
+      voter_2_model: "{{inputs.voter_2_model}}"
+      voter_3_provider: "{{inputs.voter_3_provider}}"
+      voter_3_model: "{{inputs.voter_3_model}}"
+      voter_4_provider: "{{inputs.voter_4_provider}}"
+      voter_4_model: "{{inputs.voter_4_model}}"
+      voter_5_provider: "{{inputs.voter_5_provider}}"
+      voter_5_model: "{{inputs.voter_5_model}}"
+
+  - name: verify-refine-tasks
+    when: "{{inputs.verify}}"
+    depends_on: [refine-tasks]
+    command: >
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
+      intake-util validate --type expanded-tasks
+
+  - name: breakpoint-refine-tasks
+    when: "{{inputs.breakpoints}}"
+    depends_on: [verify-refine-tasks]
+    approval:
+      message: "Review refine-tasks output"
+
+  - name: linear-activity-refine-tasks
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [refine-tasks]
+    command: >
+      TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Tasks Refined"
+        --body "Refined ${TASK_COUNT} tasks — verdict: ${{ steps.refine-tasks.outputs.verdict }}"
+
+  - name: linear-plan-generation
+    when: "{{inputs.linear_issue_id}}"
+    depends_on: [refine-tasks]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --issue-id "{{inputs.linear_issue_id}}"
+        --type plan
+        --title "Phase: Artifact Generation"
+        --body "Generating scaffolds, docs, prompts, workflows, and security analysis"
+
+  - name: generate-scaffolds
+    depends_on: [refine-tasks]
+    description: "Generate code scaffolds for each task based on agent, stack, and codebase context"
     command: >
       openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/expand-task-system.md}}",
+        "prompt": "{{prompts/scaffold-generation-system.md}}",
         "input": {
-          "tasks": ${{ steps.parse-prd.output }},
-          "complexity": ${{ steps.analyze-complexity.output }}
+          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
+          "codebase_context": "{{inputs.codebase_context}}",
+          "infrastructure_context": "{{inputs.infrastructure_context}}"
         },
-        "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514"
+        "schema": "{{schemas/scaffold.schema.json}}",
+        "provider": "{{inputs.model_fast_provider}}",
+        "model": "{{inputs.model_fast}}"
       }'
 
-  - name: vote-on-quality
-    workflow: voting.lobster.yaml
-    inputs:
-      content_to_evaluate: ${{ steps.expand-tasks.output }}
-      evaluation_criteria: "task decomposition quality, dependency ordering, decision point coverage"
-
-  - name: generate-docs
+  - name: verify-generate-scaffolds
+    when: "{{inputs.verify}}"
+    depends_on: [generate-scaffolds]
     command: >
-      echo '${{ steps.expand-tasks.output }}' | intake-util generate-docs --base-path .tasks/docs
+      echo '${{ steps.generate-scaffolds.output }}' |
+      intake-util validate --type scaffold
 
-  - name: generate-prompts
+  - name: breakpoint-generate-scaffolds
+    when: "{{inputs.breakpoints}}"
+    depends_on: [verify-generate-scaffolds]
+    approval:
+      message: "Review generate-scaffolds output"
+
+  - name: linear-activity-generate-scaffolds
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [generate-scaffolds]
     command: >
-      echo '${{ steps.expand-tasks.output }}' | intake-util generate-prompts --output-dir .tasks/docs --project-name {{inputs.project_name}}
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Scaffolds Generated"
+        --body "Generated code scaffolds for all tasks"
+
+  - name: fan-out-docs
+    depends_on: [refine-tasks, generate-scaffolds]
+    description: "Generate docs per task in parallel via fan-out"
+    command: >
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
+      intake-util fan-out
+        --prompt "{{prompts/smart-docs-system.md}}"
+        --schema "{{schemas/smart-doc-item.schema.json}}"
+        --context '{"scaffolds": ${{ steps.generate-scaffolds.output }}, "codebase_context": "{{inputs.codebase_context}}", "infrastructure_context": "{{inputs.infrastructure_context}}"}'
+        --provider "{{inputs.model_fast_provider}}"
+        --model "{{inputs.model_fast}}"
+        --concurrency 4
+
+  - name: validate-docs
+    depends_on: [fan-out-docs]
+    description: "Validate merged docs output"
+    command: >
+      TASK_IDS=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq '[.[].id]') &&
+      echo '${{ steps.fan-out-docs.output }}' |
+      intake-util validate --type docs --task-ids "$TASK_IDS"
+
+  - name: write-docs
+    depends_on: [validate-docs]
+    description: "Write fan-out docs to disk"
+    command: >
+      echo '${{ steps.fan-out-docs.output }}' |
+      intake-util write-files --base-path .tasks/docs --type docs
+
+  - name: linear-activity-write-docs
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [write-docs]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Docs Written"
+        --body "Task documentation written to .tasks/docs"
+
+  - name: search-skills
+    depends_on: [refine-tasks]
+    description: "Search ClawHub for relevant skills per task"
+    command: >
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
+      jq -r '.[] | "\(.id)|\(.title) \(.stack // "") \(.description | .[0:200])"' |
+      while IFS='|' read -r task_id query; do
+        results=$(clawhub search "$query" --limit 5 --json 2>/dev/null || echo '[]')
+        echo "{\"task_id\": $task_id, \"search_results\": $results}"
+      done | jq -s '{"skill_search_results": .}'
+
+  - name: discover-skills
+    depends_on: [search-skills]
+    description: "Match and recommend skills for each task via LLM reasoning"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/skill-discovery-system.md}}",
+        "input": {
+          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
+          "skill_search_results": ${{ steps.search-skills.output }}
+        },
+        "schema": "{{schemas/skill-recommendations.schema.json}}",
+        "provider": "{{inputs.model_fast_provider}}",
+        "model": "{{inputs.model_fast}}"
+      }'
+
+  - name: verify-discover-skills
+    when: "{{inputs.verify}}"
+    depends_on: [discover-skills]
+    command: >
+      echo '${{ steps.discover-skills.output }}' |
+      intake-util validate --type skill-recommendations
+
+  - name: linear-activity-discover-skills
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [discover-skills]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Skills Discovered"
+        --body "Skill recommendations generated for all tasks"
+
+  - name: generate-tool-manifest
+    depends_on: [refine-tasks]
+    description: "Generate project-level tool manifest from discovered tools"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/tool-manifest-system.md}}",
+        "input": {
+          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
+          "available_tools": "{{inputs.tool_context}}",
+          "infrastructure_context": "{{inputs.infrastructure_context}}"
+        },
+        "schema": "{{schemas/tool-manifest.schema.json}}",
+        "provider": "{{inputs.model_fast_provider}}",
+        "model": "{{inputs.model_fast}}"
+      }'
+
+  - name: fan-out-prompts
+    depends_on: [write-docs, discover-skills, generate-tool-manifest, generate-scaffolds]
+    description: "Generate prompts per task in parallel via fan-out"
+    command: >
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
+      intake-util fan-out
+        --prompt "{{prompts/smart-prompts-system.md}}"
+        --schema "{{schemas/smart-prompt-item.schema.json}}"
+        --context '{"scaffolds": ${{ steps.generate-scaffolds.output }}, "skill_recommendations": ${{ steps.discover-skills.output }}, "tool_manifest": ${{ steps.generate-tool-manifest.output }}, "codebase_context": "{{inputs.codebase_context}}", "project_name": "{{inputs.project_name}}"}'
+        --provider "{{inputs.model_fast_provider}}"
+        --model "{{inputs.model_fast}}"
+        --concurrency 4
+
+  - name: validate-prompts
+    depends_on: [fan-out-prompts]
+    description: "Validate merged prompts output"
+    command: >
+      TASK_IDS=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq '[.[].id]') &&
+      echo '${{ steps.fan-out-prompts.output }}' |
+      intake-util validate --type prompts --task-ids "$TASK_IDS"
+
+  - name: write-prompts
+    depends_on: [validate-prompts]
+    description: "Write fan-out prompts to disk"
+    command: >
+      echo '${{ steps.fan-out-prompts.output }}' |
+      intake-util write-files --base-path .tasks/docs --type prompts
+
+  - name: linear-activity-write-prompts
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [write-prompts]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Prompts Written"
+        --body "Per-agent implementation prompts written to .tasks/docs"
+
+  # ─────────────────────────────────────────────────────────
+  # Per-task implementation workflows (deterministic)
+  # Generates a Lobster workflow per task that controls the
+  # execution lifecycle: setup, subtask sequencing, validation
+  # gates, and PR creation. Runs parallel with docs/prompts.
+  # ─────────────────────────────────────────────────────────
+  - name: generate-workflows
+    depends_on: [refine-tasks, generate-scaffolds]
+    description: "Generate per-task Lobster implementation workflows (deterministic)"
+    command: >
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
+      intake-util generate-workflows
+        --scaffolds-json <(echo '${{ steps.generate-scaffolds.output }}')
+        --config cto-config.json
+        --repository-url "{{inputs.repository_url}}"
+
+  - name: validate-workflows
+    depends_on: [generate-workflows]
+    description: "Validate generated workflow structure and completeness"
+    command: >
+      TASK_IDS=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq '[.[].id]') &&
+      echo '${{ steps.generate-workflows.output }}' | jq '.task_workflows' |
+      intake-util validate --type workflows --task-ids "$TASK_IDS"
+
+  - name: write-workflows
+    depends_on: [validate-workflows]
+    description: "Write per-task implementation.lobster.yaml files to disk"
+    command: >
+      echo '${{ steps.generate-workflows.output }}' |
+      intake-util write-files --base-path .tasks/docs --type workflows
+
+  # ─────────────────────────────────────────────────────────
+  # Final pipeline stages: scale → security → remediation
+  # These generate additional task specs that get included in
+  # the PR alongside the main implementation tasks.
+  # ─────────────────────────────────────────────────────────
+  - name: generate-scale-tasks
+    depends_on: [refine-tasks]
+    description: "Generate Bolt production-hardening task specifications"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/bolt-production-hardening-system.md}}",
+        "input": {
+          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
+          "infrastructure_context": "{{inputs.infrastructure_context}}"
+        },
+        "schema": "{{schemas/scale-tasks.schema.json}}",
+        "provider": "{{inputs.model_fast_provider}}",
+        "model": "{{inputs.model_fast}}"
+      }'
+
+  - name: generate-security-report
+    depends_on: [generate-scale-tasks]
+    description: "Cipher analyzes task plan for security concerns"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/security-report-system.md}}",
+        "input": {
+          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
+          "scale_tasks": ${{ steps.generate-scale-tasks.output }}
+        },
+        "schema": "{{schemas/security-report.schema.json}}",
+        "provider": "{{inputs.model_frontier_provider}}",
+        "model": "{{inputs.model_frontier}}"
+      }'
+
+  - name: linear-activity-security-report
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [generate-security-report]
+    command: >
+      FINDING_COUNT=$(echo '${{ steps.generate-security-report.output }}' | jq '.findings | length') &&
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "Security Report"
+        --body "Security analysis found ${FINDING_COUNT} findings"
+
+  - name: generate-remediation-tasks
+    depends_on: [generate-security-report]
+    description: "Generate remediation tasks from security findings"
+    command: >
+      openclaw.invoke --tool llm-task --action json --args-json '{
+        "prompt": "{{prompts/security-remediation-system.md}}",
+        "input": {
+          "security_report": ${{ steps.generate-security-report.output }},
+          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }}
+        },
+        "schema": "{{schemas/remediation-tasks.schema.json}}",
+        "provider": "{{inputs.model_fast_provider}}",
+        "model": "{{inputs.model_fast}}"
+      }'
+
+  # ─────────────────────────────────────────────────────────
+  # Linear sync: create task + subtask issues
+  # Runs in parallel with commit-outputs after prompts are ready.
+  # ─────────────────────────────────────────────────────────
+  - name: sync-linear-issues
+    description: "Create Linear issues for each task and subtask"
+    when: "{{inputs.linear_project_id}}"
+    depends_on: [write-prompts]
+    command: >
+      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
+      intake-util sync-linear issues
+        --project-id "{{inputs.linear_project_id}}"
+        --prd-issue-id "{{inputs.linear_prd_issue_id}}"
+        --team-id "{{inputs.linear_team_id}}"
+        --base-url "{{inputs.repository_url}}"
+        --agent-map '{{inputs.linear_agent_map}}'
+
+  - name: linear-plan-commit
+    when: "{{inputs.linear_issue_id}}"
+    depends_on: [write-prompts, write-workflows, generate-remediation-tasks]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --issue-id "{{inputs.linear_issue_id}}"
+        --type plan
+        --title "Phase: Commit & PR"
+        --body "Committing generated artifacts and opening PR"
+
+  - name: commit-outputs
+    description: "Stage all generated task files and open a PR"
+    depends_on: [write-prompts, write-workflows, generate-remediation-tasks]
+    command: >
+      TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
+      SCALE_TASKS='${{ steps.generate-scale-tasks.output }}' &&
+      SECURITY_REPORT='${{ steps.generate-security-report.output }}' &&
+      REMEDIATION_TASKS='${{ steps.generate-remediation-tasks.output }}' &&
+      echo "$SCALE_TASKS" > .tasks/docs/scale-tasks.json &&
+      echo "$SECURITY_REPORT" > .tasks/docs/security-report.json &&
+      echo "$REMEDIATION_TASKS" > .tasks/docs/remediation-tasks.json &&
+      REFINEMENT_WARNING='${{ steps.refine-tasks.outputs.warning }}' &&
+      git config user.email "morgan@5dlabs.io" &&
+      git config user.name "Morgan (Intake Agent)" &&
+      BRANCH_NAME="intake/{{inputs.project_name}}-$(date +%Y%m%d-%H%M%S)" &&
+      git checkout -b "$BRANCH_NAME" &&
+      git add .tasks/ &&
+      git diff --staged --stat &&
+      git commit -m "feat(intake): generated ${TASK_COUNT} tasks for {{inputs.project_name}}
+
+      Generated by Morgan intake pipeline (Lobster).
+      - design-brief.md: resolved decisions and architecture overview
+      - tasks/: expanded task breakdown with subtask prompts
+      - docs/: task documentation and per-agent prompts
+      - Vote verdict: ${{ steps.refine-tasks.outputs.verdict }} (after ${{ steps.refine-tasks.outputs.revision_count }} revision(s))"
+
+  - name: create-pr
+    description: "Push branch and open GitHub PR"
+    depends_on: [commit-outputs]
+    command: >
+      TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
+      VERDICT='${{ steps.refine-tasks.outputs.verdict }}' &&
+      REVISION_COUNT='${{ steps.refine-tasks.outputs.revision_count }}' &&
+      WARNING='${{ steps.refine-tasks.outputs.warning }}' &&
+      BRANCH=$(git rev-parse --abbrev-ref HEAD) &&
+      git push origin "$BRANCH" &&
+      gh pr create \
+        --title "feat(intake): {{inputs.project_name}} task breakdown" \
+        --body "## Intake Pipeline Output
+
+      This PR was generated automatically by the Morgan intake pipeline.
+
+      ### What's included
+      - \`.tasks/docs/design-brief.md\` — Architecture decisions from Optimist vs Pessimist deliberation
+      - \`.tasks/docs/task-*/\` — Expanded task descriptions with implementation guidance
+      - Per-agent implementation prompts (\`prompt.md\`, \`prompt.xml\`, \`acceptance.md\`)
+
+      ### Process
+      1. PRD parsed into ${TASK_COUNT} tasks with agent routing
+      2. Complexity analyzed and subtasks expanded
+      3. 5-model committee voted on task quality — verdict: **${VERDICT}** (${REVISION_COUNT} revision round(s))
+      4. Documentation and prompts generated
+
+      ${WARNING:+> **Note:** $WARNING}
+
+      <!-- intake-metadata: {{inputs.intake_metadata}} -->
+
+      _Review and merge to kick off implementation._" \
+        --base "{{inputs.pr_base_branch}}" \
+        --label "intake" 2>&1 | tee /tmp/pr-url.txt &&
+      cat /tmp/pr-url.txt
+
+  - name: linear-activity-pr-created
+    when: "{{inputs.linear_session_id}}"
+    depends_on: [create-pr]
+    command: >
+      intake-util linear-activity
+        --session-id "{{inputs.linear_session_id}}"
+        --type thought
+        --title "PR Created"
+        --body "Pull request opened: ${{ steps.create-pr.output }}"
+
+  - name: deregister-run
+    when: "{{inputs.run_id}}"
+    depends_on: [create-pr, sync-linear-issues]
+    command: >
+      intake-util deregister-run
+        --run-id "{{inputs.run_id}}"
+        --status completed
+
+output_mappings:
+  task_count: ${{ steps.refine-tasks.outputs.expanded_tasks | jq 'length' }}
+  pr_url: ${{ steps.create-pr.output }}
+  vote_verdict: ${{ steps.refine-tasks.outputs.verdict }}
+  revision_count: ${{ steps.refine-tasks.outputs.revision_count }}
+  security_report: ${{ steps.generate-security-report.output }}
+  linear_issues: ${{ steps.sync-linear-issues.output }}

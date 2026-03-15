@@ -54,28 +54,28 @@
 :root {
   --radius: 0.625rem;
   /* Deep dark backgrounds with blue undertone */
-  --background: oklch(0.08 0.02 260);
+  --background: oklch(0.06 0.02 260);
   --foreground: oklch(0.95 0 0);
   /* Cards with subtle elevation */
-  --card: oklch(0.12 0.015 260);
+  --card: oklch(0.10 0.015 260);
   --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.1 0.02 260);
+  --popover: oklch(0.08 0.02 260);
   --popover-foreground: oklch(0.95 0 0);
   /* Electric cyan as primary */
   --primary: oklch(0.75 0.18 195);
   --primary-foreground: oklch(0.1 0.02 260);
   /* Muted surfaces */
-  --secondary: oklch(0.18 0.015 260);
+  --secondary: oklch(0.14 0.015 260);
   --secondary-foreground: oklch(0.9 0 0);
-  --muted: oklch(0.2 0.01 260);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.18 0.02 260);
+  --muted: oklch(0.16 0.01 260);
+  --muted-foreground: oklch(0.55 0 0);
+  --accent: oklch(0.14 0.02 260);
   --accent-foreground: oklch(0.95 0 0);
   /* Destructive - neon red */
   --destructive: oklch(0.65 0.25 25);
   /* Borders and inputs */
-  --border: oklch(0.25 0.02 260);
-  --input: oklch(0.15 0.015 260);
+  --border: oklch(0.20 0.02 260);
+  --input: oklch(0.12 0.015 260);
   --ring: oklch(0.75 0.18 195);
   /* Chart colors - neon palette */
   --chart-1: oklch(0.75 0.18 195); /* Cyan */
@@ -84,13 +84,13 @@
   --chart-4: oklch(0.65 0.2 280);  /* Purple */
   --chart-5: oklch(0.7 0.2 30);    /* Orange */
   /* Sidebar */
-  --sidebar: oklch(0.1 0.015 260);
+  --sidebar: oklch(0.08 0.015 260);
   --sidebar-foreground: oklch(0.9 0 0);
   --sidebar-primary: oklch(0.75 0.18 195);
   --sidebar-primary-foreground: oklch(0.1 0 0);
-  --sidebar-accent: oklch(0.15 0.02 260);
+  --sidebar-accent: oklch(0.12 0.02 260);
   --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.25 0.02 260);
+  --sidebar-border: oklch(0.20 0.02 260);
   --sidebar-ring: oklch(0.75 0.18 195);
   /* Custom neon colors */
   --cyan: oklch(0.8 0.2 195);
@@ -147,6 +147,56 @@
   animation: rain linear infinite;
 }
 
+/* Grid Pulse background keyframes */
+@keyframes grid-breathe {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+@keyframes grid-drift {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(60px, 60px, 0); }
+}
+/* Transform-only keyframes — compositor thread, zero repaints */
+@keyframes grid-node-wander-0 {
+  0% { transform: translate3d(0, 0, 0) scale(0.8); }
+  50% { transform: translate3d(120px, -90px, 0) scale(1.15); }
+  100% { transform: translate3d(-60px, 80px, 0) scale(0.9); }
+}
+@keyframes grid-node-wander-1 {
+  0% { transform: translate3d(0, 0, 0) scale(0.9); }
+  50% { transform: translate3d(-100px, 70px, 0) scale(1.2); }
+  100% { transform: translate3d(90px, -50px, 0) scale(0.8); }
+}
+@keyframes grid-node-wander-2 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(80px, 100px, 0) scale(0.85); }
+  100% { transform: translate3d(-90px, -70px, 0) scale(1.15); }
+}
+@keyframes grid-node-wander-3 {
+  0% { transform: translate3d(0, 0, 0) scale(0.85); }
+  50% { transform: translate3d(-80px, -90px, 0) scale(1.15); }
+  100% { transform: translate3d(100px, 60px, 0) scale(0.95); }
+}
+@keyframes grid-energy-h {
+  0% { transform: scaleX(0.3) translateX(-100%); }
+  50% { transform: scaleX(1) translateX(0%); }
+  100% { transform: scaleX(0.3) translateX(100%); }
+}
+@keyframes grid-energy-v {
+  0% { transform: scaleY(0.3) translateY(-100%); }
+  50% { transform: scaleY(1) translateY(0%); }
+  100% { transform: scaleY(0.3) translateY(100%); }
+}
+@keyframes grid-foreground-rare {
+  0%, 93%, 100% { opacity: 0; }
+  94% { opacity: 0.04; }
+  95% { opacity: 0.08; }
+  96% { opacity: 0.12; }
+  97% { opacity: 0.08; }
+  98% { opacity: 0.03; }
+  99% { opacity: 0; }
+}
+
 /* Circuit pattern background */
 .circuit-bg {
   background-image: 
@@ -185,6 +235,18 @@
   background-size: 300% 300%;
   animation: gradient-rotate 4s ease infinite;
 }
+
+/* Scroll indicator bounce — purely decorative, no opacity changes */
+@keyframes scroll-bounce-kf {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+.scroll-bounce {
+  animation: scroll-bounce-kf 3s ease-in-out infinite;
+}
+
+
 
 /* Marquee animation for tech stack */
 @keyframes marquee-scroll {

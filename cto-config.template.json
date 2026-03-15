@@ -41,9 +41,18 @@
       "local": false,
       "autoAssignMorgan": true,
       "models": {
-        "primary": "claude-opus-4-5-20251101",
-        "research": "claude-opus-4-5-20251101",
-        "fallback": "claude-opus-4-5-20251101"
+        "tiers": {
+          "primary": { "provider": "anthropic", "model": "claude-sonnet-4-6" },
+          "fast": { "provider": "anthropic", "model": "claude-sonnet-4-6" },
+          "frontier": { "provider": "anthropic", "model": "claude-opus-4-6" }
+        },
+        "committee": [
+          { "provider": "anthropic", "model": "claude-opus-4-6" },
+          { "provider": "openai", "model": "gpt-5.2-pro" },
+          { "provider": "anthropic", "model": "claude-sonnet-4-6" },
+          { "provider": "openai", "model": "o3-pro" },
+          { "provider": "google", "model": "gemini-2.5-pro" }
+        ]
       },
       "deepResearch": {
         "enabled": true,
@@ -52,6 +61,49 @@
       }
     },
     "_comment_play": "Default values for play() tool - playground test workflows. Agent names are hardcoded (Rex, Blaze, Grizz, Nova, Tap, Spark, Bolt, Cleo, Cipher, Tess) but can be overridden.",
+    "_comment_acp": "Shared ACP defaults for sessionful runtimes and internal service integrations. Stakpak is the default ACP-capable runtime entry.",
+    "acp": {
+      "enabled": false,
+      "defaultRuntime": "stakpak",
+      "runtimes": {
+        "stakpak": {
+          "enabled": true,
+          "transport": "stdio",
+          "command": "stakpak",
+          "args": ["acp"]
+        }
+      },
+      "services": {
+        "healer": {
+          "enabled": false,
+          "runtimeIds": ["stakpak"],
+          "defaultRuntime": "stakpak",
+          "allowedCallers": ["openclaw"]
+        },
+        "pm": {
+          "enabled": false,
+          "runtimeIds": ["stakpak"]
+        },
+        "controller": {
+          "enabled": false,
+          "runtimeIds": ["stakpak"]
+        },
+        "mcp": {
+          "enabled": false,
+          "runtimeIds": ["stakpak"]
+        },
+        "mcpLite": {
+          "enabled": false,
+          "runtimeIds": ["stakpak"]
+        }
+      },
+      "server": {
+        "enabled": false,
+        "bind": "127.0.0.1:8890",
+        "authTokenEnv": "CTO_ACP_SERVER_TOKEN",
+        "allowedCallers": ["openclaw"]
+      }
+    },
     "play": {
       "repository": "your-org/your-test-repo",
       "service": "your-test-service",
@@ -64,6 +116,7 @@
       "qualityMaxRetries": 5,
       "securityMaxRetries": 2,
       "testingMaxRetries": 5,
+      "agentCommunication": "subagent",
       "autoMerge": false,
       "parallelExecution": false,
       "healerEndpoint": "http://localhost:8083",
@@ -290,13 +343,17 @@
     "defaults.code.service": "Default service name for workspace isolation (creates workspace-{service} PVC)",
     "defaults.intake.local": "Run intake locally using tasks CLI instead of submitting Argo workflow (default: false)",
     "defaults.intake.autoAssignMorgan": "Auto-assign Morgan to the PRD issue to start intake workflow immediately (default: true). Set to false to review/edit cto-config first.",
-    "defaults.intake.primary": "Primary model configuration for intake workflows",
-    "defaults.intake.research": "Research model configuration for intake workflows",
-    "defaults.intake.fallback": "Fallback model configuration for intake workflows",
+    "defaults.intake.models.tiers": "Model tiers for intake pipeline steps. Each tier has {provider, model}. primary=core analysis, fast=artifact generation, frontier=critical decisions",
+    "defaults.intake.models.committee": "Array of 5 {provider, model} pairs for the voting committee. Uses diverse models across providers to maximize perspective diversity",
     "defaults.intake.deepResearch": "Deep research configuration for autonomous web investigation during intake",
     "defaults.intake.deepResearch.enabled": "Enable deep research using Firecrawl Agent for competitive analysis and pattern discovery (default: true)",
     "defaults.intake.deepResearch.maxCredits": "Maximum Firecrawl credits to spend per research task (default: 50). Controls cost of autonomous web research.",
     "defaults.intake.deepResearch.triggers": "Keywords that trigger deep research - when found in PRD, agent will use Firecrawl Agent for investigation",
+    "defaults.acp": "Workspace-wide ACP defaults, runtime registry, and internal caller policy",
+    "defaults.acp.runtimes": "Registered ACP runtimes keyed by ID. Stakpak should be added here as `stakpak acp`.",
+    "defaults.acp.services": "Per-service ACP enablement and runtime allowlists for healer, pm, controller, mcp, and mcpLite",
+    "defaults.acp.server": "Internal ACP server bind/auth defaults for services that expose ACP back to OpenClaw",
+    "defaults.play.agentCommunication": "Agent-to-agent communication mode: 'subagent' (OpenClaw /hooks/agent) or 'a2a' (HTTP JSON-RPC). Deprecated alias: 'acp'. Default: 'subagent'",
     "defaults.play.model": "Default model for play workflows",
     "defaults.play.implementationAgent": "(Optional) Override {orgName}-Rex",
     "defaults.play.frontendAgent": "(Optional) Override {orgName}-Blaze",

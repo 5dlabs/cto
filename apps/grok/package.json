@@ -18,6 +18,7 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "ask": "bun run src/ask.ts",
     "cron": "bun run src/cron.ts",
     "cron:dry-run": "bun run src/cron.ts --dry-run",
     "cron:list": "bun run src/cron.ts --list",

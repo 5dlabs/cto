@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: stdout-mux-test
+  namespace: cto
+  labels:
+    app: stdout-mux-test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: agents
+      image: ubuntu:22.04
+      command:
+        - /bin/bash
+        - -c
+        - |
+          # =====================================================
+          # Stdout Multiplexer - all agent output goes to PID 1
+          # No tmux needed - kubectl logs shows everything
+          # =====================================================
+
+          echo "=== AGENT STDOUT MULTIPLEXER ==="
+          echo "=== All agent output streams to kubectl logs ==="
+          echo ""
+
+          # Agent 1: Morgan (PM)
+          (while true; do
+            echo "[morgan][PM][$(date -u +%H:%M:%S)] Planning sprint tasks... model=claude-opus-4-6 step=deliberation"
+            sleep 3
+            echo "[morgan][PM][$(date -u +%H:%M:%S)] Reviewing task dependencies..."
+            sleep 2
+            echo "[morgan][PM][$(date -u +%H:%M:%S)] Assigning bolt to infra task #42"
+            sleep 4
+          done) &
+
+          # Agent 2: Rex (Rust engineer)
+          (while true; do
+            echo "[rex][Rust][$(date -u +%H:%M:%S)] Compiling crate controller... model=claude-opus-4-6 step=code.implement"
+            sleep 2
+            echo "[rex][Rust][$(date -u +%H:%M:%S)] Running cargo test..."
+            sleep 3
+            echo "[rex][Rust][$(date -u +%H:%M:%S)] 42 tests passed, 0 failed"
+            sleep 2
+          done) &
+
+          # Agent 3: Bolt (Infra)
+          (while true; do
+            echo "[bolt][Infra][$(date -u +%H:%M:%S)] terraform plan... model=claude-sonnet-4-6 step=infra.deploy"
+            sleep 4
+            echo "[bolt][Infra][$(date -u +%H:%M:%S)] 3 resources to add, 0 to change"
+            sleep 3
+          done) &
+
+          # Coordinator heartbeat
+          (while true; do
+            echo "[openclaw][coord][$(date -u +%H:%M:%S)] Active agents: morgan(PM), rex(rust), bolt(infra) | NATS: connected"
+            sleep 10
+          done) &
+
+          echo "[entrypoint] All agents started, waiting..."
+          wait
+      resources:
+        requests:
+          memory: "32Mi"
+          cpu: "10m"
+        limits:
+          memory: "64Mi"
+          cpu: "100m"

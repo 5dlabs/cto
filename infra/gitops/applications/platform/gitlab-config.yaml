@@ -1,0 +1,48 @@
+---
+# GitLab Configuration — Cloudflare tunnel bindings and ExternalSecrets
+# Deployed after GitLab itself is running
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitlab-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: gitlab-config
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: git-platform
+  annotations:
+    # Deploy after GitLab (sync-wave 1) and GitLab Runner (sync-wave 2)
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://git.5dlabs.ai/5dlabs/cto.git
+    targetRevision: main
+    path: infra/gitops/manifests/gitlab
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitlab
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

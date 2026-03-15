@@ -63,7 +63,7 @@ export function Updates() {
   };
 
   const formatImageName = (image: string) => {
-    return image.replace("ghcr.io/5dlabs/", "");
+    return image.replace("registry.5dlabs.ai/5dlabs/", "");
   };
 
   const formatTime = (iso: string) => {
@@ -77,7 +77,7 @@ export function Updates() {
           <div>
             <CardTitle>Updates</CardTitle>
             <CardDescription>
-              Keep CTO App components up to date
+              Keep CTO components up to date
             </CardDescription>
           </div>
           <div className="flex gap-2">

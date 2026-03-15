@@ -1,0 +1,37 @@
+[
+  {
+    "voter_id": "claude-opus",
+    "chosen_option": "jwt",
+    "confidence": 0.9,
+    "reasoning": "JWT is stateless and well-suited for microservices",
+    "concerns": ["Token revocation requires extra infrastructure"]
+  },
+  {
+    "voter_id": "gpt-5",
+    "chosen_option": "jwt",
+    "confidence": 0.85,
+    "reasoning": "JWT with short TTL and refresh tokens provides good security/UX balance",
+    "concerns": ["Need robust refresh token rotation"]
+  },
+  {
+    "voter_id": "claude-sonnet",
+    "chosen_option": "oauth",
+    "confidence": 0.7,
+    "reasoning": "OAuth provides standard delegation flow",
+    "concerns": ["More complex setup for internal services"]
+  },
+  {
+    "voter_id": "o3-pro",
+    "chosen_option": "jwt",
+    "confidence": 0.8,
+    "reasoning": "JWT is the industry standard for API authentication",
+    "concerns": []
+  },
+  {
+    "voter_id": "gemini-pro",
+    "chosen_option": "session",
+    "confidence": 0.6,
+    "reasoning": "Server-side sessions are simpler to reason about",
+    "concerns": ["Stateful sessions scale poorly without sticky sessions"]
+  }
+]

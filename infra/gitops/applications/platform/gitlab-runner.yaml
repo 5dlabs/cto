@@ -1,0 +1,58 @@
+---
+# GitLab Runner with Kubernetes Executor
+# Each CI job runs as its own K8s pod — aligns with CTO's everything-is-a-pod model
+# Replaces GitHub Actions Runner Controller (ARC)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitlab-runner
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: gitlab-runner
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: ci-cd
+  annotations:
+    # Deploy after GitLab itself is running
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  sources:
+    - repoURL: https://charts.gitlab.io/
+      chart: gitlab-runner
+      targetRevision: 0.72.0
+      helm:
+        releaseName: gitlab-runner
+        valueFiles:
+          - $values/infra/charts/gitlab-runner/values.yaml
+
+    - repoURL: https://git.5dlabs.ai/5dlabs/cto.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitlab-runners
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 5

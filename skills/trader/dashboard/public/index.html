@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IRONMAN Trading Dashboard</title>
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1a2332;
+      --bg-input: #1e293b;
+      --border: #1e293b;
+      --border-light: #2d3a4e;
+      --text-primary: #e2e8f0;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --green: #22c55e;
+      --green-dim: #166534;
+      --red: #ef4444;
+      --red-dim: #991b1b;
+      --blue: #3b82f6;
+      --yellow: #eab308;
+      --purple: #a855f7;
+      --cyan: #06b6d4;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ─── Header ───────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #111827 0%, var(--bg-primary) 100%);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-primary);
+    }
+
+    .logo span { color: var(--cyan); }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .refresh-info {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    /* ─── Portfolio Summary ────────────────────────────────────────── */
+    .portfolio-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .portfolio-stat {
+      padding: 16px 20px;
+      background: var(--bg-card);
+      text-align: center;
+    }
+
+    .portfolio-stat .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .portfolio-stat .value {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .portfolio-stat .value.positive { color: var(--green); }
+    .portfolio-stat .value.negative { color: var(--red); }
+    .portfolio-stat .value.neutral { color: var(--text-primary); }
+
+    .portfolio-stat .sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      margin-top: 2px;
+    }
+
+    /* ─── Strategy Grid ────────────────────────────────────────────── */
+    .content {
+      padding: 20px 24px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .strategy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .strategy-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .strategy-card:hover {
+      border-color: var(--border-light);
+      background: var(--bg-card-hover);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .card-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .card-badges {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .badge-running {
+      background: var(--green-dim);
+      color: var(--green);
+    }
+
+    .badge-stopped {
+      background: rgba(100, 116, 139, 0.2);
+      color: var(--text-muted);
+    }
+
+    .badge-paper {
+      background: rgba(234, 179, 8, 0.15);
+      color: var(--yellow);
+    }
+
+    .badge-live {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--red);
+    }
+
+    .card-pnl {
+      text-align: center;
+      padding: 12px 0;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-pnl .pnl-value {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .card-pnl .pnl-pct {
+      font-family: var(--mono);
+      font-size: 14px;
+      margin-top: 2px;
+    }
+
+    .pnl-positive { color: var(--green); }
+    .pnl-negative { color: var(--red); }
+    .pnl-zero { color: var(--text-muted); }
+
+    .card-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .stat-label {
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-family: var(--mono);
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .card-footer {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .last-trade {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    .toggle-btn {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border-light);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .toggle-btn:hover {
+      background: var(--bg-input);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .card-note {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* ─── Trade Log ────────────────────────────────────────────────── */
+    .trade-log-wrapper {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .trade-log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .trade-log-header h3 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .trade-table-wrap {
+      max-height: 380px;
+      overflow-y: auto;
+    }
+
+    .trade-table-wrap::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .trade-table-wrap::-webkit-scrollbar-track {
+      background: var(--bg-card);
+    }
+
+    .trade-table-wrap::-webkit-scrollbar-thumb {
+      background: var(--border-light);
+      border-radius: 3px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    th {
+      background: var(--bg-input);
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    tr:hover td {
+      background: rgba(30, 41, 59, 0.5);
+    }
+
+    .action-buy { color: var(--green); font-weight: 600; }
+    .action-sell { color: var(--red); font-weight: 600; }
+
+    .strategy-tag {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--blue);
+      font-family: var(--sans);
+      white-space: nowrap;
+    }
+
+    .strategy-tag.moltiumv2 {
+      background: rgba(168, 85, 247, 0.15);
+      color: var(--purple);
+    }
+
+    .strategy-tag.polymarket {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--cyan);
+    }
+
+    .strategy-tag.temporal-arb {
+      background: rgba(234, 179, 8, 0.15);
+      color: var(--yellow);
+    }
+
+    /* ─── Positions ────────────────────────────────────────────────── */
+    .positions-section {
+      margin-top: 24px;
+    }
+
+    /* ─── Confirm Modal ────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--red);
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 440px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .modal h2 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: var(--red);
+    }
+
+    .modal p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .btn {
+      padding: 8px 24px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-cancel {
+      background: var(--bg-input);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-light);
+    }
+
+    .btn-cancel:hover {
+      background: var(--border-light);
+    }
+
+    .btn-danger {
+      background: var(--red);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    /* ─── Loading ──────────────────────────────────────────────────── */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+    }
+
+    .loading .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border-light);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ─── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .header { flex-direction: column; gap: 12px; }
+      .portfolio-bar { grid-template-columns: repeat(2, 1fr); }
+      .strategy-grid { grid-template-columns: 1fr; }
+      .content { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="status-dot" id="statusDot"></div>
+      <div class="logo"><span>IRONMAN</span> Trading Dashboard</div>
+    </div>
+    <div class="header-right">
+      <span class="refresh-info" id="refreshInfo">Loading...</span>
+    </div>
+  </header>
+
+  <!-- Portfolio Summary -->
+  <div class="portfolio-bar" id="portfolioBar">
+    <div class="portfolio-stat">
+      <div class="label">Total P&L</div>
+      <div class="value neutral" id="totalPnl">--</div>
+      <div class="sub" id="totalPnlSub"></div>
+    </div>
+    <div class="portfolio-stat">
+      <div class="label">Open Positions</div>
+      <div class="value neutral" id="totalOpen">--</div>
+    </div>
+    <div class="portfolio-stat">
+      <div class="label">Closed Trades</div>
+      <div class="value neutral" id="totalClosed">--</div>
+    </div>
+    <div class="portfolio-stat">
+      <div class="label">Win Rate</div>
+      <div class="value neutral" id="totalWinRate">--</div>
+      <div class="sub" id="totalWinRateSub"></div>
+    </div>
+    <div class="portfolio-stat">
+      <div class="label">Active Strategies</div>
+      <div class="value neutral" id="activeStrategies">--</div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="content">
+    <!-- Strategy Cards -->
+    <div class="section-title">Strategies</div>
+    <div class="strategy-grid" id="strategyGrid">
+      <div class="loading"><span class="spinner"></span> Loading strategies...</div>
+    </div>
+
+    <!-- Open Positions -->
+    <div class="positions-section">
+      <div class="section-title">Open Positions</div>
+      <div class="trade-log-wrapper">
+        <div class="trade-table-wrap" id="positionsTableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Strategy</th>
+                <th>Asset</th>
+                <th>Invested</th>
+                <th>Buy Price</th>
+                <th>Tokens</th>
+              </tr>
+            </thead>
+            <tbody id="positionsBody">
+              <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trade Log -->
+    <div style="margin-top: 24px;">
+      <div class="trade-log-wrapper">
+        <div class="trade-log-header">
+          <h3>Recent Trades</h3>
+          <span class="refresh-info" id="tradeCount"></span>
+        </div>
+        <div class="trade-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Strategy</th>
+                <th>Action</th>
+                <th>Asset</th>
+                <th>Amount</th>
+                <th>Route</th>
+                <th>Cumul. P&L</th>
+              </tr>
+            </thead>
+            <tbody id="tradeLogBody">
+              <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+      <h2>Switch to LIVE Trading</h2>
+      <p id="confirmMessage">You are about to switch to LIVE mode. Real funds will be used for trading. This action is irreversible per trade.</p>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" id="confirmBtn" onclick="confirmToggle()">Go LIVE</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── State ──────────────────────────────────────────────────────
+    let pendingToggle = null;
+    let refreshTimer = null;
+    let lastRefresh = null;
+
+    // ─── Formatting ─────────────────────────────────────────────────
+    function fmtPnl(val, unit) {
+      const sign = val >= 0 ? '+' : '';
+      return `${sign}${val.toFixed(6)} ${unit || 'SOL'}`;
+    }
+
+    function fmtPnlShort(val) {
+      const sign = val >= 0 ? '+' : '';
+      return `${sign}${val.toFixed(6)}`;
+    }
+
+    function fmtPct(val) {
+      const sign = val >= 0 ? '+' : '';
+      return `${sign}${val.toFixed(2)}%`;
+    }
+
+    function pnlClass(val) {
+      if (val > 0) return 'pnl-positive';
+      if (val < 0) return 'pnl-negative';
+      return 'pnl-zero';
+    }
+
+    function valueClass(val) {
+      if (val > 0) return 'positive';
+      if (val < 0) return 'negative';
+      return 'neutral';
+    }
+
+    function timeAgo(ts) {
+      if (!ts) return 'Never';
+      const diff = Date.now() - new Date(ts).getTime();
+      if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
+      if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+      if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+      return `${Math.floor(diff / 86_400_000)}d ago`;
+    }
+
+    function fmtTime(ts) {
+      if (!ts) return '--';
+      const d = new Date(ts);
+      return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function fmtDate(ts) {
+      if (!ts) return '--';
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+             d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function strategyTagClass(id) {
+      const map = {
+        'copy-trader': '',
+        'moltiumv2': 'moltiumv2',
+        'polymarket': 'polymarket',
+        'temporal-arb': 'temporal-arb',
+      };
+      return map[id] || '';
+    }
+
+    function fmtTokens(n) {
+      if (!n) return '0';
+      if (n > 1e12) return (n / 1e12).toFixed(2) + 'T';
+      if (n > 1e9) return (n / 1e9).toFixed(2) + 'B';
+      if (n > 1e6) return (n / 1e6).toFixed(2) + 'M';
+      if (n > 1e3) return (n / 1e3).toFixed(2) + 'K';
+      return n.toFixed(2);
+    }
+
+    // ─── Render Strategies ──────────────────────────────────────────
+    function renderStrategies(data) {
+      const { portfolio, strategies } = data;
+
+      // Portfolio bar
+      document.getElementById('totalPnl').textContent = fmtPnlShort(portfolio.totalPnl);
+      document.getElementById('totalPnl').className = `value ${valueClass(portfolio.totalPnl)}`;
+      document.getElementById('totalPnlSub').textContent = 'SOL (aggregate)';
+
+      document.getElementById('totalOpen').textContent = portfolio.openPositions;
+      document.getElementById('totalClosed').textContent = portfolio.closedTrades;
+      document.getElementById('totalWinRate').textContent = portfolio.winRate;
+      document.getElementById('totalWinRateSub').textContent = `${portfolio.totalWins}W / ${portfolio.totalLosses}L`;
+
+      const activeCount = strategies.filter(s => s.status === 'running').length;
+      document.getElementById('activeStrategies').textContent = `${activeCount} / ${strategies.length}`;
+
+      // Status dot
+      const dot = document.getElementById('statusDot');
+      dot.style.background = activeCount > 0 ? 'var(--green)' : 'var(--text-muted)';
+
+      // Strategy cards
+      const grid = document.getElementById('strategyGrid');
+      grid.innerHTML = strategies.map(s => `
+        <div class="strategy-card">
+          <div class="card-header">
+            <div class="card-name">${s.name}</div>
+            <div class="card-badges">
+              <span class="badge ${s.status === 'running' ? 'badge-running' : 'badge-stopped'}">${s.status}</span>
+              <span class="badge ${s.mode === 'live' ? 'badge-live' : 'badge-paper'}">${s.mode}</span>
+            </div>
+          </div>
+          <div class="card-pnl">
+            <div class="pnl-value ${pnlClass(s.netPnl)}">${fmtPnl(s.netPnl, s.unit)}</div>
+            ${s.netPnlPct ? `<div class="pnl-pct ${pnlClass(s.netPnlPct)}">${fmtPct(s.netPnlPct)}</div>` : ''}
+          </div>
+          <div class="card-stats">
+            <div class="stat-row">
+              <span class="stat-label">Balance</span>
+              <span class="stat-value">${s.balance.toFixed(4)} ${s.unit}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Invested</span>
+              <span class="stat-value">${s.invested.toFixed(4)} ${s.unit}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Open</span>
+              <span class="stat-value">${s.openPositions}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Closed</span>
+              <span class="stat-value">${s.closedTrades}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Win Rate</span>
+              <span class="stat-value">${s.winRate}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">W / L</span>
+              <span class="stat-value" style="color: var(--green)">${s.wins}</span>
+              <span style="color: var(--text-muted); font-family: var(--mono); font-size: 13px;">/</span>
+              <span class="stat-value" style="color: var(--red)">${s.losses}</span>
+            </div>
+          </div>
+          <div class="card-footer">
+            <span class="last-trade">${s.lastTradeTime ? timeAgo(s.lastTradeTime) : 'No trades'}</span>
+            ${(s.id === 'moltiumv2') ? `<button class="toggle-btn" onclick="toggleStrategy('${s.id}', '${s.mode}')">${s.mode === 'paper' ? 'Go Live' : 'Go Paper'}</button>` : ''}
+          </div>
+          ${s.note ? `<div class="card-note">${s.note}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    // ─── Render Trades ──────────────────────────────────────────────
+    function renderTrades(data) {
+      const { trades } = data;
+      document.getElementById('tradeCount').textContent = `${trades.length} trades`;
+
+      if (trades.length === 0) {
+        document.getElementById('tradeLogBody').innerHTML =
+          '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">No trades recorded yet</td></tr>';
+        return;
+      }
+
+      document.getElementById('tradeLogBody').innerHTML = trades.map(t => `
+        <tr>
+          <td>${fmtDate(t.timestamp)}</td>
+          <td><span class="strategy-tag ${strategyTagClass(t.strategyId)}">${t.strategy}</span></td>
+          <td class="${t.action === 'BUY' ? 'action-buy' : 'action-sell'}">${t.action}</td>
+          <td title="${t.assetFull || ''}">${t.asset}</td>
+          <td>${t.amount.toFixed(6)} ${t.unit}</td>
+          <td style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${t.route}">${t.route || '--'}</td>
+          <td class="${pnlClass(t.pnl)}">${fmtPnlShort(t.pnl)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ─── Render Positions ───────────────────────────────────────────
+    function renderPositions(data) {
+      const { positions } = data;
+
+      if (positions.length === 0) {
+        document.getElementById('positionsBody').innerHTML =
+          '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No open positions</td></tr>';
+        return;
+      }
+
+      document.getElementById('positionsBody').innerHTML = positions.map(p => `
+        <tr>
+          <td><span class="strategy-tag ${strategyTagClass(p.strategyId)}">${p.strategy}</span></td>
+          <td title="${p.mint}">${p.mintShort}</td>
+          <td>${p.invested.toFixed(6)} ${p.unit}</td>
+          <td>${p.buyPrice.toExponential(3)}</td>
+          <td>${fmtTokens(p.tokens)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ─── Toggle Logic ───────────────────────────────────────────────
+    function toggleStrategy(strategyId, currentMode) {
+      if (currentMode === 'paper') {
+        // Show confirmation for going live
+        pendingToggle = strategyId;
+        document.getElementById('confirmMessage').textContent =
+          `You are about to switch ${strategyId} to LIVE mode. Real funds will be used for trading. This cannot be undone per-trade.`;
+        document.getElementById('confirmModal').classList.add('active');
+      } else {
+        // Going back to paper doesn't need confirmation
+        doToggle(strategyId, false);
+      }
+    }
+
+    function closeModal() {
+      pendingToggle = null;
+      document.getElementById('confirmModal').classList.remove('active');
+    }
+
+    async function confirmToggle() {
+      if (!pendingToggle) return;
+      await doToggle(pendingToggle, true);
+      closeModal();
+    }
+
+    async function doToggle(strategyId, confirm) {
+      try {
+        const res = await fetch(`/api/toggle/${strategyId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirm }),
+        });
+        const data = await res.json();
+        if (data.requireConfirm) {
+          pendingToggle = strategyId;
+          document.getElementById('confirmMessage').textContent = data.message;
+          document.getElementById('confirmModal').classList.add('active');
+          return;
+        }
+        // Refresh immediately
+        await refresh();
+      } catch (err) {
+        console.error('Toggle failed:', err);
+      }
+    }
+
+    // ─── Fetch & Refresh ────────────────────────────────────────────
+    async function refresh() {
+      try {
+        const [statusRes, tradesRes, positionsRes] = await Promise.all([
+          fetch('/api/status'),
+          fetch('/api/trades?limit=50'),
+          fetch('/api/positions'),
+        ]);
+
+        const [statusData, tradesData, positionsData] = await Promise.all([
+          statusRes.json(),
+          tradesRes.json(),
+          positionsRes.json(),
+        ]);
+
+        renderStrategies(statusData);
+        renderTrades(tradesData);
+        renderPositions(positionsData);
+
+        lastRefresh = new Date();
+        updateRefreshInfo();
+      } catch (err) {
+        console.error('Refresh failed:', err);
+      }
+    }
+
+    function updateRefreshInfo() {
+      const el = document.getElementById('refreshInfo');
+      if (!lastRefresh) {
+        el.textContent = 'Loading...';
+        return;
+      }
+      const ago = Math.floor((Date.now() - lastRefresh.getTime()) / 1000);
+      el.textContent = `Updated ${ago}s ago | Auto-refresh 10s`;
+    }
+
+    // ─── Init ───────────────────────────────────────────────────────
+    refresh();
+    setInterval(refresh, 10_000);
+    setInterval(updateRefreshInfo, 1_000);
+
+    // Close modal on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    // Close modal on backdrop click
+    document.getElementById('confirmModal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+  </script>
+</body>
+</html>

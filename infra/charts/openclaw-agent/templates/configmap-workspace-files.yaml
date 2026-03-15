@@ -1,0 +1,15 @@
+{{- if .Values.workspace.files }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openclaw-agent.fullname" . }}-workspace-files
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "openclaw-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: workspace-files
+data:
+  {{- range $filename, $fileContent := .Values.workspace.files }}
+  {{ $filename | quote }}: |-
+    {{ $fileContent | nindent 4 | trim }}
+  {{- end }}
+{{- end }}

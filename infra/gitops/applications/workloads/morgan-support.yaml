@@ -1,0 +1,66 @@
+---
+# Morgan Support Resources
+# =============================================================================
+# CTO-owned support manifests for the Morgan avatar agent:
+#   - lightweight local skill ConfigMap
+#   - Cloudflare TunnelBinding for remote /v1/chat/completions access
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: morgan-support
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: morgan-support
+    app.kubernetes.io/part-of: openclaw
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://git.5dlabs.ai/5dlabs/cto.git
+    targetRevision: main
+    path: infra/manifests/morgan-support
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openclaw
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+    - group: networking.cfargotunnel.com
+      kind: ClusterTunnel
+      jsonPointers:
+        - /status
+    - group: networking.cfargotunnel.com
+      kind: TunnelBinding
+      jqPathExpressions:
+        - .subjects
+        - .tunnelRef
+
+  revisionHistoryLimit: 5

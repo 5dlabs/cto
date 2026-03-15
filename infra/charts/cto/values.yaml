@@ -97,6 +97,8 @@ secrets:
       baoKey: github-app-stitch
     - name: vex
       baoKey: github-app-vex
+    - name: angie
+      baoKey: github-app-angie
 
   # API keys for agent CLIs (used by Argo Workflow pods)
   agentPlatformKeys:
@@ -206,7 +208,7 @@ controller:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/controller
+    repository: registry.5dlabs.ai/5dlabs/controller
     pullPolicy: Always
     tag: "main"
 
@@ -238,7 +240,7 @@ controller:
 
   # Linear sidecar configuration (whip cracking enabled)
   linear:
-    sidecarImage: ghcr.io/5dlabs/linear-sidecar:dev
+    sidecarImage: registry.5dlabs.ai/5dlabs/linear-sidecar:dev
     serviceUrl: http://pm-server:8080
 
 # =============================================================================
@@ -246,34 +248,37 @@ controller:
 # =============================================================================
 agent:
   image:
-    repository: ghcr.io/5dlabs/claude
-    tag: dev
+    repository: registry.5dlabs.ai/5dlabs/agents
+    tag: latest
   serviceAccountName: ""
-  # Each CLI type has its own dedicated image
+  # Single unified image with all CLIs installed (claude, codex, cursor, gemini, factory, opencode, openclaw)
   cliImages:
     claude:
-      repository: ghcr.io/5dlabs/claude
-      tag: dev
+      repository: registry.5dlabs.ai/5dlabs/agents
+      tag: latest
     cursor:
-      repository: ghcr.io/5dlabs/cursor
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     codex:
-      repository: ghcr.io/5dlabs/codex
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     code:
-      repository: ghcr.io/5dlabs/code
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     gemini:
-      repository: ghcr.io/5dlabs/gemini
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     factory:
-      repository: ghcr.io/5dlabs/factory
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     opencode:
-      repository: ghcr.io/5dlabs/opencode
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
     research:
-      repository: ghcr.io/5dlabs/research
+      repository: registry.5dlabs.ai/5dlabs/agents
+      tag: latest
+    grok:
+      repository: registry.5dlabs.ai/5dlabs/agents
       tag: latest
   cliProviders: {}
   agentCliConfigs: {}
@@ -292,7 +297,7 @@ pm:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/pm-server
+    repository: registry.5dlabs.ai/5dlabs/pm-server
     pullPolicy: Always
     tag: "latest"
 
@@ -327,7 +332,7 @@ pm:
   intake:
     # CLI to use for intake - image is resolved from agent.cliImages[cli]
     # Options: claude, cursor, codex, gemini, opencode, factory, dexter, research
-    cli: research
+    cli: claude
     # Model configuration for intake workflows
     # Using Opus 4.5 with extended thinking for complex task generation
     models:
@@ -356,7 +361,7 @@ tools:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/tools
+    repository: registry.5dlabs.ai/5dlabs/tools
     pullPolicy: Always
     tag: "latest"
 
@@ -468,8 +473,13 @@ tools:
           GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 
       # --- UI Components ---
-      # shadcn: removed - broken ESM dependencies, no working npm package
-      # ai-elements and better-auth are available for documentation needs
+      shadcn:
+        name: "shadcn/ui"
+        description: "Modern React UI component library - browse, search, and get component source code"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "shadcn@5.3.0", "mcp"]
+        workingDirectory: "/tmp"
 
       ai-elements:
         name: "AI Elements"
@@ -522,8 +532,13 @@ tools:
       # tavily is available below for web scraping needs
 
       # --- Codebase Analysis ---
-      # repomix: removed - missing ajv dependency, no working npm package
-      # octocode is available below for GitHub code search
+      repomix:
+        name: "Repomix"
+        description: "Pack codebases into context-optimized formats for LLM analysis - pack remote repos, search and read packed output"
+        transport: "stdio"
+        command: "npx"
+        args: ["-y", "repomix@latest", "--mcp"]
+        workingDirectory: "/tmp"
 
       octocode:
         name: "Octocode"
@@ -704,7 +719,7 @@ healer:
   replicaCount: 0
 
   image:
-    repository: ghcr.io/5dlabs/healer
+    repository: registry.5dlabs.ai/5dlabs/healer
     pullPolicy: Always
     tag: "latest"
 
@@ -767,8 +782,8 @@ healer:
       namespace: "cto"
       githubApp: "5DLabs-Rex"
       model: "claude-opus-4-6-20260205"
-      repositoryUrl: "https://github.com/5dlabs/cto"
-      docsRepositoryUrl: "https://github.com/5dlabs/cto"
+      repositoryUrl: "https://git.5dlabs.ai/5dlabs/cto"
+      docsRepositoryUrl: "https://git.5dlabs.ai/5dlabs/cto"
       docsProjectDirectory: "docs"
       docsBranch: "main"
       workingDirectory: "."
@@ -862,7 +877,7 @@ openmemory:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/openmemory
+    repository: registry.5dlabs.ai/5dlabs/openmemory
     pullPolicy: Always
     tag: "latest"
 
@@ -921,7 +936,7 @@ tweakcn:
   replicaCount: 1
 
   image:
-    repository: ghcr.io/5dlabs/tweakcn
+    repository: registry.5dlabs.ai/5dlabs/tweakcn
     pullPolicy: Always
     tag: "latest"
 
@@ -945,7 +960,7 @@ web:
   replicaCount: 2
 
   image:
-    repository: ghcr.io/5dlabs/web
+    repository: registry.5dlabs.ai/5dlabs/web
     pullPolicy: Always
     tag: "latest"
 
@@ -953,7 +968,7 @@ web:
   migrations:
     enabled: true
     image:
-      repository: ghcr.io/5dlabs/web-migrate
+      repository: registry.5dlabs.ai/5dlabs/web-migrate
       pullPolicy: Always
       tag: "latest"
 
@@ -1007,7 +1022,7 @@ grok:
   enabled: true
 
   image:
-    repository: ghcr.io/5dlabs/grok
+    repository: registry.5dlabs.ai/5dlabs/grok
     pullPolicy: Always
     tag: "latest"
 
@@ -1036,7 +1051,7 @@ research:
   enabled: false  # Deprecated: use grok section above
 
   image:
-    repository: ghcr.io/5dlabs/research
+    repository: registry.5dlabs.ai/5dlabs/research
     pullPolicy: Always
     tag: "latest"
 

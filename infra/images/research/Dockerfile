@@ -10,10 +10,10 @@
 #     cp target/release/research research
 #     cd apps/intake-agent && bun run build
 #     cp apps/intake-agent/dist/intake-agent intake-agent
-#     docker build -f infra/images/research/Dockerfile -t ghcr.io/5dlabs/research .
+#     docker build -f infra/images/research/Dockerfile -t registry.5dlabs.ai/5dlabs/research .
 #
 #   Local/Kind build (compiles from source):
-#     docker build --target local -f infra/images/research/Dockerfile -t ghcr.io/5dlabs/research:local .
+#     docker build --target local -f infra/images/research/Dockerfile -t registry.5dlabs.ai/5dlabs/research:local .
 #
 # Includes Chromium for headless browser automation and intake-agent for AI
 #
@@ -41,7 +41,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry-shared \
-    cargo build --release --package research
+    cargo build --release --package research && \
+    cargo build --release --package intake
 
 # =============================================================================
 # INTAKE-AGENT BUILD STAGE (for local builds)
@@ -63,8 +64,12 @@ FROM debian:bookworm-slim AS runtime-base
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     chromium \
+    curl \
     fonts-liberation \
     git \
+    jq \
+    nodejs \
+    python3 \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -80,6 +85,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install GitHub CLI (gh) -- required by intake.sh.hbs for repo checks, PR creation, webhooks
+# hadolint ignore=DL3008,DL4006
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+    | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Chromium path for chromiumoxide
@@ -110,12 +126,16 @@ FROM runtime-base AS local
 COPY --from=builder /build/target/release/research /usr/local/bin/research
 RUN chmod +x /usr/local/bin/research
 
+# Copy intake CLI binary from builder stage
+COPY --from=builder /build/target/release/intake /usr/local/bin/intake
+RUN chmod +x /usr/local/bin/intake
+
 # Copy intake-agent binary from intake-builder stage
 COPY --from=intake-builder /build/dist/intake-agent /usr/local/bin/intake-agent
 RUN chmod +x /usr/local/bin/intake-agent
 
 # Verify binaries work
-RUN research --help && intake-agent --help
+RUN research --help && intake-agent --help && (ldd /usr/local/bin/intake 2>&1 || true) && (intake --help 2>&1 | head -3 || echo "⚠️ intake binary check: see ldd output above")
 
 USER research
 
@@ -132,11 +152,14 @@ COPY research /usr/local/bin/research
 RUN chmod +x /usr/local/bin/research
 
 # Copy pre-built intake-agent binary (placed by CI workflow into build context)
+COPY intake /usr/local/bin/intake
+RUN chmod +x /usr/local/bin/intake
+
 COPY intake-agent /usr/local/bin/intake-agent
 RUN chmod +x /usr/local/bin/intake-agent
 
 # Verify binaries work
-RUN research --help && intake-agent --help
+RUN research --help && intake-agent --help && (ldd /usr/local/bin/intake 2>&1 || true) && (intake --help 2>&1 | head -3 || echo "⚠️ intake binary check: see ldd output above")
 
 USER research
 

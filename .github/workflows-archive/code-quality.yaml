@@ -1,0 +1,177 @@
+---
+name: Code Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Monday at 9am PT
+    - cron: '0 17 * * 1'
+  workflow_dispatch:
+
+# LESSON LEARNED: Without concurrency controls, multiple runs for the same branch
+# compete for limited runners, causing queue buildup. This cancels outdated runs.
+# See: pr-merge-loop/lessons-learned.md#ISSUE-005
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # Duplicate code detection
+  duplicate-detection:
+    name: Duplicate Code Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install jscpd
+        run: npm install -g jscpd
+
+      - name: Run duplicate detection on TypeScript
+        run: |
+          echo "🔍 Checking for duplicate code..."
+          jscpd apps/web/src --config .jscpd.json --reporters console || true
+          jscpd apps/marketing/src --config .jscpd.json --reporters console || true
+
+      - name: Upload jscpd report
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: jscpd-report
+          path: jscpd-report/
+          retention-days: 30
+
+  # Tech debt tracking (TODO/FIXME scanner)
+  tech-debt-tracker:
+    name: Tech Debt Tracker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Scan for TODO/FIXME comments
+        id: scan
+        run: |
+          echo "# Tech Debt Report" > tech-debt-report.md
+          echo "" >> tech-debt-report.md
+          echo "Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> tech-debt-report.md
+          echo "" >> tech-debt-report.md
+
+          # Count TODOs and FIXMEs
+          TODO_COUNT=$(grep -r --include="*.ts" --include="*.tsx" --include="*.rs" --include="*.go" -E "(TODO|FIXME|HACK|XXX)" . 2>/dev/null | grep -v node_modules | grep -v target | grep -v .next | wc -l | tr -d ' ')
+          echo "Total tech debt markers: $TODO_COUNT"
+          echo "total_count=$TODO_COUNT" >> "$GITHUB_OUTPUT"
+
+          echo "## Summary" >> tech-debt-report.md
+          echo "" >> tech-debt-report.md
+          echo "- **Total markers:** $TODO_COUNT" >> tech-debt-report.md
+          echo "" >> tech-debt-report.md
+
+          # TODOs by category
+          echo "## By Category" >> tech-debt-report.md
+          echo "" >> tech-debt-report.md
+
+          TODO_ONLY=$(grep -r --include="*.ts" --include="*.tsx" --include="*.rs" --include="*.go" "TODO" . 2>/dev/null | grep -v node_modules | grep -v target | grep -v .next | wc -l | tr -d ' ')
+          FIXME_ONLY=$(grep -r --include="*.ts" --include="*.tsx" --include="*.rs" --include="*.go" "FIXME" . 2>/dev/null | grep -v node_modules | grep -v target | grep -v .next | wc -l | tr -d ' ')
+          HACK_ONLY=$(grep -r --include="*.ts" --include="*.tsx" --include="*.rs" --include="*.go" "HACK" . 2>/dev/null | grep -v node_modules | grep -v target | grep -v .next | wc -l | tr -d ' ')
+
+          echo "- TODO: $TODO_ONLY" >> tech-debt-report.md
+          echo "- FIXME: $FIXME_ONLY" >> tech-debt-report.md
+          echo "- HACK: $HACK_ONLY" >> tech-debt-report.md
+          echo "" >> tech-debt-report.md
+
+          # By file type
+          echo "## By File Type" >> tech-debt-report.md
+          echo "" >> tech-debt-report.md
+
+          RS_COUNT=$(grep -r --include="*.rs" -E "(TODO|FIXME|HACK|XXX)" . 2>/dev/null | grep -v target | wc -l | tr -d ' ')
+          TS_COUNT=$(grep -r --include="*.ts" --include="*.tsx" -E "(TODO|FIXME|HACK|XXX)" . 2>/dev/null | grep -v node_modules | grep -v .next | wc -l | tr -d ' ')
+
+          echo "- Rust (.rs): $RS_COUNT" >> tech-debt-report.md
+          echo "- TypeScript (.ts/.tsx): $TS_COUNT" >> tech-debt-report.md
+          echo "" >> tech-debt-report.md
+
+          # List all markers with file and line
+          echo "## All Markers" >> tech-debt-report.md
+          echo "" >> tech-debt-report.md
+          echo '```' >> tech-debt-report.md
+          grep -rn --include="*.ts" --include="*.tsx" --include="*.rs" --include="*.go" -E "(TODO|FIXME|HACK|XXX)" . 2>/dev/null | grep -v node_modules | grep -v target | grep -v .next | head -100 >> tech-debt-report.md || true
+          echo '```' >> tech-debt-report.md
+
+          cat tech-debt-report.md
+
+      - name: Upload tech debt report
+        uses: actions/upload-artifact@v6
+        with:
+          name: tech-debt-report
+          path: tech-debt-report.md
+          retention-days: 90
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('tech-debt-report.md', 'utf8');
+            const count = '${{ steps.scan.outputs.total_count }}';
+
+            // Only comment if there's significant tech debt
+            if (parseInt(count) > 0) {
+              const body = `## 📋 Tech Debt Summary\n\nThis PR has **${count}** tech debt markers (TODO/FIXME/HACK).\n\n<details>\n<summary>View Details</summary>\n\n${report}\n\n</details>`;
+
+              // Find existing comment
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+              });
+
+              const existingComment = comments.find(c =>
+                c.user.type === 'Bot' && c.body.includes('Tech Debt Summary')
+              );
+
+              if (existingComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existingComment.id,
+                  body: body
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: body
+                });
+              }
+            }
+
+  # Unused dependencies check (Rust only - more reliable)
+  unused-deps-rust:
+    name: Unused Dependencies (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-machete
+        run: cargo install cargo-machete
+
+      - name: Check for unused dependencies
+        run: |
+          echo "🔍 Checking for unused Rust dependencies..."
+          cargo machete || true

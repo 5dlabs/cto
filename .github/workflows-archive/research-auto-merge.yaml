@@ -1,0 +1,95 @@
+---
+name: Research Auto-Merge
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/**"
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate-and-merge:
+    name: Validate and Auto-Merge Research PR
+    runs-on: ubuntu-latest
+    # Only auto-merge PRs created by the research pipeline
+    if: startsWith(github.head_ref, 'research/')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate Research Entry Structure
+        run: |
+          # Check that all research markdown files have valid frontmatter
+          for file in $(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'docs/research/*.md'); do
+            if [ -f "$file" ]; then
+              echo "Validating $file..."
+              
+              # Check frontmatter exists
+              if ! head -1 "$file" | grep -q "^---$"; then
+                echo "ERROR: $file missing frontmatter"
+                exit 1
+              fi
+              
+              # Check required fields
+              if ! grep -q "^id:" "$file"; then
+                echo "ERROR: $file missing 'id' field"
+                exit 1
+              fi
+              
+              if ! grep -q "^author:" "$file"; then
+                echo "ERROR: $file missing 'author' field"
+                exit 1
+              fi
+              
+              if ! grep -q "^implementation_score:" "$file"; then
+                echo "ERROR: $file missing 'implementation_score' field"
+                exit 1
+              fi
+              
+              echo "✅ $file is valid"
+            fi
+          done
+          echo "All research entries validated"
+
+      - name: Check for Sensitive Data
+        run: |
+          # Ensure no sensitive data in research entries
+          for file in $(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'docs/research/*.md'); do
+            if [ -f "$file" ]; then
+              # Check for common secret patterns
+              if grep -iE "(api.?key|secret|password|token|credential)" "$file" | grep -vE "(api_key:|API key|token usage)" > /dev/null 2>&1; then
+                echo "WARNING: Potential sensitive data in $file"
+                # Don't fail, just warn - the content might be legitimate discussion
+              fi
+            fi
+          done
+
+      - name: Lint Markdown
+        run: |
+          # Install markdownlint
+          npm install -g markdownlint-cli
+          
+          # Lint changed research files (allow some rules for research format)
+          for file in $(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'docs/research/*.md'); do
+            if [ -f "$file" ]; then
+              markdownlint "$file" --disable MD013 MD033 MD041 || true
+            fi
+          done
+
+      - name: Auto-Approve PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr review ${{ github.event.pull_request.number }} --approve -b "Auto-approved: Research PR from automated pipeline"
+
+      - name: Enable Auto-Merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch

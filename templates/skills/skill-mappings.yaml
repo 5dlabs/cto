@@ -555,6 +555,7 @@ morgan:
     - writing-plans
   intake:
     - prd-analysis
+    - intake-pipeline
     - multi-agent-patterns
     - frontend-stack-selection
     - doc-coauthoring
@@ -578,6 +579,50 @@ morgan:
     pptx:
       triggers: [pptx, powerpoint, slides, presentation]
       description: "Create, edit, and analyze PowerPoint presentations"
+
+angie:
+  description: "Agent systems builder focused on OpenClaw, MCP, and practical multi-agent orchestration"
+  default:
+    - context-fundamentals
+    - context-degradation
+    - context-optimization
+    - openmemory
+    - context7
+    - octocode
+    - llm-docs
+    - github-mcp
+    - openclaw-cli
+    - openclaw-mcp-debugger
+    - agent-team-orchestration
+  coder:
+    - tool-design
+    - firecrawl
+    - compound-engineering
+    - verification-before-completion
+    - systematic-debugging
+  healer:
+    - incident-response
+    - observability
+    - kubernetes-mcp
+  optional:
+    livekit-voice:
+      triggers: [livekit, webrtc, rtc, real-time voice, realtime voice, voice room]
+      description: "Realtime voice/video session architecture and operational patterns"
+    elevenlabs-agents:
+      triggers: [elevenlabs, tts, voice agent, conversational voice]
+      description: "Voice-agent orchestration and configuration with ElevenLabs"
+    elevenlabs-api:
+      triggers: [elevenlabs api, voice synthesis, voice cloning, text to speech]
+      description: "Programmatic ElevenLabs API integration patterns"
+    langgraph:
+      triggers: [langgraph, graph workflow, graph orchestration]
+      description: "Graph-based agent orchestration patterns when task requires it"
+    crewai:
+      triggers: [crewai, crew ai, role-based agents]
+      description: "Role-oriented multi-agent coordination patterns"
+    autogen:
+      triggers: [autogen, multi-agent conversation, autonomous agents]
+      description: "AutoGen collaboration patterns for agent interactions"
 
 # ============================================================================
 # VR AGENTS

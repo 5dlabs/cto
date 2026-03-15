@@ -1,6 +1,7 @@
 //! Kind cluster management commands
 
 use crate::error::{AppError, AppResult};
+use crate::runtime::{self as runtime, ContainerRuntime};
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use tracing;
@@ -105,8 +106,24 @@ pub struct NodeStatus {
 }
 
 /// Run a kind command and return stdout
+fn kind_command() -> Command {
+    let mut command = Command::new("kind");
+
+    if let Some(docker_path) = runtime::get_runtime_path(ContainerRuntime::Docker) {
+        if let Some(parent) = std::path::Path::new(&docker_path).parent() {
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            let parent_path = parent.to_string_lossy();
+            if !current_path.split(':').any(|entry| entry == parent_path) {
+                command.env("PATH", format!("{}:{}", parent_path, current_path));
+            }
+        }
+    }
+
+    command
+}
+
 fn run_kind(args: &[&str]) -> AppResult<String> {
-    let output = Command::new("kind")
+    let output = kind_command()
         .args(args)
         .output()
         .map_err(|e| AppError::CommandFailed(format!("Failed to run kind: {}", e)))?;
@@ -535,7 +552,7 @@ pub async fn detect_existing_clusters() -> Result<ClusterDetectionResult, AppErr
     let recommendation = if has_cto_lite {
         ClusterRecommendation::UseExisting {
             context: format!("kind-{}", CLUSTER_NAME),
-            reason: "CTO Lite cluster already exists".to_string(),
+            reason: "CTO cluster already exists".to_string(),
         }
     } else if let Some(ctx) = best_existing {
         // Find the cluster type for better messaging
@@ -557,7 +574,7 @@ pub async fn detect_existing_clusters() -> Result<ClusterDetectionResult, AppErr
         ClusterRecommendation::UseExisting {
             context: ctx,
             reason: format!(
-                "Found running {} - you can use this or create a dedicated CTO Lite cluster",
+                "Found running {} - you can use this or create a dedicated CTO cluster",
                 type_name
             ),
         }
@@ -700,7 +717,7 @@ pub async fn scan_environment() -> Result<EnvironmentScan, AppError> {
     let recommendation = if has_cto_lite {
         ClusterRecommendation::UseExisting {
             context: format!("kind-{}", CLUSTER_NAME),
-            reason: "CTO Lite cluster already exists".to_string(),
+            reason: "CTO cluster already exists".to_string(),
         }
     } else if let Some(ctx) = best_existing {
         let cluster_type = clusters
@@ -721,7 +738,7 @@ pub async fn scan_environment() -> Result<EnvironmentScan, AppError> {
         ClusterRecommendation::UseExisting {
             context: ctx,
             reason: format!(
-                "Found running {} - you can use this or create a dedicated CTO Lite cluster",
+                "Found running {} - you can use this or create a dedicated CTO cluster",
                 type_name
             ),
         }
@@ -752,7 +769,7 @@ pub async fn scan_environment() -> Result<EnvironmentScan, AppError> {
     })
 }
 
-/// Create the CTO Lite Kind cluster
+/// Create the CTO Kind cluster
 #[tauri::command]
 pub async fn create_cluster() -> Result<ClusterStatus, AppError> {
     // Check prerequisites
@@ -806,7 +823,7 @@ nodes:
     std::fs::write(&config_path, config)?;
 
     // Create cluster
-    let output = Command::new("kind")
+    let output = kind_command()
         .args([
             "create",
             "cluster",
@@ -836,7 +853,7 @@ nodes:
     get_cluster_status().await
 }
 
-/// Delete the CTO Lite Kind cluster
+/// Delete the CTO Kind cluster
 #[tauri::command]
 pub async fn delete_cluster() -> Result<(), AppError> {
     if !cluster_exists() {
@@ -852,7 +869,7 @@ pub async fn delete_cluster() -> Result<(), AppError> {
     Ok(())
 }
 
-/// Get the status of the CTO Lite cluster
+/// Get the status of the CTO cluster
 #[tauri::command]
 pub async fn get_cluster_status() -> Result<ClusterStatus, AppError> {
     let exists = cluster_exists();
@@ -1017,7 +1034,7 @@ pub async fn smart_init(
         user_message: None,
     };
 
-    // Step 1: Check and start Docker
+    // Step 1: Check and start a Docker-compatible runtime
     tracing::info!("Step 1: Checking container runtime...");
     match check_and_start_runtime().await {
         Ok(started) => {
@@ -1025,21 +1042,23 @@ pub async fn smart_init(
                 result.docker_started = true;
                 result
                     .actions
-                    .push("Started Docker container runtime".to_string());
+                    .push("Started a container runtime".to_string());
             } else {
                 result
                     .actions
-                    .push("Docker was already running".to_string());
+                    .push("A compatible container runtime was already running".to_string());
             }
         }
         Err(e) => {
-            tracing::error!("Failed to start Docker: {}", e);
-            result.errors.push(format!("Docker: {}", e));
+            tracing::error!("Failed to start container runtime: {}", e);
+            result.errors.push(format!("Container runtime: {}", e));
         }
     }
 
-    // Step 2: Wait for Docker to be fully ready
-    if result.docker_started {
+    // Step 2: Wait for Docker specifically if Docker Desktop was the runtime that came up.
+    if result.docker_started
+        && crate::runtime::is_runtime_running(crate::runtime::ContainerRuntime::Docker)
+    {
         tracing::info!("Waiting for Docker daemon to be ready...");
         if let Err(e) = wait_for_docker_ready(30) {
             tracing::warn!("Docker ready check timed out: {}", e);
@@ -1201,23 +1220,13 @@ pub async fn smart_init(
 async fn check_and_start_runtime() -> AppResult<bool> {
     use crate::runtime as rt;
 
-    // Check if Docker is already running
-    if rt::is_runtime_running(rt::ContainerRuntime::Docker) {
-        return Ok(false);
+    match rt::auto_start_runtime()? {
+        Some(runtime) => {
+            tracing::info!("Started container runtime: {}", runtime);
+            Ok(true)
+        }
+        None => Ok(false),
     }
-
-    // Check if Docker is available (installed)
-    if !rt::is_docker_available() {
-        return Err(AppError::RuntimeNotFound(
-            "Docker not found. Please install Docker Desktop.".to_string(),
-        ));
-    }
-
-    // Try to start Docker
-    tracing::info!("Docker is installed but not running, attempting to start...");
-    rt::start_runtime(rt::ContainerRuntime::Docker)?;
-
-    Ok(true)
 }
 
 /// Wait for Docker daemon to be ready

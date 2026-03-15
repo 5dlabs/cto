@@ -34,6 +34,15 @@
           "type": "string",
           "enum": ["high", "medium", "low"]
         },
+        "agent": {
+          "type": "string",
+          "description": "Agent name responsible for this task (bolt, rex, grizz, nova, blaze, tap, spark, cipher, tess, cleo, atlas, stitch, angie)",
+          "enum": ["bolt", "rex", "grizz", "nova", "blaze", "tap", "spark", "cipher", "tess", "cleo", "atlas", "stitch", "angie"]
+        },
+        "stack": {
+          "type": "string",
+          "description": "Primary tech stack for this task (e.g., Kubernetes, Rust/Axum, React/Next.js)"
+        },
         "details": {
           "type": "string"
         },
@@ -57,7 +66,8 @@
         "id",
         "title",
         "description",
-        "dependencies"
+        "dependencies",
+        "agent"
       ],
       "additionalProperties": false
     }

@@ -8,10 +8,10 @@
 #
 #   CI build (default — uses pre-compiled standalone binary):
 #     bun build apps/grok/src/cron.ts --compile --target=bun-linux-x64 --outfile=grok-cron
-#     docker build -f infra/images/grok/Dockerfile -t ghcr.io/5dlabs/grok .
+#     docker build -f infra/images/grok/Dockerfile -t registry.5dlabs.ai/5dlabs/grok .
 #
 #   Local build (compiles from source inside the container):
-#     docker build --target local -f infra/images/grok/Dockerfile -t ghcr.io/5dlabs/grok:local .
+#     docker build --target local -f infra/images/grok/Dockerfile -t registry.5dlabs.ai/5dlabs/grok:local .
 #
 # =============================================================================
 

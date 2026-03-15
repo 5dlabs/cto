@@ -13,10 +13,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@anthropic-ai/claude-code": "^1.0.0",
-    "@streamparser/json": "^0.0.22",
-    "handlebars": "^4.7.8",
-    "jsonrepair": "^3.13.2",
     "nats": "^2.28.0"
   },
   "devDependencies": {
@@ -31,7 +27,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/5dlabs/cto.git",
+    "url": "https://git.5dlabs.ai/5dlabs/cto.git",
     "directory": "apps/intake-agent"
   },
   "keywords": [

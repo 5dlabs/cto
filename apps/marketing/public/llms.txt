@@ -1,6 +1,6 @@
 # CTO by 5D Labs
 
-> CTO is the first AI engineering platform that ships complete features autonomously—from PRD to production. Thirteen specialized AI agents collaborate across project management, implementation, testing, security, and deployment on self-healing bare metal infrastructure.
+> CTO is the first AI engineering platform that ships complete features autonomously—from PRD to production. Fifteen specialized AI agents collaborate across project management, implementation, testing, security, and deployment on self-healing bare metal infrastructure.
 
 ## What Makes CTO Different
 
@@ -10,7 +10,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 2. **Assigns specialized agents** - Rex (Rust), Blaze (React), Grizz (Go), Nova (Node.js) implement features
 3. **Ensures quality** - Cleo reviews code, Tess writes tests, Cipher audits security
 4. **Deploys automatically** - Bolt handles GitOps deployment with zero-downtime rollouts
-5. **Self-heals** - Healer monitors production and fixes issues automatically
+5. **Self-heals** - Automated incident detection, remediation, and workflow restarts built into the platform
 
 ## The Agent Collective
 
@@ -27,6 +27,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 - **Tap** - Mobile Developer: Expo, React Native, expo-router
 - **Spark** - Desktop Developer: Electron, Tauri, cross-platform apps
 - **Vex** - XR Developer: Unity, OpenXR, Meta XR SDK
+- **Angie** - Agent Builder: OpenClaw-first agent orchestration, MCP tool routing, and practical voice-agent/runtime patterns (LiveKit, ElevenLabs, LangGraph, CrewAI, AutoGen)
 
 ### Quality & Security
 - **Cleo** - Quality Guardian: Code review, refactoring, best practices
@@ -41,7 +42,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 ## Key Differentiators
 
 ### vs. AI Coding Assistants (Cursor, Copilot, Devin)
-- **Multi-agent specialization**: 13 domain experts vs. one generic AI
+- **Multi-agent specialization**: 15 domain experts vs one generic AI
 - **Full workflow automation**: PRD → Production, not just code suggestions
 - **Built-in infrastructure**: Deployment included, not a separate concern
 - **Self-healing**: Automatic issue detection and remediation
@@ -101,6 +102,6 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 
 ## Contact
 
-- Waitlist: https://cto.5dlabs.ai/#cta
+- Waitlist: https://cto.5dlabs.ai
 - Sales: sales@5dlabs.ai
 - GitHub: https://github.com/5dlabs

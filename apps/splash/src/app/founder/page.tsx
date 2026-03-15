@@ -1,7 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
-import { RainEffect } from "@/components/rain-effect";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 
@@ -9,10 +5,10 @@ export default function FounderPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       {/* Background layers */}
-      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
-      <div className="fixed inset-0 circuit-bg z-0" />
-      <RainEffect />
-      <div className="fixed inset-0 noise-overlay z-0" />
+      <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.04_0.02_260)] z-0" />
+      <div className="fixed inset-0 circuit-bg z-[1]" />
+      {/* GridPulse at z-[2] from layout */}
+      <div className="fixed inset-0 noise-overlay z-[3]" />
 
       <Header />
 
@@ -20,31 +16,17 @@ export default function FounderPage() {
         {/* Hero */}
         <section className="py-20 px-6">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="flex flex-col md:flex-row items-center gap-12"
-            >
+            <div className="flex flex-col md:flex-row items-center gap-12">
               {/* Avatar placeholder */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.8 }}
-                className="shrink-0"
-              >
+              <div className="shrink-0">
                 <div className="w-48 h-48 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center ring-4 ring-cyan/20">
                   <span className="text-6xl font-bold text-white">JF</span>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Info */}
               <div>
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.8 }}
-                >
+                <div>
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-4">
                     <span className="text-xs text-cyan font-medium uppercase tracking-wider">
                       Founder & CEO
@@ -58,15 +40,10 @@ export default function FounderPage() {
                     autonomous systems. Obsessed with the idea that software can
                     build itself — and proving it daily.
                   </p>
-                </motion.div>
+                </div>
 
                 {/* Social links */}
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5, duration: 0.8 }}
-                  className="flex gap-4 mt-6"
-                >
+                <div className="flex gap-4 mt-6">
                   <a
                     href="https://github.com/5dlabs"
                     target="_blank"
@@ -100,9 +77,9 @@ export default function FounderPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </a>
-                </motion.div>
+                </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -111,12 +88,7 @@ export default function FounderPage() {
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12">
               {/* Background */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-              >
+              <div>
                 <h2 className="text-2xl font-bold mb-6">
                   <span className="gradient-text">Background</span>
                 </h2>
@@ -135,15 +107,10 @@ export default function FounderPage() {
                     More details coming soon.
                   </p>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Vision */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-              >
+              <div>
                 <h2 className="text-2xl font-bold mb-6">
                   <span className="gradient-text">Vision</span>
                 </h2>
@@ -155,13 +122,13 @@ export default function FounderPage() {
                     at machine speed.
                   </p>
                   <p>
-                    5D Labs exists to prove that thesis. By building OpenClaw and
+                    5D Labs exists to prove that thesis. By building CTO and
                     deploying it across multiple ventures, we&apos;re showing that
-                    the startup studio model + AI agents = a fundamentally
+                    the venture studio model combined with AI agents is a fundamentally
                     different — and better — way to build companies.
                   </p>
                 </div>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
@@ -169,17 +136,11 @@ export default function FounderPage() {
         {/* What Drives Me */}
         <section className="py-20 px-6 border-t border-border/30">
           <div className="max-w-4xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="text-center mb-12"
-            >
+            <div className="text-center mb-12">
               <h2 className="text-2xl font-bold mb-4">
                 What <span className="gradient-text">Drives</span> This
               </h2>
-            </motion.div>
+            </div>
 
             <div className="grid sm:grid-cols-3 gap-6">
               {[
@@ -214,13 +175,9 @@ export default function FounderPage() {
                     </svg>
                   ),
                 },
-              ].map((item, i) => (
-                <motion.div
+              ].map((item) => (
+                <div
                   key={item.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
                   className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-center"
                 >
                   <div className="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mx-auto mb-4 text-cyan">
@@ -230,8 +187,74 @@ export default function FounderPage() {
                   <p className="text-sm text-muted-foreground">
                     {item.description}
                   </p>
-                </motion.div>
+                </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Who We Hire */}
+        <section className="py-20 px-6 border-t border-border/30">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 mb-6">
+                <span className="text-xs text-cyan font-medium uppercase tracking-wider">
+                  How We Hire
+                </span>
+              </div>
+              <h2 className="text-2xl font-bold mb-4">
+                Every Hire Is a{" "}
+                <span className="gradient-text">CEO of Their Domain</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                We don&apos;t hire people who wait for instructions. Every person
+                at 5D Labs owns their area completely — strategy, execution, and
+                outcomes. If you need someone to tell you what to do next,
+                this isn&apos;t the right place. If you&apos;re the kind of person
+                who sees what needs to happen and makes it happen, keep reading.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-6 mb-10">
+              {[
+                {
+                  title: "Entrepreneurial by Nature",
+                  text: "You think like a founder, not an employee. You see gaps, form a plan, and ship — without waiting for permission or a detailed spec. You're driven by the outcome, not the process.",
+                },
+                {
+                  title: "Smart Creatives",
+                  text: "Technical depth combined with creative instinct. You don't just execute — you invent better ways to solve the problem. Playbooks are starting points, not destinations.",
+                },
+                {
+                  title: "Full Ownership",
+                  text: "Your domain is yours. You set the direction, make the calls, and own the results. We give people real authority because we hire people who know what to do with it.",
+                },
+                {
+                  title: "Self-Driven Execution",
+                  text: "You don't need to be managed. You identify what matters, prioritize ruthlessly, and deliver. Ambiguity is fuel, not friction.",
+                },
+              ].map((item) => (
+                <div key={item.title} className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm">
+                  <h3 className="text-base font-semibold mb-2 text-foreground">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-6 rounded-xl border border-cyan/20 bg-cyan/5 text-center">
+              <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+                We&apos;re building a studio where every person operates like a founder
+                of their own piece of the business. If that&apos;s how you work best —{" "}
+                <span className="text-foreground font-medium">we should talk.</span>
+              </p>
+              <a
+                href="https://cal.com/jonathon-fritz-2uhdqe/discovery"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-4 px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-sm hover:opacity-90 transition-all"
+              >
+                Schedule a Conversation
+              </a>
             </div>
           </div>
         </section>

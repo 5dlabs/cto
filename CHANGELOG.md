@@ -3,6 +3,136 @@
 ### 🐛 Bug Fixes
 - Preserve local task customizations when syncing from Linear (test_strategy, agent_hint, priority only update if explicitly set in Linear)
 
+## [0.2.51](https://github.com/5dlabs/cto/compare/v0.2.50...v0.2.51) (2026-03-08)
+
+
+### ✨ Features
+
+* add cloud parity callout to services page hero ([#4500](https://github.com/5dlabs/cto/issues/4500)) ([f8fb48a](https://github.com/5dlabs/cto/commit/f8fb48aa3c9ac8501aca5a66f8817cabed8acbf2))
+* **avatar:** consolidate Morgan avatar PoC into CTO repo ([#4508](https://github.com/5dlabs/cto/issues/4508)) ([2668ea9](https://github.com/5dlabs/cto/commit/2668ea98d3cec9bac180556440d070f03eac6bbd))
+* brand refresh, narrative realignment, and services catalog ([#4497](https://github.com/5dlabs/cto/issues/4497)) ([8f027f9](https://github.com/5dlabs/cto/commit/8f027f987998906e10a9da13cb87a9ad7f088a6a))
+* **deliberation:** one meeting room architecture ([b9183b7](https://github.com/5dlabs/cto/commit/b9183b71312ff8b56db027a8d5facf0e8efe20e2))
+* **intake:** generate AlertHub e2e test prompts ([c329f14](https://github.com/5dlabs/cto/commit/c329f143b92096e139a5cbb5152c371157358ca4))
+* **intake:** research step, Discord reporting, PR creation ([#4462](https://github.com/5dlabs/cto/issues/4462)) ([bff007d](https://github.com/5dlabs/cto/commit/bff007d25d4bba3dcbf65fa924c5c63ee3943b51))
+* **intake:** wire deliberation into real intake pipeline before task generation ([f6715c7](https://github.com/5dlabs/cto/commit/f6715c76fb74ed704318931a72c750fe4d8cbbe6))
+* **linear-bridge:** Loki activity stream for ACP agent dialog ([#4491](https://github.com/5dlabs/cto/issues/4491)) ([904af87](https://github.com/5dlabs/cto/commit/904af87206654539e29e4235a8242a379348866c))
+* Main Team (Lex, Hype, Tally, Chase) on splash and CTO ([#4487](https://github.com/5dlabs/cto/issues/4487)) ([9d990bd](https://github.com/5dlabs/cto/commit/9d990bdb0e4cc0f1dd67657f3e676bef2acec7fb))
+* **marketing:** add 9 bare metal providers to infrastructure section ([#4446](https://github.com/5dlabs/cto/issues/4446)) ([109b55c](https://github.com/5dlabs/cto/commit/109b55c5ac7f8a13f7a357dff4fa1de1f1bf1c75))
+* **marketing:** add Blockchain & AI Teams section ([d565ba9](https://github.com/5dlabs/cto/commit/d565ba902f8061ae4c480b14e061c9271d32ed92))
+* **marketing:** add Glitch agent avatar ([#4486](https://github.com/5dlabs/cto/issues/4486)) ([3bd33a9](https://github.com/5dlabs/cto/commit/3bd33a9dac9c95a9cae4092f6fa53006f192edba))
+* **marketing:** add Vex and Block agent avatars ([#4485](https://github.com/5dlabs/cto/issues/4485)) ([0135a4d](https://github.com/5dlabs/cto/commit/0135a4dd48443d985ea613a4b232cc671432a65a))
+* **marketing:** agent card overhaul + content corrections ([#4482](https://github.com/5dlabs/cto/issues/4482)) ([bb62d9d](https://github.com/5dlabs/cto/commit/bb62d9d97d79b6973ddbf067b82ed7232a8c825a))
+* **marketing:** clarify GPU compute optionality with 3-tier breakdown ([00eb520](https://github.com/5dlabs/cto/commit/00eb52025707ee461bb1b67eac5da934c171616e))
+* **marketing:** expand Bolt to Infrastructure & SRE, add Healer agent ([#4445](https://github.com/5dlabs/cto/issues/4445)) ([46a6818](https://github.com/5dlabs/cto/commit/46a6818a2bc2ba5f21cc94f7bfd1b599a2a4be27))
+* **marketing:** infra rewrite, new agents, blockchain refresh, security tooling ([485f3e9](https://github.com/5dlabs/cto/commit/485f3e948d668ab78acc92d3b005d5051addc3c2))
+* **marketing:** integrations section, Block/Vex agents, Cipher pen testing ([6e51966](https://github.com/5dlabs/cto/commit/6e519666376bcd5e21772877f8a4a32556e50677))
+* **marketing:** merge Specialists squad, refresh self-hosted model list to March 2026 ([e682eac](https://github.com/5dlabs/cto/commit/e682eacad1715e887a7b6a4fba74f63258dfb53e))
+* **morgan:** add lean Morgan agent for avatar PoC ([#4504](https://github.com/5dlabs/cto/issues/4504)) ([a5ed834](https://github.com/5dlabs/cto/commit/a5ed8341a397c57e3f380cf9ef00ad7edc81c005))
+* platform naming, logo, hiring philosophy, CLI additions, abstraction language ([#4498](https://github.com/5dlabs/cto/issues/4498)) ([e7cfffd](https://github.com/5dlabs/cto/commit/e7cfffdc888b55b61d7604ddc38d5bad67a79706))
+* **splash,marketing:** boost grid visibility and restore perspective breathing ([#4473](https://github.com/5dlabs/cto/issues/4473)) ([391a535](https://github.com/5dlabs/cto/commit/391a53589c0262631be1d84561dc32bc075c6d4f))
+* **splash,marketing:** Grid Pulse + Shift Dimensions, deploy via 1Password ([#4461](https://github.com/5dlabs/cto/issues/4461)) ([aa8dc6f](https://github.com/5dlabs/cto/commit/aa8dc6f08ea0eeef43fec6b3e01cbfe54d84e914))
+* **splash,marketing:** match grid and shift values to bg-preview demo ([#4474](https://github.com/5dlabs/cto/issues/4474)) ([b0e6c7a](https://github.com/5dlabs/cto/commit/b0e6c7a71f1fede6767f92cfb9ec9b48c4eece78))
+* **splash,marketing:** restore entrance animations with CSS-only approach ([#4472](https://github.com/5dlabs/cto/issues/4472)) ([dc1ff7c](https://github.com/5dlabs/cto/commit/dc1ff7cdcb3ffe86821e63e30862d65ec1225897))
+* **splash:** add Chase (Sales) business agent, increase avatar size ([ca74c70](https://github.com/5dlabs/cto/commit/ca74c70d7425b20a61af0db5717f5228b92f5e4d))
+* **splash:** add downloadable investor one-pager on investors page ([#4459](https://github.com/5dlabs/cto/issues/4459)) ([470ffab](https://github.com/5dlabs/cto/commit/470ffabf9419602dba215f4c7e002c071fb7b5f3))
+* **splash:** expand Bolt from Deployment Specialist to Infrastructure & SRE ([#4444](https://github.com/5dlabs/cto/issues/4444)) ([0e04918](https://github.com/5dlabs/cto/commit/0e049186c5f48fdd3f3550cee9b88f9d6d846ced))
+* **splash:** move Opportunities to footer, add Hivelocity provider ([#4441](https://github.com/5dlabs/cto/issues/4441)) ([86ab681](https://github.com/5dlabs/cto/commit/86ab681efcf545ca0d060cfbe8d27ebfff622248))
+* **splash:** remove Sanctuary venture ([f1183fb](https://github.com/5dlabs/cto/commit/f1183fbfd94dbd5010e113caa98148f7e213ed42))
+* **splash:** rename The Designers to The Product on team page ([#4442](https://github.com/5dlabs/cto/issues/4442)) ([075060a](https://github.com/5dlabs/cto/commit/075060a56a9becc022604daf10c5cd75e6722dab))
+* **splash:** Rex, Grizz, Nova as peers — Rust/Go/Node Engineer ([#4443](https://github.com/5dlabs/cto/issues/4443)) ([3f17f38](https://github.com/5dlabs/cto/commit/3f17f381f086780a726a74905f12bbf7b81d92d9))
+* **splash:** scroll-hide header ([#4480](https://github.com/5dlabs/cto/issues/4480)) ([de86689](https://github.com/5dlabs/cto/commit/de866891b181fa605939fd343b4da481ec6ccfa3))
+* **splash:** Sui chain, Servers.com/PhoenixNAP/i3D.net providers, model optimization ([#4439](https://github.com/5dlabs/cto/issues/4439)) ([c4f5381](https://github.com/5dlabs/cto/commit/c4f538193509794205ebd9b59633ca419a98bb08))
+* **telemetry:** enrich Loki labels with cli_name, session_type, activity_type ([d2393bd](https://github.com/5dlabs/cto/commit/d2393bdc0a96e8e7461947b05a1617255207b485))
+* **tests:** alerthub e2e intake output — subtask prompts (146 subtasks) ([#4453](https://github.com/5dlabs/cto/issues/4453)) ([d793712](https://github.com/5dlabs/cto/commit/d793712cd7d4ec208d2ec5bcfb6a139f8e21703c))
+* v0-inspired 'Build at the Speed of Thought' hero rewrite ([#4503](https://github.com/5dlabs/cto/issues/4503)) ([18c22ad](https://github.com/5dlabs/cto/commit/18c22aded104c252dea2eec80cc12621a94fe882))
+
+
+### 🐛 Bug Fixes
+
+* allow intake script to continue when deliberation fails ([3c894d1](https://github.com/5dlabs/cto/commit/3c894d1c0492e7f4f616f43514e91adf75317379))
+* **bots:** add imagePullSecrets to discord-bridge and linear-bridge ([#4495](https://github.com/5dlabs/cto/issues/4495)) ([f9b5c85](https://github.com/5dlabs/cto/commit/f9b5c856bc9a4d9cb853cd96fbad9aed857b2622))
+* **ci:** add --branch=main to wrangler deploy for production release ([9ef233e](https://github.com/5dlabs/cto/commit/9ef233e1ee58fa072980466c4890c5dc094db746))
+* **controller-template:** fix REPOSITORY_URL set-u crash, workspace persistence, intake-files fallback ([6f04f47](https://github.com/5dlabs/cto/commit/6f04f478d2153c7bc1677fc5c5c9ae093bddfdeb))
+* **controller:** add grok cliImage alias pointing to research image ([fdf902a](https://github.com/5dlabs/cto/commit/fdf902aa14cc6aebe25ae74ce572437210c3d2c7))
+* **controller:** chown /workspace/runs so research user can clean workspace ([540f225](https://github.com/5dlabs/cto/commit/540f2256ef27b7d9c8b04e7c55ba803e80996fe1))
+* **deliberation:** add dmPolicy=block to optimist/pessimist agents ([d2c1483](https://github.com/5dlabs/cto/commit/d2c148382dfa1423d0eafebb0fc6e753e5c11df0))
+* **deliberation:** AgentMessage format, NATS reply inbox, bedrock→claude model configs ([#4456](https://github.com/5dlabs/cto/issues/4456)) ([d55f7f4](https://github.com/5dlabs/cto/commit/d55f7f4a81204cc3f3b43e770703ac6dbb995ef3))
+* **deliberation:** close critical gaps in committee voting and prompts ([d663b21](https://github.com/5dlabs/cto/commit/d663b212283236dca12f0a16ad4d25374ff37e78))
+* **deliberation:** fix dmPolicy from invalid 'block' to 'disabled' ([ac152dc](https://github.com/5dlabs/cto/commit/ac152dc3286fa388eb596933dd4953f2b3e84214))
+* **deliberation:** set heartbeat=30s on all 7 debate agents ([43387e2](https://github.com/5dlabs/cto/commit/43387e2700b1e10aef057ba2b3053423f475af0a))
+* disable acp plugin install for deliberation agents ([4eea796](https://github.com/5dlabs/cto/commit/4eea79669aea5c7be5d80ed063a3e7b77b362300))
+* ignore normalized twingate access crd fields ([#4506](https://github.com/5dlabs/cto/issues/4506)) ([39395b6](https://github.com/5dlabs/cto/commit/39395b68b3c341b034b7dbefb37022c16c91ad8b))
+* **intake-agent:** error_type, Operation union, dependencies, expand-task retry ([#4451](https://github.com/5dlabs/cto/issues/4451)) ([7362f6e](https://github.com/5dlabs/cto/commit/7362f6eaa84749c2dd07562b5067d8b44a8fe832))
+* **intake-agent:** resolve all 53 TypeScript type errors ([db19d8f](https://github.com/5dlabs/cto/commit/db19d8f90e92e27aa8886f5cbd7fe8eb9acd4a1d))
+* **intake:** make workspace cleanup fault-tolerant (chmod before rm) ([#4460](https://github.com/5dlabs/cto/issues/4460)) ([d8057b7](https://github.com/5dlabs/cto/commit/d8057b70a8ab9d77214e531e017f23eb0427cef8))
+* **intake:** morgan agent → grok cli + claude-sonnet-4-20250514 model for e2e test ([88ff498](https://github.com/5dlabs/cto/commit/88ff4982fbbf7d7e570bc08234b17bfbc39ce689))
+* **intake:** respect design_brief_path when deliberate=true; hard error on missing brief ([000e741](https://github.com/5dlabs/cto/commit/000e74154af03410c1cbc15b52e51157f767a214))
+* **linear-bridge:** add LINEAR_TEAM_ID and fix missing env vars ([#4496](https://github.com/5dlabs/cto/issues/4496)) ([29b1624](https://github.com/5dlabs/cto/commit/29b16248c11196fa3217bb252d8800df8b150044))
+* **marketing:** customer-facing provider copy, remove implementation details ([#4447](https://github.com/5dlabs/cto/issues/4447)) ([7f284b2](https://github.com/5dlabs/cto/commit/7f284b2edbf976c7d16e77454b6064fd7275d4a4))
+* **marketing:** improve Telegram social preview rendering ([#4448](https://github.com/5dlabs/cto/issues/4448)) ([ff412a7](https://github.com/5dlabs/cto/commit/ff412a75b932a925072b7fdb0b8056a1863eb9b0))
+* **marketing:** make social image routes static-export compatible ([#4449](https://github.com/5dlabs/cto/issues/4449)) ([306f097](https://github.com/5dlabs/cto/commit/306f097dfb97f1ea1fb684894b28b9924b50f4b7))
+* **marketing:** remove on-premises provider listing ([#4450](https://github.com/5dlabs/cto/issues/4450)) ([bd8d3c0](https://github.com/5dlabs/cto/commit/bd8d3c04008d821bc1226419007cb24ea18015ee))
+* **openclaw-agent:** add gateway.controlUi to configmap template ([a3b4b8a](https://github.com/5dlabs/cto/commit/a3b4b8ad254fe0cfc925f86893f8686f14406753))
+* **openclaw-agent:** nil-safe controlUi template access ([1481b91](https://github.com/5dlabs/cto/commit/1481b91042e7787004beeafd051dfada2b01ab1e))
+* **pm:** use claude as default intake CLI (was research→grok which has no configured image) ([e6649f1](https://github.com/5dlabs/cto/commit/e6649f19ce31b1cccac864c6259932009bd1b577))
+* remove 'Proprietary Operating Stack' from splash hero badge ([#4499](https://github.com/5dlabs/cto/issues/4499)) ([1aedb28](https://github.com/5dlabs/cto/commit/1aedb286e8da73b875eb0e93931dee3fa5cbd69c))
+* remove backslashes from single-quoted jq filter in deliberation ([de3d2c7](https://github.com/5dlabs/cto/commit/de3d2c79743daaffad3a797c998dda262fae2789))
+* remove broken Twingate CRD manifests (TwingateRemoteNetwork doesn't exist) ([#4454](https://github.com/5dlabs/cto/issues/4454)) ([6e4c1a4](https://github.com/5dlabs/cto/commit/6e4c1a42c530a77507fe3cf24c526b902fb5f46e))
+* remove redundant Team nav link — agents already on homepage ([#4505](https://github.com/5dlabs/cto/issues/4505)) ([9b34bd7](https://github.com/5dlabs/cto/commit/9b34bd70b4073e8471b7071a62e44be28caaa89d))
+* rename Managed Foundation → 5D Runtime, rewrite cloud parity with confidence ([#4501](https://github.com/5dlabs/cto/issues/4501)) ([684a9d3](https://github.com/5dlabs/cto/commit/684a9d3127187f784fdd9e7324d7595ddb5e366b))
+* replace 'proprietary' with 'in-house', remove negative framing ([#4502](https://github.com/5dlabs/cto/issues/4502)) ([11c53ae](https://github.com/5dlabs/cto/commit/11c53aec263a72d3721b86077e81b052267f4bf8))
+* **research:** add gh CLI to image for intake workflow ([640f36c](https://github.com/5dlabs/cto/commit/640f36c28896ce455a6d8a0f92d2aeaee99c86e6))
+* **research:** add intake CLI binary to research image ([0ad592c](https://github.com/5dlabs/cto/commit/0ad592cdf9d4a69fe13cef605cf008d6ac6c860c))
+* **research:** add jq and curl to runtime image ([d283cb8](https://github.com/5dlabs/cto/commit/d283cb87f7c95c228f22600c9869f666ace92897))
+* **research:** add python3 and nodejs to runtime-base image ([9a0cf4e](https://github.com/5dlabs/cto/commit/9a0cf4eea5af2a3f6d3182802bd504a351880c89))
+* **research:** make intake verify non-fatal, add ldd diagnostic ([1f013e4](https://github.com/5dlabs/cto/commit/1f013e4f1463e5bded1aa71aa079a4d39833008e))
+* resolve duplicate --prd flag and stderr corruption in intake script ([280e9e5](https://github.com/5dlabs/cto/commit/280e9e5738b7c012ffcc1ee4bba91a2d33a6a573))
+* restore lifecycle-test dir and enable deliberation for alerthub e2e ([#4452](https://github.com/5dlabs/cto/issues/4452)) ([7d15e4c](https://github.com/5dlabs/cto/commit/7d15e4cce708c3f115ab104612a2ac4038d34427))
+* **splash,marketing:** boost GridPulse visibility + match preview intensity ([30ca3a9](https://github.com/5dlabs/cto/commit/30ca3a9b772fc0dc6e701d88d63b6270e64dff77))
+* **splash,marketing:** eliminate element flashing and fix LCP performance ([#4466](https://github.com/5dlabs/cto/issues/4466)) ([95b2488](https://github.com/5dlabs/cto/commit/95b24882899aba2dc88c86b0b160a9c12900b96d))
+* **splash,marketing:** eliminate GridPulse flashing and 3D depth sorting ([9e90c89](https://github.com/5dlabs/cto/commit/9e90c89c4023a38e8f7295fdad56b66cb69c3f4e))
+* **splash,marketing:** fix GridPulse visibility, remove Healer agent, SSR perf ([b401e9b](https://github.com/5dlabs/cto/commit/b401e9ba8d7740d2d9e131d74f7f8ed6df0141f4))
+* **splash,marketing:** GridPulse z-index stacking + will-change GPU hints ([ccb860f](https://github.com/5dlabs/cto/commit/ccb860f9073ffe358eb9d35cc3b5fd464d3c39aa))
+* **splash,marketing:** keep GridPulse lines in the background ([#4468](https://github.com/5dlabs/cto/issues/4468)) ([875eb72](https://github.com/5dlabs/cto/commit/875eb7216e1b6b328b3a552e8a94578562e92f6e))
+* **splash,marketing:** move GridPulse inside ShiftDimensionsWrapper ([9107f6e](https://github.com/5dlabs/cto/commit/9107f6e668bd7879bc8c4f53b0738c8b7d38846a))
+* **splash,marketing:** prevent grid foreground overlay from hiding content tiles ([#4470](https://github.com/5dlabs/cto/issues/4470)) ([b074809](https://github.com/5dlabs/cto/commit/b074809a3f266318f09400121f1f5c40dcace0f8))
+* **splash,marketing:** remove foreground grid lines, restore pulse animation ([#4478](https://github.com/5dlabs/cto/issues/4478)) ([5e4ab65](https://github.com/5dlabs/cto/commit/5e4ab655819795c9ebf12e2c6a1b7f9a96b50d5b))
+* **splash,marketing:** remove pulse, soften grid, fix investor page ([#4479](https://github.com/5dlabs/cto/issues/4479)) ([d7b6cad](https://github.com/5dlabs/cto/commit/d7b6cadcbb0a8e0931cadb160999db9d887a4a6d))
+* **splash,marketing:** remove scroll animation and fix compositing ([#4476](https://github.com/5dlabs/cto/issues/4476)) ([a5c5cf0](https://github.com/5dlabs/cto/commit/a5c5cf0a19f11fef1ef0e46ea734ef109283fe81))
+* **splash,marketing:** restore grid presence with rare foreground passes ([#4469](https://github.com/5dlabs/cto/issues/4469)) ([644fd23](https://github.com/5dlabs/cto/commit/644fd23f2afcc5e81dccb54509666564df371099))
+* **splash,marketing:** stop post-render hiding and stale-cache flicker ([#4467](https://github.com/5dlabs/cto/issues/4467)) ([9970a80](https://github.com/5dlabs/cto/commit/9970a8065ffe33a232e06753798286ebc632cdf2))
+* **splash,marketing:** strip all content animations to eliminate flashing ([#4477](https://github.com/5dlabs/cto/issues/4477)) ([0de36b5](https://github.com/5dlabs/cto/commit/0de36b5067038d4f32c4ea5520f4a640c0fe4d2e))
+* **splash:** consistent investor CTAs + Motion hover expand ([#4481](https://github.com/5dlabs/cto/issues/4481)) ([5269dc5](https://github.com/5dlabs/cto/commit/5269dc548aacbbedefb20e112c2b32b87867883a))
+* **splash:** strip Framer Motion from all sub-pages to eliminate flash ([#4475](https://github.com/5dlabs/cto/issues/4475)) ([02d8245](https://github.com/5dlabs/cto/commit/02d8245d26402696727590cb911e422cd52c39cf))
+* **telemetry:** add acp-cli promtail jobs for all CLI log directories ([#4494](https://github.com/5dlabs/cto/issues/4494)) ([93595a0](https://github.com/5dlabs/cto/commit/93595a0199479da6d52b539a1c0c0c0485553642))
+* **template:** make workspace cleanup non-fatal (permission denied fallback) ([dc8125f](https://github.com/5dlabs/cto/commit/dc8125f56884c34b17bc43d9ddc380496edbf9d5))
+* **twingate:** allowEmpty=true, ignoreDifferences for stale v1alpha1 resources ([e8696d1](https://github.com/5dlabs/cto/commit/e8696d138a89cb310a089d25e6efd868b9579c91))
+* **twingate:** empty kustomization - remove broken v1alpha1 CRD manifests ([2ed83c2](https://github.com/5dlabs/cto/commit/2ed83c204d5d695e01caa49748ca2f4f0516a01c))
+
+
+### ⚡ Performance
+
+* **splash,marketing:** add Service Worker for instant cached loads ([af17a9d](https://github.com/5dlabs/cto/commit/af17a9dd66a6bfe971334650e92ddf21e75c96fb))
+* **splash,marketing:** compositor-only GridPulse animations ([3d944ca](https://github.com/5dlabs/cto/commit/3d944ca5cff56573f2caf8149c90ec8773b549ca))
+
+
+### 📚 Documentation
+
+* add Cloudflare tunnel setup guide for intake testing agent ([3235987](https://github.com/5dlabs/cto/commit/32359870b59dae249eb2cb3e85c9934c4ea6a7d1))
+* **skill:** add bridge communication section and new intake-util commands to intake-pipeline skill ([cf678f5](https://github.com/5dlabs/cto/commit/cf678f525181b30803d7ced6490c84636a75694d))
+
+
+### 🔧 Maintenance
+
+* **discord-bridge:** trigger GHCR rebuild after package relink ([7ae8a26](https://github.com/5dlabs/cto/commit/7ae8a26504ceefa1c3e365bbd035df1c87fde33a))
+* remove all hardcoded agent counts across both apps ([c849531](https://github.com/5dlabs/cto/commit/c849531763a999d5f64746c22b45616f32eb9646))
+* untrack local build artifacts and add to gitignore ([6aabbac](https://github.com/5dlabs/cto/commit/6aabbac1cb4e0c8e58e0c2140f53bae4d416afdd))
+
+
+### 👷 CI/CD
+
+* **controller:** temp disable cancel-in-progress to allow build to complete ([1927dc3](https://github.com/5dlabs/cto/commit/1927dc325c5527b7b65b4b1c1657cb3893fd53a8))
+
 ## [0.2.50](https://github.com/5dlabs/cto/compare/v0.2.49...v0.2.50) (2026-02-27)
 
 

@@ -1,691 +1,229 @@
-# TOOLS.md - Local Notes
+# Tools & Skills Reference
 
+## MCP Server (In-Cluster)
 
-## Claude Code & Swarm Mode
+Connected via `.mcp.json` → `http://cto-tools.cto.svc.cluster.local:3000/mcp`
 
-### Binary Path
-```bash
-/Users/jonathonfritz/.local/bin/claudesp
-```
+150+ tools across 23 categories. Use `ToolSearch` to discover and load tools by keyword.
 
-Use `claudesp` (not `claude`) for swarm/TeammateTool features.
+| Category | Pattern | Count | Purpose |
+|----------|---------|-------|---------|
+| linear | `linear_*` | 187 | Issues, projects, cycles, teams |
+| grafana | `grafana_*` | 56 | Dashboards, alerts, Loki/Prometheus queries |
+| github | `github_*` | 26 | PRs, issues, code, branches |
+| playwright | `playwright_*` | 22 | Browser automation |
+| argocd | `argocd_*` | 14 | GitOps sync, rollback, resources |
+| octocode | `octocode_*` | 6 | GitHub code search, repo structure, PR archaeology |
+| openmemory | `openmemory_*` | 6 | Persistent cross-session memory |
+| loki | `loki_*` | 7 | Log search, patterns, correlations |
+| tavily | `tavily_*` | 5 | Web search, crawl, extract, research |
+| perplexity | `modelcontextprotocol_*` | 4 | AI search, reasoning, deep research |
+| exa | `exa_*` | 2 | Web search, code context |
+| terraform | `terraform_*` | 9 | Provider/module lookup |
+| solana | `solana_*` | 3 | Anchor framework, docs, expert |
+| context7 | `context7_*` | 2 | Library documentation (needs API key on server) |
+| graphql | `graphql_*` | 2 | Schema introspection, queries |
+| better_auth | `better_auth_*` | 4 | Auth docs search |
+| pg_aiguide | `pg_aiguide_*` | 2 | Postgres/TimescaleDB docs |
+| ai_elements | `ai_elements_*` | 2 | AI UI components |
 
-### One-Shot Coding Task
-```bash
-# PTY required for interactive terminal
-exec pty:true workdir:/path/to/project command:"claudesp 'Your task here'"
-```
+Full catalog: `docs/tools-catalog.md`
 
-### Background Coding Task
-```bash
-# Start in background, get sessionId
-exec pty:true workdir:/path/to/project background:true command:"claudesp 'Your task here'"
+## Installed Skills (`~/.agents/skills/`)
 
-# Monitor progress
-process action:log sessionId:XXX
+Skills are prompt-based capabilities loaded automatically by Claude Code and other agents.
 
-# Check if done
-process action:poll sessionId:XXX
-```
+### Web Scraping & Research
+| Skill | What it does |
+|-------|-------------|
+| `firecrawl` | Main Firecrawl skill (scrape, crawl, map, search, agent, browser) |
+| `firecrawl-scrape` | Scrape single URLs to markdown |
+| `firecrawl-crawl` | Crawl multi-page sites |
+| `firecrawl-map` | Map site URL structure |
+| `firecrawl-search` | Web search via Firecrawl |
+| `firecrawl-download` | Download full sites to `.firecrawl/` |
+| `firecrawl-browser` | Cloud browser sandbox (Playwright) |
+| `firecrawl-agent` | AI agent for autonomous web research |
 
-### Swarm Mode (Parallel Sub-Agents)
+### Documentation & Context
+| Skill | What it does |
+|-------|-------------|
+| `context7` | Look up library/framework docs via Context7 |
+| `context7-cli` | Context7 CLI integration |
+| `context7-mcp` | Context7 MCP server setup |
+| `find-docs` | Documentation research agent |
 
-Use TeammateTool for parallel orchestration:
+### Development
+| Skill | What it does |
+|-------|-------------|
+| `shadcn` | shadcn/ui component management |
+| `skill-finder` | Find and evaluate ClawHub skills |
+| `tavily` | Web search via Tavily |
+| `ultrathink` | Extended reasoning |
+| `mgrep-code-search` | Code search across repos |
+| `copilot-sdk` | GitHub Copilot SDK reference |
 
-```javascript
-// Create a team
-Teammate({ operation: "spawnTeam", team_name: "my-team" })
+### Utilities
+| Skill | What it does |
+|-------|-------------|
+| `markdown-converter` | Convert between formats |
+| `youtube-transcript` | Extract YouTube transcripts |
+| `beautiful-mermaid` | Generate Mermaid diagrams |
+| `nano-banana-2` / `nano-banana-pro` | Image generation |
+| `gpt-image-1-5` | GPT image generation |
+| `promptify` | Prompt engineering |
+| `ray-so-code-snippet` | Code snippet screenshots |
+| `lorem-ipsum` | Placeholder text |
+| `here-be-git` | Git workflows |
+| `notion-api` / `todoist-api` / `raindrop-api` | Productivity integrations |
+| `anki-connect` | Anki flashcard integration |
+| `upstash-redis-kv` | Redis KV operations |
+| `gog-cli` | GOG CLI |
 
-// Spawn a worker
-Task({
-  team_name: "my-team",
-  name: "worker-1",
-  subagent_type: "general-purpose",
-  prompt: "Your task for the sub-agent",
-  run_in_background: true
-})
+### Trading
 
-// Check inbox for results
-Teammate({ operation: "getInbox", team_name: "my-team" })
-```
+Two skill layers: **local** (executable scripts in `skills/trader/`) and **global** (prompt-based in `~/.agents/skills/`).
 
-### Auto-Notify on Completion
+#### Local Execution Skills (`skills/trader/`)
 
-For long tasks, append wake trigger:
-```
-... your task here.
+Scripts run via `bun`/`node`/`python`/`bash`. These contain actual executable code.
 
-When finished, run: clawdbot gateway wake --text "Done: [summary]" --mode now
-```
+**Execution**
+| Skill | Chain | Entry Point | What it does |
+|-------|-------|-------------|-------------|
+| `moltiumv2` | Solana | `tools/moltium/local/ctl.mjs` | pump.fun, PumpSwap, Raydium AMM v4, autostrategy runtime |
+| `jup-skill` | Solana | `scripts/fetch-api.ts` | Jupiter Ultra/Metis swaps, limit orders, DCA |
+| `solana-connect` | Solana | `scripts/solana.js` | Secure wallet toolkit (generate, balance, send, txns) |
+| `solana-sniper-bot` | Solana | `scripts/sniper.py` | Autonomous token sniper + LLM rug detection |
+| `solana-copy-trader` | Solana | `scripts/index.js` | Whale copy trading via Helius WebSocket |
+| `solana-funding-arb` | Solana | `scripts/` | Funding rate arb (Drift + Flash Trade) |
+| `base-trader` | Base | SKILL.md | Bankr API trading |
+| `polymarket-copytrading` | Polygon | `scripts/status.py` | Mirror top Polymarket traders via Simmer |
+| `solana-swaps` / `solana-easy-swap` / `solana-transfer` | Solana | scripts | Jupiter swaps, transfers |
+| `clawswap` | Solana | SKILL.md | ClawSwap perp futures |
 
-## Agent Directory
+**Safety & Analysis**
+| Skill | Entry Point | What it does |
+|-------|-------------|-------------|
+| `prism-scanner` | `scripts/scan.sh {token}` | Rug-pull detection (holder concentration, LP locks, honeypots) |
+| `fairscale-solana` | SKILL.md | Wallet reputation scoring (FairScore 0-100) |
+| `crypto-price` | `scripts/` (Python) | Real-time prices + candlestick charts |
+| `opendex` | SKILL.md | OpenDex API (token data, OHLCV, sentiment) |
+| `technical-analyst` | SKILL.md | Systematic weekly chart analysis |
+| `trading-research` | SKILL.md | Binance market data, whale tracker |
 
-See `/Users/jonathonfritz/.clawdbot/AGENT_DIRECTORY.md` for a list of all agents and how to contact them.
+**Backtesting & Paper Trading**
+| Skill | Entry Point | What it does |
+|-------|-------------|-------------|
+| `paper-trader` | `scripts/paper_trading.ts` | SQLite-backed paper trading with PnL |
+| `hft-paper-trader` | SKILL.md | HF paper trading with Kelly criterion |
+| `crypto-backtest` | SKILL.md | Multi-exchange backtesting (ccxt) |
+| `crypto-self-learning` | SKILL.md | Self-improving trade analysis |
+| `strategy-workflow` | SKILL.md | Full quant pipeline (Optuna, NautilusTrader) |
+| `pair-trade-screener` | SKILL.md | Statistical arb / cointegration |
 
-Quick reference:
-- **stitch** — code review
-- **metal** — infrastructure  
-- **pixel/ctolite** — desktop app
-- **research** — web research
-- **holt** — bot deployment
-- **intake** — PRD processing
+**Also**: `market-snapshot`, `crypto-market-analyzer`, `portfolio-watcher`, `questdb-agent-skill`, `solana-sniper-architect`
 
+#### Global Trading Skills (`~/.agents/skills/`)
 
----
+Prompt-based knowledge skills loaded automatically by Claude Code.
 
-## Agent Browser (Headless Web Automation)
+**Polymarket / Prediction Markets**
+| Skill | Source | What it does |
+|-------|--------|-------------|
+| `grimoire-polymarket` | franalgaba/grimoire | Polymarket protocol reference (CLOB, CTF, order types) |
+| `polymarket-api` | agentmc15 | Polymarket REST/WS API integration |
+| `polymarket-prediction-market` | axwelbrand/arbibot | Polymarket arb strategies & bot architecture |
+| `polymarket-copytrading` | spartanlabsxyz/simmer | Simmer SDK copy trading |
+| `polymarket-signal-sniper` | spartanlabsxyz/simmer | Simmer signal-based sniping |
+| `polymarket-mert-sniper` | spartanlabsxyz/simmer | MERT model sniping |
+| `polymarket-ai-divergence` | spartanlabsxyz/simmer | AI model divergence detection |
 
-**ALWAYS use `agent-browser` with `--state` for authenticated web automation.** Runs headless by default.
+**Solana DEX & Infrastructure**
+| Skill | What it does |
+|-------|-------------|
+| `helius` | Helius RPC, webhooks, DAS API, priority fees |
+| `drift` | Drift Protocol perp trading |
+| `pumpfun` | pump.fun token creation & trading |
+| `pump-fun-mechanics` | Bonding curve math, migration mechanics |
+| `jupiter-swap-integration` | Jupiter v6 swap implementation patterns |
+| `jito-bundles-and-priority-fees` | Jito bundle submission, tip optimization |
+| `raydium` / `orca` / `meteora` | AMM pool mechanics |
+| `solana-agent-kit` / `solana-kit` | Solana dev toolkits |
+| `pyth` | Pyth oracle price feeds |
 
-### Quick Start (Authenticated)
+**Trading Strategy & Risk**
+| Skill | What it does |
+|-------|-------------|
+| `trading-bot-architecture` | Bot design patterns (latency, state, recovery) |
+| `sniper-dynamics-and-mitigation` | Sniper detection, anti-rug, MEV protection |
+| `wallet-monitoring-bot` | Real-time wallet tracking bots |
+| `meme-rush` | Binance memecoin momentum strategies |
+| `bankr` | Bankr API (Base chain trading) |
+| `whale-wallet-analysis` | Whale wallet tracking & copy patterns |
+| `universal-trading` / `trade` | General trading frameworks |
+| `trading-signal` / `trading-strategies` | Signal generation, strategy patterns |
+| `rug-detection-checklist` | Pre-trade safety checklist |
+| `token-analysis-checklist` / `token-research` | Token due diligence |
+| `coingecko` | CoinGecko market data API |
+| `dflow` | DFlow order flow |
+| `metaplex` | NFT/token metadata |
 
-```bash
-# Linear - project management
-agent-browser --state ~/.agent-browser/linear-auth.json open https://linear.app
-
-# Discord - messaging  
-agent-browser --state ~/.agent-browser/discord-auth.json open https://discord.com/channels/@me
-
-# Get snapshot, interact, close
-agent-browser snapshot -i
-agent-browser click @e2
-agent-browser close
-```
-
-### Available Auth States
-
-| Service | State File | Example URL |
-|---------|-----------|-------------|
-| Linear | `~/.agent-browser/linear-auth.json` | `https://linear.app` |
-| Discord | `~/.agent-browser/discord-auth.json` | `https://discord.com/channels/@me` |
-
-### Workflow Pattern
-
-```bash
-# 1. Open with auth state
-agent-browser --state ~/.agent-browser/linear-auth.json open https://linear.app
-
-# 2. Get snapshot to see elements
-agent-browser snapshot -i
-
-# 3. Interact using @refs from snapshot
-agent-browser click @e5
-
-# 4. ALWAYS close when done
-agent-browser close
-```
-
-### Important Rules
-
-1. **ALWAYS use `--state`** for authenticated sites
-2. **ALWAYS `close` when done** - One browser at a time
-3. **Use @refs from snapshots** - More reliable than selectors
-
-
-# TOOLS.md - Standard Agent Tools
-
-This file documents the tools available to all agents.
-
----
-
-## Coding CLIs
-
-You have access to multiple AI coding assistants. **Default to `claudesp`** for most tasks.
-
-### Available CLIs
-
-| CLI | Path | Best For |
-|-----|------|----------|
-| `claudesp` | `~/.local/bin/claudesp` | **DEFAULT** - Swarm mode, TeammateTool, parallel sub-agents |
-| `claude` | System PATH | Standard Claude Code |
-| `codex` | System PATH | OpenAI Codex tasks |
-| `droid` | `~/.local/bin/droid` | Alternative coding agent |
-
-### claudesp (Recommended)
-
-```bash
-# One-shot task
-exec pty:true workdir:/path/to/project command:"claudesp 'Your task here'"
-
-# Background task
-exec pty:true workdir:/path/to/project background:true command:"claudesp 'Your task here'"
-
-# Monitor progress
-process action:log sessionId:XXX
-process action:poll sessionId:XXX
-```
-
-### Swarm Mode (Parallel Sub-Agents)
-
-```javascript
-// Create a team
-Teammate({ operation: "spawnTeam", team_name: "my-team" })
-
-// Spawn workers
-Task({
-  team_name: "my-team",
-  name: "worker-1",
-  subagent_type: "general-purpose",
-  prompt: "Your task",
-  run_in_background: true
-})
-
-// Check inbox
-Teammate({ operation: "getInbox", team_name: "my-team" })
-```
-
-### Auto-Notify on Completion
-
-For long tasks, append:
-```
-When finished, run: clawdbot gateway wake --text "Done: [summary]" --mode now
-```
-
----
-
-## Firecrawl (Web Scraping & Research)
-
-Access via exec with the MCP endpoint:
+### X Research (`apps/grok/`)
 
 ```bash
-# Scrape a URL
-node -e "
-fetch('http://10.106.163.36:8080/mcp', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    jsonrpc: '2.0', method: 'tools/call', id: 1,
-    params: { name: 'firecrawl_scrape', arguments: { url: 'https://example.com' }}
-  })
-}).then(r => r.json()).then(d => console.log(JSON.stringify(d, null, 2)));
-"
-
-# Search the web
-node -e "
-fetch('http://10.106.163.36:8080/mcp', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    jsonrpc: '2.0', method: 'tools/call', id: 1,
-    params: { name: 'firecrawl_search', arguments: { query: 'your search query' }}
-  })
-}).then(r => r.json()).then(d => console.log(JSON.stringify(d, null, 2)));
-"
+bun run ask "query"              # Open-ended X search via Grok
+bun run ask --days 3 "query"     # Last N days
+bun run cron                     # Keyword-based scheduled search
 ```
 
-### Available Firecrawl Tools
-- `firecrawl_scrape` - Scrape a single URL
-- `firecrawl_crawl` - Crawl multiple pages from a starting URL
-- `firecrawl_map` - Map site structure
-- `firecrawl_search` - Web search
-
----
-
-## Tool Server Access
-
-The CTO tool server at `tools.fra.5dlabs.ai` provides ~309 MCP tools.
-
-### List Available Tools
+### Installing More Skills
 
 ```bash
-# List all tools
-node -e "
-fetch('http://10.106.163.36:8080/mcp', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    jsonrpc: '2.0', method: 'tools/list', id: 1
-  })
-}).then(r => r.json()).then(d => console.log(d.result.tools.map(t => t.name).join('\n')));
-"
+# Search available skills
+npx skills search <query>
+
+# Install a skill globally
+npx -y skills add <owner/repo@skill> --global --all -y
 ```
 
-### Tool Categories
+Browse: [context7.com/skills](https://context7.com/skills) | [skills.sh](https://skills.sh)
 
-| Prefix | Category |
-|--------|----------|
-| `context7_*` | Library documentation |
-| `firecrawl_*` | Web scraping |
-| `octocode_*` | GitHub code search |
-| `openmemory_*` | Long-term memory |
-| `repomix_*` | Codebase packing |
-| `linear_*` | Linear project management |
-| `kubernetes_*` | K8s cluster management |
+## CLI Tools
 
-### Calling Any Tool
+| CLI | Purpose |
+|-----|---------|
+| `firecrawl` | Web scraping CLI (authenticated, 3K credits/cycle) |
+| `claude` | Claude Code |
+| `codex` | OpenAI Codex |
+
+### Firecrawl CLI Quick Reference
 
 ```bash
-node -e "
-fetch('http://10.106.163.36:8080/mcp', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    jsonrpc: '2.0', method: 'tools/call', id: 1,
-    params: { 
-      name: 'TOOL_NAME', 
-      arguments: { /* tool-specific args */ }
-    }
-  })
-}).then(r => r.json()).then(d => console.log(JSON.stringify(d, null, 2)));
-"
+firecrawl scrape <url>              # Scrape URL to markdown
+firecrawl search "query"            # Web search
+firecrawl crawl <url>               # Crawl site
+firecrawl map <url>                 # Map site URLs
+firecrawl agent "prompt"            # AI research agent
+firecrawl browser                   # Cloud browser
+firecrawl --status                  # Check auth & credits
 ```
 
----
-
-## Agent Browser (Headless Web Automation)
-
-```bash
-# Open with auth state
-agent-browser --state ~/.agent-browser/linear-auth.json open https://linear.app
-
-# Get snapshot
-agent-browser snapshot -i
-
-# Interact
-agent-browser click @e5
-
-# Close when done
-agent-browser close
-```
-
-### Available Auth States
-- `~/.agent-browser/linear-auth.json` - Linear
-- `~/.agent-browser/discord-auth.json` - Discord
-
----
-
-## Agent Directory
-
-See `/Users/jonathonfritz/.clawdbot/AGENT_DIRECTORY.md` for cross-agent communication.
-
-```javascript
-// Contact another agent
-sessions_send("agent:metal:main", "Hey Metal, need help with infrastructure")
-```
-
----
-
-## Tool Server Access & Self-Service Filtering
-
-You have access to the CTO tool server with ~309 MCP tools. You can **manage your own tool access** by editing your `tools-config.json`.
-
-### Tools Client Binary
-
-```
-/Users/jonathonfritz/cto/target/release/tools-client
-```
-
-If not built, run:
-```bash
-cd ~/cto && cargo build --release --bin tools-client
-```
-
-### Configuration File
-
-Create/edit `tools-config.json` in your workspace:
-
-```json
-{
-  "remoteTools": [
-    "context7_*",
-    "firecrawl_*",
-    "openmemory_*"
-  ],
-  "localServers": {},
-  "maxConnections": 10
-}
-```
-
-### Filtering Behavior
-
-| `remoteTools` Value | Behavior |
-|---------------------|----------|
-| `[]` (empty array) | **All** remote tools available (no filtering) |
-| `["tool_a", "tool_b"]` | Only listed tools (whitelist) |
-| `["prefix_*"]` | Wildcard matching (all tools starting with prefix) |
-
-### Available Tool Categories
-
-| Pattern | Tools | Use For |
-|---------|-------|---------|
-| `context7_*` | 2 | Library documentation |
-| `octocode_*` | 6 | GitHub code search |
-| `firecrawl_*` | 4 | Web scraping & research |
-| `openmemory_*` | 6 | Persistent memory |
-| `repomix_*` | 4 | Codebase packing |
-| `github_*` | 12+ | PR management, code push |
-| `github_list_code_scanning_*` | 2 | Security scanning |
-| `github_list_secret_scanning_*` | 2 | Secret detection |
-| `kubernetes_*` | 7 | K8s resource management |
-| `argocd_*` | 6 | GitOps deployments |
-| `grafana_*` | 5 | Dashboards & monitoring |
-| `prometheus_*` | 4 | Metrics queries |
-| `loki_*` | 3 | Log queries |
-| `terraform_*` | 2 | IaC lookup |
-| `shadcn_*` | 7 | UI components |
-| `ai_elements_*` | 2 | AI UI components |
-| `argo_workflows_*` | 5 | Workflow orchestration |
-| `linear_*` | ? | Project management |
-
-### Using with Cursor/Claude Code
-
-Add to `~/.cursor/mcp.json`:
-```json
-{
-  "mcpServers": {
-    "tools-client": {
-      "command": "/Users/jonathonfritz/cto/target/release/tools-client",
-      "args": [
-        "--url", "http://tools.fra.5dlabs.ai:3000/mcp",
-        "--working-dir", "/path/to/your/workspace"
-      ]
-    }
-  }
-}
-```
-
-### Using via exec (Clawdbot)
-
-```bash
-# List available tools
-/Users/jonathonfritz/cto/target/release/tools-client \
-  --url http://tools.fra.5dlabs.ai:3000/mcp \
-  --working-dir $PWD \
-  list-tools
-
-# Call a specific tool
-echo '{"name":"context7_get_library_docs","arguments":{"libraryId":"react"}}' | \
-  /Users/jonathonfritz/cto/target/release/tools-client \
-  --url http://tools.fra.5dlabs.ai:3000/mcp \
-  --working-dir $PWD \
-  call-tool
-```
-
-### Self-Service: Adding New Tools
-
-If you need a tool not in your current config:
-
-1. Check available tools: `tools-client list-tools`
-2. Edit your `tools-config.json` to add the pattern
-3. Restart your session/reload config
-
-**You are empowered to manage your own tool access based on your needs.**
-
-### Debugging
-
-```bash
-RUST_LOG=debug /Users/jonathonfritz/cto/target/release/tools-client \
-  --url http://tools.fra.5dlabs.ai:3000/mcp \
-  --working-dir $PWD
-```
-
-### Config File Search Order
-
-1. `MCP_TOOLS_CONFIG` env var
-2. `MCP_CLIENT_CONFIG` env var
-3. `<working-dir>/client-config.json`
-4. `<working-dir>/tools-config.json`
-5. `./tools-config.json` (current directory)
-
----
-
-## 🚀 Self-Service Process
-
-1. **Identify need** - What tool would help you?
-2. **Check this library** - Is it available?
-3. **Edit config** - Add to your `tools-config.json`
-4. **Reload** - Restart session or reload config
-5. **Use it** - Tool is now available!
-
-**You are empowered to manage your own tool access.**
-
----
-
-## 📚 Complete Tool Library (416 Tools)
-
-This is the **full catalog** of MCP tools available from the CTO tool server at `http://10.110.233.213:3000/mcp`.
-
-### How to Add Tools
-
-Edit your `tools-config.json`:
-```json
-{
-  "remoteTools": [
-    "category_*"     // Add entire category with wildcard
-  ]
-}
-```
-
----
-
-## 🔧 Tool Categories (23 Categories, 416 Tools)
-
-| Category | Tools | Pattern | Description |
-|----------|-------|---------|-------------|
-| **linear** | 187 | `linear_*` | Project management (issues, projects, cycles, teams, comments, labels, etc.) |
-| **grafana** | 56 | `grafana_*` | Dashboards, alerts, datasources, annotations, queries |
-| **github** | 26 | `github_*` | Repos, PRs, issues, branches, code scanning, secrets |
-| **kubernetes** | 22 | `kubernetes_*` | Pods, deployments, services, configmaps, logs, exec |
-| **playwright** | 22 | `playwright_*` | Browser automation, screenshots, navigation, clicks |
-| **postgres** | 19 | `postgres_*` | Database queries, schema, tables, migrations |
-| **argocd** | 14 | `argocd_*` | GitOps apps, sync, rollback, resources |
-| **octocode** | 13 | `octocode_*` | Code search, repo structure, LSP features |
-| **terraform** | 9 | `terraform_*` | Providers, modules, state, plans |
-| **openmemory** | 6 | `openmemory_*` | Persistent memory across sessions |
-| **prometheus** | 6 | `prometheus_*` | Metrics queries, labels, series |
-| **nano** | 6 | `nano_*` | Nano Banana tools |
-| **tavily** | 5 | `tavily_*` | Web search & research |
-| **better** | 4 | `better_*` | Better Auth tools |
-| **perplexity** | 4 | `modelcontextprotocol_*` | AI-powered search |
-| **exa** | 3 | `exa_*` | Exa search tools |
-| **solana** | 3 | `solana_*` | Solana blockchain tools |
-| **ai_elements** | 2 | `ai_*` | AI UI components |
-| **context7** | 2 | `context7_*` | Library documentation |
-| **graphql** | 2 | `graphql_*` | GraphQL introspection & queries |
-| **pg_aiguide** | 2 | `pg_*` | AI guide tools |
-| **tools** | 2 | `tools_*` | Meta tools (list, screenshot) |
-| **gamma** | 1 | `gamma_*` | Presentation generation |
-
----
-
-## 📋 Detailed Category Breakdown
-
-### Linear (187 tools) - Project Management
-**Pattern:** `linear_*`
-
-The most comprehensive toolset. Includes:
-- `linear_create_*` (33) - Create issues, projects, cycles, comments, labels
-- `linear_get_*` (61) - Get issues, projects, users, teams, workflows
-- `linear_update_*` (33) - Update issues, projects, priorities
-- `linear_delete_*` (28) - Delete issues, comments, labels
-- `linear_archive_*` (12) - Archive projects, issues
-- `linear_search_*` (3) - Search issues, projects
-- Plus: add labels, file uploads, mark complete, snooze, etc.
-
-**Use for:** Task management, sprint planning, issue tracking
-
----
-
-### Grafana (56 tools) - Observability
-**Pattern:** `grafana_*`
-
-- `grafana_list_*` (18) - List dashboards, datasources, alerts
-- `grafana_get_*` (17) - Get dashboard details, alert rules
-- `grafana_create_*` (5) - Create dashboards, alerts
-- `grafana_query_*` (4) - Query Prometheus, Loki, datasources
-- Plus: search, update, delete, patch
-
-**Use for:** Monitoring, dashboards, alerts, metrics visualization
-
----
-
-### GitHub (26 tools) - Code & PRs
-**Pattern:** `github_*`
-
-- `github_get_*` (7) - Get repos, PRs, files, comments
-- `github_create_*` (6) - Create PRs, branches, issues, reviews
-- `github_search_*` (4) - Search code, repos, issues, PRs
-- `github_list_*` (3) - List code scanning, secret scanning
-- Plus: merge, push, fork, update
-
-**Use for:** Code management, PR reviews, security scanning
-
----
-
-### Kubernetes (22 tools) - Cluster Management
-**Pattern:** `kubernetes_*` or `kubernetes_mcp_*`
-
-- Resource CRUD: list, get, create, update, delete, describe
-- Pod operations: logs, exec, port-forward
-- Namespace management
-- ConfigMap/Secret handling
-
-**Use for:** Cluster operations, deployments, debugging
-
----
-
-### Playwright (22 tools) - Browser Automation
-**Pattern:** `playwright_*` or `playwright_browser_*`
-
-- Navigation: goto, back, forward, reload
-- Interactions: click, type, fill, select, hover
-- Extraction: screenshot, pdf, content, evaluate
-- State: cookies, storage, context
-
-**Use for:** Web scraping, UI testing, automation
-
----
-
-### Postgres (19 tools) - Database
-**Pattern:** `postgres_*` or `postgres_pg_*`
-
-- Queries: execute, select, insert, update, delete
-- Schema: list tables, describe, migrations
-- Admin: connections, transactions, locks
-
-**Use for:** Database operations, data analysis
-
----
-
-### ArgoCD (14 tools) - GitOps
-**Pattern:** `argocd_*`
-
-- Apps: list, get, create, sync, delete, rollback
-- Resources: get tree, managed resources, logs
-- Operations: refresh, terminate
-
-**Use for:** GitOps deployments, rollbacks
-
----
-
-### Octocode (13 tools) - Code Intelligence
-**Pattern:** `octocode_*`
-
-- GitHub: search code, repos, PRs, view structure
-- Local: find files, search code, view structure
-- LSP: go to definition, find references, call hierarchy
-
-**Use for:** Code search, navigation, understanding
-
----
-
-### Terraform (9 tools) - Infrastructure as Code
-**Pattern:** `terraform_*`
-
-- `terraform_search_*` - Search providers, modules
-- `terraform_get_*` - Get provider/module details
-
-**Use for:** IaC discovery, module lookup
-
----
-
-### Solana (3 tools) - Blockchain
-**Pattern:** `solana_*`
-
-- Solana blockchain interactions
-- Wallet queries
-- Transaction tools
-
-**Use for:** Solana development, trading bots
-
----
-
-### Tavily (5 tools) - Web Search
-**Pattern:** `tavily_*`
-
-- Web search with AI summarization
-- Research-focused results
-
-**Use for:** Web research, fact-finding
-
----
-
-### Perplexity (4 tools) - AI Search
-**Pattern:** `modelcontextprotocol_*` or `modelcontextprotocol_perplexity_*`
-
-- AI-powered search and answers
-
-**Use for:** Research, Q&A
-
----
-
-### Gamma (1 tool) - Presentations
-**Pattern:** `gamma_*`
-
-- `gamma_generate_presentation` - Generate slide decks
-
-**Use for:** Pitch decks, presentations
-
----
-
-### Context7 (2 tools) - Library Docs
-**Pattern:** `context7_*`
-
-- `context7_resolve_library_id` - Find library
-- `context7_query_library_docs` - Get docs
-
-**Use for:** Looking up library/framework docs
-
----
-
-### Open Memory (6 tools) - Persistence
-**Pattern:** `openmemory_*`
-
-- Store, query, list, get, reinforce, delete memories
-
-**Use for:** Session continuity, long-term memory
-
----
-
-## 🚀 Quick Add by Use Case
-
-| Need | Add Pattern |
-|------|-------------|
-| Project management | `linear_*` |
-| Monitoring/dashboards | `grafana_*` |
-| Code/PR management | `github_*` |
-| Cluster ops | `kubernetes_*` |
-| Browser automation | `playwright_*` |
-| Database access | `postgres_*` |
-| GitOps | `argocd_*` |
-| Code intelligence | `octocode_*` |
-| IaC lookup | `terraform_*` |
-| Web search | `tavily_*`, `exa_*` |
-| AI search | `modelcontextprotocol_*` |
-| Presentations | `gamma_*` |
-| Solana/crypto | `solana_*` |
-| Memory | `openmemory_*` |
-| Library docs | `context7_*` |
-
----
-
-## 🔑 Self-Service
-
-**You are empowered to add any tools you need.**
-
-1. Identify what you need
-2. Find the pattern above
-3. Add to your `tools-config.json`
-4. Reload session
-
-Empty `[]` = ALL 416 tools (no filter)
+## Browser Automation
+
+Two options available:
+1. **Chrome MCP tools** (`mcp__claude-in-chrome__*`) — interact with active Chrome tabs
+2. **Playwright MCP tools** (`playwright_*`) — headless browser via tools server
+
+## API Keys (1Password)
+
+| Service | 1Password Item | Vault | Used By |
+|---------|---------------|-------|---------|
+| Firecrawl | `Firecrawl API Key` | Automation | firecrawl CLI/skills |
+| Context7 | `Context7 API Key` | Automation | context7 skill/MCP |
+| Grok / xAI | `Grok X API Key` | Automation | `apps/grok/` |
+| Helius | TBD | — | solana-copy-trader |
+| Simmer | TBD | — | polymarket-copytrading |
+| Jupiter | TBD | — | jup-skill |
+
+Firecrawl is authenticated via OAuth (CLI). Context7 key: set `CONTEXT7_API_KEY` env var or configure on tools server.

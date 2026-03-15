@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
+import modelCatalog from '@/generated/model-catalog.json';
 
 interface ValidateKeyRequest {
   provider: string;
@@ -12,6 +13,29 @@ interface ValidateKeyResponse {
   provider: string;
   message: string;
   models?: string[];
+}
+
+const GOOGLE_FALLBACK_MODELS = ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+
+const PROVIDER_ALIASES: Record<string, string> = {
+  gemini: 'google',
+};
+
+function modelsForProvider(provider: string): string[] {
+  const normalized = provider.toLowerCase();
+  const key = PROVIDER_ALIASES[normalized] ?? normalized;
+  const catalogProviders = (modelCatalog.providers ?? {}) as Record<string, string[]>;
+  const fromCatalog = catalogProviders[key];
+
+  if (Array.isArray(fromCatalog) && fromCatalog.length > 0) {
+    return fromCatalog;
+  }
+
+  if (key === 'google') {
+    return GOOGLE_FALLBACK_MODELS;
+  }
+
+  return [];
 }
 
 export async function POST(request: NextRequest) {
@@ -68,12 +92,7 @@ async function validateApiKey(provider: string, apiKey: string): Promise<Validat
           valid: true,
           provider: 'anthropic',
           message: 'Anthropic API key is valid',
-          models: [
-            'claude-sonnet-4-20250514',
-            'claude-3-5-sonnet-20241022',
-            'claude-3-opus-20240229',
-            'claude-3-haiku-20240307',
-          ],
+          models: modelsForProvider('anthropic'),
         };
       }
 
@@ -106,7 +125,7 @@ async function validateApiKey(provider: string, apiKey: string): Promise<Validat
           valid: true,
           provider: 'openai',
           message: 'OpenAI API key is valid',
-          models: ['gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+          models: modelsForProvider('openai'),
         };
       }
 
@@ -129,7 +148,7 @@ async function validateApiKey(provider: string, apiKey: string): Promise<Validat
           valid: true,
           provider: 'google',
           message: 'Google API key is valid',
-          models: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+          models: modelsForProvider('google'),
         };
       }
 

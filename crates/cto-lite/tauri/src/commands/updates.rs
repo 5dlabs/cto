@@ -1,6 +1,6 @@
 //! Update management commands
 //!
-//! CTO Lite components are distributed as Docker images, making updates
+//! CTO components are distributed as Docker images, making updates
 //! simple: just pull new images and restart the cluster.
 
 use serde::{Deserialize, Serialize};
@@ -27,24 +27,24 @@ pub struct UpdateStatus {
     pub last_checked: Option<String>,
 }
 
-/// Core images that CTO Lite uses
+/// Core images that CTO uses
 const CORE_IMAGES: &[&str] = &[
-    "ghcr.io/5dlabs/controller",
-    "ghcr.io/5dlabs/pm-lite",
-    "ghcr.io/5dlabs/tool-server",
-    "ghcr.io/5dlabs/intake",
+    "registry.5dlabs.ai/5dlabs/controller",
+    "registry.5dlabs.ai/5dlabs/pm-lite",
+    "registry.5dlabs.ai/5dlabs/tool-server",
+    "registry.5dlabs.ai/5dlabs/intake",
 ];
 
 /// Agent images
 const AGENT_IMAGES: &[&str] = &[
-    "ghcr.io/5dlabs/agent-morgan",
-    "ghcr.io/5dlabs/agent-grizz",
-    "ghcr.io/5dlabs/agent-nova",
-    "ghcr.io/5dlabs/agent-blaze",
-    "ghcr.io/5dlabs/agent-cleo",
-    "ghcr.io/5dlabs/agent-cipher",
-    "ghcr.io/5dlabs/agent-tess",
-    "ghcr.io/5dlabs/agent-bolt",
+    "registry.5dlabs.ai/5dlabs/agent-morgan",
+    "registry.5dlabs.ai/5dlabs/agent-grizz",
+    "registry.5dlabs.ai/5dlabs/agent-nova",
+    "registry.5dlabs.ai/5dlabs/agent-blaze",
+    "registry.5dlabs.ai/5dlabs/agent-cleo",
+    "registry.5dlabs.ai/5dlabs/agent-cipher",
+    "registry.5dlabs.ai/5dlabs/agent-tess",
+    "registry.5dlabs.ai/5dlabs/agent-bolt",
 ];
 
 /// Check for available updates
@@ -245,7 +245,7 @@ pub async fn apply_updates() -> AppResult<String> {
     Ok(messages.join("\n"))
 }
 
-/// Get the current version of CTO Lite components
+/// Get the current version of CTO components
 #[tauri::command]
 pub async fn get_component_versions() -> AppResult<Vec<ComponentVersion>> {
     let mut versions = Vec::new();

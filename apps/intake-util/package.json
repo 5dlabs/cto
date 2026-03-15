@@ -1,0 +1,14 @@
+{
+  "name": "intake-util",
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --compile --outfile intake-util",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/bun": "^1.2.0"
+  }
+}

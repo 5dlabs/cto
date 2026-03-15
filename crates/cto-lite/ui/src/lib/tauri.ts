@@ -1,5 +1,5 @@
 /**
- * Tauri API bindings for CTO App
+ * Tauri API bindings for CTO
  * 
  * These functions wrap Tauri's invoke() to call Rust backend commands
  * with full TypeScript type safety.
@@ -58,6 +58,23 @@ export interface SetupState {
   apiKeysConfigured: ApiKeysConfigured;
   dockerVerified: boolean;
   clusterCreated: boolean;
+}
+
+export type InstallStep =
+  | 'CheckingPrerequisites'
+  | 'InstallingBinaries'
+  | 'CreatingCluster'
+  | 'PullingImages'
+  | 'DeployingServices'
+  | 'ConfiguringIngress'
+  | 'Complete'
+  | 'Failed';
+
+export interface InstallStatus {
+  step: InstallStep;
+  message: string;
+  progress: number;
+  error: string | null;
 }
 
 /** Workflow status from Argo */
@@ -126,6 +143,11 @@ export async function autoStartRuntime(): Promise<string | null> {
   return invoke<string | null>('auto_start_runtime');
 }
 
+/** Scan the local runtime environment without starting anything */
+export async function scanRuntimeEnvironment(): Promise<RuntimeEnvironment> {
+  return invoke<RuntimeEnvironment>('scan_runtime_environment');
+}
+
 /** Fully automated runtime detection and startup - zero touch */
 export async function autoDetectAndStartRuntime(): Promise<RuntimeEnvironment> {
   return invoke<RuntimeEnvironment>('auto_detect_and_start_runtime');
@@ -149,6 +171,18 @@ export async function saveSetupState(state: SetupState): Promise<void> {
 /** Mark setup as complete */
 export async function completeSetup(): Promise<void> {
   return invoke('complete_setup');
+}
+
+export async function runInstallation(): Promise<void> {
+  return invoke('run_installation');
+}
+
+export async function getInstallStatus(): Promise<boolean> {
+  return invoke<boolean>('get_install_status');
+}
+
+export async function resetInstallation(): Promise<void> {
+  return invoke('reset_installation');
 }
 
 // ============================================================================
@@ -181,12 +215,12 @@ export async function hasApiKey(keyType: ApiKeyType): Promise<boolean> {
 // Cluster Commands
 // ============================================================================
 
-/** Create the CTO App Kind cluster */
+/** Create the CTO Kind cluster */
 export async function createCluster(): Promise<void> {
   return invoke('create_cluster');
 }
 
-/** Delete the CTO App Kind cluster */
+/** Delete the CTO Kind cluster */
 export async function deleteCluster(): Promise<void> {
   return invoke('delete_cluster');
 }
@@ -331,7 +365,7 @@ export async function checkHelm(): Promise<string | null> {
   return invoke<string | null>('check_helm');
 }
 
-/** Deploy the CTO App Helm chart */
+/** Deploy the CTO Helm chart */
 export async function deployChart(values: HelmValues): Promise<void> {
   return invoke('deploy_chart', { values });
 }
@@ -341,7 +375,7 @@ export async function getReleaseStatus(): Promise<HelmRelease | null> {
   return invoke<HelmRelease | null>('get_release_status');
 }
 
-/** Uninstall the CTO App Helm chart */
+/** Uninstall the CTO Helm chart */
 export async function uninstallChart(): Promise<void> {
   return invoke('uninstall_chart');
 }
@@ -388,6 +422,11 @@ export async function quickHealthCheck(): Promise<{
 /** Response from the OpenClaw agent */
 export interface OpenClawResponse {
   content: string;
+  latencyMs?: number;
+  gatewayUrl?: string;
+  gatewaySessionKey?: string;
+  acpSessionId?: string;
+  stopReason?: string;
   action?: {
     type: 'oauth' | 'approve' | 'link' | 'confirm';
     label: string;
@@ -411,22 +450,113 @@ export interface OpenClawStatus {
   agents: string[];
 }
 
+export interface OpenClawMessage {
+  role: string;
+  content: string;
+}
+
+/** Local bridge status for connecting CTO to the Morgan OpenClaw service */
+export interface OpenClawBridgeStatus {
+  running: boolean;
+  connected: boolean;
+  pid: number | null;
+  namespace: string | null;
+  service: string | null;
+  localUrl: string;
+}
+
+export interface MorganDiagnostics {
+  healthy: boolean;
+  modelPrimary: string | null;
+  modelFallbacks: string[];
+  catalogSource: string | null;
+  catalogGeneratedAt: string | null;
+  catalogProviderCount: number;
+  catalogModelCount: number;
+  recentErrors: string[];
+}
+
+export interface ProjectRecord {
+  id: string;
+  name: string;
+  summary: string;
+  repository: string | null;
+  prdTitle: string;
+  prdContent: string;
+  workflowSummary: string;
+  workflowNotes: string;
+  configNotes: string;
+}
+
+export interface AgentUiConfig {
+  id: string;
+  displayName: string;
+  role: string;
+  summary: string;
+  avatarLabel: string;
+  enabled: boolean;
+  skills: string[];
+  capabilities: string[];
+  tools: string[];
+  systemPrompt: string;
+  heartbeatEvery: string;
+  model: string;
+}
+
+export interface StudioState {
+  selectedProjectId: string;
+  projects: ProjectRecord[];
+  agents: AgentUiConfig[];
+}
+
+export interface RenderedAgentConfig {
+  agentId: string;
+  projectId: string | null;
+  target: string;
+  renderedAt: string;
+  content: string;
+}
+
+export interface ApplyAgentConfigResult {
+  applied: boolean;
+  agentId: string;
+  projectId: string | null;
+  target: string;
+  renderedAt: string;
+  message: string;
+}
+
 /** Send a message to the OpenClaw PM agent (Morgan) */
 export async function openclawSendMessage(
   sessionId: string,
-  message: string
+  message: string,
+  agentId?: string
 ): Promise<OpenClawResponse> {
   return invoke<OpenClawResponse>('openclaw_send_message', {
     sessionId,
     message,
+    agentId: agentId ?? null,
+  });
+}
+
+/** Send pasted supporting context into the active Morgan avatar room session */
+export async function openclawSendAvatarContext(
+  roomName: string,
+  content: string,
+  agentId?: string
+): Promise<OpenClawResponse> {
+  return invoke<OpenClawResponse>('openclaw_send_avatar_context', {
+    roomName,
+    content,
+    agentId: agentId ?? null,
   });
 }
 
 /** Get message history for a session */
 export async function openclawGetMessages(
   sessionId: string
-): Promise<OpenClawResponse[]> {
-  return invoke<OpenClawResponse[]>('openclaw_get_messages', { sessionId });
+): Promise<OpenClawMessage[]> {
+  return invoke<OpenClawMessage[]>('openclaw_get_messages', { sessionId });
 }
 
 /** Start a Lobster workflow via OpenClaw */
@@ -467,10 +597,71 @@ export async function openclawGetStatus(): Promise<OpenClawStatus> {
   return invoke<OpenClawStatus>('openclaw_get_status');
 }
 
+/** Start the local Morgan bridge */
+export async function openclawStartLocalBridge(agentId?: string): Promise<OpenClawBridgeStatus> {
+  return invoke<OpenClawBridgeStatus>('openclaw_start_local_bridge', { agentId: agentId ?? null });
+}
+
+/** Stop the local Morgan bridge */
+export async function openclawStopLocalBridge(agentId?: string): Promise<OpenClawBridgeStatus> {
+  return invoke<OpenClawBridgeStatus>('openclaw_stop_local_bridge', { agentId: agentId ?? null });
+}
+
+/** Get the local Morgan bridge status */
+export async function openclawGetLocalBridgeStatus(agentId?: string): Promise<OpenClawBridgeStatus> {
+  return invoke<OpenClawBridgeStatus>('openclaw_get_local_bridge_status', { agentId: agentId ?? null });
+}
+
+export async function openclawGetMorganDiagnostics(agentId?: string): Promise<MorganDiagnostics> {
+  return invoke<MorganDiagnostics>('openclaw_get_morgan_diagnostics', { agentId: agentId ?? null });
+}
+
 /** Execute a CLI command through the OpenClaw proxy */
 export async function openclawExecCli(
   cli: string,
   args: string[]
 ): Promise<string> {
   return invoke<string>('openclaw_exec_cli', { cli, args });
+}
+
+// ============================================================================
+// Studio Commands
+// ============================================================================
+
+export async function studioGetState(): Promise<StudioState> {
+  return invoke<StudioState>('studio_get_state');
+}
+
+export async function studioSaveState(state: StudioState): Promise<StudioState> {
+  return invoke<StudioState>('studio_save_state', { state });
+}
+
+export async function studioRenderAgentConfig(
+  agentId: string,
+  projectId?: string | null
+): Promise<RenderedAgentConfig> {
+  return invoke<RenderedAgentConfig>('studio_render_agent_config', {
+    agentId,
+    projectId: projectId ?? null,
+  });
+}
+
+export async function studioExportAgentConfig(
+  agentId: string,
+  projectId?: string | null
+): Promise<RenderedAgentConfig> {
+  return invoke<RenderedAgentConfig>('studio_export_agent_config', {
+    agentId,
+    projectId: projectId ?? null,
+  });
+}
+
+export async function studioApplyAgentConfig(
+  agentId: string,
+  projectId?: string | null
+): Promise<ApplyAgentConfigResult> {
+  return invoke<ApplyAgentConfigResult>('studio_apply_agent_config', {
+    agentId,
+    projectId: projectId ?? null,
+  });
 }

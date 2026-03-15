@@ -7,6 +7,7 @@
 //! - Loki log scanning
 
 // Internal modules needed by other modules
+pub mod acp;
 mod github;
 mod templates;
 
@@ -18,6 +19,9 @@ pub mod scanner;
 pub mod sensors;
 
 // Re-export common types
+pub use acp::{
+    HealerAcpAgent, HealerAcpClient, HealerAcpServerState, MonitorEventStore, StakpakMonitorEvent,
+};
 pub use play::{
     build_play_api_router, run_play_api_server, EvaluationSpawnResult, EvaluationSpawner,
     EvaluationSpawnerConfig, PlayApiState, PlaySession, SessionStore, SessionStoreHandle,

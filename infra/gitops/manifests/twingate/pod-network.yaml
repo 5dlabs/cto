@@ -1,0 +1,14 @@
+---
+apiVersion: twingate.com/v1beta
+kind: TwingateResource
+metadata:
+  name: cto-pod-network
+spec:
+  name: CTO Pod Network
+  address: 10.42.0.0/16
+  protocols:
+    allowIcmp: true
+    tcp:
+      policy: ALLOW_ALL
+    udp:
+      policy: ALLOW_ALL

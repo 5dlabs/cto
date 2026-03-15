@@ -1,8 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
-import { RainEffect } from "@/components/rain-effect";
 import { Header } from "@/components/header";
+
+const homeHref =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3001"
+    : "https://5dlabs.ai";
 
 const tiers = [
   {
@@ -61,7 +66,7 @@ const tiers = [
       { label: "Repositories", value: "Unlimited" },
       { label: "AI API keys", value: "BYOK or Managed (+10%)" },
       { label: "Support", value: "Slack (24h)" },
-      { label: "Features", value: "Full SSO/SAML, audit logs, SCIM, Healer" },
+      { label: "Features", value: "Full SSO/SAML, audit logs, SCIM, self-healing" },
     ],
     cta: "Start Trial",
     ctaHref: "https://app.5dlabs.ai",
@@ -107,7 +112,7 @@ const comparisonFeatures = [
       { name: "Fully Managed", free: true, team: true, growth: true, enterprise: true },
       { name: "Self-Hosted Option", free: false, team: false, growth: false, enterprise: true },
       { name: "Dedicated Namespace", free: false, team: false, growth: true, enterprise: true },
-      { name: "Self-Healing (Healer)", free: false, team: false, growth: true, enterprise: true },
+      { name: "Self-Healing Infrastructure", free: false, team: false, growth: true, enterprise: true },
     ],
   },
   {
@@ -140,7 +145,7 @@ const faqs = [
   },
   {
     question: "Can I use my own API keys?",
-    answer: "Yes! BYOK (Bring Your Own Keys) is supported on all tiers. Use your Anthropic, OpenAI, or Google API keys directly. We never see your keys—they're stored encrypted in OpenBao (HashiCorp Vault fork).",
+    answer: "Yes. BYOK (Bring Your Own Keys) is supported on all tiers. Use your Anthropic, OpenAI, or Google API keys directly. We never see your keys. They stay encrypted behind 5D Vault, our managed secrets layer.",
   },
   {
     question: "What does 'Fully Managed' mean?",
@@ -166,7 +171,6 @@ export default function PricingPage() {
       {/* Background layers */}
       <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.06_0.03_260)] z-0" />
       <div className="fixed inset-0 circuit-bg z-0" />
-      <RainEffect />
       <div className="fixed inset-0 noise-overlay z-0" />
 
       {/* Header */}
@@ -490,10 +494,15 @@ export default function PricingPage() {
         {/* Footer */}
         <footer className="py-8 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/5dlabs-logo-header-v2.png" alt="5D Labs" className="h-16 opacity-90" />
-            </div>
+            <a href={homeHref} className="flex items-center gap-2" aria-label="Back to 5D Labs">
+              <Image
+                src="/5dlabs-logo-3d.jpg"
+                alt="5D Labs"
+                width={160}
+                height={40}
+                className="h-10 w-auto opacity-90"
+              />
+            </a>
             <p className="text-sm text-muted-foreground">
               © {new Date().getFullYear()} 5D Labs. Transmitting from the Fifth Dimension.
             </p>

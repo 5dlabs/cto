@@ -1,0 +1,18 @@
+---
+# Cloudflare TunnelBinding — routes agents.5dlabs.ai to linear-bridge
+# All paths on agents.5dlabs.ai route to linear-bridge, which handles
+# dynamic routing by path internally (/webhooks/linear, /runs/:id/callback, etc.)
+#
+# DNS: One CNAME record: agents.5dlabs.ai → <tunnel-id>.cfargotunnel.com (auto-managed by operator)
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: agent-webhooks
+  namespace: bots
+spec:
+  tunnelRef:
+    kind: ClusterTunnel
+    name: cto-main
+  subjects:
+    - hostname: agents.5dlabs.ai
+      target: http://linear-bridge.bots.svc:3100

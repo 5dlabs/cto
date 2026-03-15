@@ -1,8 +1,9 @@
 import { loadConfig } from "./config.js";
 import { createDiscordClient } from "./discord-client.js";
-import { createNatsTap } from "./nats-tap.js";
 import { RoomManager } from "./room-manager.js";
 import { createBridge } from "./bridge.js";
+import { createDiscordElicitationHandler } from "./elicitation-handler.js";
+import { createHttpServer } from "./http-server.js";
 
 const logger = {
   info: (...args: unknown[]) => console.log(`[bridge]`, ...args),
@@ -14,7 +15,8 @@ async function main(): Promise<void> {
   const config = loadConfig();
   logger.info("Starting Discord bridge...");
   logger.info(`  Guild: ${config.guildId}`);
-  logger.info(`  NATS: ${config.natsUrl}`);
+  logger.info(`  HTTP port: ${config.httpPort}`);
+  logger.info(`  Linear bridge: ${config.linearBridgeUrl}`);
   logger.info(`  Inactivity timeout: ${config.inactivityTimeoutMs}ms`);
 
   // 1. Connect to Discord and initialize rooms
@@ -29,12 +31,19 @@ async function main(): Promise<void> {
   // 3. Create the bridge orchestrator
   const bridge = createBridge(config, discord, roomManager, logger);
 
-  // 4. Connect to NATS and start tapping messages
-  const natsTap = await createNatsTap(
-    config.natsUrl,
-    (subject, msg) => bridge.handleMessage(subject, msg),
-    logger,
-  );
+  // 4. Create elicitation handler (uses HTTP for cross-cancel to linear-bridge)
+  const elicitHandler = createDiscordElicitationHandler(discord, config.linearBridgeUrl, logger);
+
+  // 5. Register interaction handler for buttons/select menus
+  discord.onInteraction((interaction) => {
+    elicitHandler.handleInteraction(interaction).catch((err) => {
+      logger.error("Failed to handle interaction:", err);
+    });
+  });
+
+  // 6. Start HTTP notification server
+  const httpServer = createHttpServer(config.httpPort, bridge, elicitHandler, logger);
+  await httpServer.start();
 
   logger.info("Discord bridge is running");
 
@@ -42,7 +51,8 @@ async function main(): Promise<void> {
   const shutdown = async () => {
     logger.info("Shutting down...");
     bridge.stop();
-    await natsTap.close();
+    elicitHandler.destroy();
+    await httpServer.stop();
     discord.destroy();
     process.exit(0);
   };

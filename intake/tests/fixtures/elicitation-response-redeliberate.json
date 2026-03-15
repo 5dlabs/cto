@@ -1,0 +1,9 @@
+{
+  "elicitation_id": "session-123-dp-1",
+  "source": "discord",
+  "response_type": "redeliberate",
+  "selected_option": "",
+  "user_id": "jonathon",
+  "user_context": "I want the committee to reconsider — we may need Kafka's partition guarantees for ordering",
+  "timestamp": "2026-03-05T12:03:00.000Z"
+}

@@ -1,24 +1,24 @@
 "use client";
 
-import { motion } from "framer-motion";
+import type { MouseEvent } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { featureFlags } from "@/config/feature-flags";
 
+const homeHref =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3001"
+    : "https://5dlabs.ai";
+
 const navLinks = [
-  { name: "Team", href: "/#agents" },
   { name: "Stack", href: "/#stack" },
+  { name: "Services", href: "/services" },
   { name: "Infrastructure", href: "/#infrastructure" },
   { name: "Platform", href: "/#platform" },
 ];
 
 const socials = [
-  {
-    name: "5D Labs",
-    href: "https://5dlabs.ai",
-    icon: (
-      <span className="text-[10px] font-bold">5D</span>
-    ),
-  },
   {
     name: "GitHub",
     href: "https://github.com/5dlabs",
@@ -31,18 +31,94 @@ const socials = [
 ];
 
 export function Header() {
+  const pathname = usePathname();
+  const [currentHash, setCurrentHash] = useState("");
+
+  useEffect(() => {
+    const syncHash = () => setCurrentHash(window.location.hash);
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
+
+  const isNavLinkActive = (href: string) => {
+    if (href.startsWith("http")) {
+      return false;
+    }
+    const [targetPath, rawHash] = href.split("#");
+    const normalizedTargetPath = targetPath || "/";
+
+    if (pathname !== normalizedTargetPath) {
+      return false;
+    }
+    if (!rawHash) {
+      return true;
+    }
+
+    return currentHash === `#${rawHash}`;
+  };
+
+  const getNavLinkClassName = (href: string) =>
+    [
+      "px-3 py-1.5 rounded-full text-xs whitespace-nowrap",
+      "transition-all duration-200 ease-out",
+      isNavLinkActive(href)
+        ? "bg-white/[0.14] text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]"
+        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]",
+    ].join(" ");
+
+  const handleNavClick = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
+    const [targetPath, rawHash] = href.split("#");
+    const hash = rawHash ? `#${rawHash}` : "";
+    const normalizedTargetPath = targetPath || "/";
+
+    // Same-page hash navigation can no-op under router transitions.
+    // Force a deterministic in-page scroll so clicks always respond.
+    if (hash && pathname === normalizedTargetPath) {
+      const targetId = rawHash;
+      if (!targetId) {
+        return;
+      }
+      const target = document.getElementById(targetId);
+      if (!target) {
+        return;
+      }
+
+      event.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.history.replaceState(null, "", hash);
+      setCurrentHash(hash);
+      return;
+    }
+
+    // If user taps the page they're already on, scroll to top.
+    if (!hash && pathname === normalizedTargetPath) {
+      event.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   return (
-    <motion.header
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-      className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
-    >
+    <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4">
       <nav className="flex items-center gap-1 px-2 py-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.3)]">
-        {/* Logo */}
+        {/* Brand switcher */}
+        <a
+          href={homeHref}
+          className="flex items-center justify-center h-8 px-3 rounded-full bg-white/[0.03] text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:bg-white/[0.08] transition-colors"
+          aria-label="Back to 5D Labs"
+        >
+          5D Labs
+        </a>
+
+        <div className="w-px h-4 bg-white/[0.08] mx-1" />
+
         <Link
           href="/"
-          className="flex items-center justify-center h-8 px-3 rounded-full bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+          className={`flex items-center justify-center h-8 px-3 rounded-full transition-all duration-200 ease-out ${
+            pathname === "/"
+              ? "bg-white/[0.14] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]"
+              : "bg-white/[0.06] hover:bg-white/[0.1]"
+          }`}
           aria-label="CTO Home"
         >
           <span className="text-xs font-bold text-cyan">CTO</span>
@@ -57,7 +133,8 @@ export function Header() {
             <Link
               key={link.name}
               href={link.href}
-              className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all"
+              onClick={(event) => handleNavClick(event, link.href)}
+              className={getNavLinkClassName(link.href)}
             >
               {link.name}
             </Link>
@@ -65,7 +142,7 @@ export function Header() {
           {featureFlags.showPricingLink && (
             <Link
               href="/pricing"
-              className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all"
+              className={getNavLinkClassName("/pricing")}
             >
               Pricing
             </Link>
@@ -104,6 +181,6 @@ export function Header() {
           </>
         )}
       </nav>
-    </motion.header>
+    </header>
   );
 }

@@ -24,8 +24,8 @@ data:
     agents:
       morgan:
         githubApp: "5DLabs-Morgan"
-        cli: "claude"
-        model: "claude-opus-4-5-20251101"
+        cli: "grok"
+        model: "claude-sonnet-4-20250514"
       rex:
         githubApp: "5DLabs-Rex"
         cli: "claude"
@@ -123,6 +123,6 @@ data:
       deleteConfigMap: true
     
     linear:
-      sidecarImage: {{ .Values.controller.linear.sidecarImage | default "ghcr.io/5dlabs/linear-sidecar:latest" | quote }}
+      sidecarImage: {{ .Values.controller.linear.sidecarImage | default "registry.5dlabs.ai/5dlabs/linear-sidecar:latest" | quote }}
       serviceUrl: {{ .Values.controller.linear.serviceUrl | default "http://pm-server:8080" | quote }}
 {{- end }}

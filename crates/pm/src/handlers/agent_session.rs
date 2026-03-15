@@ -4,6 +4,7 @@
 //! - `created`: New session from @mention or delegation
 //! - `prompted`: User sent a follow-up message to an existing session
 
+use acp_runtime::AcpRunState;
 use axum::http::StatusCode;
 use axum::Json;
 use serde_json::{json, Value};
@@ -248,8 +249,22 @@ pub async fn handle_agent_session_created(
         warn!(error = %e, "Failed to move issue to started state");
     }
 
-    // TODO: Start Argo workflow based on agent type
-    // TODO: Store session-to-workflow mapping
+    state
+        .session_tracker
+        .register(
+            ctx.session_id.clone(),
+            ctx.agent_name().to_string(),
+            ctx.issue_id.clone(),
+            ctx.issue_identifier.clone(),
+        )
+        .await;
+
+    if let Some(selection) = state.acp_registry.select_runtime_for_service("pm", None) {
+        state
+            .session_tracker
+            .set_acp_runtime(&ctx.session_id, selection.runtime_id)
+            .await;
+    }
 
     Ok(Json(json!({
         "status": "accepted",
@@ -302,6 +317,11 @@ pub async fn handle_agent_session_prompted(
         })));
     }
 
+    state
+        .session_tracker
+        .set_acp_run_state(&ctx.session_id, AcpRunState::Running)
+        .await;
+
     Ok(Json(json!({
         "status": "forwarded",
         "session_id": ctx.session_id,
@@ -339,6 +359,10 @@ async fn handle_stop_signal(
 
     // TODO: Signal sidecar to stop the agent
     // This would send POST /stop to the sidecar
+    state
+        .session_tracker
+        .set_acp_run_state(&ctx.session_id, AcpRunState::Cancelled)
+        .await;
 
     Ok(Json(json!({
         "status": "stopped",

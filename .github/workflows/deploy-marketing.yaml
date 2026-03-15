@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'apps/marketing/**'
-  workflow_dispatch: # Allow manual trigger
+      - "apps/marketing/**"
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -23,8 +23,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: apps/marketing/package-lock.json
 
       - name: Install dependencies
@@ -42,5 +42,5 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/marketing
           wranglerVersion: "4"
-          command: pages deploy out --project-name=cto-marketing --commit-dirty=true
+          command: pages deploy out --project-name=cto-marketing --branch=main --commit-dirty=true
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}

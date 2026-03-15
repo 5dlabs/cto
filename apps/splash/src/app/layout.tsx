@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { GridPulse } from "@/components/grid-pulse";
+import { MagneticFilingsBackgroundSwitch } from "@/components/magnetic-filings-background";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -15,14 +18,14 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "5D Labs | OpenClaw-First AI Startup Studio",
+  title: "5D Labs | AI-Native Venture Studio",
   description:
-    "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio. We build and validate multiple ventures in parallel — from agentic trading on Solana, Base, Near, and Sui to CTO, our multi-agent AI engineering platform.",
+    "5D Labs is an AI-native venture studio powered by CTO, our build engine, an internal trading engine, and OpenClaw, our orchestration layer. We use this stack to discover, finance, and ship new ventures.",
   keywords: [
     "5D Labs",
     "OpenClaw",
-    "AI startup studio",
-    "startup studio",
+    "AI venture studio",
+    "venture studio",
     "crypto",
     "Solana",
     "Base",
@@ -50,14 +53,15 @@ export const metadata: Metadata = {
   authors: [{ name: "5D Labs", url: "https://5dlabs.ai" }],
   creator: "5D Labs",
   publisher: "5D Labs",
+  manifest: "/site.webmanifest",
   metadataBase: new URL("https://5dlabs.ai"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "5D Labs | OpenClaw-First AI Startup Studio",
+    title: "5D Labs | AI-Native Venture Studio",
     description:
-      "Build and validate multiple ventures in parallel. OpenClaw-first, crypto-first, AI-first.",
+      "AI-native venture studio powered by CTO, an internal trading engine, and OpenClaw.",
     url: "https://5dlabs.ai",
     siteName: "5D Labs",
     locale: "en_US",
@@ -67,16 +71,16 @@ export const metadata: Metadata = {
         url: "/og-image-v2.jpg",
         width: 1200,
         height: 630,
-        alt: "5D Labs - OpenClaw-First AI Startup Studio",
+        alt: "5D Labs - AI-Native Venture Studio",
         type: "image/jpeg",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "5D Labs | OpenClaw-First AI Startup Studio",
+    title: "5D Labs | AI-Native Venture Studio",
     description:
-      "Build and validate multiple ventures in parallel. OpenClaw-first, crypto-first, AI-first.",
+      "AI-native venture studio powered by CTO, an internal trading engine, and OpenClaw.",
     images: ["/og-image-v2.jpg"],
     creator: "@5dlabs",
   },
@@ -93,10 +97,10 @@ export const metadata: Metadata = {
   },
   other: {
     "ai:description":
-      "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel. Current ventures include CTO (multi-agent AI engineering platform), agentic trading on Solana, Base, Near, and Sui, OpenClaw Platform (open-source Kubernetes-native agent orchestration), and Sanctuary (AI-powered smart home orchestration). Founder Jonathon Fritz is open to technical co-founder, fractional CTO, and senior infrastructure roles — see /opportunities/.",
+      "5D Labs is an AI-native venture studio powered by CTO, our commercial build engine, an in-house trading engine, and OpenClaw, the orchestration layer beneath both. The stack exists to discover, finance, and ship new ventures.",
     "ai:capabilities":
-      "startup-studio, multi-agent-orchestration, agentic-trading, AI-engineering, crypto, DeFi, smart-home, IoT, open-source, kubernetes, gitops, technical-co-founder, fractional-cto, infrastructure-lead",
-    "ai:ventures": "CTO, Agentic Trading, OpenClaw Platform, Sanctuary",
+      "venture-studio, multi-agent-orchestration, internal-trading-infrastructure, AI-engineering, crypto, DeFi, open-source, kubernetes, gitops, technical-co-founder, fractional-cto, infrastructure-lead",
+    "ai:ventures": "CTO, Internal Trading Engine, OpenClaw Platform, Venture Pipeline",
     "ai:opportunities": "https://5dlabs.ai/opportunities/",
   },
 };
@@ -116,7 +120,7 @@ const jsonLd = {
         height: 630,
       },
       description:
-        "OpenClaw-first, crypto-first, AI-first startup studio building and validating multiple ventures in parallel.",
+        "AI-native venture studio powered by CTO, an internal trading engine, and OpenClaw.",
       foundingDate: "2024",
       founder: {
         "@type": "Person",
@@ -135,7 +139,7 @@ const jsonLd = {
         "Multi-Agent Systems",
         "Blockchain Development",
         "Solana",
-        "High-Frequency Trading",
+        "On-Chain Market Infrastructure",
         "Kubernetes",
         "DevOps",
         "OpenClaw",
@@ -147,7 +151,7 @@ const jsonLd = {
       url: "https://5dlabs.ai",
       name: "5D Labs",
       description:
-        "OpenClaw-first, crypto-first, AI-first startup studio",
+        "AI-native venture studio powered by CTO, an internal trading engine, and OpenClaw.",
       publisher: {
         "@id": "https://5dlabs.ai/#organization",
       },
@@ -193,7 +197,7 @@ const jsonLd = {
         "Solana Development",
         "Kubernetes Consulting",
         "DevOps Consulting",
-        "HFT Trading Systems",
+        "Trading Infrastructure Architecture",
         "Platform Engineering",
       ],
       areaServed: {
@@ -246,7 +250,7 @@ const jsonLd = {
           name: "What is 5D Labs?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "5D Labs is an OpenClaw-first, crypto-first, AI-first startup studio that builds and validates multiple ventures in parallel using autonomous AI agents. Current ventures include CTO (multi-agent engineering platform), Agentic Trading (HFT on Solana, Base, Near, Sui), OpenClaw Platform (open-source agent orchestration), and Sanctuary (AI smart home).",
+            text: "5D Labs is an AI-native venture studio powered by an internal operating stack. CTO is the commercial build engine, the internal trading engine helps finance experimentation and provide market intelligence, and OpenClaw is the orchestration layer beneath both. The purpose of the stack is to help 5D Labs discover, validate, and launch new ventures.",
           },
         },
         {
@@ -270,7 +274,7 @@ const jsonLd = {
           name: "What blockchains does 5D Labs support?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "5D Labs operates agentic trading systems across Solana (for raw speed and HFT), Base (for Ethereum-grade composability), Near (for AI-native smart contracts), and Sui (for Move and object-centric DeFi).",
+            text: "5D Labs runs its internal trading systems across Solana (for low-latency execution), Base (for Ethereum-grade composability), Near (for AI-native smart contracts), and Sui (for Move and object-centric DeFi).",
           },
         },
       ],
@@ -293,15 +297,23 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" sizes="32x32" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/site.webmanifest" />
         <meta name="theme-color" content="#06b6d4" />
         <link rel="llms" href="/llms.txt" />
         <link rel="llms-full" href="/llms-full.txt" />
         <meta name="llms-txt" content="/llms.txt" />
+        {/* Keep content declarative: avoid scripts that hide/show nodes post-render. */}
       </head>
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
       >
+        <Script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="da83813e-ccdc-4b94-944a-66f476db85ef"
+          strategy="afterInteractive"
+        />
+        <MagneticFilingsBackgroundSwitch />
+        <GridPulse />
         {children}
       </body>
     </html>

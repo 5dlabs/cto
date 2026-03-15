@@ -6,7 +6,7 @@
 # Based on claude image (has claude CLI, kubectl, gh, jq, etc.)
 # =============================================================================
 
-ARG BASE_IMAGE=ghcr.io/5dlabs/claude:latest
+ARG BASE_IMAGE=registry.5dlabs.ai/5dlabs/claude:latest
 FROM ${BASE_IMAGE}
 
 ARG TZ

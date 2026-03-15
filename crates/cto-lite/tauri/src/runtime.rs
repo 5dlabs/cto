@@ -421,6 +421,89 @@ pub fn wait_for_docker_ready(timeout_secs: u64) -> AppResult<()> {
     }
 }
 
+fn is_homebrew_available() -> bool {
+    which::which("brew").is_ok()
+}
+
+fn brew_install(args: &[&str]) -> AppResult<()> {
+    let output = Command::new("brew")
+        .args(args)
+        .output()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to run brew: {e}")))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if stderr.contains("already installed") {
+        return Ok(());
+    }
+
+    Err(AppError::CommandFailed(format!(
+        "brew {} failed: {}",
+        args.join(" "),
+        stderr.trim()
+    )))
+}
+
+/// Install a supported runtime.
+pub fn install_runtime(runtime: ContainerRuntime) -> AppResult<()> {
+    if !is_homebrew_available() {
+        return Err(AppError::RuntimeNotFound(
+            "Homebrew is required for automatic runtime installation".to_string(),
+        ));
+    }
+
+    match runtime {
+        #[cfg(target_os = "macos")]
+        ContainerRuntime::Docker => brew_install(&["install", "--cask", "docker"]),
+        #[cfg(not(target_os = "macos"))]
+        ContainerRuntime::Docker => Err(AppError::RuntimeNotFound(
+            "Automatic Docker installation is not implemented on this platform".to_string(),
+        )),
+        #[cfg(target_os = "macos")]
+        ContainerRuntime::OrbStack => brew_install(&["install", "--cask", "orbstack"]),
+        #[cfg(not(target_os = "macos"))]
+        ContainerRuntime::OrbStack => Err(AppError::RuntimeNotFound(
+            "Automatic OrbStack installation is only available on macOS".to_string(),
+        )),
+        ContainerRuntime::Colima => brew_install(&["install", "colima", "docker"]),
+        ContainerRuntime::Podman => brew_install(&["install", "podman"]),
+        ContainerRuntime::Nerdctl => brew_install(&["install", "nerdctl"]),
+        ContainerRuntime::Finch => brew_install(&["install", "--cask", "finch"]),
+        ContainerRuntime::RancherDesktop => brew_install(&["install", "--cask", "rancher"]),
+        ContainerRuntime::Lima => brew_install(&["install", "lima"]),
+    }
+}
+
+fn install_default_runtime() -> AppResult<ContainerRuntime> {
+    #[cfg(target_os = "macos")]
+    {
+        install_runtime(ContainerRuntime::Docker)?;
+        return Ok(ContainerRuntime::Docker);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        return Err(AppError::RuntimeNotFound(
+            "Automatic runtime installation is not implemented on Linux yet".to_string(),
+        ));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        return Err(AppError::RuntimeNotFound(
+            "Automatic runtime installation is not implemented on Windows yet".to_string(),
+        ));
+    }
+
+    #[allow(unreachable_code)]
+    Err(AppError::RuntimeNotFound(
+        "Unsupported platform for runtime installation".to_string(),
+    ))
+}
+
 /// Check if runtime provides Docker socket compatibility
 /// This means Kind can use it without KIND_EXPERIMENTAL_PROVIDER
 fn has_docker_compatibility(runtime: ContainerRuntime) -> bool {
@@ -770,10 +853,21 @@ pub fn auto_start_runtime() -> AppResult<Option<ContainerRuntime>> {
         }
     }
 
-    Err(AppError::RuntimeNotFound(
-        "No compatible container runtime found. Please install Docker Desktop, OrbStack, or Colima."
-            .to_string(),
-    ))
+    tracing::info!("No compatible container runtime found, attempting automatic installation...");
+
+    let runtime = install_default_runtime()?;
+    start_runtime(runtime)?;
+
+    if runtime == ContainerRuntime::Docker {
+        tracing::info!("Waiting for Docker daemon after install...");
+        wait_for_docker_ready(120)?;
+    } else if runtime == ContainerRuntime::OrbStack {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+    } else {
+        std::thread::sleep(std::time::Duration::from_secs(8));
+    }
+
+    Ok(Some(runtime))
 }
 
 /// Fully automated runtime detection and startup

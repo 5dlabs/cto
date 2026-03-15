@@ -18,8 +18,8 @@ keywords:
 
 home: https://github.com/moby/buildkit
 sources:
-  - https://github.com/5dlabs/cto
+  - https://git.5dlabs.ai/5dlabs/cto
 
 maintainers:
   - name: 5DLabs
-    url: https://github.com/5dlabs
+    url: https://git.5dlabs.ai/5dlabs

@@ -1,0 +1,14 @@
+---
+apiVersion: twingate.com/v1beta
+kind: TwingateResource
+metadata:
+  name: cto-service-network
+spec:
+  name: CTO Service Network
+  address: 10.43.0.0/16
+  protocols:
+    allowIcmp: true
+    tcp:
+      policy: ALLOW_ALL
+    udp:
+      policy: ALLOW_ALL

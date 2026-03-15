@@ -2,9 +2,9 @@
 [workspace]
 
 [package]
-name = "cto-lite-tauri"
+name = "cto-tauri"
 version = "0.1.0"
-description = "CTO Lite - AI Development Platform for Individual Developers"
+description = "CTO - AI Development Platform for Individual Developers"
 authors = ["5D Labs"]
 license = "AGPL-3.0"
 repository = "https://github.com/5dlabs/cto"
@@ -28,10 +28,12 @@ tokio = { version = "1.49", features = ["full"] }
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+base64 = "0.22"
 
 # Error handling
 anyhow = "1.0"
 thiserror = "2.0"
+async-trait = "0.1"
 
 # Logging
 tracing = "0.1"
@@ -63,6 +65,11 @@ urlencoding = "2.1"
 
 # Directory utilities
 dirs = "6.0"
+
+# ACP-backed Morgan chat bridge
+agent-client-protocol = "0.10.0"
+acp-runtime = { path = "../../acp-runtime" }
+cto-config = { package = "config", path = "../../config" }
 
 [features]
 default = ["custom-protocol"]

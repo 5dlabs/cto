@@ -2,6 +2,8 @@
   {
     "id": 1,
     "title": "Initialize monorepo structure (Bolt - DevOps/Turborepo)",
+    "agent": "bolt",
+    "stack": "DevOps/Turborepo",
     "description": "Set up a Turborepo-based monorepo with shared packages and applications.",
     "status": "done",
     "dependencies": [],
@@ -46,6 +48,8 @@
   {
     "id": 2,
     "title": "Create shared UI component library (Blaze - TypeScript/React)",
+    "agent": "blaze",
+    "stack": "TypeScript/React",
     "description": "Build a design system with reusable React components using Tailwind CSS.",
     "status": "in_progress",
     "dependencies": [1],
@@ -109,6 +113,8 @@
   {
     "id": 3,
     "title": "Set up PostgreSQL with migrations (Rex - Rust/SQLx)",
+    "agent": "rex",
+    "stack": "Rust/SQLx",
     "description": "Configure PostgreSQL database with migration system and connection pooling.",
     "status": "pending",
     "dependencies": [1],
@@ -119,6 +125,8 @@
   {
     "id": 4,
     "title": "Build GraphQL API gateway (Grizz - Go/gqlgen)",
+    "agent": "grizz",
+    "stack": "Go/gqlgen",
     "description": "Implement a GraphQL API gateway that federates multiple backend services.",
     "status": "pending",
     "dependencies": [1, 3],
@@ -171,6 +179,8 @@
   {
     "id": 5,
     "title": "Implement event sourcing system (Rex - Rust/Tokio)",
+    "agent": "rex",
+    "stack": "Rust/Tokio",
     "description": "Build an event store with append-only log and projection rebuilding.",
     "status": "pending",
     "dependencies": [3],
@@ -215,6 +225,8 @@
   {
     "id": 6,
     "title": "Create CLI tool for operations (Grizz - Go/Cobra)",
+    "agent": "grizz",
+    "stack": "Go/Cobra",
     "description": "Build a CLI tool for database management, migrations, and service health checks.",
     "status": "blocked",
     "dependencies": [3, 4],
@@ -238,6 +250,8 @@
   {
     "id": 7,
     "title": "Build real-time notification service (Blaze - TypeScript/WebSocket)",
+    "agent": "blaze",
+    "stack": "TypeScript/WebSocket",
     "description": "WebSocket-based notification service with channel subscriptions and presence.",
     "status": "pending",
     "dependencies": [2, 4],
@@ -301,6 +315,8 @@
   {
     "id": 8,
     "title": "Implement rate limiting middleware (Grizz - Go/Redis)",
+    "agent": "grizz",
+    "stack": "Go/Redis",
     "description": "Token bucket rate limiter with per-user and per-IP limits.",
     "status": "pending",
     "dependencies": [4],
@@ -329,6 +345,8 @@
   {
     "id": 9,
     "title": "Set up observability stack (Bolt - DevOps/Kubernetes)",
+    "agent": "bolt",
+    "stack": "DevOps/Kubernetes",
     "description": "Deploy Prometheus, Grafana, and Loki for metrics, dashboards, and log aggregation.",
     "status": "deferred",
     "dependencies": [1, 4, 7],
@@ -363,6 +381,8 @@
   {
     "id": 10,
     "title": "Write end-to-end test suite (Tess - Testing/Playwright)",
+    "agent": "tess",
+    "stack": "Testing/Playwright",
     "description": "Comprehensive E2E tests covering critical user journeys through the application.",
     "status": "pending",
     "dependencies": [2, 3, 4, 5, 7, 8],

@@ -1,0 +1,112 @@
+# GitLab Runner Helm Chart Values
+# Deployed as a separate ArgoCD application for independent lifecycle management
+# Chart: https://docs.gitlab.com/runner/install/kubernetes.html
+#
+# This runner uses the Kubernetes executor — each CI job runs as its own K8s pod
+
+# GitLab instance URL
+gitlabUrl: https://git.5dlabs.ai
+
+# Runner registration token — injected via ExternalSecrets from OpenBao
+runnerToken:
+  secret: gitlab-runner-token
+  key: runner-registration-token
+
+# Runner configuration
+runners:
+  # Runner name
+  name: "k8s-runner"
+
+  # Tags for job matching
+  tags: "k8s,docker,linux"
+
+  # Run untagged jobs
+  runUntagged: true
+
+  # Privileged mode for Docker-in-Docker builds
+  privileged: true
+
+  # Kubernetes executor configuration
+  config: |
+    [[runners]]
+      name = "k8s-runner"
+      executor = "kubernetes"
+      [runners.kubernetes]
+        namespace = "gitlab-runners"
+        image = "ubuntu:22.04"
+        privileged = true
+        pull_policy = ["if-not-present", "always"]
+
+        # Resource defaults for CI job pods
+        [runners.kubernetes.resource_requests]
+          cpu = "500m"
+          memory = "1Gi"
+        [runners.kubernetes.resource_limits]
+          cpu = "4"
+          memory = "8Gi"
+
+        # DNS configuration for reliable external resolution
+        [runners.kubernetes.dns_config]
+          nameservers = ["1.1.1.1", "8.8.8.8", "1.0.0.1"]
+          searches = ["gitlab-runners.svc.cluster.local", "svc.cluster.local", "cluster.local"]
+          [[runners.kubernetes.dns_config.options]]
+            name = "ndots"
+            value = "2"
+
+        # Docker-in-Docker service for container builds
+        [[runners.kubernetes.services]]
+          name = "docker:24-dind"
+          alias = "docker"
+          command = ["dockerd"]
+
+        # Pod labels for log collection
+        [runners.kubernetes.pod_labels]
+          "platform.5dlabs.io/log-collection" = "enabled"
+
+        [runners.kubernetes.pod_annotations]
+          "logs.platform.5dlabs.io/collect" = "true"
+          "logs.platform.5dlabs.io/service" = "gitlab-runner"
+
+        # Volume mounts for build workspace
+        [[runners.kubernetes.volumes.empty_dir]]
+          name = "work"
+          mount_path = "/builds"
+          medium = ""
+          size_limit = "20Gi"
+
+  # Cache configuration (use MinIO from GitLab or external S3)
+  cache:
+    type: s3
+    shared: true
+    s3:
+      serverAddress: minio.5dlabs.ai
+      bucketName: gitlab-runner-cache
+      insecure: false
+
+# Controller pod resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 512Mi
+
+# Concurrent jobs
+concurrent: 8
+
+# Check interval (seconds)
+checkInterval: 10
+
+# Log level
+logLevel: info
+
+# RBAC
+rbac:
+  create: true
+  clusterWideAccess: false
+
+# Service account
+serviceAccount:
+  create: true
+  name: gitlab-runner

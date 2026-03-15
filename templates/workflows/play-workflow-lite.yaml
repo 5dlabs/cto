@@ -158,7 +158,7 @@ spec:
             valueFrom:
               path: /tmp/outputs/deploy-preview
       container:
-        image: ghcr.io/5dlabs/cto-agent-morgan:latest
+        image: registry.5dlabs.ai/5dlabs/cto-agent-morgan:latest
         command: ["/agent"]
         args:
           - "--mode=intake"
@@ -186,7 +186,7 @@ spec:
           - name: branch
           - name: spec
       container:
-        image: ghcr.io/5dlabs/cto-agent-grizz:latest
+        image: registry.5dlabs.ai/5dlabs/cto-agent-grizz:latest
         command: ["/agent"]
         args:
           - "--mode=implement"
@@ -213,7 +213,7 @@ spec:
           - name: branch
           - name: spec
       container:
-        image: ghcr.io/5dlabs/cto-agent-nova:latest
+        image: registry.5dlabs.ai/5dlabs/cto-agent-nova:latest
         command: ["/agent"]
         args:
           - "--mode=implement"
@@ -240,7 +240,7 @@ spec:
           - name: branch
           - name: spec
       container:
-        image: ghcr.io/5dlabs/cto-agent-blaze:latest
+        image: registry.5dlabs.ai/5dlabs/cto-agent-blaze:latest
         command: ["/agent"]
         args:
           - "--mode=implement"
@@ -266,7 +266,7 @@ spec:
           - name: repo
           - name: branch
       container:
-        image: ghcr.io/5dlabs/cto-agent-tess:latest
+        image: registry.5dlabs.ai/5dlabs/cto-agent-tess:latest
         command: ["/agent"]
         args:
           - "--mode=test"
@@ -292,7 +292,7 @@ spec:
           - name: branch
           - name: pr-number
       container:
-        image: ghcr.io/5dlabs/cto-agent-cleo:latest
+        image: registry.5dlabs.ai/5dlabs/cto-agent-cleo:latest
         command: ["/agent"]
         args:
           - "--mode=review"
@@ -318,7 +318,7 @@ spec:
           - name: repo
           - name: branch
       container:
-        image: ghcr.io/5dlabs/cto-agent-cipher:latest
+        image: registry.5dlabs.ai/5dlabs/cto-agent-cipher:latest
         command: ["/agent"]
         args:
           - "--mode=scan"
@@ -343,7 +343,7 @@ spec:
           - name: repo
           - name: branch
       container:
-        image: ghcr.io/5dlabs/cto-agent-bolt:latest
+        image: registry.5dlabs.ai/5dlabs/cto-agent-bolt:latest
         command: ["/agent"]
         args:
           - "--mode=preview"
