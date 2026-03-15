@@ -65,7 +65,7 @@ tracing-opentelemetry = "0.31.0"
 
 # CLI
 clap = { version = "4.5", features = ["derive", "env", "cargo"] }
-dialoguer = "0.11"
+dialoguer = "0.12"
 indicatif = "0.18"
 colored = "3.1.1"
 
