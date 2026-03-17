@@ -27,6 +27,7 @@ agent:
     every: "5m"
     target: "last"
     ackMaxChars: 200
+    model: "anthropic/claude-haiku-4-5-20251001"
     prompt: >-
       Check the temporal-arb process health. Follow HEARTBEAT.md instructions exactly.
   sandbox: "off"
