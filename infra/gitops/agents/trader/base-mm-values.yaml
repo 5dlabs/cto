@@ -29,7 +29,7 @@ modelDefaults:
 workspace:
   repos:
     - name: cto
-      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      url: "https://github.com/5dlabs/cto"
       branch: "main"
       path: "repos/cto"
   files:
