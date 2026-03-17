@@ -1,0 +1,85 @@
+# =============================================================================
+# Base values for Market Maker trading agents (Mode A — agent-supervised process)
+# =============================================================================
+# Agent starts the MM process, monitors inventory and P&L via mm-state.json.
+# Latency-sensitive — continuous quoting, agent supervises.
+# =============================================================================
+---
+namespace: trading
+
+agent:
+  id: ""  # Override per variant
+  name: ""  # Override per variant
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "5m"
+    prompt: >-
+      Check market-maker process health. See HEARTBEAT.md for instructions.
+  sandbox: "off"
+
+agentDefaults:
+  thinkingDefault: "low"
+  typingMode: "instant"
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-20250514"
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    HEARTBEAT.md: |
+      # Heartbeat Instructions — Market Maker Agent
+
+      On first heartbeat:
+      1. `cd /workspace/repos/cto/skills/trader/polymarket-mm`
+      2. Start: `node index.js` as a background process
+      3. Verify process started (check mm-state.json updates)
+
+      On subsequent heartbeats:
+      1. Check if the background process is still running
+      2. Read mm-state.json for inventory, P&L, cycle count
+      3. If process died, restart it
+      4. If inventory is getting imbalanced, log a warning
+
+      Reply HEARTBEAT_OK if everything is healthy.
+
+extraEnv: []  # Override per variant
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  acp:
+    enabled: false
+  exec:
+    backgroundMs: 300000
+    notifyOnExit: true
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+storage:
+  size: 2Gi
+
+discord:
+  enabled: false
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+
+telemetry:
+  enabled: true

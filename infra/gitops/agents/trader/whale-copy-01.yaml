@@ -1,0 +1,174 @@
+---
+# =============================================================================
+# Trading Agent: Whale Copy — 01
+# =============================================================================
+# Mode B agent: LLM evaluates whale positions before mirroring.
+# Mirrors positions from high-performing Polymarket whale wallets.
+
+replicaCount: 1
+deploymentMode: statefulset
+
+global:
+  namespace: trading
+  createNamespace: false
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+agent:
+  id: "trader-whale-copy-01"
+  name: "Trader: Whale Copy (01)"
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "5m"
+    target: "last"
+    ackMaxChars: 200
+    prompt: >-
+      Run the whale copytrading scan. Follow HEARTBEAT.md instructions exactly.
+  sandbox: "off"
+  skipGlobalSkills: true
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-6"
+
+secrets:
+  external:
+    apiKeysSecret: "trading-api-keys"
+    githubSecret: "trading-github"
+
+messaging:
+  discord:
+    enabled: false
+
+models:
+  providers:
+    anthropic:
+      enabled: true
+      apiKeySecretKey: "ANTHROPIC_API_KEY"
+    openai:
+      enabled: false
+    minimax:
+      enabled: false
+
+memorySearch:
+  enabled: false
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    AGENTS.md: |
+      # Trading Agent: Whale Copy (01)
+
+      You are an autonomous trading agent running the Whale Copytrading strategy.
+      Your strategy code lives at /workspace/repos/cto/skills/trader/polymarket-copytrading/
+
+      ## Strategy Overview
+      You monitor high-performing Polymarket whale wallets via the Dome API,
+      evaluate their positions using your own reasoning, and selectively mirror
+      the ones that align with your analysis.
+
+      ## Your Configuration
+      - **Wallets tracked:** 6 verified high-performers
+      - **Max per position:** $5 USD
+      - **Max trades per run:** 5
+      - **Mode:** Buy-only (accumulate, don't sell)
+
+      ## Operating Mode
+      Mode B — you run the scan, evaluate whale positions with LLM reasoning,
+      then decide which to mirror.
+
+      ## Operating Rules
+      - Use --scan-only to get whale positions as JSON
+      - Evaluate each position: Is the whale's thesis sound? Is the market liquid?
+      - Only mirror positions where you have independent conviction
+      - Skip positions where multiple whales disagree
+
+    HEARTBEAT.md: |
+      # Heartbeat Instructions
+
+      1. cd /workspace/repos/cto/skills/trader/polymarket-copytrading
+      2. Run: python3 copytrading_trader.py --scan-only
+      3. Parse the JSON output
+      4. For each whale position, evaluate:
+         - Is the whale's track record strong?
+         - Does the market have sufficient liquidity?
+         - Do you independently agree with the direction?
+      5. For approved positions:
+         python3 copytrading_trader.py --live --wallets <wallet>
+      6. Report scan results and decisions
+
+    IDENTITY.md: |
+      - **Name:** Trader: Whale Copy (01)
+      - **Role:** Autonomous trading agent — whale position mirroring
+      - **Model:** Claude Haiku 4.5
+      - **Strategy:** Mode B (LLM-evaluated whale signals)
+
+storage:
+  size: 2Gi
+  storageClass: "gp3"
+
+extraEnv:
+  - name: SIMMER_COPYTRADING_MAX_USD
+    value: "5"
+  - name: SIMMER_COPYTRADING_MAX_TRADES
+    value: "5"
+  - name: STRATEGY_ID
+    value: "whale-copy-01"
+  - name: SIMMER_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: simmer-api-key
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  subchart:
+    enabled: false
+  role: "trader"
+  roster: []
+
+plugins:
+  nats-messenger:
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  profile: "minimal"
+  acp:
+    enabled: false
+  exec:
+    host: "gateway"
+    security: "full"
+    backgroundMs: 300000
+    notifyOnExit: true
+
+toolsServer:
+  enabled: false
+
+ssh:
+  enabled: false
+
+gateway:
+  controlUi:
+    enabled: false
+  http:
+    endpoints:
+      chatCompletions:
+        enabled: false
+      responses:
+        enabled: false

@@ -26,6 +26,7 @@ Usage:
 import os
 import sys
 import json
+import time
 import argparse
 from typing import Optional
 from datetime import datetime
@@ -540,9 +541,25 @@ def main():
         help="Set config value (e.g., --set wallets=0x123,0x456 --set max_usd=100)"
     )
     parser.add_argument(
+        "--scan-only",
+        action="store_true",
+        help="Output whale positions as JSON to stdout for agent/LLM evaluation, then exit"
+    )
+    parser.add_argument(
         "--quiet", "-q",
         action="store_true",
         help="Only output on trades/errors"
+    )
+    parser.add_argument(
+        "--loop",
+        action="store_true",
+        help="Run continuously in a loop (default interval: 300s)"
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=300,
+        help="Seconds between scans in loop mode (default: 300)"
     )
 
     args = parser.parse_args()
@@ -586,6 +603,24 @@ def main():
         show_positions()
         return
 
+    # Scan-only: output whale positions as JSON for agent LLM evaluation
+    if args.scan_only:
+        wallets = [w.strip() for w in (args.wallets or COPYTRADING_WALLETS).split(",") if w.strip()]
+        top_n = args.top_n
+        if top_n is None and COPYTRADING_TOP_N:
+            top_n = int(COPYTRADING_TOP_N)
+        venue = args.venue or _config.get("venue") or None
+        try:
+            result = execute_copytrading(
+                wallets, top_n, args.max_usd or COPYTRADING_MAX_USD,
+                dry_run=True, buy_only=True, detect_whale_exits=False,
+                max_trades=MAX_TRADES_PER_RUN, venue=venue,
+            )
+            print(json.dumps(result))
+        except Exception as e:
+            print(json.dumps({"error": str(e)}))
+        return
+
     # Default to dry-run unless --live is explicitly passed
     dry_run = not args.live
 
@@ -609,20 +644,50 @@ def main():
     # Determine venue: CLI flag > config.json > TRADING_VENUE env var > None (server auto-detect)
     venue = args.venue or _config.get("venue") or None
 
-    # Run copytrading
-    run_copytrading(
+    # Common kwargs for run_copytrading
+    ct_kwargs = dict(
         wallets=wallets,
         top_n=top_n,
         max_usd=max_usd,
         dry_run=dry_run,
-        buy_only=not args.rebalance,  # Default buy_only=True, --rebalance sets it to False
+        buy_only=not args.rebalance,
         detect_whale_exits=args.whale_exits,
-        venue=venue
+        venue=venue,
     )
 
-    # Fallback report for automaton if the strategy returned early (no signal)
-    if os.environ.get("AUTOMATON_MANAGED") and not _automaton_reported:
-        print(json.dumps({"automaton": {"signals": 0, "trades_attempted": 0, "trades_executed": 0, "skip_reason": "no_signal"}}))
+    if args.loop:
+        print(f"\n[Loop mode] Scanning every {args.interval}s. Press Ctrl+C to stop.\n")
+        cycle = 0
+        status_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "status.json")
+        while True:
+            cycle += 1
+            print(f"\n{'='*50}")
+            print(f"[Loop] Cycle {cycle} — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            try:
+                run_copytrading(**ct_kwargs)
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                print(f"\n[Loop] Error in cycle {cycle}: {e}")
+            # Write heartbeat for dashboard
+            try:
+                with open(status_file, "w") as f:
+                    json.dump({"cycle": cycle, "updatedAt": datetime.now().isoformat()}, f)
+            except Exception:
+                pass
+            print(f"\n[Loop] Sleeping {args.interval}s until next scan...")
+            try:
+                time.sleep(args.interval)
+            except KeyboardInterrupt:
+                print("\n\nStopped by user.")
+                break
+    else:
+        # Single run
+        run_copytrading(**ct_kwargs)
+
+        # Fallback report for automaton if the strategy returned early (no signal)
+        if os.environ.get("AUTOMATON_MANAGED") and not _automaton_reported:
+            print(json.dumps({"automaton": {"signals": 0, "trades_attempted": 0, "trades_executed": 0, "skip_reason": "no_signal"}}))
 
 
 if __name__ == "__main__":

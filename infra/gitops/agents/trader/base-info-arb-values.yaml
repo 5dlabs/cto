@@ -1,0 +1,107 @@
+# =============================================================================
+# Base values for Info Arb trading agents (Mode B — LLM in the loop)
+# =============================================================================
+# The agent runs the scan pipeline per heartbeat, reads raw signals,
+# applies LLM reasoning to evaluate each signal, then decides whether to execute.
+#
+# Per-variant values files override extraEnv for topic focus, thresholds, sizing.
+# =============================================================================
+---
+namespace: trading
+
+agent:
+  id: ""  # Override per variant
+  name: ""  # Override per variant
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "2m"
+    prompt: >-
+      Run the info-arb scan pipeline. See HEARTBEAT.md for full instructions.
+  sandbox: "off"
+
+agentDefaults:
+  thinkingDefault: "low"
+  typingMode: "instant"
+  compaction:
+    mode: "safeguard"
+    reserveTokensFloor: 10000
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-20250514"
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    HEARTBEAT.md: |
+      # Heartbeat Instructions — Info Arb Agent
+
+      Every heartbeat cycle:
+
+      1. `cd /workspace/repos/cto/skills/trader/grok-info-arb`
+      2. Run: `node index.js --once --signals-only`
+      3. Parse the JSON signal array from stdout
+      4. For each signal, evaluate using TRADING-DECISION.md framework
+      5. For approved signals: `node index.js --execute-signal '<signal_json>'`
+      6. Log decisions and outcomes to memory
+
+      If the scan returns 0 signals, reply HEARTBEAT_OK.
+      If the scan fails (exit code != 0), report the error.
+    TRADING-DECISION.md: |
+      # Trade Decision Framework
+
+      Before executing any signal, evaluate:
+
+      1. **Information Quality**: Is this genuinely new information? Or stale/speculative/rumor?
+      2. **Source Assessment**: Verified account? High engagement? Known analyst vs random account?
+      3. **Market Context**: Current odds suggest what consensus? Is this signal contrarian or confirming?
+      4. **Risk/Reward**: Is the edge large enough after fees? Kelly sizing appropriate?
+      5. **Correlation**: Does this overlap with existing positions? Would this create concentration risk?
+
+      Respond with one of:
+      - EXECUTE {amount} — proceed with the signal as-is or with adjusted amount
+      - REDUCE {amount} {reason} — execute with reduced size
+      - SKIP {reason} — do not execute this signal
+
+extraEnv: []  # Override per variant
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  acp:
+    enabled: false
+  exec:
+    backgroundMs: 300000
+    notifyOnExit: true
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+storage:
+  size: 2Gi
+
+discord:
+  enabled: false
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  extraSubjects:
+    - "trader.status.>"
+    - "trader.trades.>"
+
+telemetry:
+  enabled: true

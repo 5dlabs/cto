@@ -1,0 +1,46 @@
+{
+  "info-arb": {
+    "base": "base-info-arb-values.yaml",
+    "variants": {
+      "topics_focus": ["geopolitics", "tech", "crypto", "economics", "war"],
+      "min_confidence": [0.15, 0.25, 0.35],
+      "max_position_usd": [10, 25, 50],
+      "bankroll": [100, 250, 500]
+    },
+    "curated": true,
+    "notes": "Full cartesian = 225 variants. Use curated subset of ~10-15."
+  },
+  "temporal-arb": {
+    "base": "base-temporal-arb-values.yaml",
+    "variants": {
+      "momentum_threshold_pct": [0.02, 0.03, 0.05, 0.08],
+      "max_position_usd": [2, 5, 10],
+      "kelly_cap": [0.15, 0.25, 0.40]
+    },
+    "notes": "Full cartesian = 36 variants. Use curated subset of ~6-8."
+  },
+  "mm": {
+    "base": "base-mm-values.yaml",
+    "variants": {
+      "spread": [0.03, 0.04, 0.06],
+      "quote_size": [1.0, 2.0, 5.0],
+      "max_inventory": [5, 10, 20]
+    },
+    "notes": "Full cartesian = 27 variants. Use curated subset of ~4-6."
+  },
+  "whale-copy": {
+    "base": "base-whale-copy-values.yaml",
+    "variants": {
+      "max_usd": [10, 25, 50],
+      "top_n": [5, 10, 20]
+    },
+    "notes": "Small matrix — 9 variants total."
+  },
+  "solana-copy": {
+    "base": "base-solana-copy-values.yaml",
+    "variants": {
+      "max_sol": [0.1, 0.25, 0.5]
+    },
+    "notes": "Minimal variants — 3 total."
+  }
+}
