@@ -123,11 +123,6 @@ extraEnv:
     value: "true"
   - name: STRATEGY_ID
     value: "mm-wide-spread"
-  - name: SIMMER_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: trader-api-keys
-        key: simmer-api-key
 
 nats:
   enabled: true

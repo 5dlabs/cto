@@ -124,11 +124,6 @@ extraEnv:
     value: "5"
   - name: STRATEGY_ID
     value: "whale-copy-01"
-  - name: SIMMER_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: trader-api-keys
-        key: simmer-api-key
 
 nats:
   enabled: true
