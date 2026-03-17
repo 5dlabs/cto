@@ -116,6 +116,11 @@ storage:
 extraEnv:
   - name: STRATEGY_ID
     value: "solana-copy-01"
+  - name: HELIUS_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: helius-api-key
 
 nats:
   enabled: true

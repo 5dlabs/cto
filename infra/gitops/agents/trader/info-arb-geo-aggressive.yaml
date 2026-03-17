@@ -179,6 +179,11 @@ extraEnv:
       secretKeyRef:
         name: trader-api-keys
         key: grok-api-key
+  - name: SIMMER_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: simmer-api-key
   - name: GEMINI_API_KEY
     valueFrom:
       secretKeyRef:
