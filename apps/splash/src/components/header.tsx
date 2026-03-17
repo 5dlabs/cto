@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import type { MouseEvent } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 
 const navLinks = [
@@ -51,8 +53,75 @@ const socials = [
 ];
 
 export function Header() {
+  const pathname = usePathname();
   const { scrollY } = useScroll();
   const [hidden, setHidden] = useState(false);
+  const [currentHash, setCurrentHash] = useState("");
+
+  useEffect(() => {
+    const syncHash = () => setCurrentHash(window.location.hash);
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
+
+  const isNavLinkActive = (href: string) => {
+    if (href.startsWith("http")) {
+      return false;
+    }
+    const [targetPath, rawHash] = href.split("#");
+    const normalizedTargetPath = targetPath || "/";
+
+    if (pathname !== normalizedTargetPath) {
+      return false;
+    }
+    if (!rawHash) {
+      return true;
+    }
+
+    return currentHash === `#${rawHash}`;
+  };
+
+  const getNavLinkClassName = (href: string) =>
+    [
+      "px-3 py-1.5 rounded-full text-xs whitespace-nowrap",
+      "transition-all duration-200 ease-out",
+      isNavLinkActive(href)
+        ? "bg-white/[0.14] text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]"
+        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]",
+    ].join(" ");
+
+  const handleNavClick = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith("http")) {
+      return;
+    }
+
+    const [targetPath, rawHash] = href.split("#");
+    const hash = rawHash ? `#${rawHash}` : "";
+    const normalizedTargetPath = targetPath || "/";
+
+    if (hash && pathname === normalizedTargetPath) {
+      const targetId = rawHash;
+      if (!targetId) {
+        return;
+      }
+      const target = document.getElementById(targetId);
+      if (!target) {
+        return;
+      }
+
+      event.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.history.replaceState(null, "", hash);
+      setCurrentHash(hash);
+      return;
+    }
+
+    if (!hash && pathname === normalizedTargetPath) {
+      event.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   useMotionValueEvent(scrollY, "change", (current) => {
     const previous = scrollY.getPrevious() ?? 0;
@@ -74,7 +143,11 @@ export function Header() {
         {/* Logo */}
         <Link
           href="/"
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+          className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 ease-out ${
+            pathname === "/"
+              ? "bg-white/[0.14] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]"
+              : "bg-white/[0.06] hover:bg-white/[0.1]"
+          }`}
           aria-label="Home"
         >
           <span className="text-xs font-bold text-cyan">5D</span>
@@ -89,7 +162,7 @@ export function Header() {
             <a
               key={link.name}
               href={link.href}
-              className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all whitespace-nowrap"
+              className={getNavLinkClassName(link.href)}
             >
               {link.name}
             </a>
@@ -98,7 +171,8 @@ export function Header() {
               key={link.name}
               href={link.href}
               prefetch={false}
-              className="px-3 py-1.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all whitespace-nowrap"
+              onClick={(event) => handleNavClick(event, link.href)}
+              className={getNavLinkClassName(link.href)}
             >
               {link.name}
             </Link>
