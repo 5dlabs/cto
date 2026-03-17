@@ -128,6 +128,11 @@ extraEnv:
     value: "0.25"
   - name: STRATEGY_ID
     value: "temporal-btc-low"
+  - name: SIMMER_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: simmer-api-key
 
 nats:
   enabled: true
