@@ -68,7 +68,7 @@ spec:
       #   1. openclaw-platform chart (the Helm chart)
       #   2. CTO repo (agent-specific values files)
       sources:
-        - repoURL: https://git.5dlabs.ai/5dlabs/openclaw-platform.git
+        - repoURL: https://github.com/5dlabs/openclaw-platform
           targetRevision: main
           path: charts/openclaw
           helm:
@@ -76,7 +76,7 @@ spec:
             valueFiles:
               - $cto/infra/gitops/agents/trader/{{ .name }}.yaml
 
-        - repoURL: https://git.5dlabs.ai/5dlabs/cto.git
+        - repoURL: https://github.com/5dlabs/cto
           targetRevision: main
           ref: cto
 
