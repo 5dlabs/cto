@@ -1,0 +1,160 @@
+---
+# =============================================================================
+# Trading Agent: Solana Copy — 01
+# =============================================================================
+# Mode A agent: starts the Solana copy trader process, monitors via paper-summary.json.
+# Copies whale trades on Solana DEXes (Raydium, Pump.fun).
+
+replicaCount: 1
+deploymentMode: statefulset
+
+global:
+  namespace: trading
+  createNamespace: false
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+agent:
+  id: "trader-solana-copy-01"
+  name: "Trader: Solana Copy (01)"
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "5m"
+    target: "last"
+    ackMaxChars: 200
+    prompt: >-
+      Check the Solana copy trader process health. Follow HEARTBEAT.md instructions exactly.
+  sandbox: "off"
+  skipGlobalSkills: true
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-6"
+
+secrets:
+  external:
+    apiKeysSecret: "trading-api-keys"
+    githubSecret: "trading-github"
+
+messaging:
+  discord:
+    enabled: false
+
+models:
+  providers:
+    anthropic:
+      enabled: true
+      apiKeySecretKey: "ANTHROPIC_API_KEY"
+    openai:
+      enabled: false
+    minimax:
+      enabled: false
+
+memorySearch:
+  enabled: false
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    AGENTS.md: |
+      # Trading Agent: Solana Copy (01)
+
+      You are an autonomous trading agent running the Solana Copy Trading strategy.
+      Your strategy code lives at /workspace/repos/cto/skills/trader/solana-copy-trader/scripts/
+
+      ## Strategy Overview
+      You monitor whale wallets on Solana and copy their trades via Jupiter DEX.
+      Paper mode by default — tracks whale transactions and simulates trades.
+
+      ## Your Configuration
+      - **Mode:** Paper trading (copy mode with simulated execution)
+      - **Per-trade size:** 0.01 SOL
+      - **Max open positions:** 3
+      - **Take-profit:** 50%
+      - **Stop-loss:** 20%
+
+      ## Operating Mode
+      Mode A — start and monitor background process.
+      The copy trader runs in paper mode and logs to paper-summary.json.
+
+    HEARTBEAT.md: |
+      # Heartbeat Instructions
+
+      1. Read /workspace/repos/cto/skills/trader/solana-copy-trader/scripts/logs/paper-summary.json
+      2. If stale (>5 min old), start the process:
+         cd /workspace/repos/cto/skills/trader/solana-copy-trader/scripts
+         node index.js copy &
+      3. Report: open positions, total trades, P&L, win rate
+      4. Check for any errors in the process output
+
+    IDENTITY.md: |
+      - **Name:** Trader: Solana Copy (01)
+      - **Role:** Autonomous trading agent — Solana whale copy trading
+      - **Model:** Claude Haiku 4.5
+      - **Strategy:** Mode A (agent-supervised process)
+
+storage:
+  size: 2Gi
+  storageClass: "gp3"
+
+extraEnv:
+  - name: STRATEGY_ID
+    value: "solana-copy-01"
+  - name: HELIUS_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: helius-api-key
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  subchart:
+    enabled: false
+  role: "trader"
+  roster: []
+
+plugins:
+  nats-messenger:
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  profile: "minimal"
+  acp:
+    enabled: false
+  exec:
+    host: "gateway"
+    security: "full"
+    backgroundMs: 300000
+    notifyOnExit: true
+
+toolsServer:
+  enabled: false
+
+ssh:
+  enabled: false
+
+gateway:
+  controlUi:
+    enabled: false
+  http:
+    endpoints:
+      chatCompletions:
+        enabled: false
+      responses:
+        enabled: false

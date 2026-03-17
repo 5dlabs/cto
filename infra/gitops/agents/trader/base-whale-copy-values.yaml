@@ -1,0 +1,85 @@
+# =============================================================================
+# Base values for Whale Copy trading agents (Mode B — LLM evaluates whale signals)
+# =============================================================================
+# Agent runs the copytrading scan per heartbeat, evaluates whale positions
+# via LLM reasoning, then decides which to mirror.
+# =============================================================================
+---
+namespace: trading
+
+agent:
+  id: ""  # Override per variant
+  name: ""  # Override per variant
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "5m"
+    prompt: >-
+      Run whale copy scan. See HEARTBEAT.md for instructions.
+  sandbox: "off"
+
+agentDefaults:
+  thinkingDefault: "low"
+  typingMode: "instant"
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-20250514"
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    HEARTBEAT.md: |
+      # Heartbeat Instructions — Whale Copy Agent
+
+      Every heartbeat cycle:
+
+      1. `cd /workspace/repos/cto/skills/trader/polymarket-copytrading`
+      2. Run: `python3 copytrading_trader.py --scan-only`
+      3. Parse the JSON output for whale positions
+      4. For each position, evaluate:
+         - Is this whale historically profitable?
+         - Does the position align with current market conditions?
+         - Is the position size appropriate for our bankroll?
+      5. For approved positions, execute via the copytrading script
+
+      Reply HEARTBEAT_OK if scan completed (even if 0 matches).
+
+extraEnv: []  # Override per variant
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  acp:
+    enabled: false
+  exec:
+    backgroundMs: 300000
+    notifyOnExit: true
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+storage:
+  size: 2Gi
+
+discord:
+  enabled: false
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+
+telemetry:
+  enabled: true

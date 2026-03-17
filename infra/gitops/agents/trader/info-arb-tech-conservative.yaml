@@ -1,0 +1,224 @@
+---
+# =============================================================================
+# Trading Agent: Info Arb — Technology, Conservative
+# =============================================================================
+# Mode B agent: LLM evaluates each signal before execution.
+# Scans X/Grok for tech industry news, matches to Polymarket markets.
+
+replicaCount: 1
+deploymentMode: statefulset
+
+global:
+  namespace: trading
+  createNamespace: false
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+agent:
+  id: "trader-info-arb-tech-conservative"
+  name: "Trader: Info Arb (Tech, Conservative)"
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "3m"
+    target: "last"
+    ackMaxChars: 200
+    prompt: >-
+      Run the info-arb scan pipeline. Follow HEARTBEAT.md instructions exactly.
+  sandbox: "off"
+  skipGlobalSkills: true
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-6"
+
+secrets:
+  external:
+    apiKeysSecret: "trading-api-keys"
+    githubSecret: "trading-github"
+
+messaging:
+  discord:
+    enabled: false
+
+models:
+  providers:
+    anthropic:
+      enabled: true
+      apiKeySecretKey: "ANTHROPIC_API_KEY"
+    openai:
+      enabled: false
+    minimax:
+      enabled: false
+
+memorySearch:
+  enabled: false
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    AGENTS.md: |
+      # Trading Agent: Info Arb (Technology, Conservative)
+
+      You are an autonomous trading agent running the Information Arbitrage strategy.
+      Your strategy code lives at /workspace/repos/cto/skills/trader/grok-info-arb/
+
+      ## Strategy Overview
+      You scan X/Grok for breaking news, match it to Polymarket prediction markets,
+      and trade on information asymmetry before the market adjusts.
+
+      ## Your Specialty
+      **Technology, AI, antitrust, and big tech regulation.**
+      Topics: AI regulation, tech antitrust, Apple, Google, Meta, NVIDIA, semiconductors, tariffs on tech.
+
+      ## Your Risk Profile
+      **Conservative** — smaller position sizes, higher confidence thresholds.
+      You wait for high-quality, verified signals before acting.
+
+      ## Operating Rules
+      - You are a Mode B agent: you run the scan pipeline, then evaluate each signal
+        with your own reasoning before deciding to execute.
+      - Never execute a signal you haven't evaluated against the TRADING-DECISION.md framework.
+      - Publish status to NATS after every heartbeat cycle.
+      - Log all decisions (EXECUTE/SKIP) with reasoning.
+
+    HEARTBEAT.md: |
+      # Heartbeat Instructions
+
+      Every heartbeat cycle, execute these steps:
+
+      1. cd /workspace/repos/cto/skills/trader/grok-info-arb
+      2. Run: node index.js --once --signals-only
+      3. Parse the JSON signal array from stdout
+      4. For each signal, evaluate using the TRADING-DECISION.md framework
+      5. For approved signals, execute:
+         node index.js --execute-signal '<signal_json>'
+      6. Write a brief status summary to stdout
+      7. Log all decisions with reasoning
+
+      If no signals are generated, report "No signals" and wait for next heartbeat.
+
+    TRADING-DECISION.md: |
+      # Trade Decision Framework
+
+      Before executing any signal, evaluate these dimensions:
+
+      ## 1. Information Quality
+      - Is this genuinely new information? Or stale/recycled?
+      - Is the source reporting firsthand or amplifying others?
+      - Could this be misinformation or a rumor?
+
+      ## 2. Source Assessment
+      - Verified account? Known journalist/analyst?
+      - Historical accuracy of this source?
+      - Engagement level?
+
+      ## 3. Market Context
+      - What do current odds imply about consensus?
+      - Is this signal contrarian? If so, why are you right?
+      - How liquid is the market?
+
+      ## 4. Risk/Reward
+      - What is the edge after fees?
+      - Is Kelly sizing appropriate?
+
+      ## 5. Correlation
+      - Does this overlap with existing positions?
+
+      ## Decision Output
+      - EXECUTE {amount}
+      - REDUCE {amount} {reason}
+      - SKIP {reason}
+
+    IDENTITY.md: |
+      - **Name:** Trader: Info Arb (Tech, Conservative)
+      - **Role:** Autonomous trading agent — technology information arbitrage
+      - **Model:** Claude Haiku 4.5
+      - **Strategy:** Mode B (LLM-evaluated signals)
+
+storage:
+  size: 2Gi
+  storageClass: "gp3"
+
+extraEnv:
+  - name: INFO_ARB_MIN_CONFIDENCE
+    value: "0.35"
+  - name: INFO_ARB_MAX_USD
+    value: "25"
+  - name: INFO_ARB_BANKROLL
+    value: "250"
+  - name: INFO_ARB_MIN_CREDIBILITY
+    value: "40"
+  - name: INFO_ARB_MIN_RELEVANCE
+    value: "0.40"
+  - name: INFO_ARB_TOPICS
+    value: "AI regulation,tech antitrust,Apple,Google,Meta,NVIDIA,semiconductors,tariffs"
+  - name: STRATEGY_ID
+    value: "info-arb-tech-conservative"
+  - name: GROK_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: grok-api-key
+  - name: SIMMER_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: simmer-api-key
+  - name: GEMINI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: gemini-api-key
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  subchart:
+    enabled: false
+  role: "trader"
+  roster: []
+
+plugins:
+  nats-messenger:
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  profile: "minimal"
+  acp:
+    enabled: false
+  exec:
+    host: "gateway"
+    security: "full"
+    backgroundMs: 300000
+    notifyOnExit: true
+
+toolsServer:
+  enabled: false
+
+ssh:
+  enabled: false
+
+gateway:
+  controlUi:
+    enabled: false
+  http:
+    endpoints:
+      chatCompletions:
+        enabled: false
+      responses:
+        enabled: false

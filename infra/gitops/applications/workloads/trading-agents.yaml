@@ -1,0 +1,100 @@
+---
+# =============================================================================
+# CTO Trading Agents — ArgoCD ApplicationSet
+# =============================================================================
+# Deploys autonomous trading agents as OpenClaw instances in the trading namespace.
+# Each agent runs a specific strategy variant with AI model reasoning.
+#
+# Strategy types:
+#   - info-arb:      Mode B — LLM evaluates Grok/X news signals before trading
+#   - temporal-arb:  Mode A — agent supervises CEX-to-Polymarket latency arb process
+#   - mm:            Mode A — agent supervises market maker process
+#   - whale-copy:    Mode B — LLM evaluates whale positions before mirroring
+#   - solana-copy:   Mode A — agent supervises Solana copy trader process
+#
+# Chart:   5dlabs/openclaw-platform → charts/openclaw
+# Values:  5dlabs/cto → infra/gitops/agents/trader/{name}.yaml
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cto-trading-agents
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: cto-trading-agents
+    app.kubernetes.io/part-of: cto-platform
+    app.kubernetes.io/component: trading
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=zero"]
+
+  generators:
+    - list:
+        elements:
+          # Info Arb variants (Mode B — LLM in the loop)
+          - name: info-arb-geo-aggressive
+          - name: info-arb-tech-conservative
+
+          # Temporal Arb variants (Mode A — supervised process)
+          - name: temporal-btc-low
+          - name: temporal-btc-high
+
+          # Market Maker variants (Mode A — supervised process)
+          - name: mm-wide-spread
+          - name: mm-tight-spread
+
+          # Whale Copytrading (Mode B — LLM evaluates whale signals)
+          - name: whale-copy-01
+
+          # Solana Copy Trading (Mode A — supervised process)
+          - name: solana-copy-01
+
+  template:
+    metadata:
+      name: 'trading-{{ .name }}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: 'trading-{{ .name }}'
+        app.kubernetes.io/part-of: cto-platform
+        app.kubernetes.io/component: trading
+
+    spec:
+      project: default
+
+      # Two sources:
+      #   1. openclaw-platform chart (the Helm chart)
+      #   2. CTO repo (agent-specific values files)
+      sources:
+        - repoURL: https://git.5dlabs.ai/5dlabs/openclaw-platform.git
+          targetRevision: main
+          path: charts/openclaw
+          helm:
+            releaseName: 'trading-{{ .name }}'
+            valueFiles:
+              - $cto/infra/gitops/agents/trader/{{ .name }}.yaml
+
+        - repoURL: https://git.5dlabs.ai/5dlabs/cto.git
+          targetRevision: main
+          ref: cto
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: trading
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true
+        retry:
+          limit: 5
+          backoff:
+            duration: "5s"
+            factor: 2
+            maxDuration: "3m"

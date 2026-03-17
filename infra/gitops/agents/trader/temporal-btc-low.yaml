@@ -1,0 +1,178 @@
+---
+# =============================================================================
+# Trading Agent: Temporal Arb — BTC, Low Threshold
+# =============================================================================
+# Mode A agent: starts the temporal-arb process, monitors via status.json.
+# Exploits CEX-to-Polymarket price latency on 5-min BTC markets.
+
+replicaCount: 1
+deploymentMode: statefulset
+
+global:
+  namespace: trading
+  createNamespace: false
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+agent:
+  id: "trader-temporal-btc-low"
+  name: "Trader: Temporal Arb (BTC, Low Threshold)"
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "5m"
+    target: "last"
+    ackMaxChars: 200
+    prompt: >-
+      Check the temporal-arb process health. Follow HEARTBEAT.md instructions exactly.
+  sandbox: "off"
+  skipGlobalSkills: true
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-6"
+
+secrets:
+  external:
+    apiKeysSecret: "trading-api-keys"
+    githubSecret: "trading-github"
+
+messaging:
+  discord:
+    enabled: false
+
+models:
+  providers:
+    anthropic:
+      enabled: true
+      apiKeySecretKey: "ANTHROPIC_API_KEY"
+    openai:
+      enabled: false
+    minimax:
+      enabled: false
+
+memorySearch:
+  enabled: false
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    AGENTS.md: |
+      # Trading Agent: Temporal Arb (BTC, Low Threshold)
+
+      You are an autonomous trading agent running the Temporal Arbitrage strategy.
+      Your strategy code lives at /workspace/repos/cto/skills/trader/temporal-arb/
+
+      ## Strategy Overview
+      You exploit the latency between CEX price movements (Binance, Coinbase)
+      and Polymarket CLOB odds updates on 5-minute crypto binary markets.
+      When BTC spikes on Binance but the "BTC Up" contract is still cheap, you buy it.
+
+      ## Your Configuration
+      - **Asset focus:** BTC only
+      - **Momentum threshold:** 0.2% (low — catches more signals, some may be noise)
+      - **Max position:** $5 per trade
+      - **Daily budget:** $25
+
+      ## Operating Mode
+      You are a **Mode A agent**. You start the temporal-arb process as a background
+      process and monitor its health via status.json.
+
+      ## Operating Rules
+      - Start the process on first heartbeat if not running
+      - Monitor status.json for health
+      - If the process crashes, restart it
+      - Report status summary each heartbeat
+
+    HEARTBEAT.md: |
+      # Heartbeat Instructions
+
+      1. Check if temporal-arb process is running:
+         - Read /workspace/repos/cto/skills/trader/temporal-arb/status.json
+         - If updatedAt is older than 2 minutes, process may be dead
+      2. If not running, start it:
+         cd /workspace/repos/cto/skills/trader/temporal-arb
+         node index.js --verbose &
+      3. Read status.json and report:
+         - Cycle count, contracts scanned, signals found, trades executed
+         - Any errors or anomalies
+      4. If process is healthy, report "OK" with key metrics
+
+    IDENTITY.md: |
+      - **Name:** Trader: Temporal Arb (BTC, Low Threshold)
+      - **Role:** Autonomous trading agent — CEX-to-Polymarket latency arb
+      - **Model:** Claude Haiku 4.5
+      - **Strategy:** Mode A (agent-supervised process)
+
+storage:
+  size: 2Gi
+  storageClass: "gp3"
+
+extraEnv:
+  - name: TEMPORAL_ARB_MOMENTUM_THRESHOLD
+    value: "0.2"
+  - name: TEMPORAL_ARB_MAX_POSITION
+    value: "5.0"
+  - name: TEMPORAL_ARB_DAILY_BUDGET
+    value: "25.0"
+  - name: TEMPORAL_ARB_KELLY_CAP
+    value: "0.25"
+  - name: STRATEGY_ID
+    value: "temporal-btc-low"
+  - name: SIMMER_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: simmer-api-key
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  subchart:
+    enabled: false
+  role: "trader"
+  roster: []
+
+plugins:
+  nats-messenger:
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  profile: "minimal"
+  acp:
+    enabled: false
+  exec:
+    host: "gateway"
+    security: "full"
+    backgroundMs: 300000
+    notifyOnExit: true
+
+toolsServer:
+  enabled: false
+
+ssh:
+  enabled: false
+
+gateway:
+  controlUi:
+    enabled: false
+  http:
+    endpoints:
+      chatCompletions:
+        enabled: false
+      responses:
+        enabled: false

@@ -1,0 +1,83 @@
+# =============================================================================
+# Base values for Solana Copy trading agents (Mode A — agent-supervised process)
+# =============================================================================
+# Agent starts the Solana copy trader process, monitors via paper-summary.json.
+# =============================================================================
+---
+namespace: trading
+
+agent:
+  id: ""  # Override per variant
+  name: ""  # Override per variant
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "5m"
+    prompt: >-
+      Check solana copy trader process health. See HEARTBEAT.md for instructions.
+  sandbox: "off"
+
+agentDefaults:
+  thinkingDefault: "low"
+  typingMode: "instant"
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-20250514"
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    HEARTBEAT.md: |
+      # Heartbeat Instructions — Solana Copy Trader Agent
+
+      On first heartbeat:
+      1. `cd /workspace/repos/cto/skills/trader/solana-copy-trader/scripts`
+      2. Start: `node index.js copy` as a background process
+      3. Verify process started (check logs/paper-summary.json)
+
+      On subsequent heartbeats:
+      1. Check if the background process is still running
+      2. Read paper-summary.json for P&L, open positions, trade count
+      3. If process died, restart it
+
+      Reply HEARTBEAT_OK if everything is healthy.
+
+extraEnv: []  # Override per variant
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  acp:
+    enabled: false
+  exec:
+    backgroundMs: 300000
+    notifyOnExit: true
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+storage:
+  size: 2Gi
+
+discord:
+  enabled: false
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+
+telemetry:
+  enabled: true

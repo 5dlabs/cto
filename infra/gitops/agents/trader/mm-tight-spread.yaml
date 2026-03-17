@@ -1,0 +1,161 @@
+---
+# =============================================================================
+# Trading Agent: Market Maker — Tight Spread
+# =============================================================================
+# Mode A agent: tighter spread = more fills but less profit per fill.
+
+replicaCount: 1
+deploymentMode: statefulset
+
+global:
+  namespace: trading
+  createNamespace: false
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+agent:
+  id: "trader-mm-tight-spread"
+  name: "Trader: Market Maker (Tight Spread)"
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "5m"
+    target: "last"
+    ackMaxChars: 200
+    prompt: >-
+      Check the market maker process health. Follow HEARTBEAT.md instructions exactly.
+  sandbox: "off"
+  skipGlobalSkills: true
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-6"
+
+secrets:
+  external:
+    apiKeysSecret: "trading-api-keys"
+    githubSecret: "trading-github"
+
+messaging:
+  discord:
+    enabled: false
+
+models:
+  providers:
+    anthropic:
+      enabled: true
+      apiKeySecretKey: "ANTHROPIC_API_KEY"
+    openai:
+      enabled: false
+    minimax:
+      enabled: false
+
+memorySearch:
+  enabled: false
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    AGENTS.md: |
+      # Trading Agent: Market Maker (Tight Spread)
+
+      You are an autonomous trading agent running the Market Making strategy.
+      Your strategy code lives at /workspace/repos/cto/skills/trader/polymarket-mm/
+
+      ## Strategy Overview
+      Same as the wide-spread variant but with tighter spreads.
+      More fills, less profit per fill. Higher volume, higher rebate income.
+
+      ## Your Configuration
+      - **Spread:** 3c (tight — more fills, less per-fill profit)
+      - **Quote size:** $5.00 per side
+      - **Max inventory:** $20 per side per market
+      - **Skip mid-range:** No (quote all price ranges)
+
+    HEARTBEAT.md: |
+      # Heartbeat Instructions
+
+      1. Read /workspace/repos/cto/skills/trader/polymarket-mm/mm-state.json
+      2. If stale (>2 min old), start the process:
+         cd /workspace/repos/cto/skills/trader/polymarket-mm
+         node index.js &
+      3. Report: cycles run, quotes placed, fills, rebates, inventory, paired P&L
+
+    IDENTITY.md: |
+      - **Name:** Trader: Market Maker (Tight Spread)
+      - **Role:** Autonomous trading agent — Polymarket market maker
+      - **Model:** Claude Haiku 4.5
+      - **Strategy:** Mode A (agent-supervised process)
+
+storage:
+  size: 2Gi
+  storageClass: "gp3"
+
+extraEnv:
+  - name: MM_SPREAD
+    value: "0.03"
+  - name: MM_QUOTE_SIZE
+    value: "5.0"
+  - name: MM_MAX_INVENTORY
+    value: "20"
+  - name: MM_SKIP_MID_RANGE
+    value: "false"
+  - name: STRATEGY_ID
+    value: "mm-tight-spread"
+  - name: SIMMER_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: trader-api-keys
+        key: simmer-api-key
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+  subchart:
+    enabled: false
+  role: "trader"
+  roster: []
+
+plugins:
+  nats-messenger:
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  profile: "minimal"
+  acp:
+    enabled: false
+  exec:
+    host: "gateway"
+    security: "full"
+    backgroundMs: 300000
+    notifyOnExit: true
+
+toolsServer:
+  enabled: false
+
+ssh:
+  enabled: false
+
+gateway:
+  controlUi:
+    enabled: false
+  http:
+    endpoints:
+      chatCompletions:
+        enabled: false
+      responses:
+        enabled: false

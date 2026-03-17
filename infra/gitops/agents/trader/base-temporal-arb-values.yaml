@@ -1,0 +1,86 @@
+# =============================================================================
+# Base values for Temporal Arb trading agents (Mode A — agent-supervised process)
+# =============================================================================
+# Agent starts the temporal-arb process as a background task, monitors health
+# via status.json, and publishes status to NATS.
+# Latency-sensitive — the process runs continuously, agent just supervises.
+# =============================================================================
+---
+namespace: trading
+
+agent:
+  id: ""  # Override per variant
+  name: ""  # Override per variant
+  model: "anthropic/claude-haiku-4-5-20251001"
+  heartbeat:
+    every: "5m"
+    prompt: >-
+      Check temporal-arb process health. See HEARTBEAT.md for instructions.
+  sandbox: "off"
+
+agentDefaults:
+  thinkingDefault: "low"
+  typingMode: "instant"
+
+modelDefaults:
+  primary: "anthropic/claude-haiku-4-5-20251001"
+  fallbacks:
+    - "anthropic/claude-sonnet-4-20250514"
+
+workspace:
+  repos:
+    - name: cto
+      url: "https://git.5dlabs.ai/5dlabs/cto.git"
+      branch: "main"
+      path: "repos/cto"
+  files:
+    HEARTBEAT.md: |
+      # Heartbeat Instructions — Temporal Arb Agent
+
+      On first heartbeat (no background process running):
+      1. `cd /workspace/repos/cto/skills/trader/temporal-arb`
+      2. Start: `node index.js --verbose` as a background process
+      3. Verify process started (check status.json updates)
+
+      On subsequent heartbeats:
+      1. Check if the background process is still running
+      2. Read status.json for cycle count, signals, trades
+      3. If process died, restart it
+      4. Log status summary
+
+      Reply HEARTBEAT_OK if everything is healthy.
+
+extraEnv: []  # Override per variant
+
+kaniko:
+  enabled: false
+
+claudeCode:
+  enabled: false
+
+tools:
+  acp:
+    enabled: false
+  exec:
+    backgroundMs: 300000
+    notifyOnExit: true
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    memory: "512Mi"
+
+storage:
+  size: 2Gi
+
+discord:
+  enabled: false
+
+nats:
+  enabled: true
+  url: "nats://nats.messaging.svc.cluster.local:4222"
+
+telemetry:
+  enabled: true
