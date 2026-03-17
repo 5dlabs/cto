@@ -35,7 +35,7 @@ agent:
 modelDefaults:
   primary: "anthropic/claude-haiku-4-5-20251001"
   fallbacks:
-    - "anthropic/claude-sonnet-4-6"
+    - "anthropic/claude-sonnet-4-20250514"
 
 secrets:
   external:
@@ -51,6 +51,11 @@ models:
     anthropic:
       enabled: true
       apiKeySecretKey: "ANTHROPIC_API_KEY"
+      models:
+        - id: "claude-haiku-4-5-20251001"
+          name: "Claude Haiku 4.5"
+        - id: "claude-sonnet-4-20250514"
+          name: "Claude Sonnet 4"
     openai:
       enabled: false
     minimax:
