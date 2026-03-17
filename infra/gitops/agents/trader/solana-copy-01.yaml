@@ -15,9 +15,9 @@ global:
 resources:
   requests:
     cpu: "50m"
-    memory: "128Mi"
+    memory: "256Mi"
   limits:
-    memory: "512Mi"
+    memory: "1Gi"
 
 agent:
   id: "trader-solana-copy-01"
@@ -96,12 +96,14 @@ workspace:
     HEARTBEAT.md: |
       # Heartbeat Instructions
 
-      1. Read /workspace/repos/cto/skills/trader/solana-copy-trader/scripts/logs/paper-summary.json
-      2. If stale (>5 min old), start the process:
-         cd /workspace/repos/cto/skills/trader/solana-copy-trader/scripts
-         node index.js copy &
-      3. Report: open positions, total trades, P&L, win rate
-      4. Check for any errors in the process output
+      1. Check if the solana copy trader process is already running:
+         Run: pgrep -f "solana-copy-trader" (use exec tool)
+      2. If NOT running, start it as a background process:
+         Run: cd /workspace/repos/cto/skills/trader/solana-copy-trader/scripts && node index.js copy
+         IMPORTANT: Use the exec tool with background=true and timeout=300000
+      3. Read /workspace/repos/cto/skills/trader/solana-copy-trader/scripts/logs/paper-summary.json
+      4. Report: open positions, total trades, P&L, win rate
+      5. If paper-summary.json doesn't exist yet, just report "Process started, awaiting first cycle"
 
     IDENTITY.md: |
       - **Name:** Trader: Solana Copy (01)

@@ -14,9 +14,9 @@ global:
 resources:
   requests:
     cpu: "50m"
-    memory: "128Mi"
+    memory: "256Mi"
   limits:
-    memory: "512Mi"
+    memory: "1Gi"
 
 agent:
   id: "trader-mm-tight-spread"
@@ -90,11 +90,14 @@ workspace:
     HEARTBEAT.md: |
       # Heartbeat Instructions
 
-      1. Read /workspace/repos/cto/skills/trader/polymarket-mm/mm-state.json
-      2. If stale (>2 min old), start the process:
-         cd /workspace/repos/cto/skills/trader/polymarket-mm
-         node index.js &
-      3. Report: cycles run, quotes placed, fills, rebates, inventory, paired P&L
+      1. Check if the MM process is already running:
+         Run: pgrep -f "polymarket-mm" (use exec tool)
+      2. If NOT running, start it as a background process:
+         Run: cd /workspace/repos/cto/skills/trader/polymarket-mm && node index.js
+         IMPORTANT: Use the exec tool with background=true and timeout=300000
+      3. Read /workspace/repos/cto/skills/trader/polymarket-mm/mm-state.json
+      4. Report: cycles run, quotes placed, fills, rebates, inventory, paired P&L
+      5. If mm-state.json doesn't exist yet, just report "Process started, awaiting first cycle"
 
     IDENTITY.md: |
       - **Name:** Trader: Market Maker (Tight Spread)

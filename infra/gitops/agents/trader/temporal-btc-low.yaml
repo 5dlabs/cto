@@ -15,9 +15,9 @@ global:
 resources:
   requests:
     cpu: "50m"
-    memory: "128Mi"
+    memory: "256Mi"
   limits:
-    memory: "512Mi"
+    memory: "1Gi"
 
 agent:
   id: "trader-temporal-btc-low"
@@ -102,16 +102,14 @@ workspace:
     HEARTBEAT.md: |
       # Heartbeat Instructions
 
-      1. Check if temporal-arb process is running:
-         - Read /workspace/repos/cto/skills/trader/temporal-arb/status.json
-         - If updatedAt is older than 2 minutes, process may be dead
-      2. If not running, start it:
-         cd /workspace/repos/cto/skills/trader/temporal-arb
-         node index.js --verbose &
-      3. Read status.json and report:
-         - Cycle count, contracts scanned, signals found, trades executed
-         - Any errors or anomalies
-      4. If process is healthy, report "OK" with key metrics
+      1. Check if temporal-arb process is already running:
+         Run: pgrep -f "temporal-arb" (use exec tool)
+      2. If NOT running, start it as a background process:
+         Run: cd /workspace/repos/cto/skills/trader/temporal-arb && node index.js --verbose
+         IMPORTANT: Use the exec tool with background=true and timeout=300000
+      3. Read /workspace/repos/cto/skills/trader/temporal-arb/status.json
+      4. Report: cycle count, contracts scanned, signals found, trades executed
+      5. If status.json doesn't exist yet, just report "Process started, awaiting first cycle"
 
     IDENTITY.md: |
       - **Name:** Trader: Temporal Arb (BTC, Low Threshold)
