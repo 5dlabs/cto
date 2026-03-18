@@ -26,6 +26,22 @@ data:
             "type": "datasource",
             "query": "prometheus",
             "current": { "text": "Prometheus", "value": "Prometheus" }
+          },
+          {
+            "name": "loki_datasource",
+            "type": "datasource",
+            "query": "loki",
+            "current": { "text": "Loki", "value": "Loki" }
+          },
+          {
+            "name": "log_level",
+            "type": "custom",
+            "query": "info,warn,error,debug",
+            "includeAll": true,
+            "allValue": ".+",
+            "current": { "text": "All", "value": "$__all" },
+            "multi": true,
+            "label": "Log Level"
           }
         ]
       },
@@ -120,7 +136,7 @@ data:
           "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
           "targets": [
             {
-              "expr": "solana_node_num_slots_behind / clamp_min(rate(solana_node_slot_height[5m]), 0.001)",
+              "expr": "solana_node_num_slots_behind / clamp_min(rate(solana_node_slot_height[5m]), 1)",
               "legendFormat": "ETA"
             }
           ],
@@ -171,25 +187,26 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
           "targets": [
             {
-              "expr": "solana_node_num_slots_behind / clamp_min(rate(solana_node_slot_height[5m]), 0.001)",
+              "expr": "solana_node_num_slots_behind / clamp_min(rate(solana_node_slot_height[5m]), 1)",
               "legendFormat": "ETA (seconds)"
             }
           ],
           "fieldConfig": { "defaults": { "unit": "s" } }
         },
         {
-          "title": "Agave Logs (Errors)",
+          "title": "Agave Logs",
           "type": "logs",
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
-          "datasource": { "type": "loki", "uid": "loki" },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 24 },
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
           "targets": [
             {
-              "expr": "{namespace=\"solana\", container=\"agave\"} |~ \"(?i)(error|warn|fatal)\"",
-              "legendFormat": ""
+              "expr": "{namespace=\"solana\", level=~\"$log_level\"}",
+              "refId": "A"
             }
           ],
           "options": {
             "showTime": true,
+            "showLabels": true,
             "sortOrder": "Descending",
             "dedupStrategy": "none",
             "enableLogDetails": true,
