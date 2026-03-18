@@ -181,6 +181,7 @@ fn main() {
             commands::openclaw::openclaw_start_local_bridge,
             commands::openclaw::openclaw_stop_local_bridge,
             commands::openclaw::openclaw_get_local_bridge_status,
+            commands::openclaw::openclaw_get_local_health,
             commands::openclaw::openclaw_get_morgan_diagnostics,
             // Studio state
             commands::studio::studio_get_state,

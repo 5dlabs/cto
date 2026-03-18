@@ -396,7 +396,8 @@ pub fn parse_mentions(comment: &str) -> Vec<ParsedMention> {
 /// Panics if the regex pattern is invalid (this is a compile-time constant).
 #[must_use]
 pub fn parse_button_identifier(identifier: &str) -> Option<(Agent, u64, u64)> {
-    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|angie|vex|forge)-pr(\d+)-(\d+)$").unwrap();
+    let re = Regex::new(r"^fix-(rex|grizz|nova|blaze|tap|spark|angie|vex|forge)-pr(\d+)-(\d+)$")
+        .unwrap();
 
     if let Some(cap) = re.captures(identifier) {
         let agent_name = cap.get(1)?.as_str();

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: solana
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trading

@@ -228,15 +228,15 @@ export default function TradingPage() {
               {chains.map((chain) => (
                 <div
                   key={chain.name}
-                  className={`p-6 rounded-xl border ${chain.border} ${chain.bg} backdrop-blur-sm`}
+                  className={`p-4 sm:p-6 rounded-xl border ${chain.border} ${chain.bg} backdrop-blur-sm`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-2 mb-3">
-                    <h3 className={`text-xl font-bold ${chain.color}`}>{chain.name}</h3>
-                    <span className={`text-xs font-medium uppercase tracking-widest ${chain.color} opacity-70 sm:shrink-0`}>
+                    <h3 className={`text-base sm:text-xl font-bold ${chain.color}`}>{chain.name}</h3>
+                    <span className={`text-[10px] sm:text-xs font-medium uppercase tracking-widest ${chain.color} opacity-70 sm:shrink-0`}>
                       {chain.role}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{chain.detail}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{chain.detail}</p>
                 </div>
               ))}
             </div>

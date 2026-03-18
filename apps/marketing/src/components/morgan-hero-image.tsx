@@ -40,7 +40,7 @@ export function MorganHeroImage() {
             src="/agents/morgan-hero.png?v=20260318"
             alt="Morgan — your control agent"
             fill
-            className="object-contain"
+            className="object-contain object-center"
             sizes="280px"
           />
         </div>

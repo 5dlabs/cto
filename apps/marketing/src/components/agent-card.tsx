@@ -73,7 +73,7 @@ export function AgentCard({ agent }: AgentCardProps) {
       <motion.div
         className="relative h-full min-h-[172px] sm:min-h-[188px] lg:min-h-[196px] w-full"
         style={{ transformStyle: "preserve-3d", perspective: "1000px", willChange: "transform" }}
-        animate={{ rotateY: flipped ? -180 : 0 }}
+        animate={{ rotateY: flipped ? 180 : 0 }}
         transition={{ duration: 0.5, ease: "easeInOut" }}
         initial={false}
       >
@@ -149,7 +149,8 @@ export function AgentCard({ agent }: AgentCardProps) {
           style={{
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
-            transform: "rotateY(-180deg)",
+            transform: "rotateY(180deg)",
+            transformStyle: "preserve-3d",
           } as React.CSSProperties}
         >
           <div
@@ -159,10 +160,14 @@ export function AgentCard({ agent }: AgentCardProps) {
             )}
             aria-hidden
           />
-          {/* Inner wrapper rotated 180deg to un-mirror text on flipped back face */}
+          {/* Inner wrapper: rotateY + scaleX(-1) to un-mirror text on flipped back face */}
           <div
             className="relative z-10 flex h-full min-h-0 flex-col"
-            style={{ transform: "rotateY(-180deg)", direction: "ltr" } as React.CSSProperties}
+            style={{
+              transform: "rotateY(180deg) scaleX(-1)",
+              transformStyle: "preserve-3d",
+              direction: "ltr",
+            } as React.CSSProperties}
           >
             {agent.tools && agent.tools.length > 0 && (
               <div className="min-h-0 min-w-0">

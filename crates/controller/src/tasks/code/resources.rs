@@ -1492,12 +1492,9 @@ impl<'a> CodeResourceManager<'a> {
                     }
                 }));
 
-                let sidecar_image = self
-                    .config
-                    .linear
-                    .sidecar_image
-                    .clone()
-                    .unwrap_or_else(|| "registry.5dlabs.ai/5dlabs/linear-sidecar:latest".to_string());
+                let sidecar_image = self.config.linear.sidecar_image.clone().unwrap_or_else(|| {
+                    "registry.5dlabs.ai/5dlabs/linear-sidecar:latest".to_string()
+                });
                 let sidecar_pull_policy =
                     if sidecar_image.ends_with(":latest") || sidecar_image.ends_with(":dev") {
                         "Always"

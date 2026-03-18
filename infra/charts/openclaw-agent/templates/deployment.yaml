@@ -343,25 +343,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.discordTokensSecret }}
                   key: {{ $discordConfig.tokenSecretKey | default .Values.agent.id }}
-            # Provider API keys
-            - name: PROVIDER_ANTHROPIC_KEY
+            # Provider API keys used when init renders openclaw.json via envsubst.
+            {{- range $name, $provider := .Values.models.providers }}
+            {{- if and (or (not (hasKey $provider "enabled")) $provider.enabled) $provider.apiKeySecretKey }}
+            - name: PROVIDER_{{ $name | upper | replace "-" "_" }}_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.apiKeysSecret }}
-                  key: anthropic-api-key
+                  name: {{ $.Values.secrets.apiKeysSecret }}
+                  key: {{ $provider.apiKeySecretKey }}
                   optional: true
-            - name: PROVIDER_OPENAI_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.apiKeysSecret }}
-                  key: openai-api-key
-                  optional: true
-            - name: PROVIDER_OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.apiKeysSecret }}
-                  key: openai-api-key
-                  optional: true
+            {{- end }}
+            {{- end }}
             # Web tools API keys
             - name: BRAVE_API_KEY
               valueFrom:
@@ -539,6 +531,18 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.apiKeysSecret }}
                   key: openai-api-key
+                  optional: true
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: gemini-api-key
+                  optional: true
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.apiKeysSecret }}
+                  key: gemini-api-key
                   optional: true
             - name: PROVIDER_OPENAI_API_KEY
               valueFrom:

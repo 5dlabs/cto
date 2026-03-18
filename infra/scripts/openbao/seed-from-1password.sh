@@ -15,7 +15,7 @@
 #
 # Options:
 #   --dry-run           Preview changes without applying
-#   --category <name>   Only seed specific category (github-apps, linear-apps, api-keys, tools, infrastructure, research)
+#   --category <name>   Only seed specific category (github-apps, linear-apps, api-keys, openclaw-providers, tools, infrastructure, research)
 #   --help              Show this help message
 #
 # Examples:
@@ -304,6 +304,61 @@ EOF
     fi
 
     log_info "API Keys: $success found, $failed missing"
+}
+
+seed_openclaw_providers() {
+    log_header "OpenClaw Provider Keys (trading namespace)"
+
+    # These keys are stored at secret/openclaw/providers and consumed by
+    # trading-secrets.yaml ExternalSecrets (trading namespace).
+    # Uses kebab-case property names to match the ExternalSecret remoteRef.
+    # KEY|1PASSWORD_ITEM|FIELD
+    local mappings
+    mappings=$(cat <<'EOF'
+anthropic-api-key|Anthropic API Key|credential
+openai-api-key|OpenAI API Key|credential
+openrouter-api-key|Open Router API Key|credential
+gemini-api-key|Google-Gemini API Key|credential
+xai-api-key|xAI API Key|credential
+factory-api-key|Factory API Key|credential
+cursor-api-key|Cursor API Key|credential
+minimax-api-key|MiniMax API Keys|credential
+brave-api-key|Brave Search API Key|credential
+perplexity-api-key|Perplexity API Key|credential
+EOF
+)
+
+    local kv_args=()
+    local success=0
+    local failed=0
+
+    while IFS='|' read -r key item field; do
+        [[ -z "$key" ]] && continue
+
+        if ! op_item_exists "$item"; then
+            log_warning "1Password item not found: $item (for $key)"
+            ((failed++))
+            continue
+        fi
+
+        local value
+        value=$(op_get_field "$item" "$field")
+
+        if [[ -z "$value" ]]; then
+            log_warning "Empty value for $key from $item:$field"
+            ((failed++))
+            continue
+        fi
+
+        kv_args+=("$key" "$value")
+        ((success++))
+    done <<< "$mappings"
+
+    if [[ ${#kv_args[@]} -gt 0 ]]; then
+        bao_put "openclaw/providers" "${kv_args[@]}"
+    fi
+
+    log_info "OpenClaw Providers: $success found, $failed missing"
 }
 
 seed_tools() {
@@ -596,6 +651,7 @@ main() {
             seed_github_apps
             seed_linear_apps
             seed_api_keys
+            seed_openclaw_providers
             seed_tools
             seed_infrastructure
             seed_gitlab
@@ -609,6 +665,9 @@ main() {
             ;;
         api-keys)
             seed_api_keys
+            ;;
+        openclaw-providers)
+            seed_openclaw_providers
             ;;
         tools)
             seed_tools
@@ -624,7 +683,7 @@ main() {
             ;;
         *)
             log_error "Unknown category: $CATEGORY"
-            log_info "Valid categories: github-apps, linear-apps, api-keys, tools, infrastructure, gitlab, research"
+            log_info "Valid categories: github-apps, linear-apps, api-keys, openclaw-providers, tools, infrastructure, gitlab, research"
             exit 1
             ;;
     esac

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-arb
+  namespace: trading
+  labels:
+    app: temporal-arb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal-arb
+  template:
+    metadata:
+      labels:
+        app: temporal-arb
+    spec:
+      containers:
+        - name: temporal-arb
+          image: registry.5dlabs.ai/5dlabs/runtime:trader
+          command: ["node"]
+          args: ["index.js"]
+          workingDir: /app/skills/trader/temporal-arb
+          envFrom:
+            - secretRef:
+                name: trader-env
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi

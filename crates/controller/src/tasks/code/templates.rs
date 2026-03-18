@@ -3955,7 +3955,10 @@ Be constructive and explain the "why" behind your suggestions.
             ],
 
             // Implementation agents: need GitHub, context docs, and memory
-            ("rex" | "grizz" | "nova" | "blaze" | "tap" | "spark" | "angie", "implementation" | "coder") => {
+            (
+                "rex" | "grizz" | "nova" | "blaze" | "tap" | "spark" | "angie",
+                "implementation" | "coder",
+            ) => {
                 vec![
                     "mcp_tools_github_*".to_string(),
                     "mcp_tools_context7_*".to_string(),

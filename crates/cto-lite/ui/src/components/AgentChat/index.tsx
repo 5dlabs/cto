@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import * as tauri from '@/lib/tauri'
 import { getAgentBranding } from '@/lib/agent-branding'
+import type { MorganSessionState } from '@/lib/morgan-session'
 
 const CHAT_SESSION_STORAGE_KEY = 'cto.morganChatSessionId'
 
@@ -53,6 +54,8 @@ interface AgentChatProps {
   agentName?: string
   projectName?: string
   onOpenVoice?: () => void
+  sharedSession?: MorganSessionState | null
+  onSessionStateChange?: (patch: Partial<MorganSessionState>) => void
 }
 
 function createSessionId(): string {
@@ -109,7 +112,10 @@ export function AgentChat({
   agentName = 'Morgan',
   projectName,
   onOpenVoice,
+  sharedSession: incomingSharedSession,
+  onSessionStateChange,
 }: AgentChatProps) {
+  const sharedSession = incomingSharedSession
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [agentStatus, setAgentStatus] = useState<AgentStatus>({
@@ -154,7 +160,17 @@ export function AgentChat({
         }
 
         if (history.length > 0) {
-          setMessages(history.map((message, index) => mapHistoryMessage(message, index, history.length)))
+          const mapped = history.map((message, index) =>
+            mapHistoryMessage(message, index, history.length)
+          )
+          setMessages(mapped)
+          const latestUserText = [...mapped].reverse().find((entry) => entry.role === 'user')?.content ?? ''
+          const latestAgentText = [...mapped].reverse().find((entry) => entry.role === 'agent')?.content ?? ''
+          onSessionStateChange?.({
+            latestUserText,
+            latestAgentText,
+            latestTransport: 'chat',
+          })
         } else {
           setMessages([buildGreeting(agentName)])
         }
@@ -167,7 +183,7 @@ export function AgentChat({
           {
             id: crypto.randomUUID(),
             role: 'system',
-            content: `Unable to restore prior messages: ${String(error)}`,
+            content: `Unable to restore prior messages: ${tauri.getErrorMessage(error)}`,
             timestamp: new Date(),
           },
         ])
@@ -183,7 +199,39 @@ export function AgentChat({
     return () => {
       cancelled = true
     }
-  }, [agentName, sessionId])
+  }, [agentName, onSessionStateChange, sessionId])
+
+  useEffect(() => {
+    if (!historyLoaded || !sharedSession || sharedSession.latestTransport === 'chat') {
+      return
+    }
+
+    setMessages((current) => {
+      const next = [...current]
+      const lastUser = [...current].reverse().find((entry) => entry.role === 'user')?.content ?? ''
+      const lastAgent = [...current].reverse().find((entry) => entry.role === 'agent')?.content ?? ''
+
+      if (sharedSession.latestUserText && sharedSession.latestUserText !== lastUser) {
+        next.push({
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: sharedSession.latestUserText,
+          timestamp: new Date(),
+        })
+      }
+
+      if (sharedSession.latestAgentText && sharedSession.latestAgentText !== lastAgent) {
+        next.push({
+          id: crypto.randomUUID(),
+          role: 'agent',
+          content: sharedSession.latestAgentText,
+          timestamp: new Date(),
+        })
+      }
+
+      return next
+    })
+  }, [historyLoaded, sharedSession])
 
   const addMessage = useCallback(
     (
@@ -233,11 +281,19 @@ export function AgentChat({
         latencyMs: response.latencyMs,
         gatewayUrl: response.gatewayUrl,
       })
+      onSessionStateChange?.({
+        latestUserText: text,
+        latestAgentText: response.content,
+        gatewaySessionKey: response.gatewaySessionKey ?? null,
+        latestTransport: 'chat',
+        connectionState: 'connected',
+        voiceState: 'idle',
+      })
     } catch (error) {
       setAgentStatus({ state: 'idle', message: '' })
-      addMessage('system', `${agentName} could not reply: ${String(error)}`)
+      addMessage('system', `${agentName} could not reply: ${tauri.getErrorMessage(error)}`)
     }
-  }, [addMessage, agentId, agentName, inputValue, sessionId])
+  }, [addMessage, agentId, agentName, inputValue, onSessionStateChange, sessionId])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -253,7 +309,7 @@ export function AgentChat({
         await openUrl(action.url)
         addMessage('system', `Opening ${action.label} in your browser...`)
       } catch (error) {
-        addMessage('system', `Failed to open URL: ${String(error)}`)
+        addMessage('system', `Failed to open URL: ${tauri.getErrorMessage(error)}`)
       }
       return
     }
@@ -263,7 +319,7 @@ export function AgentChat({
         await tauri.openclawApprove(action.workflowId)
         addMessage('system', 'Approval sent.')
       } catch (error) {
-        addMessage('system', `Failed to approve: ${String(error)}`)
+        addMessage('system', `Failed to approve: ${tauri.getErrorMessage(error)}`)
       }
     }
   }

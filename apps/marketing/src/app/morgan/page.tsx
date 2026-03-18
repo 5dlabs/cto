@@ -114,10 +114,15 @@ export default function MorganPage() {
                   </div>
                 ))}
               </div>
-              <div className="lg:sticky lg:top-28">
-                <div className="rounded-xl border border-border bg-card/50 p-4 min-h-[400px] flex items-center justify-center">
+              <div className="lg:sticky lg:top-28 flex flex-col items-center">
+                <div className="rounded-xl border border-border bg-card/50 p-4 w-full max-w-[480px] min-h-[420px] flex items-center justify-center">
                   <LemonSliceWidget
                     initialState="minimized"
+                    inline
+                    customActiveWidth={480}
+                    customActiveHeight={480}
+                    customMinimizedWidth={120}
+                    customMinimizedHeight={120}
                     className="w-full min-h-[360px]"
                   />
                 </div>

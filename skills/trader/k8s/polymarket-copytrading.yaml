@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polymarket-copytrading
+  namespace: trading
+  labels:
+    app: polymarket-copytrading
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polymarket-copytrading
+  template:
+    metadata:
+      labels:
+        app: polymarket-copytrading
+    spec:
+      containers:
+        - name: polymarket-copytrading
+          image: registry.5dlabs.ai/5dlabs/runtime:trader
+          command: ["python"]
+          args: ["copytrading_trader.py"]
+          workingDir: /app/skills/trader/polymarket-copytrading
+          envFrom:
+            - secretRef:
+                name: trader-env
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi

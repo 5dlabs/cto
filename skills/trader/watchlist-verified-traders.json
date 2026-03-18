@@ -1,0 +1,284 @@
+{
+  "generated": "2026-03-15",
+  "sources": ["grok-x-search", "polymarket-leaderboard", "lookonchain", "nansen", "0xinsider"],
+  "notes": "All wallet addresses sourced from public on-chain data and publicly shared X posts. Verify current positions before copy trading.",
+
+  "polymarket": {
+    "description": "Current monthly profit leaders — live Polymarket leaderboard March 2026",
+    "traders": [
+      {
+        "handle": "HorizonSplendidView",
+        "wallet": "0x02227b8f5a9636e895607edd3185ed6ee5598ff7",
+        "monthly_profit": "$4,016,108",
+        "volume": "$12.4M",
+        "strategy": "unknown — high conviction directional",
+        "twitter": null
+      },
+      {
+        "handle": "beachboy4",
+        "wallet": "0xc2e7800b5af46e6093872b177b7a5e7f0563be51",
+        "monthly_profit": "$3,061,230",
+        "volume": "$9.6M",
+        "strategy": "high-risk directional — noted -$7.56M drawdown then +$6.4M recovery",
+        "twitter": null
+      },
+      {
+        "handle": "majorexploiter",
+        "wallet": "0x019782cab5d844f02bafb71f512758be78579f3c",
+        "monthly_profit": "$2,416,975",
+        "volume": "$6.9M",
+        "strategy": "unknown",
+        "twitter": null
+      },
+      {
+        "handle": "CemeterySun",
+        "wallet": "0x37c1874a60d348903594a96703e0507c518fc53a",
+        "monthly_profit": "$2,175,661",
+        "volume": "$23.7M",
+        "strategy": "unknown — high volume suggests arb or market making",
+        "twitter": null
+      },
+      {
+        "handle": "Countryside",
+        "wallet": "0xbddf61af533ff524d27154e589d2d7a81510c684",
+        "monthly_profit": "$1,877,564",
+        "volume": "$17.5M",
+        "strategy": "unknown",
+        "twitter": null
+      },
+      {
+        "handle": "0p0jogggg",
+        "wallet": "0x6ac5bb06a9eb05641fd5e82640268b92f3ab4b6e",
+        "monthly_profit": "$1,300,247",
+        "volume": "$41.9M",
+        "strategy": "likely arb/MM — very high volume:profit ratio",
+        "twitter": null
+      },
+      {
+        "handle": "gatorr",
+        "wallet": "0x93abbc022ce98d6f45d4444b594791cc4b7a9723",
+        "monthly_profit": "$1,190,506",
+        "volume": "$9.75M",
+        "strategy": "unknown",
+        "twitter": null
+      },
+      {
+        "handle": "swisstony",
+        "wallet": "0x204f72f35326db932158cba6adff0b9a1da95e14",
+        "monthly_profit": "$780,590",
+        "volume": "$90.5M",
+        "strategy": "almost certainly arb/MM — $90M volume on $780K profit = spread capture",
+        "twitter": null
+      },
+      {
+        "handle": "gabagool22",
+        "wallet": "0x6031b6eed1c97e853c6e0f03ad3ce3529351f96d",
+        "monthly_profit": "$868,863",
+        "volume": "$144.6M",
+        "strategy": "confirmed: binary arb/MM on BTC/ETH UP/DOWN markets. 99.5% win rate. Buys both sides < $1.00. Also uses Binance latency arb for momentum. ~44K lines Rust bot.",
+        "aliases": ["distinct-baguette"],
+        "twitter": null,
+        "website": "gabagool22.com"
+      },
+      {
+        "handle": "GamblingIsAllYouNeed",
+        "wallet": "0x507e52ef684ca2dd91f90a9d26d149dd3288beae",
+        "monthly_profit": "$586,868",
+        "volume": "$28.7M",
+        "strategy": "unknown",
+        "twitter": null
+      },
+      {
+        "handle": "SecondWindCapital",
+        "wallet": "0x8c80d213c0cbad777d06ee3f58f6ca4bc03102c3",
+        "monthly_profit": "$501,524",
+        "volume": "$1.28M",
+        "strategy": "high conviction directional — low volume, high profit",
+        "twitter": null
+      }
+    ],
+    "polymarket_anon_whales": [
+      {
+        "wallet": "0x9b979a065641e8cfde3022a30ed2d9415cf55e12",
+        "pnl": "$296K",
+        "win_rate": "96%",
+        "notes": "high frequency bonding, sourced from @0x_Discover"
+      },
+      {
+        "wallet": "0x12d6cccfc7470a3f4bafc53599a4779cbf2cf2a8",
+        "pnl": "$213K",
+        "win_rate": "84%",
+        "notes": "high number of limit-order trades"
+      },
+      {
+        "wallet": "0x8278252ebbf354eca8ce316e680a0eaf02859464",
+        "pnl": "$23K",
+        "win_rate": "73%",
+        "notes": "solid positioning"
+      },
+      {
+        "wallet": "0xd8f8c13644ea84d62e1ec88c5d1215e436eb0f11",
+        "pnl": "$64K",
+        "win_rate": "34%",
+        "notes": "longshot weather trader — low win rate but profitable"
+      }
+    ]
+  },
+
+  "hyperliquid": {
+    "description": "Verified whale traders from Grok X search, LookOnChain, and Nansen — active March 2026",
+    "confirmed_profitable": [
+      {
+        "label": "ETH/BTC Whale",
+        "wallet": "0x15a4F009BB324A3fb9E36137136B201E3Fe0DFDb",
+        "confirmed_pnl": "+$1.88M (closed BTC long)",
+        "positions": "20x long $42.5M BTC, 20x long $41.2M ETH, then switched to spot ETH",
+        "style": "high leverage conviction longs, takes profit",
+        "twitter": null,
+        "source": "@lookonchain March 2026"
+      },
+      {
+        "label": "ETH Mega Shorter",
+        "wallet": "0x54d796f92c566372ca09d8d22868d675935b4b98",
+        "confirmed_pnl": "unknown — $51.2M ETH short position",
+        "positions": "short 10,641 ETH ($51.2M), short WLFI, short XPL",
+        "style": "massive directional shorts",
+        "twitter": null,
+        "source": "@lookonchain"
+      },
+      {
+        "label": "Oil Longs Whale",
+        "wallet": "0xefe263da9c803d449a572e8d126cbdab306cc147",
+        "confirmed_pnl": "+$1.5M (estimated)",
+        "positions": "long $4.06M xyz:CL, long $3.67M xyz:BRENTOIL",
+        "style": "commodity perps",
+        "twitter": null,
+        "source": "@lookonchain March 2026"
+      },
+      {
+        "label": "ETH/BCH Spot+Perps",
+        "wallet": "0x8d0e342e0524392d035fb37461c6f5813ff59244",
+        "confirmed_pnl": "active — 4,022 ETH spot ($11.19M)",
+        "positions": "20x long ETH ($5.66M), 10x long BCH ($908K), 4,022 ETH spot",
+        "style": "mixed spot + leveraged longs",
+        "twitter": null,
+        "source": "@lookonchain"
+      }
+    ],
+    "active_whales_this_week": [
+      {
+        "label": "Oil Bear",
+        "wallet": "0x985f02b19dbc062e565c981aac5614baf2cf501f",
+        "positions": "$35M oil shorts (xyz:CL + xyz:BRENTOIL), also short HYPE, PUMP, XPL, APT",
+        "pnl": "-$1.87M unrealized",
+        "notes": "deposited additional $4M USDC to maintain shorts — conviction bear",
+        "source": "@lookonchain March 12-14"
+      },
+      {
+        "label": "Oil Long 20x",
+        "wallet": "0x3ed4033676d0bdb3938728ca4ac673d00e74bd06",
+        "positions": "20x long 113,080 xyz:CL ($11.52M), liq price $88.4",
+        "pnl": "unknown",
+        "notes": "returned after 2 months inactivity",
+        "source": "@lookonchain March 14"
+      },
+      {
+        "label": "Oil Short Whale",
+        "wallet": "0xF780ADB6CA4A737D2A8dEF6DD445b0C0276d70e1",
+        "positions": "short 90,000 xyz:CL ($8.55M), liq price $147.94",
+        "pnl": "unknown",
+        "notes": "deposited 5.6M USDC for position",
+        "source": "@lookonchain March 12"
+      },
+      {
+        "label": "Multi-Asset Degen",
+        "wallet": "0x75088332da14c7c729d79af11436b01268513035",
+        "positions": "40x long BTC, 20x long SOL, 10x long FARTCOIN, 5x long PUMP, 10x PEPE, 3x LAUNCHCOIN",
+        "pnl": "unknown — deposited 5M USDC",
+        "notes": "extremely aggressive multi-position degen",
+        "source": "@lookonchain"
+      },
+      {
+        "label": "HYPE Accumulator",
+        "wallet": "0x7e4e766d0ae5ea9cded0c694669194db92800107",
+        "positions": "bought 86,322 HYPE ($4.88M) + 466.68M PUMP ($2.74M)",
+        "pnl": "unknown",
+        "source": "@lookonchain"
+      },
+      {
+        "label": "HYPE Accumulator 2",
+        "wallet": "0x1abd8168ea60b37a6a8cc149fa058910d89b0767",
+        "positions": "bought HYPE with 4.58M USDC",
+        "pnl": "unknown",
+        "source": "@lookonchain"
+      },
+      {
+        "label": "New LINK Whale",
+        "wallet": "0x0833de1e42b93ec94a6ec31670bada94a9039f2c",
+        "positions": "10x long LINK ($2.27M)",
+        "pnl": "unknown",
+        "notes": "newly created wallet",
+        "source": "@lookonchain March 15"
+      },
+      {
+        "label": "New Oil Short",
+        "wallet": "0xab961d7c42bbcd454a54b342bd191a8f090219e6",
+        "positions": "5x short xyz:CL ($10.2M)",
+        "pnl": "unknown",
+        "notes": "newly created wallet",
+        "source": "@lookonchain"
+      }
+    ],
+    "named_traders": [
+      {
+        "label": "TheWhiteWhaleHL",
+        "twitter": "@TheWhiteWhaleHL",
+        "peak_pnl": "$45.8M (30d)",
+        "strategy": "conviction longs — holds through crashes. Long ETH/SOL/HYPE. Uses 4 wallets.",
+        "wallet": "unknown — not publicly shared, but trackable via Nansen/Dexly",
+        "notes": "advocates for DEX over CEX. Most profitable public figure on HL Aug 2025."
+      },
+      {
+        "label": "Wanye Kest",
+        "twitter": null,
+        "peak_pnl": "$13.68M (90d)",
+        "strategy": "long-term position sizing, 2 wallets",
+        "wallet": "unknown — trackable via Nansen"
+      },
+      {
+        "label": "CL",
+        "twitter": "@CL207",
+        "peak_pnl": "$1.1M",
+        "strategy": "leveraged longs (10x NVDA stock on HL)",
+        "wallet": "unknown"
+      }
+    ]
+  },
+
+  "solana": {
+    "description": "Solana smart money wallets from Nansen and Grok X search",
+    "wallets": [
+      {
+        "label": "SOL Mega Staker",
+        "wallet": "H2oNAX1bc7pc5fJxpM3Ej9VUGLnbDy5B4njKA2NvuLh3",
+        "activity": "withdrew 200K SOL ($17.17M) from Binance and staked",
+        "source": "@lookonchain March 2026"
+      }
+    ],
+    "nansen_published": [
+      { "label": "Trump Memecoin Whale", "wallet_prefix": "4ETAJ...ARUj6", "notes": "track on nansen.ai" },
+      { "label": "WIF Mega Holder", "wallet": "cifwifhatday.sol", "notes": "track on nansen.ai" },
+      { "label": "Active Smart Money", "wallet": "traderpow", "notes": "track on nansen.ai" },
+      { "label": "Profitable Sniper", "wallet": "naseem", "notes": "track on nansen.ai" },
+      { "label": "Smart Money Trader", "wallet": "shatter.sol", "notes": "track on nansen.ai" },
+      { "label": "Short-Term Trader", "wallet": "tonka.sol", "notes": "track on nansen.ai" }
+    ]
+  },
+
+  "tracking_tools": {
+    "hyperliquid": ["dexly.trade/hyperliquid/explorer", "hyperdash.info", "coinglass.com"],
+    "polymarket": ["polymarket.com/leaderboard", "0xinsider.com", "predicts.guru"],
+    "solana": ["birdeye.so", "gmgn.ai", "nansen.ai"],
+    "whale_alerts": ["@lookonchain", "@EmberCN", "@ai_9684xtpa", "@spotonchain", "@0x_Discover"]
+  }
+}

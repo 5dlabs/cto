@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polymarket-mm
+  namespace: trading
+  labels:
+    app: polymarket-mm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polymarket-mm
+  template:
+    metadata:
+      labels:
+        app: polymarket-mm
+    spec:
+      containers:
+        - name: polymarket-mm
+          image: registry.5dlabs.ai/5dlabs/runtime:trader
+          command: ["node"]
+          args: ["index.js"]
+          workingDir: /app/skills/trader/polymarket-mm
+          envFrom:
+            - secretRef:
+                name: trader-env
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi

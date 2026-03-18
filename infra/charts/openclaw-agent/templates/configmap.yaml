@@ -278,11 +278,13 @@ data:
         {{- end }}
         {{- $catalogProviders := get $catalogData "providers" | default dict }}
         {{- $catalogGeneratedAt := get $catalogData "generatedAt" | default (.Values.models.catalog.syncedAt | default "") }}
+        {{- if $catalogEnabled }}
         "catalog": {
           "enabled": {{ $catalogEnabled }},
           "source": {{ ternary "mmmodels" "values" $catalogEnabled | quote }},
           "generatedAt": {{ $catalogGeneratedAt | quote }}
         },
+        {{- end }}
         "providers": {
           {{- $first := true }}
           {{- $enabledProviders := dict }}

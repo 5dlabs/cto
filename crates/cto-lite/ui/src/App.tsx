@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AgentChat } from './components/AgentChat'
 import { AgentsView } from './components/AgentsView'
 import { AgentsStudioView } from './components/AgentsStudioView'
@@ -25,6 +25,11 @@ import {
 } from 'lucide-react'
 import * as tauri from './lib/tauri'
 import { getAgentBranding } from './lib/agent-branding'
+import {
+  createMorganSessionState,
+  createMorganSessionId,
+  type MorganSessionState,
+} from './lib/morgan-session'
 
 type NavView = 'chat' | 'voice' | 'video' | 'agents' | 'projects'
 
@@ -75,10 +80,6 @@ function isConversationView(view: NavView): boolean {
   return view === 'chat' || view === 'voice' || view === 'video'
 }
 
-function createSharedSessionId(agentId: string, projectId: string): string {
-  return `${agentId}-${projectId}`
-}
-
 function initialsForName(name: string): string {
   const compact = name.trim()
   if (!compact) return 'AG'
@@ -110,6 +111,7 @@ function App() {
   const [studioState, setStudioState] = useState<tauri.StudioState | null>(null)
   const [studioError, setStudioError] = useState<string | null>(null)
   const [selectedConversationAgentId, setSelectedConversationAgentId] = useState('morgan')
+  const [morganSessionState, setMorganSessionState] = useState<MorganSessionState | null>(null)
 
   useEffect(() => {
     window.localStorage.setItem('cto.activeView', activeView)
@@ -170,7 +172,7 @@ function App() {
     selectedConversationAgent?.displayName ?? selectedConversationAgentId
   const selectedConversationAgentInitials = initialsForName(selectedConversationAgentName)
   const sharedSessionId = selectedProject
-    ? createSharedSessionId(selectedConversationAgentId, selectedProject.id)
+    ? createMorganSessionId(selectedConversationAgentId, selectedProject.id)
     : `${selectedConversationAgentId}-default`
   const sharedRoomName = sharedSessionId
   const selectedConversationBranding = getAgentBranding(selectedConversationAgentId)
@@ -182,6 +184,46 @@ function App() {
         : activeView === 'video'
           ? `${selectedConversationAgentName} video`
           : activeMeta.title
+
+  useEffect(() => {
+    if (!selectedProject) {
+      return
+    }
+
+    setMorganSessionState((current) => {
+      if (
+        current &&
+        current.projectId === selectedProject.id &&
+        current.agentId === selectedConversationAgentId
+      ) {
+        return current
+      }
+
+      return createMorganSessionState(selectedProject.id, selectedConversationAgentId)
+    })
+  }, [selectedConversationAgentId, selectedProject])
+
+  const handleMorganSessionChange = useCallback(
+    (patch: Partial<MorganSessionState>) => {
+      if (!selectedProject) {
+        return
+      }
+
+      setMorganSessionState((current) => {
+        const base = current ?? createMorganSessionState(selectedProject.id, selectedConversationAgentId)
+        return {
+          ...base,
+          ...patch,
+          projectId: selectedProject.id,
+          agentId: selectedConversationAgentId,
+          sessionId: base.sessionId,
+          roomName: patch.roomName ?? base.roomName,
+          revision: base.revision + 1,
+        }
+      })
+    },
+    [selectedConversationAgentId, selectedProject]
+  )
 
   const shellBody = useMemo(() => {
     if (!studioState || !selectedProject) {
@@ -204,6 +246,8 @@ function App() {
             agentName={selectedConversationAgentName}
             projectName={selectedProject.name}
             onOpenVoice={() => setActiveView('voice')}
+            sharedSession={morganSessionState}
+            onSessionStateChange={handleMorganSessionChange}
           />
         )
       case 'voice':
@@ -214,6 +258,8 @@ function App() {
             agentName={selectedConversationAgentName}
             projectName={selectedProject.name}
             roomName={sharedRoomName}
+            sharedSession={morganSessionState}
+            onSessionStateChange={handleMorganSessionChange}
           />
         )
       case 'video':
@@ -224,6 +270,8 @@ function App() {
             agentName={selectedConversationAgentName}
             projectName={selectedProject.name}
             roomName={sharedRoomName}
+            sharedSession={morganSessionState}
+            onSessionStateChange={handleMorganSessionChange}
           />
         )
       case 'agents':
@@ -237,7 +285,17 @@ function App() {
       case 'projects':
         return <ProjectsView state={studioState} onStateChange={handleStudioStateChange} />
     }
-  }, [activeView, selectedProject, sharedRoomName, sharedSessionId, studioState])
+  }, [
+    activeView,
+    handleMorganSessionChange,
+    morganSessionState,
+    selectedConversationAgentId,
+    selectedConversationAgentName,
+    selectedProject,
+    sharedRoomName,
+    sharedSessionId,
+    studioState,
+  ])
 
   return (
     <div className="theme dark relative flex h-screen min-w-0 overflow-hidden bg-[radial-gradient(circle_at_top,#123456_0%,#08111d_26%,#04070d_100%)] text-foreground">

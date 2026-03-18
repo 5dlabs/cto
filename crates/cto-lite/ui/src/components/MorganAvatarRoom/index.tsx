@@ -209,9 +209,9 @@ function createStageViewModel({
     roomChip,
     audioChip,
     videoChip,
-    transcriptEyebrow:
-      normalizedVoiceState === 'connecting' || normalizedVoiceState === 'initializing'
-        ? 'Joining'
+      transcriptEyebrow:
+        normalizedVoiceState === 'connecting' || normalizedVoiceState === 'initializing'
+          ? 'Joining'
         : normalizedVoiceState === 'listening'
           ? 'Listening'
           : 'Ready',
@@ -219,8 +219,8 @@ function createStageViewModel({
       normalizedVoiceState === 'connecting' || normalizedVoiceState === 'initializing'
         ? 'Bringing Morgan into the room.'
         : normalizedVoiceState === 'listening'
-          ? 'Hold to talk when you want Morgan to listen.'
-          : 'Hold to talk whenever you want Morgan to listen.',
+          ? 'The call is live and Morgan is listening.'
+          : 'The call is live. Unmute if you want Morgan to listen.',
     transcriptTone:
       normalizedVoiceState === 'listening' ? 'emerald' : 'violet',
     placeholderCopy: 'Morgan will appear here once LemonSlice publishes video.',

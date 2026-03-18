@@ -8,6 +8,11 @@ global:
   namespace: openclaw
   createNamespace: false
 
+image:
+  repository: "cto/openclaw-platform"
+  tag: "beta-local-arm64"
+  pullPolicy: IfNotPresent
+
 nodeSelector: {}
 tolerations:
   - key: "node-role.kubernetes.io/control-plane"
@@ -27,10 +32,13 @@ resources:
 
 nodeOptions: "--max-old-space-size=4096"
 
+telemetry:
+  enabled: false
+
 agent:
   id: "morgan"
   name: "Morgan"
-  model: "anthropic/claude-3-5-haiku-latest"
+  model: "google/gemini-2.5-flash"
   heartbeat:
     every: "12h"
     target: "last"
@@ -46,8 +54,9 @@ agentDefaults:
   typingMode: "instant"
 
 modelDefaults:
-  primary: "anthropic/claude-3-5-haiku-latest"
+  primary: "google/gemini-2.5-flash"
   fallbacks:
+    - "google/gemini-2.5-pro"
     - "anthropic/claude-sonnet-4-20250514"
     - "openai-api/gpt-5.4"
     - "openai-api/gpt-5.3-codex"
@@ -74,18 +83,31 @@ messaging:
 
 models:
   providers:
+    google:
+      enabled: true
+      api: "google-generative-ai"
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta"
+      apiKeySecretKey: "gemini-api-key"
+      models:
+        - id: "gemini-2.5-flash"
+          name: "Gemini 2.5 Flash"
+        - id: "gemini-2.5-pro"
+          name: "Gemini 2.5 Pro"
     openai:
       enabled: true
-      apiKeySecretKey: "OPENAI_API_KEY"
+      apiKeySecretKey: "openai-api-key"
     anthropic:
       enabled: true
-      apiKeySecretKey: "ANTHROPIC_API_KEY"
+      apiKeySecretKey: "anthropic-api-key"
     minimax:
       api: "anthropic-messages"
       enabled: false
-      apiKeySecretKey: "MINIMAX_API_KEY"
+      apiKeySecretKey: "minimax-api-key"
       baseUrl: "https://api.minimax.io/anthropic"
   repos: []
+
+memorySearch:
+  enabled: false
 
 workspace:
   repos:
@@ -177,7 +199,7 @@ workspace:
       - **Name:** Morgan
       - **Role:** Technical program manager for the avatar proof of concept
       - **Primary mode:** Fast, spoken-friendly execution guidance
-      - **Model:** Claude Sonnet 4
+      - **Model:** Gemini 2.5 Flash
 
     TOOLS.md: |
       # TOOLS.md -- Morgan

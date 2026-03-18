@@ -12,6 +12,10 @@ interface LemonSliceWidgetProps {
   initialState?: "active" | "minimized";
   inline?: boolean;
   className?: string;
+  customActiveWidth?: number;
+  customActiveHeight?: number;
+  customMinimizedWidth?: number;
+  customMinimizedHeight?: number;
 }
 
 export function LemonSliceWidget({
@@ -19,6 +23,10 @@ export function LemonSliceWidget({
   initialState = "active",
   inline = true,
   className,
+  customActiveWidth,
+  customActiveHeight,
+  customMinimizedWidth,
+  customMinimizedHeight,
 }: LemonSliceWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -27,13 +35,17 @@ export function LemonSliceWidget({
     const el = document.createElement("lemon-slice-widget");
     el.setAttribute("agent-id", agentId);
     el.setAttribute("initial-state", initialState);
-    if (inline) el.setAttribute("inline", "");
+    if (inline) el.setAttribute("inline", "true");
+    if (customActiveWidth != null) el.setAttribute("custom-active-width", String(customActiveWidth));
+    if (customActiveHeight != null) el.setAttribute("custom-active-height", String(customActiveHeight));
+    if (customMinimizedWidth != null) el.setAttribute("custom-minimized-width", String(customMinimizedWidth));
+    if (customMinimizedHeight != null) el.setAttribute("custom-minimized-height", String(customMinimizedHeight));
     containerRef.current.innerHTML = "";
     containerRef.current.appendChild(el);
     return () => {
       containerRef.current?.removeChild(el);
     };
-  }, [agentId, initialState, inline]);
+  }, [agentId, initialState, inline, customActiveWidth, customActiveHeight, customMinimizedWidth, customMinimizedHeight]);
 
   return (
     <>

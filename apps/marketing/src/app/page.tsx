@@ -6,7 +6,6 @@ import { AgentGrid, type AgentSquad } from "@/components/agent-card";
 import { Header } from "@/components/header";
 import { TechStack } from "@/components/tech-stack";
 import { HeroExperiment } from "@/components/hero-experiment";
-import { LemonSliceWidget } from "@/components/lemon-slice-widget";
 import { featureFlags } from "@/config/feature-flags";
 
 const homeHref =
@@ -276,7 +275,7 @@ export default function Home() {
 
         {/* Meet Morgan Section */}
         <section id="morgan" className="py-20 px-6 border-t border-border/30 scroll-mt-24">
-          <div className="max-w-3xl mx-auto text-center">
+          <div className="max-w-3xl mx-auto flex flex-col items-center text-center">
             <MorganHeroImage />
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Meet <span className="gradient-text">Morgan</span>
@@ -290,11 +289,16 @@ export default function Home() {
             >
               Talk to Morgan
             </Link>
-            <div className="mt-12 rounded-xl border border-border bg-card/50 p-4 min-h-[320px] flex items-center justify-center">
-              <LemonSliceWidget
-                initialState="minimized"
-                className="w-full min-h-[280px]"
-              />
+            <div className="mt-12 w-full rounded-xl border border-border bg-card/50 p-8 min-h-[280px] flex flex-col items-center justify-center gap-4">
+              <p className="text-muted-foreground text-center">
+                Chat, voice, or video with Morgan — your single point of contact.
+              </p>
+              <Link
+                href="/morgan"
+                className="text-cyan hover:text-cyan-400 font-medium transition-colors"
+              >
+                Try Morgan live →
+              </Link>
             </div>
           </div>
         </section>

@@ -97,7 +97,8 @@ fn normalize_state(mut state: StudioState) -> StudioState {
     for project in &mut state.projects {
         if project.id == "cto-core" && project.name == "CTO Core" {
             project.name = "Sigma 1".to_string();
-            project.summary = "Primary product workspace for the live Morgan experience.".to_string();
+            project.summary =
+                "Primary product workspace for the live Morgan experience.".to_string();
             if project.prd_title == "CTO Desktop MVP" {
                 project.prd_title = "Sigma 1".to_string();
             }
@@ -288,7 +289,8 @@ fn render_agent_config_internal(
         .iter()
         .find(|candidate| candidate.id == agent_id)
         .ok_or_else(|| AppError::ConfigError(format!("Unknown agent id: {agent_id}")))?;
-    let project = project_id.and_then(|id| state.projects.iter().find(|candidate| candidate.id == id));
+    let project =
+        project_id.and_then(|id| state.projects.iter().find(|candidate| candidate.id == id));
     let rendered_at = Utc::now().to_rfc3339();
     let target = format!("local-runtime://openclaw/agents/{agent_id}");
     let payload = serde_json::json!({
@@ -379,10 +381,9 @@ pub async fn studio_apply_agent_config(
     let state = load_state(db.inner())?;
     let rendered = render_agent_config_internal(&state, &agent_id, project_id.as_deref())?;
 
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| AppError::CommandFailed(format!("Failed to resolve app data dir: {error}")))?;
+    let app_data_dir = app.path().app_data_dir().map_err(|error| {
+        AppError::CommandFailed(format!("Failed to resolve app data dir: {error}"))
+    })?;
     let output_dir = app_data_dir.join("studio").join("generated");
     std::fs::create_dir_all(&output_dir)?;
     let file_path = output_dir.join(format!("{}-runtime.json", agent_id));

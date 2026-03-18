@@ -25,8 +25,10 @@ spec:
       securityContext:
         seccompProfile:
           type: Unconfined
-      containers:
-        - name: agave
+      initContainers:
+        # Sidecar: Agave validator starts first, stays running (K8s 1.28+ native sidecar)
+        - name: agave-validator
+          restartPolicy: Always
           image: ghcr.io/dysnix/docker-agave:v2.2.20
           command: ["agave-validator"]
           args:
@@ -115,6 +117,20 @@ spec:
               cpu: "16"
               memory: 750Gi
               hugepages-2Mi: 4Gi
+        # Gate: blocks until Agave RPC accepts connections
+        - name: wait-for-rpc
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Agave RPC on port 8899..."
+              until nc -z localhost 8899; do
+                echo "RPC not ready, retrying in 15s..."
+                sleep 15
+              done
+              echo "RPC is ready!"
+      containers:
         - name: solana-exporter
           image: ghcr.io/asymmetric-research/solana-exporter:v3.0.2
           args:
@@ -125,6 +141,18 @@ spec:
             - name: metrics
               containerPort: 9179
               protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9179
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9179
+            periodSeconds: 15
+            failureThreshold: 2
           resources:
             requests:
               cpu: 100m

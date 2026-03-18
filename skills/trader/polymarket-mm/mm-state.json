@@ -1,0 +1,23 @@
+{
+  "inventory": {
+    "": {
+      "yesShares": 3711.3300000000113,
+      "noShares": 3759.1800000000085,
+      "yesCost": 1461.751999999999,
+      "noCost": 1455.787800000001
+    }
+  },
+  "stats": {
+    "cyclesRun": 31144,
+    "quotesPlaced": 13657,
+    "quotesCancelled": 13657,
+    "fills": 2918,
+    "totalYesBought": 1461.751999999999,
+    "totalNoBought": 1455.787800000001,
+    "totalYesSold": 0,
+    "grossProfit": 1221382.5779463607,
+    "rebatesEarned": 81.50737859760063,
+    "startedAt": "2026-03-15T21:50:41.376Z"
+  },
+  "savedAt": "2026-03-17T19:00:34.989Z"
+}

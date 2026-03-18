@@ -1,0 +1,53 @@
+# Custom Agave build optimized for AMD EPYC 9355 (Zen 5)
+# Targets: AVX-512 + SHA-NI for 10-30% improvement on crypto hot paths
+# Build on solana-rpc-01 (32 cores, znver5): ~1-2 hours with fat LTO
+# Registry: ghcr.io/5dlabs/agave:v2.2.20-znver4
+#
+# Build:
+#   docker build --build-arg AGAVE_VERSION=v2.2.20 \
+#     -t ghcr.io/5dlabs/agave:v2.2.20-znver4 \
+#     -f Dockerfile.agave .
+
+FROM rust:1.86.0-slim-bookworm AS build
+
+RUN apt-get update && apt-get install -y \
+    git \
+    clang \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    libudev-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG AGAVE_VERSION=v2.2.20
+
+RUN git clone --depth 1 --branch $AGAVE_VERSION https://github.com/anza-xyz/agave.git /agave
+
+WORKDIR /agave
+
+# Target znver4 (Zen 4) — closest stable target to Zen 5 in LLVM
+# Enables AVX-512, SHA-NI, VAES, VPCLMULQDQ
+ENV RUSTFLAGS="-C target-cpu=znver4"
+
+# Build validator-only (skip CLI tools we don't need)
+RUN ./scripts/cargo-install-all.sh --validator-only .
+
+# Strip debug symbols (~200MB savings)
+RUN strip /agave/bin/*
+
+# --- Runtime ---
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /agave/bin/ /usr/local/bin/
+
+# jemalloc tuning for reduced fragmentation under Solana's allocation patterns
+ENV MALLOC_CONF="background_thread:true,metadata_thp:always,dirty_decay_ms:3000"
+
+ENTRYPOINT ["agave-validator"]

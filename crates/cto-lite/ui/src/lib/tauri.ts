@@ -7,6 +7,13 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
+type TauriCommandError = {
+  code?: string;
+  message?: string;
+  error?: TauriCommandError | string;
+  cause?: TauriCommandError | string;
+};
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -465,6 +472,24 @@ export interface OpenClawBridgeStatus {
   localUrl: string;
 }
 
+export interface LocalMorganHealth {
+  expectedContext: string;
+  activeContext: string | null;
+  dockerAvailable: boolean;
+  kindContextConfigured: boolean;
+  kindClusterExists: boolean;
+  kindContextReachable: boolean;
+  ingressControllerReady: boolean;
+  morganDeploymentReady: boolean;
+  morganServicePresent: boolean;
+  morganIngressHost: string | null;
+  ctoToolsReady: boolean;
+  ctoOpenmemoryReady: boolean;
+  natsReady: boolean;
+  gatewayReachable: boolean;
+  problems: string[];
+}
+
 export interface MorganDiagnostics {
   healthy: boolean;
   modelPrimary: string | null;
@@ -524,6 +549,34 @@ export interface ApplyAgentConfigResult {
   target: string;
   renderedAt: string;
   message: string;
+}
+
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (error && typeof error === 'object') {
+    const candidate = error as TauriCommandError;
+
+    if (typeof candidate.message === 'string' && candidate.message.trim()) {
+      return candidate.message;
+    }
+
+    if (candidate.error) {
+      return getErrorMessage(candidate.error);
+    }
+
+    if (candidate.cause) {
+      return getErrorMessage(candidate.cause);
+    }
+  }
+
+  return 'Unknown error';
 }
 
 /** Send a message to the OpenClaw PM agent (Morgan) */
@@ -610,6 +663,10 @@ export async function openclawStopLocalBridge(agentId?: string): Promise<OpenCla
 /** Get the local Morgan bridge status */
 export async function openclawGetLocalBridgeStatus(agentId?: string): Promise<OpenClawBridgeStatus> {
   return invoke<OpenClawBridgeStatus>('openclaw_get_local_bridge_status', { agentId: agentId ?? null });
+}
+
+export async function openclawGetLocalHealth(): Promise<LocalMorganHealth> {
+  return invoke<LocalMorganHealth>('openclaw_get_local_health');
 }
 
 export async function openclawGetMorganDiagnostics(agentId?: string): Promise<MorganDiagnostics> {

@@ -5,6 +5,7 @@
 //! workflow execution, and CLI proxying.
 
 use crate::error::AppError;
+use crate::runtime;
 use acp_runtime::{run_oneshot_prompt, AcpClientProfile, AcpPermissionPolicy, AcpPromptRequest};
 use agent_client_protocol::{ContentBlock, SessionNotification, SessionUpdate};
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::State;
 
@@ -144,6 +145,26 @@ pub struct OpenClawBridgeStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LocalMorganHealth {
+    pub expected_context: String,
+    pub active_context: Option<String>,
+    pub docker_available: bool,
+    pub kind_context_configured: bool,
+    pub kind_cluster_exists: bool,
+    pub kind_context_reachable: bool,
+    pub ingress_controller_ready: bool,
+    pub morgan_deployment_ready: bool,
+    pub morgan_service_present: bool,
+    pub morgan_ingress_host: Option<String>,
+    pub cto_tools_ready: bool,
+    pub cto_openmemory_ready: bool,
+    pub nats_ready: bool,
+    pub gateway_reachable: bool,
+    pub problems: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MorganDiagnostics {
     pub healthy: bool,
     pub model_primary: Option<String>,
@@ -222,6 +243,16 @@ fn gateway_auth_token() -> String {
     std::env::var("OPENCLAW_GATEWAY_TOKEN").unwrap_or_else(|_| DEFAULT_GATEWAY_TOKEN.to_string())
 }
 
+fn gateway_ws_url(base_url: &str) -> String {
+    if let Some(stripped) = base_url.strip_prefix("http://") {
+        format!("ws://{stripped}")
+    } else if let Some(stripped) = base_url.strip_prefix("https://") {
+        format!("wss://{stripped}")
+    } else {
+        base_url.to_string()
+    }
+}
+
 fn gateway_request(client: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
     client
         .get(url)
@@ -285,7 +316,37 @@ fn desktop_acp_cwd() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("/workspace"))
 }
 
-fn agent_acp_runtime(session_key: &str, agent_id: &str) -> Result<cto_config::AcpRuntimeConfig, AppError> {
+fn local_agent_acp_runtime(
+    session_key: &str,
+    gateway_url: &str,
+) -> Result<cto_config::AcpRuntimeConfig, AppError> {
+    let openclaw = which::which("openclaw")
+        .map_err(|_| AppError::CommandFailed("openclaw is required for local ACP".to_string()))?;
+
+    let mut runtime = cto_config::AcpRuntimeConfig::stdio(
+        openclaw.to_string_lossy().to_string(),
+        [
+            "acp".to_string(),
+            "--url".to_string(),
+            gateway_ws_url(gateway_url),
+            "--token".to_string(),
+            gateway_auth_token(),
+            "--session".to_string(),
+            session_key.to_string(),
+            "--no-prefix-cwd".to_string(),
+        ],
+    );
+    runtime.env.insert(
+        "OPENCLAW_ALLOW_INSECURE_PRIVATE_WS".to_string(),
+        "1".to_string(),
+    );
+    Ok(runtime)
+}
+
+fn in_cluster_agent_acp_runtime(
+    session_key: &str,
+    agent_id: &str,
+) -> Result<cto_config::AcpRuntimeConfig, AppError> {
     let kubectl = which::which("kubectl")
         .map_err(|_| AppError::CommandFailed("kubectl is required for agent ACP".to_string()))?;
     let deployment_name = agent_deployment_name(agent_id);
@@ -314,6 +375,18 @@ fn agent_acp_runtime(session_key: &str, agent_id: &str) -> Result<cto_config::Ac
             "--no-prefix-cwd".to_string(),
         ],
     ))
+}
+
+fn agent_acp_runtime(
+    session_key: &str,
+    agent_id: &str,
+    gateway_url: Option<&str>,
+) -> Result<cto_config::AcpRuntimeConfig, AppError> {
+    if let Some(url) = gateway_url.filter(|value| !value.trim().is_empty()) {
+        return local_agent_acp_runtime(session_key, url);
+    }
+
+    in_cluster_agent_acp_runtime(session_key, agent_id)
 }
 
 fn chunk_text(content: &ContentBlock) -> Option<&str> {
@@ -517,9 +590,231 @@ fn build_bridge_status(
     }
 }
 
+fn kubectl_context_exists(context: &str) -> bool {
+    let Ok(stdout) = kubectl_output(&["config", "get-contexts", context, "-o", "name"]) else {
+        return false;
+    };
+
+    String::from_utf8_lossy(&stdout).trim() == context
+}
+
+fn kubectl_current_context() -> Option<String> {
+    let stdout = kubectl_output(&["config", "current-context"]).ok()?;
+    let value = String::from_utf8_lossy(&stdout).trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+fn kubectl_context_reachable(context: &str) -> bool {
+    kubectl_output(&[
+        "--context",
+        context,
+        "get",
+        "namespace",
+        "default",
+        "-o",
+        "name",
+    ])
+    .is_ok()
+}
+
+fn kind_cluster_exists(name: &str) -> bool {
+    let Ok(kind) = which::which("kind") else {
+        return false;
+    };
+
+    let Ok(output) = Command::new(kind).args(["get", "clusters"]).output() else {
+        return false;
+    };
+
+    if !output.status.success() {
+        return false;
+    }
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .any(|line| line.trim() == name)
+}
+
+fn kind_ready_replicas(namespace: &str, deployment: &str) -> u32 {
+    let Ok(stdout) = kubectl_output(&[
+        "--context",
+        LOCAL_KIND_CONTEXT,
+        "get",
+        "deployment",
+        deployment,
+        "-n",
+        namespace,
+        "-o",
+        "jsonpath={.status.readyReplicas}",
+    ]) else {
+        return 0;
+    };
+
+    String::from_utf8_lossy(&stdout)
+        .trim()
+        .parse::<u32>()
+        .unwrap_or(0)
+}
+
+fn kind_service_exists(namespace: &str, service: &str) -> bool {
+    kubectl_output(&[
+        "--context",
+        LOCAL_KIND_CONTEXT,
+        "get",
+        "service",
+        service,
+        "-n",
+        namespace,
+        "-o",
+        "name",
+    ])
+    .is_ok()
+}
+
+fn kind_ingress_host(namespace: &str, ingress: &str) -> Option<String> {
+    let stdout = kubectl_output(&[
+        "--context",
+        LOCAL_KIND_CONTEXT,
+        "get",
+        "ingress",
+        ingress,
+        "-n",
+        namespace,
+        "-o",
+        "jsonpath={.spec.rules[0].host}",
+    ])
+    .ok()?;
+
+    let value = String::from_utf8_lossy(&stdout).trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+async fn collect_local_morgan_health() -> LocalMorganHealth {
+    let docker_available = runtime::scan_runtime_environment().docker_available;
+    let active_context = kubectl_current_context();
+    let kind_context_configured = kubectl_context_exists(LOCAL_KIND_CONTEXT);
+    let kind_cluster_exists = kind_cluster_exists("cto-lite");
+    let kind_context_reachable =
+        kind_context_configured && kubectl_context_reachable(LOCAL_KIND_CONTEXT);
+    let ingress_controller_ready = kind_context_reachable
+        && kind_ready_replicas("ingress-nginx", "ingress-nginx-controller") > 0;
+    let morgan_deployment_ready =
+        kind_context_reachable && kind_ready_replicas("openclaw", "openclaw-morgan") > 0;
+    let morgan_service_present =
+        kind_context_reachable && kind_service_exists("openclaw", "openclaw-morgan");
+    let morgan_ingress_host = if kind_context_reachable {
+        kind_ingress_host("openclaw", "openclaw-morgan")
+    } else {
+        None
+    };
+    let cto_tools_ready = kind_context_reachable && kind_ready_replicas("cto", "cto-tools") > 0;
+    let cto_openmemory_ready =
+        kind_context_reachable && kind_ready_replicas("cto", "cto-openmemory") > 0;
+    let nats_ready = kind_context_reachable && kind_ready_replicas("messaging", "nats") > 0;
+    let gateway_reachable = if kind_context_reachable {
+        gateway_url_is_reachable(&local_ingress_url()).await
+    } else {
+        false
+    };
+
+    let mut problems = Vec::new();
+    if !docker_available {
+        problems.push("Docker-compatible runtime unavailable".to_string());
+    }
+    if !kind_cluster_exists {
+        problems.push("kind cluster 'cto-lite' does not exist".to_string());
+    }
+    if !kind_context_configured {
+        problems.push(format!("kubectl context '{LOCAL_KIND_CONTEXT}' is missing"));
+    } else if !kind_context_reachable {
+        problems.push(format!(
+            "kubectl context '{LOCAL_KIND_CONTEXT}' is not reachable"
+        ));
+    }
+    if kind_context_reachable && !ingress_controller_ready {
+        problems.push("ingress-nginx controller is not ready in kind".to_string());
+    }
+    if kind_context_reachable && !morgan_deployment_ready {
+        problems.push("Morgan deployment is not ready in kind".to_string());
+    }
+    if kind_context_reachable && !morgan_service_present {
+        problems.push("Morgan service is missing in kind".to_string());
+    }
+    if kind_context_reachable && morgan_ingress_host.as_deref() != Some("morgan.localhost") {
+        problems.push("Morgan ingress is missing or not bound to morgan.localhost".to_string());
+    }
+    if kind_context_reachable && !cto_tools_ready {
+        problems.push("cto-tools deployment is not ready".to_string());
+    }
+    if kind_context_reachable && !cto_openmemory_ready {
+        problems.push("cto-openmemory deployment is not ready".to_string());
+    }
+    if kind_context_reachable && !nats_ready {
+        problems.push("nats deployment is not ready".to_string());
+    }
+    if kind_context_reachable && !gateway_reachable {
+        problems.push("morgan.localhost is not reachable".to_string());
+    }
+
+    LocalMorganHealth {
+        expected_context: LOCAL_KIND_CONTEXT.to_string(),
+        active_context,
+        docker_available,
+        kind_context_configured,
+        kind_cluster_exists,
+        kind_context_reachable,
+        ingress_controller_ready,
+        morgan_deployment_ready,
+        morgan_service_present,
+        morgan_ingress_host,
+        cto_tools_ready,
+        cto_openmemory_ready,
+        nats_ready,
+        gateway_reachable,
+        problems,
+    }
+}
+
+fn ensure_local_morgan_exec_ready(health: &LocalMorganHealth) -> Result<(), AppError> {
+    let mut blockers = Vec::new();
+    if !health.docker_available {
+        blockers.push("Docker-compatible runtime unavailable");
+    }
+    if !health.kind_cluster_exists {
+        blockers.push("kind cluster 'cto-lite' missing");
+    }
+    if !health.kind_context_configured {
+        blockers.push("kubectl context 'kind-cto-lite' missing");
+    }
+    if !health.kind_context_reachable {
+        blockers.push("kubectl context 'kind-cto-lite' unreachable");
+    }
+    if !health.morgan_deployment_ready {
+        blockers.push("Morgan deployment not ready");
+    }
+
+    if blockers.is_empty() {
+        Ok(())
+    } else {
+        Err(AppError::CommandFailed(format!(
+            "Local Morgan is not ready: {}",
+            blockers.join("; ")
+        )))
+    }
+}
+
 fn kubectl_output(args: &[&str]) -> Result<Vec<u8>, AppError> {
-    let kubectl = which::which("kubectl")
-        .map_err(|_| AppError::CommandFailed("kubectl is required to inspect Morgan".to_string()))?;
+    let kubectl = which::which("kubectl").map_err(|_| {
+        AppError::CommandFailed("kubectl is required to inspect Morgan".to_string())
+    })?;
 
     let output = Command::new(kubectl)
         .args(args)
@@ -586,10 +881,6 @@ async fn start_local_bridge_inner(
     agent_id: &str,
 ) -> Result<OpenClawBridgeStatus, AppError> {
     let _startup = state.startup.lock().await;
-
-    if gateway_url_is_reachable(&local_ingress_url()).await {
-        return get_local_bridge_status_inner(state, agent_id).await;
-    }
 
     if gateway_url_is_reachable(&local_bridge_url()).await {
         return get_local_bridge_status_inner(state, agent_id).await;
@@ -793,68 +1084,96 @@ pub async fn openclaw_get_local_bridge_status(
 }
 
 #[tauri::command]
+pub async fn openclaw_get_local_health() -> Result<LocalMorganHealth, AppError> {
+    Ok(collect_local_morgan_health().await)
+}
+
+#[tauri::command]
 pub async fn openclaw_get_morgan_diagnostics(
     agent_id: Option<String>,
     bridge: State<'_, LocalBridgeState>,
 ) -> Result<MorganDiagnostics, AppError> {
     let agent_id = normalize_agent_id(agent_id);
     let deployment_name = agent_deployment_name(&agent_id);
-    let healthy = gateway_url_is_reachable(&resolve_gateway_url(bridge.inner(), &agent_id, false).await?)
-        .await;
+    let health = collect_local_morgan_health().await;
+    let healthy = if health.gateway_reachable {
+        true
+    } else if let Ok(url) = resolve_gateway_url(bridge.inner(), &agent_id, false).await {
+        gateway_url_is_reachable(&url).await
+    } else {
+        false
+    };
 
-    let config_bytes = kubectl_output(&[
-        "--context",
-        LOCAL_KIND_CONTEXT,
-        "-n",
-        AGENT_DEPLOYMENT_NAMESPACE,
-        "exec",
-        &format!("deploy/{deployment_name}"),
-        "-c",
-        AGENT_CONTAINER_NAME,
-        "--",
-        "sh",
-        "-lc",
-        "cat /workspace/.openclaw/openclaw.json",
-    ])?;
+    let mut model_primary = None;
+    let mut model_fallbacks = Vec::new();
+    let mut catalog_source = None;
+    let mut catalog_generated_at = None;
+    let mut catalog_provider_count = 0;
+    let mut catalog_model_count = 0;
+    let mut recent_errors = health.problems.clone();
 
-    let config: serde_json::Value = serde_json::from_slice(&config_bytes)?;
-    let model_primary = config
-        .pointer("/agents/defaults/model/primary")
-        .and_then(|value| value.as_str())
-        .map(ToOwned::to_owned);
-    let model_fallbacks = config
-        .pointer("/agents/defaults/model/fallbacks")
-        .and_then(|value| value.as_array())
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(|value| value.as_str().map(ToOwned::to_owned))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let catalog_source = config
-        .pointer("/models/catalog/source")
-        .and_then(|value| value.as_str())
-        .map(ToOwned::to_owned);
-    let catalog_generated_at = config
-        .pointer("/models/catalog/generatedAt")
-        .and_then(|value| value.as_str())
-        .map(ToOwned::to_owned);
-    let (catalog_provider_count, catalog_model_count) = config
-        .pointer("/models/providers")
-        .and_then(|value| value.as_object())
-        .map(|providers| {
-            let model_count = providers
-                .values()
-                .filter_map(|provider| provider.get("models").and_then(|models| models.as_array()))
-                .map(std::vec::Vec::len)
-                .sum::<usize>();
-            (providers.len(), model_count)
-        })
-        .unwrap_or((0, 0));
+    if health.kind_context_reachable && health.morgan_deployment_ready {
+        if let Ok(config_bytes) = kubectl_output(&[
+            "--context",
+            LOCAL_KIND_CONTEXT,
+            "-n",
+            AGENT_DEPLOYMENT_NAMESPACE,
+            "exec",
+            &format!("deploy/{deployment_name}"),
+            "-c",
+            AGENT_CONTAINER_NAME,
+            "--",
+            "sh",
+            "-lc",
+            "cat /workspace/.openclaw/openclaw.json",
+        ]) {
+            if let Ok(config) = serde_json::from_slice::<serde_json::Value>(&config_bytes) {
+                model_primary = config
+                    .pointer("/agents/defaults/model/primary")
+                    .and_then(|value| value.as_str())
+                    .map(ToOwned::to_owned);
+                model_fallbacks = config
+                    .pointer("/agents/defaults/model/fallbacks")
+                    .and_then(|value| value.as_array())
+                    .map(|values| {
+                        values
+                            .iter()
+                            .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                catalog_source = config
+                    .pointer("/models/catalog/source")
+                    .and_then(|value| value.as_str())
+                    .map(ToOwned::to_owned);
+                catalog_generated_at = config
+                    .pointer("/models/catalog/generatedAt")
+                    .and_then(|value| value.as_str())
+                    .map(ToOwned::to_owned);
+                let counts = config
+                    .pointer("/models/providers")
+                    .and_then(|value| value.as_object())
+                    .map(|providers| {
+                        let model_count = providers
+                            .values()
+                            .filter_map(|provider| {
+                                provider.get("models").and_then(|models| models.as_array())
+                            })
+                            .map(std::vec::Vec::len)
+                            .sum::<usize>();
+                        (providers.len(), model_count)
+                    })
+                    .unwrap_or((0, 0));
+                catalog_provider_count = counts.0;
+                catalog_model_count = counts.1;
+            } else {
+                recent_errors.push("Unable to parse live Morgan config".to_string());
+            }
+        } else {
+            recent_errors.push("Unable to read live Morgan config".to_string());
+        }
 
-    let logs = String::from_utf8(
-        kubectl_output(&[
+        match kubectl_output(&[
             "--context",
             LOCAL_KIND_CONTEXT,
             "-n",
@@ -865,9 +1184,24 @@ pub async fn openclaw_get_morgan_diagnostics(
             AGENT_CONTAINER_NAME,
             "--since=10m",
             "--tail=200",
-        ])?,
-    )
-    .map_err(|error| AppError::CommandFailed(format!("Invalid Morgan logs: {error}")))?;
+        ]) {
+            Ok(log_bytes) => {
+                if let Ok(logs) = String::from_utf8(log_bytes) {
+                    recent_errors.extend(recent_backend_errors(&logs));
+                } else {
+                    recent_errors.push("Unable to decode Morgan logs".to_string());
+                }
+            }
+            Err(_) => {
+                recent_errors.push("Unable to read recent Morgan logs".to_string());
+            }
+        }
+    }
+
+    recent_errors = recent_errors
+        .into_iter()
+        .filter(|entry| !entry.trim().is_empty())
+        .collect::<Vec<_>>();
 
     Ok(MorganDiagnostics {
         healthy,
@@ -877,7 +1211,7 @@ pub async fn openclaw_get_morgan_diagnostics(
         catalog_generated_at,
         catalog_provider_count,
         catalog_model_count,
-        recent_errors: recent_backend_errors(&logs),
+        recent_errors,
     })
 }
 
@@ -887,14 +1221,20 @@ pub async fn openclaw_send_message(
     session_id: String,
     message: String,
     agent_id: Option<String>,
-    _bridge: State<'_, LocalBridgeState>,
+    bridge: State<'_, LocalBridgeState>,
     conversations: State<'_, ConversationState>,
 ) -> Result<OpenClawResponse, AppError> {
     let started_at = Instant::now();
     let agent_id = normalize_agent_id(agent_id);
+    let health = collect_local_morgan_health().await;
+    ensure_local_morgan_exec_ready(&health)?;
     let deployment_name = agent_deployment_name(&agent_id);
     let gateway_session_key = project_gateway_session_key(&agent_id, &session_id);
-    let runtime = agent_acp_runtime(&gateway_session_key, &agent_id)?;
+    let gateway_base_url = match start_local_bridge_inner(bridge.inner(), &agent_id).await {
+        Ok(status) if status.running => Some(local_bridge_url()),
+        _ => None,
+    };
+    let runtime = agent_acp_runtime(&gateway_session_key, &agent_id, gateway_base_url.as_deref())?;
     let user_message = OpenClawMessage {
         role: "user".to_string(),
         content: message.clone(),
@@ -954,10 +1294,12 @@ pub async fn openclaw_send_message(
         content: assistant_text,
         action: None,
         latency_ms: Some(latency_ms),
-        gateway_url: Some(format!(
-            "k8s://{}/{}/{}",
-            LOCAL_KIND_CONTEXT, AGENT_DEPLOYMENT_NAMESPACE, deployment_name
-        )),
+        gateway_url: gateway_base_url.or_else(|| {
+            Some(format!(
+                "k8s://{}/{}/{}",
+                LOCAL_KIND_CONTEXT, AGENT_DEPLOYMENT_NAMESPACE, deployment_name
+            ))
+        }),
         gateway_session_key: Some(gateway_session_key),
         acp_session_id: Some(result.session_id),
         stop_reason: Some(format!("{:?}", result.stop_reason)),
@@ -970,6 +1312,7 @@ pub async fn openclaw_send_avatar_context(
     room_name: String,
     content: String,
     agent_id: Option<String>,
+    bridge: State<'_, LocalBridgeState>,
     conversations: State<'_, ConversationState>,
 ) -> Result<OpenClawResponse, AppError> {
     let trimmed_room = room_name.trim();
@@ -989,9 +1332,15 @@ pub async fn openclaw_send_avatar_context(
 
     let started_at = Instant::now();
     let agent_id = normalize_agent_id(agent_id);
+    let health = collect_local_morgan_health().await;
+    ensure_local_morgan_exec_ready(&health)?;
     let deployment_name = agent_deployment_name(&agent_id);
     let gateway_session_key = project_gateway_session_key(&agent_id, trimmed_room);
-    let runtime = agent_acp_runtime(&gateway_session_key, &agent_id)?;
+    let gateway_base_url = match start_local_bridge_inner(bridge.inner(), &agent_id).await {
+        Ok(status) if status.running => Some(local_bridge_url()),
+        _ => None,
+    };
+    let runtime = agent_acp_runtime(&gateway_session_key, &agent_id, gateway_base_url.as_deref())?;
     let prompt = format!(
         "The user has pasted supporting context for the active voice call. \
 Treat it as additional material for the current task and use it in the next reply.\n\n\
@@ -1043,10 +1392,12 @@ Context:\n{trimmed_content}\n\nReply exactly: CONTEXT_STORED"
         content: assistant_text,
         action: None,
         latency_ms: Some(started_at.elapsed().as_millis() as u64),
-        gateway_url: Some(format!(
-            "k8s://{}/{}/{}",
-            LOCAL_KIND_CONTEXT, AGENT_DEPLOYMENT_NAMESPACE, deployment_name
-        )),
+        gateway_url: gateway_base_url.or_else(|| {
+            Some(format!(
+                "k8s://{}/{}/{}",
+                LOCAL_KIND_CONTEXT, AGENT_DEPLOYMENT_NAMESPACE, deployment_name
+            ))
+        }),
         gateway_session_key: Some(gateway_session_key),
         acp_session_id: Some(result.session_id),
         stop_reason: Some(format!("{:?}", result.stop_reason)),
@@ -1275,10 +1626,17 @@ pub async fn openclaw_exec_cli(
 mod tests {
     use super::*;
 
+    fn morgan_acp_test_lock() -> &'static tokio::sync::Mutex<()> {
+        static LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
+    }
+
     #[tokio::test]
     #[ignore = "requires a running local kind cluster with Morgan deployed"]
     async fn smoke_morgan_acp_turn_returns_text() {
-        let runtime = agent_acp_runtime("agent:morgan:test-acp-smoke", DEFAULT_AGENT_ID).expect("runtime");
+        let _guard = morgan_acp_test_lock().lock().await;
+        let runtime = agent_acp_runtime("agent:morgan:test-acp-smoke", DEFAULT_AGENT_ID, None)
+            .expect("runtime");
         let result = run_morgan_acp_turn(
             runtime,
             AcpPromptRequest {
@@ -1302,6 +1660,145 @@ mod tests {
             !assistant_text.trim().is_empty(),
             "expected assistant text, stop_reason={:?}",
             result.stop_reason
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires a running local kind cluster with Morgan deployed"]
+    async fn smoke_morgan_acp_turn_via_local_bridge_returns_text() {
+        let _guard = morgan_acp_test_lock().lock().await;
+        let bridge = LocalBridgeState::new();
+        let bridge_status = start_local_bridge_inner(&bridge, DEFAULT_AGENT_ID)
+            .await
+            .expect("bridge should start");
+        assert!(
+            bridge_status.connected,
+            "expected local bridge connectivity, status={bridge_status:?}"
+        );
+
+        let runtime = agent_acp_runtime(
+            "agent:morgan:test-acp-bridge-smoke",
+            DEFAULT_AGENT_ID,
+            Some(DEFAULT_LOCAL_BRIDGE_URL),
+        )
+        .expect("runtime");
+        let result = run_morgan_acp_turn(
+            runtime,
+            AcpPromptRequest {
+                runtime_id: DEFAULT_AGENT_ID.to_string(),
+                cwd: desktop_acp_cwd(),
+                prompt: "Reply with exactly CTO_ACP_BRIDGE_SMOKE.".to_string(),
+                session_id: None,
+            },
+            AcpClientProfile {
+                name: "cto-acp-bridge-smoke".to_string(),
+                title: "CTO ACP Bridge Smoke".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                permission_policy: AcpPermissionPolicy::AllowAll,
+            },
+        )
+        .await
+        .expect("bridge ACP turn should succeed");
+
+        if let Ok(mut process) = bridge.process.lock() {
+            if let Some(mut child) = process.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+
+        let assistant_text = extract_agent_reply(&result.notifications);
+        assert!(
+            !assistant_text.trim().is_empty(),
+            "expected assistant text, stop_reason={:?}",
+            result.stop_reason
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires a running local kind cluster with Morgan deployed"]
+    async fn smoke_morgan_acp_session_persists_across_turns() {
+        let _guard = morgan_acp_test_lock().lock().await;
+        let session_key = format!(
+            "agent:morgan:test-acp-session-persistence-{}",
+            uuid::Uuid::new_v4()
+        );
+        let runtime = agent_acp_runtime(&session_key, DEFAULT_AGENT_ID, None).expect("runtime");
+
+        let _first = run_morgan_acp_turn(
+            runtime.clone(),
+            AcpPromptRequest {
+                runtime_id: DEFAULT_AGENT_ID.to_string(),
+                cwd: desktop_acp_cwd(),
+                prompt: "Remember the codeword RIVERSTONE and reply exactly READY.".to_string(),
+                session_id: None,
+            },
+            AcpClientProfile {
+                name: "cto-acp-session-smoke".to_string(),
+                title: "CTO ACP Session Smoke".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                permission_policy: AcpPermissionPolicy::AllowAll,
+            },
+        )
+        .await
+        .expect("first ACP turn should succeed");
+
+        let _second = run_morgan_acp_turn(
+            runtime,
+            AcpPromptRequest {
+                runtime_id: DEFAULT_AGENT_ID.to_string(),
+                cwd: desktop_acp_cwd(),
+                prompt: "What codeword did I ask you to remember? Reply with only the codeword."
+                    .to_string(),
+                session_id: None,
+            },
+            AcpClientProfile {
+                name: "cto-acp-session-smoke".to_string(),
+                title: "CTO ACP Session Smoke".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                permission_policy: AcpPermissionPolicy::AllowAll,
+            },
+        )
+        .await
+        .expect("second ACP turn should succeed");
+
+        let session_log = kubectl_output(&[
+            "--context",
+            LOCAL_KIND_CONTEXT,
+            "-n",
+            AGENT_DEPLOYMENT_NAMESPACE,
+            "exec",
+            &format!("deploy/{}", agent_deployment_name(DEFAULT_AGENT_ID)),
+            "-c",
+            AGENT_CONTAINER_NAME,
+            "--",
+            "sh",
+            "-lc",
+            &format!(
+                "rg -n '{}' /workspace/.openclaw/logs/openclaw.log | tail -n 40",
+                session_key
+            ),
+        ])
+        .expect("session log should be readable");
+        let session_text =
+            String::from_utf8(session_log).expect("session log should be valid utf-8");
+        let counts = regex::Regex::new(r"\[context-diag\] pre-prompt:.*messages=(\d+)")
+            .expect("regex")
+            .captures_iter(&session_text)
+            .filter_map(|capture| {
+                capture
+                    .get(1)
+                    .and_then(|value| value.as_str().parse::<u32>().ok())
+            })
+            .collect::<Vec<_>>();
+
+        assert!(
+            counts.len() >= 2,
+            "expected at least two context snapshots for session, log={session_text}"
+        );
+        assert!(
+            counts.iter().copied().max().unwrap_or_default() > 0,
+            "expected later turn to include prior messages, counts={counts:?}, log={session_text}"
         );
     }
 }
