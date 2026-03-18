@@ -66,26 +66,23 @@ spec:
         seccompProfile:
           type: Unconfined
       initContainers:
-        # Download Yellowstone gRPC geyser plugin .so
-        - name: download-yellowstone
-          image: ubuntu:22.04
+        # Verify Yellowstone gRPC geyser plugin .so is present
+        # Built from source: docker build -f docker/Dockerfile.yellowstone-grpc .
+        # Deployed to node: kubectl cp ... solana-rpc-01:/var/mnt/yellowstone/lib/
+        - name: check-yellowstone
+          image: busybox:1.36
           command:
-            - bash
+            - sh
             - -c
             - |
               if [ -f /opt/yellowstone/lib/libyellowstone_grpc_geyser.so ]; then
-                echo "Yellowstone gRPC plugin already downloaded, skipping."
-                exit 0
+                echo "Yellowstone gRPC plugin found."
+                ls -la /opt/yellowstone/lib/
+              else
+                echo "WARNING: Yellowstone gRPC plugin not found at /opt/yellowstone/lib/"
+                echo "Validator will start without geyser plugin."
+                mkdir -p /opt/yellowstone/lib
               fi
-              echo "Downloading Yellowstone gRPC v7.0.0+solana.2.2.20..."
-              apt-get update -qq && apt-get install -y -qq curl bzip2 ca-certificates > /dev/null 2>&1
-              curl -fsSL -o /tmp/yellowstone.tar.bz2 \
-                "https://github.com/rpcpool/yellowstone-grpc/releases/download/v7.0.0%2Bsolana.2.2.20/yellowstone-grpc-geyser-release22-x86_64-unknown-linux-gnu.tar.bz2"
-              mkdir -p /opt/yellowstone
-              tar -xjf /tmp/yellowstone.tar.bz2 -C /opt/yellowstone --strip-components=1
-              rm /tmp/yellowstone.tar.bz2
-              ls -la /opt/yellowstone/
-              echo "Yellowstone gRPC plugin ready."
           volumeMounts:
             - name: yellowstone-plugin
               mountPath: /opt/yellowstone
@@ -143,10 +140,8 @@ spec:
             - skip_any_corrupted_record
             - --use-snapshot-archives-at-startup
             - when-newest
-            # Yellowstone gRPC geyser plugin — disabled until .so crash is resolved
-            # See: https://github.com/rpcpool/yellowstone-grpc/releases/tag/v7.0.0+solana.2.2.20
-            # - --geyser-plugin-config
-            # - /etc/yellowstone/config.json
+            - --geyser-plugin-config
+            - /etc/yellowstone/config.json
             - --log
             - "-"
           env:

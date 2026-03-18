@@ -1,0 +1,49 @@
+# Build Yellowstone gRPC geyser plugin (.so) for Agave v2.2.20
+# Must use Rust 1.84.1 to match the dysnix/docker-agave:v2.2.20 binary ABI
+#
+# Build:
+#   docker build -t yellowstone-grpc-builder:v2.2.20 \
+#     -f Dockerfile.yellowstone-grpc .
+#
+# Extract .so:
+#   docker create --name ys-extract yellowstone-grpc-builder:v2.2.20
+#   docker cp ys-extract:/output/libyellowstone_grpc_geyser.so .
+#   docker rm ys-extract
+#
+# Deploy to K8s node:
+#   scp libyellowstone_grpc_geyser.so solana-rpc-01:/var/mnt/yellowstone/lib/
+#   — or use kubectl cp if preferred
+
+FROM rust:1.84.1-slim-bookworm AS build
+
+RUN apt-get update && apt-get install -y \
+    git \
+    clang \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG YELLOWSTONE_VERSION=v7.0.0+solana.2.2.20
+
+# Clone at the exact tagged release
+RUN git clone --depth 1 --branch "${YELLOWSTONE_VERSION}" \
+    https://github.com/rpcpool/yellowstone-grpc.git /yellowstone-grpc
+
+WORKDIR /yellowstone-grpc
+
+# Build only the geyser plugin crate (not the client or other tools)
+RUN cargo build --release --package yellowstone-grpc-geyser
+
+# Verify the .so exists and check its dependencies
+RUN ls -lah target/release/libyellowstone_grpc_geyser.so \
+    && ldd target/release/libyellowstone_grpc_geyser.so
+
+# Copy to output directory
+RUN mkdir -p /output \
+    && cp target/release/libyellowstone_grpc_geyser.so /output/ \
+    && strip /output/libyellowstone_grpc_geyser.so
+
+FROM scratch
+COPY --from=build /output/libyellowstone_grpc_geyser.so /output/libyellowstone_grpc_geyser.so
