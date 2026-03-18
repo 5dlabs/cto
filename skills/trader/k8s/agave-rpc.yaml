@@ -1,3 +1,37 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yellowstone-grpc-config
+  namespace: solana
+data:
+  config.json: |
+    {
+      "libpath": "/opt/yellowstone/lib/libyellowstone_grpc_geyser.so",
+      "log": {
+        "level": "info"
+      },
+      "tokio": {
+        "worker_threads": 4
+      },
+      "grpc": {
+        "address": "0.0.0.0:10000",
+        "compression": {
+          "accept": ["gzip", "zstd"],
+          "send": ["gzip", "zstd"]
+        },
+        "max_decoding_message_size": "4_194_304",
+        "snapshot_client_channel_capacity": "50_000_000",
+        "channel_capacity": "100_000",
+        "unary_concurrency_limit": 100,
+        "unary_disabled": false,
+        "x_token": null
+      },
+      "prometheus": {
+        "address": "0.0.0.0:8999"
+      }
+    }
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,6 +60,29 @@ spec:
         seccompProfile:
           type: Unconfined
       initContainers:
+        # Download Yellowstone gRPC geyser plugin .so
+        - name: download-yellowstone
+          image: ubuntu:22.04
+          command:
+            - bash
+            - -c
+            - |
+              if [ -f /opt/yellowstone/lib/libyellowstone_grpc_geyser.so ]; then
+                echo "Yellowstone gRPC plugin already downloaded, skipping."
+                exit 0
+              fi
+              echo "Downloading Yellowstone gRPC v7.0.0+solana.2.2.20..."
+              apt-get update -qq && apt-get install -y -qq curl bzip2 ca-certificates > /dev/null 2>&1
+              curl -fsSL -o /tmp/yellowstone.tar.bz2 \
+                "https://github.com/rpcpool/yellowstone-grpc/releases/download/v7.0.0%2Bsolana.2.2.20/yellowstone-grpc-geyser-release22-x86_64-unknown-linux-gnu.tar.bz2"
+              mkdir -p /opt/yellowstone
+              tar -xjf /tmp/yellowstone.tar.bz2 -C /opt/yellowstone --strip-components=1
+              rm /tmp/yellowstone.tar.bz2
+              ls -la /opt/yellowstone/
+              echo "Yellowstone gRPC plugin ready."
+          volumeMounts:
+            - name: yellowstone-plugin
+              mountPath: /opt/yellowstone
         # Sidecar: Agave validator starts first, stays running (K8s 1.28+ native sidecar)
         - name: agave-validator
           restartPolicy: Always
@@ -80,6 +137,8 @@ spec:
             - skip_any_corrupted_record
             - --use-snapshot-archives-at-startup
             - when-newest
+            - --geyser-plugin-config
+            - /etc/yellowstone/config.json
             - --log
             - "-"
           env:
@@ -100,6 +159,12 @@ spec:
             - name: gossip-udp
               containerPort: 8001
               protocol: UDP
+            - name: grpc
+              containerPort: 10000
+              protocol: TCP
+            - name: ys-metrics
+              containerPort: 8999
+              protocol: TCP
           volumeMounts:
             - name: accounts
               mountPath: /mnt/accounts
@@ -107,6 +172,12 @@ spec:
               mountPath: /mnt/ledger
             - name: identity
               mountPath: /etc/solana
+              readOnly: true
+            - name: yellowstone-plugin
+              mountPath: /opt/yellowstone
+              readOnly: true
+            - name: yellowstone-config
+              mountPath: /etc/yellowstone
               readOnly: true
           resources:
             requests:
@@ -172,3 +243,10 @@ spec:
         - name: identity
           secret:
             secretName: agave-identity
+        - name: yellowstone-plugin
+          hostPath:
+            path: /var/mnt/yellowstone
+            type: DirectoryOrCreate
+        - name: yellowstone-config
+          configMap:
+            name: yellowstone-grpc-config

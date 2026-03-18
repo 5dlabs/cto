@@ -334,6 +334,15 @@ serverFiles:
           - targets:
               - prometheus-alertmanager.observability.svc.cluster.local:9093
 
+      # Yellowstone gRPC geyser plugin metrics
+      - job_name: yellowstone-grpc
+        static_configs:
+          - targets:
+              - solana-rpc-01:8999
+            labels:
+              namespace: solana
+              service: yellowstone-grpc
+
 # Enable node-exporter (was disabled on old cluster)
 prometheus-node-exporter:
   enabled: true
