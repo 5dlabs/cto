@@ -359,17 +359,37 @@ data:
         {
           "title": "Agave Logs",
           "type": "logs",
-          "gridPos": { "h": 14, "w": 24, "x": 0, "y": 40 },
+          "gridPos": { "h": 14, "w": 12, "x": 0, "y": 40 },
           "datasource": { "type": "loki", "uid": "${loki_datasource}" },
           "targets": [
             {
-              "expr": "{namespace=\"solana\", level=~\"$log_level\"}",
+              "expr": "{namespace=\"solana\", container=\"agave\", level=~\"$log_level\"}",
               "refId": "A"
             }
           ],
           "options": {
             "showTime": true,
-            "showLabels": true,
+            "showLabels": false,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "wrapLogMessage": true
+          }
+        },
+        {
+          "title": "Exporter Logs",
+          "type": "logs",
+          "gridPos": { "h": 14, "w": 12, "x": 12, "y": 40 },
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "targets": [
+            {
+              "expr": "{namespace=\"solana\", container=\"solana-exporter\", level=~\"$log_level\"}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": false,
             "sortOrder": "Descending",
             "dedupStrategy": "none",
             "enableLogDetails": true,
