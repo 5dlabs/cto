@@ -92,7 +92,7 @@ config:
         Add                 service.name        solana-exporter
         Add                 service.component   metrics
 
-    # Try to parse JSON logs
+    # Try to parse JSON logs (structured loggers like solana-exporter)
     [FILTER]
         Name                parser
         Match               kube.*
@@ -101,22 +101,81 @@ config:
         Reserve_Data        On
         Preserve_Key        On
 
-    # Detect ERROR level
+    # Extract level from JSON "level" field (solana-exporter uses this)
     [FILTER]
         Name                modify
         Match               kube.*
-        Condition           Key_value_matches log (?i)(ERROR|FATAL|PANIC)
-        Add                 detected_level error
+        Condition           Key_Exists level
+        Condition           Key_Does_Not_Exist detected_level
+        Copy                level detected_level
 
-    # Detect WARN level
+    # Normalize JSON level values (fatal→error, warning→warn)
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_value_matches detected_level (?i)^(fatal|panic)$
+        Set                 detected_level error
+
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_value_matches detected_level (?i)^warning$
+        Set                 detected_level warn
+
+    # Detect level from Rust tracing / general log format
+    # Agave: "F [2026-03-18T02:54:24Z WARN  module] message"
+    # Anchored to timestamp to avoid false positives from message body
     [FILTER]
         Name                modify
         Match               kube.*
         Condition           Key_Does_Not_Exist detected_level
-        Condition           Key_value_matches log (?i)(WARN|WARNING)
+        Condition           Key_value_matches log \d{4}-\d{2}-\d{2}T\S+\s+(ERROR|error)\s
+        Add                 detected_level error
+
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_Does_Not_Exist detected_level
+        Condition           Key_value_matches log \d{4}-\d{2}-\d{2}T\S+\s+(WARN|warn)\s
         Add                 detected_level warn
 
-    # Default to info
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_Does_Not_Exist detected_level
+        Condition           Key_value_matches log \d{4}-\d{2}-\d{2}T\S+\s+(DEBUG|debug|TRACE|trace)\s
+        Add                 detected_level debug
+
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_Does_Not_Exist detected_level
+        Condition           Key_value_matches log \d{4}-\d{2}-\d{2}T\S+\s+(INFO|info)\s
+        Add                 detected_level info
+
+    # Fallback: detect from unstructured logs (no timestamp anchor)
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_Does_Not_Exist detected_level
+        Condition           Key_value_matches log (?i)\b(ERROR|FATAL|PANIC)\b
+        Add                 detected_level error
+
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_Does_Not_Exist detected_level
+        Condition           Key_value_matches log (?i)\b(WARN|WARNING)\b
+        Add                 detected_level warn
+
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_Does_Not_Exist detected_level
+        Condition           Key_value_matches log (?i)\b(DEBUG|TRACE)\b
+        Add                 detected_level debug
+
+    # Default: anything unmatched is info
     [FILTER]
         Name                modify
         Match               kube.*
@@ -130,7 +189,8 @@ config:
         Match               kube.*
         Host                loki-gateway.observability.svc.cluster.local
         Port                80
-        Labels              job=fluent-bit, namespace=$kubernetes['namespace_name'], pod=$kubernetes['pod_name'], container=$kubernetes['container_name']
+        Labels              job=fluent-bit, namespace=$kubernetes['namespace_name'], pod=$kubernetes['pod_name'], container=$kubernetes['container_name'], level=$detected_level
+        Label_Keys          service_name
         Auto_Kubernetes_Labels  On
         Line_Format         json
 
