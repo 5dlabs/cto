@@ -39,8 +39,10 @@ modelDefaults:
     - "anthropic/claude-sonnet-4-20250514"
 
 secrets:
-  discordTokensSecret: "trading-discord-tokens"
-  apiKeysSecret: "trading-api-keys"
+  external:
+    apiKeysSecret: "trading-api-keys"
+    messagingSecret: "trading-msg-trader-temporal-btc-high"
+    githubSecret: "trading-github"
 
 messaging:
   discord:
