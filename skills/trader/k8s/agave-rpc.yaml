@@ -116,7 +116,7 @@ spec:
               memory: 600Gi
               hugepages-2Mi: 4Gi
         - name: solana-exporter
-          image: ghcr.io/5dlabs/solana-exporter:v3.0.2
+          image: ghcr.io/asymmetric-research/solana-exporter:v3.0.2
           args:
             - -rpc-url=http://localhost:8899
             - -listen-address=:9179
