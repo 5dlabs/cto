@@ -40,9 +40,7 @@ modelDefaults:
 
 secrets:
   discordTokensSecret: "trading-discord-tokens"
-  external:
-    apiKeysSecret: "trading-api-keys"
-    githubSecret: "trading-github"
+  apiKeysSecret: "trading-api-keys"
 
 messaging:
   discord:
@@ -140,8 +138,9 @@ extraEnv:
   - name: SIMMER_API_KEY
     valueFrom:
       secretKeyRef:
-        name: trader-api-keys
+        name: trading-api-keys
         key: simmer-api-key
+        optional: true
 
 nats:
   enabled: true
