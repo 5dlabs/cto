@@ -275,37 +275,33 @@ export default function Home() {
 
         {/* Meet Morgan Section */}
         <section id="morgan" className="py-20 px-6 border-t border-border/30 scroll-mt-24">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-              <div>
-                <div className="relative aspect-square max-w-sm mx-auto lg:mx-0 mb-8">
-                  <Image
-                    src="/agents/morgan-hero.png"
-                    alt="Morgan — your control agent"
-                    fill
-                    className="object-contain"
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                  />
-                </div>
-                <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                  Meet <span className="gradient-text">Morgan</span>
-                </h2>
-                <p className="text-lg text-muted-foreground mb-6 max-w-xl">
-                  Your single point of contact. Chat, voice, or video—from any device. You only talk to Morgan; Morgan coordinates the rest.
-                </p>
-                <Link
-                  href="/morgan"
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-600 hover:to-blue-600 transition-all"
-                >
-                  Talk to Morgan
-                </Link>
-              </div>
-              <div className="rounded-xl border border-border bg-card/50 p-4 min-h-[360px] flex items-center justify-center">
-                <LemonSliceWidget
-                  initialState="minimized"
-                  className="w-full min-h-[320px]"
-                />
-              </div>
+          <div className="max-w-3xl mx-auto text-center">
+            <div className="relative aspect-square max-w-[280px] mx-auto mb-8">
+              <Image
+                src="/agents/morgan-hero.png"
+                alt="Morgan — your control agent"
+                fill
+                className="object-contain"
+                sizes="280px"
+              />
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+              Meet <span className="gradient-text">Morgan</span>
+            </h2>
+            <p className="text-lg text-muted-foreground mb-6 max-w-xl mx-auto">
+              Your single point of contact. Chat, voice, or video—from any device. You only talk to Morgan; Morgan coordinates the rest.
+            </p>
+            <Link
+              href="/morgan"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-600 hover:to-blue-600 transition-all"
+            >
+              Talk to Morgan
+            </Link>
+            <div className="mt-12 rounded-xl border border-border bg-card/50 p-4 min-h-[320px] flex items-center justify-center">
+              <LemonSliceWidget
+                initialState="minimized"
+                className="w-full min-h-[280px]"
+              />
             </div>
           </div>
         </section>
