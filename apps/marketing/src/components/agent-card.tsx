@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ export type Agent = {
   avatar?: string;
   description?: string;
   badge?: string;
+  cta?: { label: string; href: string };
   tools?: string[];
   skills?: string[];
 };
@@ -63,7 +65,7 @@ export function AgentCard({ agent }: AgentCardProps) {
       aria-label={`${agent.name} card${hasDetails ? flipped ? ", tap to return" : ", flip for details" : ""}`}
     >
       <motion.div
-        className="relative h-full min-h-[176px] sm:min-h-[188px] lg:min-h-[196px] w-full"
+        className="relative h-full min-h-[172px] sm:min-h-[188px] lg:min-h-[196px] w-full"
         style={{ transformStyle: "preserve-3d", perspective: "1000px" }}
         animate={{ rotateY: flipped ? 180 : 0 }}
         transition={{ duration: 0.5, ease: "easeInOut" }}
@@ -86,7 +88,7 @@ export function AgentCard({ agent }: AgentCardProps) {
             )}
             aria-hidden
           />
-          <Avatar className="relative z-10 size-[60px] sm:size-[88px] lg:size-[112px] shrink-0 ring-2 ring-border">
+          <Avatar className="relative z-10 size-[56px] sm:size-[88px] lg:size-[112px] shrink-0 ring-2 ring-border">
             {agent.avatar ? (
               <AvatarImage src={agent.avatar} alt={agent.name} />
             ) : null}
@@ -100,7 +102,7 @@ export function AgentCard({ agent }: AgentCardProps) {
             </AvatarFallback>
           </Avatar>
           <div className="relative z-10 min-w-0 flex-1 self-center sm:self-auto">
-            <p className="font-semibold text-[15px] sm:text-lg leading-tight text-foreground">
+            <p className="font-semibold text-[14px] sm:text-lg leading-tight text-foreground">
               {agent.name}
             </p>
             <p className="mt-1 text-[11px] sm:text-sm leading-snug text-muted-foreground">
@@ -111,7 +113,16 @@ export function AgentCard({ agent }: AgentCardProps) {
                 {agent.badge}
               </p>
             )}
-            {hasDetails && !agent.badge && (
+            {agent.cta && (
+              <Link
+                href={agent.cta.href}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-2 inline-block text-[10px] sm:text-xs font-medium text-cyan hover:text-cyan-400 transition-colors"
+              >
+                {agent.cta.label} →
+              </Link>
+            )}
+            {hasDetails && !agent.badge && !agent.cta && (
               <p className="mt-2 text-[9px] sm:text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80">
                 Flip for details
               </p>
@@ -137,7 +148,6 @@ export function AgentCard({ agent }: AgentCardProps) {
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
             transform: "rotateY(180deg)",
-            direction: "ltr",
           } as React.CSSProperties}
         >
           <div
@@ -147,17 +157,21 @@ export function AgentCard({ agent }: AgentCardProps) {
             )}
             aria-hidden
           />
-          <div className="relative z-10 flex h-full min-h-0 flex-col">
+          {/* Inner wrapper rotated 180deg to un-mirror text on flipped back face */}
+          <div
+            className="relative z-10 flex h-full min-h-0 flex-col"
+            style={{ transform: "rotateY(180deg)", direction: "ltr" } as React.CSSProperties}
+          >
             {agent.tools && agent.tools.length > 0 && (
-              <div className="min-h-0">
-                <p className="mb-2 text-[10px] sm:text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              <div className="min-h-0 min-w-0">
+                <p className="mb-1.5 text-[9px] sm:text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
                   {agent.name} · tools
                 </p>
-                <div className="flex max-h-[68px] flex-wrap gap-1.5 overflow-y-auto pr-1 sm:max-h-[72px]">
+                <div className="flex max-h-[56px] min-w-0 flex-wrap gap-1 overflow-y-auto pr-1 sm:max-h-[72px] sm:gap-1.5">
                   {agent.tools.map((tool) => (
                     <span
                       key={tool}
-                      className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[10px] sm:text-[11px] leading-tight text-foreground/90"
+                      className="max-w-full break-words rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] sm:text-[11px] sm:px-2 sm:py-1 leading-tight text-foreground/90"
                     >
                       {tool}
                     </span>
@@ -166,15 +180,15 @@ export function AgentCard({ agent }: AgentCardProps) {
               </div>
             )}
             {agent.skills && agent.skills.length > 0 && (
-              <div className="mt-3 min-h-0">
-                <p className="mb-2 text-[10px] sm:text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              <div className="mt-2 min-h-0 min-w-0 sm:mt-3">
+                <p className="mb-1.5 text-[9px] sm:text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
                   skills
                 </p>
-                <div className="flex max-h-[68px] flex-wrap gap-1.5 overflow-y-auto pr-1 sm:max-h-[72px]">
+                <div className="flex max-h-[56px] min-w-0 flex-wrap gap-1 overflow-y-auto pr-1 sm:max-h-[72px] sm:gap-1.5">
                   {agent.skills.map((skill) => (
                     <span
                       key={skill}
-                      className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[10px] sm:text-[11px] leading-tight text-foreground/90"
+                      className="max-w-full break-words rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] sm:text-[11px] sm:px-2 sm:py-1 leading-tight text-foreground/90"
                     >
                       {skill}
                     </span>

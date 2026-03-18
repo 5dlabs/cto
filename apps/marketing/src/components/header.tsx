@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { featureFlags } from "@/config/feature-flags";
+import { cn } from "@/lib/utils";
 
 const homeHref =
   process.env.NODE_ENV === "development"
@@ -33,6 +34,7 @@ const socials = [
 export function Header() {
   const pathname = usePathname();
   const [currentHash, setCurrentHash] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const syncHash = () => setCurrentHash(window.location.hash);
@@ -101,7 +103,10 @@ export function Header() {
   };
 
   return (
-    <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4">
+    <header
+      className="fixed left-0 right-0 z-50 flex justify-center px-4"
+      style={{ top: "max(1rem, env(safe-area-inset-top, 1rem))" }}
+    >
       <nav className="flex items-center gap-1 px-2 py-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.3)]">
         {/* Brand switcher */}
         <a
@@ -126,10 +131,103 @@ export function Header() {
           <span className="text-xs font-bold text-cyan">CTO</span>
         </Link>
 
-        {/* Divider */}
-        <div className="w-px h-4 bg-white/[0.08] mx-1" />
+        {/* Morgan - prominent CTA (desktop only; mobile uses hamburger) */}
+        <Link
+          href="/morgan"
+          className="hidden sm:flex items-center justify-center h-8 px-3 rounded-full bg-gradient-to-r from-cyan-500/90 to-blue-500/90 text-white text-xs font-semibold hover:from-cyan-500 hover:to-blue-500 transition-all shadow-[0_0_12px_rgba(34,211,238,0.3)]"
+          aria-label="Talk to Morgan"
+        >
+          Talk to Morgan
+        </Link>
 
-        {/* Nav links */}
+        {/* Divider (desktop only when Morgan is visible) */}
+        <div className="hidden sm:block w-px h-4 bg-white/[0.08] mx-1" />
+
+        {/* Mobile menu button */}
+        <div className="relative sm:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((o) => !o)}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+          {mobileMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                aria-hidden
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <div className="absolute right-0 top-full mt-2 z-50 min-w-[160px] rounded-xl border border-white/[0.08] bg-card/95 py-2 shadow-xl backdrop-blur-xl">
+                <Link
+                  href="/morgan"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan border-b border-white/[0.06] mb-2 -mx-1 -mt-1 rounded-t-xl"
+                >
+                  <span className="w-2 h-2 rounded-full bg-cyan animate-pulse" />
+                  Talk to Morgan
+                </Link>
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.name}
+                    href={link.href}
+                    onClick={(event) => {
+                      handleNavClick(event, link.href);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={cn(
+                      "block px-4 py-2 text-sm transition-colors",
+                      isNavLinkActive(link.href)
+                        ? "text-foreground bg-white/[0.08]"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                    )}
+                  >
+                    {link.name}
+                  </Link>
+                ))}
+                {featureFlags.showPricingLink && (
+                  <Link
+                    href="/pricing"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      "block px-4 py-2 text-sm transition-colors",
+                      isNavLinkActive("/pricing")
+                        ? "text-foreground bg-white/[0.08]"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                    )}
+                  >
+                    Pricing
+                  </Link>
+                )}
+                <Link
+                  href="/team"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "block px-4 py-2 text-sm transition-colors",
+                    isNavLinkActive("/team")
+                      ? "text-foreground bg-white/[0.08]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
+                  )}
+                >
+                  Team
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Nav links (desktop) */}
         <div className="hidden sm:flex items-center gap-0.5">
           {navLinks.map((link) => (
             <Link
@@ -149,6 +247,9 @@ export function Header() {
               Pricing
             </Link>
           )}
+          <Link href="/team" className={getNavLinkClassName("/team")}>
+            Team
+          </Link>
         </div>
 
         {/* Divider */}

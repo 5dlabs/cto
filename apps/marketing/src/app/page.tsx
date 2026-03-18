@@ -1,9 +1,11 @@
 import Image from "next/image";
+import Link from "next/link";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { AgentGrid, type AgentSquad } from "@/components/agent-card";
 import { Header } from "@/components/header";
 import { TechStack } from "@/components/tech-stack";
 import { HeroExperiment } from "@/components/hero-experiment";
+import { LemonSliceWidget } from "@/components/lemon-slice-widget";
 import { featureFlags } from "@/config/feature-flags";
 
 const homeHref =
@@ -21,6 +23,8 @@ const squads: AgentSquad[] = [
         role: "Technical Program Manager",
         avatar: "/agents/morgan-avatar-512.png",
         color: "from-cyan-400 to-pink-500",
+        badge: "Control Agent",
+        cta: { label: "Talk to Morgan", href: "/morgan" },
         description: "Orchestrates project lifecycles—syncing your Git repo (GitHub, GitLab, or Gitea) with Linear, decomposing PRDs into tasks. Research tools for docs, web, and codebase context.",
         tools: ["Context7", "Firecrawl", "Perplexity", "Tavily", "Exa", "Repomix", "Linear", "GitHub"],
         skills: ["PRD Analysis", "Deep Research", "Multi-Agent", "Brainstorming", "Writing Plans"],
@@ -268,6 +272,43 @@ export default function Home() {
       {/* Content */}
       <main className="relative z-10">
         <HeroExperiment />
+
+        {/* Meet Morgan Section */}
+        <section id="morgan" className="py-20 px-6 border-t border-border/30 scroll-mt-24">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+              <div>
+                <div className="relative aspect-square max-w-sm mx-auto lg:mx-0 mb-8">
+                  <Image
+                    src="/agents/morgan-hero.png"
+                    alt="Morgan — your control agent"
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                  Meet <span className="gradient-text">Morgan</span>
+                </h2>
+                <p className="text-lg text-muted-foreground mb-6 max-w-xl">
+                  Your single point of contact. Chat, voice, or video—from any device. You only talk to Morgan; Morgan coordinates the rest.
+                </p>
+                <Link
+                  href="/morgan"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-600 hover:to-blue-600 transition-all"
+                >
+                  Talk to Morgan
+                </Link>
+              </div>
+              <div className="rounded-xl border border-border bg-card/50 p-4 min-h-[360px] flex items-center justify-center">
+                <LemonSliceWidget
+                  initialState="minimized"
+                  className="w-full min-h-[320px]"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* Agents Section */}
         <section id="agents" className="py-20 px-6">
@@ -723,15 +764,15 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Blockchain & AI Section */}
+        {/* Startups Section */}
         <section id="web3-ai" className="py-20 px-6 border-t border-border/30">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Built for <span className="gradient-text">Blockchain & AI Teams</span>
+                Built for <span className="gradient-text">Startups</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Teams building on-chain systems and AI products need the same thing: reliable execution, strong operational controls, and infrastructure that does not turn into a second product to manage.
+                Any startup. Reliable execution, strong operational controls, and infrastructure that doesn&apos;t turn into a second product to manage. We&apos;re especially strong for teams building in blockchain and AI.
               </p>
             </div>
 
