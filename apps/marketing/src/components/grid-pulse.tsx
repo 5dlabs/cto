@@ -8,7 +8,7 @@ const hues = [195, 300] as const;
 export function GridPulse() {
   return (
     <div
-      className="fixed inset-0 pointer-events-none overflow-hidden z-[5]"
+      className="fixed inset-0 pointer-events-none overflow-hidden z-0"
       style={{ contain: "layout style paint", isolation: "isolate" }}
     >
       {/* Drifting grid lines — subtle, stays behind text */}
