@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { WaitlistForm } from "@/components/waitlist-form";
+import { MorganHeroImage } from "@/components/morgan-hero-image";
 import { AgentGrid, type AgentSquad } from "@/components/agent-card";
 import { Header } from "@/components/header";
 import { TechStack } from "@/components/tech-stack";
@@ -21,7 +22,7 @@ const squads: AgentSquad[] = [
       {
         name: "Morgan",
         role: "Technical Program Manager",
-        avatar: "/agents/morgan-avatar-512.png",
+        avatar: "/agents/morgan-avatar-512.png?v=20260318",
         color: "from-cyan-400 to-pink-500",
         badge: "Control Agent",
         cta: { label: "Talk to Morgan", href: "/morgan" },
@@ -276,15 +277,7 @@ export default function Home() {
         {/* Meet Morgan Section */}
         <section id="morgan" className="py-20 px-6 border-t border-border/30 scroll-mt-24">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="relative aspect-square max-w-[280px] mx-auto mb-8">
-              <Image
-                src="/agents/morgan-hero.png"
-                alt="Morgan — your control agent"
-                fill
-                className="object-contain"
-                sizes="280px"
-              />
-            </div>
+            <MorganHeroImage />
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               Meet <span className="gradient-text">Morgan</span>
             </h2>

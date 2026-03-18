@@ -50,8 +50,15 @@ export function AgentCard({ agent }: AgentCardProps) {
   };
 
   return (
-    <button
-      type="button"
+    <div
+      role={hasDetails ? "button" : undefined}
+      tabIndex={hasDetails ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (hasDetails && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          setFlipped((f) => !f);
+        }
+      }}
       className={cn(
         "group block w-full text-left",
         hasDetails ? "cursor-pointer touch-manipulation" : "cursor-default"
@@ -60,14 +67,13 @@ export function AgentCard({ agent }: AgentCardProps) {
       onClick={() => hasDetails && setFlipped((f) => !f)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      disabled={!hasDetails}
       aria-pressed={hasDetails ? flipped : undefined}
-      aria-label={`${agent.name} card${hasDetails ? flipped ? ", tap to return" : ", flip for details" : ""}`}
+      aria-label={hasDetails ? `${agent.name} card${flipped ? ", tap to return" : ", flip for details"}` : undefined}
     >
       <motion.div
         className="relative h-full min-h-[172px] sm:min-h-[188px] lg:min-h-[196px] w-full"
-        style={{ transformStyle: "preserve-3d", perspective: "1000px" }}
-        animate={{ rotateY: flipped ? 180 : 0 }}
+        style={{ transformStyle: "preserve-3d", perspective: "1000px", willChange: "transform" }}
+        animate={{ rotateY: flipped ? -180 : 0 }}
         transition={{ duration: 0.5, ease: "easeInOut" }}
         initial={false}
       >
@@ -76,8 +82,7 @@ export function AgentCard({ agent }: AgentCardProps) {
           className={cn(
             "absolute inset-0 flex items-start sm:items-center gap-3 sm:gap-4 lg:gap-5 rounded-xl p-3 sm:p-4 lg:p-5",
             "bg-card border border-border",
-            "hover:border-primary/50 transition-colors duration-300",
-            flipped && "invisible"
+            "hover:border-primary/50 transition-colors duration-300"
           )}
           style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" } as React.CSSProperties}
         >
@@ -140,14 +145,11 @@ export function AgentCard({ agent }: AgentCardProps) {
 
         {/* Back: tools + skills in two sections */}
         <div
-          className={cn(
-            "absolute inset-0 overflow-hidden rounded-xl border border-border bg-card p-3 sm:p-4 lg:p-5",
-            !flipped && "invisible"
-          )}
+          className="absolute inset-0 overflow-hidden rounded-xl border border-border bg-card p-3 sm:p-4 lg:p-5"
           style={{
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
-            transform: "rotateY(180deg)",
+            transform: "rotateY(-180deg)",
           } as React.CSSProperties}
         >
           <div
@@ -160,7 +162,7 @@ export function AgentCard({ agent }: AgentCardProps) {
           {/* Inner wrapper rotated 180deg to un-mirror text on flipped back face */}
           <div
             className="relative z-10 flex h-full min-h-0 flex-col"
-            style={{ transform: "rotateY(180deg)", direction: "ltr" } as React.CSSProperties}
+            style={{ transform: "rotateY(-180deg)", direction: "ltr" } as React.CSSProperties}
           >
             {agent.tools && agent.tools.length > 0 && (
               <div className="min-h-0 min-w-0">
@@ -199,7 +201,7 @@ export function AgentCard({ agent }: AgentCardProps) {
           </div>
         </div>
       </motion.div>
-    </button>
+    </div>
   );
 }
 

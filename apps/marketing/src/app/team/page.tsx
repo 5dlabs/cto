@@ -36,7 +36,7 @@ const squads: TeamSquad[] = [
       {
         name: "Morgan",
         role: "Technical Program Manager",
-        avatar: "/agents/morgan-avatar-512.png",
+        avatar: "/agents/morgan-avatar-512.png?v=20260318",
         color: "from-cyan-400 to-pink-500",
         personality: "Keeps the trains running. Decomposes PRDs, assigns tasks, tracks progress. Runs a tight ship.",
         description: "Orchestrates project lifecycles, syncs your Git repo (GitHub, GitLab, or Gitea) with Linear, and turns PRDs into coordinated execution plans with strong research context.",

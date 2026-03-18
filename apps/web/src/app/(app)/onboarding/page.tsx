@@ -194,7 +194,7 @@ export default function OnboardingPage() {
       <div className="border-border flex items-center justify-between border-b px-6 py-4">
         <div className="flex items-center gap-3">
           <Avatar className="border-primary h-10 w-10 border-2">
-            <AvatarImage src="/agents/morgan.png" alt="Morgan" />
+            <AvatarImage src="/agents/morgan-avatar-512.png" alt="Morgan" />
             <AvatarFallback className="bg-gradient-to-br from-violet-500 to-purple-600 text-white">
               M
             </AvatarFallback>
@@ -232,7 +232,7 @@ export default function OnboardingPage() {
             >
               {message.role === 'assistant' && (
                 <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarImage src="/agents/morgan.png" alt="Morgan" />
+                  <AvatarImage src="/agents/morgan-avatar-512.png" alt="Morgan" />
                   <AvatarFallback className="bg-gradient-to-br from-violet-500 to-purple-600 text-xs text-white">
                     M
                   </AvatarFallback>

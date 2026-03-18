@@ -11,7 +11,7 @@ const agents = [
     name: 'Morgan',
     role: 'Project Manager',
     status: 'idle',
-    avatar: '/agents/morgan.png',
+    avatar: '/agents/morgan-avatar-512.png',
     color: 'from-violet-500 to-purple-600',
   },
   {

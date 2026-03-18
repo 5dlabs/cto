@@ -76,7 +76,7 @@ export default function MorganPage() {
             </div>
             <div className="relative aspect-square max-w-md mx-auto lg:mx-0">
               <Image
-                src="/agents/morgan-hero.png"
+                src="/agents/morgan-hero.png?v=20260318"
                 alt="Morgan — golden retriever cyberpunk avatar"
                 fill
                 className="object-contain"

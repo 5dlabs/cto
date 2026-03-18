@@ -10,12 +10,14 @@ const LEMON_SLICE_SCRIPT =
 interface LemonSliceWidgetProps {
   agentId?: string;
   initialState?: "active" | "minimized";
+  inline?: boolean;
   className?: string;
 }
 
 export function LemonSliceWidget({
   agentId = MORGAN_AGENT_ID,
   initialState = "active",
+  inline = true,
   className,
 }: LemonSliceWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -25,12 +27,13 @@ export function LemonSliceWidget({
     const el = document.createElement("lemon-slice-widget");
     el.setAttribute("agent-id", agentId);
     el.setAttribute("initial-state", initialState);
+    if (inline) el.setAttribute("inline", "");
     containerRef.current.innerHTML = "";
     containerRef.current.appendChild(el);
     return () => {
       containerRef.current?.removeChild(el);
     };
-  }, [agentId, initialState]);
+  }, [agentId, initialState, inline]);
 
   return (
     <>

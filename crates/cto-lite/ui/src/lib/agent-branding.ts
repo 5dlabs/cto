@@ -5,7 +5,7 @@ export type AgentBranding = {
 
 export const AGENT_BRANDING: Record<string, AgentBranding> = {
   morgan: {
-    avatar: '/agents/morgan-avatar-512.png',
+    avatar: '/agents/morgan-avatar-512.png?v=20260318',
     accent: 'from-cyan-400 to-pink-500',
   },
   atlas: {
