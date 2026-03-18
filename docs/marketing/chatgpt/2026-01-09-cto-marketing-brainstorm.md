@@ -38,7 +38,7 @@
 
 ### Option A (team + cost)
 **A full engineering team that runs on bare metal.**  
-Connect GitHub, describe what you want, and review PRs from specialists—backend, frontend, QA, integration, and more. Infrastructure, CI/CD, and monitoring included. No cloud tax.
+Connect your Git repo (GitHub, GitLab, or Gitea), describe what you want, and review PRs from specialists—backend, frontend, QA, integration, and more. Infrastructure, CI/CD, and monitoring included. No cloud tax.
 
 ### Option B (workflow + managed everything)
 **Describe the work. We deliver the PR.**  
