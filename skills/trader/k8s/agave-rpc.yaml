@@ -16,16 +16,22 @@ data:
       },
       "grpc": {
         "address": "0.0.0.0:10000",
+        "tls_config": null,
         "compression": {
           "accept": ["gzip", "zstd"],
           "send": ["gzip", "zstd"]
         },
         "max_decoding_message_size": "4_194_304",
+        "snapshot_plugin_channel_capacity": null,
         "snapshot_client_channel_capacity": "50_000_000",
         "channel_capacity": "100_000",
         "unary_concurrency_limit": 100,
         "unary_disabled": false,
-        "x_token": null
+        "x_token": null,
+        "replay_stored_slots": 0,
+        "filter_name_size_limit": 128,
+        "filter_names_size_limit": 4096,
+        "filter_names_cleanup_interval": "1s"
       },
       "prometheus": {
         "address": "0.0.0.0:8999"
@@ -137,8 +143,10 @@ spec:
             - skip_any_corrupted_record
             - --use-snapshot-archives-at-startup
             - when-newest
-            - --geyser-plugin-config
-            - /etc/yellowstone/config.json
+            # Yellowstone gRPC geyser plugin — disabled until .so crash is resolved
+            # See: https://github.com/rpcpool/yellowstone-grpc/releases/tag/v7.0.0+solana.2.2.20
+            # - --geyser-plugin-config
+            # - /etc/yellowstone/config.json
             - --log
             - "-"
           env:
