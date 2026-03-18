@@ -155,27 +155,6 @@ export default function MorganPage() {
                 sizes="(max-width: 768px) 100vw, 672px"
               />
             </div>
-            {/* HUD-in-use: what you see through the lenses */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="relative aspect-[4/5] rounded-xl overflow-hidden border border-border bg-card/30">
-                <Image
-                  src="/even-realities/g2-hud-side-profile.png"
-                  alt="Even G2 display — navigation, health, and productivity in your field of view"
-                  fill
-                  className="object-cover object-top"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
-              </div>
-              <div className="relative aspect-[4/5] rounded-xl overflow-hidden border border-border bg-card/30">
-                <Image
-                  src="/even-realities/g2-hud-front-view.png"
-                  alt="Even G2 — a seamless blend, with you in control"
-                  fill
-                  className="object-cover object-top"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
-              </div>
-            </div>
 
             <p className="mt-8 text-center text-sm text-muted-foreground">
               Work should be fun. It shouldn&apos;t be gruelling. Even G2 helps
