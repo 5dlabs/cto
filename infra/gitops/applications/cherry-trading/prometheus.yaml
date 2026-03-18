@@ -17,6 +17,7 @@ spec:
       chart: prometheus
       targetRevision: 25.27.0
       helm:
+        releaseName: prometheus
         valueFiles:
           - $values/skills/trader/k8s/observability/prometheus-values.yaml
     - repoURL: https://github.com/5dlabs/cto

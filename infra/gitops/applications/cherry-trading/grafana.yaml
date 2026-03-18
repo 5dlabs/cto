@@ -17,6 +17,7 @@ spec:
       chart: grafana
       targetRevision: 9.2.9
       helm:
+        releaseName: grafana
         valueFiles:
           - $values/skills/trader/k8s/observability/grafana-values.yaml
     - repoURL: https://github.com/5dlabs/cto

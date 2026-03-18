@@ -17,6 +17,7 @@ spec:
       chart: loki
       targetRevision: 6.16.0
       helm:
+        releaseName: loki
         valueFiles:
           - $values/skills/trader/k8s/observability/loki-values.yaml
     - repoURL: https://github.com/5dlabs/cto

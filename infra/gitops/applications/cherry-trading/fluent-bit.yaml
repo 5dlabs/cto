@@ -17,6 +17,7 @@ spec:
       chart: fluent-bit
       targetRevision: 0.47.7
       helm:
+        releaseName: fluent-bit
         valueFiles:
           - $values/skills/trader/k8s/observability/fluent-bit-values.yaml
     - repoURL: https://github.com/5dlabs/cto
