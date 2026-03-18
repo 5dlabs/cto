@@ -25,6 +25,7 @@ spec:
     - 'https://git.5dlabs.ai/5dlabs/cto'
 
     - 'https://git.5dlabs.ai/5dlabs/*'
+    - 'https://github.com/5dlabs/*'
     - 'https://charts.gitlab.io/'
     - 'https://argoproj.github.io/argo-helm'
     - 'https://fluent.github.io/helm-charts'
@@ -98,6 +99,9 @@ spec:
 
   # Destinations that applications in this project can deploy to
   destinations:
+    # Cherry trading cluster (Talos on Cherry Servers)
+    - namespace: '*'
+      server: https://84.32.103.99:6443
     - namespace: '*'
       server: https://kubernetes.default.svc
     - namespace: cto

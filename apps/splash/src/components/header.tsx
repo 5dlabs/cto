@@ -4,7 +4,6 @@ import type { MouseEvent } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 
 const navLinks = [
   { name: "CTO", href: "https://cto.5dlabs.ai" },
@@ -54,8 +53,6 @@ const socials = [
 
 export function Header() {
   const pathname = usePathname();
-  const { scrollY } = useScroll();
-  const [hidden, setHidden] = useState(false);
   const [currentHash, setCurrentHash] = useState("");
 
   useEffect(() => {
@@ -123,22 +120,8 @@ export function Header() {
     }
   };
 
-  useMotionValueEvent(scrollY, "change", (current) => {
-    const previous = scrollY.getPrevious() ?? 0;
-    if (current > previous && current > 150) {
-      setHidden(true);
-    } else {
-      setHidden(false);
-    }
-  });
-
   return (
-    <motion.header
-      className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4"
-      initial={false}
-      animate={{ y: hidden ? "-100%" : "0%" }}
-      transition={{ duration: 0.3, ease: "easeInOut" }}
-    >
+    <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4">
       <nav className="flex items-center gap-1 px-2 py-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl shadow-[0_0_30px_rgba(0,0,0,0.3)]">
         {/* Logo */}
         <Link
@@ -198,6 +181,6 @@ export function Header() {
           ))}
         </div>
       </nav>
-    </motion.header>
+    </header>
   );
 }

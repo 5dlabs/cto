@@ -15,9 +15,9 @@ global:
 resources:
   requests:
     cpu: "50m"
-    memory: "128Mi"
+    memory: "256Mi"
   limits:
-    memory: "512Mi"
+    memory: "2Gi"
 
 agent:
   id: "trader-mm-wide-spread"
@@ -27,6 +27,7 @@ agent:
     every: "5m"
     target: "last"
     ackMaxChars: 200
+    model: "anthropic/claude-haiku-4-5-20251001"
     prompt: >-
       Check the market maker process health. Follow HEARTBEAT.md instructions exactly.
   sandbox: "off"
@@ -35,22 +36,38 @@ agent:
 modelDefaults:
   primary: "anthropic/claude-haiku-4-5-20251001"
   fallbacks:
-    - "anthropic/claude-sonnet-4-6"
+    - "anthropic/claude-sonnet-4-20250514"
 
 secrets:
   external:
     apiKeysSecret: "trading-api-keys"
+    messagingSecret: "trading-msg-trader-mm-wide-spread"
     githubSecret: "trading-github"
 
 messaging:
   discord:
-    enabled: false
+    enabled: true
+    groupPolicy: "allowlist"
+    guilds:
+      "*":
+        requireMention: false
+        users:
+          - "444519104808878090"
+    allowBots: true
+    dm:
+      policy: "disabled"
+      allowFrom: []
 
 models:
   providers:
     anthropic:
       enabled: true
       apiKeySecretKey: "ANTHROPIC_API_KEY"
+      models:
+        - id: "claude-haiku-4-5-20251001"
+          name: "Claude Haiku 4.5"
+        - id: "claude-sonnet-4-20250514"
+          name: "Claude Sonnet 4"
     openai:
       enabled: false
     minimax:
@@ -95,12 +112,15 @@ workspace:
     HEARTBEAT.md: |
       # Heartbeat Instructions
 
-      1. Read /workspace/repos/cto/skills/trader/polymarket-mm/mm-state.json
-      2. If stale (>2 min old), start the process:
-         cd /workspace/repos/cto/skills/trader/polymarket-mm
-         node index.js &
-      3. Report: cycles run, quotes placed, fills, rebates earned,
+      1. Check if the MM process is already running:
+         Run: pgrep -f "polymarket-mm" (use exec tool)
+      2. If NOT running, start it as a background process:
+         Run: cd /workspace/repos/cto/skills/trader/polymarket-mm && node index.js
+         IMPORTANT: Use the exec tool with background=true and timeout=300000
+      3. Read /workspace/repos/cto/skills/trader/polymarket-mm/mm-state.json
+      4. Report: cycles run, quotes placed, fills, rebates earned,
          inventory balance (YES vs NO shares), paired P&L
+      5. If mm-state.json doesn't exist yet, just report "Process started, awaiting first cycle"
 
     IDENTITY.md: |
       - **Name:** Trader: Market Maker (Wide Spread)
@@ -126,8 +146,9 @@ extraEnv:
   - name: SIMMER_API_KEY
     valueFrom:
       secretKeyRef:
-        name: trader-api-keys
+        name: trading-api-keys
         key: simmer-api-key
+        optional: true
 
 nats:
   enabled: true

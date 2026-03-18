@@ -103,7 +103,7 @@ const comparisonFeatures = [
       { name: "Users", free: "1", team: "10", growth: "Unlimited", enterprise: "Unlimited" },
       { name: "Repositories", free: "5", team: "Unlimited", growth: "Unlimited", enterprise: "Unlimited" },
       { name: "All 13 AI Agents", free: true, team: true, growth: true, enterprise: true },
-      { name: "GitHub Integration", free: true, team: true, growth: true, enterprise: true },
+      { name: "GitHub, GitLab, or Gitea", free: true, team: true, growth: true, enterprise: true },
     ],
   },
   {
@@ -149,7 +149,7 @@ const faqs = [
   },
   {
     question: "What does 'Fully Managed' mean?",
-    answer: "You don't touch any infrastructure. No Kubernetes knowledge required. We handle everything—server provisioning, deployments, scaling, monitoring, and self-healing. You just connect GitHub and go.",
+    answer: "You don't touch any infrastructure. No Kubernetes knowledge required. We handle everything—server provisioning, deployments, scaling, monitoring, and self-healing. Connect your Git repo (GitHub, self-hosted GitLab, or Gitea) and go. Self-host GitLab for all features at no extra cost.",
   },
   {
     question: "Can Enterprise customers self-host?",

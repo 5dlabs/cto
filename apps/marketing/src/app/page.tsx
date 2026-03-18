@@ -21,7 +21,7 @@ const squads: AgentSquad[] = [
         role: "Technical Program Manager",
         avatar: "/agents/morgan-avatar-512.png",
         color: "from-cyan-400 to-pink-500",
-        description: "Orchestrates project lifecycles—syncing GitHub with Linear, decomposing PRDs into tasks. Research tools for docs, web, and codebase context.",
+        description: "Orchestrates project lifecycles—syncing your Git repo (GitHub, GitLab, or Gitea) with Linear, decomposing PRDs into tasks. Research tools for docs, web, and codebase context.",
         tools: ["Context7", "Firecrawl", "Perplexity", "Tavily", "Exa", "Repomix", "Linear", "GitHub"],
         skills: ["PRD Analysis", "Deep Research", "Multi-Agent", "Brainstorming", "Writing Plans"],
       },
@@ -377,7 +377,7 @@ export default function Home() {
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green/60"></span>
-                    <span>GitHub, Linear, Slack, Teams, and more</span>
+                    <span>GitHub, GitLab, Gitea, Linear, Slack, Teams, and more</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green/60"></span>
@@ -551,9 +551,9 @@ export default function Home() {
                   </svg>
                 </div>
                 <h3 className="font-semibold mb-1">Source Control & CI</h3>
-                <p className="text-xs text-muted-foreground mb-4">Each agent has its own GitHub App. PRs, reviews, and deployments are fully automated through Git.</p>
+                <p className="text-xs text-muted-foreground mb-4">Each agent integrates with your Git host. PRs, reviews, and deployments are fully automated—whether you use GitHub, self-hosted GitLab, or Gitea.</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {["GitHub Apps", "GitHub Actions", "ArgoCD", "Webhooks", "PR Automation"].map(name => (
+                  {["Git Apps", "CI/CD", "ArgoCD", "Webhooks", "PR Automation"].map(name => (
                     <span key={name} className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-green-500/10 text-green-400">{name}</span>
                   ))}
                 </div>

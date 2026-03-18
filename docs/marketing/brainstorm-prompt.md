@@ -48,7 +48,7 @@ We're struggling to find the right **buzzword, tagline, or positioning** that ca
 
 3. **Bare metal advantage** - Cloud is expensive. We run on bare metal = massive cost savings passed to customers.
 
-4. **Managed everything** - Zero ops burden. Connect GitHub, describe what you want, review PRs. That's it.
+4. **Managed everything** - Zero ops burden. Connect your Git repo (GitHub, GitLab, or Gitea), describe what you want, review PRs. That's it.
 
 ## Current Ideas (Not Loving These)
 
