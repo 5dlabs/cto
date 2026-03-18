@@ -64,7 +64,7 @@ export function AgentCard({ agent }: AgentCardProps) {
     >
       <motion.div
         className="relative h-full min-h-[176px] sm:min-h-[188px] lg:min-h-[196px] w-full"
-        style={{ transformStyle: "preserve-3d" }}
+        style={{ transformStyle: "preserve-3d", perspective: "1000px" }}
         animate={{ rotateY: flipped ? 180 : 0 }}
         transition={{ duration: 0.5, ease: "easeInOut" }}
         initial={false}
@@ -74,9 +74,10 @@ export function AgentCard({ agent }: AgentCardProps) {
           className={cn(
             "absolute inset-0 flex items-start sm:items-center gap-3 sm:gap-4 lg:gap-5 rounded-xl p-3 sm:p-4 lg:p-5",
             "bg-card border border-border",
-            "hover:border-primary/50 transition-colors duration-300"
+            "hover:border-primary/50 transition-colors duration-300",
+            flipped && "invisible"
           )}
-          style={{ backfaceVisibility: "hidden" }}
+          style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" } as React.CSSProperties}
         >
           <div
             className={cn(
@@ -128,11 +129,16 @@ export function AgentCard({ agent }: AgentCardProps) {
 
         {/* Back: tools + skills in two sections */}
         <div
-          className="absolute inset-0 overflow-hidden rounded-xl border border-border bg-card p-3 sm:p-4 lg:p-5"
+          className={cn(
+            "absolute inset-0 overflow-hidden rounded-xl border border-border bg-card p-3 sm:p-4 lg:p-5",
+            !flipped && "invisible"
+          )}
           style={{
             backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
             transform: "rotateY(180deg)",
-          }}
+            direction: "ltr",
+          } as React.CSSProperties}
         >
           <div
             className={cn(
