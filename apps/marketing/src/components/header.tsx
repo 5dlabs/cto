@@ -46,9 +46,10 @@ export function Header() {
       return false;
     }
     const [targetPath, rawHash] = href.split("#");
-    const normalizedTargetPath = targetPath || "/";
+    const normalizedTargetPath = (targetPath || "/").replace(/\/+$/, "") || "/";
+    const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
 
-    if (pathname !== normalizedTargetPath) {
+    if (normalizedPathname !== normalizedTargetPath) {
       return false;
     }
     if (!rawHash) {
@@ -70,11 +71,12 @@ export function Header() {
   const handleNavClick = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
     const [targetPath, rawHash] = href.split("#");
     const hash = rawHash ? `#${rawHash}` : "";
-    const normalizedTargetPath = targetPath || "/";
+    const normalizedTargetPath = (targetPath || "/").replace(/\/+$/, "") || "/";
+    const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
 
     // Same-page hash navigation can no-op under router transitions.
     // Force a deterministic in-page scroll so clicks always respond.
-    if (hash && pathname === normalizedTargetPath) {
+    if (hash && normalizedPathname === normalizedTargetPath) {
       const targetId = rawHash;
       if (!targetId) {
         return;
@@ -92,7 +94,7 @@ export function Header() {
     }
 
     // If user taps the page they're already on, scroll to top.
-    if (!hash && pathname === normalizedTargetPath) {
+    if (!hash && normalizedPathname === normalizedTargetPath) {
       event.preventDefault();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -115,7 +117,7 @@ export function Header() {
         <Link
           href="/"
           className={`flex items-center justify-center h-8 px-3 rounded-full transition-all duration-200 ease-out ${
-            pathname === "/"
+            pathname === "/" || pathname === ""
               ? "bg-white/[0.14] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]"
               : "bg-white/[0.06] hover:bg-white/[0.1]"
           }`}

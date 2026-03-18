@@ -67,9 +67,10 @@ export function Header() {
       return false;
     }
     const [targetPath, rawHash] = href.split("#");
-    const normalizedTargetPath = targetPath || "/";
+    const normalizedTargetPath = (targetPath || "/").replace(/\/+$/, "") || "/";
+    const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
 
-    if (pathname !== normalizedTargetPath) {
+    if (normalizedPathname !== normalizedTargetPath) {
       return false;
     }
     if (!rawHash) {
@@ -95,9 +96,10 @@ export function Header() {
 
     const [targetPath, rawHash] = href.split("#");
     const hash = rawHash ? `#${rawHash}` : "";
-    const normalizedTargetPath = targetPath || "/";
+    const normalizedTargetPath = (targetPath || "/").replace(/\/+$/, "") || "/";
+    const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
 
-    if (hash && pathname === normalizedTargetPath) {
+    if (hash && normalizedPathname === normalizedTargetPath) {
       const targetId = rawHash;
       if (!targetId) {
         return;
@@ -114,7 +116,7 @@ export function Header() {
       return;
     }
 
-    if (!hash && pathname === normalizedTargetPath) {
+    if (!hash && normalizedPathname === normalizedTargetPath) {
       event.preventDefault();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
