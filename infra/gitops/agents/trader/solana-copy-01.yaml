@@ -39,13 +39,24 @@ modelDefaults:
     - "anthropic/claude-sonnet-4-20250514"
 
 secrets:
+  discordTokensSecret: "trading-discord-tokens"
   external:
     apiKeysSecret: "trading-api-keys"
     githubSecret: "trading-github"
 
 messaging:
   discord:
-    enabled: false
+    enabled: true
+    groupPolicy: "allowlist"
+    guilds:
+      "*":
+        requireMention: false
+        users:
+          - "444519104808878090"
+    allowBots: true
+    dm:
+      policy: "disabled"
+      allowFrom: []
 
 models:
   providers:

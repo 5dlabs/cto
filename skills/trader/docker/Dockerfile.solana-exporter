@@ -1,0 +1,10 @@
+FROM golang:1.22-bookworm AS build
+ARG EXPORTER_VERSION=v3.0.2
+RUN git clone --depth 1 --branch $EXPORTER_VERSION \
+    https://github.com/asymmetric-research/solana-exporter.git /src
+WORKDIR /src
+RUN CGO_ENABLED=0 go build -o /solana-exporter ./cmd/solana-exporter
+
+FROM gcr.io/distroless/static-debian12
+COPY --from=build /solana-exporter /solana-exporter
+ENTRYPOINT ["/solana-exporter"]

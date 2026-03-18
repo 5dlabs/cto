@@ -1,0 +1,140 @@
+# Prometheus Helm values for Cherry trading cluster
+# Chart: prometheus-community/prometheus v25.27.0
+# Storage: local-path (hostPath on db-01)
+# Deploy: helm install prometheus prometheus-community/prometheus -n observability -f prometheus-values.yaml
+
+server:
+  persistentVolume:
+    enabled: true
+    storageClass: "local-path"
+    size: 50Gi
+  securityContext:
+    fsGroup: 65534
+    runAsUser: 65534
+    runAsGroup: 65534
+    runAsNonRoot: true
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  retention: 15d
+  extraFlags:
+    - web.enable-lifecycle
+  global:
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    evaluation_interval: 15s
+  nodeSelector:
+    kubernetes.io/hostname: db-01
+
+# Scrape configurations
+serverFiles:
+  prometheus.yml:
+    scrape_configs:
+      # Self-scrape Prometheus
+      - job_name: prometheus
+        static_configs:
+          - targets:
+              - localhost:9090
+
+      # kube-state-metrics
+      - job_name: kube-state-metrics
+        static_configs:
+          - targets:
+              - prometheus-kube-state-metrics.observability.svc.cluster.local:8080
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: 'kube_pod_.*|kube_container_.*|kube_job_.*|kube_namespace_.*|kube_node_.*|kube_deployment_.*|kube_statefulset_.*|kube_daemonset_.*'
+            action: keep
+
+      # Node exporter (CPU, RAM, disk, network) — per-pod SD for both nodes
+      - job_name: node-exporter
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - observability
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            action: keep
+            regex: prometheus-node-exporter
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: ${1}:9100
+
+      # Cilium agent eBPF metrics
+      - job_name: cilium-agent
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - kube-system
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_k8s_app]
+            action: keep
+            regex: cilium
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: ${1}:9962
+
+      # Hubble flow/DNS/drop metrics
+      - job_name: hubble
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - kube-system
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_k8s_app]
+            action: keep
+            regex: cilium
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: ${1}:9965
+
+      # Solana exporter (slot height, epoch, TPS)
+      - job_name: solana-exporter
+        static_configs:
+          - targets:
+              - solana-exporter.solana.svc.cluster.local:9179
+            labels:
+              namespace: solana
+              service: solana-exporter
+
+      # Loki metrics
+      - job_name: loki
+        static_configs:
+          - targets:
+              - loki.observability.svc.cluster.local:3100
+            labels:
+              namespace: observability
+              service: loki
+
+      # Grafana metrics
+      - job_name: grafana
+        static_configs:
+          - targets:
+              - grafana.observability.svc.cluster.local:80
+            labels:
+              namespace: observability
+              service: grafana
+
+# Enable node-exporter (was disabled on old cluster)
+prometheus-node-exporter:
+  enabled: true
+
+# Enable kube-state-metrics
+kube-state-metrics:
+  enabled: true
+
+# Disable components we don't need
+alertmanager:
+  enabled: false
+
+prometheus-pushgateway:
+  enabled: false

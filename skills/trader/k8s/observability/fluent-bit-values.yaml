@@ -1,0 +1,163 @@
+# Fluent Bit Helm values for Cherry trading cluster
+# Chart: fluent/fluent-bit v0.47.7
+# Ships logs directly to Loki (no OTEL Collector)
+# Deploy: helm install fluent-bit fluent/fluent-bit -n observability -f fluent-bit-values.yaml
+
+fullnameOverride: fluent-bit
+serviceAccount:
+  create: true
+tolerations: []
+nodeSelector: {}
+podAnnotations: {}
+
+config:
+  service: |
+    [SERVICE]
+        Flush           1
+        Daemon          Off
+        Log_Level       info
+        Parsers_File    /fluent-bit/etc/conf/custom_parsers.conf
+        HTTP_Server     On
+        HTTP_Listen     0.0.0.0
+        HTTP_Port       2020
+
+  inputs: |
+    [INPUT]
+        Name              tail
+        Tag               kube.*
+        Path              /var/log/containers/*.log
+        Exclude_Path      /var/log/containers/fluent-bit-*.log
+        Parser            cri
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+        Refresh_Interval  5
+
+  filters: |
+    # Enrich with Kubernetes metadata
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Keep_Log            Off
+        Labels              On
+        Annotations         On
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude Off
+
+    # Add cluster identifier
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Add                 cluster.name        trading-cherry
+
+    # Solana namespace enrichment
+    [FILTER]
+        Name                modify
+        Match               kube.var.log.containers.*_solana_*
+        Add                 service.namespace   solana
+
+    # Trading namespace enrichment
+    [FILTER]
+        Name                modify
+        Match               kube.var.log.containers.*_trading_*
+        Add                 service.namespace   trading
+
+    # Observability namespace enrichment
+    [FILTER]
+        Name                modify
+        Match               kube.var.log.containers.*_observability_*
+        Add                 service.namespace   observability
+
+    # kube-system namespace enrichment
+    [FILTER]
+        Name                modify
+        Match               kube.var.log.containers.*_kube-system_*
+        Add                 service.namespace   kube-system
+
+    # Agave RPC logs
+    [FILTER]
+        Name                modify
+        Match               kube.var.log.containers.*agave*_solana_*
+        Add                 service.name        agave-rpc
+        Add                 service.component   validator
+
+    # Solana exporter logs
+    [FILTER]
+        Name                modify
+        Match               kube.var.log.containers.*solana-exporter*_solana_*
+        Add                 service.name        solana-exporter
+        Add                 service.component   metrics
+
+    # Try to parse JSON logs
+    [FILTER]
+        Name                parser
+        Match               kube.*
+        Key_Name            log
+        Parser              json_log
+        Reserve_Data        On
+        Preserve_Key        On
+
+    # Detect ERROR level
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_value_matches log (?i)(ERROR|FATAL|PANIC)
+        Add                 detected_level error
+
+    # Detect WARN level
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_Does_Not_Exist detected_level
+        Condition           Key_value_matches log (?i)(WARN|WARNING)
+        Add                 detected_level warn
+
+    # Default to info
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Condition           Key_Does_Not_Exist detected_level
+        Add                 detected_level info
+
+  outputs: |
+    # Ship directly to Loki
+    [OUTPUT]
+        Name                loki
+        Match               kube.*
+        Host                loki-gateway.observability.svc.cluster.local
+        Port                80
+        Labels              job=fluent-bit, namespace=$kubernetes['namespace_name'], pod=$kubernetes['pod_name'], container=$kubernetes['container_name']
+        Auto_Kubernetes_Labels  On
+        Line_Format         json
+
+  customParsers: |
+    # CRI log format parser
+    [PARSER]
+        Name        cri
+        Format      regex
+        Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<log>.*)$
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    # JSON log parser
+    [PARSER]
+        Name        json_log
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    # Rust tracing format (Agave uses this)
+    [PARSER]
+        Name        rust_tracing
+        Format      regex
+        Regex       ^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*)\s+(?<level>\w+)\s+(?<target>[^:]+):\s*(?<message>.*)$
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%LZ
+
+hostTail:
+  enabled: true
+  path: /var/log/containers

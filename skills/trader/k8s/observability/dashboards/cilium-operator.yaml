@@ -1,0 +1,576 @@
+# Cilium Operator dashboard — Grafana.com #16612
+# Auto-discovered by Grafana sidecar via grafana_dashboard label
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-cilium-operator
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana.com/dashboard-id: "16612"
+    grafana.com/folder: "Cilium"
+data:
+  cilium-operator.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "gnetId": 16612,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "aliasColors": {
+            "avg": "#cffaff"
+          },
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 0,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "hiddenSeries": false,
+          "id": 24,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "max",
+              "fillBelowTo": "min",
+              "lines": false
+            },
+            {
+              "alias": "min",
+              "lines": false
+            }
+          ],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "min(irate(cilium_operator_process_cpu_seconds_total{io_cilium_app=\"operator\"}[1m])) by (pod) * 100",
+              "legendFormat": "min",
+              "refId": "A"
+            },
+            {
+              "expr": "avg(irate(cilium_operator_process_cpu_seconds_total{io_cilium_app=\"operator\"}[1m])) by (pod) * 100",
+              "legendFormat": "avg",
+              "refId": "B"
+            },
+            {
+              "expr": "max(irate(cilium_operator_process_cpu_seconds_total{io_cilium_app=\"operator\"}[1m])) by (pod) * 100",
+              "legendFormat": "max",
+              "refId": "C"
+            }
+          ],
+          "title": "CPU Usage per node",
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "percent",
+              "show": true
+            },
+            {
+              "format": "short",
+              "show": true
+            }
+          ]
+        },
+        {
+          "aliasColors": {
+            "MAX_resident_memory_bytes_max": "#e5ac0e"
+          },
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "hiddenSeries": false,
+          "id": 26,
+          "legend": {
+            "show": true
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "avg(cilium_operator_process_resident_memory_bytes{io_cilium_app=\"operator\"})",
+              "legendFormat": "AVG_resident_memory_bytes",
+              "refId": "C"
+            },
+            {
+              "expr": "max(cilium_operator_process_resident_memory_bytes{io_cilium_app=\"operator\"})",
+              "legendFormat": "MAX_resident_memory_bytes",
+              "refId": "D"
+            },
+            {
+              "expr": "min(cilium_operator_process_resident_memory_bytes{io_cilium_app=\"operator\"})",
+              "legendFormat": "MIN_resident_memory_bytes",
+              "refId": "E"
+            }
+          ],
+          "title": "Resident memory status",
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "bytes",
+              "show": true
+            },
+            {
+              "format": "short",
+              "show": true
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 5
+          },
+          "id": 6,
+          "panels": [],
+          "title": "IPAM",
+          "type": "row"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 6
+          },
+          "id": 8,
+          "legend": {
+            "show": true
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "stack": true,
+          "targets": [
+            {
+              "expr": "avg(cilium_operator_ipam_ips) by (type)",
+              "legendFormat": "{{type}}",
+              "refId": "A"
+            }
+          ],
+          "title": "IP Addresses",
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "show": true
+            },
+            {
+              "format": "short",
+              "show": true
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 6
+          },
+          "id": 10,
+          "legend": {
+            "show": true
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "targets": [
+            {
+              "expr": "rate(cilium_operator_ec2_api_duration_seconds_sum[1m])/rate(cilium_operator_ec2_api_duration_seconds_count[1m])",
+              "legendFormat": "{{operation}} {{response_code}}",
+              "refId": "A"
+            }
+          ],
+          "title": "EC2 API Interactions",
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "dtdurations",
+              "show": true
+            },
+            {
+              "format": "short",
+              "show": true
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 0,
+            "y": 14
+          },
+          "id": 4,
+          "legend": {
+            "show": true
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "targets": [
+            {
+              "expr": "cilium_operator_ipam_nodes",
+              "legendFormat": "{{category}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Number of nodes",
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "show": true
+            },
+            {
+              "format": "short",
+              "show": true
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 8,
+            "y": 14
+          },
+          "id": 12,
+          "legend": {
+            "show": true
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "targets": [
+            {
+              "expr": "cilium_operator_ipam_available",
+              "legendFormat": "interfaces",
+              "refId": "A"
+            }
+          ],
+          "title": "# interfaces with addresses available",
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "show": true
+            },
+            {
+              "format": "short",
+              "show": true
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 16,
+            "y": 14
+          },
+          "id": 16,
+          "legend": {
+            "show": true
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "targets": [
+            {
+              "expr": "rate(cilium_operator_ipam_resync_total[1m])",
+              "legendFormat": "operations",
+              "refId": "A"
+            }
+          ],
+          "title": "Metadata Resync Operations",
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "ops",
+              "show": true
+            },
+            {
+              "format": "short",
+              "show": true
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 21
+          },
+          "id": 14,
+          "legend": {
+            "show": true
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "stack": true,
+          "targets": [
+            {
+              "expr": "rate(cilium_operator_ec2_api_rate_limit_duration_seconds_sum[1m])/rate(cilium_operator_ec2_api_rate_limit_duration_seconds_count[1m])",
+              "legendFormat": "{{operation}}",
+              "refId": "A"
+            }
+          ],
+          "title": "EC2 client side rate limiting",
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "reqps",
+              "show": true
+            },
+            {
+              "format": "short",
+              "show": true
+            }
+          ]
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 21
+          },
+          "id": 2,
+          "legend": {
+            "show": true
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "targets": [
+            {
+              "expr": "avg(rate(cilium_operator_ipam_interface_creation_ops[1m])) by (subnetId, status)",
+              "legendFormat": "{{status}} ({{subnetId}})",
+              "refId": "A"
+            }
+          ],
+          "title": "Interface Creation",
+          "type": "graph",
+          "xaxis": {
+            "mode": "time",
+            "show": true
+          },
+          "yaxes": [
+            {
+              "format": "ops",
+              "show": true
+            },
+            {
+              "format": "short",
+              "show": true
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 25,
+      "style": "dark",
+      "tags": [],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Cilium Operator",
+      "uid": "cilium-operator",
+      "version": 1,
+      "description": "Dashboard for the Cilium v1.12 Operator metrics"
+    }

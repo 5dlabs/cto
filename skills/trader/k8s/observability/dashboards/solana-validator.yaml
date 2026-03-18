@@ -1,0 +1,202 @@
+# Custom Solana Validator dashboard — asymmetric-research/solana-exporter v3.0.2 metrics
+# Auto-discovered by Grafana sidecar via grafana_dashboard label
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-solana-validator
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana.com/folder: "Solana"
+data:
+  solana-validator.json: |
+    {
+      "title": "Solana Validator",
+      "uid": "solana-validator",
+      "description": "Slot height, sync status, RPC health, SOL balance — from asymmetric-research/solana-exporter",
+      "tags": ["solana", "validator", "rpc"],
+      "timezone": "browser",
+      "editable": true,
+      "graphTooltip": 1,
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "prometheus",
+            "current": { "text": "Prometheus", "value": "Prometheus" }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Current Slot",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "solana_node_slot_height",
+              "legendFormat": "slot"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none" } }
+        },
+        {
+          "title": "Slots Behind",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "targets": [
+            {
+              "expr": "solana_node_num_slots_behind",
+              "legendFormat": "behind"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 1000 }] } } }
+        },
+        {
+          "title": "RPC Health",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "solana_node_is_healthy",
+              "legendFormat": "healthy"
+            }
+          ],
+          "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "0": { "text": "UNHEALTHY", "color": "red" }, "1": { "text": "HEALTHY", "color": "green" } } }] } }
+        },
+        {
+          "title": "Exporter Up",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "targets": [
+            {
+              "expr": "up{job=\"solana-exporter\"}",
+              "legendFormat": "exporter"
+            }
+          ],
+          "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }] } }
+        },
+        {
+          "title": "SOL Balance",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+          "targets": [
+            {
+              "expr": "solana_account_balance",
+              "legendFormat": "{{ address }}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none", "decimals": 4 } }
+        },
+        {
+          "title": "Agave Version",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+          "targets": [
+            {
+              "expr": "solana_node_version",
+              "legendFormat": "{{ version }}"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none" } }
+        },
+        {
+          "title": "Slot Processing Rate (slots/sec)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
+          "targets": [
+            {
+              "expr": "rate(solana_node_slot_height[5m])",
+              "legendFormat": "slots/s"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } }
+        },
+        {
+          "title": "Sync ETA",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+          "targets": [
+            {
+              "expr": "solana_node_num_slots_behind / clamp_min(rate(solana_node_slot_height[5m]), 0.001)",
+              "legendFormat": "ETA"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 300 }, { "color": "red", "value": 3600 }] } } }
+        },
+        {
+          "title": "Slot Height Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "solana_node_slot_height",
+              "legendFormat": "local slot"
+            },
+            {
+              "expr": "solana_node_slot_height + solana_node_num_slots_behind",
+              "legendFormat": "network slot (estimated)"
+            }
+          ]
+        },
+        {
+          "title": "Slots Behind Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "targets": [
+            {
+              "expr": "solana_node_num_slots_behind",
+              "legendFormat": "slots behind"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none", "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 20 } } }
+        },
+        {
+          "title": "Slot Processing Rate Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "targets": [
+            {
+              "expr": "rate(solana_node_slot_height[5m])",
+              "legendFormat": "slots/s"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "ops" } }
+        },
+        {
+          "title": "Sync ETA Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "targets": [
+            {
+              "expr": "solana_node_num_slots_behind / clamp_min(rate(solana_node_slot_height[5m]), 0.001)",
+              "legendFormat": "ETA (seconds)"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        },
+        {
+          "title": "Agave Logs (Errors)",
+          "type": "logs",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "expr": "{namespace=\"solana\", container=\"agave\"} |~ \"(?i)(error|warn|fatal)\"",
+              "legendFormat": ""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "wrapLogMessage": true
+          }
+        }
+      ],
+      "schemaVersion": 39,
+      "version": 1
+    }
