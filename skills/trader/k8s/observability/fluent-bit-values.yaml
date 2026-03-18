@@ -190,7 +190,6 @@ config:
         Host                loki-gateway.observability.svc.cluster.local
         Port                80
         Labels              job=fluent-bit, namespace=$kubernetes['namespace_name'], pod=$kubernetes['pod_name'], container=$kubernetes['container_name'], level=$detected_level
-        Label_Keys          service_name
         Auto_Kubernetes_Labels  On
         Line_Format         json
 
