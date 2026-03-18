@@ -97,6 +97,21 @@ serverFiles:
             target_label: __address__
             replacement: ${1}:9965
 
+      # Cilium operator metrics
+      - job_name: cilium-operator
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - kube-system
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_name]
+            action: keep
+            regex: cilium-operator
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: ${1}:9963
+
       # Solana exporter (slot height, epoch, TPS)
       - job_name: solana-exporter
         static_configs:
