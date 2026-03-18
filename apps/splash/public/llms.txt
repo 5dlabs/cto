@@ -7,7 +7,7 @@
 ## Operating Stack
 
 - [CTO Platform](https://cto.5dlabs.ai): Multi-agent AI engineering platform — our commercial build engine and the first market-facing proof that the operating model works
-- [Internal Trading Engine](https://5dlabs.ai/trading): Proprietary internal capital and market-intelligence engine operating across Solana, Base, Near, and Sui; not offered as a public service
+- [Internal Trading Engine](https://5dlabs.ai/trading): Proprietary internal capital and market-intelligence engine operating across Solana, Base, Polygon, Near, and Sui; not offered as a public service
 - [OpenClaw Platform](https://github.com/5dlabs/openclaw-platform): Open-source Kubernetes-native agent orchestration foundation beneath CTO, the internal trading engine, and future ventures
 
 ## Technology
@@ -17,7 +17,7 @@
 
 ## Consulting
 
-- [Consulting Services](https://5dlabs.ai/consulting/): Expert consulting in AI agent systems, blockchain (Solana, Base, Near, Sui, Ethereum), Kubernetes infrastructure, and DevOps — $225/hr, $1,600/day, $3,500/mo retainer (USD)
+- [Consulting Services](https://5dlabs.ai/consulting/): Expert consulting in AI agent systems, blockchain (Solana, Base, Polygon, Near, Sui, Ethereum), Kubernetes infrastructure, and DevOps — $225/hr, $1,600/day, $3,500/mo retainer (USD)
 - [Schedule a Discovery Call](https://cal.com/jonathon-fritz-2uhdqe/discovery): Book a free 30-minute consultation
 - [Resume](https://resume.jonathonfritz.com): Professional background and experience
 

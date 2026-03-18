@@ -18,7 +18,7 @@ const operatingStack: Venture[] = [
     name: "Trading Engine",
     tagline: "The capital engine.",
     description:
-      "Our in-house system that generates revenue, sharpens market intelligence, and finances venture creation across Solana, Base, Near, and Sui.",
+      "Our in-house system that generates revenue, sharpens market intelligence, and finances venture creation across Solana, Base, Polygon, Near, and Sui.",
     tags: ["Revenue Engine", "Market Intelligence", "Multi-Chain", "In-House"],
     color: "from-purple-500 to-magenta",
     href: "/trading",

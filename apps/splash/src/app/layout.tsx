@@ -266,7 +266,7 @@ const jsonLd = {
           name: "Does 5D Labs offer consulting services?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. 5D Labs offers expert consulting in AI agent systems, blockchain development (Solana, Base, Near, Sui), Kubernetes infrastructure, and DevOps. Rates start at $225/hr with monthly retainers available at $3,500/mo. Book a free discovery call at https://cal.com/jonathon-fritz-2uhdqe/discovery.",
+            text: "Yes. 5D Labs offers expert consulting in AI agent systems, blockchain development (Solana, Base, Polygon, Near, Sui), Kubernetes infrastructure, and DevOps. Rates start at $225/hr with monthly retainers available at $3,500/mo. Book a free discovery call at https://cal.com/jonathon-fritz-2uhdqe/discovery.",
           },
         },
         {
@@ -274,7 +274,7 @@ const jsonLd = {
           name: "What blockchains does 5D Labs support?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "5D Labs runs its internal trading systems across Solana (for low-latency execution), Base (for Ethereum-grade composability), Near (for AI-native smart contracts), and Sui (for Move and object-centric DeFi).",
+            text: "5D Labs runs its internal trading systems across Solana (low-latency execution), Base (Ethereum composability), Polygon (Ethereum scaling and institutional adoption), Near (AI-native smart contracts), and Sui (Move, object-centric DeFi).",
           },
         },
       ],

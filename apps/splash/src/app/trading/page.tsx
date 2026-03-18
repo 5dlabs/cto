@@ -64,6 +64,14 @@ const chains = [
     bg: "bg-blue-400/5",
   },
   {
+    name: "Polygon",
+    role: "Ethereum scaling & institutional adoption",
+    detail: "Enterprise-grade Ethereum scaling with strong institutional adoption. Real-world asset rails and traditional finance integration.",
+    color: "text-purple-400",
+    border: "border-purple-400/30",
+    bg: "bg-purple-400/5",
+  },
+  {
     name: "Near",
     role: "AI-native contract surfaces",
     detail: "Chain abstraction and AI-native smart contracts. A natural fit for agents operating across multiple chains.",
@@ -108,7 +116,7 @@ export default function TradingPage() {
             </h1>
 
             <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10">
-              5D Labs operates its own trading engine across Solana, Base, Near, and Sui.
+              5D Labs operates its own trading engine across Solana, Base, Polygon, Near, and Sui.
               It finances the studio, sharpens our market intelligence, and gives us
               a front-row seat as{" "}
               <span className="text-foreground">on-chain finance becomes the new market infrastructure</span>.

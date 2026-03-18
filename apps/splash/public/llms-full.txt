@@ -56,7 +56,7 @@ The commercial build engine. Thirteen specialized AI agents ship complete featur
 This is 5D Labs' proprietary internal trading system. It helps generate internal revenue, sharpen market intelligence, and finance venture creation. It is not offered as a public service.
 
 - **Status**: Internal and in active development
-- **Chains**: Solana (low-latency execution), Base (Ethereum composability), Near (AI-native smart contracts), Sui (Move, object-centric DeFi)
+- **Chains**: Solana (low-latency execution), Base (Ethereum composability), Polygon (Ethereum scaling, institutional adoption), Near (AI-native smart contracts), Sui (Move, object-centric DeFi)
 - **Role**: Capital engine and live market-intelligence layer for the studio
 - **Reason It Stays Internal**: Selling the system broadly would expose trade secrets and increase direct competition against our own edge
 
@@ -115,7 +115,7 @@ Jonathon Fritz / 5D Labs offers expert consulting for early-stage teams and ente
 ### Expertise Areas
 
 1. **AI Agent Systems & OpenClaw**: Multi-agent orchestration, autonomous workflows, MCP integration, model selection and optimization
-2. **Blockchain & Solana**: Solana program development, on-chain trading agents, DeFi protocol integration, Base/Near/Sui/Ethereum node operations
+2. **Blockchain & Solana**: Solana program development, on-chain trading agents, DeFi protocol integration, Base/Polygon/Near/Sui/Ethereum node operations
 3. **Infrastructure & DevOps**: Bare-metal Kubernetes, Talos Linux, ArgoCD GitOps, CI/CD pipelines, cloud-to-metal migration
 4. **Platform Engineering**: Self-healing systems, observability stacks, secret management, multi-tenant architectures
 5. **Security**: Threat modeling, supply chain security, runtime protection, audit automation
@@ -162,9 +162,9 @@ Jonathon Fritz is open to technical co-founder, fractional CTO, and senior infra
 
 15+ years of experience shipping production systems across AI, blockchain, infrastructure, and trading. Building at the intersection of AI, crypto, and autonomous systems.
 
-- **Current Focus**: 5D Labs venture studio, OpenClaw agent orchestration, and the internal trading engine across Solana/Base/Near/Sui
+- **Current Focus**: 5D Labs venture studio, OpenClaw agent orchestration, and the internal trading engine across Solana/Base/Polygon/Near/Sui
 - **Background**: Full-stack engineering leadership across enterprise and startup environments
-- **Specialties**: Multi-agent AI systems, Kubernetes/bare-metal infrastructure, blockchain (Solana, Base, Near, Sui), Rust, Go, TypeScript, security, DevOps
+- **Specialties**: Multi-agent AI systems, Kubernetes/bare-metal infrastructure, blockchain (Solana, Base, Polygon, Near, Sui), Rust, Go, TypeScript, security, DevOps
 - **Profile**: https://5dlabs.ai/founder
 
 ---

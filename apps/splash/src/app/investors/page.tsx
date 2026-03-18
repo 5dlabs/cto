@@ -21,7 +21,7 @@ const highlights = [
   {
     metric: "4",
     label: "On-Chain Environments",
-    description: "Internal trading infrastructure active across Solana, Base, Near, and Sui",
+    description: "Internal trading infrastructure active across Solana, Base, Polygon, Near, and Sui",
   },
 ];
 
