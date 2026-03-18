@@ -1,4 +1,5 @@
-# Cilium Operator dashboard — Grafana.com #16612
+# Cilium Operator dashboard — bare-metal variant
+# Replaces Grafana.com #16612 (AWS-centric) with metrics available on bare metal
 # Auto-discovered by Grafana sidecar via grafana_dashboard label
 apiVersion: v1
 kind: ConfigMap
@@ -8,7 +9,6 @@ metadata:
   labels:
     grafana_dashboard: "1"
   annotations:
-    grafana.com/dashboard-id: "16612"
     grafana.com/folder: "Cilium"
 data:
   cilium-operator.json: |
@@ -27,550 +27,666 @@ data:
         ]
       },
       "editable": true,
-      "gnetId": 16612,
-      "graphTooltip": 0,
+      "graphTooltip": 1,
       "id": null,
       "links": [],
       "panels": [
         {
-          "aliasColors": {
-            "avg": "#cffaff"
-          },
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": {
-            "h": 5,
-            "w": 12,
-            "x": 0,
-            "y": 0
-          },
-          "hiddenSeries": false,
-          "id": 24,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "alias": "max",
-              "fillBelowTo": "min",
-              "lines": false
-            },
-            {
-              "alias": "min",
-              "lines": false
-            }
-          ],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "expr": "min(irate(cilium_operator_process_cpu_seconds_total{io_cilium_app=\"operator\"}[1m])) by (pod) * 100",
-              "legendFormat": "min",
-              "refId": "A"
-            },
-            {
-              "expr": "avg(irate(cilium_operator_process_cpu_seconds_total{io_cilium_app=\"operator\"}[1m])) by (pod) * 100",
-              "legendFormat": "avg",
-              "refId": "B"
-            },
-            {
-              "expr": "max(irate(cilium_operator_process_cpu_seconds_total{io_cilium_app=\"operator\"}[1m])) by (pod) * 100",
-              "legendFormat": "max",
-              "refId": "C"
-            }
-          ],
-          "title": "CPU Usage per node",
-          "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true
-          },
-          "yaxes": [
-            {
-              "format": "percent",
-              "show": true
-            },
-            {
-              "format": "short",
-              "show": true
-            }
-          ]
-        },
-        {
-          "aliasColors": {
-            "MAX_resident_memory_bytes_max": "#e5ac0e"
-          },
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
-          "fill": 1,
-          "fillGradient": 0,
-          "gridPos": {
-            "h": 5,
-            "w": 12,
-            "x": 12,
-            "y": 0
-          },
-          "hiddenSeries": false,
-          "id": 26,
-          "legend": {
-            "show": true
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "expr": "avg(cilium_operator_process_resident_memory_bytes{io_cilium_app=\"operator\"})",
-              "legendFormat": "AVG_resident_memory_bytes",
-              "refId": "C"
-            },
-            {
-              "expr": "max(cilium_operator_process_resident_memory_bytes{io_cilium_app=\"operator\"})",
-              "legendFormat": "MAX_resident_memory_bytes",
-              "refId": "D"
-            },
-            {
-              "expr": "min(cilium_operator_process_resident_memory_bytes{io_cilium_app=\"operator\"})",
-              "legendFormat": "MIN_resident_memory_bytes",
-              "refId": "E"
-            }
-          ],
-          "title": "Resident memory status",
-          "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true
-          },
-          "yaxes": [
-            {
-              "format": "bytes",
-              "show": true
-            },
-            {
-              "format": "short",
-              "show": true
-            }
-          ]
-        },
-        {
           "collapsed": false,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 5
-          },
-          "id": 6,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
           "panels": [],
-          "title": "IPAM",
+          "title": "Overview",
           "type": "row"
         },
         {
           "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              },
+              "mappings": [],
+              "color": { "mode": "thresholds" }
             },
             "overrides": []
           },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+          "id": 101,
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none"
+          },
+          "targets": [
+            {
+              "expr": "cilium_operator_version",
+              "legendFormat": "{{version}}",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "title": "Operator Version",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              },
+              "mappings": [],
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+          "id": 102,
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "area"
+          },
+          "targets": [
+            {
+              "expr": "cilium_operator_unmanaged_pods",
+              "legendFormat": "unmanaged",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "title": "Unmanaged Pods",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              },
+              "mappings": [],
+              "color": { "mode": "thresholds" },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "id": 103,
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "area"
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(cilium_operator_errors_warnings_total{level=\"error\"}[5m]))",
+              "legendFormat": "errors/s",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "title": "Error Rate",
+          "type": "stat"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 }
+                ]
+              },
+              "mappings": [],
+              "color": { "mode": "thresholds" },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "id": 104,
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "area"
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(cilium_operator_errors_warnings_total{level=\"warning\"}[5m]))",
+              "legendFormat": "warnings/s",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "title": "Warning Rate",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "id": 110,
+          "panels": [],
+          "title": "Process Resources",
+          "type": "row"
+        },
+        {
+          "aliasColors": { "avg": "#cffaff" },
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 1,
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 6
-          },
-          "id": 8,
-          "legend": {
-            "show": true
-          },
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 6 },
+          "hiddenSeries": false,
+          "id": 111,
+          "legend": { "show": true },
           "lines": true,
           "linewidth": 1,
           "nullPointMode": "null",
-          "pointradius": 2,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "irate(cilium_operator_process_cpu_seconds_total[1m]) * 100",
+              "legendFormat": "CPU %",
+              "refId": "A"
+            }
+          ],
+          "title": "CPU Usage",
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true },
+          "yaxes": [
+            { "format": "percent", "show": true },
+            { "format": "short", "show": false }
+          ]
+        },
+        {
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 6 },
+          "hiddenSeries": false,
+          "id": 112,
+          "legend": { "show": true },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "cilium_operator_process_resident_memory_bytes",
+              "legendFormat": "RSS",
+              "refId": "A"
+            },
+            {
+              "expr": "cilium_operator_process_virtual_memory_bytes",
+              "legendFormat": "Virtual",
+              "refId": "B"
+            }
+          ],
+          "title": "Memory Usage",
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true },
+          "yaxes": [
+            { "format": "bytes", "show": true },
+            { "format": "short", "show": false }
+          ]
+        },
+        {
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
+          "hiddenSeries": false,
+          "id": 113,
+          "legend": { "show": true },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "cilium_operator_process_open_fds",
+              "legendFormat": "Open FDs",
+              "refId": "A"
+            },
+            {
+              "expr": "cilium_operator_process_max_fds",
+              "legendFormat": "Max FDs",
+              "refId": "B"
+            }
+          ],
+          "title": "File Descriptors",
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true },
+          "yaxes": [
+            { "format": "short", "show": true },
+            { "format": "short", "show": false }
+          ]
+        },
+        {
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
+          "hiddenSeries": false,
+          "id": 114,
+          "legend": { "show": true },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "irate(cilium_operator_process_network_receive_bytes_total[1m])",
+              "legendFormat": "Receive",
+              "refId": "A"
+            },
+            {
+              "expr": "irate(cilium_operator_process_network_transmit_bytes_total[1m])",
+              "legendFormat": "Transmit",
+              "refId": "B"
+            }
+          ],
+          "title": "Network I/O",
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true },
+          "yaxes": [
+            { "format": "Bps", "show": true },
+            { "format": "short", "show": false }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+          "id": 120,
+          "panels": [],
+          "title": "Errors & Warnings",
+          "type": "row"
+        },
+        {
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Prometheus",
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 21 },
+          "hiddenSeries": false,
+          "id": 121,
+          "legend": { "show": true },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
           "points": false,
           "renderer": "flot",
           "spaceLength": 10,
           "stack": true,
+          "steppedLine": false,
           "targets": [
             {
-              "expr": "avg(cilium_operator_ipam_ips) by (type)",
-              "legendFormat": "{{type}}",
+              "expr": "sum by (level, subsystem) (rate(cilium_operator_errors_warnings_total[5m]))",
+              "legendFormat": "{{level}} / {{subsystem}}",
               "refId": "A"
             }
           ],
-          "title": "IP Addresses",
+          "title": "Errors & Warnings Rate",
           "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true
-          },
+          "xaxis": { "mode": "time", "show": true },
           "yaxes": [
-            {
-              "format": "short",
-              "show": true
-            },
-            {
-              "format": "short",
-              "show": true
-            }
+            { "format": "ops", "show": true },
+            { "format": "short", "show": false }
           ]
         },
         {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+          "id": 130,
+          "panels": [],
+          "title": "Identity Garbage Collection",
+          "type": "row"
+        },
+        {
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
           "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 1,
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 6
-          },
-          "id": 10,
-          "legend": {
-            "show": true
-          },
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 29 },
+          "hiddenSeries": false,
+          "id": 131,
+          "legend": { "show": true },
           "lines": true,
           "linewidth": 1,
           "nullPointMode": "null",
-          "pointradius": 2,
+          "percentage": false,
+          "pointradius": 5,
           "points": false,
           "renderer": "flot",
           "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(cilium_operator_ec2_api_duration_seconds_sum[1m])/rate(cilium_operator_ec2_api_duration_seconds_count[1m])",
-              "legendFormat": "{{operation}} {{response_code}}",
+              "expr": "rate(cilium_operator_identity_gc_runs[5m])",
+              "legendFormat": "GC runs/s",
               "refId": "A"
             }
           ],
-          "title": "EC2 API Interactions",
+          "title": "Identity GC Runs",
           "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true
-          },
+          "xaxis": { "mode": "time", "show": true },
           "yaxes": [
-            {
-              "format": "dtdurations",
-              "show": true
-            },
-            {
-              "format": "short",
-              "show": true
-            }
+            { "format": "ops", "show": true },
+            { "format": "short", "show": false }
           ]
         },
         {
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
           "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 1,
-          "gridPos": {
-            "h": 7,
-            "w": 8,
-            "x": 0,
-            "y": 14
-          },
-          "id": 4,
-          "legend": {
-            "show": true
-          },
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 29 },
+          "hiddenSeries": false,
+          "id": 132,
+          "legend": { "show": true },
           "lines": true,
           "linewidth": 1,
           "nullPointMode": "null",
-          "pointradius": 2,
+          "percentage": false,
+          "pointradius": 5,
           "points": false,
           "renderer": "flot",
           "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
           "targets": [
             {
-              "expr": "cilium_operator_ipam_nodes",
-              "legendFormat": "{{category}}",
+              "expr": "cilium_operator_identity_gc_entries",
+              "legendFormat": "entries",
               "refId": "A"
             }
           ],
-          "title": "Number of nodes",
+          "title": "Identity GC Entries",
           "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true
-          },
+          "xaxis": { "mode": "time", "show": true },
           "yaxes": [
-            {
-              "format": "short",
-              "show": true
-            },
-            {
-              "format": "short",
-              "show": true
-            }
+            { "format": "short", "show": true },
+            { "format": "short", "show": false }
           ]
         },
         {
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
           "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 1,
-          "gridPos": {
-            "h": 7,
-            "w": 8,
-            "x": 8,
-            "y": 14
-          },
-          "id": 12,
-          "legend": {
-            "show": true
-          },
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 29 },
+          "hiddenSeries": false,
+          "id": 133,
+          "legend": { "show": true },
           "lines": true,
           "linewidth": 1,
           "nullPointMode": "null",
-          "pointradius": 2,
+          "percentage": false,
+          "pointradius": 5,
           "points": false,
           "renderer": "flot",
           "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
           "targets": [
             {
-              "expr": "cilium_operator_ipam_available",
-              "legendFormat": "interfaces",
+              "expr": "cilium_operator_identity_gc_latency",
+              "legendFormat": "latency",
               "refId": "A"
             }
           ],
-          "title": "# interfaces with addresses available",
+          "title": "Identity GC Latency",
           "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true
-          },
+          "xaxis": { "mode": "time", "show": true },
           "yaxes": [
-            {
-              "format": "short",
-              "show": true
-            },
-            {
-              "format": "short",
-              "show": true
-            }
+            { "format": "s", "show": true },
+            { "format": "short", "show": false }
           ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+          "id": 140,
+          "panels": [],
+          "title": "CiliumEndpointSlice (CES)",
+          "type": "row"
         },
         {
           "datasource": "Prometheus",
           "fieldConfig": {
             "defaults": {
-              "custom": {}
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "fillOpacity": 10,
+                "pointSize": 5,
+                "showPoints": "never"
+              }
             },
             "overrides": []
           },
-          "fill": 1,
-          "gridPos": {
-            "h": 7,
-            "w": 8,
-            "x": 16,
-            "y": 14
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 37 },
+          "id": 141,
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
           },
-          "id": 16,
-          "legend": {
-            "show": true
-          },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "spaceLength": 10,
           "targets": [
             {
-              "expr": "rate(cilium_operator_ipam_resync_total[1m])",
-              "legendFormat": "operations",
+              "expr": "histogram_quantile(0.50, rate(cilium_operator_number_of_ceps_per_ces_bucket[5m]))",
+              "legendFormat": "p50",
               "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.90, rate(cilium_operator_number_of_ceps_per_ces_bucket[5m]))",
+              "legendFormat": "p90",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(cilium_operator_number_of_ceps_per_ces_bucket[5m]))",
+              "legendFormat": "p99",
+              "refId": "C"
             }
           ],
-          "title": "Metadata Resync Operations",
-          "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true
-          },
-          "yaxes": [
-            {
-              "format": "ops",
-              "show": true
-            },
-            {
-              "format": "short",
-              "show": true
-            }
-          ]
+          "title": "CEPs per CES (quantiles)",
+          "type": "timeseries"
         },
         {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
+          "id": 150,
+          "panels": [],
+          "title": "Hive Jobs",
+          "type": "row"
+        },
+        {
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
           "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 1,
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 21
-          },
-          "id": 14,
-          "legend": {
-            "show": true
-          },
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 45 },
+          "hiddenSeries": false,
+          "id": 151,
+          "legend": { "show": true },
           "lines": true,
           "linewidth": 1,
           "nullPointMode": "null",
-          "pointradius": 2,
+          "percentage": false,
+          "pointradius": 5,
           "points": false,
           "renderer": "flot",
           "spaceLength": 10,
           "stack": true,
+          "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(cilium_operator_ec2_api_rate_limit_duration_seconds_sum[1m])/rate(cilium_operator_ec2_api_rate_limit_duration_seconds_count[1m])",
-              "legendFormat": "{{operation}}",
+              "expr": "sum by (name, outcome) (rate(cilium_operator_hive_jobs_runs_total[5m]))",
+              "legendFormat": "{{name}} ({{outcome}})",
               "refId": "A"
             }
           ],
-          "title": "EC2 client side rate limiting",
+          "title": "Hive Job Runs",
           "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true
-          },
+          "xaxis": { "mode": "time", "show": true },
           "yaxes": [
-            {
-              "format": "reqps",
-              "show": true
-            },
-            {
-              "format": "short",
-              "show": true
-            }
+            { "format": "ops", "show": true },
+            { "format": "short", "show": false }
           ]
         },
         {
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
           "datasource": "Prometheus",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
+          "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 1,
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 21
-          },
-          "id": 2,
-          "legend": {
-            "show": true
-          },
+          "fillGradient": 0,
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 45 },
+          "hiddenSeries": false,
+          "id": 152,
+          "legend": { "show": true },
           "lines": true,
           "linewidth": 1,
           "nullPointMode": "null",
-          "pointradius": 2,
+          "percentage": false,
+          "pointradius": 5,
           "points": false,
           "renderer": "flot",
           "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
           "targets": [
             {
-              "expr": "avg(rate(cilium_operator_ipam_interface_creation_ops[1m])) by (subnetId, status)",
-              "legendFormat": "{{status}} ({{subnetId}})",
+              "expr": "cilium_operator_hive_jobs_observer_last_run_duration_seconds",
+              "legendFormat": "observer",
               "refId": "A"
-            }
-          ],
-          "title": "Interface Creation",
-          "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true
-          },
-          "yaxes": [
-            {
-              "format": "ops",
-              "show": true
             },
             {
-              "format": "short",
-              "show": true
+              "expr": "cilium_operator_hive_jobs_timer_last_run_duration_seconds",
+              "legendFormat": "timer",
+              "refId": "B"
             }
+          ],
+          "title": "Hive Job Last Run Duration",
+          "type": "graph",
+          "xaxis": { "mode": "time", "show": true },
+          "yaxes": [
+            { "format": "s", "show": true },
+            { "format": "short", "show": false }
           ]
         }
       ],
-      "schemaVersion": 25,
+      "schemaVersion": 36,
       "style": "dark",
-      "tags": [],
+      "tags": ["cilium"],
       "templating": {
         "list": []
       },
       "time": {
-        "from": "now-30m",
+        "from": "now-1h",
         "to": "now"
       },
       "timepicker": {},
       "timezone": "",
       "title": "Cilium Operator",
       "uid": "cilium-operator",
-      "version": 1,
-      "description": "Dashboard for the Cilium v1.12 Operator metrics"
+      "version": 2,
+      "description": "Cilium Operator metrics for bare-metal clusters (replaces AWS-centric #16612)"
     }

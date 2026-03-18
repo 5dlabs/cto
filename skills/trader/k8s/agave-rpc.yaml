@@ -113,7 +113,7 @@ spec:
               hugepages-2Mi: 4Gi
             limits:
               cpu: "16"
-              memory: 600Gi
+              memory: 750Gi
               hugepages-2Mi: 4Gi
         - name: solana-exporter
           image: ghcr.io/asymmetric-research/solana-exporter:v3.0.2

@@ -1574,7 +1574,7 @@ data:
           "steppedLine": false,
           "targets": [
             {
-              "expr": "avg(rate(cilium_bpf_syscall_duration_seconds_count{k8s_app=\"cilium\", pod=~\"$pod\"}[1m])) by (pod, operation)",
+              "expr": "avg by (operation) (rate(cilium_bpf_map_ops_total{job=\"cilium-agent\"}[1m]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{operation}}",
@@ -1585,7 +1585,7 @@ data:
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "# system calls (average node)",
+          "title": "BPF Map Ops/s (avg node)",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1676,7 +1676,7 @@ data:
           "steppedLine": false,
           "targets": [
             {
-              "expr": "max(rate(cilium_bpf_syscall_duration_seconds_count{k8s_app=\"cilium\", pod=~\"$pod\"}[1m])) by (pod, operation)",
+              "expr": "max by (operation) (rate(cilium_bpf_map_ops_total{job=\"cilium-agent\"}[1m]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{operation}}",
@@ -1687,7 +1687,7 @@ data:
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "# system calls (max node)",
+          "title": "BPF Map Ops/s (max node)",
           "tooltip": {
             "shared": true,
             "sort": 2,
@@ -1778,10 +1778,10 @@ data:
           "steppedLine": false,
           "targets": [
             {
-              "expr": "avg(rate(cilium_bpf_syscall_duration_seconds_sum{k8s_app=\"cilium\", pod=~\"$pod\"}[1m])/ rate(cilium_bpf_syscall_duration_seconds_count{k8s_app=\"cilium\", pod=~\"$pod\"}[1m])) by (pod, operation)",
+              "expr": "sum by (outcome) (rate(cilium_bpf_map_ops_total{job=\"cilium-agent\"}[1m]))",
               "format": "time_series",
               "intervalFactor": 1,
-              "legendFormat": "{{operation}}",
+              "legendFormat": "{{outcome}}",
               "refId": "A"
             }
           ],
@@ -1789,7 +1789,7 @@ data:
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "system call latency (avg node)",
+          "title": "BPF Map Ops by Outcome",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1805,7 +1805,7 @@ data:
           },
           "yaxes": [
             {
-              "format": "s",
+              "format": "ops",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -1877,10 +1877,10 @@ data:
           "steppedLine": false,
           "targets": [
             {
-              "expr": "max(rate(cilium_bpf_syscall_duration_seconds_sum{k8s_app=\"cilium\", pod=~\"$pod\"}[1m])/ rate(cilium_bpf_syscall_duration_seconds_count{k8s_app=\"cilium\", pod=~\"$pod\"}[1m])) by (pod, operation)",
+              "expr": "topk(10, sum by (map_name) (rate(cilium_bpf_map_ops_total{job=\"cilium-agent\"}[1m])))",
               "format": "time_series",
               "intervalFactor": 1,
-              "legendFormat": "{{operation}}",
+              "legendFormat": "{{map_name}}",
               "refId": "A"
             }
           ],
@@ -1888,7 +1888,7 @@ data:
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "system call latency (max node)",
+          "title": "BPF Map Ops by Map (Top 10)",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1904,7 +1904,7 @@ data:
           },
           "yaxes": [
             {
-              "format": "s",
+              "format": "ops",
               "label": null,
               "logBase": 1,
               "max": null,
