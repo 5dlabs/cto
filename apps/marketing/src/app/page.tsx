@@ -364,6 +364,10 @@ export default function Home() {
                     <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
                     <span>Keys and runtime managed for you</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-yellow/60"></span>
+                    <span>Intelligent routing across Anthropic, OpenAI, Google, Bedrock, OpenRouter, xAI, DeepSeek, and 50+ more</span>
+                  </div>
                 </div>
               </div>
 
@@ -618,10 +622,10 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">5D Code</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Multiple CLIs, multiple model providers, one consistent experience. CTO abstracts the underlying toolchain so your team works with whatever interface fits — Claude Code, Cursor, Codex, Factory, Gemini, GitHub Copilot, Kimi — without the cognitive overhead of managing the stack beneath it.
+                  OpenClaw&apos;s ACP harness manages all supported CLIs and makes intelligent routing decisions based on available token usage across providers. Multiple CLIs — Claude Code, Cursor, Codex, OpenCode, Gemini, Copilot, Kimi, Pi — and 60+ model providers (Anthropic, OpenAI, Google, AWS Bedrock, Azure Foundry, OpenRouter, xAI, DeepSeek, MiniMax, DeepInfra, and more) in one consistent experience.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {["Multi-CLI", "Model-agnostic", "Zero config"].map(tool => (
+                  {["ACP harness", "Multi-CLI", "Token-aware routing", "60+ providers"].map(tool => (
                     <span key={tool} className="text-xs px-2 py-1 rounded bg-cyan/10 text-cyan">{tool}</span>
                   ))}
                 </div>
@@ -667,7 +671,7 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">5D Runtime</h3>
+                <h3 className="text-xl font-semibold mb-2">5D Infrastructure</h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   Databases, storage, and inference — the same managed services teams expect from cloud providers, already running and ready to use. No setup, no assembly, no surprise bills.
                 </p>
@@ -761,7 +765,7 @@ export default function Home() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold">AI Runtime, Without the Ops Burden</h3>
+                  <h3 className="text-xl font-semibold">AI Inference, Without the Ops Burden</h3>
                 </div>
                 <p className="text-muted-foreground mb-5">
                   Start with hosted providers, move to dedicated GPU infrastructure when usage justifies it, and keep the same product surface the entire way through.
@@ -775,7 +779,7 @@ export default function Home() {
                 </div>
                 <div className="space-y-3 text-sm text-muted-foreground">
                   <p>Use leading hosted models now or self-host later.</p>
-                  <p>Keep one runtime contract as teams scale up.</p>
+                  <p>Keep one API contract as teams scale up.</p>
                   <p>Focus on product behavior, not inference plumbing.</p>
                 </div>
               </div>

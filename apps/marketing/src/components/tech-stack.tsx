@@ -117,6 +117,41 @@ export function TechStack() {
           </p>
         </div>
 
+        <div className="mb-14 rounded-2xl border border-border/50 bg-card/30 p-6 backdrop-blur-sm">
+          <p className="mb-4 text-sm font-medium uppercase tracking-widest text-muted-foreground">
+            Model Providers (Token-Aware Routing)
+          </p>
+          <p className="mb-4 text-sm text-muted-foreground text-center">
+            OpenClaw&apos;s ACP harness routes intelligently across 60+ providers based on available token usage — no single vendor lock-in.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            {[
+              "Anthropic",
+              "OpenAI",
+              "Google (Vertex)",
+              "AWS Bedrock",
+              "Azure Foundry",
+              "OpenRouter",
+              "xAI",
+              "DeepSeek",
+              "MiniMax",
+              "DeepInfra",
+              "NovitaAI",
+              "NVIDIA",
+            ].map((provider) => (
+              <span
+                key={provider}
+                className="inline-flex items-center rounded-full border border-border/60 bg-background/60 px-4 py-2 text-sm font-medium text-foreground"
+              >
+                {provider}
+              </span>
+            ))}
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground text-center">
+            Plus 50+ more via OpenRouter and direct integrations
+          </p>
+        </div>
+
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {services.map((service) => {
             const colors = colorMap[service.color] ?? colorMap.cyan;

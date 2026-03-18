@@ -85,7 +85,8 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 - **Git hosting**: GitHub, self-hosted GitLab (all features free), or Gitea—choose what fits your stack
 - **Linear**: Project management, task sync, agent activity
 - **MCP Servers**: Extensible tooling ecosystem
-- **AI CLIs**: Claude Code, Cursor, Factory, Codex, Gemini, OpenCode
+- **AI CLIs**: Claude Code, Cursor, Codex, OpenCode, Gemini, GitHub Copilot, Kimi, Pi — OpenClaw ACP harness manages all supported CLIs
+- **Model providers**: Token-aware routing across 60+ providers — Anthropic, OpenAI, Google Vertex, AWS Bedrock, Azure Foundry, OpenRouter, xAI, DeepSeek, MiniMax, DeepInfra, NovitaAI, NVIDIA, and more
 
 ## Getting Started
 
