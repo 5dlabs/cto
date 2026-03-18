@@ -51,6 +51,14 @@ const services = [
     color: "purple",
   },
   {
+    name: "5D Git",
+    tagline: "Self-hosted GitLab or Gitea",
+    description:
+      "Enterprise Git hosting on your infrastructure — GitLab or Gitea, your choice. Full CI/CD, issues, and MRs without vendor lock-in.",
+    highlights: ["GitLab or Gitea", "Self-hosted", "No per-seat pricing"],
+    color: "purple",
+  },
+  {
     name: "5D Inference",
     tagline: "Managed model runtime",
     description:
@@ -141,7 +149,7 @@ export function TechStack() {
 
         <div className="mt-10 text-center">
           <p className="text-sm text-muted-foreground max-w-3xl mx-auto">
-            Behind the scenes, CTO manages databases, storage, secrets, deployments,
+            Behind the scenes, CTO manages databases, storage, secrets, source control, deployments,
             and inference as productized platform services so teams can stay focused
             on product delivery instead of infrastructure assembly.
           </p>

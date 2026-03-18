@@ -119,6 +119,23 @@ const categories: ServiceCategory[] = [
     ],
   },
   {
+    title: "Source Control",
+    description:
+      "Self-hosted Git hosting with full CI/CD, issues, and merge requests — no vendor lock-in, no per-seat pricing. Choose the stack that fits your workflow.",
+    color: "text-purple-400",
+    border: "border-purple-400/20",
+    bg: "bg-purple-400/5",
+    services: [
+      {
+        name: "5D Git",
+        tagline: "Self-hosted GitLab or Gitea",
+        description:
+          "Enterprise-grade Git hosting on your infrastructure. Run GitLab or Gitea as your default — full CI/CD, issues, merge requests, and repository management. All features included. Integrates seamlessly with CTO agents and 5D Deploy.",
+        poweredBy: "GitLab Helm chart / Gitea Helm chart",
+      },
+    ],
+  },
+  {
     title: "Delivery & Observability",
     description:
       "GitOps-driven release pipelines, unified monitoring, and self-healing operations — so the platform stays healthy and delivery stays fast.",
@@ -215,7 +232,7 @@ export default function ServicesPage() {
               <span className="gradient-text">Needs to Run</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-              CTO manages databases, storage, inference, secrets, delivery, networking, and
+              CTO manages databases, storage, inference, secrets, source control, delivery, networking, and
               blockchain infrastructure as productized platform services — all branded,
               all operated for you.
             </p>

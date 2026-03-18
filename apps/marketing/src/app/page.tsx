@@ -331,7 +331,7 @@ export default function Home() {
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-magenta/60"></span>
-                    <span>Managed databases, storage, and deployments</span>
+                    <span>Managed databases, storage, source control, and deployments</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-magenta/60"></span>
