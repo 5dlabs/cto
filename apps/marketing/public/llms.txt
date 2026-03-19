@@ -15,7 +15,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 ## The Agent Collective
 
 ### Project Management
-- **Morgan** - Technical Program Manager: Orchestrates project lifecycles, syncs GitHub with Linear, decomposes PRDs into tasks
+- **Morgan** - Technical Program Manager: Orchestrates project lifecycles, syncs your Git repo with Linear, decomposes PRDs into tasks
 
 ### Backend Engineering
 - **Rex** - Rust Architect: High-performance APIs with Axum, Tokio, sqlx
@@ -82,7 +82,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 
 ## Integrations
 
-- **GitHub**: PRs, reviews, deployments, Actions
+- **Git hosting**: GitHub, self-hosted GitLab (all features free), or Gitea—choose what fits your stack
 - **Linear**: Project management, task sync, agent activity
 - **MCP Servers**: Extensible tooling ecosystem
 - **AI CLIs**: Claude Code, Cursor, Factory, Codex, Gemini, OpenCode
@@ -90,7 +90,7 @@ Unlike AI coding assistants (Cursor, Copilot) that help you write code, or deplo
 ## Getting Started
 
 1. Join the waitlist at https://cto.5dlabs.ai
-2. Connect your GitHub repository
+2. Connect your Git repository (GitHub, GitLab, or Gitea)
 3. Submit a PRD (Product Requirements Document)
 4. Watch your AI team ship
 

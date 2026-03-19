@@ -1,0 +1,402 @@
+# Custom Solana Validator dashboard — asymmetric-research/solana-exporter v3.0.2 metrics
+# Auto-discovered by Grafana sidecar via grafana_dashboard label
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-solana-validator
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana.com/folder: "Trading Cluster"
+data:
+  solana-validator.json: |
+    {
+      "title": "Solana Validator",
+      "uid": "solana-validator",
+      "description": "Slot height, sync status, RPC health, SOL balance — from asymmetric-research/solana-exporter",
+      "tags": ["solana", "validator", "rpc"],
+      "timezone": "browser",
+      "editable": true,
+      "graphTooltip": 1,
+      "time": { "from": "now-6h", "to": "now" },
+      "refresh": "10s",
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "prometheus",
+            "current": { "text": "Prometheus", "value": "Prometheus" }
+          },
+          {
+            "name": "loki_datasource",
+            "type": "datasource",
+            "query": "loki",
+            "current": { "text": "Loki", "value": "Loki" }
+          },
+          {
+            "name": "log_level",
+            "type": "custom",
+            "query": "info,warn,error,debug",
+            "includeAll": true,
+            "allValue": ".+",
+            "current": { "text": "All", "value": "$__all" },
+            "multi": true,
+            "label": "Log Level"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false,
+          "panels": []
+        },
+        {
+          "title": "Node Phase",
+          "description": "Derived from exporter + RPC health. STARTING = exporter can't reach RPC (snapshot/indexing). CATCHING UP = RPC online but behind. SYNCED = healthy and current.",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "targets": [
+            {
+              "expr": "(up{job=\"solana-exporter\"} == 0) * 0 or (up{job=\"solana-exporter\"} == 1 and solana_node_is_healthy == 0) * 1 + 0 or (up{job=\"solana-exporter\"} == 1 and solana_node_is_healthy == 1) * 2 + 0",
+              "legendFormat": "phase",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "STARTING", "color": "orange", "index": 0 } } },
+                { "type": "value", "options": { "1": { "text": "CATCHING UP", "color": "yellow", "index": 1 } } },
+                { "type": "value", "options": { "2": { "text": "SYNCED", "color": "green", "index": 2 } } }
+              ],
+              "noValue": "OFFLINE",
+              "thresholds": { "steps": [{ "color": "red", "value": null }] }
+            }
+          }
+        },
+        {
+          "title": "Block Height Advancing",
+          "description": "Whether slot height has changed in the last 5 minutes. 0 = stalled (indexing or down), >0 = advancing.",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "targets": [
+            {
+              "expr": "increase(solana_node_slot_height[5m])",
+              "legendFormat": "slots",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value_and_name",
+            "justifyMode": "center"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "noValue": "N/A (exporter down)",
+              "mappings": [
+                { "type": "range", "options": { "from": 0, "to": 0, "result": { "text": "STALLED", "color": "red", "index": 0 } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "green", "value": 100 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "RPC Health",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "targets": [
+            {
+              "expr": "solana_node_is_healthy",
+              "legendFormat": "healthy",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "RPC OFFLINE",
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "UNHEALTHY", "color": "red" }, "1": { "text": "HEALTHY", "color": "green" } } }
+              ],
+              "thresholds": { "steps": [{ "color": "red", "value": null }] }
+            }
+          }
+        },
+        {
+          "title": "Exporter Status",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+          "targets": [
+            {
+              "expr": "up{job=\"solana-exporter\"}",
+              "legendFormat": "exporter",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "NO DATA",
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+              ],
+              "thresholds": { "steps": [{ "color": "red", "value": null }] }
+            }
+          }
+        },
+        {
+          "title": "Startup Activity",
+          "description": "Recent startup log messages — snapshot download, account indexing, replay progress",
+          "type": "logs",
+          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 7 },
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "targets": [
+            {
+              "expr": "{namespace=\"solana\", container=\"agave\"} |~ \"(?i)(snapshot|index_startup|Purging|catching|replay_stage|Starting|health|ready|rpc.*listen|unpacking|Loading|loaded|ledger)\"",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": false,
+            "sortOrder": "Descending",
+            "dedupStrategy": "signature",
+            "enableLogDetails": true,
+            "wrapLogMessage": true
+          }
+        },
+        {
+          "title": "",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+          "collapsed": false,
+          "panels": []
+        },
+        {
+          "title": "Current Slot",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 14 },
+          "targets": [
+            {
+              "expr": "solana_node_slot_height",
+              "legendFormat": "slot",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none", "noValue": "—" } }
+        },
+        {
+          "title": "Slots Behind",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 14 },
+          "targets": [
+            {
+              "expr": "solana_node_num_slots_behind",
+              "legendFormat": "behind",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none", "noValue": "—", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 1000 }] } } }
+        },
+        {
+          "title": "Slot Rate (slots/sec)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 14 },
+          "targets": [
+            {
+              "expr": "rate(solana_node_slot_height[5m])",
+              "legendFormat": "slots/s",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1, "noValue": "—" } }
+        },
+        {
+          "title": "Sync ETA",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 14 },
+          "targets": [
+            {
+              "expr": "solana_node_num_slots_behind / clamp_min(rate(solana_node_slot_height[5m]), 1)",
+              "legendFormat": "ETA",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s", "noValue": "—", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 300 }, { "color": "red", "value": 3600 }] } } }
+        },
+        {
+          "title": "SOL Balance",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 18 },
+          "targets": [
+            {
+              "expr": "solana_account_balance",
+              "legendFormat": "{{ address }}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none", "decimals": 4, "noValue": "—" } }
+        },
+        {
+          "title": "Agave Version",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 18 },
+          "targets": [
+            {
+              "expr": "solana_node_version",
+              "legendFormat": "{{ version }}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none", "noValue": "—" } }
+        },
+        {
+          "title": "",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+          "collapsed": false,
+          "panels": []
+        },
+        {
+          "title": "Slot Height Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+          "targets": [
+            {
+              "expr": "solana_node_slot_height",
+              "legendFormat": "local slot",
+              "refId": "A"
+            },
+            {
+              "expr": "solana_node_slot_height + solana_node_num_slots_behind",
+              "legendFormat": "network slot (estimated)",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "title": "Slots Behind Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+          "targets": [
+            {
+              "expr": "solana_node_num_slots_behind",
+              "legendFormat": "slots behind",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "none", "color": { "mode": "palette-classic" }, "custom": { "fillOpacity": 20 } } }
+        },
+        {
+          "title": "Slot Processing Rate Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+          "targets": [
+            {
+              "expr": "rate(solana_node_slot_height[5m])",
+              "legendFormat": "slots/s",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "ops" } }
+        },
+        {
+          "title": "Sync ETA Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+          "targets": [
+            {
+              "expr": "solana_node_num_slots_behind / clamp_min(rate(solana_node_slot_height[5m]), 1)",
+              "legendFormat": "ETA (seconds)",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        },
+        {
+          "title": "",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
+          "collapsed": false,
+          "panels": []
+        },
+        {
+          "title": "Agave Logs",
+          "type": "logs",
+          "gridPos": { "h": 14, "w": 12, "x": 0, "y": 40 },
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "targets": [
+            {
+              "expr": "{namespace=\"solana\", container=\"agave\", level=~\"$log_level\"}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": false,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "wrapLogMessage": true
+          }
+        },
+        {
+          "title": "Exporter Logs",
+          "type": "logs",
+          "gridPos": { "h": 14, "w": 12, "x": 12, "y": 40 },
+          "datasource": { "type": "loki", "uid": "${loki_datasource}" },
+          "targets": [
+            {
+              "expr": "{namespace=\"solana\", container=\"solana-exporter\", level=~\"$log_level\"}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": false,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "wrapLogMessage": true
+          }
+        }
+      ],
+      "schemaVersion": 39,
+      "version": 1
+    }

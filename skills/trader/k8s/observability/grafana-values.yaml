@@ -1,0 +1,121 @@
+# Grafana Helm values for Cherry trading cluster
+# Chart: grafana/grafana v9.2.9
+# Access: NodePort 30300 on db-01 (84.32.176.180:30300)
+# Deploy: helm install grafana grafana/grafana -n observability -f grafana-values.yaml
+
+adminUser: admin
+adminPassword: admin
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: "local-path"
+
+# NodePort access on db-01's public IP
+service:
+  type: NodePort
+  port: 80
+  nodePort: 30300
+
+nodeSelector:
+  kubernetes.io/hostname: db-01
+
+# Datasources: Prometheus + Loki (no Alertmanager)
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-server.observability.svc.cluster.local:80
+        isDefault: true
+        editable: false
+        jsonData:
+          timeInterval: "15s"
+          queryTimeout: "60s"
+          httpMethod: POST
+
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki-gateway.observability.svc.cluster.local:80
+        editable: false
+        jsonData:
+          maxLines: 1000
+
+plugins:
+  - grafana-piechart-panel
+
+rbac:
+  create: true
+  pspEnabled: false
+
+serviceAccount:
+  create: true
+  name: grafana
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 472
+  fsGroup: 472
+
+# Talos restriction — init-chown-data fails
+initChownData:
+  enabled: false
+
+env:
+  GF_EXPLORE_ENABLED: "true"
+  GF_ALERTING_ENABLED: "true"
+  GF_UNIFIED_ALERTING_ENABLED: "true"
+
+grafana.ini:
+  server:
+    domain: grafana.local
+    root_url: "%(protocol)s://%(domain)s/"
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+  log:
+    mode: console
+    level: info
+  unified_alerting:
+    enabled: true
+
+# Sidecar for auto-discovering dashboard ConfigMaps
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    folder: /tmp/dashboards
+    provider:
+      name: sidecarProvider
+      orgId: 1
+      folder: 'Trading Cluster'
+      type: file
+      disableDeletion: false
+      allowUiUpdates: true
+  datasources:
+    enabled: true
+    label: grafana_datasource
+
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  initialDelaySeconds: 60
+  timeoutSeconds: 30
+  failureThreshold: 10

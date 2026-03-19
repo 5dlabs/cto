@@ -15,9 +15,9 @@ global:
 resources:
   requests:
     cpu: "50m"
-    memory: "128Mi"
+    memory: "256Mi"
   limits:
-    memory: "512Mi"
+    memory: "2Gi"
 
 agent:
   id: "trader-temporal-btc-low"
@@ -27,6 +27,7 @@ agent:
     every: "5m"
     target: "last"
     ackMaxChars: 200
+    model: "anthropic/claude-haiku-4-5-20251001"
     prompt: >-
       Check the temporal-arb process health. Follow HEARTBEAT.md instructions exactly.
   sandbox: "off"
@@ -35,22 +36,38 @@ agent:
 modelDefaults:
   primary: "anthropic/claude-haiku-4-5-20251001"
   fallbacks:
-    - "anthropic/claude-sonnet-4-6"
+    - "anthropic/claude-sonnet-4-20250514"
 
 secrets:
   external:
     apiKeysSecret: "trading-api-keys"
+    messagingSecret: "trading-msg-trader-temporal-btc-low"
     githubSecret: "trading-github"
 
 messaging:
   discord:
-    enabled: false
+    enabled: true
+    groupPolicy: "allowlist"
+    guilds:
+      "*":
+        requireMention: false
+        users:
+          - "444519104808878090"
+    allowBots: true
+    dm:
+      policy: "disabled"
+      allowFrom: []
 
 models:
   providers:
     anthropic:
       enabled: true
       apiKeySecretKey: "ANTHROPIC_API_KEY"
+      models:
+        - id: "claude-haiku-4-5-20251001"
+          name: "Claude Haiku 4.5"
+        - id: "claude-sonnet-4-20250514"
+          name: "Claude Sonnet 4"
     openai:
       enabled: false
     minimax:
@@ -96,16 +113,14 @@ workspace:
     HEARTBEAT.md: |
       # Heartbeat Instructions
 
-      1. Check if temporal-arb process is running:
-         - Read /workspace/repos/cto/skills/trader/temporal-arb/status.json
-         - If updatedAt is older than 2 minutes, process may be dead
-      2. If not running, start it:
-         cd /workspace/repos/cto/skills/trader/temporal-arb
-         node index.js --verbose &
-      3. Read status.json and report:
-         - Cycle count, contracts scanned, signals found, trades executed
-         - Any errors or anomalies
-      4. If process is healthy, report "OK" with key metrics
+      1. Check if temporal-arb process is already running:
+         Run: pgrep -f "temporal-arb" (use exec tool)
+      2. If NOT running, start it as a background process:
+         Run: cd /workspace/repos/cto/skills/trader/temporal-arb && node index.js --verbose
+         IMPORTANT: Use the exec tool with background=true and timeout=300000
+      3. Read /workspace/repos/cto/skills/trader/temporal-arb/status.json
+      4. Report: cycle count, contracts scanned, signals found, trades executed
+      5. If status.json doesn't exist yet, just report "Process started, awaiting first cycle"
 
     IDENTITY.md: |
       - **Name:** Trader: Temporal Arb (BTC, Low Threshold)
@@ -131,8 +146,9 @@ extraEnv:
   - name: SIMMER_API_KEY
     valueFrom:
       secretKeyRef:
-        name: trader-api-keys
+        name: trading-api-keys
         key: simmer-api-key
+        optional: true
 
 nats:
   enabled: true

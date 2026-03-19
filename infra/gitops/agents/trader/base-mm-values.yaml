@@ -75,7 +75,7 @@ storage:
   size: 2Gi
 
 discord:
-  enabled: false
+  enabled: true
 
 nats:
   enabled: true

@@ -15,9 +15,9 @@ global:
 resources:
   requests:
     cpu: "50m"
-    memory: "128Mi"
+    memory: "256Mi"
   limits:
-    memory: "512Mi"
+    memory: "2Gi"
 
 agent:
   id: "trader-whale-copy-01"
@@ -27,6 +27,7 @@ agent:
     every: "5m"
     target: "last"
     ackMaxChars: 200
+    model: "anthropic/claude-haiku-4-5-20251001"
     prompt: >-
       Run the whale copytrading scan. Follow HEARTBEAT.md instructions exactly.
   sandbox: "off"
@@ -35,22 +36,38 @@ agent:
 modelDefaults:
   primary: "anthropic/claude-haiku-4-5-20251001"
   fallbacks:
-    - "anthropic/claude-sonnet-4-6"
+    - "anthropic/claude-sonnet-4-20250514"
 
 secrets:
   external:
     apiKeysSecret: "trading-api-keys"
+    messagingSecret: "trading-msg-trader-whale-copy-01"
     githubSecret: "trading-github"
 
 messaging:
   discord:
-    enabled: false
+    enabled: true
+    groupPolicy: "allowlist"
+    guilds:
+      "*":
+        requireMention: false
+        users:
+          - "444519104808878090"
+    allowBots: true
+    dm:
+      policy: "disabled"
+      allowFrom: []
 
 models:
   providers:
     anthropic:
       enabled: true
       apiKeySecretKey: "ANTHROPIC_API_KEY"
+      models:
+        - id: "claude-haiku-4-5-20251001"
+          name: "Claude Haiku 4.5"
+        - id: "claude-sonnet-4-20250514"
+          name: "Claude Sonnet 4"
     openai:
       enabled: false
     minimax:
@@ -127,8 +144,9 @@ extraEnv:
   - name: SIMMER_API_KEY
     valueFrom:
       secretKeyRef:
-        name: trader-api-keys
+        name: trading-api-keys
         key: simmer-api-key
+        optional: true
 
 nats:
   enabled: true

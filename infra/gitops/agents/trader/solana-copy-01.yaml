@@ -15,9 +15,9 @@ global:
 resources:
   requests:
     cpu: "50m"
-    memory: "128Mi"
+    memory: "256Mi"
   limits:
-    memory: "512Mi"
+    memory: "2Gi"
 
 agent:
   id: "trader-solana-copy-01"
@@ -27,6 +27,7 @@ agent:
     every: "5m"
     target: "last"
     ackMaxChars: 200
+    model: "anthropic/claude-haiku-4-5-20251001"
     prompt: >-
       Check the Solana copy trader process health. Follow HEARTBEAT.md instructions exactly.
   sandbox: "off"
@@ -35,22 +36,38 @@ agent:
 modelDefaults:
   primary: "anthropic/claude-haiku-4-5-20251001"
   fallbacks:
-    - "anthropic/claude-sonnet-4-6"
+    - "anthropic/claude-sonnet-4-20250514"
 
 secrets:
   external:
     apiKeysSecret: "trading-api-keys"
+    messagingSecret: "trading-msg-trader-solana-copy-01"
     githubSecret: "trading-github"
 
 messaging:
   discord:
-    enabled: false
+    enabled: true
+    groupPolicy: "allowlist"
+    guilds:
+      "*":
+        requireMention: false
+        users:
+          - "444519104808878090"
+    allowBots: true
+    dm:
+      policy: "disabled"
+      allowFrom: []
 
 models:
   providers:
     anthropic:
       enabled: true
       apiKeySecretKey: "ANTHROPIC_API_KEY"
+      models:
+        - id: "claude-haiku-4-5-20251001"
+          name: "Claude Haiku 4.5"
+        - id: "claude-sonnet-4-20250514"
+          name: "Claude Sonnet 4"
     openai:
       enabled: false
     minimax:
@@ -90,12 +107,14 @@ workspace:
     HEARTBEAT.md: |
       # Heartbeat Instructions
 
-      1. Read /workspace/repos/cto/skills/trader/solana-copy-trader/scripts/logs/paper-summary.json
-      2. If stale (>5 min old), start the process:
-         cd /workspace/repos/cto/skills/trader/solana-copy-trader/scripts
-         node index.js copy &
-      3. Report: open positions, total trades, P&L, win rate
-      4. Check for any errors in the process output
+      1. Check if the solana copy trader process is already running:
+         Run: pgrep -f "solana-copy-trader" (use exec tool)
+      2. If NOT running, start it as a background process:
+         Run: cd /workspace/repos/cto/skills/trader/solana-copy-trader/scripts && node index.js copy
+         IMPORTANT: Use the exec tool with background=true and timeout=300000
+      3. Read /workspace/repos/cto/skills/trader/solana-copy-trader/scripts/logs/paper-summary.json
+      4. Report: open positions, total trades, P&L, win rate
+      5. If paper-summary.json doesn't exist yet, just report "Process started, awaiting first cycle"
 
     IDENTITY.md: |
       - **Name:** Trader: Solana Copy (01)
@@ -113,8 +132,9 @@ extraEnv:
   - name: HELIUS_API_KEY
     valueFrom:
       secretKeyRef:
-        name: trader-api-keys
+        name: trading-api-keys
         key: helius-api-key
+        optional: true
 
 nats:
   enabled: true

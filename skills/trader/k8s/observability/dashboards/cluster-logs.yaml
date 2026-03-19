@@ -1,0 +1,269 @@
+# Cluster Logs dashboard — browse and filter logs from all namespaces
+# Auto-discovered by Grafana sidecar via grafana_dashboard label
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-cluster-logs
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana.com/folder: "Trading Cluster"
+data:
+  cluster-logs.json: |
+    {
+      "title": "Cluster Logs",
+      "uid": "cluster-logs",
+      "description": "Browse and filter logs by namespace, pod, container, and level",
+      "tags": ["logs", "loki"],
+      "timezone": "browser",
+      "editable": true,
+      "graphTooltip": 1,
+      "time": { "from": "now-1h", "to": "now" },
+      "refresh": "10s",
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "loki",
+            "current": { "text": "Loki", "value": "Loki" }
+          },
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": { "type": "loki", "uid": "${datasource}" },
+            "query": "label_values(namespace)",
+            "includeAll": true,
+            "allValue": ".+",
+            "current": { "text": "All", "value": "$__all" },
+            "multi": true,
+            "refresh": 2,
+            "sort": 1
+          },
+          {
+            "name": "pod",
+            "type": "query",
+            "datasource": { "type": "loki", "uid": "${datasource}" },
+            "query": "label_values({namespace=~\"$namespace\"}, pod)",
+            "includeAll": true,
+            "allValue": ".+",
+            "current": { "text": "All", "value": "$__all" },
+            "multi": true,
+            "refresh": 2,
+            "sort": 1
+          },
+          {
+            "name": "container",
+            "type": "query",
+            "datasource": { "type": "loki", "uid": "${datasource}" },
+            "query": "label_values({namespace=~\"$namespace\", pod=~\"$pod\"}, container)",
+            "includeAll": true,
+            "allValue": ".+",
+            "current": { "text": "All", "value": "$__all" },
+            "multi": true,
+            "refresh": 2,
+            "sort": 1
+          },
+          {
+            "name": "level",
+            "type": "custom",
+            "query": "info,warn,error,debug",
+            "includeAll": true,
+            "allValue": ".+",
+            "current": { "text": "All", "value": "$__all" },
+            "multi": true
+          },
+          {
+            "name": "search",
+            "type": "textbox",
+            "current": { "text": "", "value": "" },
+            "label": "Search"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Log Volume by Level",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "sum by (level) (count_over_time({namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\", level=~\"$level\"} |~ \"$search\" [$__auto]))",
+              "legendFormat": "{{level}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "fillOpacity": 30,
+                "stacking": { "mode": "normal" },
+                "drawStyle": "bars"
+              }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "error" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "warn" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "info" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "debug" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi" }
+          }
+        },
+        {
+          "title": "Error Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 6 },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "sum(count_over_time({namespace=~\"$namespace\", level=\"error\"} [5m]))",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 10 }
+                ]
+              },
+              "noValue": "0"
+            }
+          }
+        },
+        {
+          "title": "Warn Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 6 },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "sum(count_over_time({namespace=~\"$namespace\", level=\"warn\"} [5m]))",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 10 },
+                  { "color": "orange", "value": 50 }
+                ]
+              },
+              "noValue": "0"
+            }
+          }
+        },
+        {
+          "title": "Total Log Lines (5m)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 6 },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "sum(count_over_time({namespace=~\"$namespace\"} [5m]))",
+              "refId": "A"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" },
+          "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } } }
+        },
+        {
+          "title": "Namespaces Logging",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 6 },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "count(count by (namespace) (count_over_time({namespace=~\".+\"} [5m])))",
+              "refId": "A"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" },
+          "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" } } }
+        },
+        {
+          "title": "Logs",
+          "type": "logs",
+          "gridPos": { "h": 20, "w": 24, "x": 0, "y": 10 },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\", level=~\"$level\"} |~ \"$search\"",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "dedupStrategy": "none",
+            "sortOrder": "Descending"
+          }
+        },
+        {
+          "title": "Log Volume by Namespace",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 30 },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "sum by (namespace) (count_over_time({namespace=~\"$namespace\", level=~\"$level\"} |~ \"$search\" [$__auto]))",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "fillOpacity": 20,
+                "stacking": { "mode": "normal" },
+                "drawStyle": "bars"
+              }
+            }
+          }
+        },
+        {
+          "title": "Log Volume by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 30 },
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "sum by (pod) (count_over_time({namespace=~\"$namespace\", pod=~\"$pod\", level=~\"$level\"} |~ \"$search\" [$__auto]))",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "fillOpacity": 20,
+                "stacking": { "mode": "normal" },
+                "drawStyle": "bars"
+              }
+            }
+          }
+        }
+      ],
+      "schemaVersion": 39
+    }

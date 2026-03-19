@@ -1,0 +1,146 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agave-rpc
+  namespace: solana
+  labels:
+    app: agave-rpc
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: agave-rpc
+  template:
+    metadata:
+      labels:
+        app: agave-rpc
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: solana-rpc-01
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        seccompProfile:
+          type: Unconfined
+      containers:
+        - name: agave
+          image: ghcr.io/dysnix/docker-agave:v2.2.20
+          command: ["agave-validator"]
+          args:
+            - --identity
+            - /etc/solana/validator-keypair.json
+            - --ledger
+            - /mnt/ledger
+            - --accounts
+            - /mnt/accounts
+            - --snapshots
+            - /mnt/ledger/snapshots
+            - --rpc-port
+            - "8899"
+            - --rpc-bind-address
+            - 0.0.0.0
+            - --private-rpc
+            - --full-rpc-api
+            - --no-voting
+            - --account-index
+            - spl-token-owner
+            - --account-index
+            - program-id
+            - --account-index
+            - spl-token-mint
+            - --limit-ledger-size
+            - "500000000"
+            - --expected-genesis-hash
+            - 5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d
+            - --entrypoint
+            - entrypoint.mainnet-beta.solana.com:8001
+            - --entrypoint
+            - entrypoint2.mainnet-beta.solana.com:8001
+            - --entrypoint
+            - entrypoint3.mainnet-beta.solana.com:8001
+            - --known-validator
+            - 7Np41oeYqPefeNQEHSv1UDhYrehxin3NStELsSKCT4K2
+            - --known-validator
+            - GdnSyH3YtwcxFvQrVVJMm1JhTS4QVX7MFsX56uJLUfiZ
+            - --known-validator
+            - dDzy5SR3AXdYWVqbDEkVFdvSPCtS9ihF5kJkHCtXoFs
+            - --known-validator
+            - Ft5fbkqNa76vnsjYNwjDZUXoTWpP7VYm3mtsaQckQADN
+            - --dynamic-port-range
+            - "8000-8020"
+            - --gossip-port
+            - "8001"
+            - --no-port-check
+            - --wal-recovery-mode
+            - skip_any_corrupted_record
+            - --use-snapshot-archives-at-startup
+            - when-newest
+            - --log
+            - "-"
+          env:
+            - name: RUST_LOG
+              value: "solana=info"
+            - name: MALLOC_CONF
+              value: "background_thread:true,metadata_thp:always,dirty_decay_ms:3000"
+          ports:
+            - name: rpc
+              containerPort: 8899
+              protocol: TCP
+            - name: ws
+              containerPort: 8900
+              protocol: TCP
+            - name: gossip-tcp
+              containerPort: 8001
+              protocol: TCP
+            - name: gossip-udp
+              containerPort: 8001
+              protocol: UDP
+          volumeMounts:
+            - name: accounts
+              mountPath: /mnt/accounts
+            - name: ledger
+              mountPath: /mnt/ledger
+            - name: identity
+              mountPath: /etc/solana
+              readOnly: true
+          resources:
+            requests:
+              cpu: "16"
+              memory: 512Gi
+              hugepages-2Mi: 4Gi
+            limits:
+              cpu: "16"
+              memory: 750Gi
+              hugepages-2Mi: 4Gi
+        - name: solana-exporter
+          image: ghcr.io/asymmetric-research/solana-exporter:v3.0.2
+          args:
+            - -rpc-url=http://localhost:8899
+            - -listen-address=:9179
+            - -light-mode
+          ports:
+            - name: metrics
+              containerPort: 9179
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: accounts
+          hostPath:
+            path: /var/mnt/accounts
+            type: DirectoryOrCreate
+        - name: ledger
+          hostPath:
+            path: /var/mnt/ledger
+            type: DirectoryOrCreate
+        - name: identity
+          secret:
+            secretName: agave-identity
