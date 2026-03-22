@@ -9,6 +9,7 @@ The External Secrets Operator automatically syncs secrets from OpenBao into Kube
 ## Components
 
 - **cluster-secret-store.yaml** - ClusterSecretStore that connects to OpenBao
+- **presync-bootstrap-eso-policy.yaml** - Argo PreSync hook that repairs OpenBao ESO policy/role drift
 - **argocd-secrets.yaml** - ExternalSecrets for the `argocd` namespace (repository credentials)
 - **cto-secrets.yaml** - ExternalSecrets for the `cto` namespace
 - **infra-secrets.yaml** - ExternalSecrets for the `infra` namespace
@@ -50,6 +51,15 @@ kubectl create secret generic openbao-token \
   --from-literal=token="$ROOT_TOKEN" \
   -n openbao \
   --dry-run=client -o yaml | kubectl apply -f -
+```
+
+### 2b. Bootstrap ESO OpenBao Policy/Role
+
+Ensure the OpenBao role and policy backing the `openbao` `ClusterSecretStore` include
+all required paths for ESO-managed secrets:
+
+```bash
+./infra/scripts/openbao/bootstrap-eso-policy.sh
 ```
 
 ### 3. Verify Secret Sync
@@ -105,6 +115,7 @@ Common issues:
 - OpenBao is sealed
 - Token is invalid or expired
 - Secret path doesn't exist in OpenBao
+- OpenBao policy/role does not allow the requested path (run `bootstrap-eso-policy.sh`)
 
 ### Secret data mismatch
 

@@ -32,11 +32,9 @@ spec:
       serviceAccountName: linear-bridge
       imagePullSecrets:
         - name: ghcr-secret
-      nodeSelector:
-        node-role.kubernetes.io/worker: ""
       containers:
         - name: bridge
-          image: registry.5dlabs.ai/5dlabs/linear-bridge:latest
+          image: ghcr.io/5dlabs/linear-bridge:latest
           imagePullPolicy: Always
           env:
             # Linear API key from OpenBao secret
@@ -61,7 +59,7 @@ spec:
 
             # Discord bridge URL for cross-cancel callbacks
             - name: DISCORD_BRIDGE_URL
-              value: "http://discord-bridge.bots.svc:3200"
+              value: "http://discord-bridge-http.bots.svc:3200"
 
             # HTTP server port
             - name: WEBHOOK_PORT
@@ -154,9 +152,9 @@ spec:
   data:
     - secretKey: apiKey
       remoteRef:
-        key: secret/openclaw-linear
+        key: openclaw-linear
         property: LINEAR_API_KEY
     - secretKey: webhookSecret
       remoteRef:
-        key: secret/openclaw-linear
+        key: openclaw-linear
         property: LINEAR_WEBHOOK_SECRET

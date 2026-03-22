@@ -8,20 +8,19 @@ The intake pipeline now uses HTTP webhooks instead of NATS. Linear webhooks and 
 
 ## Existing Infrastructure
 
-### ClusterTunnel (already deployed)
+### ClusterTunnel (deploy with linear-bridge manifests)
 
-The platform has a single ClusterTunnel managed by the Cloudflare Tunnel Operator:
+The linear-bridge manifests include a dedicated ClusterTunnel managed by the Cloudflare Tunnel Operator:
 
 ```yaml
-# infra/charts/cto/templates/cloudflare/cluster-tunnel.yaml
+# infra/manifests/linear-bridge/cluster-tunnel.yaml
 apiVersion: networking.cfargotunnel.com/v1alpha2
 kind: ClusterTunnel
 metadata:
-  name: cto-main
+  name: agents-main
 spec:
-  existingTunnel:
-    id: "87889b67-ee20-4ed1-8de7-fb43d1b5156f"
-    name: cto-main
+  newTunnel:
+    name: agents-main
   cloudflare:
     domain: 5dlabs.ai
     secret: cto-main-tunnel-credentials
@@ -30,7 +29,7 @@ spec:
   fallbackTarget: http_status:404
 ```
 
-### TunnelBinding for Agent Webhooks (new, needs deployment)
+### TunnelBinding for Agent Webhooks
 
 ```yaml
 # infra/manifests/linear-bridge/tunnel-binding.yaml
@@ -39,12 +38,14 @@ kind: TunnelBinding
 metadata:
   name: agent-webhooks
   namespace: bots
-spec:
-  tunnelRef:
-    kind: ClusterTunnel
-    name: cto-main
-  subjects:
-    - hostname: agents.5dlabs.ai
+tunnelRef:
+  kind: ClusterTunnel
+  name: agents-main
+subjects:
+  - kind: Service
+    name: linear-bridge
+    spec:
+      fqdn: agents.5dlabs.ai
       target: http://linear-bridge.bots.svc:3100
 ```
 
@@ -74,7 +75,7 @@ kubectl apply -f infra/manifests/linear-bridge/tunnel-binding.yaml
 Verify the binding was created and the operator picked it up:
 
 ```bash
-kubectl get tunnelbindings -n bots
+kubectl get tunnelbindings.networking.cfargotunnel.com -n bots
 # Should show: agent-webhooks
 
 # Check the tunnel operator logs for the route being added:
@@ -87,13 +88,13 @@ The Cloudflare Tunnel Operator should auto-create the CNAME record. Verify:
 
 ```bash
 dig agents.5dlabs.ai CNAME +short
-# Expected: 87889b67-ee20-4ed1-8de7-fb43d1b5156f.cfargotunnel.com (or similar)
+# Expected: <agents-main-tunnel-id>.cfargotunnel.com
 ```
 
 If the CNAME isn't created automatically, add it manually in the Cloudflare dashboard:
 - **Type**: CNAME
 - **Name**: agents
-- **Target**: `87889b67-ee20-4ed1-8de7-fb43d1b5156f.cfargotunnel.com`
+- **Target**: `<agents-main-tunnel-id>.cfargotunnel.com`
 - **Proxy**: ON (orange cloud)
 
 ### 3. Verify Linear Bridge is Running

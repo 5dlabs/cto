@@ -16,7 +16,7 @@
  *   generate-workflows       --config <path> [--scaffolds-json <file>] [--repository-url <url>]
  *   linear-activity          --session-id <id> --type <type> --body <text> [--ephemeral]
  *   linear-plan              --session-id <id> --plan <json>
- *   register-run             --run-id <id> --agent <name> [--issue-id <id>]
+ *   register-run             --run-id <id> --agent <name> [--issue-id <id>] [--session-key <k>] [--linear-session-id <id>]
  *   deregister-run           --run-id <id>
  *   invoke-agent             --mode <subagent|a2a> --agent <name> [--prompt-file <path>]
  *   classify-output          --cli <claude|codex|openclaw> [--intermediate]
@@ -123,6 +123,8 @@ Subcommands:
     --run-id <id>        Run ID (required)
     --agent <name>       Agent name (required)
     --issue-id <id>      Linear issue ID
+    --session-key <k>    Optional Lobster/session key for the bridge
+    --linear-session-id <id>  Linear Agent API session id (optional)
 
   deregister-run     Deregister pipeline run
     --run-id <id>        Run ID (required)
@@ -610,16 +612,17 @@ async function main(): Promise<void> {
     case 'register-run': {
       const runId = getArg(args, '--run-id');
       const agent = getArg(args, '--agent');
-      const issueId = getArg(args, '--issue-id');
-      const sessionKey = getArg(args, '--session-key');
+      const issueId = getArg(args, '--issue-id') || undefined;
+      const sessionKey = getArg(args, '--session-key') || undefined;
+      const linearSessionId = getArg(args, '--linear-session-id') || undefined;
 
       if (!runId || !agent) {
         console.error('Error: --run-id and --agent are required');
         process.exit(1);
       }
 
-      const ok = await registerRun({ runId, agent, issueId, sessionKey });
-      console.log(JSON.stringify({ registered: ok }));
+      const ok = await registerRun({ runId, agent, issueId, sessionKey, linearSessionId });
+      console.log(JSON.stringify({ registered: ok, run_id: runId }));
       process.exit(ok ? 0 : 1);
       break;
     }

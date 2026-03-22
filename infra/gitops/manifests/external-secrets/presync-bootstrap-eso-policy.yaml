@@ -1,0 +1,172 @@
+---
+# ArgoCD PreSync Hook - Ensure OpenBao policy/role for ESO is present and correct.
+#
+# Behavior:
+# - No-op if policy/role already match expected shape.
+# - Repairs drift by writing policy and role idempotently.
+# - Skips (non-fatal) on clusters that do not expose root token bootstrap secret.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bootstrap-eso-openbao-policy
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: openbao-bootstrap
+    app.kubernetes.io/component: presync-hook
+    app.kubernetes.io/part-of: external-secrets-config
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openbao-bootstrap
+    spec:
+      restartPolicy: Never
+      serviceAccountName: openbao-bootstrap
+      containers:
+        - name: bootstrap
+          image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              NS="vault"
+              POD="openclaw-openbao-0"
+              ROOT_SECRET="openbao-unseal-key"
+              ROOT_KEY="root-token"
+              POLICY="openclaw-read"
+              ROLE="external-secrets"
+
+              echo "[bootstrap] checking prerequisites"
+              if ! kubectl -n "$NS" get pod "$POD" >/dev/null 2>&1; then
+                echo "[bootstrap] skip: pod $NS/$POD not found"
+                exit 0
+              fi
+
+              if ! kubectl -n "$NS" get secret "$ROOT_SECRET" >/dev/null 2>&1; then
+                echo "[bootstrap] skip: secret $NS/$ROOT_SECRET not found"
+                exit 0
+              fi
+
+              ROOT_TOKEN="$(kubectl -n "$NS" get secret "$ROOT_SECRET" -o "jsonpath={.data.${ROOT_KEY}}" | base64 -d || true)"
+              if [ -z "$ROOT_TOKEN" ]; then
+                echo "[bootstrap] skip: root token missing/empty"
+                exit 0
+              fi
+
+              echo "[bootstrap] checking current role/policy state"
+              POLICY_TEXT="$(kubectl -n "$NS" exec "$POD" -- env BAO_TOKEN="$ROOT_TOKEN" bao policy read "$POLICY" 2>/dev/null || true)"
+              ROLE_JSON="$(kubectl -n "$NS" exec "$POD" -- env BAO_TOKEN="$ROOT_TOKEN" bao read -format=json "auth/kubernetes/role/$ROLE" 2>/dev/null || true)"
+
+              if echo "$POLICY_TEXT" | grep -q 'path "secret/data/openclaw-linear"' && \
+                 echo "$POLICY_TEXT" | grep -q 'path "secret/data/openclaw-discord"' && \
+                 echo "$ROLE_JSON" | grep -q '"openclaw-read"'; then
+                echo "[bootstrap] already healthy; no changes needed"
+                exit 0
+              fi
+
+              echo "[bootstrap] applying policy $POLICY"
+              kubectl -n "$NS" exec -i "$POD" -- env BAO_TOKEN="$ROOT_TOKEN" bao policy write "$POLICY" - <<'EOF'
+              path "secret/data/openclaw/*" {
+                capabilities = ["read", "list"]
+              }
+              path "secret/metadata/openclaw/*" {
+                capabilities = ["read", "list"]
+              }
+
+              path "secret/data/openclaw-linear" {
+                capabilities = ["read", "list"]
+              }
+              path "secret/metadata/openclaw-linear" {
+                capabilities = ["read", "list"]
+              }
+
+              path "secret/data/openclaw-discord" {
+                capabilities = ["read", "list"]
+              }
+              path "secret/metadata/openclaw-discord" {
+                capabilities = ["read", "list"]
+              }
+
+              path "secret/data/ghcr-secret" {
+                capabilities = ["read", "list"]
+              }
+              path "secret/metadata/ghcr-secret" {
+                capabilities = ["read", "list"]
+              }
+              EOF
+
+              echo "[bootstrap] applying kubernetes role $ROLE"
+              kubectl -n "$NS" exec "$POD" -- env BAO_TOKEN="$ROOT_TOKEN" \
+                bao write "auth/kubernetes/role/$ROLE" \
+                bound_service_account_names="openclaw-external-secrets" \
+                bound_service_account_namespaces="external-secrets" \
+                policies="$POLICY" \
+                ttl="1h" >/dev/null
+
+              echo "[bootstrap] done"
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openbao-bootstrap
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: openbao-bootstrap
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-3"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openbao-bootstrap
+  namespace: vault
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-3"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openbao-bootstrap
+  namespace: vault
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-3"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+subjects:
+  - kind: ServiceAccount
+    name: openbao-bootstrap
+    namespace: vault
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openbao-bootstrap

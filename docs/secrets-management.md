@@ -230,6 +230,11 @@ kubectl annotate externalsecret -A --all force-sync="$(date +%s)" --overwrite
    ./infra/scripts/openbao/seed-from-1password.sh
    ```
 
+2.5. If error is `permission denied`, bootstrap/repair the ESO OpenBao policy+role:
+   ```bash
+   ./infra/scripts/openbao/bootstrap-eso-policy.sh
+   ```
+
 3. Force refresh the ExternalSecret:
    ```bash
    kubectl annotate externalsecret <name> -n <namespace> force-sync="$(date +%s)" --overwrite

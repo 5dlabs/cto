@@ -32,11 +32,9 @@ spec:
       serviceAccountName: discord-bridge
       imagePullSecrets:
         - name: ghcr-secret
-      nodeSelector:
-        node-role.kubernetes.io/worker: ""
       containers:
         - name: bridge
-          image: registry.5dlabs.ai/5dlabs/discord-bridge:latest
+          image: ghcr.io/5dlabs/discord-bridge:latest
           imagePullPolicy: Always
           env:
             # Discord bot token from OpenBao secret
@@ -127,5 +125,5 @@ spec:
   data:
     - secretKey: token
       remoteRef:
-        key: secret/openclaw-discord
+        key: openclaw-discord
         property: DISCORD_TOKEN_BRIDGE
