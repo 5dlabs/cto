@@ -2,10 +2,6 @@ import Link from "next/link";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { VentureGrid, type Venture } from "@/components/venture-card";
-import { MeshGradientBg } from "@/components/mesh-gradient-bg";
-import { Reveal, RevealGroup, RevealItem } from "@/components/reveal";
-import { TextScramble } from "@/components/text-scramble";
-import { AnimatedCounter } from "@/components/animated-counter";
 
 const operatingStack: Venture[] = [
   {
@@ -109,7 +105,7 @@ export default function Home() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="fixed inset-0 bg-gradient-to-b from-background via-background to-[oklch(0.04_0.02_260)] z-0" />
-      <MeshGradientBg />
+      <div className="fixed inset-0 circuit-bg z-[1]" />
       <div className="fixed inset-0 noise-overlay z-[3]" />
 
       <Header />
@@ -118,38 +114,31 @@ export default function Home() {
         {/* Hero Section */}
         <section className="min-h-[100dvh] flex flex-col items-center justify-center px-6 py-20 pt-24">
           <div className="max-w-4xl mx-auto text-center">
-            <Reveal>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full premium-chip mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full premium-chip mb-8">
                 <span className="size-2 rounded-full bg-cyan animate-[glowPulse_3s_ease-in-out_infinite]" />
                 <span className="text-sm text-cyan font-semibold tracking-wide">
                   AI-Native Venture Studio
                 </span>
-              </div>
-            </Reveal>
+            </div>
 
-            <Reveal delay={0.05}>
-              <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6">
                 <span className="gradient-text-stitch glow-text-cyan">
-                  <TextScramble text="We Built the Stack" duration={700} />
+                  We Built the Stack
                 </span>
                 <br />
                 <span className="text-foreground">
-                  <TextScramble text="That Helps Us Build Companies." duration={900} />
+                  That Helps Us Build Companies.
                 </span>
-              </h1>
-            </Reveal>
+            </h1>
 
-            <Reveal delay={0.1}>
-              <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10">
+            <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10">
                 5D Labs is an AI-native venture studio. <span className="text-foreground">CTO</span> is the build
                 engine — an operating system for software delivery, not just a coding tool. Our{" "}
                 <span className="text-foreground">trading engine</span> helps finance and
                 inform the work. The ventures are what we bring to market.
-              </p>
-            </Reveal>
+            </p>
 
-            <Reveal delay={0.15}>
-              <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
                 <a
                   href="/cto"
                   className="relative overflow-hidden px-8 py-4 rounded-lg bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-500 text-white font-semibold text-lg transition-all shadow-xl shadow-indigo-500/35 hover:shadow-indigo-500/55 hover:scale-105 hover:brightness-110 active:translate-y-px"
@@ -169,31 +158,27 @@ export default function Home() {
                 >
                   See How It Works
                 </Link>
-              </div>
-            </Reveal>
+            </div>
 
-            <Reveal delay={0.2}>
-              <div className="premium-shell rounded-2xl p-5 md:p-6 mb-6">
-                <RevealGroup className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto">
+            <div className="premium-shell rounded-2xl p-5 md:p-6 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto">
                   {northStarMetrics.map((metric) => (
-                    <RevealItem
+                    <div
                       key={metric.label}
                       className="rounded-xl premium-chip p-4 text-left"
                     >
-                      <p className="text-2xl font-bold text-foreground">
-                        <AnimatedCounter value={metric.value} />
+                      <p className="text-2xl font-bold text-foreground font-mono tabular-nums">
+                        {metric.value}
                       </p>
                       <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
                         {metric.label}
                       </p>
-                    </RevealItem>
+                    </div>
                   ))}
-                </RevealGroup>
-              </div>
-            </Reveal>
+                </div>
+            </div>
 
-            <Reveal delay={0.25}>
-              <div className="flex flex-wrap justify-center gap-2 max-w-3xl mx-auto">
+            <div className="flex flex-wrap justify-center gap-2 max-w-3xl mx-auto">
                 {proofSignals.map((signal, i) => (
                   <span
                     key={signal}
@@ -205,8 +190,7 @@ export default function Home() {
                     {signal}
                   </span>
                 ))}
-              </div>
-            </Reveal>
+            </div>
           </div>
 
           <div className="absolute bottom-10 left-1/2 -translate-x-1/2">
@@ -217,139 +201,125 @@ export default function Home() {
         </section>
 
         {/* Disruptor Manifesto */}
-        <Reveal>
-          <section className="py-16 px-6">
-            <div className="max-w-3xl mx-auto text-center">
-              <p className="text-xl sm:text-2xl text-muted-foreground leading-relaxed">
-                One idea. One team. One shot at product-market fit.
-                <br className="hidden sm:block" />
-                We thought there{" "}
-                <span className="text-foreground font-semibold">must be a better way</span>.{" "}
-                <span className="text-foreground font-bold">We built it.</span>
-              </p>
-            </div>
-          </section>
-        </Reveal>
+        <section className="py-16 px-6">
+          <div className="max-w-3xl mx-auto text-center">
+            <p className="text-xl sm:text-2xl text-muted-foreground leading-relaxed">
+              One idea. One team. One shot at product-market fit.
+              <br className="hidden sm:block" />
+              We thought there{" "}
+              <span className="text-foreground font-semibold">must be a better way</span>.{" "}
+              <span className="text-foreground font-bold">We built it.</span>
+            </p>
+          </div>
+        </section>
 
         <section className="section-frame py-20 px-6">
           <div className="max-w-6xl mx-auto">
-            <Reveal>
-              <div className="text-center mb-12">
-                <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                  The <span className="gradient-text">Execution Loop</span>
-                </h2>
-                <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                  We keep strategy, shipping, and market signal in one tight loop so venture decisions are made with live evidence.
-                </p>
-              </div>
-            </Reveal>
-            <RevealGroup className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                The <span className="gradient-text">Execution Loop</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                We keep strategy, shipping, and market signal in one tight loop so venture decisions are made with live evidence.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
               {executionLoop.map((item, index) => (
-                <RevealItem key={item.title} className="p-6 rounded-xl premium-shell backdrop-blur-sm relative">
+                <div key={item.title} className="p-6 rounded-xl premium-shell backdrop-blur-sm relative">
                   <p className="text-xs uppercase tracking-wider text-cyan mb-3">
                     Step {index + 1}
                   </p>
                   <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
                   <p className="text-sm text-muted-foreground">{item.text}</p>
-                </RevealItem>
+                </div>
               ))}
-            </RevealGroup>
+            </div>
           </div>
         </section>
 
         {/* Operating Model Section */}
         <section id="operating-model" className="section-frame py-20 px-6">
           <div className="max-w-5xl mx-auto">
-            <Reveal>
-              <div className="text-center mb-16">
-                <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                  How <span className="gradient-text">5D Labs</span> Works
-                </h2>
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                  One studio, one operating stack, multiple venture outcomes.
-                </p>
-              </div>
-            </Reveal>
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                How <span className="gradient-text">5D Labs</span> Works
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                One studio, one operating stack, multiple venture outcomes.
+              </p>
+            </div>
 
-            <RevealGroup className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
               {operatingModel.map((item) => (
-                <RevealItem key={item.title} className="p-6 rounded-xl premium-shell backdrop-blur-sm">
+                <div key={item.title} className="p-6 rounded-xl premium-shell backdrop-blur-sm">
                   <h3 className="text-lg font-semibold mb-3">{item.title}</h3>
                   <p className="text-sm text-muted-foreground">{item.text}</p>
-                </RevealItem>
+                </div>
               ))}
-            </RevealGroup>
+            </div>
           </div>
         </section>
 
         {/* Operating Stack Section */}
         <section id="stack" className="section-frame py-20 px-6">
           <div className="max-w-6xl mx-auto">
-            <Reveal>
-              <div className="text-center mb-16">
-                <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                  The <span className="gradient-text">Stack</span> Behind the Studio
-                </h2>
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                  CTO, the trading engine, and the venture pipeline are not separate company theses.
-                  They are coordinated parts of one operating model.
-                </p>
-              </div>
-            </Reveal>
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                The <span className="gradient-text">Stack</span> Behind the Studio
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                CTO, the trading engine, and the venture pipeline are not separate company theses.
+                They are coordinated parts of one operating model.
+              </p>
+            </div>
 
-            <Reveal>
-              <VentureGrid ventures={operatingStack} />
-            </Reveal>
+            <VentureGrid ventures={operatingStack} />
           </div>
         </section>
 
         {/* Capital Engine Section */}
         <section className="section-frame py-20 px-6">
           <div className="max-w-5xl mx-auto">
-            <Reveal>
-              <div className="text-center mb-16">
-                <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                  The <span className="gradient-text">Trading Engine</span> in the Model
-                </h2>
-                <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                  It funds experimentation, keeps the studio close to live on-chain markets,
-                  and compounds market intelligence that only comes from operating with real stakes.
-                </p>
-              </div>
-            </Reveal>
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+                The <span className="gradient-text">Trading Engine</span> in the Model
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                It funds experimentation, keeps the studio close to live on-chain markets,
+                and compounds market intelligence that only comes from operating with real stakes.
+              </p>
+            </div>
 
-            <RevealGroup className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-3 gap-8">
               {capitalEnginePoints.map((item) => (
-                <RevealItem key={item.title} className="p-6 rounded-xl premium-shell backdrop-blur-sm">
+                <div key={item.title} className="p-6 rounded-xl premium-shell backdrop-blur-sm">
                   <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
                   <p className="text-sm text-muted-foreground">{item.text}</p>
-                </RevealItem>
+                </div>
               ))}
-            </RevealGroup>
+            </div>
           </div>
         </section>
 
         {/* OpenClaw Section */}
         <section id="openclaw" className="section-frame py-20 px-6">
           <div className="max-w-4xl mx-auto text-center">
-            <Reveal>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full premium-chip mb-6">
-                <span className="size-2 rounded-full bg-cyan" />
-                <span className="text-xs text-cyan font-medium uppercase tracking-wider">
-                  The Engine Underneath
-                </span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-                Powered by the <span className="gradient-text">OpenClaw Platform</span>
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
-                The OpenClaw platform is the orchestration layer beneath CTO and the rest of the operating stack.
-                It coordinates AI agents across multiple CLIs, bare-metal Kubernetes infrastructure,
-                and a growing ecosystem of MCP tools — turning a collection of specialized agents
-                into a coherent, self-healing system.
-              </p>
-            </Reveal>
-            <RevealGroup className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full premium-chip mb-6">
+              <span className="size-2 rounded-full bg-cyan" />
+              <span className="text-xs text-cyan font-medium uppercase tracking-wider">
+                The Engine Underneath
+              </span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+              Powered by the <span className="gradient-text">OpenClaw Platform</span>
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
+              The OpenClaw platform is the orchestration layer beneath CTO and the rest of the operating stack.
+              It coordinates AI agents across multiple CLIs, bare-metal Kubernetes infrastructure,
+              and a growing ecosystem of MCP tools — turning a collection of specialized agents
+              into a coherent, self-healing system.
+            </p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 text-left">
               {[
                 {
                   title: "Multi-CLI Agnostic",
@@ -368,12 +338,12 @@ export default function Home() {
                   text: "Specialists like Angie focus on agent architecture for the OpenClaw platform: MCP tool routing, runtime integration, and practical voice-agent patterns on top of the core orchestration layer.",
                 },
               ].map((item) => (
-                <RevealItem key={item.title} className="p-5 rounded-xl premium-shell backdrop-blur-sm">
+                <div key={item.title} className="p-5 rounded-xl premium-shell backdrop-blur-sm">
                   <h3 className="text-base font-semibold mb-2 text-foreground">{item.title}</h3>
                   <p className="text-sm text-muted-foreground">{item.text}</p>
-                </RevealItem>
+                </div>
               ))}
-            </RevealGroup>
+            </div>
           </div>
         </section>
 
