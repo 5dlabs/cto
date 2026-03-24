@@ -71,16 +71,16 @@ export function AgentCard({ agent }: AgentCardProps) {
       aria-label={hasDetails ? `${agent.name} card${flipped ? ", tap to return" : ", flip for details"}` : undefined}
     >
       <motion.div
-        className="relative h-full min-h-[200px] sm:min-h-[216px] lg:min-h-[224px] w-full"
+        className="relative w-full"
         style={{ transformStyle: "preserve-3d", perspective: "1000px", willChange: "transform" }}
         animate={{ rotateY: flipped ? 180 : 0 }}
         transition={{ duration: 0.5, ease: "easeInOut" }}
         initial={false}
       >
-        {/* Front: avatar, name, role, description */}
+        {/* Front: avatar, name, role, description — natural height drives container */}
         <div
           className={cn(
-            "absolute inset-0 flex items-start gap-3 sm:gap-4 lg:gap-5 rounded-xl p-3 sm:p-4 lg:p-5",
+            "flex items-start gap-3 sm:gap-4 lg:gap-5 rounded-xl p-3 sm:p-4 lg:p-5",
             "bg-card border border-border",
             "hover:border-primary/50 transition-colors duration-300"
           )}
@@ -119,7 +119,7 @@ export function AgentCard({ agent }: AgentCardProps) {
               </p>
             )}
             {agent.description && (
-              <p className="mt-2 text-[11px] sm:text-xs leading-relaxed text-muted-foreground line-clamp-3">
+              <p className="mt-2 text-[11px] sm:text-xs leading-relaxed text-muted-foreground">
                 {agent.description}
               </p>
             )}
@@ -143,9 +143,9 @@ export function AgentCard({ agent }: AgentCardProps) {
           )}
         </div>
 
-        {/* Back: tools + skills in two sections */}
+        {/* Back: tools + skills — pinned over front */}
         <div
-          className="absolute inset-0 overflow-hidden rounded-xl border border-border bg-card p-3 sm:p-4 lg:p-5"
+          className="absolute inset-0 overflow-auto rounded-xl border border-border bg-card p-3 sm:p-4 lg:p-5"
           style={{
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
