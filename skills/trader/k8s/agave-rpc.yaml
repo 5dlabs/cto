@@ -12,7 +12,7 @@ data:
         "level": "info"
       },
       "tokio": {
-        "worker_threads": 4
+        "worker_threads": 8
       },
       "grpc": {
         "address": "0.0.0.0:10000",
@@ -22,9 +22,9 @@ data:
           "send": ["gzip", "zstd"]
         },
         "max_decoding_message_size": "4_194_304",
-        "snapshot_plugin_channel_capacity": null,
+        "snapshot_plugin_channel_capacity": "100_000_000",
         "snapshot_client_channel_capacity": "50_000_000",
-        "channel_capacity": "100_000",
+        "channel_capacity": "500_000",
         "unary_concurrency_limit": 100,
         "unary_disabled": false,
         "x_token": null,
@@ -173,7 +173,6 @@ spec:
             - program-id
             - --accounts-db-cache-limit-mb
             - "16384"
-            - --accounts-db-skip-shrink
             - --limit-ledger-size
             - "50000000"
             - --expected-genesis-hash

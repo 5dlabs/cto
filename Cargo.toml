@@ -19,6 +19,7 @@ members = [
     "crates/tools",
     "crates/utils",
     "crates/cto-lite/pm-lite-server",
+    "crates/dex-indexer",
 ]
 exclude = [
     "talos-orchestrator",
