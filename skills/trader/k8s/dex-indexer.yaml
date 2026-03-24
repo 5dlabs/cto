@@ -18,8 +18,6 @@ spec:
       labels:
         app: dex-indexer
     spec:
-      imagePullSecrets:
-        - name: ghcr-pull
       nodeSelector:
         kubernetes.io/hostname: db-01
       containers:

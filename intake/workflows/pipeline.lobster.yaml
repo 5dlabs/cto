@@ -34,9 +34,13 @@ args:
     default: private
   webhook_callback_url:
     default: ""
-  deliberate:
+    description: "PM server webhook URL. If set, a GitHub webhook is created on the repo."
+  - name: deliberate
+    type: boolean
     default: true
-  timebox_minutes:
+    description: "When true, run Optimist/Pessimist deliberation before task generation"
+  - name: timebox_minutes
+    type: number
     default: 30
   infrastructure_context:
     default: ""
@@ -84,6 +88,16 @@ steps:
       r['linear_team_id'] = lin.get('teamId','')
       print(json.dumps(r))
       "
+
+  - name: register-run
+    depends_on: [load-config]
+    description: "Register pipeline run for tracking"
+    command: >
+      intake-util register-run
+        --run-id "{{inputs.project_name}}-{{timestamp}}"
+        --agent intake
+        --linear-session-id "{{inputs.linear_session_id}}"
+        --issue-id "{{inputs.linear_issue_id}}"
 
   - id: preflight
     env:
@@ -761,6 +775,13 @@ steps:
         ]]' "$TASKS_FILE" 2>/dev/null || cat "$TASKS_FILE")
       printf '%s' "$TASKS_WITH_DPS" > "$WS/.intake/initial-tasks.json"
       printf '%s' "$OUTPUT"
+
+  - name: deregister-run
+    depends_on: [intake]
+    description: "Deregister pipeline run"
+    command: >
+      intake-util deregister-run
+        --run-id "${{ steps.register-run.output | jq -r '.run_id // empty' }}"
 
   - id: split-decision-points
     env:
