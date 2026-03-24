@@ -39,7 +39,7 @@ inputs:
     description: "PM server webhook URL. If set, a GitHub webhook is created on the repo."
   - name: deliberate
     type: boolean
-    default: false
+    default: true
     description: "When true, run Optimist/Pessimist deliberation before task generation"
   - name: timebox_minutes
     type: number
@@ -109,8 +109,9 @@ steps:
     command: >
       intake-util register-run
         --run-id "{{inputs.project_name}}-{{timestamp}}"
-        --session-id "{{inputs.linear_session_id}}"
-        --workflow pipeline
+        --agent intake
+        --linear-session-id "{{inputs.linear_session_id}}"
+        --issue-id "{{inputs.linear_issue_id}}"
 
   # ─────────────────────────────────────────────────────────
   # Phase 0-repo: Ensure GitHub repository exists
@@ -191,7 +192,7 @@ steps:
         2>/dev/null | sort -u | sed 's/^/- /' &&
       echo "" &&
       echo "## ArgoCD Applications" &&
-      argocd app list --output json 2>/dev/null | jq -r '.[] | "- \(.metadata.name) [\(.status.sync.status)] ns=\(.spec.destination.namespace)"' &&
+      (command -v argocd >/dev/null 2>&1 && [ -n "${ARGOCD_SERVER:-}" ] && argocd app list --output json 2>/dev/null | jq -r '.[] | "- \(.metadata.name) [\(.status.sync.status)] ns=\(.spec.destination.namespace)"' || echo "- (argocd skipped: set ARGOCD_SERVER, ensure argocd is on PATH, and run argocd login — or ignore for local runs)") &&
       echo "" &&
       echo "## Custom Resource Definitions" &&
       kubectl get crds -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -v 'argoproj\|cert-manager' | head -30 | sed 's/^/- /' &&
@@ -348,7 +349,6 @@ steps:
     command: >
       intake-util deregister-run
         --run-id "${{ steps.register-run.output | jq -r '.run_id // empty' }}"
-        --status completed
 
 output_mappings:
   repository_url: ${{ steps.setup-repo.output | jq -r '.repository_url' }}

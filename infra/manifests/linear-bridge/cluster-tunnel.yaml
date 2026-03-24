@@ -1,0 +1,18 @@
+---
+# Dedicated Cloudflare tunnel for agent webhooks.
+# Keeping this isolated avoids unintended ingress merges on shared tunnels.
+apiVersion: networking.cfargotunnel.com/v1alpha2
+kind: ClusterTunnel
+metadata:
+  name: agents-main
+spec:
+  newTunnel:
+    name: agents-main
+  cloudflare:
+    domain: 5dlabs.ai
+    secret: cto-main-tunnel-credentials
+    accountId: b73ec19faa187789b3f9d1deb0e0d95f
+    email: j@jonathonfritz.com
+  fallbackTarget: http_status:404
+  noTlsVerify: false
+  protocol: auto

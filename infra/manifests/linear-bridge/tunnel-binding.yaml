@@ -9,10 +9,12 @@ kind: TunnelBinding
 metadata:
   name: agent-webhooks
   namespace: bots
-spec:
-  tunnelRef:
-    kind: ClusterTunnel
-    name: cto-main
-  subjects:
-    - hostname: agents.5dlabs.ai
+tunnelRef:
+  kind: ClusterTunnel
+  name: agents-main
+subjects:
+  - kind: Service
+    name: linear-bridge
+    spec:
+      fqdn: agents.5dlabs.ai
       target: http://linear-bridge.bots.svc:3100
