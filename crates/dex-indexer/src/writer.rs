@@ -28,7 +28,7 @@ impl Writer {
 
         Ok(Self {
             sender,
-            buffer: Buffer::new(ProtocolVersion::V2),
+            buffer: Buffer::new(ProtocolVersion::V1),
             batch_size: config.flush_batch_size,
             flush_interval: Duration::from_millis(config.flush_interval_ms),
             row_count: 0,

@@ -33,21 +33,30 @@ async fn main() -> Result<()> {
     let writer_shutdown = shutdown_tx.subscribe();
 
     let sub_handle = tokio::spawn(async move { subscriber.run(swap_tx, sub_shutdown).await });
-
     let writer_handle = tokio::spawn(async move { writer.run(swap_rx, writer_shutdown).await });
 
-    tokio::signal::ctrl_c().await?;
-    tracing::info!("shutdown signal received");
+    // Exit on SIGTERM/SIGINT OR if either task exits (crash / error).
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            tracing::info!("shutdown signal received");
+        }
+        result = sub_handle => {
+            match result {
+                Ok(Ok(())) => tracing::info!("subscriber exited cleanly"),
+                Ok(Err(e)) => tracing::error!(error = %e, "subscriber failed"),
+                Err(e) => tracing::error!(error = %e, "subscriber panicked"),
+            }
+        }
+        result = writer_handle => {
+            match result {
+                Ok(Ok(())) => tracing::info!("writer exited cleanly"),
+                Ok(Err(e)) => tracing::error!(error = %e, "writer failed"),
+                Err(e) => tracing::error!(error = %e, "writer panicked"),
+            }
+        }
+    }
+
     let _ = shutdown_tx.send(());
-
-    let (sub_result, writer_result) = tokio::join!(sub_handle, writer_handle);
-    if let Err(e) = sub_result {
-        tracing::error!(error = %e, "subscriber task panicked");
-    }
-    if let Err(e) = writer_result {
-        tracing::error!(error = %e, "writer task panicked");
-    }
-
     tracing::info!("dex-indexer stopped");
     Ok(())
 }

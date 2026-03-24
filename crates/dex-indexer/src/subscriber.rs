@@ -91,7 +91,7 @@ impl Subscriber {
             ..Default::default()
         };
 
-        let (_, mut stream) = client
+        let (_sink, mut stream) = client
             .subscribe_with_request(Some(request))
             .await
             .map_err(|e| Error::GrpcTransport(e.to_string()))?;
@@ -105,6 +105,9 @@ impl Subscriber {
 
             if let Some(UpdateOneof::Transaction(tx_update)) = msg.update_oneof {
                 tx_count += 1;
+                if tx_count <= 5 || tx_count.is_multiple_of(10000) {
+                    tracing::debug!(tx_count, slot = tx_update.slot, "received transaction");
+                }
                 if let Some(info) = tx_update.transaction {
                     match self.decoder.decode(&info, tx_update.slot) {
                         Ok(swaps) => {
