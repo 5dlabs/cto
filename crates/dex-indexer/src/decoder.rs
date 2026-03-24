@@ -57,7 +57,10 @@ impl Decoder {
 
         // Identify DEX program.
         let dex = match self.registry.identify(&account_keys) {
-            Some(d) => d,
+            Some(d) => {
+                tracing::debug!(dex = d.label, "matched DEX program");
+                d
+            }
             None => return Ok(Vec::new()),
         };
 
@@ -70,46 +73,83 @@ impl Decoder {
         let signature = bs58::encode(&info.signature).into_string();
 
         // Compute token-balance deltas.
-        let deltas = compute_deltas(&meta.pre_token_balances, &meta.post_token_balances);
+        let mut deltas = compute_deltas(&meta.pre_token_balances, &meta.post_token_balances);
 
-        // Signer's deltas tell us what they sold and bought.
-        let mut sold: Vec<&TokenDelta> = Vec::new();
-        let mut bought: Vec<&TokenDelta> = Vec::new();
-        for d in &deltas {
-            if d.owner == signer {
-                if d.amount < -f64::EPSILON {
-                    sold.push(d);
-                } else if d.amount > f64::EPSILON {
-                    bought.push(d);
-                }
+        // Include native SOL changes for the signer (not in token balances).
+        // Adjust for tx fee so we only see swap-related SOL movement.
+        if !meta.pre_balances.is_empty() && !meta.post_balances.is_empty() {
+            let fee = meta.fee as i64;
+            let sol_lamport_delta =
+                (meta.post_balances[0] as i64 - meta.pre_balances[0] as i64) + fee;
+            let sol_amount = sol_lamport_delta as f64 / 1_000_000_000.0;
+            if sol_amount.abs() > 0.000_001 {
+                deltas.push(TokenDelta {
+                    mint: "So11111111111111111111111111111111111111112".to_string(),
+                    owner: signer.clone(),
+                    amount: sol_amount,
+                });
             }
         }
 
-        if sold.is_empty() || bought.is_empty() {
+        if deltas.is_empty() {
             return Ok(Vec::new());
         }
 
-        // Pool identification: first non-signer owner with opposing deltas.
+        let now_nanos = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
+
+        // Group deltas by owner. Find any owner with opposing deltas (sold + bought).
+        // Priority: signer first, then any other owner (captures swaps where signer
+        // uses ephemeral WSOL accounts invisible to token balance tracking).
+        let mut best_owner: Option<(&str, Vec<&TokenDelta>, Vec<&TokenDelta>)> = None;
+
+        // Collect unique owners.
+        let mut owners: Vec<&str> = deltas.iter().map(|d| d.owner.as_str()).collect();
+        owners.sort_unstable();
+        owners.dedup();
+
+        // Check signer first, then others.
+        let ordered: Vec<&str> = std::iter::once(signer.as_str())
+            .chain(owners.iter().copied().filter(|o| *o != signer.as_str()))
+            .collect();
+
+        for owner in &ordered {
+            let mut sold = Vec::new();
+            let mut bought = Vec::new();
+            for d in &deltas {
+                if d.owner == *owner {
+                    if d.amount < -f64::EPSILON {
+                        sold.push(d);
+                    } else if d.amount > f64::EPSILON {
+                        bought.push(d);
+                    }
+                }
+            }
+            if !sold.is_empty() && !bought.is_empty() {
+                best_owner = Some((owner, sold, bought));
+                break;
+            }
+        }
+
+        let (swap_owner, sold, bought) = match best_owner {
+            Some(v) => v,
+            None => return Ok(Vec::new()),
+        };
+
+        // Pool = first owner that isn't the swap initiator.
         let pool = deltas
             .iter()
-            .find(|d| d.owner != signer && d.owner != "unknown")
+            .find(|d| d.owner != swap_owner && d.owner != "unknown")
             .map(|d| d.owner.clone())
             .unwrap_or_else(|| "unknown".to_string());
 
-        let now_nanos = chrono::Utc::now()
-            .timestamp_nanos_opt()
-            .unwrap_or(0);
-
-        // For multi-hop (e.g. Jupiter), pair the largest sold with the largest bought.
-        // For simple swaps there is exactly one of each.
         let token_in_delta = sold
             .iter()
             .min_by(|a, b| a.amount.partial_cmp(&b.amount).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap(); // safe: sold is non-empty
+            .unwrap();
         let token_out_delta = bought
             .iter()
             .max_by(|a, b| a.amount.partial_cmp(&b.amount).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap(); // safe: bought is non-empty
+            .unwrap();
 
         let amount_in = token_in_delta.amount.abs();
         let amount_out = token_out_delta.amount;
