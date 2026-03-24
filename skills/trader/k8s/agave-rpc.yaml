@@ -216,9 +216,9 @@ spec:
                 - sh
                 - -c
                 - "curl -sf http://localhost:8899/health || exit 1"
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 30
-            failureThreshold: 240
+            failureThreshold: 720
             timeoutSeconds: 5
           livenessProbe:
             exec:
