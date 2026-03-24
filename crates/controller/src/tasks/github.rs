@@ -2,6 +2,7 @@
 
 use anyhow::{Context as AnyhowContext, Result};
 use octocrab::{models::pulls::PullRequest, Octocrab};
+use scm::{ScmClient, ScmClientConfig, ScmProvider, create_scm_client};
 use tracing::{info, warn};
 
 use crate::crds::coderun::CodeRun;
@@ -67,6 +68,44 @@ pub async fn check_github_for_pr_by_branch(
     }
 }
 
+/// Check SCM (GitHub or GitLab) for PR/MR by branch name using the trait.
+pub async fn check_scm_for_pr_by_branch(
+    scm_client: &dyn ScmClient,
+    repo_url: &str,
+    task_id: u32,
+) -> Result<Option<String>> {
+    let (owner, repo) = scm_client.parse_repo_from_url(repo_url)?;
+
+    info!(
+        "Checking {} for PR/MR matching task-{} in {}/{}",
+        scm_client.provider(), task_id, owner, repo
+    );
+
+    let branch_patterns = [
+        format!("task-{task_id}"),
+        format!("feature/task-{task_id}"),
+    ];
+
+    let mrs = scm_client
+        .list_open_mrs(&owner, &repo, None)
+        .await
+        .with_context(|| format!("Failed to list MRs in {owner}/{repo}"))?;
+
+    for mr in &mrs {
+        for pattern in &branch_patterns {
+            if mr.source_branch == *pattern
+                || mr.source_branch.starts_with(&format!("{pattern}-"))
+            {
+                info!("Found MR via SCM API for task {}: {}", task_id, mr.url);
+                return Ok(Some(mr.url.clone()));
+            }
+        }
+    }
+
+    info!("No MR found for task branch patterns: task-{}", task_id);
+    Ok(None)
+}
+
 async fn next_page(
     client: &Octocrab,
     current: &octocrab::Page<PullRequest>,
@@ -125,19 +164,25 @@ fn repo_identity_matches(
     }
 }
 
-/// Parse repository URL to extract owner and repo name
+/// Parse repository URL to extract owner and repo name.
+///
 /// Supports formats like:
-/// - <https://github.com/owner/repo>
-/// - git@github.com:owner/repo.git
-/// - owner/repo
+/// - `https://github.com/owner/repo`
+/// - `https://git.5dlabs.ai/owner/repo`
+/// - `git@github.com:owner/repo.git`
+/// - `git@git.5dlabs.ai:owner/repo.git`
+/// - `owner/repo`
 fn parse_repository_url(repo_url: &str) -> Result<(String, String)> {
-    // Handle different URL formats
     let cleaned_url = repo_url
         .trim_end_matches(".git")
         .replace("git@github.com:", "https://github.com/")
-        .replace("https://github.com/", "");
+        .replace("git@git.5dlabs.ai:", "https://git.5dlabs.ai/");
 
-    let parts: Vec<&str> = cleaned_url.split('/').collect();
+    let path = cleaned_url
+        .replace("https://github.com/", "")
+        .replace("https://git.5dlabs.ai/", "");
+
+    let parts: Vec<&str> = path.split('/').collect();
     if parts.len() >= 2 {
         Ok((parts[0].to_string(), parts[1].to_string()))
     } else {
@@ -213,6 +258,18 @@ mod tests {
         assert_eq!(
             parse_repository_url("owner/repo").unwrap(),
             ("owner".to_string(), "repo".to_string())
+        );
+
+        // GitLab HTTPS
+        assert_eq!(
+            parse_repository_url("https://git.5dlabs.ai/5dlabs/cto").unwrap(),
+            ("5dlabs".to_string(), "cto".to_string())
+        );
+
+        // GitLab SSH
+        assert_eq!(
+            parse_repository_url("git@git.5dlabs.ai:5dlabs/cto.git").unwrap(),
+            ("5dlabs".to_string(), "cto".to_string())
         );
 
         // Invalid format

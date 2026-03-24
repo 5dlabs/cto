@@ -5,36 +5,34 @@ description: >
   context (codebase + design brief, or raw PRD) into the task-generation
   intake workflow.
 
-inputs:
-  - name: prd_content
-    type: string
-    description: "Full PRD markdown content"
-  - name: project_name
-    type: string
-    default: "project"
-    description: "Short project slug used for branch names and PR titles"
-  - name: num_tasks
-    type: number
-    default: 10
-    description: "Target number of top-level tasks to generate"
-  - name: include_codebase
-    type: boolean
-    default: false
-    description: "When true, analyze existing repo via Repomix/OctoCode before task generation"
-  - name: repository_url
-    type: string
+args:
+  prd_content:
     default: ""
-    description: "Existing GitHub repository URL. If empty, a new repo is created from project_name."
-  - name: github_org
-    type: string
-    default: "5dlabs"
-    description: "GitHub org for new repo creation (ignored when repository_url is set)"
-  - name: github_visibility
-    type: string
-    default: "private"
-    description: "Visibility for new repos: 'public' or 'private'"
-  - name: webhook_callback_url
-    type: string
+  # When set (path relative to WORKSPACE), PRD is copied into .intake/run-prd.txt so shell never
+  # expands $(command) / backticks inside the document. Required for real PRDs (e.g. sigma-1).
+  prd_path:
+    default: ""
+  design_prompt:
+    default: ""
+  design_artifacts_path:
+    default: ""
+  design_urls:
+    default: ""
+  design_mode:
+    default: ingest_plus_stitch
+  project_name:
+    default: project
+  num_tasks:
+    default: 10
+  include_codebase:
+    default: false
+  repository_url:
+    default: ""
+  github_org:
+    default: 5dlabs
+  github_visibility:
+    default: private
+  webhook_callback_url:
     default: ""
     description: "PM server webhook URL. If set, a GitHub webhook is created on the repo."
   - name: deliberate
@@ -44,45 +42,33 @@ inputs:
   - name: timebox_minutes
     type: number
     default: 30
-    description: "Deliberation timebox in minutes (ignored when deliberate=false)"
-  - name: infrastructure_context
-    type: string
+  infrastructure_context:
     default: ""
-    description: "Available operators and services (injected from cluster state)"
-  - name: intake_metadata
-    type: string
+  intake_metadata:
     default: ""
-    description: "JSON string of Linear metadata for PR body"
-  - name: pr_base_branch
-    type: string
-    default: "main"
-    description: "Base branch for the PR"
-  - name: linear_session_id
-    type: string
+  pr_base_branch:
+    default: main
+  linear_session_id:
     default: ""
-    description: "Linear session ID for activity tracking"
-  - name: linear_issue_id
-    type: string
+  linear_issue_id:
     default: ""
-    description: "Linear issue ID for plan updates"
-  - name: verify
-    type: string
+  verify:
     default: "true"
-    description: "When true, validate outputs after each major step"
-  - name: breakpoints
-    type: string
+  breakpoints:
     default: "false"
-    description: "When true, pause for human approval at key checkpoints"
+  audio_debug:
+    default: "true"
+  audio_mute_pre_intake:
+    default: "true"
 
 steps:
-  # ─────────────────────────────────────────────────────────
-  # Phase 0: Load model configuration from cto-config.json
-  # Reads tiers (primary/fast/frontier) and committee models,
-  # outputs flat key-value pairs for downstream steps.
-  # ─────────────────────────────────────────────────────────
-  - name: load-config
-    description: "Load model tiers and committee config from cto-config.json"
-    command: >
+  - id: load-config
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      root="${WORKSPACE:-.}"
+      date +%s > "$root/.intake/.pipeline-start-epoch"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "load-config" "${audio_debug}" "project ${project_name}"
       python3 -c "
       import json, os
       config_path = os.path.join(os.environ.get('WORKSPACE', '.'), 'cto-config.json')
@@ -113,79 +99,446 @@ steps:
         --linear-session-id "{{inputs.linear_session_id}}"
         --issue-id "{{inputs.linear_issue_id}}"
 
-  # ─────────────────────────────────────────────────────────
-  # Phase 0-repo: Ensure GitHub repository exists
-  # If repository_url is provided, validates it exists.
-  # If not, creates a new repo under the configured org and
-  # attaches a webhook for PR merge notifications.
-  # ─────────────────────────────────────────────────────────
-  - name: setup-repo
-    description: "Create or verify GitHub repository and attach webhook"
-    depends_on: [load-config]
-    command: >
-      REPO_URL="{{inputs.repository_url}}"
-      ORG="{{inputs.github_org}}"
-      PROJECT="{{inputs.project_name}}"
-      VISIBILITY="{{inputs.github_visibility}}"
-      WEBHOOK_URL="{{inputs.webhook_callback_url}}"
+  - id: preflight
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "preflight" "${audio_debug}" "project ${project_name}"
+      "${root}/intake/scripts/pipeline-preflight.sh"
 
+  - id: materialize-prd
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "materialize-prd" "${audio_debug}" "project ${project_name}"
+      mkdir -p "$WS/.intake"
+      OUT="$WS/.intake/run-prd.txt"
+      if [ -n "${prd_path}" ]; then
+        REL=$(printf '%s' "${prd_path}" | sed 's|^\./||')
+        SRC="$WS/$REL"
+        if [ ! -f "$SRC" ]; then
+          echo "materialize-prd: missing PRD file: $SRC (prd_path=${prd_path})" >&2
+          exit 1
+        fi
+        cp "$SRC" "$OUT"
+      else
+        if [ -z "${prd_content}" ]; then
+          echo "materialize-prd: set prd_path or prd_content" >&2
+          exit 1
+        fi
+        printf '%s' "${prd_content}" > "$OUT"
+      fi
+      printf '%s\n' "$OUT"
+
+  - id: materialize-design-inputs
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "materialize-design-inputs" "${audio_debug}" "project ${project_name}"
+      DESIGN_DIR="$WS/.intake/design"
+      ASSETS_DIR="$DESIGN_DIR/assets"
+      mkdir -p "$ASSETS_DIR"
+      INTAKE_AGENT_BIN="${INTAKE_AGENT_BIN:-}"
+      if [ -z "$INTAKE_AGENT_BIN" ]; then
+        if command -v intake-agent >/dev/null 2>&1; then
+          INTAKE_AGENT_BIN="intake-agent"
+        elif [ -x "$WS/apps/intake-agent/dist/intake-agent" ]; then
+          INTAKE_AGENT_BIN="$WS/apps/intake-agent/dist/intake-agent"
+        elif [ -x "$WS/apps/intake-agent/intake-agent" ]; then
+          INTAKE_AGENT_BIN="$WS/apps/intake-agent/intake-agent"
+        fi
+      fi
+      if [ -z "$INTAKE_AGENT_BIN" ]; then
+        "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "design-intake-agent" "failed" "${audio_debug}" "error" "project ${project_name}"
+        echo "materialize-design-inputs: intake-agent binary not found. Set INTAKE_AGENT_BIN or build apps/intake-agent." >&2
+        exit 1
+      fi
+      MODE="${design_mode:-ingest_plus_stitch}"
+      STITCH_KEY_STATE="missing"
+      if [ -n "${STITCH_API_KEY:-}" ]; then
+        STITCH_KEY_STATE="present"
+      fi
+      AUTH_DISCOVERY_JSON="$DESIGN_DIR/auth-discovery.json"
+      jq -n \
+        --arg mode "$MODE" \
+        --arg stitch_api_key_state "$STITCH_KEY_STATE" \
+        --arg stitch_project_id_state "$( [ -n "${STITCH_PROJECT_ID:-}" ] && printf 'present' || printf 'missing' )" \
+        --arg stitch_access_token_state "$( [ -n "${STITCH_ACCESS_TOKEN:-}" ] && printf 'present' || printf 'missing' )" \
+        --arg google_cloud_project_state "$( [ -n "${GOOGLE_CLOUD_PROJECT:-}" ] && printf 'present' || printf 'missing' )" \
+        '{mode:$mode, stitch_api_key:$stitch_api_key_state, stitch_project_id:$stitch_project_id_state, stitch_access_token:$stitch_access_token_state, google_cloud_project:$google_cloud_project_state}' \
+        > "$AUTH_DISCOVERY_JSON"
+
+      if [ "$MODE" = "ingest_plus_stitch" ] && [ -z "${STITCH_API_KEY:-}" ]; then
+        "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "stitch-credentials" "failed" "${audio_debug}" "error" "design_mode ${MODE}"
+        echo "materialize-design-inputs: STITCH_API_KEY is required when design_mode=${MODE}." >&2
+        echo "credential discovery: $(cat "$AUTH_DISCOVERY_JSON")" >&2
+        exit 1
+      fi
+      "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "stitch-credentials" "passed" "${audio_debug}" "normal" "design_mode ${MODE}"
+
+      if [ -n "${design_artifacts_path}" ]; then
+        REL=$(printf '%s' "${design_artifacts_path}" | sed 's|^\./||')
+        SRC="$WS/$REL"
+        if [ -e "$SRC" ]; then
+          cp -R "$SRC" "$ASSETS_DIR/"
+        else
+          echo "materialize-design-inputs: design_artifacts_path not found: $SRC" >&2
+        fi
+      fi
+
+      jq -n \
+        --rawfile prd "$WS/.intake/run-prd.txt" \
+        --arg design_prompt "${design_prompt}" \
+        --arg design_artifacts_path "$ASSETS_DIR" \
+        --arg design_urls "${design_urls}" \
+        --arg design_mode "${design_mode}" \
+        --arg project_name "${project_name}" \
+        --arg output_dir "$DESIGN_DIR" \
+        '{
+          operation: "design_intake",
+          payload: {
+            prd_content: $prd,
+            design_prompt: $design_prompt,
+            design_artifacts_path: $design_artifacts_path,
+            design_urls: $design_urls,
+            design_mode: $design_mode,
+            project_name: $project_name,
+            output_dir: $output_dir
+          }
+        }' | "$INTAKE_AGENT_BIN" > "/tmp/design-intake-$$.json"
+
+      if ! jq -e '.success == true' "/tmp/design-intake-$$.json" >/dev/null 2>&1; then
+        echo "materialize-design-inputs: intake-agent design_intake failed; writing fallback design context." >&2
+        jq -n \
+          --arg project_name "${project_name}" \
+          --arg design_mode "${design_mode}" \
+          --arg design_prompt "${design_prompt}" \
+          '{"projectName":$project_name,"mode":$design_mode,"prompt":$design_prompt,"hasFrontend":false,"frontendTargets":[],"confidence":0,"evidence":[],"urls":[],"stitch":{"status":"failed","reason":"design_intake_failed","warnings":["intake-agent design_intake failed"],"candidates":[]}}' \
+          > "$DESIGN_DIR/design-context.json"
+      else
+        jq -c '.data' "/tmp/design-intake-$$.json" > "$DESIGN_DIR/design-context.json"
+      fi
+
+      cat "$DESIGN_DIR/design-context.json"
+
+  - id: save-design-bundle
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "save-design-bundle" "${audio_debug}" "project ${project_name}"
+      SRC_DIR="$WS/.intake/design"
+      OUT_DIR="$WS/.tasks/design"
+      mkdir -p "$OUT_DIR/crawled" "$OUT_DIR/stitch"
+      cp "$SRC_DIR/design-context.json" "$OUT_DIR/design-context.json"
+      if [ -f "$SRC_DIR/crawled/urls.json" ]; then
+        cp "$SRC_DIR/crawled/urls.json" "$OUT_DIR/crawled/urls.json"
+      fi
+      if [ -f "$SRC_DIR/stitch/stitch-run.json" ]; then
+        cp "$SRC_DIR/stitch/stitch-run.json" "$OUT_DIR/stitch/stitch-run.json"
+      fi
+      if [ -f "$SRC_DIR/stitch/candidates.json" ]; then
+        cp "$SRC_DIR/stitch/candidates.json" "$OUT_DIR/stitch/candidates.json"
+      fi
+      if [ -f "$SRC_DIR/auth-discovery.json" ]; then
+        cp "$SRC_DIR/auth-discovery.json" "$OUT_DIR/auth-discovery.json"
+      fi
+      jq -n \
+        --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --arg project_name "${project_name}" \
+        --arg linear_session_id "${linear_session_id}" \
+        --arg design_mode "${design_mode}" \
+        --arg bundle_dir "$OUT_DIR" \
+        --arg stitch_required "$( [ "${design_mode}" = "ingest_plus_stitch" ] && printf 'true' || printf 'false' )" \
+        --argjson context "$(cat "$SRC_DIR/design-context.json" 2>/dev/null || printf '{}')" \
+        '{
+          generated_at: $generated_at,
+          project_name: $project_name,
+          linear_session_id: $linear_session_id,
+          design_mode: $design_mode,
+          stitch_required: ($stitch_required == "true"),
+          bundle_dir: $bundle_dir,
+          has_frontend: ($context.hasFrontend // false),
+          stitch_status: ($context.stitch.status // "unknown"),
+          files: {
+            design_context: ($bundle_dir + "/design-context.json"),
+            crawled_urls: ($bundle_dir + "/crawled/urls.json"),
+            stitch_run: ($bundle_dir + "/stitch/stitch-run.json"),
+            stitch_candidates: ($bundle_dir + "/stitch/candidates.json"),
+            auth_discovery: ($bundle_dir + "/auth-discovery.json")
+          }
+        }' > "$OUT_DIR/manifest.json"
+      cat "$OUT_DIR/manifest.json"
+
+  - id: persist-design-metadata
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "persist-design-metadata" "${audio_debug}" "project ${project_name}"
+      DESIGN_CTX="$(cat "$WS/.intake/design/design-context.json" 2>/dev/null || printf '{}')"
+      SNAPSHOT_PAYLOAD="$(jq -nc \
+        --arg session_id "${linear_session_id:-${project_name}-design}" \
+        --arg run_id "" \
+        --arg project_name "${project_name}" \
+        --arg design_mode "${design_mode}" \
+        --arg stitch_required "$( [ "${design_mode}" = "ingest_plus_stitch" ] && printf 'true' || printf 'false' )" \
+        --arg stitch_status "$(printf '%s' "$DESIGN_CTX" | jq -r '.stitch.status // "unknown"')" \
+        --arg has_frontend "$(printf '%s' "$DESIGN_CTX" | jq -r '.hasFrontend // false')" \
+        --arg artifact_bundle_path "$WS/.tasks/design" \
+        --argjson context "$DESIGN_CTX" \
+        '{session_id:$session_id,run_id:$run_id,project_name:$project_name,design_mode:$design_mode,stitch_required:($stitch_required=="true"),stitch_status:$stitch_status,has_frontend:($has_frontend=="true"),artifact_bundle_path:$artifact_bundle_path,context:$context}')"
+      LINEAR_URL="${LINEAR_BRIDGE_URL:-http://127.0.0.1:3100}"
+      DISCORD_URL="${DISCORD_BRIDGE_URL:-http://127.0.0.1:3200}"
+      linear_ok=false
+      discord_ok=false
+      if curl -fsS -X POST "${LINEAR_URL%/}/history/design-snapshot" -H 'Content-Type: application/json' -d "$SNAPSHOT_PAYLOAD" >/dev/null 2>&1; then
+        linear_ok=true
+      else
+        if curl -fsS -X POST "${DISCORD_URL%/}/history/design-snapshot" -H 'Content-Type: application/json' -d "$SNAPSHOT_PAYLOAD" >/dev/null 2>&1; then
+          discord_ok=true
+        fi
+      fi
+      if [ "$linear_ok" != true ] && [ "$discord_ok" != true ]; then
+        if [ "${INTAKE_PREFLIGHT_BRIDGES_SKIP:-}" = "true" ]; then
+          echo "persist-design-metadata: bridges skipped (INTAKE_PREFLIGHT_BRIDGES_SKIP=true); continuing without persistence" >&2
+        else
+          "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "design-metadata-persistence" "failed" "${audio_debug}" "error" "project ${project_name}"
+          echo "persist-design-metadata: failed to persist design snapshot to linear and discord bridges" >&2
+          exit 1
+        fi
+      fi
+      "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "design-metadata-persistence" "passed" "${audio_debug}" "normal" "linear=${linear_ok},discord=${discord_ok}"
+      jq -nc --argjson linear "$linear_ok" --argjson discord "$discord_ok" '{linear:$linear,discord:$discord}'
+
+  - id: generate-design-variants
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "generate-design-variants" "${audio_debug}" "project ${project_name}"
+      CANDIDATES="$WS/.intake/design/stitch/candidates.json"
+      if [ "${design_mode}" != "ingest_plus_stitch" ]; then
+        echo "generate-design-variants: skipped (design_mode=${design_mode})" >&2
+        printf '{"skipped":true,"reason":"design_mode_not_stitch"}'
+        exit 0
+      fi
+      if [ ! -f "$CANDIDATES" ]; then
+        echo "generate-design-variants: no candidates.json — skipping" >&2
+        printf '{"skipped":true,"reason":"no_candidates"}'
+        exit 0
+      fi
+      GENERATED=$(jq '[.[] | select(.status=="generated" and .screenId)] | length' "$CANDIDATES" 2>/dev/null || echo 0)
+      if [ "$GENERATED" -eq 0 ]; then
+        echo "generate-design-variants: no generated screens — skipping" >&2
+        printf '{"skipped":true,"reason":"no_generated_screens"}'
+        exit 0
+      fi
+      echo '{"operation":"design_variants","payload":{"candidates_path":"'"$CANDIDATES"'","output_dir":"'"$WS/.intake/design/stitch"'","variant_count":3,"creative_range":"EXPLORE"}}' \
+        | "$WS/apps/intake-agent/intake-agent"
+      RESULT=$?
+      if [ $RESULT -ne 0 ]; then
+        echo "generate-design-variants: intake-agent failed (exit $RESULT) — continuing without variants" >&2
+        printf '{"skipped":true,"reason":"intake_agent_failed"}'
+        exit 0
+      fi
+      "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "generate-design-variants" "design variants generated" "${audio_debug}" "normal" "project ${project_name}"
+      cat "$WS/.intake/design/stitch/design-variants.json"
+
+  - id: design-review
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_DESIGN_VARIANTS_STDOUT: $generate-design-variants.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "design-review" "${audio_debug}" "project ${project_name}"
+      VARIANTS_FILE="$WS/.intake/design/stitch/design-variants.json"
+      if [ ! -f "$VARIANTS_FILE" ]; then
+        echo "design-review: no design-variants.json — skipping" >&2
+        printf '{"skipped":true}'
+        exit 0
+      fi
+      SKIPPED=$(printf '%s' "$CTO_DESIGN_VARIANTS_STDOUT" | jq -r '.skipped // false' 2>/dev/null || echo true)
+      if [ "$SKIPPED" = "true" ]; then
+        echo "design-review: variant generation was skipped — skipping review" >&2
+        printf '{"skipped":true}'
+        exit 0
+      fi
+      SESSION_ID="${linear_session_id:-${project_name}-design}"
+      intake-util design-review \
+        --variants "$VARIANTS_FILE" \
+        --session-id "$SESSION_ID" \
+        --output "$WS/.intake/design/stitch/design-selections.json" \
+        ${linear_issue_id:+--linear-issue-id "$linear_issue_id"} \
+        || {
+          echo "design-review: intake-util failed — continuing without selections" >&2
+          printf '{"skipped":true,"reason":"intake_util_failed"}'
+          exit 0
+        }
+      "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "design-review" "design feedback collected" "${audio_debug}" "normal" "project ${project_name}"
+      cat "$WS/.intake/design/stitch/design-selections.json"
+
+  - id: save-design-selections
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_DESIGN_REVIEW_STDOUT: $design-review.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "save-design-selections" "${audio_debug}" "project ${project_name}"
+      SRC="$WS/.intake/design/stitch/design-selections.json"
+      DST="$WS/.tasks/design/selections.json"
+      if [ -f "$SRC" ]; then
+        mkdir -p "$(dirname "$DST")"
+        cp "$SRC" "$DST"
+        echo "save-design-selections: saved to $DST" >&2
+        cat "$DST"
+      else
+        echo "save-design-selections: no selections to save — skipping" >&2
+        printf '{"skipped":true}'
+      fi
+      if [ -f "$WS/.intake/design/stitch/design-variants.json" ]; then
+        cp "$WS/.intake/design/stitch/design-variants.json" "$WS/.tasks/design/stitch/design-variants.json" 2>/dev/null || true
+      fi
+
+  - id: notify-pipeline-start
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "notify-pipeline-start" "${audio_debug}" "project ${project_name}"
+      RUN_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      MSG=$(jq -n \
+        --arg pn "${project_name}" \
+        --arg ts "$RUN_TS" \
+        --arg d "${deliberate}" \
+        --arg sid "${linear_session_id:-}" \
+        --arg iid "${linear_issue_id:-}" \
+        --arg branch "${pr_base_branch}" \
+        '"🚀 **Intake pipeline fired up** for project **" + $pn + "**\n\n" +
+        "⚙️ deliberate: " + $d + "\n" +
+        "🌿 pr_base_branch: " + $branch + "\n" +
+        "🔗 linear_session_id: " + $sid + "\n" +
+        "📎 linear_issue_id: " + $iid + "\n" +
+        "⏰ " + $ts')
+      META=$(jq -nc \
+        --arg step "pipeline-start" \
+        --arg pn "${project_name}" \
+        --arg d "${deliberate}" \
+        --arg sid "${linear_session_id:-}" \
+        --arg iid "${linear_issue_id:-}" \
+        --arg ts "$RUN_TS" \
+        '{step: $step, project_name: $pn, deliberate: $d, linear_session_id: $sid, linear_issue_id: $iid, time_utc: $ts}')
+      echo "$MSG" | intake-util bridge-notify --from intake --to deliberation --metadata "$META" || true
+
+  - id: register-run
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "register-run" "${audio_debug}" "project ${project_name}"
+      RUN_TS=$(date +%s)
+      if [ "${INTAKE_PREFLIGHT_BRIDGES_SKIP:-}" = "true" ]; then
+        echo '{"registered":false,"run_id":"'"${project_name}-${RUN_TS}"'","skipped":"bridges_skip"}'
+      else
+        intake-util register-run \
+          --run-id "${project_name}-${RUN_TS}" \
+          --agent intake \
+          --linear-session-id "${linear_session_id}" \
+          --issue-id "${linear_issue_id}"
+      fi
+
+  - id: setup-repo
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "setup-repo" "${audio_debug}" "project ${project_name}"
+      source "$root/scripts/scm-dispatch.sh"
+      REPO_URL="${repository_url}"
+      ORG="${github_org}"
+      PROJECT="${project_name}"
+      VISIBILITY="${github_visibility}"
+      WEBHOOK_URL="${webhook_callback_url}"
       if [ -n "$REPO_URL" ] && [ "$REPO_URL" != "unnamed-project" ]; then
-        REPO_FULL=$(echo "$REPO_URL" | sed 's|https://github.com/||')
+        case "$SCM_PROVIDER" in
+          github) REPO_FULL=$(echo "$REPO_URL" | sed 's|https://github.com/||') ;;
+          gitlab) REPO_FULL=$(echo "$REPO_URL" | sed "s|https://${SCM_GITLAB_HOST}/||") ;;
+        esac
         echo "Using existing repository: $REPO_URL" >&2
       else
         REPO_FULL="${ORG}/${PROJECT}"
-        REPO_URL="https://github.com/${REPO_FULL}"
+        REPO_URL=$(scm_repo_url "$REPO_FULL")
         echo "Creating repository: $REPO_FULL ($VISIBILITY)" >&2
-        gh repo create "$REPO_FULL" --"$VISIBILITY" --description "Generated by CTO intake pipeline" --clone=false 2>&1 || true
+        scm_create_repo "$REPO_FULL" "$VISIBILITY" "Generated by CTO intake pipeline"
         echo "Initializing default branch" >&2
-        gh api "repos/${REPO_FULL}/contents/README.md" \
-          -X PUT \
-          -f message="chore: initialize repository" \
-          -f content="$(echo "# ${PROJECT}" | base64)" \
-          --silent 2>&1 || true
+        scm_init_file "$REPO_FULL" "README.md" "$(echo "# ${PROJECT}" | base64)" "chore: initialize repository"
       fi
-
       if [ -n "$WEBHOOK_URL" ]; then
         echo "Setting up webhook → $WEBHOOK_URL" >&2
-        gh api "repos/${REPO_FULL}/hooks" \
-          -X POST \
-          -f name=web \
-          -f "config[url]=${WEBHOOK_URL}" \
-          -f "config[content_type]=json" \
-          -f "config[insecure_ssl]=0" \
-          -f "events[]=pull_request" \
-          -f "events[]=check_run" \
-          -f "events[]=issue_comment" \
-          -f active=true \
-          --silent 2>&1 || echo "Webhook may already exist" >&2
+        scm_create_webhook "$REPO_FULL" "$WEBHOOK_URL"
       fi
-
       echo "{\"repository_url\": \"${REPO_URL}\", \"repo_full\": \"${REPO_FULL}\"}"
 
-  # ─────────────────────────────────────────────────────────
-  # Phase 0-lin: Create Linear project and PRD issue
-  # Gives stakeholders immediate visibility into the pipeline
-  # run as soon as config is loaded.
-  # ─────────────────────────────────────────────────────────
-  - name: create-linear-project
-    description: "Create Linear project and PRD issue for early visibility"
-    depends_on: [load-config]
-    command: >
-      echo '{{inputs.prd_content}}' |
-      intake-util sync-linear init
-        --project-name "{{inputs.project_name}}"
-        --team-id "${{ steps.load-config.output | jq -r '.linear_team_id' }}"
+  - id: create-linear-project
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_LOAD_CONFIG_JSON: $load-config.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "create-linear-project" "${audio_debug}" "project ${project_name}"
+      TEAM_ID=$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.linear_team_id')
+      intake-util sync-linear init \
+        --project-name "${project_name}" \
+        --team-id "$TEAM_ID" < "$WS/.intake/run-prd.txt"
 
-  # ─────────────────────────────────────────────────────────
-  # Phase 0a: Build Infrastructure Context
-  # Reads the static operator catalog and formats it as structured
-  # context for downstream steps (deliberation, task generation).
-  # This runs unconditionally so agents always know what infra
-  # is available in the cluster.
-  # ─────────────────────────────────────────────────────────
-  - name: build-infra-context
-    description: "Query cluster for live infrastructure context"
-    command: >
+  - id: ensure-linear-session
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_CREATE_LINEAR_JSON: $create-linear-project.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "ensure-linear-session" "${audio_debug}" "project ${project_name}"
+      if [ -n "${linear_session_id}" ]; then
+        jq -nc --arg sid "${linear_session_id}" '{linear_session_id: $sid}'
+        exit 0
+      fi
+      ISSUE_REF_INPUT="$(printf '%s' "${linear_issue_id:-}" | sed -E 's#https?://linear.app/[^/]+/issue/([^/]+).*#\1#')"
+      PRD_ISSUE_ID="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIssueId // empty')"
+      PRD_IDENTIFIER="$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIdentifier // empty')"
+      ISSUE_REF="${ISSUE_REF_INPUT:-${PRD_IDENTIFIER:-$PRD_ISSUE_ID}}"
+      if [ -z "$ISSUE_REF" ]; then
+        echo "ensure-linear-session: missing issue reference (linear_issue_id or PRD issue)" >&2
+        jq -nc '{linear_session_id: ""}'
+        exit 0
+      fi
+      code=$(curl -sS -o /tmp/linear_session_create_$$.json -w '%{http_code}' \
+        -H "Authorization: Bearer ${LINEAR_API_KEY:?LINEAR_API_KEY required}" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -nc --arg issue "$ISSUE_REF" \
+          '{query:"mutation Create($input: AgentSessionCreateOnIssue!){ agentSessionCreateOnIssue(input:$input){ success agentSession { id } } }", variables:{input:{issueId:$issue}}}')" \
+        https://api.linear.app/graphql)
+      if [[ "$code" != "200" ]]; then
+        echo "ensure-linear-session: Linear HTTP $code (see /tmp/linear_session_create_$$.json)" >&2
+        jq -nc '{linear_session_id: ""}'
+        exit 0
+      fi
+      sid="$(jq -r '.data.agentSessionCreateOnIssue.agentSession.id // empty' /tmp/linear_session_create_$$.json)"
+      if [ -z "$sid" ]; then
+        echo "ensure-linear-session: could not create session (see /tmp/linear_session_create_$$.json)" >&2
+        jq -nc '{linear_session_id: ""}'
+        exit 0
+      fi
+      jq -nc --arg sid "$sid" '{linear_session_id: $sid}'
+
+  - id: build-infra-context
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "build-infra-context" "${audio_debug}" "project ${project_name}"
       kubectl cluster-info >/dev/null 2>&1 || { echo "ERROR: No cluster access — cannot build infrastructure context" >&2; exit 1; } &&
       echo "## Deployed Operators" &&
       kubectl get pods -n operators -o jsonpath='{range .items[*]}{.metadata.labels.app\.kubernetes\.io/name}{"\n"}{end}' \
@@ -200,16 +553,12 @@ steps:
       echo "## Services (non-kube-system)" &&
       kubectl get svc --all-namespaces --no-headers 2>/dev/null | grep -v kube-system | awk '{print "- " $1 "/" $2 " (" $5 ")"}' | head -40
 
-  # ─────────────────────────────────────────────────────────
-  # Phase 0a-tools: Discover available MCP tools
-  # Queries cto-config.json for agent tool registrations and
-  # the cluster for MCP-related services. Produces a text
-  # inventory passed to intake for tool manifest generation.
-  # ─────────────────────────────────────────────────────────
-  - name: discover-tools
-    description: "Discover available MCP tools from config and cluster"
-    depends_on: [load-config]
-    command: >
+  - id: discover-tools
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "discover-tools" "${audio_debug}" "project ${project_name}"
       echo "## Agent Tool Registry (from cto-config.json)" &&
       python3 -c "
       import json, os
@@ -232,116 +581,200 @@ steps:
       echo "## Cluster Databases & Caches" &&
       kubectl get svc -n operators --no-headers 2>/dev/null | grep -iE 'postgres|redis|mysql|mongo|nats' | awk '{print "- " $1 " (" $5 ")"}' | head -20
 
-  # ─────────────────────────────────────────────────────────
-  # Phase 0b: Codebase Analysis (conditional)
-  # For non-greenfield projects, pack and analyze the existing
-  # repository to produce structured context that informs both
-  # the deliberation debate and the task generation.
-  # ─────────────────────────────────────────────────────────
-  - name: codebase-analysis
-    when: "{{inputs.include_codebase}}"
-    depends_on: [load-config, setup-repo]
-    workflow: codebase-analysis.lobster.yaml
-    inputs:
-      repository_url: "${{ steps.setup-repo.output | jq -r '.repository_url' }}"
-      prd_content: "{{inputs.prd_content}}"
-      branch: "{{inputs.pr_base_branch}}"
-      model_primary_provider: "${{ steps.load-config.output | jq -r '.primary_provider' }}"
-      model_primary: "${{ steps.load-config.output | jq -r '.primary_model' }}"
+  - id: codebase-analysis
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_LOAD_CONFIG_JSON: $load-config.stdout
+      CTO_SETUP_REPO_JSON: $setup-repo.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "codebase-analysis" "${audio_debug}" "project ${project_name}"
+      if [ "${include_codebase}" != "true" ] && [ "${include_codebase}" != "1" ]; then
+        printf ''; exit 0; fi;
+      WS="${WORKSPACE:-.}";
+      ARGS=$(jq -n \
+        --arg repository_url "$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url')" \
+        --arg branch "${pr_base_branch}" \
+        --arg model_primary_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_provider')" \
+        --arg model_primary "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_model')" \
+        --arg audio_debug "${audio_debug}" \
+        '{repository_url: $repository_url, branch: $branch, model_primary_provider: $model_primary_provider, model_primary: $model_primary, audio_debug: $audio_debug}') &&
+      lobster run --mode tool "$WS/intake/workflows/codebase-analysis.lobster.yaml" --args-json "$ARGS" || { "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "codebase-analysis failed" "${audio_debug}" "error" "project ${project_name}"; exit 1; }
 
-  # ─────────────────────────────────────────────────────────
-  # Phase 1: Deliberation (conditional)
-  # Runs the Optimist/Pessimist debate to produce a design brief
-  # that resolves architectural decision points before task generation.
-  # When codebase analysis ran, its context is passed to the debate
-  # agents so they can reference existing architecture.
-  # ─────────────────────────────────────────────────────────
-  - name: deliberation
-    when: "{{inputs.deliberate}}"
-    depends_on: [load-config, build-infra-context, codebase-analysis]
-    workflow: deliberation.lobster.yaml
-    inputs:
-      prd_content: "{{inputs.prd_content}}"
-      timebox_minutes: "{{inputs.timebox_minutes}}"
-      session_id: "{{inputs.project_name}}-{{timestamp}}"
-      infrastructure_context: "${{ steps.build-infra-context.output }}"
-      human_review_mode: "full_auto"
-      verify: "{{inputs.verify}}"
-      breakpoints: "{{inputs.breakpoints}}"
-      linear_session_id: "{{inputs.linear_session_id}}"
-      model_frontier_provider: "${{ steps.load-config.output | jq -r '.frontier_provider' }}"
-      model_frontier: "${{ steps.load-config.output | jq -r '.frontier_model' }}"
-      voter_1_provider: "${{ steps.load-config.output | jq -r '.voter_1_provider' }}"
-      voter_1_model: "${{ steps.load-config.output | jq -r '.voter_1_model' }}"
-      voter_2_provider: "${{ steps.load-config.output | jq -r '.voter_2_provider' }}"
-      voter_2_model: "${{ steps.load-config.output | jq -r '.voter_2_model' }}"
-      voter_3_provider: "${{ steps.load-config.output | jq -r '.voter_3_provider' }}"
-      voter_3_model: "${{ steps.load-config.output | jq -r '.voter_3_model' }}"
-      voter_4_provider: "${{ steps.load-config.output | jq -r '.voter_4_provider' }}"
-      voter_4_model: "${{ steps.load-config.output | jq -r '.voter_4_model' }}"
-      voter_5_provider: "${{ steps.load-config.output | jq -r '.voter_5_provider' }}"
-      voter_5_model: "${{ steps.load-config.output | jq -r '.voter_5_model' }}"
-      codebase_context: >
-        {{#if steps.codebase-analysis.outputs.codebase_context}}
-          {{steps.codebase-analysis.outputs.codebase_context}}
-        {{else}}
-        {{/if}}
+  - id: initial-parse-prd
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_LOAD_CONFIG_JSON: $load-config.stdout
+      CTO_CODEBASE_ANALYSIS_STDOUT: $codebase-analysis.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "initial-parse-prd" "${audio_debug}" "project ${project_name}"
+      if [ "${deliberate}" != "true" ] && [ "${deliberate}" != "1" ]; then
+        printf '[]'; exit 0; fi
+      PRD_FILE="$WS/.intake/run-prd.txt"
+      if [ ! -s "$PRD_FILE" ]; then
+        echo "initial-parse-prd: PRD file missing or empty — skipping" >&2
+        printf '[]'; exit 0
+      fi
+      CODEBASE_CTX="$(printf '%s' "$CTO_CODEBASE_ANALYSIS_STDOUT" | jq -r '.output[-1] // empty' 2>/dev/null || true)"
+      DESIGN_CONTEXT_BRIEF="$(jq -r '[
+        "mode=" + (.mode // "unknown"),
+        "has_frontend=" + ((.hasFrontend // false) | tostring),
+        "targets=" + ((.frontendTargets // []) | join("|")),
+        "stitch_status=" + (.stitch.status // "unknown"),
+        "stitch_reason=" + (.stitch.reason // "")
+      ] | join("; ")' "$WS/.intake/design/design-context.json" 2>/dev/null || printf '')"
+      ARGS=$(jq -n \
+        --rawfile sys "$WS/intake/prompts/parse-prd-system.md" \
+        --rawfile usr "$WS/intake/prompts/parse-prd-user.md" \
+        --rawfile prd "$PRD_FILE" \
+        --arg codebase "$CODEBASE_CTX" \
+        --arg design_context "$DESIGN_CONTEXT_BRIEF" \
+        --arg num_tasks "${num_tasks}" \
+        --arg schema "$WS/intake/schemas/generated-task.schema.json" \
+        --arg provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" \
+        --arg model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')" \
+        '{ "prompt": ($sys + "\n\n" + $usr),
+           "input": { "prd_content": $prd, "codebase_context": $codebase, "design_context": $design_context, "num_tasks": ($num_tasks | tonumber), "next_id": 1 },
+           "schema": $schema, "provider": $provider, "model": $model }') || {
+        echo "initial-parse-prd: failed to build LLM args — falling back to empty tasks" >&2
+        printf '[]'; exit 0
+      }
+      OUTPUT=$("$WS/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
+        echo "initial-parse-prd: openclaw.invoke failed — falling back to empty tasks" >&2
+        printf '[]'; exit 0
+      }
+      if [ -z "$OUTPUT" ] || ! printf '%s' "$OUTPUT" | jq -e 'type' >/dev/null 2>&1; then
+        echo "initial-parse-prd: invalid JSON output — falling back to empty tasks" >&2
+        printf '[]'; exit 0
+      fi
+      OUTPUT=$(printf '%s' "$OUTPUT" | jq '
+        def parse_kv: split(": ") | {(.[0]): (.[1:] | join(": "))};
+        def fix_colon_obj:
+          [to_entries[] | (.key | parse_kv), (.value | tostring | parse_kv)] | add
+          | if .requires_approval then .requires_approval |= (. == "true") else . end
+          | if .options and (.options | type) == "string" then .options |= (try fromjson catch [.]) else . end;
+        def fix_one_dp:
+          if type == "string" then (try fromjson catch null)
+          elif type == "object" then
+            if has("id") and has("category") then .
+            elif (keys | any(startswith("{"))) then
+              (keys | map(select(startswith("{"))))[0] | try fromjson catch null
+            elif (keys | any(contains(": "))) then
+              fix_colon_obj
+            else . end
+          else null
+          end;
+        def fix_dp_array:
+          if type == "array" and length > 0 and (.[0] | type) == "string" and (.[0] | startswith("{") | not) then
+            [range(0; length; 2) as $i | {(.[($i)]): .[($i+1)]}] | add // {}
+            | if .options and (.options | type) == "string" then .options |= (try fromjson catch [.]) else . end
+            | [.]
+          elif type == "array" then
+            [.[] | fix_one_dp | select(. != null and type == "object" and has("id"))]
+          else .
+          end;
+        [.[] | .decision_points = ((.decision_points // .decisionPoints // []) | fix_dp_array)]
+      ' 2>/dev/null || printf '%s' "$OUTPUT")
+      printf '%s' "$OUTPUT" > "$WS/.intake/initial-tasks.json"
+      TASK_COUNT=$(printf '%s' "$OUTPUT" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo 0)
+      echo "initial-parse-prd: parsed $TASK_COUNT tasks" >&2
+      "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "initial-parse-prd" "parsed ${TASK_COUNT} tasks" "${audio_debug}" "normal" "project ${project_name}"
+      printf '%s' "$OUTPUT"
 
-  # ─────────────────────────────────────────────────────────
-  # Phase 2: Task generation
-  # Uses the design brief from deliberation as the PRD content
-  # when deliberation ran, otherwise uses the raw PRD directly.
-  # Codebase context is passed through so the parse-prd step
-  # can generate tasks that extend existing code.
-  # ─────────────────────────────────────────────────────────
-  - name: intake
-    depends_on: [load-config, deliberation, codebase-analysis, build-infra-context, discover-tools, create-linear-project, setup-repo]
-    workflow: intake.lobster.yaml
-    inputs:
-      prd_content: >
-        {{#if steps.deliberation.outputs.design_brief}}
-          {{steps.deliberation.outputs.design_brief}}
-        {{else}}
-          {{inputs.prd_content}}
-        {{/if}}
-      prd_path: ".tasks/docs/prd.txt"
-      num_tasks: "{{inputs.num_tasks}}"
-      project_name: "{{inputs.project_name}}"
-      intake_metadata: "{{inputs.intake_metadata}}"
-      pr_base_branch: "{{inputs.pr_base_branch}}"
-      linear_project_id: "${{ steps.create-linear-project.output | jq -r '.projectId' }}"
-      linear_prd_issue_id: "${{ steps.create-linear-project.output | jq -r '.prdIssueId' }}"
-      linear_team_id: "${{ steps.load-config.output | jq -r '.linear_team_id' }}"
-      linear_agent_map: "${{ steps.create-linear-project.output | jq -c '.agentMap' }}"
-      repository_url: "${{ steps.setup-repo.output | jq -r '.repository_url' }}"
-      verify: "{{inputs.verify}}"
-      breakpoints: "{{inputs.breakpoints}}"
-      linear_session_id: "{{inputs.linear_session_id}}"
-      linear_issue_id: "{{inputs.linear_issue_id}}"
-      run_id: "${{ steps.register-run.output | jq -r '.run_id // empty' }}"
-      infrastructure_context: "${{ steps.build-infra-context.output }}"
-      tool_context: "${{ steps.discover-tools.output }}"
-      codebase_context: >
-        {{#if steps.codebase-analysis.outputs.codebase_context}}
-          {{steps.codebase-analysis.outputs.codebase_context}}
-        {{else}}
-        {{/if}}
-      model_primary_provider: "${{ steps.load-config.output | jq -r '.primary_provider' }}"
-      model_primary: "${{ steps.load-config.output | jq -r '.primary_model' }}"
-      model_fast_provider: "${{ steps.load-config.output | jq -r '.fast_provider' }}"
-      model_fast: "${{ steps.load-config.output | jq -r '.fast_model' }}"
-      model_frontier_provider: "${{ steps.load-config.output | jq -r '.frontier_provider' }}"
-      model_frontier: "${{ steps.load-config.output | jq -r '.frontier_model' }}"
-      voter_1_provider: "${{ steps.load-config.output | jq -r '.voter_1_provider' }}"
-      voter_1_model: "${{ steps.load-config.output | jq -r '.voter_1_model' }}"
-      voter_2_provider: "${{ steps.load-config.output | jq -r '.voter_2_provider' }}"
-      voter_2_model: "${{ steps.load-config.output | jq -r '.voter_2_model' }}"
-      voter_3_provider: "${{ steps.load-config.output | jq -r '.voter_3_provider' }}"
-      voter_3_model: "${{ steps.load-config.output | jq -r '.voter_3_model' }}"
-      voter_4_provider: "${{ steps.load-config.output | jq -r '.voter_4_provider' }}"
-      voter_4_model: "${{ steps.load-config.output | jq -r '.voter_4_model' }}"
-      voter_5_provider: "${{ steps.load-config.output | jq -r '.voter_5_provider' }}"
-      voter_5_model: "${{ steps.load-config.output | jq -r '.voter_5_model' }}"
+  - id: validate-tasks
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_INITIAL_PARSE_PRD_STDOUT: $initial-parse-prd.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "validate-tasks" "${audio_debug}" "project ${project_name}"
+      if [ "${deliberate}" != "true" ] && [ "${deliberate}" != "1" ]; then
+        printf '{"valid":true,"skipped":true}'; exit 0; fi
+      RESULT=$(cat "$WS/.intake/initial-tasks.json" | intake-util validate --type tasks --strict 2>&1) || true
+      VALID=$(printf '%s' "$RESULT" | jq -r '.valid // false' 2>/dev/null || echo false)
+      if [ "$VALID" = "true" ]; then
+        "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "validate-tasks" "tasks validated successfully" "${audio_debug}" "normal" "project ${project_name}"
+      else
+        "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "validate-tasks" "task validation has warnings" "${audio_debug}" "wait" "project ${project_name}"
+        echo "validate-tasks: warnings — $RESULT" >&2
+        echo "$RESULT" | intake-util bridge-notify --from pipeline --to deliberation \
+          --metadata '{"step":"validate-tasks","severity":"warning"}' || true
+      fi
+      printf '%s' "$RESULT"
+
+  - id: extract-decision-points
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_LOAD_CONFIG_JSON: $load-config.stdout
+      CTO_BUILD_INFRA_STDOUT: $build-infra-context.stdout
+      CTO_CODEBASE_ANALYSIS_STDOUT: $codebase-analysis.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "extract-decision-points" "${audio_debug}" "project ${project_name}"
+      if [ "${deliberate}" != "true" ] && [ "${deliberate}" != "1" ]; then
+        printf '[]' > "$WS/.intake/decision-points.json"
+        printf '[]'; exit 0; fi
+      PRD_FILE="$WS/.intake/run-prd.txt"
+      TASKS_FILE="$WS/.intake/initial-tasks.json"
+      if [ ! -s "$PRD_FILE" ] || [ ! -s "$TASKS_FILE" ]; then
+        echo "extract-decision-points: PRD or tasks file missing — skipping" >&2
+        printf '[]' > "$WS/.intake/decision-points.json"
+        printf '[]'; exit 0
+      fi
+      CODEBASE_CTX="$(printf '%s' "$CTO_CODEBASE_ANALYSIS_STDOUT" | jq -r '.output[-1] // empty' 2>/dev/null || true)"
+      INFRA_CTX="$(printf '%s' "$CTO_BUILD_INFRA_STDOUT" 2>/dev/null || true)"
+      DESIGN_CTX="$(jq -r '[
+        "mode=" + (.mode // "unknown"),
+        "has_frontend=" + ((.hasFrontend // false) | tostring),
+        "targets=" + ((.frontendTargets // []) | join("|")),
+        "stitch_status=" + (.stitch.status // "unknown")
+      ] | join("; ")' "$WS/.intake/design/design-context.json" 2>/dev/null || printf '')"
+      TASKS_SUMMARY=$(jq -r '
+        "## Task Decomposition (" + (length | tostring) + " tasks)\n\n" +
+        ([.[] |
+          "### Task " + (.id | tostring) + ": " + .title + "\n" +
+          "- Agent: " + .agent + " | Stack: " + .stack + "\n" +
+          "- " + .description
+        ] | join("\n\n"))' "$TASKS_FILE" 2>/dev/null || echo "")
+      ARGS=$(jq -n \
+        --rawfile sys "$WS/intake/prompts/extract-decision-points-system.md" \
+        --rawfile prd "$PRD_FILE" \
+        --arg tasks "$TASKS_SUMMARY" \
+        --arg codebase_context "$CODEBASE_CTX" \
+        --arg infrastructure_context "$INFRA_CTX" \
+        --arg design_context "$DESIGN_CTX" \
+        --arg schema "$WS/intake/schemas/project-decision-points.schema.json" \
+        --arg provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" \
+        --arg model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')" \
+        '{ "prompt": ($sys),
+           "input": { "prd": $prd, "tasks": $tasks, "codebase_context": $codebase_context, "infrastructure_context": $infrastructure_context, "design_context": $design_context },
+           "schema": $schema, "provider": $provider, "model": $model }') || {
+        echo "extract-decision-points: failed to build LLM args" >&2
+        printf '[]' > "$WS/.intake/decision-points.json"
+        printf '[]'; exit 0
+      }
+      OUTPUT=$("$WS/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
+        echo "extract-decision-points: openclaw.invoke failed" >&2
+        printf '[]' > "$WS/.intake/decision-points.json"
+        printf '[]'; exit 0
+      }
+      if [ -z "$OUTPUT" ] || ! printf '%s' "$OUTPUT" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        echo "extract-decision-points: invalid output — expected JSON array" >&2
+        printf '[]' > "$WS/.intake/decision-points.json"
+        printf '[]'; exit 0
+      fi
+      printf '%s' "$OUTPUT" > "$WS/.intake/decision-points.json"
+      DP_COUNT=$(printf '%s' "$OUTPUT" | jq 'length' 2>/dev/null || echo 0)
+      echo "extract-decision-points: extracted $DP_COUNT decision points" >&2
+      "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "extract-decision-points" "extracted ${DP_COUNT} decision points" "${audio_debug}" "normal" "project ${project_name}"
+      TASKS_WITH_DPS=$(jq --slurpfile dps "$WS/.intake/decision-points.json" '
+        [.[] | . as $task | .decision_points = [
+          $dps[0][] | select(.affected_tasks | index($task.id))
+          | {id, category, description, options, requires_approval, constraint_type}
+        ]]' "$TASKS_FILE" 2>/dev/null || cat "$TASKS_FILE")
+      printf '%s' "$TASKS_WITH_DPS" > "$WS/.intake/initial-tasks.json"
+      printf '%s' "$OUTPUT"
 
   - name: deregister-run
     depends_on: [intake]
@@ -350,14 +783,377 @@ steps:
       intake-util deregister-run
         --run-id "${{ steps.register-run.output | jq -r '.run_id // empty' }}"
 
-output_mappings:
-  repository_url: ${{ steps.setup-repo.output | jq -r '.repository_url' }}
-  infrastructure_context: ${{ steps.build-infra-context.output }}
-  codebase_context: ${{ steps.codebase-analysis.outputs.codebase_context }}
-  design_brief: ${{ steps.deliberation.outputs.design_brief }}
-  deliberation_result: ${{ steps.deliberation.outputs.deliberation_result }}
-  pr_url: ${{ steps.intake.outputs.pr_url }}
-  linear_project_id: ${{ steps.create-linear-project.output | jq -r '.projectId' }}
-  linear_prd_issue_id: ${{ steps.create-linear-project.output | jq -r '.prdIssueId' }}
-  linear_issues: ${{ steps.intake.outputs.linear_issues }}
-  run_id: ${{ steps.register-run.output | jq -r '.run_id // empty' }}
+  - id: split-decision-points
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_DECISION_POINTS_STDOUT: $extract-decision-points.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "split-decision-points" "${audio_debug}" "project ${project_name}"
+      ALL_DPS="$(cat "$WS/.intake/decision-points.json" 2>/dev/null || echo '[]')"
+      if [ -z "$ALL_DPS" ] || ! printf '%s' "$ALL_DPS" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        ALL_DPS="[]"
+      fi
+      DESIGN_CATS='["ux-behavior","visual-identity","design-system","component-library","layout-pattern"]'
+      TECH_DPS=$(printf '%s' "$ALL_DPS" | jq --argjson dc "$DESIGN_CATS" '[.[] | select(.category as $c | $dc | index($c) | not)]')
+      DESIGN_DPS=$(printf '%s' "$ALL_DPS" | jq --argjson dc "$DESIGN_CATS" '[.[] | select(.category as $c | $dc | index($c))]')
+      TECH_COUNT=$(printf '%s' "$TECH_DPS" | jq 'length')
+      DESIGN_COUNT=$(printf '%s' "$DESIGN_DPS" | jq 'length')
+      printf '%s' "$TECH_DPS" > "$WS/.intake/tech-decision-points.json"
+      printf '%s' "$DESIGN_DPS" > "$WS/.intake/design-decision-points.json"
+      echo "split-decision-points: $TECH_COUNT tech, $DESIGN_COUNT design" >&2
+      "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "split-decision-points" "split: ${TECH_COUNT} tech, ${DESIGN_COUNT} design" "${audio_debug}" "normal" "project ${project_name}"
+      jq -n \
+        --argjson tech "$TECH_DPS" \
+        --argjson design "$DESIGN_DPS" \
+        --argjson tech_count "$TECH_COUNT" \
+        --argjson design_count "$DESIGN_COUNT" \
+        '{tech_decision_points: $tech, design_decision_points: $design, tech_count: $tech_count, design_count: $design_count}'
+
+  - id: design-deliberation
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_SPLIT_DPS_JSON: $split-decision-points.stdout
+      CTO_LOAD_CONFIG_JSON: $load-config.stdout
+      CTO_ENSURE_LINEAR_SESSION_JSON: $ensure-linear-session.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "design-deliberation" "${audio_debug}" "project ${project_name}"
+      DESIGN_DPS=$(printf '%s' "$CTO_SPLIT_DPS_JSON" | jq -c '.design_decision_points // []')
+      DESIGN_COUNT=$(printf '%s' "$CTO_SPLIT_DPS_JSON" | jq -r '.design_count // 0')
+      if [ "$DESIGN_COUNT" -eq 0 ]; then
+        echo "design-deliberation: no design decision points — skipping" >&2
+        jq -nc '{skipped: true, design_decisions: []}'
+        exit 0
+      fi
+      RUN_TS=$(date +%s)
+      SESSION_ID="${project_name}-design-${RUN_TS}"
+      LINEAR_SID="$(printf '%s' "$CTO_ENSURE_LINEAR_SESSION_JSON" | jq -r '.linear_session_id // empty')"
+      ARGS=$(jq -n \
+        --arg audio_debug "false" \
+        --arg session_id "$SESSION_ID" \
+        --arg design_decision_points "$DESIGN_DPS" \
+        --arg linear_session_id "$LINEAR_SID" \
+        --arg linear_issue_id "${linear_issue_id}" \
+        --arg model_frontier_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_provider')" \
+        --arg model_frontier "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_model')" \
+        '{audio_debug: $audio_debug, session_id: $session_id, design_decision_points: $design_decision_points, linear_session_id: $linear_session_id, linear_issue_id: $linear_issue_id, model_frontier_provider: $model_frontier_provider, model_frontier: $model_frontier}')
+      lobster run --mode tool "$WS/intake/workflows/design-deliberation.lobster.yaml" --args-json "$ARGS" 2>"$WS/.intake/design-deliberation.log" || {
+        echo "design-deliberation sub-workflow failed — see $WS/.intake/design-deliberation.log" >&2
+        cat "$WS/.intake/design-deliberation.log" >&2
+        jq -nc '{skipped: false, failed: true, design_decisions: []}'
+        exit 0
+      }
+
+  - id: deliberation
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_LOAD_CONFIG_JSON: $load-config.stdout
+      CTO_BUILD_INFRA_STDOUT: $build-infra-context.stdout
+      CTO_CODEBASE_ANALYSIS_STDOUT: $codebase-analysis.stdout
+      CTO_ENSURE_LINEAR_SESSION_JSON: $ensure-linear-session.stdout
+      CTO_MATERIALIZE_DESIGN_STDOUT: $materialize-design-inputs.stdout
+      CTO_INITIAL_PARSE_PRD_STDOUT: $initial-parse-prd.stdout
+      CTO_SPLIT_DPS_JSON: $split-decision-points.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "deliberation" "${audio_debug}" "project ${project_name}"
+      if [ "${deliberate}" != "true" ] && [ "${deliberate}" != "1" ]; then
+        printf '%s' '{"skipped":true}'; exit 0; fi;
+      RUN_TS=$(date +%s);
+      SESSION_ID="${project_name}-${RUN_TS}";
+      CODEBASE_CTX="$(printf '%s' "$CTO_CODEBASE_ANALYSIS_STDOUT" | jq -r '.output[-1] // empty' 2>/dev/null || true)";
+      DESIGN_CONTEXT_BRIEF="$(jq -r '[
+        "mode=" + (.mode // "unknown"),
+        "has_frontend=" + ((.hasFrontend // false) | tostring),
+        "targets=" + ((.frontendTargets // []) | join("|")),
+        "stitch_status=" + (.stitch.status // "unknown"),
+        "stitch_reason=" + (.stitch.reason // "")
+      ] | join("; ")' "$WS/.intake/design/design-context.json" 2>/dev/null || printf '')";
+      INITIAL_TASKS_JSON="$(printf '%s' "$CTO_INITIAL_PARSE_PRD_STDOUT")"
+      if [ -z "$INITIAL_TASKS_JSON" ] || ! printf '%s' "$INITIAL_TASKS_JSON" | jq -e 'type' >/dev/null 2>&1; then
+        INITIAL_TASKS_JSON="[]"
+      fi
+      DECISION_POINTS_JSON="$(cat "$WS/.intake/tech-decision-points.json" 2>/dev/null || cat "$WS/.intake/decision-points.json" 2>/dev/null || echo '[]')"
+      if [ -z "$DECISION_POINTS_JSON" ] || ! printf '%s' "$DECISION_POINTS_JSON" | jq -e 'type' >/dev/null 2>&1; then
+        DECISION_POINTS_JSON="[]"
+      fi
+      WS="${WORKSPACE:-.}";
+      CTX_DIR="$WS/.intake/contexts"
+      mkdir -p "$CTX_DIR"
+      printf '%s' "$CTO_BUILD_INFRA_STDOUT" > "$CTX_DIR/infrastructure.txt"
+      printf '%s' "$DESIGN_CONTEXT_BRIEF" > "$CTX_DIR/design.txt"
+      printf '%s' "$CODEBASE_CTX" > "$CTX_DIR/codebase.txt"
+      ARGS=$(jq -n \
+        --arg timebox_minutes "${timebox_minutes}" \
+        --arg session_id "${SESSION_ID}" \
+        --arg human_review_mode "human_required" \
+        --arg verify "${verify}" \
+        --arg breakpoints "${breakpoints}" \
+        --arg linear_session_id "$(printf '%s' "$CTO_ENSURE_LINEAR_SESSION_JSON" | jq -r '.linear_session_id // empty')" \
+        --arg model_frontier_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_provider')" \
+        --arg model_frontier "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_model')" \
+        --arg voter_1_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_1_provider')" \
+        --arg voter_1_model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_1_model')" \
+        --arg voter_2_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_2_provider')" \
+        --arg voter_2_model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_2_model')" \
+        --arg voter_3_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_3_provider')" \
+        --arg voter_3_model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_3_model')" \
+        --arg parsed_tasks "$INITIAL_TASKS_JSON" \
+        --arg decision_points_json "$DECISION_POINTS_JSON" \
+        --arg audio_debug "false" \
+        '{timebox_minutes: $timebox_minutes, session_id: $session_id, human_review_mode: $human_review_mode, verify: $verify, breakpoints: $breakpoints, linear_session_id: $linear_session_id, model_frontier_provider: $model_frontier_provider, model_frontier: $model_frontier, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, parsed_tasks: $parsed_tasks, decision_points_json: $decision_points_json, audio_debug: $audio_debug}') &&
+      DELIB_OK=false
+      DELIB_OUT=""
+      for ATTEMPT in 1 2 3 4 5; do
+        DELIB_OUT="$(lobster run --mode tool "$WS/intake/workflows/deliberation.lobster.yaml" --args-json "$ARGS" 2>&1)" && { DELIB_OK=true; break; }
+        case "$DELIB_OUT" in
+          *"HTTP Error 503"*|*"Service Unavailable"*|*"ECONNREFUSED"*|*"network"*)
+            if [ "$ATTEMPT" -lt 5 ]; then
+              BACKOFF=$((ATTEMPT * ATTEMPT * 5))
+              "$WS/intake/scripts/workflow-gate-audio.sh" "pipeline" "deliberation-retry" "retrying after transient failure (attempt ${ATTEMPT}, waiting ${BACKOFF}s)" "${audio_debug}" "wait" "project ${project_name}, session ${SESSION_ID}"
+              sleep "$BACKOFF"
+              continue
+            fi
+            ;;
+        esac
+        break
+      done
+      [ "$DELIB_OK" = true ] && printf '%s\n' "$DELIB_OUT" || {
+        printf '%s\n' "$DELIB_OUT" >&2
+        FAIL_MSG="$(jq -n --arg sid "${SESSION_ID}" --arg pn "${project_name}" \
+          '"❌ **Deliberation failed** for **" + $pn + "** (session `" + $sid + "`)."')"
+        THREAD_META="$(jq -nc --arg step "deliberation-failed" --arg sid "${SESSION_ID}" --arg pn "${project_name}" \
+          '{step:$step,session_id:$sid,project_name:$pn,severity:"error"}')"
+        MAIN_META="$(jq -nc --arg step "deliberation-failed" --arg pn "${project_name}" \
+          '{step:$step,project_name:$pn,severity:"error"}')"
+        echo "$FAIL_MSG" | intake-util bridge-notify --from intake --to deliberation --metadata "$THREAD_META" || true
+        echo "$FAIL_MSG" | intake-util bridge-notify --from intake --to deliberation --metadata "$MAIN_META" || true
+        "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "deliberation failed" "${audio_debug}" "error" "project ${project_name}, session ${SESSION_ID}"
+        exit 1
+      }
+
+  - id: notify-task-gen
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+      CTO_DESIGN_DELIB_STDOUT: $design-deliberation.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "notify-task-gen" "${audio_debug}" "project ${project_name}"
+      DESIGN_STATUS=$(printf '%s' "$CTO_DESIGN_DELIB_STDOUT" | jq -r 'if .skipped == true then "skipped" elif .failed == true then "failed" else "completed" end' 2>/dev/null || echo "unknown")
+      MSG=$(jq -n --arg pn "${project_name}" --arg ds "$DESIGN_STATUS" \
+        '"🔨 **Deliberation wrapped up** — moving to task generation for **" + $pn + "**\n\n" +
+        "📦 Compiling design brief into actionable tasks...\n" +
+        "🎨 Design deliberation: " + $ds + "\n" +
+        "🤖 Agents standing by for assignments."')
+      META=$(jq -nc --arg step "task-gen-start" --arg pn "${project_name}" '{step:$step,project_name:$pn}')
+      echo "$MSG" | intake-util bridge-notify --from intake --to deliberation --metadata "$META" || true
+
+  - id: gateway-health-check
+    env:
+      INTAKE_AUDIO_MUTE: ${audio_mute_pre_intake}
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "gateway-health-check" "${audio_debug}" "project ${project_name}"
+      if ! openclaw.invoke --tool llm-task --action json --args-json '{"prompt":"ping","input":{},"provider":"anthropic","model":"claude-sonnet-4-6"}' >/dev/null 2>&1; then
+        echo "gateway-health-check: OpenClaw gateway unhealthy — restarting..." >&2
+        pkill -f openclaw-gateway 2>/dev/null || true
+        sleep 3
+        if ! openclaw.invoke --tool llm-task --action json --args-json '{"prompt":"ping","input":{},"provider":"anthropic","model":"claude-sonnet-4-6"}' >/dev/null 2>&1; then
+          echo "gateway-health-check: gateway still unhealthy after restart — proceeding anyway" >&2
+        else
+          echo "gateway-health-check: gateway recovered after restart" >&2
+        fi
+      else
+        echo "gateway-health-check: OpenClaw gateway healthy" >&2
+      fi
+      printf '{"gateway":"checked"}'
+
+  - id: intake
+    env:
+      CTO_LOAD_CONFIG_JSON: $load-config.stdout
+      CTO_SETUP_REPO_JSON: $setup-repo.stdout
+      CTO_CREATE_LINEAR_JSON: $create-linear-project.stdout
+      CTO_REGISTER_RUN_JSON: $register-run.stdout
+      CTO_ENSURE_LINEAR_SESSION_JSON: $ensure-linear-session.stdout
+      CTO_BUILD_INFRA_STDOUT: $build-infra-context.stdout
+      CTO_DISCOVER_TOOLS_STDOUT: $discover-tools.stdout
+      CTO_CODEBASE_ANALYSIS_STDOUT: $codebase-analysis.stdout
+      CTO_DELIBERATION_STDOUT: $deliberation.stdout
+      CTO_MATERIALIZE_DESIGN_STDOUT: $materialize-design-inputs.stdout
+    command: |
+      WS="${WORKSPACE:-.}"
+      "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "intake" "${audio_debug}" "project ${project_name}"
+      CODEBASE_CTX="$(printf '%s' "$CTO_CODEBASE_ANALYSIS_STDOUT" | jq -r '.output[-1] // empty' 2>/dev/null || true)";
+      DESIGN_CONTEXT_BRIEF="$(jq -r '[
+        "mode=" + (.mode // "unknown"),
+        "has_frontend=" + ((.hasFrontend // false) | tostring),
+        "targets=" + ((.frontendTargets // []) | join("|")),
+        "stitch_status=" + (.stitch.status // "unknown"),
+        "stitch_reason=" + (.stitch.reason // "")
+      ] | join("; ")' "$WS/.intake/design/design-context.json" 2>/dev/null || printf '')";
+      WS="${WORKSPACE:-.}";
+      INTAKE_PRD="$WS/.intake/run-prd-for-intake.txt"
+      if [ "${deliberate}" = "true" ] || [ "${deliberate}" = "1" ]; then
+        ENHANCED_PRD="$WS/.tasks/docs/design-brief.md"
+        if [ -s "$ENHANCED_PRD" ]; then
+          cp "$ENHANCED_PRD" "$INTAKE_PRD"
+          echo "intake: using Enhanced PRD from deliberation ($ENHANCED_PRD)" >&2
+        else
+          BRIEF_RAW="$(printf '%s' "$CTO_DELIBERATION_STDOUT" | jq -r '(.output // [])
+            | map(select(type=="string"))
+            | map(select(test("^Design brief saved to "; "i") | not))
+            | last // empty' 2>/dev/null || true)"
+          if [ -n "$BRIEF_RAW" ] && [ "$BRIEF_RAW" != "null" ]; then
+            printf '%s\n' "$BRIEF_RAW" > "$INTAKE_PRD"
+            echo "intake: using design brief from deliberation stdout (fallback)" >&2
+          else
+            cp "$WS/.intake/run-prd.txt" "$INTAKE_PRD"
+            echo "intake: using raw PRD (no deliberation output found)" >&2
+          fi
+        fi
+      else
+        cp "$WS/.intake/run-prd.txt" "$INTAKE_PRD"
+      fi
+      CTX_DIR="$WS/.intake/contexts"
+      mkdir -p "$CTX_DIR"
+      printf '%s' "$CTO_BUILD_INFRA_STDOUT" > "$CTX_DIR/infrastructure.txt"
+      printf '%s' "$CTO_DISCOVER_TOOLS_STDOUT" > "$CTX_DIR/tools.txt"
+      printf '%s' "$DESIGN_CONTEXT_BRIEF" > "$CTX_DIR/design.txt"
+      printf '%s' "$CODEBASE_CTX" > "$CTX_DIR/codebase.txt"
+      ARGS=$(jq -n \
+        --arg prd_path ".tasks/docs/prd.txt" \
+        --arg num_tasks_raw "${num_tasks}" \
+        --arg project_name "${project_name}" \
+        --arg intake_metadata "${intake_metadata}" \
+        --arg pr_base_branch "${pr_base_branch}" \
+        --arg linear_project_id "$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.projectId')" \
+        --arg linear_prd_issue_id "$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -r '.prdIssueId')" \
+        --arg linear_team_id "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.linear_team_id')" \
+        --arg linear_agent_map "$(printf '%s' "$CTO_CREATE_LINEAR_JSON" | jq -c '.agentMap')" \
+        --arg repository_url "$(printf '%s' "$CTO_SETUP_REPO_JSON" | jq -r '.repository_url')" \
+        --arg verify "${verify}" \
+        --arg breakpoints "${breakpoints}" \
+        --arg linear_session_id "$(printf '%s' "$CTO_ENSURE_LINEAR_SESSION_JSON" | jq -r '.linear_session_id // empty')" \
+        --arg linear_issue_id "${linear_issue_id}" \
+        --arg run_id "$(printf '%s' "$CTO_REGISTER_RUN_JSON" | jq -r '.run_id // empty')" \
+        --arg model_primary_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_provider')" \
+        --arg model_primary "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.primary_model')" \
+        --arg model_fast_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_provider')" \
+        --arg model_fast "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.fast_model')" \
+        --arg model_frontier_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_provider')" \
+        --arg model_frontier "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.frontier_model')" \
+        --arg voter_1_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_1_provider')" \
+        --arg voter_1_model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_1_model')" \
+        --arg voter_2_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_2_provider')" \
+        --arg voter_2_model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_2_model')" \
+        --arg voter_3_provider "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_3_provider')" \
+        --arg voter_3_model "$(printf '%s' "$CTO_LOAD_CONFIG_JSON" | jq -r '.voter_3_model')" \
+        --arg audio_debug "${audio_debug}" \
+        '{prd_path: $prd_path, num_tasks: ($num_tasks_raw | tonumber), project_name: $project_name, intake_metadata: $intake_metadata, pr_base_branch: $pr_base_branch, linear_project_id: $linear_project_id, linear_prd_issue_id: $linear_prd_issue_id, linear_team_id: $linear_team_id, linear_agent_map: $linear_agent_map, repository_url: $repository_url, verify: $verify, breakpoints: $breakpoints, linear_session_id: $linear_session_id, linear_issue_id: $linear_issue_id, run_id: $run_id, model_primary_provider: $model_primary_provider, model_primary: $model_primary, model_fast_provider: $model_fast_provider, model_fast: $model_fast, model_frontier_provider: $model_frontier_provider, model_frontier: $model_frontier, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug}') &&
+      INTAKE_LOG="$WS/.intake/intake-sub-workflow.log"
+      lobster run --mode tool "$WS/intake/workflows/intake.lobster.yaml" --args-json "$ARGS" >"$INTAKE_LOG" 2>&1 || {
+        echo "intake sub-workflow failed — detailed log:" >&2
+        tail -200 "$INTAKE_LOG" >&2
+        "$WS/intake/scripts/workflow-step-audio.sh" "pipeline" "intake failed" "${audio_debug}" "error" "project ${project_name}"
+        exit 1
+      }
+
+  - id: verify-intake-output
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "verify-intake-output" "${audio_debug}" "project ${project_name}"
+      if [ ! -f "$root/.intake/intake-summary.json" ]; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "pipeline" "intake-output" "failed: intake-summary.json missing" "${audio_debug}" "error" "project ${project_name}"
+        echo "verify-intake-output: .intake/intake-summary.json does not exist — intake workflow produced no artifacts" >&2
+        exit 1
+      fi
+      TASK_COUNT="$(jq -r '.artifact_counts.task_count // 0' "$root/.intake/intake-summary.json" 2>/dev/null || echo 0)"
+      if [ "$TASK_COUNT" = "0" ] || [ "$TASK_COUNT" = "null" ]; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "pipeline" "intake-output" "failed: zero tasks generated" "${audio_debug}" "error" "project ${project_name}"
+        echo "verify-intake-output: intake-summary.json exists but task_count is $TASK_COUNT — intake workflow failed to generate tasks" >&2
+        cat "$root/.intake/intake-summary.json" >&2
+        exit 1
+      fi
+      "$root/intake/scripts/workflow-gate-audio.sh" "pipeline" "intake-output" "passed with ${TASK_COUNT} tasks" "${audio_debug}" "normal" "project ${project_name}"
+
+  - id: notify-pipeline-complete
+    env:
+      CTO_REGISTER_RUN_JSON: $register-run.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "notify-pipeline-complete" "${audio_debug}" "project ${project_name}"
+      RUN_ID="$(printf '%s' "$CTO_REGISTER_RUN_JSON" | jq -r '.run_id // empty')"
+      if [ -n "$RUN_ID" ]; then
+        ACTIVE_COUNT="$(sqlite3 "$root/.intake/bridge-state.db" "select count(*) from runs where run_id = '$RUN_ID';" 2>/dev/null || printf '0')"
+        if [ "$ACTIVE_COUNT" != "1" ]; then
+          echo "notify-pipeline-complete: suppressing completion notify for inactive run $RUN_ID" >&2
+          exit 0
+        fi
+      fi
+      START_EPOCH="$(cat "$root/.intake/.pipeline-start-epoch" 2>/dev/null || date +%s)"
+      ELAPSED=$(( $(date +%s) - START_EPOCH ))
+      MINS=$(( ELAPSED / 60 ))
+      SECS=$(( ELAPSED % 60 ))
+      SUMMARY_JSON="$(cat "$root/.intake/intake-summary.json" 2>/dev/null || printf '{}')"
+      TASK_COUNT="$(printf '%s' "$SUMMARY_JSON" | jq -r '.artifact_counts.task_count // 0' 2>/dev/null || echo 0)"
+      if [ "$TASK_COUNT" = "0" ] || [ "$TASK_COUNT" = "null" ]; then
+        MSG=$(jq -n \
+          --arg pn "${project_name}" \
+          --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          --arg dur "${MINS}m ${SECS}s" \
+          '"❌ **INTAKE FAILED** ❌\n\n" +
+          "🏁 Project **" + $pn + "** completed the pipeline but **produced zero artifacts**.\n" +
+          "📋 Expanded tasks: 0\n" +
+          "⏱️ Total time: " + $dur + "\n" +
+          "⏰ Failed at " + $ts + "\n\n" +
+          "🔍 Check the lobster run terminal output and OpenClaw gateway logs for errors.\n" +
+          "🦞 *The intake workflow ran but did not generate any tasks, docs, or prompts.*"')
+        META=$(jq -nc \
+          --arg step "pipeline-failed" \
+          --arg pn "${project_name}" \
+          --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          '{step: $step, project_name: $pn, time_utc: $ts, severity: "error"}')
+        echo "$MSG" | intake-util bridge-notify --from intake --to deliberation --metadata "$META" || true
+        exit 1
+      fi
+      MSG=$(jq -n \
+        --arg pn "${project_name}" \
+        --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --arg dur "${MINS}m ${SECS}s" \
+        --argjson summary "$SUMMARY_JSON" \
+        '"🎉🎉🎉 **INTAKE HANDOFF READY!** 🎉🎉🎉\n\n" +
+        "🏁 Project **" + $pn + "** has finished the full intake handoff.\n" +
+        "🧭 Decision record: `" + ($summary.decision_record_path // ".tasks/docs/design-brief.md") + "`\n" +
+        "📋 Expanded tasks: " + (($summary.artifact_counts.task_count // 0) | tostring)
+          + "  (" + (($summary.artifact_counts.subtask_count // 0) | tostring) + " subtasks, "
+          + (($summary.artifact_counts.decision_point_count // 0) | tostring) + " decision points)\n" +
+        "📝 Docs: " + (($summary.artifact_counts.doc_count // 0) | tostring)
+          + "  •  Prompts: " + (($summary.artifact_counts.prompt_count // 0) | tostring)
+          + "  •  Workflows: " + (($summary.artifact_counts.workflow_count // 0) | tostring) + "\n" +
+        "🧩 Linear issues: " + (($summary.delivery.issue_count // 0) | tostring) + "\n" +
+        (if (($summary.delivery.pr_url // "") | length) > 0
+          then "🔗 PR: " + ($summary.delivery.pr_url // "") + "\n"
+          else "" end) +
+        "⏱️ Total time: " + $dur + "\n" +
+        "⏰ Finished at " + $ts + "\n\n" +
+        "🦞 *Woohoo! The intake package is ready for implementation.* 🚀"')
+      META=$(jq -nc \
+        --arg step "pipeline-complete" \
+        --arg pn "${project_name}" \
+        --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{step: $step, project_name: $pn, time_utc: $ts}')
+      echo "$MSG" | intake-util bridge-notify --from intake --to deliberation --metadata "$META" || true
+
+  - id: deregister-run
+    env:
+      CTO_REGISTER_RUN_JSON: $register-run.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "pipeline" "deregister-run" "${audio_debug}" "project ${project_name}"
+      if [ "${INTAKE_PREFLIGHT_BRIDGES_SKIP:-}" = "true" ]; then
+        echo "deregister-run: skipped (bridges not available)" >&2
+      else
+        intake-util deregister-run \
+          --run-id "$(printf '%s' "$CTO_REGISTER_RUN_JSON" | jq -r '.run_id // empty')"
+      fi

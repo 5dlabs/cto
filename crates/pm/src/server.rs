@@ -194,6 +194,7 @@ pub fn build_router(state: AppState) -> Router {
         play_config: state.config.play.clone(),
         kube_client: state.kube_client.clone(),
         github_webhook_secret: state.config.github_webhook_secret.clone(),
+        gitlab_webhook_secret: state.config.gitlab_webhook_secret.clone(),
     });
 
     Router::new()
@@ -215,6 +216,12 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/github/webhook",
             post(crate::handlers::github_events::handle_github_events)
+                .with_state(callback_state.clone()),
+        )
+        // GitLab webhook endpoint (dual SCM support)
+        .route(
+            "/webhooks/gitlab/events",
+            post(crate::handlers::gitlab_events::handle_gitlab_events)
                 .with_state(callback_state.clone()),
         )
         // Agent interaction webhooks (from Argo Events sensors - legacy, will be removed)

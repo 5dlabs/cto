@@ -16,9 +16,9 @@
         },
         "committee": [
           { "provider": "anthropic", "model": "claude-opus-4-6" },
-          { "provider": "openai", "model": "gpt-5.2-pro" },
+          { "provider": "openai-api", "model": "gpt-5.4-pro" },
           { "provider": "anthropic", "model": "claude-sonnet-4-6" },
-          { "provider": "openai", "model": "o3-pro" },
+          { "provider": "openai-api", "model": "o3-pro" },
           { "provider": "google", "model": "gemini-3.1-pro-preview" }
         ],
         "cliModels": {
@@ -95,6 +95,23 @@
         "dependabot[bot]",
         "renovate[bot]"
       ]
+    },
+    "scm": {
+      "provider": "github",
+      "github": {
+        "host": "github.com",
+        "apiBase": "https://api.github.com",
+        "org": "5dlabs",
+        "registry": "ghcr.io/5dlabs",
+        "appName": "5DLabs-Morgan"
+      },
+      "gitlab": {
+        "host": "git.5dlabs.ai",
+        "apiBase": "https://git.5dlabs.ai/api/v4",
+        "group": "5dlabs",
+        "registry": "registry.5dlabs.ai/5dlabs",
+        "tokenEnvVar": "GITLAB_TOKEN"
+      }
     }
   },
   "agents": {

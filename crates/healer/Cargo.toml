@@ -56,6 +56,10 @@ handlebars = { workspace = true }
 
 # Notifications
 notify = { path = "../notify" }
+
+# Unified SCM abstraction (GitHub + GitLab)
+scm = { path = "../scm" }
+urlencoding = "2.1"
 acp-runtime = { path = "../acp-runtime" }
 cto-config = { path = "../config", package = "config" }
 

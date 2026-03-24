@@ -6,6 +6,124 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::{Arc, RwLock};
 
+// =============================================================================
+// SCM Provider Configuration
+// =============================================================================
+
+/// Which source control management platform to use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScmProvider {
+    GitHub,
+    GitLab,
+}
+
+impl Default for ScmProvider {
+    fn default() -> Self {
+        Self::GitHub
+    }
+}
+
+impl std::fmt::Display for ScmProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GitHub => write!(f, "github"),
+            Self::GitLab => write!(f, "gitlab"),
+        }
+    }
+}
+
+impl std::str::FromStr for ScmProvider {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "github" => Ok(Self::GitHub),
+            "gitlab" => Ok(Self::GitLab),
+            other => Err(format!("unknown SCM provider: {other}")),
+        }
+    }
+}
+
+/// Unified SCM configuration for GitHub and GitLab side-by-side operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScmConfig {
+    /// Active provider (override via `CTO_SCM_PROVIDER` env var).
+    pub provider: ScmProvider,
+    /// Hostname of the SCM (e.g. `github.com` or `git.5dlabs.ai`).
+    pub host: String,
+    /// Base URL for REST API calls.
+    pub api_base: String,
+    /// Organization (GitHub) or group (GitLab).
+    pub org_or_group: String,
+    /// Container registry prefix (e.g. `ghcr.io/5dlabs`).
+    pub registry: String,
+    /// Auth token for API calls.
+    pub token: Option<String>,
+    /// Webhook verification secret.
+    pub webhook_secret: Option<String>,
+}
+
+impl Default for ScmConfig {
+    fn default() -> Self {
+        Self::from_env()
+    }
+}
+
+impl ScmConfig {
+    /// Build config from environment, defaulting to GitHub.
+    #[must_use]
+    pub fn from_env() -> Self {
+        let provider: ScmProvider = env::var("CTO_SCM_PROVIDER")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_default();
+
+        match provider {
+            ScmProvider::GitHub => Self {
+                provider,
+                host: env::var("GITHUB_HOST").unwrap_or_else(|_| "github.com".to_string()),
+                api_base: env::var("GITHUB_API_BASE")
+                    .unwrap_or_else(|_| "https://api.github.com".to_string()),
+                org_or_group: env::var("GITHUB_DEFAULT_ORG")
+                    .unwrap_or_else(|_| "5dlabs".to_string()),
+                registry: env::var("GITHUB_REGISTRY")
+                    .unwrap_or_else(|_| "ghcr.io/5dlabs".to_string()),
+                token: env::var("GITHUB_TOKEN").ok().filter(|s| !s.is_empty()),
+                webhook_secret: env::var("GITHUB_WEBHOOK_SECRET")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+            },
+            ScmProvider::GitLab => Self {
+                provider,
+                host: env::var("GITLAB_HOST")
+                    .unwrap_or_else(|_| "git.5dlabs.ai".to_string()),
+                api_base: env::var("GITLAB_API_BASE")
+                    .unwrap_or_else(|_| "https://git.5dlabs.ai/api/v4".to_string()),
+                org_or_group: env::var("GITLAB_GROUP")
+                    .unwrap_or_else(|_| "5dlabs".to_string()),
+                registry: env::var("GITLAB_REGISTRY")
+                    .unwrap_or_else(|_| "registry.5dlabs.ai/5dlabs".to_string()),
+                token: env::var("GITLAB_TOKEN").ok().filter(|s| !s.is_empty()),
+                webhook_secret: env::var("GITLAB_WEBHOOK_SECRET")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
+            },
+        }
+    }
+
+    /// Whether the active provider is GitHub.
+    #[must_use]
+    pub fn is_github(&self) -> bool {
+        self.provider == ScmProvider::GitHub
+    }
+
+    /// Whether the active provider is GitLab.
+    #[must_use]
+    pub fn is_gitlab(&self) -> bool {
+        self.provider == ScmProvider::GitLab
+    }
+}
+
 /// PM webhook handler configuration.
 #[derive(Clone)]
 pub struct Config {
@@ -36,6 +154,10 @@ pub struct Config {
     pub skip_signature_verification: bool,
     /// GitHub webhook secret for HMAC-SHA256 signature verification.
     pub github_webhook_secret: Option<String>,
+    /// GitLab webhook secret for token verification.
+    pub gitlab_webhook_secret: Option<String>,
+    /// Unified SCM provider configuration.
+    pub scm: ScmConfig,
 }
 
 // =============================================================================
@@ -360,6 +482,10 @@ impl Default for Config {
             github_webhook_secret: env::var("GITHUB_WEBHOOK_SECRET")
                 .ok()
                 .filter(|s| !s.is_empty()),
+            gitlab_webhook_secret: env::var("GITLAB_WEBHOOK_SECRET")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            scm: ScmConfig::from_env(),
         }
     }
 }

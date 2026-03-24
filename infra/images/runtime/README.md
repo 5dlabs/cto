@@ -136,6 +136,7 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 ### Development & Build Tools
 - **TaskMaster AI** - AI-powered task management
 - **Tools Client** - MCP server integration
+- **@google/stitch-sdk** - Stitch AI SDK available via global npm install
 - **Pre-commit** - Git hooks framework
 - **SQLFluff** - SQL linter and formatter
 - **Pip-tools** - Python dependency management

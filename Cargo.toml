@@ -15,6 +15,7 @@ members = [
     "crates/pm",
     "crates/pm-lite",
     "crates/research",
+    "crates/scm",
     "crates/tenant-operator",
     "crates/tools",
     "crates/utils",
