@@ -60,7 +60,7 @@ export function AgentCard({ agent }: AgentCardProps) {
         }
       }}
       className={cn(
-        "group block w-full text-left",
+        "group block w-full h-full text-left",
         hasDetails ? "cursor-pointer touch-manipulation" : "cursor-default"
       )}
       style={{ perspective: "1000px" }}
@@ -71,7 +71,7 @@ export function AgentCard({ agent }: AgentCardProps) {
       aria-label={hasDetails ? `${agent.name} card${flipped ? ", tap to return" : ", flip for details"}` : undefined}
     >
       <motion.div
-        className="relative w-full"
+        className="relative h-full w-full"
         style={{ transformStyle: "preserve-3d", perspective: "1000px", willChange: "transform" }}
         animate={{ rotateY: flipped ? 180 : 0 }}
         transition={{ duration: 0.5, ease: "easeInOut" }}
@@ -80,7 +80,7 @@ export function AgentCard({ agent }: AgentCardProps) {
         {/* Front: avatar, name, role, description — natural height drives container */}
         <div
           className={cn(
-            "flex items-start gap-3 sm:gap-4 lg:gap-5 rounded-xl p-3 sm:p-4 lg:p-5",
+            "flex h-full items-start gap-3 sm:gap-4 lg:gap-5 rounded-xl p-3 sm:p-4 lg:p-5",
             "bg-card border border-border",
             "hover:border-primary/50 transition-colors duration-300"
           )}

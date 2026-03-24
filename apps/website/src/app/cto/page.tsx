@@ -340,7 +340,7 @@ export default function Home() {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
               {[
-                { name: "On-Premises", region: "Your hardware", desc: "USB key — plug in and run", own: true },
+                { name: "On-Premises", region: "Your hardware", desc: "USB key — plug in and run" },
                 { name: "Latitude.sh", region: "Americas, Europe, Asia", desc: "Global bare-metal cloud" },
                 { name: "Hetzner", region: "Germany, Finland", desc: "European dedicated servers" },
                 { name: "OVH", region: "Europe, Americas, Asia", desc: "Global bare-metal & cloud" },
