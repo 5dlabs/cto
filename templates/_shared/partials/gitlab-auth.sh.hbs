@@ -1,0 +1,30 @@
+# GitLab Authentication (PAT-based)
+# Parallel to github-auth.sh.hbs for dual SCM support.
+GL_HOST="${GITLAB_HOST:-git.5dlabs.ai}"
+
+if [ -n "${GITLAB_TOKEN:-}" ]; then
+  echo "GitLab token found, configuring git credentials" >&2
+
+  # Configure git to use the token for HTTPS operations
+  git config --global credential.helper store
+  echo "https://oauth2:${GITLAB_TOKEN}@${GL_HOST}" > ~/.git-credentials
+  chmod 600 ~/.git-credentials
+
+  # URL rewrite: git@host: -> https://host/
+  git config --global "url.https://${GL_HOST}/.insteadOf" "git@${GL_HOST}:"
+
+  # Set bot identity
+  git config --global user.name "{{github_app}}[bot]"
+  git config --global user.email "bot@${GL_HOST}"
+
+  # Configure glab CLI if available
+  if command -v glab >/dev/null 2>&1; then
+    export GITLAB_TOKEN
+    export GITLAB_HOST="$GL_HOST"
+    glab auth login --hostname "$GL_HOST" --token "$GITLAB_TOKEN" 2>/dev/null || true
+  fi
+
+  echo "GitLab authentication configured for ${GL_HOST}" >&2
+else
+  echo "WARNING: No GITLAB_TOKEN set — GitLab API calls will fail" >&2
+fi

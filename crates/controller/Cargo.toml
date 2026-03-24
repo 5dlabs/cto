@@ -75,6 +75,9 @@ uuid = { version = "1.22", features = ["v4", "serde"] }
 # Notifications
 notify = { path = "../notify" }
 
+# Unified SCM abstraction (GitHub + GitLab)
+scm = { path = "../scm" }
+
 # CTO config types
 cto-config = { path = "../config", package = "config" }
 acp-runtime = { path = "../acp-runtime" }

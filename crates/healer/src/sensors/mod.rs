@@ -4,5 +4,7 @@
 //! remediation when problems are detected.
 
 pub mod github_actions;
+pub mod gitlab_pipelines;
 
 pub use github_actions::{GitHubActionsSensor, SensorConfig, WorkflowFailure};
+pub use gitlab_pipelines::{GitLabPipelineSensor, GitLabSensorConfig, PipelineFailure};

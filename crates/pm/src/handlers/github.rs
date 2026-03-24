@@ -10,6 +10,7 @@ use axum::{
     response::Json,
 };
 use kube::{api::PostParams, Api};
+use scm::ScmClient;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -921,6 +922,49 @@ pub async fn fetch_tasks_json_from_repo(
         "Successfully fetched tasks.json"
     );
 
+    Ok(tasks_json)
+}
+
+/// Fetch tasks.json using the unified SCM client (supports GitHub and GitLab).
+pub async fn fetch_tasks_json_from_scm(
+    scm_client: &dyn ScmClient,
+    repo_full_name: &str,
+    commit_sha: Option<&str>,
+    project_dir: &str,
+) -> anyhow::Result<TasksJson> {
+    use anyhow::Context;
+
+    let (owner, repo) = scm_client.parse_repo_from_url(
+        &scm_client.repo_url(
+            repo_full_name.split('/').next().unwrap_or(""),
+            repo_full_name.split('/').nth(1).unwrap_or(""),
+        ),
+    ).unwrap_or_else(|_| {
+        let parts: Vec<&str> = repo_full_name.splitn(2, '/').collect();
+        (parts.first().unwrap_or(&"").to_string(), parts.get(1).unwrap_or(&"").to_string())
+    });
+
+    let file_path = format!("{project_dir}/.tasks/tasks/tasks.json");
+    let ref_ = commit_sha.unwrap_or("main");
+
+    info!(
+        owner = %owner,
+        repo = %repo,
+        file_path = %file_path,
+        ref_ = %ref_,
+        "Fetching tasks.json via SCM client"
+    );
+
+    let content = scm_client
+        .get_file_contents(&owner, &repo, &file_path, ref_)
+        .await
+        .context("Failed to fetch tasks.json via SCM")?;
+
+    let json_str = String::from_utf8(content).context("tasks.json is not valid UTF-8")?;
+    let tasks_json: TasksJson = serde_json::from_str(&json_str)
+        .context("Failed to parse tasks.json")?;
+
+    info!(task_count = tasks_json.tasks.len(), "Fetched tasks.json via SCM");
     Ok(tasks_json)
 }
 

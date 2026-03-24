@@ -73,6 +73,8 @@ pub struct CallbackState {
     pub kube_client: kube::Client,
     /// GitHub webhook secret for HMAC-SHA256 signature verification.
     pub github_webhook_secret: Option<String>,
+    /// GitLab webhook secret for `X-Gitlab-Token` verification.
+    pub gitlab_webhook_secret: Option<String>,
 }
 
 /// Handle intake workflow completion callback.

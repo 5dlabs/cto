@@ -363,6 +363,10 @@ pub struct AgentDefinition {
     #[serde(rename = "githubApp")]
     pub github_app: String,
 
+    /// Generic SCM identity (provider-agnostic, replaces github_app for new code)
+    #[serde(default, rename = "scmIdentity")]
+    pub scm_identity: Option<String>,
+
     /// Preferred CLI type for this agent (e.g., "Codex", "Claude")
     #[serde(default, alias = "cliType", alias = "cli_type")]
     pub cli: Option<String>,
@@ -632,7 +636,10 @@ impl Default for ControllerConfig {
                 cli_images: HashMap::new(),
                 cli_providers: HashMap::new(),
                 agent_cli_configs: HashMap::new(),
-                image_pull_secrets: vec!["ghcr-secret".to_string()],
+                image_pull_secrets: vec![
+                    "ghcr-secret".to_string(),
+                    "gitlab-registry-secret".to_string(),
+                ],
                 service_account_name: None,
             },
             agents: HashMap::new(),
@@ -794,6 +801,7 @@ cleanup:
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                scm_identity: None,
                 cli: Some("Codex".to_string()),
                 model: Some("gpt-5-codex".to_string()),
                 max_tokens: Some(64000),

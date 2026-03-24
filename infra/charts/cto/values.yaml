@@ -920,6 +920,11 @@ webhooks:
     mode: gateway
     host: github.public.5dlabs.ai
     path: /github/webhook
+    # GitLab project webhooks → PM server (dual SCM); templates add routes parallel to GitHub
+    gitlab:
+      enabled: true
+      host: cto.5dlabs.ai
+      path: /webhooks/gitlab/events
     gateway:
       name: public-gateway
       namespace: cto

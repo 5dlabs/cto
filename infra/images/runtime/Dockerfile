@@ -76,6 +76,11 @@ RUN --mount=type=cache,target=/root/.cache \
     npm install -g npm@latest && \
     rm -rf /var/lib/apt/lists/*
 
+# Install Stitch SDK globally so design-intake dependencies
+# are always present in runtime images.
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g --no-fund @google/stitch-sdk
+
 # Install GitHub CLI (essential for PR operations)
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     ARCH=$(dpkg --print-architecture) && \
@@ -84,6 +89,15 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     apt-get -o Acquire::ForceIPv4=true update && \
     apt-get -o Acquire::ForceIPv4=true install -y gh && \
     rm -rf /var/lib/apt/lists/*
+
+# GitLab CLI (glab) for dual SCM support
+RUN GLAB_VERSION="1.46.1" && \
+    ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
+    curl -sLo /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_Linux_${ARCH}.tar.gz" && \
+    tar -xzf /tmp/glab.tar.gz -C /tmp && \
+    mv /tmp/bin/glab /usr/local/bin/glab && \
+    chmod +x /usr/local/bin/glab && \
+    rm -rf /tmp/glab* /tmp/bin
 
 # Install CTO binaries from pre-downloaded files in build context
 COPY .docker-binaries/ /tmp/binaries/
@@ -148,7 +162,7 @@ ENV DEVCONTAINER=true
 FROM minimal-base AS minimal
 
 # Verify essential tools
-RUN node --version && npm --version && git --version && gh --version && op --version
+RUN node --version && npm --version && git --version && gh --version && glab --version && op --version
 
 # =============================================================================
 # TRADER TARGET (for autonomous trading agent)
@@ -310,6 +324,10 @@ RUN --mount=type=cache,target=/root/.cache \
   && npm install -g npm@latest \
   && rm -rf /var/lib/apt/lists/*
 
+# Keep Stitch SDK available in full runtime variants too.
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install -g --no-fund @google/stitch-sdk
+
 # Enable corepack for pnpm only (skip yarn since we use system yarn)
 RUN if command -v corepack >/dev/null 2>&1; then \
     corepack enable pnpm && \
@@ -398,6 +416,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/* && \
     gh extension install github/gh-copilot 2>/dev/null || true && \
     gh extension install github/gh-codeql 2>/dev/null || true
+
+# GitLab CLI (glab) for dual SCM support
+RUN GLAB_VERSION="1.46.1" && \
+    ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
+    curl -sLo /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_Linux_${ARCH}.tar.gz" && \
+    tar -xzf /tmp/glab.tar.gz -C /tmp && \
+    mv /tmp/bin/glab /usr/local/bin/glab && \
+    chmod +x /usr/local/bin/glab && \
+    rm -rf /tmp/glab* /tmp/bin
 
 # AWS CLI v2
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \

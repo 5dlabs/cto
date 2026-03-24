@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 use octocrab::Octocrab;
+use scm::ScmClient;
 
 /// Creates pull requests on GitHub.
 pub struct PrCreator {
@@ -78,4 +79,28 @@ impl PrCreator {
 
         Ok(())
     }
+}
+
+/// Create a pull request using the unified SCM client (supports GitHub and GitLab).
+pub async fn create_pr_via_scm(
+    scm_client: &dyn ScmClient,
+    owner: &str,
+    repo: &str,
+    title: &str,
+    body: &str,
+    head: &str,
+    base: &str,
+) -> Result<String> {
+    let mr = scm_client
+        .create_mr(owner, repo, title, body, head, base)
+        .await
+        .context("Failed to create MR via SCM client")?;
+
+    tracing::info!(
+        mr_url = %mr.url,
+        provider = %scm_client.provider(),
+        "Created merge request via SCM"
+    );
+
+    Ok(mr.url)
 }

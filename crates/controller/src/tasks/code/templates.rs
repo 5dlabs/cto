@@ -5335,6 +5335,7 @@ mod tests {
             "test-agent".to_string(),
             AgentDefinition {
                 github_app: "Test-App".to_string(),
+                scm_identity: None,
                 cli: None,
                 model: None,
                 max_tokens: None,
@@ -5361,6 +5362,7 @@ mod tests {
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                scm_identity: None,
                 cli: None,
                 model: None,
                 max_tokens: None,
@@ -5454,6 +5456,7 @@ mod tests {
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                scm_identity: None,
                 cli: None,
                 model: None,
                 max_tokens: None,
@@ -5561,6 +5564,7 @@ mod tests {
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                scm_identity: None,
                 cli: None,
                 model: None,
                 max_tokens: None,
@@ -5617,6 +5621,7 @@ mod tests {
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                scm_identity: None,
                 cli: None,
                 model: None,
                 max_tokens: None,
@@ -5691,6 +5696,7 @@ mod tests {
             "cipher".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Cipher".to_string(),
+                scm_identity: None,
                 cli: None,
                 model: None,
                 max_tokens: None,
@@ -5740,6 +5746,7 @@ mod tests {
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                scm_identity: None,
                 cli: None,
                 model: None,
                 max_tokens: None,

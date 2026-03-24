@@ -63,6 +63,9 @@ regex = "1"
 # YAML frontmatter parsing
 serde_yaml = "0.9"
 
+# Unified SCM abstraction (GitHub + GitLab)
+scm = { path = "../scm" }
+
 # Shared CTO config types
 config = { path = "../config" }
 acp-runtime = { path = "../acp-runtime" }

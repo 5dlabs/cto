@@ -55,6 +55,9 @@ chromiumoxide = { version = "0.8", features = ["tokio-runtime"], default-feature
 # GitHub API for PR creation
 octocrab = "0.49"
 
+# Unified SCM abstraction (GitHub + GitLab)
+scm = { path = "../scm" }
+
 # File system utilities
 walkdir = "2"
 urlencoding = "2"

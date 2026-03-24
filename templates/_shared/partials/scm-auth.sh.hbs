@@ -1,0 +1,12 @@
+# SCM Authentication Dispatcher
+# Selects GitHub or GitLab auth based on CTO_SCM_PROVIDER env var.
+SCM_PROVIDER="${CTO_SCM_PROVIDER:-github}"
+
+case "$SCM_PROVIDER" in
+  gitlab)
+    {{> gitlab-auth}}
+    ;;
+  github|*)
+    {{> github-auth}}
+    ;;
+esac

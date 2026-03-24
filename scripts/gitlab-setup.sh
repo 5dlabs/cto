@@ -364,6 +364,50 @@ setup_ci_variables() {
     fi
 }
 
+register_pm_webhook() {
+    log_header "Registering PM Webhook"
+
+    local project_id
+    project_id=$(curl -sf -H "PRIVATE-TOKEN: ${TOKEN}" \
+        "${GITLAB_API}/projects?search=cto" | jq -r ".[] | select(.path == \"cto\" and .namespace.path == \"${GITLAB_GROUP}\") | .id // empty")
+
+    if [[ -z "$project_id" ]]; then
+        log_warning "CTO project not found — skipping webhook registration"
+        return
+    fi
+
+    local webhook_url="${PM_WEBHOOK_URL:-https://cto.5dlabs.ai/webhooks/gitlab/events}"
+    local webhook_secret
+    webhook_secret=$(kubectl exec -n openbao openbao-0 -- bao kv get -field=webhook-secret secret/gitlab 2>/dev/null || echo "")
+
+    # Check if webhook already exists
+    local existing
+    existing=$(curl -sf -H "PRIVATE-TOKEN: ${TOKEN}" \
+        "${GITLAB_API}/projects/${project_id}/hooks" | jq -r ".[] | select(.url == \"${webhook_url}\") | .id // empty")
+
+    if [[ -n "$existing" ]]; then
+        log_success "PM webhook already registered (ID: ${existing})"
+        return
+    fi
+
+    local token_param=""
+    if [[ -n "$webhook_secret" ]]; then
+        token_param=",\"token\":\"${webhook_secret}\""
+    fi
+
+    curl -sf -H "PRIVATE-TOKEN: ${TOKEN}" \
+        -H "Content-Type: application/json" \
+        "${GITLAB_API}/projects/${project_id}/hooks" \
+        -d "{
+            \"url\": \"${webhook_url}\",
+            \"merge_requests_events\": true,
+            \"pipeline_events\": true,
+            \"note_events\": true,
+            \"push_events\": false,
+            \"enable_ssl_verification\": true${token_param}
+        }" > /dev/null 2>&1 && log_success "PM webhook registered" || log_warning "Failed to register PM webhook"
+}
+
 # Store GitLab secrets in OpenBao
 seed_gitlab_secrets() {
     log_header "Seeding GitLab Secrets in OpenBao"
@@ -424,6 +468,7 @@ main() {
     setup_runner
     setup_scheduled_pipeline
     setup_ci_variables
+    register_pm_webhook
 
     echo ""
     log_header "Setup Complete"

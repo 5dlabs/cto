@@ -1,674 +1,1076 @@
 name: intake
-description: >
-  PRD intake pipeline — parses a PRD (or design brief) into tasks, analyzes
-  complexity, expands into subtasks, runs 5-model quality voting, generates
-  documentation and prompts, then commits and opens a PR.
-inputs:
-  - name: prd_content
-    type: string
-    description: "Full PRD or design brief markdown content"
-  - name: prd_path
-    type: string
-    description: "Path to the PRD file (for reference in docs)"
-  - name: num_tasks
-    type: number
-    default: 10
-    description: "Target number of top-level tasks to generate"
-  - name: project_name
-    type: string
-    default: "project"
-    description: "Short project slug used for branch names and PR titles"
-  - name: intake_metadata
-    type: string
-    default: ""
-    description: "JSON string of Linear metadata (session_id, prd_issue_id, etc.) for PR body"
-  - name: pr_base_branch
-    type: string
-    default: "main"
-    description: "Base branch for the PR"
-  - name: codebase_context
-    type: string
-    default: ""
-    description: "Structured codebase context from codebase-analysis step (empty for greenfield)"
-  - name: infrastructure_context
-    type: string
-    default: ""
-    description: "Available operators and services (built from operator catalog)"
-  - name: linear_project_id
-    type: string
-    default: ""
-    description: "Linear project ID (from create-linear-project step)"
-  - name: linear_prd_issue_id
-    type: string
-    default: ""
-    description: "Linear PRD issue ID (from create-linear-project step)"
-  - name: linear_team_id
-    type: string
-    default: ""
-    description: "Linear team ID (from cto-config.json)"
-  - name: linear_agent_map
-    type: string
-    default: "{}"
-    description: "JSON map of agent name → Linear user ID"
-  - name: repository_url
-    type: string
-    default: ""
-    description: "Repository URL for linking to generated prompt files"
-  - name: tool_context
-    type: string
-    default: ""
-    description: "Discovered MCP tools from config and cluster (from discover-tools step)"
-  - name: verify
-    type: string
+
+args:
+  audio_debug:
     default: "true"
-    description: "When true, validate outputs after each major step"
-  - name: breakpoints
-    type: string
-    default: "false"
-    description: "When true, pause for human approval at key checkpoints"
-  - name: linear_session_id
-    type: string
-    default: ""
-    description: "Linear session ID for activity tracking"
-  - name: linear_issue_id
-    type: string
-    default: ""
-    description: "Linear issue ID for plan updates"
-  - name: run_id
-    type: string
-    default: ""
-    description: "Pipeline run ID for registration/deregistration"
-  - name: model_primary_provider
-    type: string
-    default: "anthropic"
-  - name: model_primary
-    type: string
-    default: "claude-sonnet-4-6"
-  - name: model_fast_provider
-    type: string
-    default: "anthropic"
-  - name: model_fast
-    type: string
-    default: "claude-sonnet-4-6"
-  - name: model_frontier_provider
-    type: string
-    default: "anthropic"
-  - name: model_frontier
-    type: string
-    default: "claude-opus-4-6"
-  - name: voter_1_provider
-    type: string
-    default: "anthropic"
-  - name: voter_1_model
-    type: string
-    default: "claude-opus-4-6"
-  - name: voter_2_provider
-    type: string
-    default: "openai"
-  - name: voter_2_model
-    type: string
-    default: "gpt-5.2-pro"
-  - name: voter_3_provider
-    type: string
-    default: "anthropic"
-  - name: voter_3_model
-    type: string
-    default: "claude-sonnet-4-6"
-  - name: voter_4_provider
-    type: string
-    default: "openai"
-  - name: voter_4_model
-    type: string
-    default: "o3-pro"
-  - name: voter_5_provider
-    type: string
-    default: "google"
-  - name: voter_5_model
-    type: string
-    default: "gemini-3.1-pro-preview"
+  prd_content:
+    default: ''
+  prd_path:
+    default: ''
+  num_tasks:
+    default: 10
+  project_name:
+    default: project
+  intake_metadata:
+    default: ''
+  pr_base_branch:
+    default: main
+  codebase_context_file:
+    default: '.intake/contexts/codebase.txt'
+  infrastructure_context_file:
+    default: '.intake/contexts/infrastructure.txt'
+  design_context_file:
+    default: '.intake/contexts/design.txt'
+  linear_project_id:
+    default: ''
+  linear_prd_issue_id:
+    default: ''
+  linear_team_id:
+    default: ''
+  linear_agent_map:
+    default: '{}'
+  repository_url:
+    default: ''
+  tool_context_file:
+    default: '.intake/contexts/tools.txt'
+  verify:
+    default: 'true'
+  breakpoints:
+    default: 'false'
+  linear_session_id:
+    default: ''
+  linear_issue_id:
+    default: ''
+  run_id:
+    default: ''
+  model_primary_provider:
+    default: anthropic
+  model_primary:
+    default: claude-sonnet-4-6
+  model_fast_provider:
+    default: anthropic
+  model_fast:
+    default: claude-sonnet-4-6
+  model_frontier_provider:
+    default: anthropic
+  model_frontier:
+    default: claude-opus-4-6
+  voter_1_provider:
+    default: anthropic
+  voter_1_model:
+    default: claude-opus-4-6
+  voter_2_provider:
+    default: openai
+  voter_2_model:
+    default: gpt-5.2-pro
+  voter_3_provider:
+    default: anthropic
+  voter_3_model:
+    default: claude-sonnet-4-6
 
 steps:
-  # ─────────────────────────────────────────────────────────
-  # Run registration
-  # ─────────────────────────────────────────────────────────
-  - name: register-run
-    when: "{{inputs.run_id}}"
-    command: >
-      intake-util register-run
-        --run-id "{{inputs.run_id}}"
-        --session-id "{{inputs.linear_session_id}}"
-        --workflow intake
+  - id: register-run
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "register-run" "${audio_debug}"
+      intake-util register-run \
+        --run-id "${run_id}" \
+        --agent intake \
+        --session-id "${linear_session_id}" \
+        --workflow intake || echo "register-run: skipped (non-fatal)" >&2
 
-  - name: linear-plan-parsing
-    when: "{{inputs.linear_issue_id}}"
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --issue-id "{{inputs.linear_issue_id}}"
-        --type plan
-        --title "Phase: PRD Parsing & Analysis"
-        --body "Starting PRD parse and complexity analysis"
+  - id: linear-plan-parsing
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-plan-parsing" "${audio_debug}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --issue-id "${linear_issue_id}" \
+        --type plan \
+        --title "Phase: PRD Parsing & Analysis" \
+        --body "Starting PRD parse and complexity analysis" || true
 
-  - name: parse-prd
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/parse-prd-system.md}}\n\n{{prompts/parse-prd-user.md}}",
-        "input": {
-          "prd_content": "{{inputs.prd_content}}",
-          "codebase_context": "{{inputs.codebase_context}}",
-          "num_tasks": {{inputs.num_tasks}},
-          "next_id": 1
-        },
-        "schema": "{{schemas/generated-task.schema.json}}",
-        "provider": "{{inputs.model_primary_provider}}",
-        "model": "{{inputs.model_primary}}"
-      }'
+  - id: parse-prd
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "parse-prd" "${audio_debug}"
+      if [ ! -s "$root/.intake/run-prd-for-intake.txt" ]; then
+        echo "parse-prd: FATAL — .intake/run-prd-for-intake.txt is missing or empty" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: PRD file missing" "${audio_debug}" "error"
+        exit 1
+      fi
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/parse-prd-system.md" \
+        --rawfile usr "$root/intake/prompts/parse-prd-user.md" \
+        --rawfile prd "$root/.intake/run-prd-for-intake.txt" \
+        --rawfile codebase "$root/.intake/contexts/codebase.txt" \
+        --rawfile design_context "$root/.intake/contexts/design.txt" \
+        --arg num_tasks "${num_tasks}" \
+        --arg schema "$root/intake/schemas/generated-task.schema.json" \
+        --arg provider "${model_primary_provider}" \
+        --arg model "${model_primary}" \
+        '{ "prompt": ($sys + "\n\n" + $usr),
+           "input": { "prd_content": $prd, "codebase_context": $codebase, "design_context": $design_context, "num_tasks": ($num_tasks | tonumber), "next_id": 1 },
+           "schema": $schema, "provider": $provider, "model": $model }') || {
+        echo "parse-prd: FATAL — failed to build LLM args (jq error)" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: jq args" "${audio_debug}" "error"
+        exit 1
+      }
+      OUTPUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
+        echo "parse-prd: FATAL — openclaw.invoke failed after retries" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: openclaw.invoke error" "${audio_debug}" "error"
+        exit 1
+      }
+      if [ -z "$OUTPUT" ] || ! printf '%s' "$OUTPUT" | jq -e 'type' >/dev/null 2>&1; then
+        echo "parse-prd: FATAL — openclaw.invoke returned empty or invalid JSON" >&2
+        printf '%s\n' "$OUTPUT" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "parse-prd" "failed: empty or invalid output" "${audio_debug}" "error"
+        exit 1
+      fi
+      printf '%s' "$OUTPUT"
 
-  - name: verify-parse-prd
-    when: "{{inputs.verify}}"
-    depends_on: [parse-prd]
-    command: >
-      echo '${{ steps.parse-prd.output }}' |
-      intake-util validate --type generated-task
+  - id: verify-parse-prd
+    env:
+      CTO_PARSE_PRD_OUT: $parse-prd.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-parse-prd" "${audio_debug}"
+      if [ -z "$CTO_PARSE_PRD_OUT" ]; then
+        echo "verify-parse-prd: FATAL — parse-prd produced no output" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-parse-prd" "failed: empty output from parse-prd" "${audio_debug}" "error"
+        exit 1
+      fi
+      TASK_COUNT=$(printf '%s' "$CTO_PARSE_PRD_OUT" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo 0)
+      if [ "$TASK_COUNT" = "0" ]; then
+        echo "verify-parse-prd: FATAL — parse-prd returned 0 tasks" >&2
+        printf 'Output was: %.500s\n' "$CTO_PARSE_PRD_OUT" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-parse-prd" "failed: zero tasks parsed" "${audio_debug}" "error"
+        exit 1
+      fi
+      printf '%s' "$CTO_PARSE_PRD_OUT" | intake-util validate --type generated-task
 
-  - name: breakpoint-parse-prd
-    when: "{{inputs.breakpoints}}"
-    depends_on: [verify-parse-prd]
-    approval:
-      message: "Review parse-prd output"
+  - id: breakpoint-parse-prd
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "breakpoint-parse-prd" "${audio_debug}"
+      if [ "${breakpoints}" = "true" ] || [ "${breakpoints}" = "1" ]; then
+        echo "breakpoint-parse-prd: breakpoint reached — manual approval required" >&2
+      fi
+      printf '%s\n' '{"breakpoint":"parse-prd","skipped":true}'
 
-  - name: linear-activity-parse-prd
-    when: "{{inputs.linear_session_id}}"
-    depends_on: [parse-prd]
-    command: >
-      TASK_COUNT=$(echo '${{ steps.parse-prd.output }}' | jq 'length') &&
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "PRD Parsed"
-        --body "Parsed PRD into ${TASK_COUNT} tasks"
+  - id: linear-activity-parse-prd
+    env:
+      CTO_PARSE_PRD_OUT: $parse-prd.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-parse-prd" "${audio_debug}"
+      TASK_COUNT=$(printf '%s' "$CTO_PARSE_PRD_OUT" | jq 'length')
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --title "PRD Parsed" \
+        --body "Parsed PRD into ${TASK_COUNT} tasks" || true
 
-  - name: analyze-complexity
-    depends_on: [parse-prd]
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/analyze-complexity-system.md}}",
-        "input": { "tasks": ${{ steps.parse-prd.output }} },
-        "schema": "{{schemas/complexity-analysis.schema.json}}",
-        "provider": "{{inputs.model_primary_provider}}",
-        "model": "{{inputs.model_primary}}"
-      }'
+  - id: analyze-complexity
+    env:
+      CTO_PARSE_PRD_OUT: $parse-prd.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "analyze-complexity" "${audio_debug}"
+      if [ -z "$CTO_PARSE_PRD_OUT" ]; then
+        echo "analyze-complexity: FATAL — no parsed tasks available (parse-prd output empty)" >&2
+        exit 1
+      fi
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/analyze-complexity-system.md" \
+        --argjson tasks "$(printf '%s' "$CTO_PARSE_PRD_OUT")" \
+        --arg schema "$root/intake/schemas/complexity-analysis.schema.json" \
+        --arg provider "${model_primary_provider}" \
+        --arg model "${model_primary}" \
+        '{ "prompt": $sys,
+           "input": { "tasks": $tasks },
+           "schema": $schema, "provider": $provider, "model": $model }') || {
+        echo "analyze-complexity: FATAL — jq args build failed" >&2; exit 1; }
+      OUTPUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
+        echo "analyze-complexity: FATAL — openclaw.invoke failed after retries" >&2; exit 1; }
+      if [ -z "$OUTPUT" ]; then
+        echo "analyze-complexity: FATAL — openclaw.invoke returned empty output" >&2; exit 1; fi
+      printf '%s' "$OUTPUT"
 
-  - name: verify-analyze-complexity
-    when: "{{inputs.verify}}"
-    depends_on: [analyze-complexity]
-    command: >
-      echo '${{ steps.analyze-complexity.output }}' |
-      intake-util validate --type complexity-analysis
+  - id: verify-analyze-complexity
+    env:
+      CTO_ANALYZE_COMPLEXITY_OUT: $analyze-complexity.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-analyze-complexity" "${audio_debug}"
+      printf '%s' "$CTO_ANALYZE_COMPLEXITY_OUT" | intake-util validate --type complexity-analysis
 
-  - name: breakpoint-analyze-complexity
-    when: "{{inputs.breakpoints}}"
-    depends_on: [verify-analyze-complexity]
-    approval:
-      message: "Review analyze-complexity output"
+  - id: breakpoint-analyze-complexity
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "breakpoint-analyze-complexity" "${audio_debug}"
+      printf '%s\n' '{"breakpoint":"analyze-complexity","skipped":true}'
 
-  - name: linear-activity-analyze-complexity
-    when: "{{inputs.linear_session_id}}"
-    depends_on: [analyze-complexity]
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Complexity Analyzed"
-        --body '${{ steps.analyze-complexity.output }}'
+  - id: linear-activity-analyze-complexity
+    env:
+      CTO_ANALYZE_COMPLEXITY_OUT: $analyze-complexity.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-analyze-complexity" "${audio_debug}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --title "Complexity Analyzed" \
+        --body "$(printf '%s' "$CTO_ANALYZE_COMPLEXITY_OUT")" || true
 
-  - name: review-tasks
-    depends_on: [analyze-complexity]
-    approval:
-      message: "Review generated tasks and complexity analysis before expanding"
-      show:
-        - tasks: ${{ steps.parse-prd.output }}
-        - complexity: ${{ steps.analyze-complexity.output }}
+  - id: review-tasks
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "review-tasks" "${audio_debug}"
+      printf '%s\n' '{"breakpoint":"review-tasks","skipped":true}'
 
-  # ─────────────────────────────────────────────────────────
-  # Task refinement: expand -> vote -> revise loop (max 2 rounds)
-  # Replaces the old expand-tasks + vote-on-quality steps with a
-  # sub-workflow that gates on committee approval.
-  # ─────────────────────────────────────────────────────────
-  - name: refine-tasks
-    depends_on: [review-tasks]
-    workflow: task-refinement.lobster.yaml
-    inputs:
-      tasks: ${{ steps.parse-prd.output }}
-      complexity: ${{ steps.analyze-complexity.output }}
-      evaluation_criteria: "task decomposition quality, dependency ordering, decision point coverage"
-      max_revisions: 2
-      model_primary_provider: "{{inputs.model_primary_provider}}"
-      model_primary: "{{inputs.model_primary}}"
-      voter_1_provider: "{{inputs.voter_1_provider}}"
-      voter_1_model: "{{inputs.voter_1_model}}"
-      voter_2_provider: "{{inputs.voter_2_provider}}"
-      voter_2_model: "{{inputs.voter_2_model}}"
-      voter_3_provider: "{{inputs.voter_3_provider}}"
-      voter_3_model: "{{inputs.voter_3_model}}"
-      voter_4_provider: "{{inputs.voter_4_provider}}"
-      voter_4_model: "{{inputs.voter_4_model}}"
-      voter_5_provider: "{{inputs.voter_5_provider}}"
-      voter_5_model: "{{inputs.voter_5_model}}"
+  - id: refine-tasks
+    env:
+      CTO_PARSE_PRD_OUT: $parse-prd.stdout
+      CTO_ANALYZE_COMPLEXITY_OUT: $analyze-complexity.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "refine-tasks" "${audio_debug}"
+      WS="${WORKSPACE:-.}"
+      ARGS=$(jq -n \
+        --argjson tasks "$(printf '%s' "$CTO_PARSE_PRD_OUT")" \
+        --argjson complexity "$(printf '%s' "$CTO_ANALYZE_COMPLEXITY_OUT")" \
+        --arg evaluation_criteria "task decomposition quality, dependency ordering, decision point coverage" \
+        --arg max_revisions "2" \
+        --arg model_primary_provider "${model_primary_provider}" \
+        --arg model_primary "${model_primary}" \
+        --arg voter_1_provider "${voter_1_provider}" \
+        --arg voter_1_model "${voter_1_model}" \
+        --arg voter_2_provider "${voter_2_provider}" \
+        --arg voter_2_model "${voter_2_model}" \
+        --arg voter_3_provider "${voter_3_provider}" \
+        --arg voter_3_model "${voter_3_model}" \
+        --arg audio_debug "${audio_debug}" \
+        '{tasks: $tasks, complexity: $complexity, evaluation_criteria: $evaluation_criteria, max_revisions: $max_revisions, model_primary_provider: $model_primary_provider, model_primary: $model_primary, voter_1_provider: $voter_1_provider, voter_1_model: $voter_1_model, voter_2_provider: $voter_2_provider, voter_2_model: $voter_2_model, voter_3_provider: $voter_3_provider, voter_3_model: $voter_3_model, audio_debug: $audio_debug}')
+      lobster run --mode tool "$WS/intake/workflows/task-refinement.lobster.yaml" --args-json "$ARGS" || { "$WS/intake/scripts/workflow-step-audio.sh" "intake" "refine-tasks failed" "${audio_debug}" "error"; exit 1; }
 
-  - name: verify-refine-tasks
-    when: "{{inputs.verify}}"
-    depends_on: [refine-tasks]
-    command: >
-      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
-      intake-util validate --type expanded-tasks
+  - id: verify-refine-tasks
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-refine-tasks" "${audio_debug}"
+      if [ -z "$CTO_REFINE_TASKS_OUT" ]; then
+        echo "verify-refine-tasks: FATAL — refine-tasks produced no output" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-refine-tasks" "failed: empty refinement output" "${audio_debug}" "error"
+        exit 1
+      fi
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      if [ -z "$EXP" ] || [ "$EXP" = "null" ]; then
+        echo "verify-refine-tasks: FATAL — could not extract expanded_tasks from refinement output" >&2
+        printf 'Raw output: %.500s\n' "$CTO_REFINE_TASKS_OUT" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-refine-tasks" "failed: no expanded tasks in output" "${audio_debug}" "error"
+        exit 1
+      fi
+      TASK_COUNT=$(printf '%s' "$EXP" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo 0)
+      if [ "$TASK_COUNT" = "0" ]; then
+        echo "verify-refine-tasks: FATAL — expanded_tasks array is empty" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-refine-tasks" "failed: zero expanded tasks" "${audio_debug}" "error"
+        exit 1
+      fi
+      printf '%s' "$EXP" | intake-util validate --type expanded-tasks
 
-  - name: breakpoint-refine-tasks
-    when: "{{inputs.breakpoints}}"
-    depends_on: [verify-refine-tasks]
-    approval:
-      message: "Review refine-tasks output"
+  - id: breakpoint-refine-tasks
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "breakpoint-refine-tasks" "${audio_debug}"
+      printf '%s\n' '{"breakpoint":"refine-tasks","skipped":true}'
 
-  - name: linear-activity-refine-tasks
-    when: "{{inputs.linear_session_id}}"
-    depends_on: [refine-tasks]
-    command: >
-      TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Tasks Refined"
-        --body "Refined ${TASK_COUNT} tasks — verdict: ${{ steps.refine-tasks.outputs.verdict }}"
+  - id: linear-activity-refine-tasks
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-refine-tasks" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
+      VERDICT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].verdict' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --title "Tasks Refined" \
+        --body "Refined ${TASK_COUNT} tasks — verdict: ${VERDICT}" || true
 
-  - name: linear-plan-generation
-    when: "{{inputs.linear_issue_id}}"
-    depends_on: [refine-tasks]
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --issue-id "{{inputs.linear_issue_id}}"
-        --type plan
-        --title "Phase: Artifact Generation"
-        --body "Generating scaffolds, docs, prompts, workflows, and security analysis"
+  - id: linear-plan-generation
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-plan-generation" "${audio_debug}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --issue-id "${linear_issue_id}" \
+        --type plan \
+        --title "Phase: Artifact Generation" \
+        --body "Generating scaffolds, docs, prompts, workflows, and security analysis" || true
 
-  - name: generate-scaffolds
-    depends_on: [refine-tasks]
-    description: "Generate code scaffolds for each task based on agent, stack, and codebase context"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/scaffold-generation-system.md}}",
-        "input": {
-          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
-          "codebase_context": "{{inputs.codebase_context}}",
-          "infrastructure_context": "{{inputs.infrastructure_context}}"
-        },
-        "schema": "{{schemas/scaffold.schema.json}}",
-        "provider": "{{inputs.model_fast_provider}}",
-        "model": "{{inputs.model_fast}}"
-      }'
+  - id: generate-scaffolds
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-scaffolds" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      if [ -z "$EXP" ] || [ "$EXP" = "null" ] || [ "$EXP" = "[]" ]; then
+        echo "generate-scaffolds: FATAL — no expanded tasks available" >&2; exit 1; fi
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/scaffold-generation-system.md" \
+        --argjson expanded_tasks "$EXP" \
+        --rawfile codebase "$root/.intake/contexts/codebase.txt" \
+        --rawfile infra "$root/.intake/contexts/infrastructure.txt" \
+        --arg schema "$root/intake/schemas/scaffold.schema.json" \
+        --arg provider "${model_fast_provider}" \
+        --arg model "${model_fast}" \
+        '{ "prompt": $sys,
+           "input": { "expanded_tasks": $expanded_tasks, "codebase_context": $codebase, "infrastructure_context": $infra },
+           "schema": $schema, "provider": $provider, "model": $model }') || {
+        echo "generate-scaffolds: FATAL — jq args build failed" >&2; exit 1; }
+      OUTPUT=$("$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS") || {
+        echo "generate-scaffolds: FATAL — openclaw.invoke failed after retries" >&2; exit 1; }
+      if [ -z "$OUTPUT" ]; then
+        echo "generate-scaffolds: FATAL — openclaw.invoke returned empty output" >&2; exit 1; fi
+      printf '%s' "$OUTPUT"
 
-  - name: verify-generate-scaffolds
-    when: "{{inputs.verify}}"
-    depends_on: [generate-scaffolds]
-    command: >
-      echo '${{ steps.generate-scaffolds.output }}' |
-      intake-util validate --type scaffold
+  - id: verify-generate-scaffolds
+    env:
+      CTO_GENERATE_SCAFFOLDS_OUT: $generate-scaffolds.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-generate-scaffolds" "${audio_debug}"
+      if [ -z "$CTO_GENERATE_SCAFFOLDS_OUT" ]; then
+        echo "verify-generate-scaffolds: FATAL — generate-scaffolds produced no output" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "verify-generate-scaffolds" "failed: empty scaffolds output" "${audio_debug}" "error"
+        exit 1
+      fi
+      printf '%s' "$CTO_GENERATE_SCAFFOLDS_OUT" | intake-util validate --type scaffold
 
-  - name: breakpoint-generate-scaffolds
-    when: "{{inputs.breakpoints}}"
-    depends_on: [verify-generate-scaffolds]
-    approval:
-      message: "Review generate-scaffolds output"
+  - id: breakpoint-generate-scaffolds
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "breakpoint-generate-scaffolds" "${audio_debug}"
+      printf '%s\n' '{"breakpoint":"generate-scaffolds","skipped":true}'
 
-  - name: linear-activity-generate-scaffolds
-    when: "{{inputs.linear_session_id}}"
-    depends_on: [generate-scaffolds]
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Scaffolds Generated"
-        --body "Generated code scaffolds for all tasks"
+  - id: linear-activity-generate-scaffolds
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-generate-scaffolds" "${audio_debug}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --title "Scaffolds Generated" \
+        --body "Generated code scaffolds for all tasks" || true
 
-  - name: fan-out-docs
-    depends_on: [refine-tasks, generate-scaffolds]
-    description: "Generate docs per task in parallel via fan-out"
-    command: >
-      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
-      intake-util fan-out
-        --prompt "{{prompts/smart-docs-system.md}}"
-        --schema "{{schemas/smart-doc-item.schema.json}}"
-        --context '{"scaffolds": ${{ steps.generate-scaffolds.output }}, "codebase_context": "{{inputs.codebase_context}}", "infrastructure_context": "{{inputs.infrastructure_context}}"}'
-        --provider "{{inputs.model_fast_provider}}"
-        --model "{{inputs.model_fast}}"
-        --concurrency 4
+  - id: fan-out-docs
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_GENERATE_SCAFFOLDS_OUT: $generate-scaffolds.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "fan-out-docs" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      if [ -z "$EXP" ] || [ "$EXP" = "null" ] || [ "$EXP" = "[]" ]; then
+        echo "fan-out-docs: FATAL — no expanded tasks available" >&2; exit 1; fi
+      if [ -z "$CTO_GENERATE_SCAFFOLDS_OUT" ]; then
+        echo "fan-out-docs: FATAL — no scaffolds available (generate-scaffolds output empty)" >&2; exit 1; fi
+      CTX=$(jq -n \
+        --argjson sc "$(printf '%s' "$CTO_GENERATE_SCAFFOLDS_OUT")" \
+        --rawfile cb "$root/.intake/contexts/codebase.txt" \
+        --rawfile inf "$root/.intake/contexts/infrastructure.txt" \
+        '{scaffolds: $sc, codebase_context: $cb, infrastructure_context: $inf}') || {
+        echo "fan-out-docs: FATAL — jq context build failed" >&2; exit 1; }
+      OUTPUT=$(printf '%s' "$EXP" | intake-util fan-out \
+        --prompt "$root/intake/prompts/smart-docs-system.md" \
+        --schema "$root/intake/schemas/smart-doc-item.schema.json" \
+        --context "$CTX" \
+        --provider "${model_fast_provider}" \
+        --model "${model_fast}" \
+        --concurrency 4) || {
+        echo "fan-out-docs: FATAL — intake-util fan-out failed (exit $?)" >&2; exit 1; }
+      if [ -z "$OUTPUT" ]; then
+        echo "fan-out-docs: FATAL — fan-out returned empty output" >&2; exit 1; fi
+      printf '%s' "$OUTPUT"
 
-  - name: validate-docs
-    depends_on: [fan-out-docs]
-    description: "Validate merged docs output"
-    command: >
-      TASK_IDS=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq '[.[].id]') &&
-      echo '${{ steps.fan-out-docs.output }}' |
-      intake-util validate --type docs --task-ids "$TASK_IDS"
+  - id: validate-docs
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_FAN_OUT_DOCS_OUT: $fan-out-docs.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "validate-docs" "${audio_debug}"
+      if [ -z "$CTO_FAN_OUT_DOCS_OUT" ]; then
+        echo "validate-docs: FATAL — fan-out-docs produced no output" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-docs" "failed: empty docs output" "${audio_debug}" "error"
+        exit 1
+      fi
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
+      printf '%s' "$CTO_FAN_OUT_DOCS_OUT" | intake-util validate --type docs --task-ids "$TASK_IDS"
+      MISSING_ACCEPTANCE=$(printf '%s' "$CTO_FAN_OUT_DOCS_OUT" | jq '[.[] | select((.acceptance_md // "") | length == 0) | .task_id]')
+      MISSING_ACCEPTANCE_COUNT=$(printf '%s' "$MISSING_ACCEPTANCE" | jq 'length')
+      if [ "$MISSING_ACCEPTANCE_COUNT" != "0" ]; then
+        echo "validate-docs: WARNING — $MISSING_ACCEPTANCE_COUNT doc(s) missing acceptance_md: $MISSING_ACCEPTANCE" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-docs" "warning: $MISSING_ACCEPTANCE_COUNT docs missing acceptance criteria" "${audio_debug}" "warning"
+      fi
+      MISSING_DECISIONS=$(printf '%s' "$CTO_FAN_OUT_DOCS_OUT" | jq '[.[] | select((.decisions_md // "") | length == 0) | .task_id]')
+      MISSING_DECISIONS_COUNT=$(printf '%s' "$MISSING_DECISIONS" | jq 'length')
+      if [ "$MISSING_DECISIONS_COUNT" != "0" ]; then
+        echo "validate-docs: WARNING — $MISSING_DECISIONS_COUNT doc(s) missing decisions_md: $MISSING_DECISIONS" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-docs" "warning: $MISSING_DECISIONS_COUNT docs missing decision points" "${audio_debug}" "warning"
+      fi
+      DOC_COUNT=$(printf '%s' "$CTO_FAN_OUT_DOCS_OUT" | jq 'if type=="array" then length else 0 end')
+      TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
+      if [ "$DOC_COUNT" != "$TASK_COUNT" ]; then
+        echo "validate-docs: WARNING — doc count ($DOC_COUNT) does not match task count ($TASK_COUNT)" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-docs" "warning: doc/task count mismatch ($DOC_COUNT vs $TASK_COUNT)" "${audio_debug}" "warning"
+      fi
 
-  - name: write-docs
-    depends_on: [validate-docs]
-    description: "Write fan-out docs to disk"
-    command: >
-      echo '${{ steps.fan-out-docs.output }}' |
-      intake-util write-files --base-path .tasks/docs --type docs
+  - id: write-docs
+    env:
+      CTO_FAN_OUT_DOCS_OUT: $fan-out-docs.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "write-docs" "${audio_debug}"
+      printf '%s' "$CTO_FAN_OUT_DOCS_OUT" | intake-util write-files --base-path .tasks/docs --type docs
 
-  - name: linear-activity-write-docs
-    when: "{{inputs.linear_session_id}}"
-    depends_on: [write-docs]
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Docs Written"
-        --body "Task documentation written to .tasks/docs"
+  - id: linear-activity-write-docs
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-write-docs" "${audio_debug}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --title "Docs Written" \
+        --body "Task documentation written to .tasks/docs" || true
 
-  - name: search-skills
-    depends_on: [refine-tasks]
-    description: "Search ClawHub for relevant skills per task"
-    command: >
-      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
-      jq -r '.[] | "\(.id)|\(.title) \(.stack // "") \(.description | .[0:200])"' |
-      while IFS='|' read -r task_id query; do
+  - id: search-skills
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "search-skills" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      printf '%s' "$EXP" | jq -r '.[] | "\(.id)|\(.title) \(.stack // "") \(.description | .[0:200])"' | while IFS='|' read -r task_id query; do
         results=$(clawhub search "$query" --limit 5 --json 2>/dev/null || echo '[]')
         echo "{\"task_id\": $task_id, \"search_results\": $results}"
       done | jq -s '{"skill_search_results": .}'
 
-  - name: discover-skills
-    depends_on: [search-skills]
-    description: "Match and recommend skills for each task via LLM reasoning"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/skill-discovery-system.md}}",
-        "input": {
-          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
-          "skill_search_results": ${{ steps.search-skills.output }}
-        },
-        "schema": "{{schemas/skill-recommendations.schema.json}}",
-        "provider": "{{inputs.model_fast_provider}}",
-        "model": "{{inputs.model_fast}}"
-      }'
+  - id: discover-skills
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_SEARCH_SKILLS_OUT: $search-skills.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "discover-skills" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/skill-discovery-system.md" \
+        --argjson expanded_tasks "$EXP" \
+        --argjson skill_search_results "$(printf '%s' "$CTO_SEARCH_SKILLS_OUT" | jq -c '.skill_search_results // []')" \
+        --arg schema "$root/intake/schemas/skill-recommendations.schema.json" \
+        --arg provider "${model_fast_provider}" \
+        --arg model "${model_fast}" \
+        '{ "prompt": $sys,
+           "input": { "expanded_tasks": $expanded_tasks, "skill_search_results": $skill_search_results },
+           "schema": $schema, "provider": $provider, "model": $model }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
 
-  - name: verify-discover-skills
-    when: "{{inputs.verify}}"
-    depends_on: [discover-skills]
-    command: >
-      echo '${{ steps.discover-skills.output }}' |
-      intake-util validate --type skill-recommendations
+  - id: verify-discover-skills
+    env:
+      CTO_DISCOVER_SKILLS_OUT: $discover-skills.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-discover-skills" "${audio_debug}"
+      printf '%s' "$CTO_DISCOVER_SKILLS_OUT" | intake-util validate --type skill-recommendations
 
-  - name: linear-activity-discover-skills
-    when: "{{inputs.linear_session_id}}"
-    depends_on: [discover-skills]
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Skills Discovered"
-        --body "Skill recommendations generated for all tasks"
+  - id: linear-activity-discover-skills
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-discover-skills" "${audio_debug}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --title "Skills Discovered" \
+        --body "Skill recommendations generated for all tasks" || true
 
-  - name: generate-tool-manifest
-    depends_on: [refine-tasks]
-    description: "Generate project-level tool manifest from discovered tools"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/tool-manifest-system.md}}",
-        "input": {
-          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
-          "available_tools": "{{inputs.tool_context}}",
-          "infrastructure_context": "{{inputs.infrastructure_context}}"
-        },
-        "schema": "{{schemas/tool-manifest.schema.json}}",
-        "provider": "{{inputs.model_fast_provider}}",
-        "model": "{{inputs.model_fast}}"
-      }'
+  - id: generate-tool-manifest
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-tool-manifest" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/tool-manifest-system.md" \
+        --argjson expanded_tasks "$EXP" \
+        --rawfile available_tools "$root/.intake/contexts/tools.txt" \
+        --rawfile infrastructure_context "$root/.intake/contexts/infrastructure.txt" \
+        --arg schema "$root/intake/schemas/tool-manifest.schema.json" \
+        --arg provider "${model_fast_provider}" \
+        --arg model "${model_fast}" \
+        '{ "prompt": $sys,
+           "input": { "expanded_tasks": $expanded_tasks, "available_tools": $available_tools, "infrastructure_context": $infrastructure_context },
+           "schema": $schema, "provider": $provider, "model": $model }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
 
-  - name: fan-out-prompts
-    depends_on: [write-docs, discover-skills, generate-tool-manifest, generate-scaffolds]
-    description: "Generate prompts per task in parallel via fan-out"
-    command: >
-      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
-      intake-util fan-out
-        --prompt "{{prompts/smart-prompts-system.md}}"
-        --schema "{{schemas/smart-prompt-item.schema.json}}"
-        --context '{"scaffolds": ${{ steps.generate-scaffolds.output }}, "skill_recommendations": ${{ steps.discover-skills.output }}, "tool_manifest": ${{ steps.generate-tool-manifest.output }}, "codebase_context": "{{inputs.codebase_context}}", "project_name": "{{inputs.project_name}}"}'
-        --provider "{{inputs.model_fast_provider}}"
-        --model "{{inputs.model_fast}}"
-        --concurrency 4
+  - id: fan-out-prompts
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_GENERATE_SCAFFOLDS_OUT: $generate-scaffolds.stdout
+      CTO_DISCOVER_SKILLS_OUT: $discover-skills.stdout
+      CTO_GENERATE_TOOL_MANIFEST_OUT: $generate-tool-manifest.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "fan-out-prompts" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      if [ -z "$EXP" ] || [ "$EXP" = "null" ] || [ "$EXP" = "[]" ]; then
+        echo "fan-out-prompts: FATAL — no expanded tasks available" >&2; exit 1; fi
+      if [ -z "$CTO_GENERATE_SCAFFOLDS_OUT" ]; then
+        echo "fan-out-prompts: FATAL — no scaffolds available" >&2; exit 1; fi
+      CTX=$(jq -n \
+        --argjson sc "$(printf '%s' "$CTO_GENERATE_SCAFFOLDS_OUT")" \
+        --argjson sr "$(printf '%s' "$CTO_DISCOVER_SKILLS_OUT")" \
+        --argjson tm "$(printf '%s' "$CTO_GENERATE_TOOL_MANIFEST_OUT")" \
+        --rawfile cb "$root/.intake/contexts/codebase.txt" \
+        --arg pn "${project_name}" \
+        '{scaffolds: $sc, skill_recommendations: $sr, tool_manifest: $tm, codebase_context: $cb, project_name: $pn}') || {
+        echo "fan-out-prompts: FATAL — jq context build failed" >&2; exit 1; }
+      OUTPUT=$(printf '%s' "$EXP" | intake-util fan-out \
+        --prompt "$root/intake/prompts/smart-prompts-system.md" \
+        --schema "$root/intake/schemas/smart-prompt-item.schema.json" \
+        --context "$CTX" \
+        --provider "${model_fast_provider}" \
+        --model "${model_fast}" \
+        --concurrency 4) || {
+        echo "fan-out-prompts: FATAL — intake-util fan-out failed (exit $?)" >&2; exit 1; }
+      if [ -z "$OUTPUT" ]; then
+        echo "fan-out-prompts: FATAL — fan-out returned empty output" >&2; exit 1; fi
+      printf '%s' "$OUTPUT"
 
-  - name: validate-prompts
-    depends_on: [fan-out-prompts]
-    description: "Validate merged prompts output"
-    command: >
-      TASK_IDS=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq '[.[].id]') &&
-      echo '${{ steps.fan-out-prompts.output }}' |
-      intake-util validate --type prompts --task-ids "$TASK_IDS"
+  - id: validate-prompts
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_FAN_OUT_PROMPTS_OUT: $fan-out-prompts.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "validate-prompts" "${audio_debug}"
+      if [ -z "$CTO_FAN_OUT_PROMPTS_OUT" ]; then
+        echo "validate-prompts: FATAL — fan-out-prompts produced no output" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-prompts" "failed: empty prompts output" "${audio_debug}" "error"
+        exit 1
+      fi
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
+      printf '%s' "$CTO_FAN_OUT_PROMPTS_OUT" | intake-util validate --type prompts --task-ids "$TASK_IDS"
+      MISSING_XML=$(printf '%s' "$CTO_FAN_OUT_PROMPTS_OUT" | jq '[.[] | select((.prompt_xml // "") | length == 0) | .task_id]')
+      MISSING_XML_COUNT=$(printf '%s' "$MISSING_XML" | jq 'length')
+      if [ "$MISSING_XML_COUNT" != "0" ]; then
+        echo "validate-prompts: WARNING — $MISSING_XML_COUNT prompt(s) missing prompt_xml (acceptance criteria): $MISSING_XML" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-prompts" "warning: $MISSING_XML_COUNT prompts missing acceptance criteria XML" "${audio_debug}" "warning"
+      fi
+      TASKS_WITH_SUBTASKS=$(printf '%s' "$EXP" | jq '[.[] | select((.subtasks // []) | length > 0) | .id]')
+      TASKS_WITH_SUBTASKS_COUNT=$(printf '%s' "$TASKS_WITH_SUBTASKS" | jq 'length')
+      if [ "$TASKS_WITH_SUBTASKS_COUNT" != "0" ]; then
+        PROMPTS_MISSING_SUBTASK_PROMPTS=$(printf '%s' "$CTO_FAN_OUT_PROMPTS_OUT" | jq --argjson parent_ids "$TASKS_WITH_SUBTASKS" \
+          '[.[] | select(.task_id as $tid | $parent_ids | index($tid)) | select((.subtasks // []) | length == 0) | .task_id]')
+        MISSING_SP_COUNT=$(printf '%s' "$PROMPTS_MISSING_SUBTASK_PROMPTS" | jq 'length')
+        if [ "$MISSING_SP_COUNT" != "0" ]; then
+          echo "validate-prompts: WARNING — $MISSING_SP_COUNT task(s) with subtasks have no subtask prompts: $PROMPTS_MISSING_SUBTASK_PROMPTS" >&2
+          "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-prompts" "warning: $MISSING_SP_COUNT tasks missing subtask prompts" "${audio_debug}" "warning"
+        fi
+      fi
+      PROMPT_COUNT=$(printf '%s' "$CTO_FAN_OUT_PROMPTS_OUT" | jq 'if type=="array" then length else 0 end')
+      TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
+      if [ "$PROMPT_COUNT" != "$TASK_COUNT" ]; then
+        echo "validate-prompts: WARNING — prompt count ($PROMPT_COUNT) does not match task count ($TASK_COUNT)" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-prompts" "warning: prompt/task count mismatch ($PROMPT_COUNT vs $TASK_COUNT)" "${audio_debug}" "warning"
+      fi
 
-  - name: write-prompts
-    depends_on: [validate-prompts]
-    description: "Write fan-out prompts to disk"
-    command: >
-      echo '${{ steps.fan-out-prompts.output }}' |
-      intake-util write-files --base-path .tasks/docs --type prompts
+  - id: write-prompts
+    env:
+      CTO_FAN_OUT_PROMPTS_OUT: $fan-out-prompts.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "write-prompts" "${audio_debug}"
+      printf '%s' "$CTO_FAN_OUT_PROMPTS_OUT" | intake-util write-files --base-path .tasks/docs --type prompts
 
-  - name: linear-activity-write-prompts
-    when: "{{inputs.linear_session_id}}"
-    depends_on: [write-prompts]
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Prompts Written"
-        --body "Per-agent implementation prompts written to .tasks/docs"
+  - id: linear-activity-write-prompts
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-write-prompts" "${audio_debug}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --title "Prompts Written" \
+        --body "Per-agent implementation prompts written to .tasks/docs" || true
 
-  # ─────────────────────────────────────────────────────────
-  # Per-task implementation workflows (deterministic)
-  # Generates a Lobster workflow per task that controls the
-  # execution lifecycle: setup, subtask sequencing, validation
-  # gates, and PR creation. Runs parallel with docs/prompts.
-  # ─────────────────────────────────────────────────────────
-  - name: generate-workflows
-    depends_on: [refine-tasks, generate-scaffolds]
-    description: "Generate per-task Lobster implementation workflows (deterministic)"
-    command: >
-      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
-      intake-util generate-workflows
-        --scaffolds-json <(echo '${{ steps.generate-scaffolds.output }}')
-        --config cto-config.json
-        --repository-url "{{inputs.repository_url}}"
+  - id: generate-workflows
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_GENERATE_SCAFFOLDS_OUT: $generate-scaffolds.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-workflows" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      if [ -z "$EXP" ] || [ "$EXP" = "null" ] || [ "$EXP" = "[]" ]; then
+        echo "generate-workflows: FATAL — no expanded tasks available" >&2; exit 1; fi
+      OUTPUT=$(printf '%s' "$EXP" | intake-util generate-workflows \
+        --scaffolds-json <(printf '%s' "$CTO_GENERATE_SCAFFOLDS_OUT") \
+        --config cto-config.json \
+        --repository-url "${repository_url}") || {
+        echo "generate-workflows: FATAL — intake-util generate-workflows failed (exit $?)" >&2; exit 1; }
+      if [ -z "$OUTPUT" ]; then
+        echo "generate-workflows: FATAL — generate-workflows returned empty output" >&2; exit 1; fi
+      printf '%s' "$OUTPUT"
 
-  - name: validate-workflows
-    depends_on: [generate-workflows]
-    description: "Validate generated workflow structure and completeness"
-    command: >
-      TASK_IDS=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq '[.[].id]') &&
-      echo '${{ steps.generate-workflows.output }}' | jq '.task_workflows' |
-      intake-util validate --type workflows --task-ids "$TASK_IDS"
+  - id: validate-workflows
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_GENERATE_WORKFLOWS_OUT: $generate-workflows.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "validate-workflows" "${audio_debug}"
+      if [ -z "$CTO_GENERATE_WORKFLOWS_OUT" ]; then
+        echo "validate-workflows: FATAL — generate-workflows produced no output" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-workflows" "failed: empty workflow output" "${audio_debug}" "error"
+        exit 1
+      fi
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      TASK_IDS=$(printf '%s' "$EXP" | jq '[.[].id]')
+      WF_COUNT=$(printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | jq '.task_workflows | length' 2>/dev/null || echo 0)
+      if [ "$WF_COUNT" = "0" ]; then
+        echo "validate-workflows: FATAL — task_workflows array is empty" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "validate-workflows" "failed: zero workflows generated" "${audio_debug}" "error"
+        exit 1
+      fi
+      printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | jq '.task_workflows' | intake-util validate --type workflows --task-ids "$TASK_IDS"
 
-  - name: write-workflows
-    depends_on: [validate-workflows]
-    description: "Write per-task implementation.lobster.yaml files to disk"
-    command: >
-      echo '${{ steps.generate-workflows.output }}' |
-      intake-util write-files --base-path .tasks/docs --type workflows
+  - id: write-workflows
+    env:
+      CTO_GENERATE_WORKFLOWS_OUT: $generate-workflows.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "write-workflows" "${audio_debug}"
+      printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | intake-util write-files --base-path .tasks/docs --type workflows
 
-  # ─────────────────────────────────────────────────────────
-  # Final pipeline stages: scale → security → remediation
-  # These generate additional task specs that get included in
-  # the PR alongside the main implementation tasks.
-  # ─────────────────────────────────────────────────────────
-  - name: generate-scale-tasks
-    depends_on: [refine-tasks]
-    description: "Generate Bolt production-hardening task specifications"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/bolt-production-hardening-system.md}}",
-        "input": {
-          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
-          "infrastructure_context": "{{inputs.infrastructure_context}}"
-        },
-        "schema": "{{schemas/scale-tasks.schema.json}}",
-        "provider": "{{inputs.model_fast_provider}}",
-        "model": "{{inputs.model_fast}}"
-      }'
+  - id: generate-scale-tasks
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-scale-tasks" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/bolt-production-hardening-system.md" \
+        --argjson expanded_tasks "$EXP" \
+        --rawfile infrastructure_context "$root/.intake/contexts/infrastructure.txt" \
+        --arg schema "$root/intake/schemas/scale-tasks.schema.json" \
+        --arg provider "${model_fast_provider}" \
+        --arg model "${model_fast}" \
+        '{ "prompt": $sys,
+           "input": { "expanded_tasks": $expanded_tasks, "infrastructure_context": $infrastructure_context },
+           "schema": $schema, "provider": $provider, "model": $model }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
 
-  - name: generate-security-report
-    depends_on: [generate-scale-tasks]
-    description: "Cipher analyzes task plan for security concerns"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/security-report-system.md}}",
-        "input": {
-          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }},
-          "scale_tasks": ${{ steps.generate-scale-tasks.output }}
-        },
-        "schema": "{{schemas/security-report.schema.json}}",
-        "provider": "{{inputs.model_frontier_provider}}",
-        "model": "{{inputs.model_frontier}}"
-      }'
+  - id: generate-security-report
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_GENERATE_SCALE_TASKS_OUT: $generate-scale-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-security-report" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/security-report-system.md" \
+        --argjson expanded_tasks "$EXP" \
+        --argjson scale_tasks "$(printf '%s' "$CTO_GENERATE_SCALE_TASKS_OUT")" \
+        --arg schema "$root/intake/schemas/security-report.schema.json" \
+        --arg provider "${model_frontier_provider}" \
+        --arg model "${model_frontier}" \
+        '{ "prompt": $sys,
+           "input": { "expanded_tasks": $expanded_tasks, "scale_tasks": $scale_tasks },
+           "schema": $schema, "provider": $provider, "model": $model }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
 
-  - name: linear-activity-security-report
-    when: "{{inputs.linear_session_id}}"
-    depends_on: [generate-security-report]
-    command: >
-      FINDING_COUNT=$(echo '${{ steps.generate-security-report.output }}' | jq '.findings | length') &&
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "Security Report"
-        --body "Security analysis found ${FINDING_COUNT} findings"
+  - id: linear-activity-security-report
+    env:
+      CTO_GENERATE_SECURITY_REPORT_OUT: $generate-security-report.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-security-report" "${audio_debug}"
+      FINDING_COUNT=$(printf '%s' "$CTO_GENERATE_SECURITY_REPORT_OUT" | jq '.findings | length')
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --title "Security Report" \
+        --body "Security analysis found ${FINDING_COUNT} findings" || true
 
-  - name: generate-remediation-tasks
-    depends_on: [generate-security-report]
-    description: "Generate remediation tasks from security findings"
-    command: >
-      openclaw.invoke --tool llm-task --action json --args-json '{
-        "prompt": "{{prompts/security-remediation-system.md}}",
-        "input": {
-          "security_report": ${{ steps.generate-security-report.output }},
-          "expanded_tasks": ${{ steps.refine-tasks.outputs.expanded_tasks }}
-        },
-        "schema": "{{schemas/remediation-tasks.schema.json}}",
-        "provider": "{{inputs.model_fast_provider}}",
-        "model": "{{inputs.model_fast}}"
-      }'
+  - id: generate-remediation-tasks
+    env:
+      CTO_GENERATE_SECURITY_REPORT_OUT: $generate-security-report.stdout
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}";
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "generate-remediation-tasks" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT");
+      ARGS=$(jq -n \
+        --rawfile sys "$root/intake/prompts/security-remediation-system.md" \
+        --argjson security_report "$(printf '%s' "$CTO_GENERATE_SECURITY_REPORT_OUT")" \
+        --argjson expanded_tasks "$EXP" \
+        --arg schema "$root/intake/schemas/remediation-tasks.schema.json" \
+        --arg provider "${model_fast_provider}" \
+        --arg model "${model_fast}" \
+        '{ "prompt": $sys,
+           "input": { "security_report": $security_report, "expanded_tasks": $expanded_tasks },
+           "schema": $schema, "provider": $provider, "model": $model }')
+      "$root/intake/scripts/openclaw-invoke-retry.sh" --tool llm-task --action json --args-json "$ARGS"
 
-  # ─────────────────────────────────────────────────────────
-  # Linear sync: create task + subtask issues
-  # Runs in parallel with commit-outputs after prompts are ready.
-  # ─────────────────────────────────────────────────────────
-  - name: sync-linear-issues
-    description: "Create Linear issues for each task and subtask"
-    when: "{{inputs.linear_project_id}}"
-    depends_on: [write-prompts]
-    command: >
-      echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' |
-      intake-util sync-linear issues
-        --project-id "{{inputs.linear_project_id}}"
-        --prd-issue-id "{{inputs.linear_prd_issue_id}}"
-        --team-id "{{inputs.linear_team_id}}"
-        --base-url "{{inputs.repository_url}}"
-        --agent-map '{{inputs.linear_agent_map}}'
+  - id: verify-artifact-gates
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_FAN_OUT_DOCS_OUT: $fan-out-docs.stdout
+      CTO_FAN_OUT_PROMPTS_OUT: $fan-out-prompts.stdout
+      CTO_GENERATE_WORKFLOWS_OUT: $generate-workflows.stdout
+      CTO_GENERATE_SECURITY_REPORT_OUT: $generate-security-report.stdout
+      CTO_GENERATE_REMEDIATION_TASKS_OUT: $generate-remediation-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-artifact-gates" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      mkdir -p .tasks/tasks
+      printf '%s\n' "$EXP" > .tasks/tasks/tasks.json
 
-  - name: linear-plan-commit
-    when: "{{inputs.linear_issue_id}}"
-    depends_on: [write-prompts, write-workflows, generate-remediation-tasks]
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --issue-id "{{inputs.linear_issue_id}}"
-        --type plan
-        --title "Phase: Commit & PR"
-        --body "Committing generated artifacts and opening PR"
+      TASK_COUNT=$(printf '%s' "$EXP" | jq 'length' 2>/dev/null || echo 0)
+      DOC_COUNT=$(printf '%s' "$CTO_FAN_OUT_DOCS_OUT" | jq 'if type=="array" then length elif .items? then (.items|length) else 0 end' 2>/dev/null || echo 0)
+      PROMPT_COUNT=$(printf '%s' "$CTO_FAN_OUT_PROMPTS_OUT" | jq 'if type=="array" then length elif .items? then (.items|length) else 0 end' 2>/dev/null || echo 0)
+      WORKFLOW_COUNT=$(printf '%s' "$CTO_GENERATE_WORKFLOWS_OUT" | jq '.task_workflows | length' 2>/dev/null || echo 0)
 
-  - name: commit-outputs
-    description: "Stage all generated task files and open a PR"
-    depends_on: [write-prompts, write-workflows, generate-remediation-tasks]
-    command: >
-      TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
-      SCALE_TASKS='${{ steps.generate-scale-tasks.output }}' &&
-      SECURITY_REPORT='${{ steps.generate-security-report.output }}' &&
-      REMEDIATION_TASKS='${{ steps.generate-remediation-tasks.output }}' &&
-      echo "$SCALE_TASKS" > .tasks/docs/scale-tasks.json &&
-      echo "$SECURITY_REPORT" > .tasks/docs/security-report.json &&
-      echo "$REMEDIATION_TASKS" > .tasks/docs/remediation-tasks.json &&
-      REFINEMENT_WARNING='${{ steps.refine-tasks.outputs.warning }}' &&
-      git config user.email "morgan@5dlabs.io" &&
-      git config user.name "Morgan (Intake Agent)" &&
-      BRANCH_NAME="intake/{{inputs.project_name}}-$(date +%Y%m%d-%H%M%S)" &&
-      git checkout -b "$BRANCH_NAME" &&
-      git add .tasks/ &&
-      git diff --staged --stat &&
-      git commit -m "feat(intake): generated ${TASK_COUNT} tasks for {{inputs.project_name}}
+      if ! printf '%s' "$TASK_COUNT" | jq -e 'type=="number" and . > 0' >/dev/null 2>&1; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "failed: tasks missing" "${audio_debug}" "error" "project ${project_name}"
+        echo "verify-artifact-gates: expected expanded tasks > 0" >&2
+        exit 1
+      fi
+      if ! printf '%s' "$DOC_COUNT" | jq -e 'type=="number" and . > 0' >/dev/null 2>&1; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "failed: docs missing" "${audio_debug}" "error" "project ${project_name}"
+        echo "verify-artifact-gates: expected docs fan-out output > 0" >&2
+        exit 1
+      fi
+      if ! printf '%s' "$PROMPT_COUNT" | jq -e 'type=="number" and . > 0' >/dev/null 2>&1; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "failed: prompts missing" "${audio_debug}" "error" "project ${project_name}"
+        echo "verify-artifact-gates: expected prompts fan-out output > 0" >&2
+        exit 1
+      fi
+      if ! printf '%s' "$WORKFLOW_COUNT" | jq -e 'type=="number" and . > 0' >/dev/null 2>&1; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "failed: workflows missing" "${audio_debug}" "error" "project ${project_name}"
+        echo "verify-artifact-gates: expected generated workflows > 0" >&2
+        exit 1
+      fi
+      if [ ! -s .tasks/tasks/tasks.json ]; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "failed: tasks.json not written" "${audio_debug}" "error" "project ${project_name}"
+        echo "verify-artifact-gates: .tasks/tasks/tasks.json missing or empty" >&2
+        exit 1
+      fi
 
-      Generated by Morgan intake pipeline (Lobster).
-      - design-brief.md: resolved decisions and architecture overview
-      - tasks/: expanded task breakdown with subtask prompts
-      - docs/: task documentation and per-agent prompts
-      - Vote verdict: ${{ steps.refine-tasks.outputs.verdict }} (after ${{ steps.refine-tasks.outputs.revision_count }} revision(s))"
+      TASKS_WITH_SUBTASKS=$(printf '%s' "$EXP" | jq '[.[] | select((.subtasks // []) | length > 0)] | length' 2>/dev/null || echo 0)
+      TOTAL_SUBTASKS=$(printf '%s' "$EXP" | jq '[.[] | (.subtasks // []) | length] | add // 0' 2>/dev/null || echo 0)
+      TASKS_WITH_DECISIONS=$(printf '%s' "$EXP" | jq '[.[] | select((.decision_points // []) | length > 0)] | length' 2>/dev/null || echo 0)
+      TOTAL_DECISIONS=$(printf '%s' "$EXP" | jq '[.[] | (.decision_points // []) | length] | add // 0' 2>/dev/null || echo 0)
+      if [ "$TASKS_WITH_SUBTASKS" = "0" ]; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "warning: no tasks have subtasks" "${audio_debug}" "warning" "project ${project_name}"
+        echo "verify-artifact-gates: WARNING — none of the $TASK_COUNT tasks have subtasks" >&2
+      else
+        echo "verify-artifact-gates: $TASKS_WITH_SUBTASKS/$TASK_COUNT tasks have subtasks ($TOTAL_SUBTASKS total subtasks)" >&2
+      fi
+      if [ "$TASKS_WITH_DECISIONS" = "0" ]; then
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "warning: no tasks have decision points" "${audio_debug}" "warning" "project ${project_name}"
+        echo "verify-artifact-gates: WARNING — none of the $TASK_COUNT tasks have decision_points" >&2
+      else
+        echo "verify-artifact-gates: $TASKS_WITH_DECISIONS/$TASK_COUNT tasks have decision_points ($TOTAL_DECISIONS total)" >&2
+      fi
 
-  - name: create-pr
-    description: "Push branch and open GitHub PR"
-    depends_on: [commit-outputs]
-    command: >
-      TASK_COUNT=$(echo '${{ steps.refine-tasks.outputs.expanded_tasks }}' | jq 'length') &&
-      VERDICT='${{ steps.refine-tasks.outputs.verdict }}' &&
-      REVISION_COUNT='${{ steps.refine-tasks.outputs.revision_count }}' &&
-      WARNING='${{ steps.refine-tasks.outputs.warning }}' &&
-      BRANCH=$(git rev-parse --abbrev-ref HEAD) &&
-      git push origin "$BRANCH" &&
-      gh pr create \
-        --title "feat(intake): {{inputs.project_name}} task breakdown" \
-        --body "## Intake Pipeline Output
+      if [ ! -s .tasks/docs/security-report.json ] && [ -n "$CTO_GENERATE_SECURITY_REPORT_OUT" ]; then
+        printf '%s\n' "$CTO_GENERATE_SECURITY_REPORT_OUT" > .tasks/docs/security-report.json
+      fi
+      if [ ! -s .tasks/docs/remediation-tasks.json ] && [ -n "$CTO_GENERATE_REMEDIATION_TASKS_OUT" ]; then
+        printf '%s\n' "$CTO_GENERATE_REMEDIATION_TASKS_OUT" > .tasks/docs/remediation-tasks.json
+      fi
+      if [ "${deliberate}" = "true" ] || [ "${deliberate}" = "1" ]; then
+        if [ ! -s .tasks/docs/design-brief.md ]; then
+          "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "failed: design-brief missing" "${audio_debug}" "error" "project ${project_name}"
+          echo "verify-artifact-gates: .tasks/docs/design-brief.md missing or empty" >&2
+          exit 1
+        fi
+      fi
+
+      "$root/intake/scripts/workflow-gate-audio.sh" "intake" "artifacts" "passed tasks=${TASK_COUNT}(${TOTAL_SUBTASKS} subtasks, ${TOTAL_DECISIONS} decisions) docs=${DOC_COUNT} prompts=${PROMPT_COUNT} workflows=${WORKFLOW_COUNT}" "${audio_debug}" "normal" "project ${project_name}"
+      jq -nc \
+        --argjson task_count "$TASK_COUNT" \
+        --argjson doc_count "$DOC_COUNT" \
+        --argjson prompt_count "$PROMPT_COUNT" \
+        --argjson workflow_count "$WORKFLOW_COUNT" \
+        --argjson subtask_count "$TOTAL_SUBTASKS" \
+        --argjson decision_point_count "$TOTAL_DECISIONS" \
+        '{task_count:$task_count,doc_count:$doc_count,prompt_count:$prompt_count,workflow_count:$workflow_count,subtask_count:$subtask_count,decision_point_count:$decision_point_count,tasks_path:".tasks/tasks/tasks.json"}'
+
+  - id: verify-folder-structure
+    env:
+      CTO_VERIFY_ARTIFACT_GATES_OUT: $verify-artifact-gates.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-folder-structure" "${audio_debug}"
+      ERRORS=""
+      if [ ! -d .tasks ]; then
+        ERRORS="${ERRORS}FATAL: .tasks/ directory does not exist\n"
+      fi
+      if [ ! -d .tasks/tasks ]; then
+        ERRORS="${ERRORS}FATAL: .tasks/tasks/ directory does not exist\n"
+      fi
+      if [ ! -s .tasks/tasks/tasks.json ]; then
+        ERRORS="${ERRORS}FATAL: .tasks/tasks/tasks.json missing or empty\n"
+      else
+        TASK_COUNT=$(jq 'length' .tasks/tasks/tasks.json 2>/dev/null || echo 0)
+        SUBTASK_TOTAL=$(jq '[.[] | (.subtasks // []) | length] | add // 0' .tasks/tasks/tasks.json 2>/dev/null || echo 0)
+        DECISION_TOTAL=$(jq '[.[] | (.decision_points // []) | length] | add // 0' .tasks/tasks/tasks.json 2>/dev/null || echo 0)
+        echo "verify-folder-structure: .tasks/tasks/tasks.json — $TASK_COUNT tasks, $SUBTASK_TOTAL subtasks, $DECISION_TOTAL decision points" >&2
+      fi
+      if [ ! -d .tasks/docs ]; then
+        ERRORS="${ERRORS}FATAL: .tasks/docs/ directory does not exist\n"
+      else
+        DOC_FILES=$(find .tasks/docs -name "*.md" -o -name "*.json" 2>/dev/null | wc -l | tr -d ' ')
+        echo "verify-folder-structure: .tasks/docs/ contains $DOC_FILES files" >&2
+        if [ "$DOC_FILES" = "0" ]; then
+          ERRORS="${ERRORS}FATAL: .tasks/docs/ exists but contains no files\n"
+        fi
+        if [ "${deliberate}" = "true" ] || [ "${deliberate}" = "1" ]; then
+          if [ ! -s .tasks/docs/design-brief.md ]; then
+            ERRORS="${ERRORS}FATAL: .tasks/docs/design-brief.md missing or empty\n"
+          fi
+        fi
+        PROMPT_FILES=$(find .tasks/docs -name "*prompt*" -o -name "*-prompt.md" 2>/dev/null | wc -l | tr -d ' ')
+        DOC_MD_FILES=$(find .tasks/docs -name "*.md" ! -name "*prompt*" ! -name "design-brief.md" 2>/dev/null | wc -l | tr -d ' ')
+        echo "verify-folder-structure: found $PROMPT_FILES prompt files, $DOC_MD_FILES doc markdown files" >&2
+        for expected_json in security-report.json remediation-tasks.json scale-tasks.json; do
+          if [ -f ".tasks/docs/$expected_json" ]; then
+            SIZE=$(wc -c < ".tasks/docs/$expected_json" | tr -d ' ')
+            echo "verify-folder-structure: .tasks/docs/$expected_json — ${SIZE} bytes" >&2
+          else
+            echo "verify-folder-structure: WARNING — .tasks/docs/$expected_json not found" >&2
+          fi
+        done
+      fi
+      if [ -n "$ERRORS" ]; then
+        printf '%b' "$ERRORS" >&2
+        "$root/intake/scripts/workflow-gate-audio.sh" "intake" "folder-structure" "failed: missing expected files or directories" "${audio_debug}" "error" "project ${project_name}"
+        exit 1
+      fi
+      ARTIFACT_COUNTS=$(printf '%s' "$CTO_VERIFY_ARTIFACT_GATES_OUT" | jq -c '.' 2>/dev/null || printf '{}')
+      echo "verify-folder-structure: all expected directories and files present" >&2
+      "$root/intake/scripts/workflow-gate-audio.sh" "intake" "folder-structure" "passed" "${audio_debug}" "normal" "project ${project_name}"
+
+  - id: sync-linear-issues
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "sync-linear-issues" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      SYNC_OUT="$(printf '%s' "$EXP" | intake-util sync-linear issues \
+        --project-id "${linear_project_id}" \
+        --prd-issue-id "${linear_prd_issue_id}" \
+        --team-id "${linear_team_id}" \
+        --base-url "${repository_url}" \
+        --agent-map '${linear_agent_map}' 2>&1)" || {
+        echo "sync-linear-issues: Linear sync failed (non-fatal) — $SYNC_OUT" >&2
+        printf '{"issueCount":0,"skipped":true}\n'
+        exit 0
+      }
+      ISSUE_COUNT="$(printf '%s' "$SYNC_OUT" | jq -r '.issueCount // 0' 2>/dev/null || echo 0)"
+      if ! printf '%s' "$ISSUE_COUNT" | jq -e 'type=="number" and . > 0' >/dev/null 2>&1; then
+        echo "sync-linear-issues: issueCount=$ISSUE_COUNT (non-fatal warning)" >&2
+      fi
+      printf '%s\n' "$SYNC_OUT"
+
+  - id: linear-plan-commit
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-plan-commit" "${audio_debug}"
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --issue-id "${linear_issue_id}" \
+        --type plan \
+        --title "Phase: Commit & PR" \
+        --body "Committing generated artifacts and opening PR" || true
+
+  - id: commit-outputs
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+      CTO_GENERATE_SCALE_TASKS_OUT: $generate-scale-tasks.stdout
+      CTO_GENERATE_SECURITY_REPORT_OUT: $generate-security-report.stdout
+      CTO_GENERATE_REMEDIATION_TASKS_OUT: $generate-remediation-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "commit-outputs" "${audio_debug}"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
+      printf '%s' "$CTO_GENERATE_SCALE_TASKS_OUT" > .tasks/docs/scale-tasks.json
+      printf '%s' "$CTO_GENERATE_SECURITY_REPORT_OUT" > .tasks/docs/security-report.json
+      printf '%s' "$CTO_GENERATE_REMEDIATION_TASKS_OUT" > .tasks/docs/remediation-tasks.json
+      REFINEMENT_WARNING=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].warning' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      VERDICT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].verdict' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      REVISION_COUNT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].revision_count' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      git config user.email "morgan@5dlabs.io"
+      git config user.name "Morgan (Intake Agent)"
+      BRANCH_NAME="intake/${project_name}-$(date +%Y%m%d-%H%M%S)"
+      git checkout -b "$BRANCH_NAME" || {
+        echo "commit-outputs: branch $BRANCH_NAME already exists or checkout failed — using current branch" >&2
+        BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD)"
+      }
+      git add .tasks/
+      git add .tasks/design/ 2>/dev/null || true
+      if git diff --staged --quiet 2>/dev/null; then
+        echo "commit-outputs: no staged changes to commit" >&2
+      else
+        git diff --staged --stat
+        git commit -m "feat(intake): generated ${TASK_COUNT} tasks for ${project_name}
+
+      Generated by Morgan intake pipeline (Lobster). - design-brief.md: resolved decisions and architecture overview - tasks/: expanded task breakdown with subtask prompts - docs/: task documentation and per-agent prompts - Vote verdict: ${VERDICT} (after ${REVISION_COUNT} revision(s))" || echo "commit-outputs: git commit failed (non-fatal)" >&2
+      fi
+
+  - id: create-pr
+    env:
+      CTO_REFINE_TASKS_OUT: $refine-tasks.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "create-pr" "${audio_debug}"
+      source "$root/scripts/scm-dispatch.sh"
+      EXP=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].expanded_tasks' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      TASK_COUNT=$(printf '%s' "$EXP" | jq 'length')
+      VERDICT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].verdict' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      REVISION_COUNT=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].revision_count' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      WARNING=$(printf '%s' "$CTO_REFINE_TASKS_OUT" | jq -c '.output[0].warning' 2>/dev/null || printf '%s' "$CTO_REFINE_TASKS_OUT")
+      BRANCH=$(git rev-parse --abbrev-ref HEAD)
+      git push origin "$BRANCH"
+      PR_PATTERN=$(scm_pr_url_pattern)
+      case "$SCM_PROVIDER" in
+        github)
+          PR_CREATE_OUT="$(gh pr create \
+            --title "feat(intake): ${project_name} task breakdown" \
+            --body "## Intake Pipeline Output
 
       This PR was generated automatically by the Morgan intake pipeline.
-
-      ### What's included
-      - \`.tasks/docs/design-brief.md\` — Architecture decisions from Optimist vs Pessimist deliberation
-      - \`.tasks/docs/task-*/\` — Expanded task descriptions with implementation guidance
-      - Per-agent implementation prompts (\`prompt.md\`, \`prompt.xml\`, \`acceptance.md\`)
-
-      ### Process
-      1. PRD parsed into ${TASK_COUNT} tasks with agent routing
-      2. Complexity analyzed and subtasks expanded
-      3. 5-model committee voted on task quality — verdict: **${VERDICT}** (${REVISION_COUNT} revision round(s))
-      4. Documentation and prompts generated
-
+      ### What's included - \`.tasks/docs/design-brief.md\` — Architecture decisions from Optimist vs Pessimist deliberation - \`.tasks/docs/task-*/\` — Expanded task descriptions with implementation guidance - Per-agent implementation prompts (\`prompt.md\`, \`prompt.xml\`, \`acceptance.md\`)
+      ### Process 1. PRD parsed into ${TASK_COUNT} tasks with agent routing 2. Complexity analyzed and subtasks expanded 3. 5-model committee voted on task quality — verdict: **${VERDICT}** (${REVISION_COUNT} revision round(s)) 4. Documentation and prompts generated
       ${WARNING:+> **Note:** $WARNING}
-
-      <!-- intake-metadata: {{inputs.intake_metadata}} -->
-
+      <!-- intake-metadata: ${intake_metadata} -->
       _Review and merge to kick off implementation._" \
-        --base "{{inputs.pr_base_branch}}" \
-        --label "intake" 2>&1 | tee /tmp/pr-url.txt &&
-      cat /tmp/pr-url.txt
+            --base "${pr_base_branch}" \
+            --label "intake" 2>&1 || true)"
+          PR_URL="$(printf '%s' "$PR_CREATE_OUT" | rg -o "$PR_PATTERN" -m 1 || true)"
+          ;;
+        gitlab)
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          PR_CREATE_OUT="$(scm_create_pr "feat(intake): ${project_name} task breakdown" "Intake Pipeline Output - ${project_name}" "${pr_base_branch}" 2>&1 || true)"
+          PR_URL="$(printf '%s' "$PR_CREATE_OUT" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("web_url",""))' 2>/dev/null || printf '%s' "$PR_CREATE_OUT" | rg -o "$PR_PATTERN" -m 1 || true)"
+          ;;
+      esac
+      printf '%s\n' "$PR_CREATE_OUT" > /tmp/pr-url.txt
+      if [ -z "$PR_URL" ]; then
+        echo "create-pr: PR creation failed or returned no URL (non-fatal)" >&2
+        printf '%s\n' "$PR_CREATE_OUT" >&2
+        PR_URL="none"
+      fi
+      jq -nc --arg pr_url "$PR_URL" --arg branch "$BRANCH" '{pr_url: $pr_url, branch: $branch}'
 
-  - name: linear-activity-pr-created
-    when: "{{inputs.linear_session_id}}"
-    depends_on: [create-pr]
-    command: >
-      intake-util linear-activity
-        --session-id "{{inputs.linear_session_id}}"
-        --type thought
-        --title "PR Created"
-        --body "Pull request opened: ${{ steps.create-pr.output }}"
+  - id: verify-delivery-gates
+    env:
+      CTO_SYNC_LINEAR_ISSUES_OUT: $sync-linear-issues.stdout
+      CTO_CREATE_PR_OUT: $create-pr.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "verify-delivery-gates" "${audio_debug}"
+      ISSUE_COUNT="$(printf '%s' "$CTO_SYNC_LINEAR_ISSUES_OUT" | jq -r '.issueCount // 0' 2>/dev/null || echo 0)"
+      PR_URL="$(printf '%s' "$CTO_CREATE_PR_OUT" | jq -r '.pr_url // empty' 2>/dev/null || true)"
+      if [ -z "$PR_URL" ]; then
+        PR_URL="$(printf '%s' "$CTO_CREATE_PR_OUT" | rg -o 'https://github\\.com/[^[:space:]]+/pull/[0-9]+' -m 1 || true)"
+      fi
+      if ! printf '%s' "$ISSUE_COUNT" | jq -e 'type=="number" and . > 0' >/dev/null 2>&1; then
+        echo "verify-delivery-gates: Linear issues gate skipped (issueCount=$ISSUE_COUNT)" >&2
+      fi
+      if [ -z "$PR_URL" ]; then
+        echo "verify-delivery-gates: PR gate skipped (no PR URL — may need manual creation)" >&2
+        PR_URL="none"
+      fi
+      "$root/intake/scripts/workflow-gate-audio.sh" "intake" "delivery" "passed with ${ISSUE_COUNT} Linear issues and PR ${PR_URL}" "${audio_debug}" "normal" "project ${project_name}"
+      jq -nc --arg pr_url "$PR_URL" --argjson issue_count "$ISSUE_COUNT" '{pr_url: $pr_url, issue_count: $issue_count}'
 
-  - name: deregister-run
-    when: "{{inputs.run_id}}"
-    depends_on: [create-pr, sync-linear-issues]
-    command: >
-      intake-util deregister-run
-        --run-id "{{inputs.run_id}}"
-        --status completed
+  - id: linear-activity-pr-created
+    env:
+      CTO_CREATE_PR_OUT: $create-pr.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "linear-activity-pr-created" "${audio_debug}"
+      PR_URL="$(printf '%s' "$CTO_CREATE_PR_OUT" | jq -r '.pr_url // empty' 2>/dev/null || true)"
+      if [ -z "$PR_URL" ]; then
+        PR_URL="$(printf '%s' "$CTO_CREATE_PR_OUT" | rg -o 'https://github\\.com/[^[:space:]]+/pull/[0-9]+' -m 1 || true)"
+      fi
+      intake-util linear-activity \
+        --session-id "${linear_session_id}" \
+        --type thought \
+        --title "PR Created" \
+        --body "Pull request opened: ${PR_URL}" || true
 
-output_mappings:
-  task_count: ${{ steps.refine-tasks.outputs.expanded_tasks | jq 'length' }}
-  pr_url: ${{ steps.create-pr.output }}
-  vote_verdict: ${{ steps.refine-tasks.outputs.verdict }}
-  revision_count: ${{ steps.refine-tasks.outputs.revision_count }}
-  security_report: ${{ steps.generate-security-report.output }}
-  linear_issues: ${{ steps.sync-linear-issues.output }}
+  - id: write-handoff-summary
+    env:
+      CTO_VERIFY_ARTIFACT_GATES_OUT: $verify-artifact-gates.stdout
+      CTO_VERIFY_DELIVERY_GATES_OUT: $verify-delivery-gates.stdout
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "write-handoff-summary" "${audio_debug}"
+      mkdir -p "$root/.intake"
+      jq -nc \
+        --arg project_name "${project_name}" \
+        --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --arg decision_record_path ".tasks/docs/design-brief.md" \
+        --arg tasks_path ".tasks/tasks/tasks.json" \
+        --arg docs_path ".tasks/docs" \
+        --arg prompts_path ".tasks/docs" \
+        --arg workflows_path ".tasks/docs" \
+        --argjson artifacts "$(printf '%s' "$CTO_VERIFY_ARTIFACT_GATES_OUT" | jq -c '.' 2>/dev/null || printf '{}')" \
+        --argjson delivery "$(printf '%s' "$CTO_VERIFY_DELIVERY_GATES_OUT" | jq -c '.' 2>/dev/null || printf '{}')" \
+        '{
+          project_name: $project_name,
+          generated_at: $generated_at,
+          decision_record_path: $decision_record_path,
+          tasks_path: $tasks_path,
+          docs_path: $docs_path,
+          prompts_path: $prompts_path,
+          workflows_path: $workflows_path,
+          artifact_counts: {
+            task_count: ($artifacts.task_count // 0),
+            subtask_count: ($artifacts.subtask_count // 0),
+            decision_point_count: ($artifacts.decision_point_count // 0),
+            doc_count: ($artifacts.doc_count // 0),
+            prompt_count: ($artifacts.prompt_count // 0),
+            workflow_count: ($artifacts.workflow_count // 0)
+          },
+          delivery: {
+            issue_count: ($delivery.issue_count // 0),
+            pr_url: ($delivery.pr_url // "")
+          }
+        }' > "$root/.intake/intake-summary.json"
+      cat "$root/.intake/intake-summary.json"
+
+  - id: deregister-run
+    command: |
+      root="${WORKSPACE:-.}"
+      "$root/intake/scripts/workflow-step-audio.sh" "intake" "deregister-run" "${audio_debug}"
+      intake-util deregister-run \
+        --run-id "${run_id}" \
+        --status completed || echo "deregister-run: skipped (non-fatal)" >&2

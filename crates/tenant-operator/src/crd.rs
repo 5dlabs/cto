@@ -32,6 +32,14 @@ pub struct TenantSpec {
     #[serde(default)]
     pub github: Option<GitHubConfig>,
 
+    /// GitLab integration configuration (dual SCM support)
+    #[serde(default)]
+    pub gitlab: Option<GitLabConfig>,
+
+    /// Active SCM provider for this tenant
+    #[serde(default)]
+    pub scm_provider: Option<ScmProviderType>,
+
     /// AI provider configuration
     #[serde(default)]
     pub ai_provider: Option<AiProviderConfig>,
@@ -98,6 +106,46 @@ pub struct GitHubRepo {
     pub name: String,
     #[serde(default)]
     pub full_name: Option<String>,
+}
+
+/// SCM provider selection for the tenant
+#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ScmProviderType {
+    #[default]
+    GitHub,
+    GitLab,
+}
+
+/// GitLab integration configuration (dual SCM support)
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitLabConfig {
+    /// Self-hosted GitLab hostname (e.g., "git.5dlabs.ai")
+    #[serde(default = "default_gitlab_host")]
+    pub host: String,
+    /// GitLab group (namespace) for projects
+    pub group: String,
+    /// Reference to secret containing the GitLab PAT
+    #[serde(default)]
+    pub token_secret: Option<String>,
+    /// List of authorized GitLab projects
+    #[serde(default)]
+    pub projects: Vec<GitLabProject>,
+}
+
+fn default_gitlab_host() -> String {
+    "git.5dlabs.ai".to_string()
+}
+
+/// GitLab project reference
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitLabProject {
+    pub group: String,
+    pub name: String,
+    #[serde(default)]
+    pub path_with_namespace: Option<String>,
 }
 
 /// AI provider configuration

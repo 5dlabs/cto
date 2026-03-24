@@ -990,6 +990,7 @@ dependencies = [
  "regex",
  "reqwest 0.12.28",
  "schemars 0.8.22",
+ "scm",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2833,6 +2834,7 @@ dependencies = [
  "notify",
  "regex",
  "reqwest 0.12.28",
+ "scm",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -2841,6 +2843,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "urlencoding",
  "uuid",
 ]
 
@@ -5163,6 +5166,7 @@ dependencies = [
  "linear-sink",
  "regex",
  "reqwest 0.12.28",
+ "scm",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -6047,6 +6051,7 @@ dependencies = [
  "octocrab",
  "regex",
  "reqwest 0.12.28",
+ "scm",
  "scraper",
  "serde",
  "serde_json",
@@ -6387,6 +6392,20 @@ dependencies = [
  "quote",
  "serde_derive_internals",
  "syn 2.0.114",
+]
+
+[[package]]
+name = "scm"
+version = "0.2.51"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tracing",
+ "urlencoding",
 ]
 
 [[package]]

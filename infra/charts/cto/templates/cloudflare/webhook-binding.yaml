@@ -23,6 +23,27 @@ subjects:
       # The PM server handles this path via a route alias.
       path: {{ .Values.webhooks.exposure.path }}
       target: http://{{ include "cto.pm.fullname" . }}.{{ include "cto.namespace" . }}.svc:{{ .Values.pm.service.port }}
+{{- if and .Values.webhooks.exposure.gitlab.enabled .Values.webhooks.exposure.gitlab.host .Values.webhooks.exposure.gitlab.path }}
+---
+# TunnelBinding: GitLab Webhooks (PM /webhooks/gitlab/events)
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: gitlab-webhooks
+  namespace: {{ include "cto.namespace" . }}
+  labels:
+    {{- include "cto.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflare-binding
+tunnelRef:
+  kind: ClusterTunnel
+  name: {{ .Values.cloudflare.tunnel.name }}
+subjects:
+  - name: {{ include "cto.pm.fullname" . }}
+    spec:
+      fqdn: {{ .Values.webhooks.exposure.gitlab.host }}
+      path: {{ .Values.webhooks.exposure.gitlab.path }}
+      target: http://{{ include "cto.pm.fullname" . }}.{{ include "cto.namespace" . }}.svc:{{ .Values.pm.service.port }}
+{{- end }}
 {{- end }}
 
 
