@@ -44,7 +44,7 @@ shellexpand = "3"
 base64 = "0.22"
 
 # JWT generation for GitHub App auth
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 
 # Lazy static initialization
 lazy_static = "1"
