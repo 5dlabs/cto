@@ -823,7 +823,7 @@ dependencies = [
  "k8s-openapi",
  "opentelemetry 0.31.0",
  "regex",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "serial_test",
@@ -989,7 +989,7 @@ dependencies = [
  "pulldown-cmark 0.9.6",
  "regex",
  "reqwest 0.12.28",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "scm",
  "serde",
  "serde_json",
@@ -5423,7 +5423,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "itertools",
  "log",
  "multimap",
@@ -6931,7 +6931,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "proc-macro2",
  "quote",
  "syn 2.0.114",
@@ -7730,7 +7730,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82a72c767771b47409d2345987fda8628641887d5466101319899796367354a0"
 dependencies = [
  "fastrand",
- "getrandom 0.4.2",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -7745,7 +7745,7 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "reqwest 0.12.28",
- "schemars 0.8.22",
+ "schemars 1.2.1",
  "serde",
  "serde_json",
  "serde_yaml",
