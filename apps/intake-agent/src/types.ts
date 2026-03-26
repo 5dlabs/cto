@@ -1,7 +1,8 @@
 /**
  * Type definitions for the intake-agent JSON protocol.
- * Remaining operations: ping, prd_research, design_intake.
+ * Remaining operations: ping, prd_research, design_intake, design_variants.
  * All LLM-based operations are handled by Lobster llm-task steps.
+ * Deliberation-related interfaces below are retained as shared workflow types.
  */
 
 // =============================================================================
@@ -142,7 +143,7 @@ export interface ResearchMemos {
 }
 
 /**
- * Payload for the deliberate operation.
+ * Payload shape used by the deliberation workflow.
  */
 export type HumanReviewMode = 'full_auto' | 'semi_auto' | 'manual';
 

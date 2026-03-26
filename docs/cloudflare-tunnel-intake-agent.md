@@ -58,7 +58,7 @@ This routes ALL paths on `agents.5dlabs.ai` to linear-bridge on port 3100. Path-
 | `POST /notify` | Agent message → Linear comment |
 | `POST /elicitation` | Elicitation → Linear select signal |
 | `POST /elicitation/cancel` | Cancel pending elicitation (answered elsewhere) |
-| `POST /runs/{runId}/register` | Register run → {agent, sessionKey, issueId} |
+| `POST /runs/{runId}/register` | Register run → {agent, sessionKey, issueId, linearSessionId?, resumeToken?} |
 | `DELETE /runs/{runId}` | Deregister run |
 | `GET /health` | Health check |
 
@@ -114,7 +114,7 @@ From outside the cluster (your local machine):
 ```bash
 # Health check
 curl -s https://agents.5dlabs.ai/health
-# Expected: {"status":"ok"} or 200
+# Expected: {"status":"ok","service":"linear-bridge","runs":<number>} or 200
 
 # If linear-bridge isn't deployed yet, you'll get the fallback 404
 curl -s -o /dev/null -w "%{http_code}" https://agents.5dlabs.ai/health
@@ -189,6 +189,64 @@ The following secrets must exist in OpenBao at `secret/openclaw-linear`:
 | `LINEAR_WEBHOOK_SECRET` | Webhook signing secret (configured in Linear webhook settings) |
 
 These are pulled into the `openclaw-linear` Kubernetes secret by the ExternalSecret in `infra/manifests/linear-bridge/deployment.yaml`.
+
+## Runtime Configuration
+
+`linear-bridge` startup fails fast if required Linear config is missing.
+
+### Required environment variables
+
+| Variable | Required | Source / default | Notes |
+|----------|----------|------------------|-------|
+| `LINEAR_API_KEY` | Yes | ExternalSecret `openclaw-linear` | Workspace API key (`lin_api_*`) |
+| `LINEAR_TEAM_ID` | Yes | Deployment env | Default team for issue creation |
+
+### Optional environment variables
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `LINEAR_WEBHOOK_SECRET` | unset | If set, `/webhooks/linear` requires valid HMAC SHA256 signature (`Linear-Signature` or `X-Linear-Signature`) |
+| `LINEAR_DEFAULT_PROJECT_ID` | unset | Assigns ad-hoc created issues to this project |
+| `WEBHOOK_PORT` | `3100` | HTTP server port |
+| `AGENT_SESSIONS_ENABLED` | `true` | Enables session/elicitation handling and run/session GC |
+| `INACTIVITY_TIMEOUT_MS` | `3600000` | Session/run stale timeout |
+| `DISCORD_BRIDGE_URL` | `http://discord-bridge.bots.svc:3200` | Cross-cancel destination for elicitation flow |
+| `ACP_ACTIVITY_ENABLED` | `true` | Enables Loki poller that mirrors ACP logs to Linear activity stream |
+| `LOKI_URL` | `http://openclaw-observability-loki-gateway.openclaw.svc.cluster.local:80` | Loki query endpoint base URL |
+| `LOKI_ORG_ID` | `openclaw` | Sent as `X-Scope-OrgID` header |
+| `LOKI_POLL_INTERVAL_MS` | `2000` | Loki poll interval |
+
+## ACP Activity Stream (Loki -> Linear)
+
+When `ACP_ACTIVITY_ENABLED=true`, `linear-bridge` polls Loki and posts ACP dialog events into Linear agent session activity.
+
+- LogQL query: `{agent_id=~".+", source=~"acp-.*"} | json`
+- Correlation key: Loki `agent_id` label must match run registry `agentPod`
+- Target session: run entry must include `linearSessionId`
+- Skipped events: `type: "elicitation"` logs (handled by elicitation flow)
+
+If run callbacks/comments are working but agent activity stream is empty, verify:
+
+1. Run registration includes `agent` and `linearSessionId`.
+2. ACP logs in Loki include `agent_id` and `source=acp-*` labels.
+3. `LOKI_URL` and `LOKI_ORG_ID` are reachable/correct from `bots/linear-bridge`.
+
+## Quick API Validation
+
+Use these calls to validate runtime behavior directly:
+
+```bash
+# Health includes active run count
+curl -s http://linear-bridge.bots.svc:3100/health | jq
+
+# Register a run (include linearSessionId to enable Loki->Linear activity mapping)
+curl -s -X POST http://linear-bridge.bots.svc:3100/runs/test-run/register \
+  -H 'content-type: application/json' \
+  -d '{"agent":"agent-rex-123","sessionKey":"sess-1","issueId":"ISS-1","linearSessionId":"lin-sess-1"}'
+
+# Remove the run mapping
+curl -s -X DELETE http://linear-bridge.bots.svc:3100/runs/test-run
+```
 
 ## Architecture Diagram
 
