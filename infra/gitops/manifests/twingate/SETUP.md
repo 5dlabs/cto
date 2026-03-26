@@ -1,133 +1,96 @@
-# Twingate Setup Summary
+# Twingate Setup Runbook
 
-## ✅ Completed Setup
+This runbook reflects the current split deployment model:
 
-### 1. API Configuration
-- **API Key**: Stored in 1Password as "Twingate API Key"
-- **Subdomain**: `turquoiseelephant631`
-- **API Endpoint**: `https://turquoiseelephant631.twingate.com/api/graphql/`
+- Operator app: [`infra/gitops/applications/operators/twingate-operator.yaml`](../../applications/operators/twingate-operator.yaml)
+- Resource app: [`infra/gitops/applications/networking/twingate.yaml`](../../applications/networking/twingate.yaml)
+- Connector app: [`infra/gitops/applications/networking/twingate-connector.yaml`](../../applications/networking/twingate-connector.yaml)
 
-### 2. Remote Network
-- **Name**: Latitude
-- **ID**: `UmVtb3RlTmV0d29yazoyNzU4MDY=`
-- **Status**: ✅ Existing network found
+## 1. Seed OpenBao secrets
 
-### 3. Connector
-- **Name**: giga-octopus
-- **ID**: `Q29ubmVjdG9yOjcxOTEwMQ==`
-- **Status**: ✅ Using existing connector
-- **Tokens**: Generated via GraphQL API
-
-### 4. Resources
-- **Cluster Pod Network**: Created
-  - **Name**: Cluster Pod Network
-  - **ID**: `UmVzb3VyY2U6MzMwMDMyMw==`
-  - **Address**: `10.244.0.0/16` (wildcard for all pods)
-  - **Protocols**: TCP/UDP/ICMP - ALLOW_ALL
-
-### 5. Kubernetes Configuration
-
-#### ExternalSecrets
-- **twingate-api-secret** (operators namespace)
-  - Stores `TWINGATE_API_TOKEN` for the operator
-  - Source: OpenBao `secret/tools-twingate`
-  
-- **twingate-connector-tokens** (cto namespace)
-  - Stores `TWINGATE_CONNECTOR_ACCESS_TOKEN` and `TWINGATE_CONNECTOR_REFRESH_TOKEN`
-  - Source: OpenBao `secret/tools-twingate`
-
-#### Argo CD Applications
-- **twingate-operator** (`infra/gitops/applications/operators/twingate-operator.yaml`)
-  - Deploys Twingate Kubernetes Operator
-  - Uses CRDs for RemoteNetwork, Connector, Resource management
-  
-- **twingate-connector** (`infra/gitops/applications/networking/twingate-connector.yaml`)
-  - Deploys connector pods via Helm chart
-  - Uses official Twingate Helm chart: `twingate/connector`
-  - Configured with 2 replicas for HA
-
-## 📋 Next Steps
-
-### 1. Store Secrets in OpenBao
-
-Run the script to store all Twingate secrets in OpenBao:
+Store the required values under `secret/tools-twingate`.
 
 ```bash
-export TWINGATE_CONNECTOR_ACCESS_TOKEN="eyJhbGciOiJFUzI1NiIsImtpZCI6IjEzdjhMUncxSU9YZGJjeWlaSUFIU3Npa09LWTJhVHhJb2owWWFNUFBnUlEiLCJ0eXAiOiJEQVQifQ.eyJhdWRzIjpudWxsLCJudCI6IkFOIiwiYWlkIjoiNzE5MTAxIiwiZGlkIjoiMjkwNjYwMSIsInJudyI6MTc2OTUyNDE4NSwianRpIjoiMGRhNmJmMGItYWVkNi00MDYxLTk3M2QtMzI2NzY5MmQwNTUxIiwiaXNzIjoidHdpbmdhdGUiLCJhdWQiOiJ0dXJxdW9pc2VlbGVwaGFudDYzMSIsImV4cCI6MTc2OTUyNzU1OCwiaWF0IjoxNzY5NTIzOTU4LCJ2ZXIiOiI0IiwidGlkIjoiMTk0ODciLCJybmV0aWQiOiIyNzU4MDYifQ.bakIpXaJXH4_U9ycni7APtEPixqo7lX5WBOuM-0Z9ouX10wqaQuR7nRkhP2xT82D-P2hVuBG2vRs2C2Z2PTT_g"
-
-export TWINGATE_CONNECTOR_REFRESH_TOKEN="3WbvshI52qdDK1deYKKrz-j8jjXN9fGEXlXwlT-5yBE7HlAigYRCbfzBaRwc_GD0_C5Bb-8zrCnTXcU7uDuce5J9Ehp67aPxLd6safenr_lsEc09jiNRyyRPXoVwXnVU3Q3U3A"
-
-./scripts/store-twingate-secrets.sh
-```
-
-Or manually store in OpenBao:
-
-```bash
-# Get OpenBao root token
+# Get OpenBao root token from 1Password
 ROOT_TOKEN=$(op item get "OpenBao Unseal Keys - CTO Platform" --format=json | \
   jq -r '.fields[] | select(.label == "password" or .label == "Root Token") | .value')
 
-# Get API key from 1Password
-API_KEY=$(op item get "Twingate API Key" --fields credential --reveal)
+# Get Twingate API key
+TWINGATE_API_TOKEN=$(op item get "Twingate API Key" --fields credential --reveal)
 
-# Store in OpenBao
-kubectl exec -n openbao-system openbao-0 -- env BAO_TOKEN="$ROOT_TOKEN" \
+# Set connector tokens (from Twingate Admin or API)
+TWINGATE_CONNECTOR_ACCESS_TOKEN="<set-me>"
+TWINGATE_CONNECTOR_REFRESH_TOKEN="<set-me>"
+
+kubectl exec -n openbao openbao-0 -- env BAO_TOKEN="$ROOT_TOKEN" \
   bao kv put secret/tools-twingate \
-  TWINGATE_API_TOKEN="$API_KEY" \
+  TWINGATE_API_TOKEN="$TWINGATE_API_TOKEN" \
   TWINGATE_CONNECTOR_ACCESS_TOKEN="$TWINGATE_CONNECTOR_ACCESS_TOKEN" \
   TWINGATE_CONNECTOR_REFRESH_TOKEN="$TWINGATE_CONNECTOR_REFRESH_TOKEN"
 ```
 
-### 2. Deploy via Argo CD
+## 2. Confirm ExternalSecret sync
 
-The Argo CD applications will automatically sync once secrets are available:
+Expected Kubernetes secrets:
+
+- `operators/twingate-api-secret` with key `apiToken`
+- `cto/twingate-connector-tokens` with keys `TWINGATE_ACCESS_TOKEN`, `TWINGATE_REFRESH_TOKEN`
 
 ```bash
-# Check operator status
-kubectl get application twingate-operator -n argocd
-
-# Check connector status
-kubectl get application twingate-connector -n argocd
-
-# Check connector pods
-kubectl get pods -n cto -l app.kubernetes.io/name=twingate-connector
-```
-
-### 3. Verify Access
-
-Once deployed, Twingate clients can access:
-- **Pod Network**: `10.244.0.0/16` (all pods in the cluster)
-- **Services**: Via pod network access
-
-## 🔧 Troubleshooting
-
-### Check Connector Status
-```bash
-# View connector logs
-kubectl logs -n cto -l app.kubernetes.io/name=twingate-connector --tail=100
-
-# Check ExternalSecret sync status
+kubectl get externalsecret twingate-api-secret -n operators
 kubectl get externalsecret twingate-connector-tokens -n cto
-kubectl describe externalsecret twingate-connector-tokens -n cto
+kubectl get secret twingate-api-secret -n operators
+kubectl get secret twingate-connector-tokens -n cto
 ```
 
-### Regenerate Connector Tokens
-If tokens expire, regenerate via GraphQL API:
+## 3. Sync and verify Argo CD apps
 
 ```bash
-export TWINGATE_API_KEY=$(op item get "Twingate API Key" --fields credential --reveal)
-export TWINGATE_SUBDOMAIN=turquoiseelephant631
-
-curl -s "https://${TWINGATE_SUBDOMAIN}.twingate.com/api/graphql/" \
-  -H "Content-Type: application/json" \
-  -H "X-API-KEY: ${TWINGATE_API_KEY}" \
-  -d '{"query":"mutation { connectorGenerateTokens(connectorId: \"Q29ubmVjdG9yOjcxOTEwMQ==\") { connectorTokens { accessToken refreshToken } ok error } }"}' | jq .
+kubectl get application twingate-operator -n argocd
+kubectl get application twingate -n argocd
+kubectl get application twingate-connector -n argocd
 ```
 
-Then update OpenBao with new tokens.
+If an app is not healthy/synced, trigger sync:
 
-## 📚 References
+```bash
+argocd app sync twingate-operator
+argocd app sync twingate
+argocd app sync twingate-connector
+```
 
-- [Twingate API Documentation](https://www.twingate.com/docs/api-overview)
-- [Twingate Helm Chart](https://github.com/Twingate/helm-charts)
-- [Twingate Kubernetes Operator](https://github.com/Twingate/kubernetes-operator)
+## 4. Validate runtime state
+
+```bash
+# Operator resources
+kubectl get twingateresource -n operators
+kubectl get twingateresourceaccess -n operators
+
+# Connector pods
+kubectl get pods -n cto -l app.kubernetes.io/name=twingate-connector
+
+# Operator logs
+kubectl logs -n operators -l app.kubernetes.io/name=twingate-operator --tail=100
+```
+
+## Troubleshooting
+
+### Argo `OutOfSync` on Twingate CRDs
+
+The operator app intentionally ignores normalized CRD fields (`twingateresourceaccesses.twingate.com`) via `ignoreDifferences`. Confirm the ignore list still exists in [`infra/gitops/applications/operators/twingate-operator.yaml`](../../applications/operators/twingate-operator.yaml).
+
+### `twingate-connector` pods CrashLoop
+
+1. Check token secret keys and values in `cto/twingate-connector-tokens`.
+2. Verify connector network slug in `twingate-connector.yaml` (`connector.network`).
+3. Check pod logs:
+
+```bash
+kubectl logs -n cto -l app.kubernetes.io/name=twingate-connector --tail=200
+```
+
+### Resources exist but users cannot reach services
+
+1. Verify `principalId` values in `*-access.yaml` map to the intended Twingate group.
+2. Verify resource addresses/CIDRs match the cluster networking (`10.42.0.0/16` pods, `10.43.0.0/16` services).
+3. Confirm users are in the group referenced by `principalId`.
