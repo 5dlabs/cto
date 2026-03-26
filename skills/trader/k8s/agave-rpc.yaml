@@ -79,9 +79,9 @@ spec:
                 echo "Yellowstone gRPC plugin found."
                 ls -la /opt/yellowstone/lib/
               else
-                echo "WARNING: Yellowstone gRPC plugin not found at /opt/yellowstone/lib/"
-                echo "Validator will start without geyser plugin."
-                mkdir -p /opt/yellowstone/lib
+                echo "ERROR: Yellowstone gRPC plugin not found at /opt/yellowstone/lib/"
+                echo "Agave validator is configured with --geyser-plugin-config and cannot start without the plugin .so."
+                exit 1
               fi
           volumeMounts:
             - name: yellowstone-plugin
